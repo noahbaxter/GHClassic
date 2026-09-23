@@ -46,6 +46,13 @@ if [ "$RECOMP" = 1 ]; then
   # at output/ beside it. Both are verbose, so their output goes to logs.
   "$TOOLS/ps2xAnalyzer/ps2_analyzer" "$RECOMP_DIR/gh2.elf" "$RECOMP_DIR/gh2.toml" \
     > "$RECOMP_DIR/analyzer.log" 2>&1 || { tail -20 "$RECOMP_DIR/analyzer.log"; exit 1; }
+
+  # The denylist goes into [general], the first table in the analyzer's output.
+  DENY="$(grep -v -e '^#' -e '^$' "$ROOT/config/stub-denylist.txt" | sed 's/.*/"&"/' | paste -sd, -)"
+  awk -v deny="stub_denylist = [$DENY]" '{ print } /^\[general\]$/ { print deny }' \
+    "$RECOMP_DIR/gh2.toml" > "$RECOMP_DIR/gh2.toml.tmp"
+  mv "$RECOMP_DIR/gh2.toml.tmp" "$RECOMP_DIR/gh2.toml"
+
   "$TOOLS/ps2xRecomp/ps2_recomp" "$RECOMP_DIR/gh2.toml" > "$RECOMP_DIR/recomp.log" 2>&1 ||
     { tail -20 "$RECOMP_DIR/recomp.log"; exit 1; }
   echo "generated $(find "$RECOMP_DIR/output" -name '*.cpp' | wc -l | tr -d ' ') files"
