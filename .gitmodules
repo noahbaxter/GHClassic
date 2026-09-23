@@ -1,0 +1,4 @@
+[submodule "lib/PS2Recomp"]
+	path = lib/PS2Recomp
+	url = https://github.com/noahbaxter/PS2Recomp.git
+	branch = ghrecomp
