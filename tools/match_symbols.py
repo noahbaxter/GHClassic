@@ -17,7 +17,10 @@ scored on instruction similarity and on agreement between their named call
 targets. Each round names more call targets, so it repeats until nothing new
 resolves.
 
-    tools/match_symbols.py [--check] <debug.elf> <retail.elf-or-disc> [out.tsv]
+    tools/match_symbols.py [--check] <debug.elf> <retail.elf-or-disc> [out.symbols]
+
+The symbols file is committed as config/<game>-retail.symbols, since users do
+not have the debug ELF to regenerate it.
 
 --check measures the map against evidence the matcher never scores on:
 string literals each pair references, and a holdout that hides known exact
@@ -96,11 +99,17 @@ def debug_functions(data, sections, headers, name_at):
     return sorted((addr, name, size) for addr, (name, size) in by_addr.items())
 
 
-def retail_function_starts(code):
-    """Addresses that begin a function: every jal target, and every stack-frame
-    prologue that follows a return."""
+def entry_point(data):
+    return struct.unpack_from("<I", data, 0x18)[0]
+
+
+def retail_function_starts(code, entry):
+    """Addresses that begin a function: the ELF entry point, every jal target,
+    and every stack-frame prologue that follows a return. The entry needs
+    naming outright: nothing calls _start, and the function before it in GH2
+    is the main loop, which never returns."""
     addrs = {a for a, _ in code}
-    starts = {(w & 0x3FFFFFF) << 2 for _, w in code if w >> 26 == JAL}
+    starts = {entry} | {(w & 0x3FFFFFF) << 2 for _, w in code if w >> 26 == JAL}
     for i in range(len(code) - 2):
         if code[i][1] != JR_RA:
             continue
@@ -179,7 +188,7 @@ class Matcher:
         self.r_raw = [w for _, w in r_code]
         self.r_mask = [mask(w) for w in self.r_raw]
         self.r_pos = {a: i for i, a in enumerate(self.r_addr)}
-        self.r_starts = retail_function_starts(r_code)
+        self.r_starts = retail_function_starts(r_code, entry_point(r_data))
 
         self.results = {}  # debug addr -> (status, retail addr or None, score)
 
@@ -319,13 +328,19 @@ def report(m, rounds):
     print(f"fuzzy rounds: {rounds}, retail function starts found: {len(m.r_starts)}")
 
 
-def write_map(m, path):
+def write_symbols(m, path):
+    """The retail symbols file symbolize.py reads: one `address name` per line.
+
+    Byte-identical helpers (type info, template destructors) can put several
+    debug names on one retail address; the first in debug link order wins."""
+    named = {}
+    for a, name, _ in m.funcs:
+        r = m.results[a][1]
+        if r is not None:
+            named.setdefault(r, name)
     with open(path, "w") as f:
-        f.write("# debug_addr\tretail_addr\tsize\tstatus\tscore\tname\n")
-        for addr, name, size in m.funcs:
-            status, r, score = m.results[addr]
-            retail = f"{r:08x}" if r is not None else "-"
-            f.write(f"{addr:08x}\t{retail}\t{size}\t{status}\t{score:.2f}\t{name}\n")
+        f.write("# Retail function names, from tools/match_symbols.py. Regenerate, do not edit.\n")
+        f.writelines(f"{r:08x} {named[r]}\n" for r in sorted(named))
 
 
 def load_elf(path):
@@ -399,7 +414,7 @@ def main():
     if "--check" in sys.argv:
         check(m)
     if len(args) > 2:
-        write_map(m, args[2])
+        write_symbols(m, args[2])
 
 
 if __name__ == "__main__":

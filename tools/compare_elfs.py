@@ -14,7 +14,6 @@ figures involving a stripped ELF are lower bounds. Functions under four
 instructions are left out as too generic to mean anything.
 """
 import hashlib
-import struct
 import sys
 
 import disc
@@ -25,13 +24,13 @@ MIN_WORDS = 4
 
 def profile(label, data):
     elf, sections, headers, name_at = ms.parse_elf(data)
-    entry, = struct.unpack_from("<I", data, 0x18)
+    entry = ms.entry_point(data)
     code = ms.code_words(data, sections)
     words = dict(code)
     if ".symtab" in sections:
         funcs = [(a, s) for a, _, s in ms.debug_functions(data, sections, headers, name_at)]
     else:
-        starts = ms.retail_function_starts(code)
+        starts = ms.retail_function_starts(code, entry)
         end = code[-1][0] + 4
         funcs = [(a, b - a) for a, b in zip(starts, starts[1:] + [end])]
 
