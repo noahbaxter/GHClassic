@@ -3,6 +3,9 @@
 
     tools/disc.py identify [--image-hash] <image-or-elf>...
     tools/disc.py extract <image> <path-on-disc> <out>
+    tools/disc.py find <serial> <path>...    print the first image of that release
+    tools/disc.py boot-elf <image> <out>     extract the boot executable, refusing
+                                             anything but a known supported one
 
 Images are .iso or .bin (ISO 9660, cooked or raw sectors) or .chd, read in
 place through libchdr from lib/libchdr, which is built into build/chdr on
@@ -248,8 +251,9 @@ def identify(paths, image_hash=False):
             with Image(path) as img:
                 rel = release(img.boot_name())
             if rel:
-                support = "supported" if rel.get("supported") else "not supported yet"
-                print(f"{Path(path).name}: {rel['name']} v{rel['version']}, {support}")
+                role = {"engine": "engine disc", "content": "content disc"}.get(
+                    rel.get("role"), "not supported yet")
+                print(f"{Path(path).name}: {rel['name']} v{rel['version']}, {role}")
             else:
                 print(f"{Path(path).name}: not a known Guitar Hero release")
         for label, data in executables_in(path):
@@ -273,8 +277,34 @@ def main():
     elif args[:1] == ["extract"] and len(args) == 4:
         with Image(args[1]) as img:
             Path(args[3]).write_bytes(img.read(args[2]))
+    elif args[:1] == ["find"] and len(args) >= 3:
+        for path in (p for p in args[2:] if is_image(p)):
+            with Image(path) as img:
+                rel = release(img.boot_name())
+            if rel and rel["serial"] == args[1]:
+                print(path)
+                return
+        sys.exit(f"no {args[1]} image among the given paths")
+    elif args[:1] == ["boot-elf"] and len(args) == 3:
+        boot_elf(args[1], args[2])
     else:
         sys.exit(__doc__)
+
+
+def boot_elf(image, out):
+    with Image(image) as img:
+        name = img.boot_name()
+        data = img.read(name)
+    rel = release(name)
+    if not rel or rel.get("role") != "engine":
+        what = f"{rel['name']} v{rel['version']}" if rel else name
+        sys.exit(f"{image}: {what} is not the engine disc (Guitar Hero II (USA))")
+    sha1 = hashlib.sha1(data).hexdigest()
+    if not lookup(sha1):
+        sys.exit(f"{image}: {name} has SHA-1 {sha1}, not the known retail executable; "
+                 "the dump may be damaged or modified")
+    Path(out).write_bytes(data)
+    print(f"{rel['name']} v{rel['version']}: {name}")
 
 
 if __name__ == "__main__":

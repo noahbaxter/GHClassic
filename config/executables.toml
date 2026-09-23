@@ -26,14 +26,15 @@ data_sha1 = "8ef0d0a6e90d46c64a553590ffc27c6e2a2bc447"
 
 # Every Milo-engine release Redump lists (GH1, GH2, 80s; GH3 onward is a
 # different engine). Recognised by the serial in the boot executable's name,
-# so a disc we cannot build from still gets named. Each is a separate compile
-# with its own addresses; only the USA retail discs are supported.
+# so a disc we cannot use still gets named. Each is a separate compile with
+# its own addresses. role: "engine" is recompiled (required), "content" adds
+# its songs and venues; a release with no role is not supported.
 
 [[release]]
 serial = "SLUS-21224"
 name = "Guitar Hero (USA)"
 version = "1.00"
-supported = true
+role = "content"
 
 [[release]]
 serial = "SLES-54093"
@@ -54,7 +55,7 @@ version = "1.00"
 serial = "SLUS-21447"
 name = "Guitar Hero II (USA)"
 version = "1.00"
-supported = true
+role = "engine"
 
 [[release]]
 serial = "SLES-54442"
@@ -75,7 +76,7 @@ version = "1.00"
 serial = "SLUS-21586"
 name = "Guitar Hero Encore: Rocks the 80s (USA)"
 version = "1.00"
-supported = true
+role = "content"
 
 [[release]]
 serial = "SLES-54859"
