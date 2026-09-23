@@ -30,7 +30,7 @@ def profile(label, data):
     if ".symtab" in sections:
         funcs = [(a, s) for a, _, s in ms.debug_functions(data, sections, headers, name_at)]
     else:
-        starts = ms.retail_function_starts(code, entry)
+        starts = ms.retail_function_starts(data, sections, code)
         end = code[-1][0] + 4
         funcs = [(a, b - a) for a, b in zip(starts, starts[1:] + [end])]
 

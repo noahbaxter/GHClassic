@@ -37,7 +37,7 @@ def symbolize(elf, names):
     if ".symtab" in sections:
         raise ValueError("ELF already has a symbol table")
     code = ms.code_words(data, sections)
-    starts = sorted(set(names) | set(ms.retail_function_starts(code, ms.entry_point(data))))
+    starts = sorted(set(names) | set(ms.retail_function_starts(data, sections, code)))
 
     # Section index and end for each code section, to bound the last function.
     section_of = []

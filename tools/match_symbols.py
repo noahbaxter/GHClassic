@@ -103,22 +103,58 @@ def entry_point(data):
     return struct.unpack_from("<I", data, 0x18)[0]
 
 
-def retail_function_starts(code, entry):
+def data_code_refs(data, sections, addrs):
+    """Code addresses held in .data, as two sets.
+
+    vtable: the function word of a gcc 2 vtable entry, which is 8 bytes, a
+    zero delta word then the function at +4. Always a function start.
+    table: any code address after a zero or another code address, which also
+    takes in callback tables. A function start only right after a return.
+
+    Jump tables live in .rodata and point inside functions, so it is left
+    out, as are code-range values among plain integers (unwind records,
+    constants like 0x400000)."""
+    if ".data" not in sections:
+        return set(), set()
+    _, _, _, base, off, size, *_ = sections[".data"]
+    words = struct.unpack_from(f"<{size // 4}I", data, off)
+    vtable, table = set(), set()
+    for i in range(1, len(words)):
+        w, prev = words[i], words[i - 1]
+        if w not in addrs:
+            continue
+        if prev == 0 and (base + 4 * i) % 8 == 4:
+            vtable.add(w)
+        if prev == 0 or prev in addrs:
+            table.add(w)
+    return vtable, table
+
+
+def retail_function_starts(data, sections, code):
     """Addresses that begin a function: the ELF entry point, every jal target,
-    and every stack-frame prologue that follows a return. The entry needs
-    naming outright: nothing calls _start, and the function before it in GH2
-    is the main loop, which never returns."""
+    every vtable entry, and whatever follows a return that is a stack-frame
+    prologue or a table entry. The entry needs naming outright: nothing calls
+    _start, and the function before it in GH2 is the main loop, which never
+    returns. Vtable entries catch leaf virtuals like AsyncFile::Fail, two
+    instructions with no prologue that nothing calls directly; they need no
+    return before them because filler between functions is not always nops.
+    Checked against the GH1, GH2 and 80s debug symbol tables, neither data
+    rule adds a false start."""
     addrs = {a for a, _ in code}
-    starts = {entry} | {(w & 0x3FFFFFF) << 2 for _, w in code if w >> 26 == JAL}
+    vtable, refs = data_code_refs(data, sections, addrs)
+    starts = {entry_point(data)} | vtable | {(w & 0x3FFFFFF) << 2 for _, w in code if w >> 26 == JAL}
     for i in range(len(code) - 2):
         if code[i][1] != JR_RA:
             continue
         j = i + 2  # past the delay slot
         while j < len(code) and code[j][1] == NOP:
             j += 1
+        if j == len(code):
+            continue
+        a, w = code[j]
         # addiu $sp, $sp, -N
-        if j < len(code) and code[j][1] >> 16 == 0x27BD and code[j][1] & 0x8000:
-            starts.add(code[j][0])
+        if (w >> 16 == 0x27BD and w & 0x8000) or a in refs:
+            starts.add(a)
     return sorted(s for s in starts if s in addrs)
 
 
@@ -188,7 +224,7 @@ class Matcher:
         self.r_raw = [w for _, w in r_code]
         self.r_mask = [mask(w) for w in self.r_raw]
         self.r_pos = {a: i for i, a in enumerate(self.r_addr)}
-        self.r_starts = retail_function_starts(r_code, entry_point(r_data))
+        self.r_starts = retail_function_starts(r_data, r_secs, r_code)
 
         self.results = {}  # debug addr -> (status, retail addr or None, score)
 
