@@ -2,3 +2,6 @@
 	path = lib/PS2Recomp
 	url = https://github.com/noahbaxter/PS2Recomp.git
 	branch = ghrecomp
+[submodule "lib/libchdr"]
+	path = lib/libchdr
+	url = https://github.com/rtissera/libchdr.git

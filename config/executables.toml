@@ -1,0 +1,175 @@
+# Known GH executables and discs, identified by SHA-1.
+#
+# executable.sha1 is the boot ELF, which is what the recompile depends on.
+# disc.data_sha1 hashes the data track's 2048-byte sectors
+# (`tools/disc.py identify --image-hash`), which is exactly Redump's SHA-1.
+# The three retail discs match Redump's published values.
+
+[[disc]]
+name = "Guitar Hero (USA)"
+data_sha1 = "4caacaea582c79605f8c3582dd4b90abdec699f5"
+redump = "http://redump.org/disc/699/"
+
+[[disc]]
+name = "Guitar Hero II (USA)"
+data_sha1 = "e1a3a81827aa4264984b4f3678de58ca3d881528"
+redump = "http://redump.org/disc/627/"
+
+[[disc]]
+name = "Guitar Hero Encore - Rocks the 80s (USA)"
+data_sha1 = "184f2dc9993d9b1e6edf0125f68e1ce07742567a"
+redump = "http://forum.redump.org/post/131232/"
+
+[[disc]]
+name = "Guitar Hero II Deluxe 2.0"
+data_sha1 = "8ef0d0a6e90d46c64a553590ffc27c6e2a2bc447"
+
+# Every Milo-engine release Redump lists (GH1, GH2, 80s; GH3 onward is a
+# different engine). Recognised by the serial in the boot executable's name,
+# so a disc we cannot use still gets named. Each is a separate compile with
+# its own addresses. role: "engine" is recompiled (required), "content" adds
+# its songs and venues; a release with no role is not supported.
+
+[[release]]
+serial = "SLUS-21224"
+name = "Guitar Hero (USA)"
+version = "1.00"
+role = "content"
+
+[[release]]
+serial = "SLES-54093"
+name = "Guitar Hero (Europe)"
+version = "1.00"
+
+[[release]]
+serial = "SLES-54132"
+name = "Guitar Hero (Europe, Australia)"
+version = "1.00"
+
+[[release]]
+serial = "SLUS-29177"
+name = "Guitar Hero (USA) (Demo)"
+version = "1.00"
+
+[[release]]
+serial = "SLUS-21447"
+name = "Guitar Hero II (USA)"
+version = "1.00"
+role = "engine"
+
+[[release]]
+serial = "SLES-54442"
+name = "Guitar Hero II (Europe, Australia)"
+version = "1.01"
+
+[[release]]
+serial = "SLUS-29198"
+name = "Guitar Hero II (USA) (Demo)"
+version = "1.01"
+
+[[release]]
+serial = "SLED-54509"
+name = "Guitar Hero II (Europe) (Demo)"
+version = "1.00"
+
+[[release]]
+serial = "SLUS-21586"
+name = "Guitar Hero Encore: Rocks the 80s (USA)"
+version = "1.00"
+role = "content"
+
+[[release]]
+serial = "SLES-54859"
+name = "Guitar Hero: Rocks the 80s (Europe, Australia)"
+version = "1.00"
+
+[[release]]
+serial = "SLES-54860"
+name = "Guitar Hero: Rocks the 80s (Europe)"
+version = "1.01"
+
+# Retail, from the discs above.
+
+[[executable]]
+name = "GH1 retail"
+file = "SLUS_212.24"
+sha1 = "8f1e036852e466b0a6614d633c9c3beab4d060ce"
+
+[[executable]]
+name = "GH2 retail"
+file = "SLUS_214.47"
+sha1 = "aea7bbb01eb6e56056c3a33771ed046090d39168"
+
+[[executable]]
+name = "80s retail"
+file = "SLUS_215.86"
+sha1 = "3b53114bc65731b96e4a123c2c15496eec8eaca8"
+
+# Debug builds from Project Deluge (2021). Not on any retail disc.
+
+[[executable]]
+name = "GH1 debug"
+file = "SLUS_212.24"
+sha1 = "edd9f972f355e1a6b4ed003cac4ecbf6a5f81e60"
+
+[[executable]]
+name = "GH2 debug"
+file = "SLUS_214.47"
+sha1 = "29624b902a43aac5afcfcc5fa44675aafb0a10ab"
+
+[[executable]]
+name = "80s debug"
+file = "SLUS_215.86"
+sha1 = "c30b031bfe3828b8936a1c3dd4a5f6a58e2a0db4"
+
+# Guitar Hero II Deluxe 2.0, all on the one disc.
+
+[[executable]]
+name = "DX loader"
+file = "GHCE_000.01"
+sha1 = "9c9b15264e57ce1c6a359f2111b63a83696f867a"
+
+[[executable]]
+name = "DX GH2"
+file = "GH2DX.ELF"
+sha1 = "7c0e5aa078e3f9801b32c7bdecf38187acfff054"
+
+[[executable]]
+name = "DX 80s"
+file = "GH80SDX.ELF"
+sha1 = "651161ea7d1d0eee3e874387b82d88a9f7d0b6ad"
+
+[[executable]]
+name = "DX GH1 Redux"
+file = "GH1RDX.ELF"
+sha1 = "fea1c7c375e59e6ec314e177635d4462f268e15c"
+
+[[executable]]
+name = "DX Mega"
+file = "GHMEGADX.ELF"
+sha1 = "e90c44a35fec012728f8d9a7dbb456bc9899bf69"
+
+[[executable]]
+name = "DX Custom"
+file = "CUSTOMDX.ELF"
+sha1 = "949806fd96daa51b4a5fef342e11b2aa92a5ae63"
+
+[[executable]]
+name = "DX Drums"
+file = "DRUMDX.ELF"
+sha1 = "8a23bce71f670b56312a730e85bec7e7d0ccdc0a"
+
+[[executable]]
+name = "DX Extra"
+file = "GHEXTRA.ELF"
+sha1 = "0cbb8e7539fbd22bca934831c7beaba0ae985775"
+
+[[executable]]
+name = "DX GH2 debug"
+file = "GH2DEBUG.ELF"
+sha1 = "6a34c2999a400989e7b4027081d55d8b9cc3a3c1"
+
+[[executable]]
+name = "DX 80s debug"
+file = "80SDEBUG.ELF"
+sha1 = "87aafdc5efb9e0d4244787d0b89c22087adda77c"
