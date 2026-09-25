@@ -130,18 +130,45 @@ def data_code_refs(data, sections, addrs):
     return vtable, table
 
 
+def code_built_refs(code, addrs, window=8):
+    """Code addresses built in code by `lui rX, hi` then `addiu/ori rY, rX, lo`
+    within a few instructions: function pointers passed as arguments, like a
+    qsort comparator."""
+    stores = {0x28, 0x29, 0x2B, 0x3F}  # sb, sh, sw, sd leave rt unchanged
+    out = set()
+    for i, (_, w) in enumerate(code):
+        if w >> 26 != LUI:
+            continue
+        base, hi = (w >> 16) & 31, (w & 0xFFFF) << 16
+        for _, w2 in code[i + 1:i + 1 + window]:
+            op, rs, rt = w2 >> 26, (w2 >> 21) & 31, (w2 >> 16) & 31
+            if op in (0x09, 0x0D) and rs == base:  # addiu, ori
+                lo = w2 & 0xFFFF
+                if op == 0x09 and lo & 0x8000:
+                    lo -= 0x10000
+                target = (hi + lo) & 0xFFFFFFFF
+                if target in addrs:
+                    out.add(target)
+                break
+            if rt == base and op not in stores:
+                break
+    return out
+
+
 def retail_function_starts(data, sections, code):
     """Addresses that begin a function: the ELF entry point, every jal target,
     every vtable entry, and whatever follows a return that is a stack-frame
-    prologue or a table entry. The entry needs naming outright: nothing calls
-    _start, and the function before it in GH2 is the main loop, which never
-    returns. Vtable entries catch leaf virtuals like AsyncFile::Fail, two
-    instructions with no prologue that nothing calls directly; they need no
-    return before them because filler between functions is not always nops.
-    Checked against the GH1, GH2 and 80s debug symbol tables, neither data
-    rule adds a false start."""
+    prologue, a table entry or an address built in code. The entry needs
+    naming outright: nothing calls _start, and the function before it in GH2
+    is the main loop, which never returns. Vtable entries catch leaf virtuals
+    like AsyncFile::Fail, two instructions with no prologue that nothing calls
+    directly; they need no return before them because filler between
+    functions is not always nops. Built addresses catch callbacks like
+    DataArray::Sort's qsort comparator. Checked against the GH1, GH2 and 80s
+    debug symbol tables, none of these rules adds a false start."""
     addrs = {a for a, _ in code}
     vtable, refs = data_code_refs(data, sections, addrs)
+    refs |= code_built_refs(code, addrs)
     starts = {entry_point(data)} | vtable | {(w & 0x3FFFFFF) << 2 for _, w in code if w >> 26 == JAL}
     for i in range(len(code) - 2):
         if code[i][1] != JR_RA:
