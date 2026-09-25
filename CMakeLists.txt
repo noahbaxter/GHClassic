@@ -24,6 +24,11 @@ set(PS2X_BUILD_TEST OFF CACHE BOOL "" FORCE)
 set(PS2X_BUILD_STUDIO OFF CACHE BOOL "" FORCE)
 set(PS2X_ENABLE_DEBUG_UI OFF CACHE BOOL "" FORCE)
 
+# The runtime reads .chd images when chdr-static exists, so libchdr comes
+# first. EXCLUDE_FROM_ALL builds only the static library it links.
+set(CHDR_WANT_TESTS OFF CACHE BOOL "" FORCE)
+add_subdirectory(lib/libchdr EXCLUDE_FROM_ALL)
+
 # EXCLUDE_FROM_ALL keeps upstream's own ps2EntryRunner out of the default
 # build, leaving ghrecomp and what it links.
 add_subdirectory(lib/PS2Recomp EXCLUDE_FROM_ALL)
