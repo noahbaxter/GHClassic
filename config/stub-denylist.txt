@@ -1,0 +1,11 @@
+# Functions that keep their recompiled body instead of binding to the runtime
+# handler of the same name. The ELF is symbolized and GH2 links Sony's
+# libraries statically, so a name match swaps real code for a generic handler.
+# One name per line, each under its reason.
+
+# libscf. Takes no arguments: reads rom0:ROMVER into its own static buffer and
+# returns a pointer to it, and IsT10K reads that buffer directly. The handler
+# treats leftover $a0/$a1 as buffer and size and overruns guest RAM. With no
+# rom0: device the real open fails, the buffer stays zeroed, and IsT10K reports
+# a retail console.
+GetRomName
