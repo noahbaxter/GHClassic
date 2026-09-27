@@ -44,10 +44,21 @@ endif()
 
 set(PS2X_RUNTIME_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib/PS2Recomp/ps2xRuntime")
 
+# The game layer: GH2's hooks, installed through the runtime's override
+# registry.
+set(GHRECOMP_GAME_SOURCES
+    src/game.cpp
+    src/null_rnd.cpp
+)
+
 add_executable(ghrecomp
     ${GHRECOMP_GENERATED_SOURCES}
+    ${GHRECOMP_GAME_SOURCES}
     "${PS2X_RUNTIME_DIR}/src/main.cpp"
 )
+
+# Unity batches are for the generated code; game files stay separate units.
+set_source_files_properties(${GHRECOMP_GAME_SOURCES} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 
 target_include_directories(ghrecomp PRIVATE "${GHRECOMP_GENERATED_DIR}")
 target_link_libraries(ghrecomp PRIVATE ps2_runtime)
