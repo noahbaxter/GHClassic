@@ -24,6 +24,11 @@ set(PS2X_BUILD_TEST OFF CACHE BOOL "" FORCE)
 set(PS2X_BUILD_STUDIO OFF CACHE BOOL "" FORCE)
 set(PS2X_ENABLE_DEBUG_UI OFF CACHE BOOL "" FORCE)
 
+# A dev unit's 128MB rather than retail's 32MB. GH2 sizes its own heaps and
+# leaves the rest to libc, so the extra room keeps later additions out of
+# the out-of-memory paths retail runs close to.
+set(PS2X_EE_RAM_MB 128 CACHE STRING "" FORCE)
+
 # The runtime reads .chd images when chdr-static exists, so libchdr comes
 # first. EXCLUDE_FROM_ALL builds only the static library it links.
 set(CHDR_WANT_TESTS OFF CACHE BOOL "" FORCE)
