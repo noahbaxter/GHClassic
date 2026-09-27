@@ -10,6 +10,8 @@ namespace gh2
     {
         uint32_t entry;
         uint32_t psRndFlushPacket;
+        uint32_t psRndBeginDrawing;
+        uint32_t psRndEndDrawing;
         uint32_t playMovie;
     };
 
@@ -17,6 +19,8 @@ namespace gh2
     inline constexpr Addresses kSlus21447{
         .entry = 0x100bf0u,
         .psRndFlushPacket = 0x3d7d58u,
+        .psRndBeginDrawing = 0x19af38u,
+        .psRndEndDrawing = 0x19b018u,
         .playMovie = 0x21bb60u,
     };
 }

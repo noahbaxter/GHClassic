@@ -72,6 +72,7 @@ set(GHRECOMP_GAME_SOURCES
     src/host/vulkan_frontend.cpp
     src/host/vma.cpp
     src/render/frame.cpp
+    src/render/native_rnd.cpp
 )
 
 add_executable(ghrecomp
