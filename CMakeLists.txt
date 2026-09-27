@@ -71,7 +71,11 @@ set(GHRECOMP_GAME_SOURCES
     src/null_synth.cpp
     src/host/vulkan_frontend.cpp
     src/host/vma.cpp
+    src/host/scene_renderer.cpp
+    src/render/camera.cpp
     src/render/frame.cpp
+    src/render/mesh_capture.cpp
+    src/render/native_mesh.cpp
     src/render/native_rnd.cpp
 )
 
@@ -79,6 +83,29 @@ add_executable(ghrecomp
     ${GHRECOMP_GENERATED_SOURCES}
     ${GHRECOMP_GAME_SOURCES}
 )
+
+# Shaders compile to SPIR-V headers, each a uint32_t array named after it
+# (mesh.vert -> kMeshVert in mesh_vert.h).
+find_program(GLSLANG_VALIDATOR glslangValidator REQUIRED)
+set(GHRECOMP_SHADER_DIR "${CMAKE_CURRENT_BINARY_DIR}/shaders")
+file(MAKE_DIRECTORY "${GHRECOMP_SHADER_DIR}")
+set(GHRECOMP_SHADER_HEADERS)
+foreach(SHADER mesh.vert mesh.frag)
+    string(REPLACE "." "_" SHADER_ID "${SHADER}")
+    string(REPLACE "mesh_vert" "kMeshVert" SHADER_VAR "${SHADER_ID}")
+    string(REPLACE "mesh_frag" "kMeshFrag" SHADER_VAR "${SHADER_VAR}")
+    set(SHADER_HEADER "${GHRECOMP_SHADER_DIR}/${SHADER_ID}.h")
+    add_custom_command(
+        OUTPUT "${SHADER_HEADER}"
+        COMMAND "${GLSLANG_VALIDATOR}" -V --vn "${SHADER_VAR}" -o "${SHADER_HEADER}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/src/host/shaders/${SHADER}"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/host/shaders/${SHADER}"
+        VERBATIM)
+    list(APPEND GHRECOMP_SHADER_HEADERS "${SHADER_HEADER}")
+endforeach()
+add_custom_target(ghrecomp_shaders DEPENDS ${GHRECOMP_SHADER_HEADERS})
+add_dependencies(ghrecomp ghrecomp_shaders)
+target_include_directories(ghrecomp PRIVATE "${GHRECOMP_SHADER_DIR}")
 
 # Unity batches are for the generated code; game files stay separate units.
 set_source_files_properties(${GHRECOMP_GAME_SOURCES} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

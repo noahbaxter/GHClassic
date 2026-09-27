@@ -7,4 +7,10 @@ namespace gh2
         static FrameMailbox mailbox;
         return mailbox;
     }
+
+    Frame &building()
+    {
+        static Frame frame;
+        return frame;
+    }
 }

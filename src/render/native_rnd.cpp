@@ -19,8 +19,10 @@ namespace gh2
         constexpr uint32_t kClearColor = 0x30u;
         constexpr uint32_t kWidth = 0x40u;
         constexpr uint32_t kHeight = 0x44u;
-
-        Frame s_building;
+        // Aspect index (+0xd4), which Rnd::YRatio (0x1d4c20) looks up in
+        // {1, 0.75, 0.5625}.
+        constexpr uint32_t kAspect = 0xd4u;
+        constexpr float kYRatios[] = {1.0f, 0.75f, 0.5625f};
 
         struct BeginTag;
         struct EndTag;
@@ -28,24 +30,29 @@ namespace gh2
         void onBeginDrawing(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
             const uint32_t rnd = GPR_U32(ctx, 4);
-            s_building = Frame{};
-            s_building.serial = frames().latest().serial + 1u;
+            Frame &frame = building();
+            const uint64_t serial = frame.serial + 1u;
+            frame = Frame{};
+            frame.serial = serial;
             for (uint32_t i = 0; i < 4; ++i)
-                s_building.clear[i] = load<float>(rdram, rnd + kClearColor + i * 4u);
+                frame.clear[i] = load<float>(rdram, rnd + kClearColor + i * 4u);
             const int32_t width = load<int32_t>(rdram, rnd + kWidth);
             const int32_t height = load<int32_t>(rdram, rnd + kHeight);
             if (width > 0 && height > 0)
             {
-                s_building.width = static_cast<uint32_t>(width);
-                s_building.height = static_cast<uint32_t>(height);
+                frame.width = static_cast<uint32_t>(width);
+                frame.height = static_cast<uint32_t>(height);
             }
+            const uint32_t aspect = load<uint32_t>(rdram, rnd + kAspect);
+            if (aspect < 3u)
+                frame.yRatio = kYRatios[aspect];
         }
 
         // Every draw of the frame has been recorded by the time EndDrawing
         // starts.
         void onEndDrawing(uint8_t *, R5900Context *, PS2Runtime *)
         {
-            frames().publish(s_building);
+            frames().publish(building());
         }
     }
 

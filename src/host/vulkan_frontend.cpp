@@ -1,5 +1,6 @@
 #include "host/vulkan_frontend.h"
 
+#include "host/scene_renderer.h"
 #include "render/frame.h"
 
 #include <SDL3/SDL.h>
@@ -91,6 +92,8 @@ namespace gh2
         VkDeviceSize readbackSize = 0;
 
         std::chrono::steady_clock::time_point nextHiddenFrame{};
+
+        SceneRenderer scene;
 
         bool createSwapchain()
         {
@@ -329,6 +332,8 @@ namespace gh2
             vkCreateSemaphore(s.device.device, &semInfo, nullptr, &slot.imageAvailable);
         }
 
+        if (!s.scene.initialize(s.device.device, s.allocator))
+            return false;
         if (!s.hidden && !s.createSwapchain())
             return false;
         s.nextHiddenFrame = std::chrono::steady_clock::now();
@@ -385,16 +390,8 @@ namespace gh2
         begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         vkBeginCommandBuffer(cmd, &begin);
 
-        imageBarrier(cmd, s.target, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0,
-                     VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
-        VkClearColorValue clear{};
-        for (int i = 0; i < 4; ++i)
-            clear.float32[i] = frame.clear[i];
-        const VkImageSubresourceRange range{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-        vkCmdClearColorImage(cmd, s.target, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear, 1, &range);
-        imageBarrier(cmd, s.target, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                     VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                     VK_PIPELINE_STAGE_TRANSFER_BIT);
+        if (!s.scene.record(cmd, frame, s.target, s.targetWidth, s.targetHeight, s.presented))
+            return false;
 
         if (shot)
         {
@@ -463,6 +460,7 @@ namespace gh2
         if (s.device.device != VK_NULL_HANDLE)
         {
             vkDeviceWaitIdle(s.device.device);
+            s.scene.shutdown();
             s.destroyTarget();
             s.destroySwapchain();
             for (State::Slot &slot : s.slots)
