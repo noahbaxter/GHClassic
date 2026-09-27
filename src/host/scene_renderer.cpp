@@ -121,6 +121,22 @@ namespace gh2
             float uv[2];
         };
 
+        struct GpuTexture
+        {
+            std::shared_ptr<const TextureData> source; // keeps the key alive
+            VkImage image = VK_NULL_HANDLE;
+            VmaAllocation memory = VK_NULL_HANDLE;
+            VkImageView view = VK_NULL_HANDLE;
+            VkDescriptorSet sets[2]{}; // clamped, wrapped
+            VkBuffer staging = VK_NULL_HANDLE;
+            VmaAllocation stagingMemory = VK_NULL_HANDLE;
+            uint64_t uploaded = 0;
+            uint64_t lastUsed = 0;
+        };
+
+        // Room for this many live textures before the pool refuses.
+        constexpr uint32_t kMaxTextures = 4096;
+
         bool check(VkResult result, const char *what)
         {
             if (result == VK_SUCCESS)
@@ -152,6 +168,158 @@ namespace gh2
         uint32_t height = 0;
 
         std::unordered_map<const MeshData *, GpuMesh> meshes;
+
+        VkDescriptorSetLayout setLayout = VK_NULL_HANDLE;
+        VkDescriptorPool pool = VK_NULL_HANDLE;
+        VkSampler samplers[2]{}; // clamped, wrapped
+        std::unordered_map<const TextureData *, GpuTexture> textures;
+        // What an untextured pass samples, so every pass multiplies by a
+        // texture.
+        std::shared_ptr<const TextureData> white;
+
+        bool createTextureState()
+        {
+            VkDescriptorSetLayoutBinding binding{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
+                                                 VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
+            VkDescriptorSetLayoutCreateInfo layoutInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+            layoutInfo.bindingCount = 1;
+            layoutInfo.pBindings = &binding;
+            if (!check(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &setLayout), "set layout"))
+                return false;
+
+            VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kMaxTextures * 2u};
+            VkDescriptorPoolCreateInfo poolInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+            poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+            poolInfo.maxSets = kMaxTextures * 2u;
+            poolInfo.poolSizeCount = 1;
+            poolInfo.pPoolSizes = &size;
+            if (!check(vkCreateDescriptorPool(device, &poolInfo, nullptr, &pool), "descriptor pool"))
+                return false;
+
+            // PsTex sets TEX1 to bilinear with no mips (SyncBitmap 0x1a14b8).
+            for (int wrap = 0; wrap < 2; ++wrap)
+            {
+                const VkSamplerAddressMode mode =
+                    wrap ? VK_SAMPLER_ADDRESS_MODE_REPEAT : VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+                VkSamplerCreateInfo info{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+                info.magFilter = VK_FILTER_LINEAR;
+                info.minFilter = VK_FILTER_LINEAR;
+                info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+                info.addressModeU = mode;
+                info.addressModeV = mode;
+                info.addressModeW = mode;
+                info.maxLod = 0.0f;
+                if (!check(vkCreateSampler(device, &info, nullptr, &samplers[wrap]), "sampler"))
+                    return false;
+            }
+
+            auto pixel = std::make_shared<TextureData>();
+            pixel->width = 1;
+            pixel->height = 1;
+            pixel->rgba = {255, 255, 255, 255};
+            white = std::move(pixel);
+            return true;
+        }
+
+        void destroyTexture(GpuTexture &texture)
+        {
+            vkFreeDescriptorSets(device, pool, 2, texture.sets);
+            vkDestroyImageView(device, texture.view, nullptr);
+            vmaDestroyImage(allocator, texture.image, texture.memory);
+            if (texture.staging != VK_NULL_HANDLE)
+                vmaDestroyBuffer(allocator, texture.staging, texture.stagingMemory);
+        }
+
+        // The texture's GPU copy, uploading it through `cmd` the first time.
+        // Called outside the render pass.
+        GpuTexture *gpuTexture(VkCommandBuffer cmd, const std::shared_ptr<const TextureData> &data, uint64_t serial)
+        {
+            auto found = textures.find(data.get());
+            if (found != textures.end())
+            {
+                found->second.lastUsed = serial;
+                return &found->second;
+            }
+
+            GpuTexture gpu;
+            gpu.source = data;
+            gpu.uploaded = serial;
+            gpu.lastUsed = serial;
+            const VkDeviceSize bytes = data->rgba.size();
+            if (!createBuffer(data->rgba.data(), bytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, gpu.staging,
+                              gpu.stagingMemory))
+                return nullptr;
+
+            VkImageCreateInfo imageInfo{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
+            imageInfo.imageType = VK_IMAGE_TYPE_2D;
+            imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+            imageInfo.extent = {data->width, data->height, 1};
+            imageInfo.mipLevels = 1;
+            imageInfo.arrayLayers = 1;
+            imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+            imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+            imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+            VmaAllocationCreateInfo alloc{};
+            alloc.usage = VMA_MEMORY_USAGE_AUTO;
+            if (!check(vmaCreateImage(allocator, &imageInfo, &alloc, &gpu.image, &gpu.memory, nullptr), "texture"))
+            {
+                vmaDestroyBuffer(allocator, gpu.staging, gpu.stagingMemory);
+                return nullptr;
+            }
+
+            VkImageViewCreateInfo view{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+            view.image = gpu.image;
+            view.viewType = VK_IMAGE_VIEW_TYPE_2D;
+            view.format = VK_FORMAT_R8G8B8A8_UNORM;
+            view.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+            check(vkCreateImageView(device, &view, nullptr, &gpu.view), "texture view");
+
+            const VkDescriptorSetLayout layouts[2] = {setLayout, setLayout};
+            VkDescriptorSetAllocateInfo setInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+            setInfo.descriptorPool = pool;
+            setInfo.descriptorSetCount = 2;
+            setInfo.pSetLayouts = layouts;
+            if (!check(vkAllocateDescriptorSets(device, &setInfo, gpu.sets), "descriptor sets"))
+            {
+                vkDestroyImageView(device, gpu.view, nullptr);
+                vmaDestroyImage(allocator, gpu.image, gpu.memory);
+                vmaDestroyBuffer(allocator, gpu.staging, gpu.stagingMemory);
+                return nullptr;
+            }
+            for (int wrap = 0; wrap < 2; ++wrap)
+            {
+                VkDescriptorImageInfo image{samplers[wrap], gpu.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+                VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+                write.dstSet = gpu.sets[wrap];
+                write.descriptorCount = 1;
+                write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                write.pImageInfo = &image;
+                vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
+            }
+
+            VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+            barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.image = gpu.image;
+            barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+            barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
+                                 nullptr, 0, nullptr, 1, &barrier);
+            VkBufferImageCopy copy{};
+            copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+            copy.imageExtent = {data->width, data->height, 1};
+            vkCmdCopyBufferToImage(cmd, gpu.staging, gpu.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0,
+                                 nullptr, 0, nullptr, 1, &barrier);
+
+            return &textures.emplace(data.get(), std::move(gpu)).first->second;
+        }
 
         VkShaderModule shader(const uint32_t *code, size_t bytes)
         {
@@ -228,6 +396,8 @@ namespace gh2
             VkPipelineLayoutCreateInfo layoutInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
             layoutInfo.pushConstantRangeCount = 1;
             layoutInfo.pPushConstantRanges = &range;
+            layoutInfo.setLayoutCount = 1;
+            layoutInfo.pSetLayouts = &setLayout;
             if (!check(vkCreatePipelineLayout(device, &layoutInfo, nullptr, &layout), "pipeline layout"))
                 return false;
             vertexShader = shader(kMeshVert, sizeof(kMeshVert));
@@ -438,6 +608,23 @@ namespace gh2
                 else
                     ++it;
             }
+            for (auto it = textures.begin(); it != textures.end();)
+            {
+                GpuTexture &texture = it->second;
+                if (texture.lastUsed + kRetireAfter < serial)
+                {
+                    destroyTexture(texture);
+                    it = textures.erase(it);
+                    continue;
+                }
+                if (texture.staging != VK_NULL_HANDLE && texture.uploaded + kRetireAfter < serial)
+                {
+                    vmaDestroyBuffer(allocator, texture.staging, texture.stagingMemory);
+                    texture.staging = VK_NULL_HANDLE;
+                    texture.stagingMemory = VK_NULL_HANDLE;
+                }
+                ++it;
+            }
         }
     };
 
@@ -449,7 +636,7 @@ namespace gh2
         m_state = std::make_unique<State>();
         m_state->device = device;
         m_state->allocator = allocator;
-        return m_state->createRenderPass() && m_state->createLayout();
+        return m_state->createRenderPass() && m_state->createTextureState() && m_state->createLayout();
     }
 
     void SceneRenderer::shutdown()
@@ -460,6 +647,16 @@ namespace gh2
         for (auto &entry : s.meshes)
             s.destroyMesh(entry.second);
         s.meshes.clear();
+        for (auto &entry : s.textures)
+            s.destroyTexture(entry.second);
+        s.textures.clear();
+        for (VkSampler sampler : s.samplers)
+            if (sampler != VK_NULL_HANDLE)
+                vkDestroySampler(s.device, sampler, nullptr);
+        if (s.pool != VK_NULL_HANDLE)
+            vkDestroyDescriptorPool(s.device, s.pool, nullptr);
+        if (s.setLayout != VK_NULL_HANDLE)
+            vkDestroyDescriptorSetLayout(s.device, s.setLayout, nullptr);
         s.destroyAttachments();
         for (VkPipeline pipeline : s.pipelines)
             if (pipeline != VK_NULL_HANDLE)
@@ -482,6 +679,15 @@ namespace gh2
         if (!s.ensureAttachments(target, width, height))
             return false;
 
+        // Textures upload before the pass begins.
+        std::vector<const GpuTexture *> drawTextures(frame.draws.size(), nullptr);
+        for (size_t i = 0; i < frame.draws.size(); ++i)
+        {
+            const std::shared_ptr<const TextureData> &data =
+                frame.draws[i].material.texture ? frame.draws[i].material.texture : s.white;
+            drawTextures[i] = s.gpuTexture(cmd, data, serial);
+        }
+
         VkClearValue clears[2]{};
         for (int i = 0; i < 4; ++i)
             clears[0].color.float32[i] = frame.clear[i];
@@ -503,9 +709,11 @@ namespace gh2
         const float h = static_cast<float>(height);
         uint32_t boundCamera = UINT32_MAX;
         VkPipeline boundPipeline = VK_NULL_HANDLE;
-        for (const DrawCall &draw : frame.draws)
+        for (size_t i = 0; i < frame.draws.size(); ++i)
         {
-            if (!draw.mesh || draw.camera >= viewProjections.size())
+            const DrawCall &draw = frame.draws[i];
+            const GpuTexture *texture = drawTextures[i];
+            if (!draw.mesh || !texture || draw.camera >= viewProjections.size())
                 continue;
             if (frame.cameras[draw.camera].rect[2] <= 0.0f || frame.cameras[draw.camera].rect[3] <= 0.0f)
                 continue;
@@ -542,9 +750,15 @@ namespace gh2
             const Matrix mvp = multiply(draw.world, viewProjections[draw.camera]);
             std::memcpy(push.mvp, mvp.data(), sizeof(push.mvp));
             std::memcpy(push.color, material.color, sizeof(push.color));
+            // Intensify raises a textured pass's rgb scale from 128 to 255.
+            if (material.texture && material.intensify)
+                for (int c = 0; c < 3; ++c)
+                    push.color[c] *= 255.0f / 128.0f;
             push.params[0] = material.alphaCut ? 1.0f : 0.0f;
             vkCmdPushConstants(cmd, s.layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                                sizeof(push), &push);
+            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, s.layout, 0, 1,
+                                    &texture->sets[material.texWrap ? 1 : 0], 0, nullptr);
             const VkDeviceSize offset = 0;
             vkCmdBindVertexBuffers(cmd, 0, 1, &mesh->vertices, &offset);
             vkCmdBindIndexBuffer(cmd, mesh->indices, 0, VK_INDEX_TYPE_UINT16);

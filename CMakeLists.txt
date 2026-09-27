@@ -78,6 +78,7 @@ set(GHRECOMP_GAME_SOURCES
     src/render/native_mat.cpp
     src/render/native_mesh.cpp
     src/render/native_rnd.cpp
+    src/render/texture_capture.cpp
 )
 
 add_executable(ghrecomp

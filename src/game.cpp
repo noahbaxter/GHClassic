@@ -9,6 +9,7 @@
 #include "render/native_mat.h"
 #include "render/native_mesh.h"
 #include "render/native_rnd.h"
+#include "render/texture_capture.h"
 
 namespace
 {
@@ -17,6 +18,7 @@ namespace
         gh2::installNullRnd(runtime, gh2::kSlus21447);
         gh2::installNativeRnd(runtime, gh2::kSlus21447);
         gh2::installMeshCapture(runtime, gh2::kSlus21447);
+        gh2::installTextureCapture(runtime, gh2::kSlus21447);
         gh2::installNativeMesh(runtime, gh2::kSlus21447);
         gh2::installNativeMat(runtime, gh2::kSlus21447);
         gh2::installNullSynth(runtime);

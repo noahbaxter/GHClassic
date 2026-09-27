@@ -60,6 +60,36 @@ namespace milo
         };
     }
 
+    // RndBitmap, 0x1c bytes.
+    namespace bitmap
+    {
+        constexpr uint32_t kWidth = 0x00u;    // u16
+        constexpr uint32_t kHeight = 0x02u;   // u16
+        constexpr uint32_t kRowBytes = 0x04u; // u16
+        constexpr uint32_t kBpp = 0x06u;      // u8: 4, 8, 16, 24 or 32
+        constexpr uint32_t kOrder = 0x08u;    // u32, Order bits
+        constexpr uint32_t kPixels = 0x0cu;   // u8*
+        constexpr uint32_t kPalette = 0x10u;  // u8*, 4 bytes an entry
+
+        // Read from ConvertColor (0x1ae538), PaletteOffset (0x1b0f08) and
+        // PixelOffset (0x1aed38).
+        enum Order : uint32_t
+        {
+            kRgba = 0x1u,     // bytes R, G, B, A; else B, G, R, A. 16bpp: R in the low bits
+            kPs2Alpha = 0x2u, // alpha 0..0x80; for 8bpp also the GS's CLUT entry order
+            kSwizzled = 0x4u, // 4 and 8bpp pixels in the order the GS upload wants
+        };
+    }
+
+    // RndTex, 0x70 bytes, then PsTex's own.
+    namespace tex
+    {
+        constexpr uint32_t kBitmap = 0x28u; // RndBitmap
+        constexpr uint32_t kType = 0x48u;   // Type bits
+        // Only regular textures have pixels in RAM (SyncBitmap 0x1a13c0).
+        constexpr uint32_t kTypeNoPixels = 0x2u | 0x4u | 0x8u; // rendered, movie, frame buffer
+    }
+
     // RndMesh, 0x180 bytes; PsMesh adds its packet at +0x150.
     namespace mesh
     {

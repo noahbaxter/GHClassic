@@ -21,6 +21,7 @@
 #include "milo/layout.h"
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
+#include "render/texture_capture.h"
 
 namespace gh2
 {
@@ -45,7 +46,7 @@ namespace gh2
         m.texWrap = load<uint32_t>(rdram, mat + milo::mat::kTexWrap) != 0u;
         // Update drops the texture for a dest-blended material.
         if (m.blend != milo::mat::kBlendDest)
-            m.texture = load<uint32_t>(rdram, mat + milo::mat::kDiffuseTex);
+            m.texture = capturedTexture(load<uint32_t>(rdram, mat + milo::mat::kDiffuseTex));
         if (m.blend >= milo::mat::kBlendCount)
             m.blend = milo::mat::kBlendSrcAlpha; // Update's default case
         if (m.zMode >= milo::mat::kZModeCount)

@@ -26,6 +26,15 @@ namespace gh2
 
     using Matrix = std::array<float, 16>; // row-major, row vectors
 
+    // A texture's top level as RGBA8. Alpha 255 is the GS's 0x80, which it
+    // blends as 1.0; PS2 alpha above 0x80 clamps.
+    struct TextureData
+    {
+        uint32_t width = 0;
+        uint32_t height = 0;
+        std::vector<uint8_t> rgba;
+    };
+
     // One material pass as the engine held it at draw time.
     struct Material
     {
@@ -35,7 +44,7 @@ namespace gh2
         bool intensify = false;
         bool alphaCut = false;
         bool texWrap = true;
-        uint32_t texture = 0; // the RndTex's guest address, 0 for none
+        std::shared_ptr<const TextureData> texture; // null for none
     };
 
     struct DrawCall
