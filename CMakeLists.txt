@@ -49,26 +49,47 @@ endif()
 
 set(PS2X_RUNTIME_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib/PS2Recomp/ps2xRuntime")
 
+# The host: SDL3 for the window, Vulkan (MoltenVK on macOS) for the picture.
+find_package(SDL3 CONFIG REQUIRED)
+find_package(Vulkan REQUIRED)
+include(FetchContent)
+FetchContent_Declare(vk-bootstrap
+    GIT_REPOSITORY https://github.com/charles-lunarg/vk-bootstrap.git
+    GIT_TAG v1.4.357)
+FetchContent_Declare(VulkanMemoryAllocator
+    GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+    GIT_TAG v3.4.0)
+FetchContent_MakeAvailable(vk-bootstrap VulkanMemoryAllocator)
+
 # The game layer: GH2's hooks, installed through the runtime's override
-# registry.
+# registry, and the host window and renderer they draw through.
 set(GHRECOMP_GAME_SOURCES
+    src/main.cpp
     src/game.cpp
     src/null_movie.cpp
     src/null_rnd.cpp
     src/null_synth.cpp
+    src/host/vulkan_frontend.cpp
+    src/host/vma.cpp
+    src/render/frame.cpp
 )
 
 add_executable(ghrecomp
     ${GHRECOMP_GENERATED_SOURCES}
     ${GHRECOMP_GAME_SOURCES}
-    "${PS2X_RUNTIME_DIR}/src/main.cpp"
 )
 
 # Unity batches are for the generated code; game files stay separate units.
 set_source_files_properties(${GHRECOMP_GAME_SOURCES} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 
-target_include_directories(ghrecomp PRIVATE "${GHRECOMP_GENERATED_DIR}")
-target_link_libraries(ghrecomp PRIVATE ps2_runtime)
+target_include_directories(ghrecomp PRIVATE "${GHRECOMP_GENERATED_DIR}" src)
+target_link_libraries(ghrecomp PRIVATE
+    ps2_runtime
+    SDL3::SDL3
+    Vulkan::Vulkan
+    vk-bootstrap::vk-bootstrap
+    GPUOpen::VulkanMemoryAllocator
+)
 
 # Upstream sets its platform setup (sse2neon on ARM) at directory scope, so it
 # reaches only targets inside lib/PS2Recomp. Generated code needs it too.

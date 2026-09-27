@@ -122,8 +122,10 @@ if [ "$REF" = 1 ]; then
     rm "$shot"
   done
 else
-  for shot in "$OUT"/frames/frame_??????.png; do
-    [ -e "$shot" ] && mv "$shot" "$OUT/frames/frame_$(since "$shot")s.png"
+  for shot in "$OUT"/frames/frame_??????.ppm; do
+    [ -e "$shot" ] || continue
+    magick "$shot" "$OUT/frames/frame_$(since "$shot")s.png"
+    rm "$shot"
   done
 fi
 
