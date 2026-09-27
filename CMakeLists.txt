@@ -24,6 +24,11 @@ set(PS2X_BUILD_TEST OFF CACHE BOOL "" FORCE)
 set(PS2X_BUILD_STUDIO OFF CACHE BOOL "" FORCE)
 set(PS2X_ENABLE_DEBUG_UI OFF CACHE BOOL "" FORCE)
 
+# A dev unit's 128MB rather than retail's 32MB. GH2 sizes its own heaps and
+# leaves the rest to libc, so the extra room keeps later additions out of
+# the out-of-memory paths retail runs close to.
+set(PS2X_EE_RAM_MB 128 CACHE STRING "" FORCE)
+
 # The runtime reads .chd images when chdr-static exists, so libchdr comes
 # first. EXCLUDE_FROM_ALL builds only the static library it links.
 set(CHDR_WANT_TESTS OFF CACHE BOOL "" FORCE)
@@ -44,10 +49,23 @@ endif()
 
 set(PS2X_RUNTIME_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib/PS2Recomp/ps2xRuntime")
 
+# The game layer: GH2's hooks, installed through the runtime's override
+# registry.
+set(GHRECOMP_GAME_SOURCES
+    src/game.cpp
+    src/null_movie.cpp
+    src/null_rnd.cpp
+    src/null_synth.cpp
+)
+
 add_executable(ghrecomp
     ${GHRECOMP_GENERATED_SOURCES}
+    ${GHRECOMP_GAME_SOURCES}
     "${PS2X_RUNTIME_DIR}/src/main.cpp"
 )
+
+# Unity batches are for the generated code; game files stay separate units.
+set_source_files_properties(${GHRECOMP_GAME_SOURCES} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 
 target_include_directories(ghrecomp PRIVATE "${GHRECOMP_GENERATED_DIR}")
 target_link_libraries(ghrecomp PRIVATE ps2_runtime)
