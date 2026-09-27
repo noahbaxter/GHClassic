@@ -2,6 +2,7 @@
 
 #include "addresses.h"
 #include "game_overrides.h"
+#include "null_movie.h"
 #include "null_rnd.h"
 #include "null_synth.h"
 
@@ -11,6 +12,7 @@ namespace
     {
         gh2::installNullRnd(runtime, gh2::kSlus21447);
         gh2::installNullSynth(runtime);
+        gh2::installNullMovie(runtime, gh2::kSlus21447);
     }
 }
 

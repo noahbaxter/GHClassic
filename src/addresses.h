@@ -10,11 +10,13 @@ namespace gh2
     {
         uint32_t entry;
         uint32_t psRndFlushPacket;
+        uint32_t playMovie;
     };
 
     // Guitar Hero II (USA), SLUS-21447.
     inline constexpr Addresses kSlus21447{
         .entry = 0x100bf0u,
         .psRndFlushPacket = 0x3d7d58u,
+        .playMovie = 0x21bb60u,
     };
 }

@@ -48,6 +48,7 @@ set(PS2X_RUNTIME_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib/PS2Recomp/ps2xRuntime")
 # registry.
 set(GHRECOMP_GAME_SOURCES
     src/game.cpp
+    src/null_movie.cpp
     src/null_rnd.cpp
     src/null_synth.cpp
 )
