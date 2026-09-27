@@ -26,10 +26,23 @@ namespace gh2
 
     using Matrix = std::array<float, 16>; // row-major, row vectors
 
+    // One material pass as the engine held it at draw time.
+    struct Material
+    {
+        uint32_t blend = 1;  // milo::mat::Blend
+        uint32_t zMode = 1;  // milo::mat::ZMode
+        float color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+        bool intensify = false;
+        bool alphaCut = false;
+        bool texWrap = true;
+        uint32_t texture = 0; // the RndTex's guest address, 0 for none
+    };
+
     struct DrawCall
     {
         std::shared_ptr<const MeshData> mesh;
         Matrix world{};
         uint32_t camera = 0; // index into Frame::cameras
+        Material material;
     };
 }

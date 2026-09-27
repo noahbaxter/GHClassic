@@ -75,6 +75,7 @@ set(GHRECOMP_GAME_SOURCES
     src/render/camera.cpp
     src/render/frame.cpp
     src/render/mesh_capture.cpp
+    src/render/native_mat.cpp
     src/render/native_mesh.cpp
     src/render/native_rnd.cpp
 )

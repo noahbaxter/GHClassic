@@ -16,6 +16,7 @@ namespace gh2
         uint32_t psMeshCopy;
         uint32_t psMeshDestroy;
         uint32_t psMeshDrawShowing;
+        uint32_t psMatSelect;
         uint32_t worldXfm;       // RndTransformable::WorldXfm
         uint32_t playMovie;
         // Data
@@ -33,6 +34,7 @@ namespace gh2
         .psMeshCopy = 0x19dc38u,
         .psMeshDestroy = 0x19dd88u,
         .psMeshDrawShowing = 0x3d88d8u,
+        .psMatSelect = 0x3d8348u,
         .worldXfm = 0x3d8ea0u,
         .playMovie = 0x21bb60u,
         .rndCamCurrent = 0x3de348u,

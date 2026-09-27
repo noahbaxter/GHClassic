@@ -1,5 +1,6 @@
 #include "host/scene_renderer.h"
 
+#include "milo/layout.h"
 #include "render/camera.h"
 
 #include <vk_mem_alloc.h>
@@ -23,8 +24,84 @@ namespace gh2
         struct PushConstants
         {
             float mvp[16];
-            float color[4];
+            float color[4];  // material colour, times the colour scale
+            float params[4]; // x: alpha cut
         };
+
+        constexpr uint32_t kPipelineCount = milo::mat::kBlendCount * milo::mat::kZModeCount;
+
+        // The GS's ALPHA_1 for each blend, as PsMat::Update sets it.
+        VkPipelineColorBlendAttachmentState blendState(uint32_t blend)
+        {
+            VkPipelineColorBlendAttachmentState state{};
+            state.blendEnable = VK_TRUE;
+            state.colorBlendOp = VK_BLEND_OP_ADD;
+            state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+            state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+            state.alphaBlendOp = VK_BLEND_OP_ADD;
+            state.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                   VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+            switch (blend)
+            {
+            case milo::mat::kBlendDest:
+                state.srcColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+                state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+                state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+                state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+                break;
+            case milo::mat::kBlendSrc:
+                state.blendEnable = VK_FALSE;
+                break;
+            case milo::mat::kBlendAdd:
+                state.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+                state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+                break;
+            case milo::mat::kBlendSrcAlphaAdd:
+                state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+                state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+                break;
+            case milo::mat::kBlendSubtract:
+                state.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+                state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+                state.colorBlendOp = VK_BLEND_OP_REVERSE_SUBTRACT;
+                break;
+            default: // kBlendSrcAlpha
+                state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+                state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+                break;
+            }
+            return state;
+        }
+
+        // The GS's ZTST and ZMSK for each z mode. Depth is reversed like the
+        // GS's, nearer is larger.
+        VkPipelineDepthStencilStateCreateInfo depthState(uint32_t zMode)
+        {
+            VkPipelineDepthStencilStateCreateInfo state{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
+            state.depthTestEnable = VK_TRUE;
+            switch (zMode)
+            {
+            case milo::mat::kZDisable:
+                state.depthCompareOp = VK_COMPARE_OP_ALWAYS;
+                break;
+            case milo::mat::kZTransparent:
+                state.depthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
+                break;
+            case milo::mat::kZForce:
+                state.depthCompareOp = VK_COMPARE_OP_ALWAYS;
+                state.depthWriteEnable = VK_TRUE;
+                break;
+            case milo::mat::kZDecal:
+                state.depthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
+                state.depthWriteEnable = VK_TRUE;
+                break;
+            default: // kZNormal
+                state.depthCompareOp = VK_COMPARE_OP_GREATER;
+                state.depthWriteEnable = VK_TRUE;
+                break;
+            }
+            return state;
+        }
 
         struct GpuMesh
         {
@@ -59,7 +136,10 @@ namespace gh2
         VmaAllocator allocator = VK_NULL_HANDLE;
         VkRenderPass renderPass = VK_NULL_HANDLE;
         VkPipelineLayout layout = VK_NULL_HANDLE;
-        VkPipeline pipeline = VK_NULL_HANDLE;
+        VkShaderModule vertexShader = VK_NULL_HANDLE;
+        VkShaderModule fragmentShader = VK_NULL_HANDLE;
+        // By blend and z mode, built on first use.
+        VkPipeline pipelines[kPipelineCount]{};
 
         // Attachments for the current target.
         VkImage target = VK_NULL_HANDLE;
@@ -141,25 +221,34 @@ namespace gh2
             return check(vkCreateRenderPass(device, &info, nullptr, &renderPass), "render pass");
         }
 
-        bool createPipeline()
+        bool createLayout()
         {
-            VkPushConstantRange range{VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstants)};
+            VkPushConstantRange range{VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                                      sizeof(PushConstants)};
             VkPipelineLayoutCreateInfo layoutInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
             layoutInfo.pushConstantRangeCount = 1;
             layoutInfo.pPushConstantRanges = &range;
             if (!check(vkCreatePipelineLayout(device, &layoutInfo, nullptr, &layout), "pipeline layout"))
                 return false;
+            vertexShader = shader(kMeshVert, sizeof(kMeshVert));
+            fragmentShader = shader(kMeshFrag, sizeof(kMeshFrag));
+            return vertexShader != VK_NULL_HANDLE && fragmentShader != VK_NULL_HANDLE;
+        }
 
-            VkShaderModule vert = shader(kMeshVert, sizeof(kMeshVert));
-            VkShaderModule frag = shader(kMeshFrag, sizeof(kMeshFrag));
+        VkPipeline pipeline(uint32_t blend, uint32_t zMode)
+        {
+            VkPipeline &slot = pipelines[blend * milo::mat::kZModeCount + zMode];
+            if (slot != VK_NULL_HANDLE)
+                return slot;
+
             VkPipelineShaderStageCreateInfo stages[2]{};
             stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
             stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-            stages[0].module = vert;
+            stages[0].module = vertexShader;
             stages[0].pName = "main";
             stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
             stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-            stages[1].module = frag;
+            stages[1].module = fragmentShader;
             stages[1].pName = "main";
 
             VkVertexInputBindingDescription binding{0, sizeof(PackedVertex), VK_VERTEX_INPUT_RATE_VERTEX};
@@ -190,24 +279,12 @@ namespace gh2
             VkPipelineMultisampleStateCreateInfo multisample{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
             multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-            VkPipelineDepthStencilStateCreateInfo depthState{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
-            depthState.depthTestEnable = VK_FALSE;
-            depthState.depthWriteEnable = VK_FALSE;
-            depthState.depthCompareOp = VK_COMPARE_OP_ALWAYS;
+            const VkPipelineDepthStencilStateCreateInfo depth = depthState(zMode);
 
-            VkPipelineColorBlendAttachmentState blend{};
-            blend.blendEnable = VK_TRUE;
-            blend.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-            blend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-            blend.colorBlendOp = VK_BLEND_OP_ADD;
-            blend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-            blend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-            blend.alphaBlendOp = VK_BLEND_OP_ADD;
-            blend.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                                   VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-            VkPipelineColorBlendStateCreateInfo blendState{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
-            blendState.attachmentCount = 1;
-            blendState.pAttachments = &blend;
+            const VkPipelineColorBlendAttachmentState attachment = blendState(blend);
+            VkPipelineColorBlendStateCreateInfo colorBlend{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
+            colorBlend.attachmentCount = 1;
+            colorBlend.pAttachments = &attachment;
 
             const VkDynamicState dynamics[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
             VkPipelineDynamicStateCreateInfo dynamic{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
@@ -222,16 +299,13 @@ namespace gh2
             info.pViewportState = &viewport;
             info.pRasterizationState = &raster;
             info.pMultisampleState = &multisample;
-            info.pDepthStencilState = &depthState;
-            info.pColorBlendState = &blendState;
+            info.pDepthStencilState = &depth;
+            info.pColorBlendState = &colorBlend;
             info.pDynamicState = &dynamic;
             info.layout = layout;
             info.renderPass = renderPass;
-            const bool ok = check(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &info, nullptr, &pipeline),
-                                  "pipeline");
-            vkDestroyShaderModule(device, vert, nullptr);
-            vkDestroyShaderModule(device, frag, nullptr);
-            return ok;
+            check(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &info, nullptr, &slot), "pipeline");
+            return slot;
         }
 
         void destroyAttachments()
@@ -375,7 +449,7 @@ namespace gh2
         m_state = std::make_unique<State>();
         m_state->device = device;
         m_state->allocator = allocator;
-        return m_state->createRenderPass() && m_state->createPipeline();
+        return m_state->createRenderPass() && m_state->createLayout();
     }
 
     void SceneRenderer::shutdown()
@@ -387,8 +461,13 @@ namespace gh2
             s.destroyMesh(entry.second);
         s.meshes.clear();
         s.destroyAttachments();
-        if (s.pipeline != VK_NULL_HANDLE)
-            vkDestroyPipeline(s.device, s.pipeline, nullptr);
+        for (VkPipeline pipeline : s.pipelines)
+            if (pipeline != VK_NULL_HANDLE)
+                vkDestroyPipeline(s.device, pipeline, nullptr);
+        if (s.vertexShader != VK_NULL_HANDLE)
+            vkDestroyShaderModule(s.device, s.vertexShader, nullptr);
+        if (s.fragmentShader != VK_NULL_HANDLE)
+            vkDestroyShaderModule(s.device, s.fragmentShader, nullptr);
         if (s.layout != VK_NULL_HANDLE)
             vkDestroyPipelineLayout(s.device, s.layout, nullptr);
         if (s.renderPass != VK_NULL_HANDLE)
@@ -415,8 +494,6 @@ namespace gh2
         begin.pClearValues = clears;
         vkCmdBeginRenderPass(cmd, &begin, VK_SUBPASS_CONTENTS_INLINE);
 
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, s.pipeline);
-
         std::vector<Matrix> viewProjections;
         viewProjections.reserve(frame.cameras.size());
         for (const Camera &camera : frame.cameras)
@@ -425,6 +502,7 @@ namespace gh2
         const float w = static_cast<float>(width);
         const float h = static_cast<float>(height);
         uint32_t boundCamera = UINT32_MAX;
+        VkPipeline boundPipeline = VK_NULL_HANDLE;
         for (const DrawCall &draw : frame.draws)
         {
             if (!draw.mesh || draw.camera >= viewProjections.size())
@@ -451,11 +529,22 @@ namespace gh2
                 vkCmdSetScissor(cmd, 0, 1, &scissor);
                 boundCamera = draw.camera;
             }
+            const Material &material = draw.material;
+            const VkPipeline pipeline = s.pipeline(material.blend, material.zMode);
+            if (pipeline == VK_NULL_HANDLE)
+                continue;
+            if (pipeline != boundPipeline)
+            {
+                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+                boundPipeline = pipeline;
+            }
             PushConstants push{};
             const Matrix mvp = multiply(draw.world, viewProjections[draw.camera]);
             std::memcpy(push.mvp, mvp.data(), sizeof(push.mvp));
-            push.color[0] = push.color[1] = push.color[2] = push.color[3] = 1.0f;
-            vkCmdPushConstants(cmd, s.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push), &push);
+            std::memcpy(push.color, material.color, sizeof(push.color));
+            push.params[0] = material.alphaCut ? 1.0f : 0.0f;
+            vkCmdPushConstants(cmd, s.layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                               sizeof(push), &push);
             const VkDeviceSize offset = 0;
             vkCmdBindVertexBuffers(cmd, 0, 1, &mesh->vertices, &offset);
             vkCmdBindIndexBuffer(cmd, mesh->indices, 0, VK_INDEX_TYPE_UINT16);

@@ -25,6 +25,41 @@ namespace milo
         constexpr uint32_t kRect = 0x2d4u;  // normalized x, y, w, h
     }
 
+    // RndMat, 0x120 bytes; PsMat adds its GS state after. Enums read from
+    // PsMat::Update (0x19cfe0) and its jump tables at 0x418910 and 0x418930.
+    namespace mat
+    {
+        constexpr uint32_t kIntensify = 0x28u;  // bool: textured colour scale 255, not 128
+        constexpr uint32_t kBlend = 0x2cu;      // Blend
+        constexpr uint32_t kColor = 0x30u;      // 4 floats
+        constexpr uint32_t kZMode = 0x44u;      // ZMode
+        constexpr uint32_t kTexWrap = 0x4cu;    // 0 clamps
+        constexpr uint32_t kDiffuseTex = 0x98u; // RndTex* (ObjPtr at +0x90)
+        constexpr uint32_t kAlphaCut = 0xa0u;   // bool: ATST greater, AREF 0
+        constexpr uint32_t kNextPass = 0xb0u;   // RndMat* (ObjPtr at +0xa8)
+
+        enum Blend : uint32_t
+        {
+            kBlendDest,          // Cd
+            kBlendSrc,           // Cs, alpha blending off
+            kBlendAdd,           // Cs + Cd
+            kBlendSrcAlpha,      // (Cs - Cd) * As + Cd
+            kBlendSrcAlphaAdd,   // Cs * As + Cd
+            kBlendSubtract,      // Cd - Cs
+            kBlendCount,
+        };
+
+        enum ZMode : uint32_t
+        {
+            kZDisable,       // always, no write
+            kZNormal,        // greater, write
+            kZTransparent,   // gequal, no write
+            kZForce,         // always, write
+            kZDecal,         // gequal, write
+            kZModeCount,
+        };
+    }
+
     // RndMesh, 0x180 bytes; PsMesh adds its packet at +0x150.
     namespace mesh
     {

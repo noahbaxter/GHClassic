@@ -12,6 +12,7 @@
 #include "ps2_runtime_macros.h"
 #include "render/frame.h"
 #include "render/mesh_capture.h"
+#include "render/native_mat.h"
 
 #include <cstring>
 
@@ -71,7 +72,16 @@ namespace gh2
                 draw.mesh = std::move(geometry);
                 draw.world = readTransform(rdram, world);
                 draw.camera = currentCamera(rdram);
-                building().draws.push_back(std::move(draw));
+                // One draw per material pass, from this mesh's material, not
+                // the owner's.
+                uint32_t mat = load<uint32_t>(rdram, mesh + milo::mesh::kMat);
+                if (mat == 0u)
+                    mat = load<uint32_t>(rdram, s_addresses->defaultMat);
+                for (; mat != 0u; mat = nextPass(rdram, mat))
+                {
+                    draw.material = readMaterial(rdram, mat);
+                    building().draws.push_back(draw);
+                }
             }
             ctx->pc = returnTo;
         }

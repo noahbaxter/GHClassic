@@ -10,6 +10,7 @@ layout(push_constant) uniform Push
 {
     mat4 mvp;
     vec4 color;
+    vec4 params;
 } pc;
 
 layout(location = 0) out vec4 vColor;
