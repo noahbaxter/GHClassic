@@ -4,7 +4,8 @@
 #   scripts/arm.sh <out> [--secs 30] [--disc <image>] [--shot-every 60] [--ref]
 #
 # The window stays hidden, no audio device opens, the memory card is a
-# throwaway copy, and only the process this script started is ever killed.
+# throwaway copy of ghpc's (both arms boot from the same save), and only the
+# process this script started is ever killed.
 # <out> gets run.log, frames/ (the guest picture every --shot-every presented
 # frames) and stack.txt, a 3s sample taken just before the stop. The summary
 # names where the game thread spends its time, by recompiled function.
@@ -61,13 +62,15 @@ START="$(stat -f %Fm "$OUT/.start")"
 rm "$OUT/.start"
 since() { stat -f %Fm "$1" | awk -v s="$START" '{ printf "%07.2f", $1 - s }'; }
 
+# Both arms start from a copy of ghpc's card, so they boot from the same save.
+[ -n "$GHPC" ] && [ -d "$GHPC/work/mc0" ] && cp -Rp "$GHPC/work/mc0/." "$CARD/"
+
 if [ "$REF" = 1 ]; then
   [ -n "$GHPC" ] || { echo "no ../ghpc beside this repo" >&2; exit 1; }
   if pgrep -x ps2EntryRunner > /dev/null; then
     echo "a ghpc runner is already up; not starting beside it" >&2
     exit 1
   fi
-  [ -d "$GHPC/work/mc0" ] && cp -Rp "$GHPC/work/mc0/." "$CARD/"
   find /tmp/ -maxdepth 1 -name 'ghpc_vk_*' -delete
   GHPC_HIDE_WINDOW=1 GHPC_AUDIO=0 GHPC_NO_FOCUS=1 GHPC_MC_ROOT="$CARD" \
     GHPC_RENDERER=vulkan GHPC_VK_SHOT="$EVERY" GHPC_VK_SHOT_LIMIT=100000 \
