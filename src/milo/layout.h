@@ -32,11 +32,13 @@ namespace milo
         constexpr uint32_t kIntensify = 0x28u;  // bool: textured colour scale 255, not 128
         constexpr uint32_t kBlend = 0x2cu;      // Blend
         constexpr uint32_t kColor = 0x30u;      // 4 floats
+        constexpr uint32_t kUseEnviron = 0x40u; // bool: lit by the current environ
         constexpr uint32_t kZMode = 0x44u;      // ZMode
         constexpr uint32_t kTexGen = 0x48u;     // TexGen
         constexpr uint32_t kTexWrap = 0x4cu;    // 0 clamps
         constexpr uint32_t kTexXfm = 0x50u;     // Transform
         constexpr uint32_t kDiffuseTex = 0x98u; // RndTex* (ObjPtr at +0x90)
+        constexpr uint32_t kPrelit = 0x9cu;     // bool: vertex colour is baked light
         constexpr uint32_t kAlphaCut = 0xa0u;   // bool: ATST greater, AREF 0
         constexpr uint32_t kNextPass = 0xb0u;   // RndMat* (ObjPtr at +0xa8)
 
@@ -70,6 +72,28 @@ namespace milo
             kZForce,         // always, write
             kZDecal,         // gequal, write
             kZModeCount,
+        };
+    }
+
+    // RndEnviron; PsEnviron adds nothing it reads. From PsEnviron::Select
+    // (0x1a2060).
+    namespace environ
+    {
+        constexpr uint32_t kFirstLight = 0x30u; // light list node*: {RndLight*, next*}
+        constexpr uint32_t kAmbient = 0x40u;    // 3 floats
+    }
+
+    // RndLight, a RndTransformable at +0.
+    namespace light
+    {
+        constexpr uint32_t kColor = 0xc0u;  // 4 floats; VU1 gets w as 0
+        constexpr uint32_t kRange = 0xd0u;  // point lights
+        constexpr uint32_t kType = 0xd4u;   // Type
+
+        enum Type : uint32_t
+        {
+            kPoint,
+            kDirectional, // shines along its world +y
         };
     }
 

@@ -21,15 +21,37 @@ namespace gh2
         // Frames a GPU resource must outlive its last use by.
         constexpr uint64_t kRetireAfter = 3;
 
+        // How a vertex gets its colour, by the VU1 lighting program the
+        // material and environ pick (PsMat::Select 0x3d8548).
+        enum ColorMode : uint32_t
+        {
+            kColorVertex,      // 0x614 (prelit, no environ): as is
+            kColorAmbient,     // 0x7c5 with the environ: base * ambient
+            kColorDirectional, // 0x6ec: base * ambient + lights * material
+            kColorMaterial,    // 0x7c5 without the environ or prelit: the material's
+        };
+        constexpr uint32_t kFlagPrelit = 1u << 2;    // base is the vertex colour, else the material's
+        constexpr uint32_t kFlagAlphaCut = 1u << 3;  // discard alpha below the GS's 1
+        constexpr uint32_t kFlagIntensify = 1u << 4; // textured rgb scale 255 over 128
+
         struct PushConstants
         {
             float mvp[16];
-            float color[4];  // material colour, times the colour scale
-            float params[4]; // x: alpha cut
+            float matColor[4];
             float uvRows[4]; // Material::uvXfm
             float uvOffset[2];
+            int32_t lightBase; // the draw's lighting block in the frame data
+            uint32_t flags;    // ColorMode in bits 0-1, then the kFlag bits
         };
         static_assert(sizeof(PushConstants) <= 128, "past Vulkan's guaranteed push constant size");
+
+        // Each frame writes its lighting to its own slot's buffer,
+        // so a slot is reused only after its frame has retired.
+        constexpr uint32_t kFrameSlots = kRetireAfter + 1u;
+        constexpr uint32_t kMinFrameData = 1024u; // vec4s
+        // A draw's lighting block: ambient, three light colours, then the
+        // three directions to the lights in the mesh's own space.
+        constexpr uint32_t kLightingVec4s = 7u;
 
         constexpr uint32_t kPipelineCount = milo::mat::kBlendCount * milo::mat::kZModeCount;
 
@@ -120,6 +142,7 @@ namespace gh2
         struct PackedVertex
         {
             float pos[3];
+            float normal[3];
             float color[4];
             float uv[2];
         };
@@ -139,6 +162,56 @@ namespace gh2
 
         // Room for this many live textures before the pool refuses.
         constexpr uint32_t kMaxTextures = 4096;
+
+        struct Vec4
+        {
+            float v[4];
+        };
+
+        struct FrameDataSlot
+        {
+            VkBuffer buffer = VK_NULL_HANDLE;
+            VmaAllocation memory = VK_NULL_HANDLE;
+            Vec4 *mapped = nullptr;
+            uint32_t capacity = 0; // vec4s
+            VkDescriptorSet set = VK_NULL_HANDLE;
+        };
+
+        // The lighting program a draw runs. PsMat::Update counts a material
+        // lit when it has use_environ or is not prelit (0x19d12c). Select
+        // passes the environ's program for use_environ, else 0x7c5 with
+        // use_environ clear, which stores the material colour, clamped to 1,
+        // to every vert (0x3e58). An unlit material, prelit alone, runs 0x614:
+        // the vertex colour as it is.
+        uint32_t colorMode(const DrawCall &draw)
+        {
+            if (!draw.material.useEnviron)
+                return draw.material.prelit ? kColorVertex : kColorMaterial;
+            return draw.environ.kind == Environ::kDirectional ? kColorDirectional : kColorAmbient;
+        }
+
+        // Ambient (w 1), the three light colours (w 0, unused slots black),
+        // then each light's direction taken into the mesh's space through the
+        // rows of its lighting matrix, as the directional program does before
+        // its loop (0x3788..0x37c8): d = n . direction.
+        void writeLighting(const DrawCall &draw, Vec4 *out)
+        {
+            const Environ &e = draw.environ;
+            out[0] = {{e.ambient[0], e.ambient[1], e.ambient[2], 1.0f}};
+            for (uint32_t i = 0; i < 3; ++i)
+            {
+                const bool present = i < e.lightCount;
+                out[1 + i] = {{present ? e.color[i][0] : 0.0f, present ? e.color[i][1] : 0.0f,
+                               present ? e.color[i][2] : 0.0f, 0.0f}};
+                Vec4 direction{{0.0f, 0.0f, 0.0f, 0.0f}};
+                if (present)
+                    for (uint32_t row = 0; row < 3; ++row)
+                        direction.v[row] = draw.lightWorld[row * 4 + 0] * e.toLight[i][0] +
+                                           draw.lightWorld[row * 4 + 1] * e.toLight[i][1] +
+                                           draw.lightWorld[row * 4 + 2] * e.toLight[i][2];
+                out[4 + i] = direction;
+            }
+        }
 
         bool check(VkResult result, const char *what)
         {
@@ -180,7 +253,10 @@ namespace gh2
         // texture.
         std::shared_ptr<const TextureData> white;
 
-        bool createTextureState()
+        VkDescriptorSetLayout frameDataSetLayout = VK_NULL_HANDLE;
+        FrameDataSlot frameData[kFrameSlots];
+
+        bool createDescriptorState()
         {
             VkDescriptorSetLayoutBinding binding{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
                                                  VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
@@ -189,15 +265,35 @@ namespace gh2
             layoutInfo.pBindings = &binding;
             if (!check(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &setLayout), "set layout"))
                 return false;
+            VkDescriptorSetLayoutBinding frameDataBinding{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
+                                                          VK_SHADER_STAGE_VERTEX_BIT, nullptr};
+            layoutInfo.pBindings = &frameDataBinding;
+            if (!check(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &frameDataSetLayout),
+                       "frame data set layout"))
+                return false;
 
-            VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kMaxTextures * 2u};
+            const VkDescriptorPoolSize sizes[] = {
+                {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kMaxTextures * 2u},
+                {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kFrameSlots},
+            };
             VkDescriptorPoolCreateInfo poolInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
             poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-            poolInfo.maxSets = kMaxTextures * 2u;
-            poolInfo.poolSizeCount = 1;
-            poolInfo.pPoolSizes = &size;
+            poolInfo.maxSets = kMaxTextures * 2u + kFrameSlots;
+            poolInfo.poolSizeCount = 2;
+            poolInfo.pPoolSizes = sizes;
             if (!check(vkCreateDescriptorPool(device, &poolInfo, nullptr, &pool), "descriptor pool"))
                 return false;
+
+            for (FrameDataSlot &slot : frameData)
+            {
+                VkDescriptorSetAllocateInfo setInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+                setInfo.descriptorPool = pool;
+                setInfo.descriptorSetCount = 1;
+                setInfo.pSetLayouts = &frameDataSetLayout;
+                if (!check(vkAllocateDescriptorSets(device, &setInfo, &slot.set), "frame data set") ||
+                    !growFrameData(slot, kMinFrameData))
+                    return false;
+            }
 
             // PsTex sets TEX1 to bilinear with no mips (SyncBitmap 0x1a14b8).
             for (int wrap = 0; wrap < 2; ++wrap)
@@ -221,6 +317,41 @@ namespace gh2
             pixel->height = 1;
             pixel->rgba = {255, 255, 255, 255};
             white = std::move(pixel);
+            return true;
+        }
+
+        // Replaces the slot's buffer with one holding at least `count`
+        // vec4s. Only called on a slot no frame in flight uses.
+        bool growFrameData(FrameDataSlot &slot, uint32_t count)
+        {
+            if (count <= slot.capacity)
+                return true;
+            uint32_t capacity = slot.capacity ? slot.capacity : kMinFrameData;
+            while (capacity < count)
+                capacity *= 2u;
+            if (slot.buffer != VK_NULL_HANDLE)
+                vmaDestroyBuffer(allocator, slot.buffer, slot.memory);
+            slot = FrameDataSlot{VK_NULL_HANDLE, VK_NULL_HANDLE, nullptr, 0, slot.set};
+
+            VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+            info.size = static_cast<VkDeviceSize>(capacity) * sizeof(Vec4);
+            info.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+            VmaAllocationCreateInfo alloc{};
+            alloc.usage = VMA_MEMORY_USAGE_AUTO;
+            alloc.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+            VmaAllocationInfo allocated{};
+            if (!check(vmaCreateBuffer(allocator, &info, &alloc, &slot.buffer, &slot.memory, &allocated), "frame data"))
+                return false;
+            slot.mapped = static_cast<Vec4 *>(allocated.pMappedData);
+            slot.capacity = capacity;
+
+            VkDescriptorBufferInfo buffer{slot.buffer, 0, VK_WHOLE_SIZE};
+            VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+            write.dstSet = slot.set;
+            write.descriptorCount = 1;
+            write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            write.pBufferInfo = &buffer;
+            vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
             return true;
         }
 
@@ -399,8 +530,9 @@ namespace gh2
             VkPipelineLayoutCreateInfo layoutInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
             layoutInfo.pushConstantRangeCount = 1;
             layoutInfo.pPushConstantRanges = &range;
-            layoutInfo.setLayoutCount = 1;
-            layoutInfo.pSetLayouts = &setLayout;
+            const VkDescriptorSetLayout setLayouts[] = {setLayout, frameDataSetLayout};
+            layoutInfo.setLayoutCount = 2;
+            layoutInfo.pSetLayouts = setLayouts;
             if (!check(vkCreatePipelineLayout(device, &layoutInfo, nullptr, &layout), "pipeline layout"))
                 return false;
             vertexShader = shader(kMeshVert, sizeof(kMeshVert));
@@ -425,15 +557,16 @@ namespace gh2
             stages[1].pName = "main";
 
             VkVertexInputBindingDescription binding{0, sizeof(PackedVertex), VK_VERTEX_INPUT_RATE_VERTEX};
-            VkVertexInputAttributeDescription attributes[3] = {
+            VkVertexInputAttributeDescription attributes[4] = {
                 {0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(PackedVertex, pos)},
                 {1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(PackedVertex, color)},
                 {2, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(PackedVertex, uv)},
+                {3, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(PackedVertex, normal)},
             };
             VkPipelineVertexInputStateCreateInfo vertexInput{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
             vertexInput.vertexBindingDescriptionCount = 1;
             vertexInput.pVertexBindingDescriptions = &binding;
-            vertexInput.vertexAttributeDescriptionCount = 3;
+            vertexInput.vertexAttributeDescriptionCount = 4;
             vertexInput.pVertexAttributeDescriptions = attributes;
 
             VkPipelineInputAssemblyStateCreateInfo assembly{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
@@ -576,6 +709,7 @@ namespace gh2
                 for (size_t i = 0; i < packed.size(); ++i)
                 {
                     std::memcpy(packed[i].pos, mesh->verts[i].pos, sizeof(packed[i].pos));
+                    std::memcpy(packed[i].normal, mesh->verts[i].normal, sizeof(packed[i].normal));
                     std::memcpy(packed[i].color, mesh->verts[i].color, sizeof(packed[i].color));
                     std::memcpy(packed[i].uv, mesh->verts[i].uv, sizeof(packed[i].uv));
                 }
@@ -639,7 +773,7 @@ namespace gh2
         m_state = std::make_unique<State>();
         m_state->device = device;
         m_state->allocator = allocator;
-        return m_state->createRenderPass() && m_state->createTextureState() && m_state->createLayout();
+        return m_state->createRenderPass() && m_state->createDescriptorState() && m_state->createLayout();
     }
 
     void SceneRenderer::shutdown()
@@ -656,10 +790,15 @@ namespace gh2
         for (VkSampler sampler : s.samplers)
             if (sampler != VK_NULL_HANDLE)
                 vkDestroySampler(s.device, sampler, nullptr);
+        for (FrameDataSlot &slot : s.frameData)
+            if (slot.buffer != VK_NULL_HANDLE)
+                vmaDestroyBuffer(s.allocator, slot.buffer, slot.memory);
         if (s.pool != VK_NULL_HANDLE)
             vkDestroyDescriptorPool(s.device, s.pool, nullptr);
         if (s.setLayout != VK_NULL_HANDLE)
             vkDestroyDescriptorSetLayout(s.device, s.setLayout, nullptr);
+        if (s.frameDataSetLayout != VK_NULL_HANDLE)
+            vkDestroyDescriptorSetLayout(s.device, s.frameDataSetLayout, nullptr);
         s.destroyAttachments();
         for (VkPipeline pipeline : s.pipelines)
             if (pipeline != VK_NULL_HANDLE)
@@ -691,6 +830,27 @@ namespace gh2
             drawTextures[i] = s.gpuTexture(cmd, data, serial);
         }
 
+        // Every lit draw's lighting block, in draw order.
+        FrameDataSlot &data = s.frameData[serial % kFrameSlots];
+        std::vector<int32_t> lightBases(frame.draws.size(), -1);
+        std::vector<uint32_t> colorModes(frame.draws.size(), kColorVertex);
+        uint32_t used = 0;
+        for (size_t i = 0; i < frame.draws.size(); ++i)
+        {
+            colorModes[i] = colorMode(frame.draws[i]);
+            if (colorModes[i] == kColorAmbient || colorModes[i] == kColorDirectional)
+            {
+                lightBases[i] = static_cast<int32_t>(used);
+                used += kLightingVec4s;
+            }
+        }
+        if (!s.growFrameData(data, used))
+            return false;
+        for (size_t i = 0; i < frame.draws.size(); ++i)
+            if (lightBases[i] >= 0)
+                writeLighting(frame.draws[i], data.mapped + lightBases[i]);
+        vmaFlushAllocation(s.allocator, data.memory, 0, VK_WHOLE_SIZE);
+
         VkClearValue clears[2]{};
         for (int i = 0; i < 4; ++i)
             clears[0].color.float32[i] = frame.clear[i];
@@ -702,6 +862,7 @@ namespace gh2
         begin.clearValueCount = 2;
         begin.pClearValues = clears;
         vkCmdBeginRenderPass(cmd, &begin, VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, s.layout, 1, 1, &data.set, 0, nullptr);
 
         std::vector<Matrix> viewProjections;
         viewProjections.reserve(frame.cameras.size());
@@ -752,12 +913,16 @@ namespace gh2
             PushConstants push{};
             const Matrix mvp = multiply(draw.world, viewProjections[draw.camera]);
             std::memcpy(push.mvp, mvp.data(), sizeof(push.mvp));
-            std::memcpy(push.color, material.color, sizeof(push.color));
+            std::memcpy(push.matColor, material.color, sizeof(push.matColor));
+            push.flags = colorModes[i];
+            if (material.prelit)
+                push.flags |= kFlagPrelit;
+            if (material.alphaCut)
+                push.flags |= kFlagAlphaCut;
             // Intensify raises a textured pass's rgb scale from 128 to 255.
             if (material.texture && material.intensify)
-                for (int c = 0; c < 3; ++c)
-                    push.color[c] *= 255.0f / 128.0f;
-            push.params[0] = material.alphaCut ? 1.0f : 0.0f;
+                push.flags |= kFlagIntensify;
+            push.lightBase = lightBases[i];
             std::memcpy(push.uvRows, material.uvXfm, sizeof(push.uvRows));
             std::memcpy(push.uvOffset, material.uvXfm + 4, sizeof(push.uvOffset));
             vkCmdPushConstants(cmd, s.layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,

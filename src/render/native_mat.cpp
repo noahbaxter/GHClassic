@@ -75,6 +75,8 @@ namespace gh2
         m.intensify = load<uint32_t>(rdram, mat + milo::mat::kIntensify) != 0u;
         m.alphaCut = load<uint32_t>(rdram, mat + milo::mat::kAlphaCut) != 0u;
         m.texWrap = load<uint32_t>(rdram, mat + milo::mat::kTexWrap) != 0u;
+        m.useEnviron = load<uint32_t>(rdram, mat + milo::mat::kUseEnviron) != 0u;
+        m.prelit = load<uint32_t>(rdram, mat + milo::mat::kPrelit) != 0u;
         // Update drops the texture for a dest-blended material.
         if (m.blend != milo::mat::kBlendDest)
             m.texture = capturedTexture(load<uint32_t>(rdram, mat + milo::mat::kDiffuseTex));

@@ -12,6 +12,7 @@
 #include "ps2_runtime_macros.h"
 #include "render/frame.h"
 #include "render/mesh_capture.h"
+#include "render/native_environ.h"
 #include "render/native_mat.h"
 
 #include <cstring>
@@ -71,6 +72,8 @@ namespace gh2
                 DrawCall draw;
                 draw.mesh = std::move(geometry);
                 draw.world = readTransform(rdram, world);
+                draw.lightWorld = draw.world;
+                draw.environ = currentEnviron();
                 draw.camera = currentCamera(rdram);
                 // One draw per material pass, from this mesh's material, not
                 // the owner's.

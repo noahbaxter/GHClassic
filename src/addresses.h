@@ -17,6 +17,7 @@ namespace gh2
         uint32_t psMeshDestroy;
         uint32_t psMeshDrawShowing;
         uint32_t psMatSelect;
+        uint32_t psEnvironSelect;
         uint32_t psTexSyncBitmap;
         uint32_t psTexDestroy;
         uint32_t worldXfm;       // RndTransformable::WorldXfm
@@ -25,6 +26,7 @@ namespace gh2
         // Data
         uint32_t rndCamCurrent;  // RndCam::sCurrent
         uint32_t defaultMat;     // the RndMat a mesh without one draws with
+        uint32_t rndEnvironCurrent; // RndEnviron::sCurrent
         // RndBitmap::PixelOffset's swizzle tables, by (y / 4) & 1: 64 bytes
         // each for 8bpp, 128 for 4bpp.
         uint32_t swizzle8[2];
@@ -42,6 +44,7 @@ namespace gh2
         .psMeshDestroy = 0x19dd88u,
         .psMeshDrawShowing = 0x3d88d8u,
         .psMatSelect = 0x3d8348u,
+        .psEnvironSelect = 0x1a2060u,
         .psTexSyncBitmap = 0x1a13a8u,
         .psTexDestroy = 0x1a0f18u,
         .worldXfm = 0x3d8ea0u,
@@ -49,6 +52,7 @@ namespace gh2
         .optionsSyncVideo = 0x10db80u,
         .rndCamCurrent = 0x3de348u,
         .defaultMat = 0x3da4f0u,
+        .rndEnvironCurrent = 0x3de358u,
         .swizzle8 = {0x3de1c8u, 0x3de208u},
         .swizzle4 = {0x3de248u, 0x3de2c8u},
     };
