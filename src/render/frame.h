@@ -30,6 +30,10 @@ namespace gh2
         uint32_t height = 448;
         float clear[4] = {0.0f, 0.0f, 0.0f, 1.0f};
         float yRatio = 0.75f; // Rnd::YRatio for the current aspect
+        // What the picture is shown at. PS2 pixels are not square: the frame
+        // fills a 4:3 screen, or a 16:9 one when the aspect squeezes the
+        // cameras for it.
+        float displayAspect = 4.0f / 3.0f;
         std::vector<Camera> cameras;
         std::vector<DrawCall> draws;
     };

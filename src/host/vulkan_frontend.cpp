@@ -22,9 +22,6 @@ namespace gh2
         constexpr uint32_t kFramesInFlight = 2;
         constexpr int kWindowWidth = 960;
         constexpr int kWindowHeight = 720;
-        // The guest picture is shown at 4:3 whatever its pixel size, since
-        // PS2 pixels are not square.
-        constexpr float kDisplayAspect = 4.0f / 3.0f;
 
         bool check(VkResult result, const char *what)
         {
@@ -183,8 +180,9 @@ namespace gh2
             readback = VK_NULL_HANDLE;
         }
 
-        // The guest picture into the window, centred at the display aspect.
-        void blitToSwapchain(VkCommandBuffer cmd, VkImage image)
+        // The guest picture into the window, centred at the frame's display
+        // aspect.
+        void blitToSwapchain(VkCommandBuffer cmd, VkImage image, float displayAspect)
         {
             const VkExtent2D extent = swapchain.extent;
             imageBarrier(cmd, image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0,
@@ -195,11 +193,11 @@ namespace gh2
             vkCmdClearColorImage(cmd, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &black, 1, &range);
 
             float width = static_cast<float>(extent.width);
-            float height = width / kDisplayAspect;
+            float height = width / displayAspect;
             if (height > static_cast<float>(extent.height))
             {
                 height = static_cast<float>(extent.height);
-                width = height * kDisplayAspect;
+                width = height * displayAspect;
             }
             const int32_t x = static_cast<int32_t>((static_cast<float>(extent.width) - width) * 0.5f);
             const int32_t y = static_cast<int32_t>((static_cast<float>(extent.height) - height) * 0.5f);
@@ -401,7 +399,7 @@ namespace gh2
             vkCmdCopyImageToBuffer(cmd, s.target, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, s.readback, 1, &copy);
         }
         if (present)
-            s.blitToSwapchain(cmd, s.swapchainImages[imageIndex]);
+            s.blitToSwapchain(cmd, s.swapchainImages[imageIndex], frame.displayAspect);
         vkEndCommandBuffer(cmd);
 
         const VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_TRANSFER_BIT;

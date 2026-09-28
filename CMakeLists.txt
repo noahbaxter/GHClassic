@@ -69,6 +69,7 @@ set(GHRECOMP_GAME_SOURCES
     src/null_movie.cpp
     src/null_rnd.cpp
     src/null_synth.cpp
+    src/video_options.cpp
     src/host/vulkan_frontend.cpp
     src/host/vma.cpp
     src/host/scene_renderer.cpp

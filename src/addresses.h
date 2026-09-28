@@ -21,6 +21,7 @@ namespace gh2
         uint32_t psTexDestroy;
         uint32_t worldXfm;       // RndTransformable::WorldXfm
         uint32_t playMovie;
+        uint32_t optionsSyncVideo; // Options::SyncVideoOptions
         // Data
         uint32_t rndCamCurrent;  // RndCam::sCurrent
         uint32_t defaultMat;     // the RndMat a mesh without one draws with
@@ -45,6 +46,7 @@ namespace gh2
         .psTexDestroy = 0x1a0f18u,
         .worldXfm = 0x3d8ea0u,
         .playMovie = 0x21bb60u,
+        .optionsSyncVideo = 0x10db80u,
         .rndCamCurrent = 0x3de348u,
         .defaultMat = 0x3da4f0u,
         .swizzle8 = {0x3de1c8u, 0x3de208u},

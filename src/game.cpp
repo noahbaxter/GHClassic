@@ -10,6 +10,7 @@
 #include "render/native_mesh.h"
 #include "render/native_rnd.h"
 #include "render/texture_capture.h"
+#include "video_options.h"
 
 namespace
 {
@@ -23,6 +24,7 @@ namespace
         gh2::installNativeMat(runtime, gh2::kSlus21447);
         gh2::installNullSynth(runtime);
         gh2::installNullMovie(runtime, gh2::kSlus21447);
+        gh2::installVideoOptions(runtime, gh2::kSlus21447);
     }
 }
 

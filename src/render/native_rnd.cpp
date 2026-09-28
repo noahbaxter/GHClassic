@@ -23,6 +23,7 @@ namespace gh2
         // {1, 0.75, 0.5625}.
         constexpr uint32_t kAspect = 0xd4u;
         constexpr float kYRatios[] = {1.0f, 0.75f, 0.5625f};
+        constexpr uint32_t kAspectWidescreen = 2u; // what Options::SetWideScreen(true) sets
 
         struct BeginTag;
         struct EndTag;
@@ -46,6 +47,7 @@ namespace gh2
             const uint32_t aspect = load<uint32_t>(rdram, rnd + kAspect);
             if (aspect < 3u)
                 frame.yRatio = kYRatios[aspect];
+            frame.displayAspect = aspect == kAspectWidescreen ? 16.0f / 9.0f : 4.0f / 3.0f;
         }
 
         // Every draw of the frame has been recorded by the time EndDrawing
