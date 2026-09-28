@@ -49,26 +49,79 @@ endif()
 
 set(PS2X_RUNTIME_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib/PS2Recomp/ps2xRuntime")
 
+# The host: SDL3 for the window, Vulkan (MoltenVK on macOS) for the picture.
+find_package(SDL3 CONFIG REQUIRED)
+find_package(Vulkan REQUIRED)
+include(FetchContent)
+FetchContent_Declare(vk-bootstrap
+    GIT_REPOSITORY https://github.com/charles-lunarg/vk-bootstrap.git
+    GIT_TAG v1.4.357)
+FetchContent_Declare(VulkanMemoryAllocator
+    GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+    GIT_TAG v3.4.0)
+FetchContent_MakeAvailable(vk-bootstrap VulkanMemoryAllocator)
+
 # The game layer: GH2's hooks, installed through the runtime's override
-# registry.
+# registry, and the host window and renderer they draw through.
 set(GHRECOMP_GAME_SOURCES
+    src/main.cpp
     src/game.cpp
     src/null_movie.cpp
     src/null_rnd.cpp
     src/null_synth.cpp
+    src/video_options.cpp
+    src/host/vulkan_frontend.cpp
+    src/host/vma.cpp
+    src/host/scene_renderer.cpp
+    src/render/camera.cpp
+    src/render/frame.cpp
+    src/render/mesh_capture.cpp
+    src/render/native_environ.cpp
+    src/render/native_mat.cpp
+    src/render/native_mesh.cpp
+    src/render/native_rnd.cpp
+    src/render/texture_capture.cpp
 )
 
 add_executable(ghrecomp
     ${GHRECOMP_GENERATED_SOURCES}
     ${GHRECOMP_GAME_SOURCES}
-    "${PS2X_RUNTIME_DIR}/src/main.cpp"
 )
+
+# Shaders compile to SPIR-V headers, each a uint32_t array named after it
+# (mesh.vert -> kMeshVert in mesh_vert.h).
+find_program(GLSLANG_VALIDATOR glslangValidator REQUIRED)
+set(GHRECOMP_SHADER_DIR "${CMAKE_CURRENT_BINARY_DIR}/shaders")
+file(MAKE_DIRECTORY "${GHRECOMP_SHADER_DIR}")
+set(GHRECOMP_SHADER_HEADERS)
+foreach(SHADER mesh.vert mesh.frag)
+    string(REPLACE "." "_" SHADER_ID "${SHADER}")
+    string(REPLACE "mesh_vert" "kMeshVert" SHADER_VAR "${SHADER_ID}")
+    string(REPLACE "mesh_frag" "kMeshFrag" SHADER_VAR "${SHADER_VAR}")
+    set(SHADER_HEADER "${GHRECOMP_SHADER_DIR}/${SHADER_ID}.h")
+    add_custom_command(
+        OUTPUT "${SHADER_HEADER}"
+        COMMAND "${GLSLANG_VALIDATOR}" -V --vn "${SHADER_VAR}" -o "${SHADER_HEADER}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/src/host/shaders/${SHADER}"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/host/shaders/${SHADER}"
+        VERBATIM)
+    list(APPEND GHRECOMP_SHADER_HEADERS "${SHADER_HEADER}")
+endforeach()
+add_custom_target(ghrecomp_shaders DEPENDS ${GHRECOMP_SHADER_HEADERS})
+add_dependencies(ghrecomp ghrecomp_shaders)
+target_include_directories(ghrecomp PRIVATE "${GHRECOMP_SHADER_DIR}")
 
 # Unity batches are for the generated code; game files stay separate units.
 set_source_files_properties(${GHRECOMP_GAME_SOURCES} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 
-target_include_directories(ghrecomp PRIVATE "${GHRECOMP_GENERATED_DIR}")
-target_link_libraries(ghrecomp PRIVATE ps2_runtime)
+target_include_directories(ghrecomp PRIVATE "${GHRECOMP_GENERATED_DIR}" src)
+target_link_libraries(ghrecomp PRIVATE
+    ps2_runtime
+    SDL3::SDL3
+    Vulkan::Vulkan
+    vk-bootstrap::vk-bootstrap
+    GPUOpen::VulkanMemoryAllocator
+)
 
 # Upstream sets its platform setup (sse2neon on ARM) at directory scope, so it
 # reaches only targets inside lib/PS2Recomp. Generated code needs it too.

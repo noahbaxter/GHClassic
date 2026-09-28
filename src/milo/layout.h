@@ -1,0 +1,154 @@
+#pragma once
+
+#include <cstdint>
+
+// Where Milo keeps its renderer objects' fields, read from GH2 retail. These
+// describe the engine rather than one executable (GH2 and 80s share it), so
+// they live apart from the per-executable function addresses.
+namespace milo
+{
+    // RndTransformable: local transform at +0x20, world at +0x60. A
+    // transform is three 16-byte rows then the position.
+    namespace transformable
+    {
+        constexpr uint32_t kWorld = 0x60u;
+    }
+
+    // RndCam, 0x320 bytes (PsCam adds nothing).
+    namespace camera
+    {
+        constexpr uint32_t kView = 0xc0u;   // Transform: inverse of the camera's world
+        constexpr uint32_t kNear = 0x2c0u;
+        constexpr uint32_t kFar = 0x2c4u;
+        constexpr uint32_t kYFov = 0x2c8u;  // 0 is orthographic
+        constexpr uint32_t kZRange = 0x2ccu; // 2 floats
+        constexpr uint32_t kRect = 0x2d4u;  // normalized x, y, w, h
+    }
+
+    // RndMat, 0x120 bytes; PsMat adds its GS state after. Enums read from
+    // PsMat::Update (0x19cfe0) and its jump tables at 0x418910 and 0x418930.
+    namespace mat
+    {
+        constexpr uint32_t kIntensify = 0x28u;  // bool: textured colour scale 255, not 128
+        constexpr uint32_t kBlend = 0x2cu;      // Blend
+        constexpr uint32_t kColor = 0x30u;      // 4 floats
+        constexpr uint32_t kUseEnviron = 0x40u; // bool: lit by the current environ
+        constexpr uint32_t kZMode = 0x44u;      // ZMode
+        constexpr uint32_t kTexGen = 0x48u;     // TexGen
+        constexpr uint32_t kTexWrap = 0x4cu;    // 0 clamps
+        constexpr uint32_t kTexXfm = 0x50u;     // Transform
+        constexpr uint32_t kDiffuseTex = 0x98u; // RndTex* (ObjPtr at +0x90)
+        constexpr uint32_t kPrelit = 0x9cu;     // bool: vertex colour is baked light
+        constexpr uint32_t kAlphaCut = 0xa0u;   // bool: ATST greater, AREF 0
+        constexpr uint32_t kNextPass = 0xb0u;   // RndMat* (ObjPtr at +0xa8)
+
+        enum Blend : uint32_t
+        {
+            kBlendDest,          // Cd
+            kBlendSrc,           // Cs, alpha blending off
+            kBlendAdd,           // Cs + Cd
+            kBlendSrcAlpha,      // (Cs - Cd) * As + Cd
+            kBlendSrcAlphaAdd,   // Cs * As + Cd
+            kBlendSubtract,      // Cd - Cs
+            kBlendCount,
+        };
+
+        // Update's jump table at 0x418950.
+        enum TexGen : uint32_t
+        {
+            kTexGenNone,
+            kTexGenXfm,       // uv through tex_xfm, about the texture's centre
+            kTexGenSphere,
+            kTexGenProjected,
+            kTexGenXfmOrigin, // uv through tex_xfm, about the origin
+            kTexGenEnviron,
+        };
+
+        enum ZMode : uint32_t
+        {
+            kZDisable,       // always, no write
+            kZNormal,        // greater, write
+            kZTransparent,   // gequal, no write
+            kZForce,         // always, write
+            kZDecal,         // gequal, write
+            kZModeCount,
+        };
+    }
+
+    // RndEnviron; PsEnviron adds nothing it reads. From PsEnviron::Select
+    // (0x1a2060).
+    namespace environ
+    {
+        constexpr uint32_t kFirstLight = 0x30u; // light list node*: {RndLight*, next*}
+        constexpr uint32_t kAmbient = 0x40u;    // 3 floats
+    }
+
+    // RndLight, a RndTransformable at +0.
+    namespace light
+    {
+        constexpr uint32_t kColor = 0xc0u;  // 4 floats; VU1 gets w as 0
+        constexpr uint32_t kRange = 0xd0u;  // point lights
+        constexpr uint32_t kType = 0xd4u;   // Type
+
+        enum Type : uint32_t
+        {
+            kPoint,
+            kDirectional, // shines along its world +y
+        };
+    }
+
+    // RndBitmap, 0x1c bytes.
+    namespace bitmap
+    {
+        constexpr uint32_t kWidth = 0x00u;    // u16
+        constexpr uint32_t kHeight = 0x02u;   // u16
+        constexpr uint32_t kRowBytes = 0x04u; // u16
+        constexpr uint32_t kBpp = 0x06u;      // u8: 4, 8, 16, 24 or 32
+        constexpr uint32_t kOrder = 0x08u;    // u32, Order bits
+        constexpr uint32_t kPixels = 0x0cu;   // u8*
+        constexpr uint32_t kPalette = 0x10u;  // u8*, 4 bytes an entry
+
+        // Read from ConvertColor (0x1ae538), PaletteOffset (0x1b0f08) and
+        // PixelOffset (0x1aed38).
+        enum Order : uint32_t
+        {
+            kRgba = 0x1u,     // bytes R, G, B, A; else B, G, R, A. 16bpp: R in the low bits
+            kPs2Alpha = 0x2u, // alpha 0..0x80; for 8bpp also the GS's CLUT entry order
+            kSwizzled = 0x4u, // 4 and 8bpp pixels in the order the GS upload wants
+        };
+    }
+
+    // RndTex, 0x70 bytes, then PsTex's own.
+    namespace tex
+    {
+        constexpr uint32_t kBitmap = 0x28u; // RndBitmap
+        constexpr uint32_t kType = 0x48u;   // Type bits
+        // Only regular textures have pixels in RAM (SyncBitmap 0x1a13c0).
+        constexpr uint32_t kTypeNoPixels = 0x2u | 0x4u | 0x8u; // rendered, movie, frame buffer
+    }
+
+    // RndMesh, 0x180 bytes; PsMesh adds its packet at +0x150.
+    namespace mesh
+    {
+        constexpr uint32_t kVerts = 0x100u;      // Vert*
+        constexpr uint32_t kVertCount = 0x104u;  // int
+        constexpr uint32_t kFacesBegin = 0x108u; // Face* (3 x u16)
+        constexpr uint32_t kFacesEnd = 0x10cu;
+        constexpr uint32_t kMat = 0x120u;        // RndMat* (ObjPtr at +0x118)
+        constexpr uint32_t kOwner = 0x138u;      // RndMesh* (ObjPtr at +0x130)
+        constexpr uint32_t kBones = 0x13cu;      // Bones*
+        constexpr uint32_t kTransform = 0x40u;   // the RndTransformable base
+        constexpr uint32_t kObjectBase = 0x160u; // the Hmx::Object virtual base, in a PsMesh
+        constexpr uint32_t kVertSize = 0x40u;
+        constexpr uint32_t kFaceSize = 6u;
+        // Vert: position +0x00, normal +0x10, colour (4 floats) +0x20,
+        // uv +0x30. On skinned meshes the colour holds bone weights.
+        constexpr uint32_t kVertPos = 0x00u;
+        constexpr uint32_t kVertNormal = 0x10u;
+        constexpr uint32_t kVertColor = 0x20u;
+        constexpr uint32_t kVertUv = 0x30u;
+        // Sync flags: which parts changed.
+        constexpr uint32_t kSyncVerts = 0x1fu;
+        constexpr uint32_t kSyncFaces = 0x20u;
+    }
+}

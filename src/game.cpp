@@ -5,14 +5,28 @@
 #include "null_movie.h"
 #include "null_rnd.h"
 #include "null_synth.h"
+#include "render/mesh_capture.h"
+#include "render/native_environ.h"
+#include "render/native_mat.h"
+#include "render/native_mesh.h"
+#include "render/native_rnd.h"
+#include "render/texture_capture.h"
+#include "video_options.h"
 
 namespace
 {
     void applySlus21447(PS2Runtime &runtime)
     {
         gh2::installNullRnd(runtime, gh2::kSlus21447);
+        gh2::installNativeRnd(runtime, gh2::kSlus21447);
+        gh2::installMeshCapture(runtime, gh2::kSlus21447);
+        gh2::installTextureCapture(runtime, gh2::kSlus21447);
+        gh2::installNativeMesh(runtime, gh2::kSlus21447);
+        gh2::installNativeMat(runtime, gh2::kSlus21447);
+        gh2::installNativeEnviron(runtime, gh2::kSlus21447);
         gh2::installNullSynth(runtime);
         gh2::installNullMovie(runtime, gh2::kSlus21447);
+        gh2::installVideoOptions(runtime, gh2::kSlus21447);
     }
 }
 

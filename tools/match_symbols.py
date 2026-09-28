@@ -107,7 +107,11 @@ def data_code_refs(data, sections, addrs):
     """Code addresses held in .data, as two sets.
 
     vtable: the function word of a gcc 2 vtable entry, which is 8 bytes, a
-    zero delta word then the function at +4. Always a function start.
+    word of short delta and short index then the function at +4. Always a
+    function start. Most deltas are 0; a nonzero one (a base's vtable inside
+    a derived class, like RndParticleSys's RndDrawable at -0xd0) counts only
+    beside another entry, since a lone small integer before a code address
+    is sometimes plain data.
     table: any code address after a zero or another code address, which also
     takes in callback tables. A function start only right after a return.
 
@@ -123,8 +127,10 @@ def data_code_refs(data, sections, addrs):
         w, prev = words[i], words[i - 1]
         if w not in addrs:
             continue
-        if prev == 0 and (base + 4 * i) % 8 == 4:
-            vtable.add(w)
+        if (base + 4 * i) % 8 == 4 and prev >> 16 == 0:
+            beside = (i >= 2 and words[i - 2] in addrs) or (i + 2 < len(words) and words[i + 2] in addrs)
+            if prev == 0 or beside:
+                vtable.add(w)
         if prev == 0 or prev in addrs:
             table.add(w)
     return vtable, table

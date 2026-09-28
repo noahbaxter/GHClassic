@@ -1,0 +1,16 @@
+#pragma once
+
+#include "addresses.h"
+#include "render/scene.h"
+
+#include <memory>
+
+class PS2Runtime;
+
+namespace gh2
+{
+    // The geometry a mesh object last synced, or null. Game thread only.
+    std::shared_ptr<const MeshData> capturedMesh(uint32_t mesh);
+
+    void installMeshCapture(PS2Runtime &runtime, const Addresses &addresses);
+}
