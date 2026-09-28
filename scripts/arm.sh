@@ -12,7 +12,9 @@
 #
 # --ref runs ../ghpc instead, the reference: the debug ELF through play.sh,
 # the software picture presented through Vulkan. It refuses to start while
-# any ghpc runner is up, since that is someone playing.
+# any ghpc runner is up, since that is someone playing. play.sh boot-skips
+# to main_screen for scripted runs; --intro boots the reference through the
+# title like ours.
 #
 # Frames from both arms are 640x448 PNGs named by seconds since launch
 # (frame_0012.3s.png, the reference adding its screen name), since the two
@@ -28,12 +30,14 @@ SECS=30
 DISC=""
 EVERY=60
 REF=0
+INTRO=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --secs)       SECS="$2"; shift ;;
     --disc)       DISC="$2"; shift ;;
     --shot-every) EVERY="$2"; shift ;;
     --ref)        REF=1 ;;
+    --intro)      INTRO=(--intro) ;;
     -*) echo "unknown argument: $1" >&2; exit 2 ;;
     *)  OUT="$1" ;;
   esac
@@ -74,7 +78,7 @@ if [ "$REF" = 1 ]; then
   find /tmp/ -maxdepth 1 -name 'ghpc_vk_*' -delete
   GHPC_HIDE_WINDOW=1 GHPC_AUDIO=0 GHPC_NO_FOCUS=1 GHPC_MC_ROOT="$CARD" \
     GHPC_RENDERER=vulkan GHPC_VK_SHOT="$EVERY" GHPC_VK_SHOT_LIMIT=100000 \
-    "$GHPC/ghpc/scripts/play.sh" --log "$OUT/run.log" > /dev/null 2>&1 &
+    "$GHPC/ghpc/scripts/play.sh" ${INTRO[@]+"${INTRO[@]}"} --log "$OUT/run.log" > /dev/null 2>&1 &
   PID=$!
   for _ in 1 2 3 4 5 6 7 8 9 10; do
     RUNNER="$(pgrep -x ps2EntryRunner -P "$PID" || true)"
