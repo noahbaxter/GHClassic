@@ -53,7 +53,7 @@ namespace gh2
         }
 
         struct SyncTag;
-        struct CopyTag;
+        struct FixVertsTag;
         struct DestroyTag;
 
         // PsMesh::Sync(flags). Retail acts only when the mesh owns its data.
@@ -72,19 +72,21 @@ namespace gh2
             slot = std::move(next);
         }
 
-        // PsMesh::Copy(from, type). A clone of a static mesh gets its
-        // geometry only through the copied packet, so it takes the source's
-        // captured geometry here. `from` is the source's Hmx::Object, which
-        // retail turns back into a PsMesh with __dynamic_cast (0x19dc8c).
-        void onCopy(uint8_t *, R5900Context *ctx, PS2Runtime *)
+        // PsMesh::FixVerts(src, packet, count), which PsMesh::Copy calls
+        // only once it has swapped in a copy of the source's packet (0x19dd4c),
+        // after RndMesh::Copy has synced this mesh from what it holds. A clone
+        // of a static mesh holds no verts, so that sync captured nothing and
+        // the source's geometry is what it draws. A clone that kept verts has
+        // its packet pointed back at them, so it keeps its own.
+        void onFixVerts(uint8_t *, R5900Context *ctx, PS2Runtime *)
         {
             const uint32_t mesh = GPR_U32(ctx, 4);
-            const uint32_t from = GPR_U32(ctx, 5);
-            if (from < milo::mesh::kObjectBase)
+            const auto source = s_meshes.find(GPR_U32(ctx, 5));
+            if (source == s_meshes.end())
                 return;
-            const auto source = s_meshes.find(from - milo::mesh::kObjectBase);
-            if (source != s_meshes.end())
-                s_meshes[mesh] = source->second;
+            std::shared_ptr<const MeshData> &slot = s_meshes[mesh];
+            if (!slot || slot->verts.empty())
+                slot = source->second;
         }
 
         void onDestroy(uint8_t *, R5900Context *ctx, PS2Runtime *)
@@ -102,7 +104,7 @@ namespace gh2
     void installMeshCapture(PS2Runtime &runtime, const Addresses &addresses)
     {
         EntryHook<SyncTag>::install(runtime, addresses.psMeshSync, onSync);
-        EntryHook<CopyTag>::install(runtime, addresses.psMeshCopy, onCopy);
+        EntryHook<FixVertsTag>::install(runtime, addresses.psMeshFixVerts, onFixVerts);
         EntryHook<DestroyTag>::install(runtime, addresses.psMeshDestroy, onDestroy);
     }
 }

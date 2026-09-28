@@ -13,7 +13,7 @@ namespace gh2
         uint32_t psRndBeginDrawing;
         uint32_t psRndEndDrawing;
         uint32_t psMeshSync;
-        uint32_t psMeshCopy;
+        uint32_t psMeshFixVerts;
         uint32_t psMeshDestroy;
         uint32_t psMeshDrawShowing;
         uint32_t psMatSelect;
@@ -40,7 +40,7 @@ namespace gh2
         .psRndBeginDrawing = 0x19af38u,
         .psRndEndDrawing = 0x19b018u,
         .psMeshSync = 0x3d4f08u,
-        .psMeshCopy = 0x19dc38u,
+        .psMeshFixVerts = 0x19dbb8u,
         .psMeshDestroy = 0x19dd88u,
         .psMeshDrawShowing = 0x3d88d8u,
         .psMatSelect = 0x3d8348u,
