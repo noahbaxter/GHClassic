@@ -33,7 +33,9 @@ namespace milo
         constexpr uint32_t kBlend = 0x2cu;      // Blend
         constexpr uint32_t kColor = 0x30u;      // 4 floats
         constexpr uint32_t kZMode = 0x44u;      // ZMode
+        constexpr uint32_t kTexGen = 0x48u;     // TexGen
         constexpr uint32_t kTexWrap = 0x4cu;    // 0 clamps
+        constexpr uint32_t kTexXfm = 0x50u;     // Transform
         constexpr uint32_t kDiffuseTex = 0x98u; // RndTex* (ObjPtr at +0x90)
         constexpr uint32_t kAlphaCut = 0xa0u;   // bool: ATST greater, AREF 0
         constexpr uint32_t kNextPass = 0xb0u;   // RndMat* (ObjPtr at +0xa8)
@@ -47,6 +49,17 @@ namespace milo
             kBlendSrcAlphaAdd,   // Cs * As + Cd
             kBlendSubtract,      // Cd - Cs
             kBlendCount,
+        };
+
+        // Update's jump table at 0x418950.
+        enum TexGen : uint32_t
+        {
+            kTexGenNone,
+            kTexGenXfm,       // uv through tex_xfm, about the texture's centre
+            kTexGenSphere,
+            kTexGenProjected,
+            kTexGenXfmOrigin, // uv through tex_xfm, about the origin
+            kTexGenEnviron,
         };
 
         enum ZMode : uint32_t

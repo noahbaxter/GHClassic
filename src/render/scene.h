@@ -45,6 +45,9 @@ namespace gh2
         bool alphaCut = false;
         bool texWrap = true;
         std::shared_ptr<const TextureData> texture; // null for none
+        uint32_t texGen = 0; // milo::mat::TexGen
+        // uv' = u * uvXfm[0..1] + v * uvXfm[2..3] + uvXfm[4..5]
+        float uvXfm[6] = {1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f};
     };
 
     struct DrawCall

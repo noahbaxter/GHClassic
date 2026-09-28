@@ -11,6 +11,8 @@ layout(push_constant) uniform Push
     mat4 mvp;
     vec4 color;
     vec4 params;
+    vec4 uvRows; // u's row, then v's
+    vec2 uvOffset;
 } pc;
 
 layout(location = 0) out vec4 vColor;
@@ -20,5 +22,5 @@ void main()
 {
     gl_Position = pc.mvp * vec4(inPos, 1.0);
     vColor = inColor * pc.color;
-    vUv = inUv;
+    vUv = inUv.x * pc.uvRows.xy + inUv.y * pc.uvRows.zw + pc.uvOffset;
 }

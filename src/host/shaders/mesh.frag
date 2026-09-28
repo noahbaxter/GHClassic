@@ -10,6 +10,8 @@ layout(push_constant) uniform Push
     mat4 mvp;
     vec4 color;
     vec4 params; // x: alpha cut
+    vec4 uvRows;
+    vec2 uvOffset;
 } pc;
 
 layout(location = 0) out vec4 outColor;

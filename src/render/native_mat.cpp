@@ -27,6 +27,37 @@ namespace gh2
 {
     namespace
     {
+        // The uv transform PsMat::Update builds from tex_xfm for the xfm tex
+        // gens (0x19d510), rows at +0x170/+0x180 and offset at +0x1a0. The
+        // off-diagonals flip sign, and xfm turns about the texture's centre
+        // where xfm origin keeps tex_xfm's position as is.
+        void readUvXfm(uint8_t *rdram, uint32_t mat, Material &m)
+        {
+            const uint32_t xfm = mat + milo::mat::kTexXfm;
+            const float m00 = load<float>(rdram, xfm + 0x00u);
+            const float m01 = load<float>(rdram, xfm + 0x04u);
+            const float m10 = load<float>(rdram, xfm + 0x10u);
+            const float m11 = load<float>(rdram, xfm + 0x14u);
+            const float px = load<float>(rdram, xfm + 0x30u);
+            const float py = load<float>(rdram, xfm + 0x34u);
+            m.uvXfm[0] = m00;
+            m.uvXfm[1] = -m01;
+            m.uvXfm[2] = -m10;
+            m.uvXfm[3] = m11;
+            if (m.texGen == milo::mat::kTexGenXfm)
+            {
+                const float x = -px - 0.5f;
+                const float y = py - 0.5f;
+                m.uvXfm[4] = x * m00 + y * -m10 + 0.5f;
+                m.uvXfm[5] = x * -m01 + y * m11 + 0.5f;
+            }
+            else
+            {
+                m.uvXfm[4] = px;
+                m.uvXfm[5] = py;
+            }
+        }
+
         void select(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
             SET_GPR_U32(ctx, 2, nextPass(rdram, GPR_U32(ctx, 4)));
@@ -47,6 +78,9 @@ namespace gh2
         // Update drops the texture for a dest-blended material.
         if (m.blend != milo::mat::kBlendDest)
             m.texture = capturedTexture(load<uint32_t>(rdram, mat + milo::mat::kDiffuseTex));
+        m.texGen = load<uint32_t>(rdram, mat + milo::mat::kTexGen);
+        if (m.texGen == milo::mat::kTexGenXfm || m.texGen == milo::mat::kTexGenXfmOrigin)
+            readUvXfm(rdram, mat, m);
         if (m.blend >= milo::mat::kBlendCount)
             m.blend = milo::mat::kBlendSrcAlpha; // Update's default case
         if (m.zMode >= milo::mat::kZModeCount)

@@ -26,7 +26,10 @@ namespace gh2
             float mvp[16];
             float color[4];  // material colour, times the colour scale
             float params[4]; // x: alpha cut
+            float uvRows[4]; // Material::uvXfm
+            float uvOffset[2];
         };
+        static_assert(sizeof(PushConstants) <= 128, "past Vulkan's guaranteed push constant size");
 
         constexpr uint32_t kPipelineCount = milo::mat::kBlendCount * milo::mat::kZModeCount;
 
@@ -755,6 +758,8 @@ namespace gh2
                 for (int c = 0; c < 3; ++c)
                     push.color[c] *= 255.0f / 128.0f;
             push.params[0] = material.alphaCut ? 1.0f : 0.0f;
+            std::memcpy(push.uvRows, material.uvXfm, sizeof(push.uvRows));
+            std::memcpy(push.uvOffset, material.uvXfm + 4, sizeof(push.uvOffset));
             vkCmdPushConstants(cmd, s.layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                                sizeof(push), &push);
             vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, s.layout, 0, 1,
