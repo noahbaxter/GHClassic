@@ -15,6 +15,7 @@
 #include <cmath>
 #include <cstdio>
 #include <iostream>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -272,6 +273,18 @@ namespace gh2
         {
             std::cerr << "[sdl] window: " << SDL_GetError() << std::endl;
             return false;
+        }
+        // Also the Dock icon on macOS. A missing one leaves SDL's default.
+        const char *base = SDL_GetBasePath();
+        const std::string iconPath = std::string(base ? base : "") + "icon.png";
+        if (SDL_Surface *icon = SDL_LoadPNG(iconPath.c_str()))
+        {
+            SDL_SetWindowIcon(s.window, icon);
+            SDL_DestroySurface(icon);
+        }
+        else
+        {
+            std::cerr << "[sdl] icon: " << SDL_GetError() << std::endl;
         }
 
         Uint32 extensionCount = 0;
