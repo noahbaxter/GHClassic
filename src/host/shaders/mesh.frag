@@ -18,7 +18,7 @@ layout(push_constant) uniform Push
 
 layout(location = 0) out vec4 outColor;
 
-const uint kFlagAlphaCut = 8u;
+const uint kFlagAlphaCut = 16u;
 
 void main()
 {

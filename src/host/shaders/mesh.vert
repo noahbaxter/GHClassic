@@ -15,7 +15,7 @@ layout(push_constant) uniform Push
     vec2 uvOffset;
     int boneBase;
     int lightBase;
-    uint flags; // colour mode in bits 0-1, prelit 4, alpha cut 8, intensify 16
+    uint flags; // colour mode in bits 0-2, prelit 8, alpha cut 16, intensify 32
 } pc;
 
 layout(set = 1, binding = 0, std430) readonly buffer FrameData
@@ -30,8 +30,9 @@ const uint kColorVertex = 0u;
 const uint kColorAmbient = 1u;
 const uint kColorDirectional = 2u;
 const uint kColorMaterial = 3u;
-const uint kFlagPrelit = 4u;
-const uint kFlagIntensify = 16u;
+const uint kColorPoint = 4u;
+const uint kFlagPrelit = 8u;
+const uint kFlagIntensify = 32u;
 
 mat4 bone(int b)
 {
@@ -54,7 +55,7 @@ void main()
     gl_Position = pc.mvp * pos;
 
     // What VU1's lighting program leaves in the vertex's colour.
-    uint mode = pc.flags & 3u;
+    uint mode = pc.flags & 7u;
     vec4 base = (pc.flags & kFlagPrelit) != 0u ? vertexColor : pc.matColor;
     vec4 color = vertexColor;
     if (mode == kColorAmbient)
@@ -78,6 +79,20 @@ void main()
         vec4 lit = d.x * (data[pc.lightBase + 1] * pc.matColor) + d.y * (data[pc.lightBase + 2] * pc.matColor) +
                    d.z * (data[pc.lightBase + 3] * pc.matColor);
         color = min(lit + base * ambient, vec4(1.0));
+    }
+    else if (mode == kColorPoint)
+    {
+        // 0x436: base * ambient, plus within range the light * material *
+        // (to . n) * (1/|to| - 1/range), where to runs from the vertex to the
+        // light in the mesh's space. The dot is not clamped at zero; the
+        // result is clamped to [0, 1].
+        vec4 local = data[pc.lightBase + 4];
+        vec3 to = local.xyz - pos.xyz;
+        float d2 = dot(to, to);
+        color = base * data[pc.lightBase];
+        if (d2 <= data[pc.lightBase + 5].w && d2 > 0.0)
+            color += data[pc.lightBase + 1] * pc.matColor * (dot(to, inNormal) * (local.w + inversesqrt(d2)));
+        color = clamp(color, vec4(0.0), vec4(1.0));
     }
     // The GS colour scale: 128 with a texture, raised to 255 by intensify.
     if ((pc.flags & kFlagIntensify) != 0u)

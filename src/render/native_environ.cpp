@@ -20,7 +20,6 @@
 #include "ps2_runtime_macros.h"
 
 #include <cmath>
-#include <iostream>
 
 namespace gh2
 {
@@ -38,19 +37,30 @@ namespace gh2
             for (uint32_t i = 0; i < 3; ++i)
                 e.ambient[i] = load<float>(rdram, env + milo::environ::kAmbient + i * 4u);
 
-            bool point = false;
-            for (uint32_t node = load<uint32_t>(rdram, env + milo::environ::kFirstLight); node != 0u;
+            uint32_t point = 0u;
+            for (uint32_t node = load<uint32_t>(rdram, env + milo::environ::kFirstLight); node != 0u && point == 0u;
                  node = load<uint32_t>(rdram, node + 4u))
-                if (load<uint32_t>(rdram, load<uint32_t>(rdram, node) + milo::light::kType) == milo::light::kPoint)
-                    point = true;
-
-            if (point)
             {
+                const uint32_t light = load<uint32_t>(rdram, node);
+                if (load<uint32_t>(rdram, light + milo::light::kType) == milo::light::kPoint)
+                    point = light;
+            }
+
+            if (point != 0u)
+            {
+                // The first point light: its colour (qw682), world position
+                // (qw685..687 x) and range (-1/range in qw685 w, range squared
+                // in qw686 w), from 0x1a213c..0x1a2248.
                 e.kind = Environ::kPoint;
-                static bool warned = false;
-                if (!warned)
-                    std::cerr << "[environ] point light: not implemented, lit by ambient alone" << std::endl;
-                warned = true;
+                e.lightCount = 1u;
+                const uint32_t world = static_cast<uint32_t>(
+                    runtime->callGuestFunction(rdram, ctx, s_addresses->worldXfm, {point}));
+                for (uint32_t c = 0; c < 3; ++c)
+                {
+                    e.color[0][c] = load<float>(rdram, point + milo::light::kColor + c * 4u);
+                    e.position[c] = load<float>(rdram, world + 0x30u + c * 4u);
+                }
+                e.range = load<float>(rdram, point + milo::light::kRange);
             }
             else
             {

@@ -29,10 +29,11 @@ namespace gh2
             kColorAmbient,     // 0x7c5 with the environ: base * ambient
             kColorDirectional, // 0x6ec: base * ambient + lights * material
             kColorMaterial,    // 0x7c5 without the environ or prelit: the material's
+            kColorPoint,       // 0x436: base * ambient + a point light * material, within its range
         };
-        constexpr uint32_t kFlagPrelit = 1u << 2;    // base is the vertex colour, else the material's
-        constexpr uint32_t kFlagAlphaCut = 1u << 3;  // discard alpha below the GS's 1
-        constexpr uint32_t kFlagIntensify = 1u << 4; // textured rgb scale 255 over 128
+        constexpr uint32_t kFlagPrelit = 1u << 3;    // base is the vertex colour, else the material's
+        constexpr uint32_t kFlagAlphaCut = 1u << 4;  // discard alpha below the GS's 1
+        constexpr uint32_t kFlagIntensify = 1u << 5; // textured rgb scale 255 over 128
 
         struct PushConstants
         {
@@ -42,7 +43,7 @@ namespace gh2
             float uvOffset[2];
             int32_t boneBase;  // the draw's first bone vec4 in the frame data, -1 when rigid
             int32_t lightBase; // the draw's lighting block in the frame data
-            uint32_t flags;    // ColorMode in bits 0-1, then the kFlag bits
+            uint32_t flags;    // ColorMode in bits 0-2, then the kFlag bits
         };
         static_assert(sizeof(PushConstants) <= 128, "past Vulkan's guaranteed push constant size");
 
@@ -188,6 +189,8 @@ namespace gh2
         {
             if (!draw.material.useEnviron)
                 return draw.material.prelit ? kColorVertex : kColorMaterial;
+            if (draw.environ.kind == Environ::kPoint)
+                return kColorPoint;
             return draw.environ.kind == Environ::kDirectional ? kColorDirectional : kColorAmbient;
         }
 
@@ -195,10 +198,30 @@ namespace gh2
         // then each light's direction taken into the mesh's space through the
         // rows of its lighting matrix, as the directional program does before
         // its loop (0x3788..0x37c8): d = n . direction.
+        //
+        // A point light fills the same block as the point program reads it
+        // (0x21b0..0x2238): its colour in [1], its position taken relative to
+        // the mesh's origin (qw679) and into the mesh's space through the rows
+        // in [4] with -1/range in w, and range squared in [5] w.
         void writeLighting(const DrawCall &draw, Vec4 *out)
         {
             const Environ &e = draw.environ;
             out[0] = {{e.ambient[0], e.ambient[1], e.ambient[2], 1.0f}};
+            if (e.kind == Environ::kPoint)
+            {
+                out[1] = {{e.color[0][0], e.color[0][1], e.color[0][2], 0.0f}};
+                out[2] = out[3] = out[6] = {{0.0f, 0.0f, 0.0f, 0.0f}};
+                float rel[3];
+                for (uint32_t c = 0; c < 3; ++c)
+                    rel[c] = e.position[c] - draw.lightWorld[12 + c];
+                Vec4 local{{0.0f, 0.0f, 0.0f, e.range != 0.0f ? -1.0f / e.range : 0.0f}};
+                for (uint32_t row = 0; row < 3; ++row)
+                    local.v[row] = draw.lightWorld[row * 4 + 0] * rel[0] + draw.lightWorld[row * 4 + 1] * rel[1] +
+                                   draw.lightWorld[row * 4 + 2] * rel[2];
+                out[4] = local;
+                out[5] = {{0.0f, 0.0f, 0.0f, e.range * e.range}};
+                return;
+            }
             for (uint32_t i = 0; i < 3; ++i)
             {
                 const bool present = i < e.lightCount;
@@ -847,7 +870,7 @@ namespace gh2
                 used += milo::mesh::kBoneCount * 4u;
             }
             colorModes[i] = colorMode(draw);
-            if (colorModes[i] == kColorAmbient || colorModes[i] == kColorDirectional)
+            if (colorModes[i] == kColorAmbient || colorModes[i] == kColorDirectional || colorModes[i] == kColorPoint)
             {
                 lightBases[i] = static_cast<int32_t>(used);
                 used += kLightingVec4s;

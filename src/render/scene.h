@@ -60,13 +60,15 @@ namespace gh2
         {
             kAmbient,     // no lights: program 0x7c5
             kDirectional, // up to three directional lights: program 0x6ec
-            kPoint,       // a point light: program 0x436, not implemented
+            kPoint,       // one point light with a range: program 0x436
         };
         uint32_t kind = kAmbient;
         float ambient[3] = {0.0f, 0.0f, 0.0f};
         uint32_t lightCount = 0;
-        float color[3][3] = {};   // rgb; VU1 gets alpha 0
+        float color[3][3] = {};   // rgb; VU1 gets alpha 0. A point light's is color[0]
         float toLight[3][3] = {}; // world, unit length: each light's -y
+        float position[3] = {};   // the point light's world position
+        float range = 0.0f;       // the point light's range
     };
 
     struct DrawCall
