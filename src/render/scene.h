@@ -72,12 +72,16 @@ namespace gh2
     struct DrawCall
     {
         std::shared_ptr<const MeshData> mesh;
-        Matrix world{};
+        Matrix world{};      // identity when skinned
         uint32_t camera = 0; // index into Frame::cameras
         Material material;
+        // A skinned vert is sum over b of weight[b] * (pos * bones[b]), its
+        // four colour floats being the weights.
+        bool skinned = false;
+        std::array<Matrix, 4> bones{};
         Environ environ;
         // Takes normals to world space for lighting (qw676..678): the world
-        // transform.
+        // transform, or for a skinned mesh the palette's fifth matrix.
         Matrix lightWorld{};
     };
 }

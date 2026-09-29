@@ -26,6 +26,13 @@ namespace gh2
         return out;
     }
 
+    Matrix identity()
+    {
+        Matrix m{};
+        m[0] = m[5] = m[10] = m[15] = 1.0f;
+        return m;
+    }
+
     Matrix viewProjection(const Camera &camera, float yRatio)
     {
         const float n = camera.nearPlane;

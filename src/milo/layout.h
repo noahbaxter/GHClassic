@@ -136,9 +136,10 @@ namespace milo
         constexpr uint32_t kFacesEnd = 0x10cu;
         constexpr uint32_t kMat = 0x120u;        // RndMat* (ObjPtr at +0x118)
         constexpr uint32_t kOwner = 0x138u;      // RndMesh* (ObjPtr at +0x130)
-        constexpr uint32_t kBones = 0x13cu;      // Bones*
+        constexpr uint32_t kBones = 0x13cu;      // Bones*, null for a rigid mesh
         constexpr uint32_t kTransform = 0x40u;   // the RndTransformable base
         constexpr uint32_t kObjectBase = 0x160u; // the Hmx::Object virtual base, in a PsMesh
+        constexpr uint32_t kPacket = 0x150u;     // PsMesh's face packet MemHandle*, null until synced
         constexpr uint32_t kVertSize = 0x40u;
         constexpr uint32_t kFaceSize = 6u;
         // Vert: position +0x00, normal +0x10, colour (4 floats) +0x20,
@@ -147,6 +148,13 @@ namespace milo
         constexpr uint32_t kVertNormal = 0x10u;
         constexpr uint32_t kVertColor = 0x20u;
         constexpr uint32_t kVertUv = 0x30u;
+        // Bones: four ObjPtr<RndTransformable> (object at +0x8 of each,
+        // 0xc apart), then each bone's bind Transform (0x40 apart).
+        constexpr uint32_t kBoneCount = 4u;
+        constexpr uint32_t kBoneObject = 0x08u;
+        constexpr uint32_t kBoneObjectStride = 0x0cu;
+        constexpr uint32_t kBoneBind = 0x30u;
+        constexpr uint32_t kBoneBindStride = 0x40u;
         // Sync flags: which parts changed.
         constexpr uint32_t kSyncVerts = 0x1fu;
         constexpr uint32_t kSyncFaces = 0x20u;
