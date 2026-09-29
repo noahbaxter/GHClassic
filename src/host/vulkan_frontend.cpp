@@ -1,5 +1,6 @@
 #include "host/vulkan_frontend.h"
 
+#include "host/input.h"
 #include "host/scene_renderer.h"
 #include "render/frame.h"
 
@@ -334,6 +335,9 @@ namespace gh2
             return false;
         if (!s.hidden && !s.createSwapchain())
             return false;
+        // A hidden run is scripted; the player's controller stays out of it.
+        if (!s.hidden)
+            openInput();
         s.nextHiddenFrame = std::chrono::steady_clock::now();
         return true;
     }
@@ -342,13 +346,17 @@ namespace gh2
     {
         State &s = *m_state;
         SDL_Event event;
+        bool devicesChanged = false;
         while (SDL_PollEvent(&event))
         {
             if (event.type == SDL_EVENT_QUIT)
                 return false;
             if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED)
                 s.swapchainStale = true;
+            if (event.type == SDL_EVENT_GAMEPAD_ADDED || event.type == SDL_EVENT_GAMEPAD_REMOVED)
+                devicesChanged = true;
         }
+        pollInput(devicesChanged);
 
         const Frame frame = frames().latest();
         if (!s.ensureTarget(frame.width, frame.height))
@@ -475,6 +483,7 @@ namespace gh2
             vkb::destroy_surface(s.instance, s.surface);
         if (s.instance.instance != VK_NULL_HANDLE)
             vkb::destroy_instance(s.instance);
+        closeInput();
         if (s.window)
             SDL_DestroyWindow(s.window);
         SDL_Quit();

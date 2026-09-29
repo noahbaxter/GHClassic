@@ -25,6 +25,8 @@ namespace gh2
         uint32_t playMovie;
         uint32_t optionsSyncVideo; // Options::SyncVideoOptions
         uint32_t ctlClientPoll;
+        uint32_t scePadRead;
+        uint32_t scePadInfoAct;
         // Data
         uint32_t rndCamCurrent;  // RndCam::sCurrent
         uint32_t defaultMat;     // the RndMat a mesh without one draws with
@@ -56,6 +58,8 @@ namespace gh2
         .playMovie = 0x21bb60u,
         .optionsSyncVideo = 0x10db80u,
         .ctlClientPoll = 0x22dc68u,
+        .scePadRead = 0x2f2c48u,
+        .scePadInfoAct = 0x2f2e58u,
         .rndCamCurrent = 0x3de348u,
         .defaultMat = 0x3da4f0u,
         .rndEnvironCurrent = 0x3de358u,
