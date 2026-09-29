@@ -158,5 +158,17 @@ namespace milo
         // Sync flags: which parts changed.
         constexpr uint32_t kSyncVerts = 0x1fu;
         constexpr uint32_t kSyncFaces = 0x20u;
+        // PsMultiMesh::DrawShowing turns each instance to face the camera
+        // when this is kFaceCamera (0x1a31c8). The field's name is unknown.
+        constexpr uint32_t kInstanceMode = 0xe4u;
+        constexpr uint32_t kFaceCamera = 8u;
+    }
+
+    // RndMultiMesh: one mesh drawn at each of a list of transforms.
+    namespace multimesh
+    {
+        constexpr uint32_t kMesh = 0x48u;      // RndMesh* (ObjPtr at +0x40)
+        constexpr uint32_t kInstances = 0x50u; // the instance list's sentinel node; its first word is the first node
+        constexpr uint32_t kInstanceXfm = 0x10u; // a node's Transform
     }
 }

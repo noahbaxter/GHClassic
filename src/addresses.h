@@ -16,6 +16,7 @@ namespace gh2
         uint32_t psMeshFixVerts;
         uint32_t psMeshDestroy;
         uint32_t psMeshDrawShowing;
+        uint32_t psMultiMeshDrawShowing;
         uint32_t psMatSelect;
         uint32_t psEnvironSelect;
         uint32_t psTexSyncBitmap;
@@ -46,6 +47,7 @@ namespace gh2
         .psMeshFixVerts = 0x19dbb8u,
         .psMeshDestroy = 0x19dd88u,
         .psMeshDrawShowing = 0x3d88d8u,
+        .psMultiMeshDrawShowing = 0x1a2f00u,
         .psMatSelect = 0x3d8348u,
         .psEnvironSelect = 0x1a2060u,
         .psTexSyncBitmap = 0x1a13a8u,

@@ -1,7 +1,8 @@
-// PsMesh::DrawShowing, native: record the draw instead of building packets.
+// PsMesh::DrawShowing and PsMultiMesh::DrawShowing, native: record the draws
+// instead of building packets.
 //
-// Retail (0x3d88d8) draws the owner's geometry with this mesh's own world
-// transform, or its bones when it has them, once per material pass.
+// Retail PsMesh (0x3d88d8) draws the owner's geometry with this mesh's own
+// world transform, or its bones when it has them, once per material pass.
 // Everything else it does is DMA packet work, so nothing in guest state
 // depends on it running.
 
@@ -17,6 +18,7 @@
 #include "render/native_environ.h"
 #include "render/native_mat.h"
 
+#include <algorithm>
 #include <cstring>
 
 namespace gh2
@@ -59,6 +61,20 @@ namespace gh2
                 return static_cast<uint32_t>(frame.cameras.size() - 1u);
             frame.cameras.push_back(camera);
             return static_cast<uint32_t>(frame.cameras.size() - 1u);
+        }
+
+        // One draw per material pass, from this mesh's material, not the
+        // owner's.
+        void pushPasses(uint8_t *rdram, uint32_t mesh, DrawCall &draw)
+        {
+            uint32_t mat = load<uint32_t>(rdram, mesh + milo::mesh::kMat);
+            if (mat == 0u)
+                mat = load<uint32_t>(rdram, s_addresses->defaultMat);
+            for (; mat != 0u; mat = nextPass(rdram, mat))
+            {
+                draw.material = readMaterial(rdram, mat);
+                building().draws.push_back(draw);
+            }
         }
 
         // The bone palette DrawShowing uploads for a skinned mesh (0x3d8974):
@@ -122,15 +138,44 @@ namespace gh2
                 draw.mesh = std::move(geometry);
                 draw.environ = currentEnviron();
                 draw.camera = currentCamera(rdram);
-                // One draw per material pass, from this mesh's material, not
-                // the owner's.
-                uint32_t mat = load<uint32_t>(rdram, mesh + milo::mesh::kMat);
-                if (mat == 0u)
-                    mat = load<uint32_t>(rdram, s_addresses->defaultMat);
-                for (; mat != 0u; mat = nextPass(rdram, mat))
+                pushPasses(rdram, mesh, draw);
+            }
+            ctx->pc = returnTo;
+        }
+
+        // PsMultiMesh::DrawShowing, retail 0x1a2f00: the mesh drawn at each
+        // instance's transform, once per material pass, gated on the owner's
+        // packet as PsMesh is (GetMultiMeshPacket, 0x19e208). An instance
+        // takes the camera's world rotation, keeping its own position, when
+        // the mesh asks to face the camera. The rest is packet work.
+        void drawMultiShowing(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t returnTo = GPR_U32(ctx, 31);
+            const uint32_t multi = GPR_U32(ctx, 4);
+            const uint32_t mesh = load<uint32_t>(rdram, multi + milo::multimesh::kMesh);
+            const uint32_t owner = mesh != 0u ? load<uint32_t>(rdram, mesh + milo::mesh::kOwner) : 0u;
+            std::shared_ptr<const MeshData> geometry = owner != 0u ? capturedMesh(owner) : nullptr;
+            const bool synced = owner != 0u && load<uint32_t>(rdram, owner + milo::mesh::kPacket) != 0u;
+            const uint32_t sentinel = multi + milo::multimesh::kInstances;
+            const uint32_t first = load<uint32_t>(rdram, sentinel);
+            if (synced && geometry && !geometry->indices.empty() && first != sentinel)
+            {
+                // Retail asks for the camera's world on every draw (0x1a31d0).
+                const Matrix cameraWorld = readTransform(
+                    rdram, static_cast<uint32_t>(runtime->callGuestFunction(
+                               rdram, ctx, s_addresses->worldXfm, {load<uint32_t>(rdram, s_addresses->rndCamCurrent)})));
+                const bool faceCamera = load<uint32_t>(rdram, mesh + milo::mesh::kInstanceMode) == milo::mesh::kFaceCamera;
+                DrawCall draw;
+                draw.mesh = std::move(geometry);
+                draw.environ = currentEnviron();
+                draw.camera = currentCamera(rdram);
+                for (uint32_t node = first; node != sentinel; node = load<uint32_t>(rdram, node))
                 {
-                    draw.material = readMaterial(rdram, mat);
-                    building().draws.push_back(draw);
+                    draw.world = readTransform(rdram, node + milo::multimesh::kInstanceXfm);
+                    if (faceCamera)
+                        std::copy(cameraWorld.begin(), cameraWorld.begin() + 12, draw.world.begin());
+                    draw.lightWorld = draw.world;
+                    pushPasses(rdram, mesh, draw);
                 }
             }
             ctx->pc = returnTo;
@@ -141,5 +186,6 @@ namespace gh2
     {
         s_addresses = &addresses;
         runtime.replaceFunction(addresses.psMeshDrawShowing, drawShowing);
+        runtime.replaceFunction(addresses.psMultiMeshDrawShowing, drawMultiShowing);
     }
 }
