@@ -11,6 +11,7 @@ layout(push_constant) uniform Push
     vec4 matColor;
     vec4 uvRows;
     vec2 uvOffset;
+    int boneBase;
     int lightBase;
     uint flags;
 } pc;

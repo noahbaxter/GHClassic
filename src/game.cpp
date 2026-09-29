@@ -4,13 +4,13 @@
 #include "game_overrides.h"
 #include "null_movie.h"
 #include "null_rnd.h"
-#include "null_synth.h"
 #include "render/mesh_capture.h"
 #include "render/native_environ.h"
 #include "render/native_mat.h"
 #include "render/native_mesh.h"
 #include "render/native_rnd.h"
 #include "render/texture_capture.h"
+#include "silent_synth.h"
 #include "video_options.h"
 
 namespace
@@ -24,7 +24,7 @@ namespace
         gh2::installNativeMesh(runtime, gh2::kSlus21447);
         gh2::installNativeMat(runtime, gh2::kSlus21447);
         gh2::installNativeEnviron(runtime, gh2::kSlus21447);
-        gh2::installNullSynth(runtime);
+        gh2::installSilentSynth(runtime, gh2::kSlus21447);
         gh2::installNullMovie(runtime, gh2::kSlus21447);
         gh2::installVideoOptions(runtime, gh2::kSlus21447);
     }

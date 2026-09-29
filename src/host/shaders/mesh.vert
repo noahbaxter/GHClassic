@@ -5,14 +5,15 @@ layout(location = 1) in vec4 inColor;
 layout(location = 2) in vec2 inUv;
 layout(location = 3) in vec3 inNormal;
 
-// mvp is Milo's row-vector matrix stored row-major, which GLSL reads as its
-// transpose, so mvp * p here is p * M there.
+// Matrices are Milo's row-vector matrices stored row-major, which GLSL reads
+// as their transpose, so M * p here is p * M there.
 layout(push_constant) uniform Push
 {
     mat4 mvp;
     vec4 matColor;
     vec4 uvRows; // u's row, then v's
     vec2 uvOffset;
+    int boneBase;
     int lightBase;
     uint flags; // colour mode in bits 0-1, prelit 4, alpha cut 8, intensify 16
 } pc;
@@ -32,10 +33,25 @@ const uint kColorMaterial = 3u;
 const uint kFlagPrelit = 4u;
 const uint kFlagIntensify = 16u;
 
+mat4 bone(int b)
+{
+    int i = pc.boneBase + b * 4;
+    return mat4(data[i], data[i + 1], data[i + 2], data[i + 3]);
+}
+
 void main()
 {
+    vec4 pos = vec4(inPos, 1.0);
     vec4 vertexColor = inColor;
-    gl_Position = pc.mvp * vec4(inPos, 1.0);
+    if (pc.boneBase >= 0)
+    {
+        // The colour floats are the bone weights, so the vert has no colour
+        // of its own.
+        pos = inColor.x * (bone(0) * pos) + inColor.y * (bone(1) * pos) + inColor.z * (bone(2) * pos) +
+              inColor.w * (bone(3) * pos);
+        vertexColor = vec4(1.0);
+    }
+    gl_Position = pc.mvp * pos;
 
     // What VU1's lighting program leaves in the vertex's colour.
     uint mode = pc.flags & 3u;

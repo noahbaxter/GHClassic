@@ -40,12 +40,13 @@ namespace gh2
             float matColor[4];
             float uvRows[4]; // Material::uvXfm
             float uvOffset[2];
+            int32_t boneBase;  // the draw's first bone vec4 in the frame data, -1 when rigid
             int32_t lightBase; // the draw's lighting block in the frame data
             uint32_t flags;    // ColorMode in bits 0-1, then the kFlag bits
         };
         static_assert(sizeof(PushConstants) <= 128, "past Vulkan's guaranteed push constant size");
 
-        // Each frame writes its lighting to its own slot's buffer,
+        // Each frame writes its bones and lighting to its own slot's buffer,
         // so a slot is reused only after its frame has retired.
         constexpr uint32_t kFrameSlots = kRetireAfter + 1u;
         constexpr uint32_t kMinFrameData = 1024u; // vec4s
@@ -830,14 +831,22 @@ namespace gh2
             drawTextures[i] = s.gpuTexture(cmd, data, serial);
         }
 
-        // Every lit draw's lighting block, in draw order.
+        // Every skinned draw's four bones and every lit draw's lighting
+        // block, in draw order.
         FrameDataSlot &data = s.frameData[serial % kFrameSlots];
+        std::vector<int32_t> boneBases(frame.draws.size(), -1);
         std::vector<int32_t> lightBases(frame.draws.size(), -1);
         std::vector<uint32_t> colorModes(frame.draws.size(), kColorVertex);
         uint32_t used = 0;
         for (size_t i = 0; i < frame.draws.size(); ++i)
         {
-            colorModes[i] = colorMode(frame.draws[i]);
+            const DrawCall &draw = frame.draws[i];
+            if (draw.skinned)
+            {
+                boneBases[i] = static_cast<int32_t>(used);
+                used += milo::mesh::kBoneCount * 4u;
+            }
+            colorModes[i] = colorMode(draw);
             if (colorModes[i] == kColorAmbient || colorModes[i] == kColorDirectional)
             {
                 lightBases[i] = static_cast<int32_t>(used);
@@ -847,8 +856,12 @@ namespace gh2
         if (!s.growFrameData(data, used))
             return false;
         for (size_t i = 0; i < frame.draws.size(); ++i)
+        {
+            if (boneBases[i] >= 0)
+                std::memcpy(data.mapped + boneBases[i], frame.draws[i].bones.data(), sizeof(frame.draws[i].bones));
             if (lightBases[i] >= 0)
                 writeLighting(frame.draws[i], data.mapped + lightBases[i]);
+        }
         vmaFlushAllocation(s.allocator, data.memory, 0, VK_WHOLE_SIZE);
 
         VkClearValue clears[2]{};
@@ -922,6 +935,7 @@ namespace gh2
             // Intensify raises a textured pass's rgb scale from 128 to 255.
             if (material.texture && material.intensify)
                 push.flags |= kFlagIntensify;
+            push.boneBase = boneBases[i];
             push.lightBase = lightBases[i];
             std::memcpy(push.uvRows, material.uvXfm, sizeof(push.uvRows));
             std::memcpy(push.uvOffset, material.uvXfm + 4, sizeof(push.uvOffset));

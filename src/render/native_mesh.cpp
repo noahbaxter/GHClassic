@@ -1,8 +1,9 @@
 // PsMesh::DrawShowing, native: record the draw instead of building packets.
 //
 // Retail (0x3d88d8) draws the owner's geometry with this mesh's own world
-// transform, once per material pass. Everything else it does is DMA packet
-// work, so nothing in guest state depends on it running.
+// transform, or its bones when it has them, once per material pass.
+// Everything else it does is DMA packet work, so nothing in guest state
+// depends on it running.
 
 #include "render/native_mesh.h"
 
@@ -10,6 +11,7 @@
 #include "milo/layout.h"
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
+#include "render/camera.h"
 #include "render/frame.h"
 #include "render/mesh_capture.h"
 #include "render/native_environ.h"
@@ -59,20 +61,65 @@ namespace gh2
             return static_cast<uint32_t>(frame.cameras.size() - 1u);
         }
 
+        // The bone palette DrawShowing uploads for a skinned mesh (0x3d8974):
+        // each bone's bind transform, then its object's world. A missing bone
+        // after the first repeats the first. The fifth matrix, which the
+        // lighting programs take normals through, is identity when a second
+        // bone exists, else the first bone's.
+        template <typename WorldXfm>
+        bool readBones(uint8_t *rdram, uint32_t bones, const WorldXfm &worldXfm, DrawCall &draw)
+        {
+            bool several = false;
+            for (uint32_t b = 0; b < milo::mesh::kBoneCount; ++b)
+            {
+                const uint32_t object =
+                    load<uint32_t>(rdram, bones + milo::mesh::kBoneObject + b * milo::mesh::kBoneObjectStride);
+                if (object == 0u)
+                {
+                    if (b == 0u)
+                        return false; // retail would dereference null
+                    draw.bones[b] = draw.bones[0];
+                    continue;
+                }
+                several |= b != 0u;
+                const Matrix bind =
+                    readTransform(rdram, bones + milo::mesh::kBoneBind + b * milo::mesh::kBoneBindStride);
+                draw.bones[b] = multiply(bind, worldXfm(object));
+            }
+            draw.skinned = true;
+            draw.world = identity();
+            draw.lightWorld = several ? identity() : draw.bones[0];
+            return true;
+        }
+
         void drawShowing(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
             const uint32_t returnTo = GPR_U32(ctx, 31);
             const uint32_t mesh = GPR_U32(ctx, 4);
             const uint32_t owner = load<uint32_t>(rdram, mesh + milo::mesh::kOwner);
             std::shared_ptr<const MeshData> geometry = capturedMesh(owner);
-            if (geometry && !geometry->indices.empty())
+            // Retail draws nothing, and calls nothing, until the owner has a
+            // packet (0x3d890c).
+            const bool synced = load<uint32_t>(rdram, owner + milo::mesh::kPacket) != 0u;
+            if (synced && geometry && !geometry->indices.empty())
             {
-                const uint32_t world = static_cast<uint32_t>(runtime->callGuestFunction(
-                    rdram, ctx, s_addresses->worldXfm, {mesh + milo::mesh::kTransform}));
+                const auto worldXfm = [&](uint32_t transformable) {
+                    return readTransform(rdram, static_cast<uint32_t>(runtime->callGuestFunction(
+                                                    rdram, ctx, s_addresses->worldXfm, {transformable})));
+                };
                 DrawCall draw;
+                const uint32_t bones = load<uint32_t>(rdram, mesh + milo::mesh::kBones);
+                if (bones == 0u)
+                {
+                    draw.world = worldXfm(mesh + milo::mesh::kTransform);
+                    draw.lightWorld = draw.world;
+                }
+                else if (!readBones(rdram, bones, worldXfm, draw))
+                {
+                    ctx->pc = returnTo;
+                    return;
+                }
                 draw.mesh = std::move(geometry);
-                draw.world = readTransform(rdram, world);
-                draw.lightWorld = draw.world;
                 draw.environ = currentEnviron();
                 draw.camera = currentCamera(rdram);
                 // One draw per material pass, from this mesh's material, not

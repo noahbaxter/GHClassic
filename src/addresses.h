@@ -23,10 +23,13 @@ namespace gh2
         uint32_t worldXfm;       // RndTransformable::WorldXfm
         uint32_t playMovie;
         uint32_t optionsSyncVideo; // Options::SyncVideoOptions
+        uint32_t ctlClientPoll;
         // Data
         uint32_t rndCamCurrent;  // RndCam::sCurrent
         uint32_t defaultMat;     // the RndMat a mesh without one draws with
         uint32_t rndEnvironCurrent; // RndEnviron::sCurrent
+        uint32_t synthServerHandler; // the handler CtlServerInit stores
+        uint32_t synthServerBuffer;  // its RPC server's receive buffer
         // RndBitmap::PixelOffset's swizzle tables, by (y / 4) & 1: 64 bytes
         // each for 8bpp, 128 for 4bpp.
         uint32_t swizzle8[2];
@@ -50,9 +53,12 @@ namespace gh2
         .worldXfm = 0x3d8ea0u,
         .playMovie = 0x21bb60u,
         .optionsSyncVideo = 0x10db80u,
+        .ctlClientPoll = 0x22dc68u,
         .rndCamCurrent = 0x3de348u,
         .defaultMat = 0x3da4f0u,
         .rndEnvironCurrent = 0x3de358u,
+        .synthServerHandler = 0x3de454u,
+        .synthServerBuffer = 0x484340u,
         .swizzle8 = {0x3de1c8u, 0x3de208u},
         .swizzle4 = {0x3de248u, 0x3de2c8u},
     };

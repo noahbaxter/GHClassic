@@ -11,4 +11,6 @@ namespace gh2
 
     // a * b for row-vector matrices: apply a, then b.
     Matrix multiply(const Matrix &a, const Matrix &b);
+
+    Matrix identity();
 }
