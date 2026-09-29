@@ -2,6 +2,10 @@
 // options for unattended runs.
 //
 //   ghrecomp <elf> [disc] [--hidden] [--mute] [--mc <dir>] [--shots <dir>] [--shot-every <n>]
+//            [--res window|native|480p|720p|1080p|1440p|2160p]
+//
+// --res is what the scene is drawn at: the window's size (the default), the
+// game's own (512x448), or that height at the picture's aspect.
 
 #include "host/vulkan_frontend.h"
 #include "ps2_runtime.h"
@@ -18,7 +22,7 @@ int main(int argc, char *argv[])
     if (argc < 2)
     {
         std::cerr << "usage: ghrecomp <elf> [disc] [--hidden] [--mute] [--mc <dir>]"
-                     " [--shots <dir>] [--shot-every <n>]"
+                     " [--shots <dir>] [--shot-every <n>] [--res window|native|480p|720p|1080p|1440p|2160p]"
                   << std::endl;
         return 2;
     }
@@ -27,6 +31,7 @@ int main(int argc, char *argv[])
     std::filesystem::path discPath;
     std::filesystem::path mcRoot;
     PS2Runtime::HostOptions hostOptions;
+    gh2::RenderSize renderSize;
     for (int i = 2; i < argc; ++i)
     {
         const std::string arg = argv[i];
@@ -41,6 +46,25 @@ int main(int argc, char *argv[])
             hostOptions.shotDir = argv[++i];
         else if (arg == "--shot-every" && hasValue)
             hostOptions.shotEvery = static_cast<uint32_t>(std::strtoul(argv[++i], nullptr, 10));
+        else if (arg == "--res" && hasValue)
+        {
+            const std::string res = argv[++i];
+            if (res == "window")
+                renderSize.mode = gh2::RenderSize::kWindow;
+            else if (res == "native")
+                renderSize.mode = gh2::RenderSize::kNative;
+            else if (res == "480p" || res == "720p" || res == "1080p" || res == "1440p" || res == "2160p")
+            {
+                renderSize.mode = gh2::RenderSize::kHeight;
+                renderSize.height = static_cast<uint32_t>(std::strtoul(res.c_str(), nullptr, 10));
+            }
+            else
+            {
+                std::cerr << "--res takes window, native, 480p, 720p, 1080p, 1440p or 2160p, not " << res
+                          << std::endl;
+                return 2;
+            }
+        }
         else if (!arg.empty() && arg[0] != '-' && discPath.empty())
             discPath = arg;
         else
@@ -54,7 +78,7 @@ int main(int argc, char *argv[])
 
     PS2Runtime runtime;
     runtime.setHostOptions(hostOptions);
-    runtime.setHostFrontend(std::make_unique<gh2::VulkanFrontend>());
+    runtime.setHostFrontend(std::make_unique<gh2::VulkanFrontend>(renderSize));
     if (!runtime.initialize("Guitar Hero II"))
     {
         std::cerr << "failed to initialize the runtime" << std::endl;
