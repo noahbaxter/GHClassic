@@ -56,6 +56,12 @@ namespace gh2
                     camera.zRange[i] = load<float>(rdram, cam + milo::camera::kZRange + i * 4u);
                 for (uint32_t i = 0; i < 4; ++i)
                     camera.rect[i] = load<float>(rdram, cam + milo::camera::kRect + i * 4u);
+                camera.target = load<uint32_t>(rdram, cam + milo::camera::kTargetTex);
+                if (camera.target != 0u)
+                {
+                    camera.targetWidth = load<uint32_t>(rdram, camera.target + milo::tex::kWidth);
+                    camera.targetHeight = load<uint32_t>(rdram, camera.target + milo::tex::kHeight);
+                }
             }
             if (!frame.cameras.empty() && std::memcmp(&frame.cameras.back(), &camera, sizeof(Camera)) == 0)
                 return static_cast<uint32_t>(frame.cameras.size() - 1u);

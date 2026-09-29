@@ -18,6 +18,12 @@ namespace gh2
         float yFov = 0.0f; // 0 is orthographic
         float zRange[2] = {0.0f, 1.0f};
         float rect[4] = {0.0f, 0.0f, 1.0f, 1.0f}; // normalized screen x, y, w, h
+        // The RndTex it draws into (RndCam +0x2ec), 0 for the screen, and
+        // that texture's size, which PsCam::Select takes as the viewport
+        // (0x19c4d0) and UpdateLocal as the aspect (0x1b1f7c).
+        uint32_t target = 0;
+        uint32_t targetWidth = 0;
+        uint32_t targetHeight = 0;
     };
 
     // Everything the host needs to draw one guest frame. Built on the game

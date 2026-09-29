@@ -79,7 +79,12 @@ namespace gh2
         m.prelit = load<uint32_t>(rdram, mat + milo::mat::kPrelit) != 0u;
         // Update drops the texture for a dest-blended material.
         if (m.blend != milo::mat::kBlendDest)
-            m.texture = capturedTexture(load<uint32_t>(rdram, mat + milo::mat::kDiffuseTex));
+        {
+            const uint32_t tex = load<uint32_t>(rdram, mat + milo::mat::kDiffuseTex);
+            m.texture = capturedTexture(tex);
+            if (tex != 0u && (load<uint32_t>(rdram, tex + milo::tex::kType) & milo::tex::kTypeRendered) != 0u)
+                m.renderTarget = tex;
+        }
         m.texGen = load<uint32_t>(rdram, mat + milo::mat::kTexGen);
         if (m.texGen == milo::mat::kTexGenXfm || m.texGen == milo::mat::kTexGenXfmOrigin)
             readUvXfm(rdram, mat, m);

@@ -23,6 +23,7 @@ namespace milo
         constexpr uint32_t kYFov = 0x2c8u;  // 0 is orthographic
         constexpr uint32_t kZRange = 0x2ccu; // 2 floats
         constexpr uint32_t kRect = 0x2d4u;  // normalized x, y, w, h
+        constexpr uint32_t kTargetTex = 0x2ecu; // RndTex* (ObjPtr at +0x2e4), null for the screen
     }
 
     // RndMat, 0x120 bytes; PsMat adds its GS state after. Enums read from
@@ -123,6 +124,9 @@ namespace milo
     {
         constexpr uint32_t kBitmap = 0x28u; // RndBitmap
         constexpr uint32_t kType = 0x48u;   // Type bits
+        constexpr uint32_t kWidth = 0x4cu;  // int
+        constexpr uint32_t kHeight = 0x50u; // int
+        constexpr uint32_t kTypeRendered = 0x2u; // drawn into through a camera's target
         // Only regular textures have pixels in RAM (SyncBitmap 0x1a13c0).
         constexpr uint32_t kTypeNoPixels = 0x2u | 0x4u | 0x8u; // rendered, movie, frame buffer
     }
