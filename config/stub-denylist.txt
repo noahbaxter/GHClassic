@@ -9,3 +9,23 @@
 # rom0: device the real open fails, the buffer stays zeroed, and IsT10K reports
 # a retail console.
 GetRomName
+
+# newlib's allocator. Every GH2 allocation reaches malloc (MemAlloc falls back
+# to it while gCurHeap is null), so the handlers swapped the game's allocator,
+# and with it which freed memory gets reused and when, for the runtime's
+# first-fit list. The game's own grows its heap with sbrk up to EndOfHeap; the
+# runtime keeps to its arena above. The whole family or none of it: a real
+# _malloc_r reaches sbrk through malloc_extend_top.
+malloc
+free
+realloc
+memalign
+_malloc_r
+_free_r
+_realloc_r
+_calloc_r
+_memalign_r
+_malloc_trim_r
+malloc_extend_top
+__malloc_lock
+__malloc_unlock
