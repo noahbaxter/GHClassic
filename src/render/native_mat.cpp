@@ -58,6 +58,20 @@ namespace gh2
             }
         }
 
+        // What PsMat::Update's environ case (0x19d60c) leaves at +0x170: tex_xfm's
+        // rotation transposed, times rows (1 0 0) (0 0 1) (0 -1 0). Select hands
+        // it to VU1 as qw691..693 for program 0x139.
+        void readEnvRows(uint8_t *rdram, uint32_t mat, Material &m)
+        {
+            const uint32_t xfm = mat + milo::mat::kTexXfm;
+            for (uint32_t i = 0; i < 3; ++i)
+            {
+                m.envRows[i][0] = load<float>(rdram, xfm + 0x00u + i * 4u);
+                m.envRows[i][1] = -load<float>(rdram, xfm + 0x20u + i * 4u);
+                m.envRows[i][2] = load<float>(rdram, xfm + 0x10u + i * 4u);
+            }
+        }
+
         void select(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
             SET_GPR_U32(ctx, 2, nextPass(rdram, GPR_U32(ctx, 4)));
@@ -88,6 +102,8 @@ namespace gh2
         m.texGen = load<uint32_t>(rdram, mat + milo::mat::kTexGen);
         if (m.texGen == milo::mat::kTexGenXfm || m.texGen == milo::mat::kTexGenXfmOrigin)
             readUvXfm(rdram, mat, m);
+        else if (m.texGen == milo::mat::kTexGenEnviron)
+            readEnvRows(rdram, mat, m);
         if (m.blend >= milo::mat::kBlendCount)
             m.blend = milo::mat::kBlendSrcAlpha; // Update's default case
         if (m.zMode >= milo::mat::kZModeCount)

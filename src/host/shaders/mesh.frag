@@ -14,6 +14,7 @@ layout(push_constant) uniform Push
     int boneBase;
     int lightBase;
     uint flags;
+    int envBase;
 } pc;
 
 layout(location = 0) out vec4 outColor;

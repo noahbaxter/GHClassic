@@ -49,6 +49,8 @@ namespace gh2
             if (cam != 0u)
             {
                 camera.view = readTransform(rdram, cam + milo::camera::kView);
+                for (uint32_t i = 0; i < 3; ++i)
+                    camera.eye[i] = load<float>(rdram, cam + milo::transformable::kWorld + 0x30u + i * 4u);
                 camera.nearPlane = load<float>(rdram, cam + milo::camera::kNear);
                 camera.farPlane = load<float>(rdram, cam + milo::camera::kFar);
                 camera.yFov = load<float>(rdram, cam + milo::camera::kYFov);
@@ -109,6 +111,7 @@ namespace gh2
                 draw.bones[b] = multiply(bind, worldXfm(object));
             }
             draw.skinned = true;
+            draw.blended = several;
             draw.world = identity();
             draw.lightWorld = several ? identity() : draw.bones[0];
             return true;

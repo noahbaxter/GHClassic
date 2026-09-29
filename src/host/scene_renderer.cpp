@@ -34,6 +34,7 @@ namespace gh2
         constexpr uint32_t kFlagPrelit = 1u << 3;    // base is the vertex colour, else the material's
         constexpr uint32_t kFlagAlphaCut = 1u << 4;  // discard alpha below the GS's 1
         constexpr uint32_t kFlagIntensify = 1u << 5; // textured rgb scale 255 over 128
+        constexpr uint32_t kFlagBlended = 1u << 6;   // lit and tex-genned from the skinned vert
 
         struct PushConstants
         {
@@ -44,6 +45,7 @@ namespace gh2
             int32_t boneBase;  // the draw's first bone vec4 in the frame data, -1 when rigid
             int32_t lightBase; // the draw's lighting block in the frame data
             uint32_t flags;    // ColorMode in bits 0-2, then the kFlag bits
+            int32_t envBase;   // the draw's environ tex gen block in the frame data, -1 for none
         };
         static_assert(sizeof(PushConstants) <= 128, "past Vulkan's guaranteed push constant size");
 
@@ -54,6 +56,8 @@ namespace gh2
         // A draw's lighting block: ambient, three light colours, then the
         // three directions to the lights in the mesh's own space.
         constexpr uint32_t kLightingVec4s = 7u;
+        // A draw's environ tex gen block: see writeEnvTexGen.
+        constexpr uint32_t kEnvTexGenVec4s = 4u;
 
         constexpr uint32_t kPipelineCount = milo::mat::kBlendCount * milo::mat::kZModeCount;
 
@@ -254,6 +258,30 @@ namespace gh2
                                            draw.lightWorld[row * 4 + 2] * e.toLight[i][2];
                 out[4 + i] = direction;
             }
+        }
+
+        // Program 0x139, the environ tex gen (0x09c8..0x0bd8), takes the vert
+        // and its normal through the lighting matrix W (qw676..679) and then
+        // the material's rows M (qw691..693), the eye (qw698) through M alone,
+        // and reflects the vert-to-eye vector about the normal:
+        //   v = E.M - (p.W).M,  n' = n.W.M,  r = 2n'(n'.v) - v
+        //   uv = r.xy * 0.5 / |v| + (0.5, 0.5)
+        // The block holds W.M as three rows, then (E - W's position).M, so
+        // v = [3] - p.[0..2].
+        void writeEnvTexGen(const DrawCall &draw, const float eye[3], Vec4 *out)
+        {
+            const Matrix &w = draw.lightWorld;
+            const float(&m)[3][3] = draw.material.envRows;
+            for (uint32_t r = 0; r < 3; ++r)
+            {
+                out[r] = {{0.0f, 0.0f, 0.0f, 0.0f}};
+                for (uint32_t c = 0; c < 3; ++c)
+                    out[r].v[c] = w[r * 4 + 0] * m[0][c] + w[r * 4 + 1] * m[1][c] + w[r * 4 + 2] * m[2][c];
+            }
+            out[3] = {{0.0f, 0.0f, 0.0f, 0.0f}};
+            for (uint32_t c = 0; c < 3; ++c)
+                for (uint32_t k = 0; k < 3; ++k)
+                    out[3].v[c] += (eye[k] - w[12 + k]) * m[k][c];
         }
 
         bool check(VkResult result, const char *what)
@@ -1045,11 +1073,12 @@ namespace gh2
             drawTextures[i] = s.gpuTexture(cmd, data, serial);
         }
 
-        // Every skinned draw's four bones and every lit draw's lighting
-        // block, in draw order.
+        // Every skinned draw's four bones, every lit draw's lighting block
+        // and every environ tex gen's block, in draw order.
         FrameDataSlot &data = s.frameData[serial % kFrameSlots];
         std::vector<int32_t> boneBases(frame.draws.size(), -1);
         std::vector<int32_t> lightBases(frame.draws.size(), -1);
+        std::vector<int32_t> envBases(frame.draws.size(), -1);
         std::vector<uint32_t> colorModes(frame.draws.size(), kColorVertex);
         uint32_t used = 0;
         for (size_t i = 0; i < frame.draws.size(); ++i)
@@ -1066,6 +1095,11 @@ namespace gh2
                 lightBases[i] = static_cast<int32_t>(used);
                 used += kLightingVec4s;
             }
+            if (draw.material.texGen == milo::mat::kTexGenEnviron)
+            {
+                envBases[i] = static_cast<int32_t>(used);
+                used += kEnvTexGenVec4s;
+            }
         }
         if (!s.growFrameData(data, used))
             return false;
@@ -1075,6 +1109,8 @@ namespace gh2
                 std::memcpy(data.mapped + boneBases[i], frame.draws[i].bones.data(), sizeof(frame.draws[i].bones));
             if (lightBases[i] >= 0)
                 writeLighting(frame.draws[i], data.mapped + lightBases[i]);
+            if (envBases[i] >= 0)
+                writeEnvTexGen(frame.draws[i], frame.cameras[frame.draws[i].camera].eye, data.mapped + envBases[i]);
         }
         vmaFlushAllocation(s.allocator, data.memory, 0, VK_WHOLE_SIZE);
 
@@ -1207,8 +1243,11 @@ namespace gh2
             // Intensify raises a textured pass's rgb scale from 128 to 255.
             if ((material.texture || material.renderTarget != 0u) && material.intensify)
                 push.flags |= kFlagIntensify;
+            if (draw.blended)
+                push.flags |= kFlagBlended;
             push.boneBase = boneBases[i];
             push.lightBase = lightBases[i];
+            push.envBase = envBases[i];
             std::memcpy(push.uvRows, material.uvXfm, sizeof(push.uvRows));
             std::memcpy(push.uvOffset, material.uvXfm + 4, sizeof(push.uvOffset));
             vkCmdPushConstants(cmd, s.layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,

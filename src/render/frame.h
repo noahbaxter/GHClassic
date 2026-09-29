@@ -13,6 +13,7 @@ namespace gh2
     {
         uint32_t id = 0;   // the RndCam's guest address, for telling cameras apart
         Matrix view{};     // RndCam +0xc0: the inverse of its world transform
+        float eye[3] = {}; // its world position, which PsCam::Select uploads as qw698 (0x19c9d4)
         float nearPlane = 1.0f;
         float farPlane = 1000.0f;
         float yFov = 0.0f; // 0 is orthographic

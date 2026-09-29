@@ -51,6 +51,9 @@ namespace gh2
         uint32_t texGen = 0; // milo::mat::TexGen
         // uv' = u * uvXfm[0..1] + v * uvXfm[2..3] + uvXfm[4..5]
         float uvXfm[6] = {1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f};
+        // The environ tex gen's 3x3 (rows), which the reflection is taken
+        // through: tex_xfm's rotation transposed, then y and z swapped.
+        float envRows[3][3] = {{1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, -1.0f, 0.0f}};
     };
 
     // What the current environ gives VU1's lighting programs, as
@@ -81,6 +84,10 @@ namespace gh2
         // A skinned vert is sum over b of weight[b] * (pos * bones[b]), its
         // four colour floats being the weights.
         bool skinned = false;
+        // Two or more bones: VU1's skin program leaves the skinned position
+        // and normal in the vert for lighting and tex gen, which then take
+        // them through an identity lightWorld. One bone is left as is.
+        bool blended = false;
         std::array<Matrix, 4> bones{};
         Environ environ;
         // Takes normals to world space for lighting (qw676..678): the world
