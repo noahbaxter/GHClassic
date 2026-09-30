@@ -1,0 +1,154 @@
+; The main menu, as the game's own (main.dta) with a Quit button under
+; Options. main.milo has five buttons; the sixth is Options cloned on entry
+; (copy brings its style and resource), scaled down into the gap below it,
+; and linked below it (strum up follows the link backwards). The buttons
+; draw through their parent group, so it joins that; sync_objects adds it to
+; the panel's focus list.
+{retype main_panel
+   (
+      ; From the ARK root: a path resolves against the file its array came
+      ; from, and this one comes from no file.
+      (file ui/main.milo)
+      (focus main_quickspin.btn)
+      (msg_last_frame 0)
+      (already_entered FALSE)
+      (memcard_flow_entered FALSE)
+      (retain_last_focus FALSE)
+      ; Quit's size, and where from Options (x right, z up): small, in the
+      ; black gap at the poster's foot. Shrunk less in height, which keeps
+      ; the bitmap font nearer full size and so sharper.
+      (quit_width 0.44)
+      (quit_height 0.72)
+      (quit_dx 47)
+      (quit_dz -14)
+      (enter
+         {$this add_quit}
+         {set $main_entered TRUE}
+         {$this reset_player_settings}
+         {if {! [already_entered]}
+            {synth play_sequence meta_lick}
+            {if {&& {== {game get_controller 0} guitar} {== {campaign tutorials_done} 0}}
+               {$this set_focus main_tutorial.btn}
+            }
+            {$this set already_entered TRUE}
+         }
+         {game set_tutorial_running FALSE}
+         {main_msg.view set_showing FALSE}
+         {set [msg_last_frame] 0}
+      )
+      (add_quit
+         {if {! {exists quit.btn}}
+            {do
+               ($ox 0) ($oy 0) ($oz 0)
+               ($group {main_options.btn get trans_parent})
+               {new {main_options.btn class_name} quit.btn}
+               {quit.btn copy main_options.btn 0}
+               {main_options.btn get_local_pos $ox $oy $oz}
+               ; The button's own scale belongs to its button.tnm (BandButton
+               ; Update 0x28ccd8), so a group under it carries the size.
+               {new Group quit.grp}
+               {quit.grp set trans_parent $group}
+               {quit.grp set_local_pos {'+' $ox [quit_dx]} $oy {'+' $oz [quit_dz]}}
+               {quit.grp set_local_scale [quit_width] 1 [quit_height]}
+               {quit.btn set trans_parent quit.grp}
+               {quit.btn set_local_pos 0 0 0}
+               {quit.btn set text_token pause_quit} ; "QUIT", the pause menu's
+               {main_options.btn set nav_down quit.btn}
+               ; Last, so it draws over the poster as the others do.
+               {$group insert (objects {$group size objects}) quit.btn}
+               {{$this loaded_dir} sync_objects}
+            }
+         }
+      )
+      (SELECT_START_MSG
+         {switch $component
+            (main_career.btn
+               {gamecfg set mode career}
+               {if_else {> {campaign num_profiles} 0}
+                  {ui goto_screen chooseprof_screen}
+                  {do
+                     {nameprof_screen set back_screen main_screen}
+                     {nameprof_screen set is_editing FALSE}
+                     {nameprof_screen set profile_slot 0}
+                     {nameprof_screen set next_screen sel_difficulty_screen}
+                     {ui goto_screen nameprof_screen}
+                  }
+               }
+            )
+            (main_quickspin.btn
+               {gamecfg set mode quickplay}
+               {ui goto_screen qp_selsong_screen}
+            )
+            (main_multiplayer.btn {ui goto_screen multi_screen})
+            (main_tutorial.btn {ui goto_screen training_screen})
+            (main_options.btn {ui goto_screen options_screen})
+            ; As the win screen leaves (endgame.dta): fade to black over a
+            ; second; then a moment on black. The music fades on its own
+            ; (MetaMusic::Stop ramps it down over a second), not through the
+            ; fade's fade_synth, which would take the select sound with it.
+            ; The help bar draws over the fade, so it goes.
+            (quit.btn
+               {helpbar set_display ()}
+               {fade_panel start_fade 1 (color 0 0 0) (fade_synth FALSE) (fade_out TRUE)}
+               {meta_music stop}
+               {script_task (units kTaskUISeconds) (delay 1.2) (script {quit_app})}
+            )
+         }
+      )
+      (poll
+         {if_else {game is_missing_multi_controller}
+            {$this disable main_multiplayer.btn}
+            {$this enable main_multiplayer.btn}
+         }
+         {main_msg.view set_showing
+            {< {taskmgr ui_seconds} {$this get msg_last_frame}}
+         }
+      )
+      (reset_player_settings
+         {{game get_player_config 0} set_difficulty kDifficultyMedium}
+         {game set_venue small2}
+         {game set_song_index 0}
+         {game set_character punk1 TRUE}
+         {game set_guitar_index 0}
+         {do
+            ($player2_config {game get_player_config 1})
+            {$player2_config set_character rockabill1 TRUE}
+            {$player2_config set_guitar_index 0}
+            {$player2_config set_difficulty kDifficultyMedium}
+         }
+      )
+      (display_cheat_msg
+         ($cheat $enable)
+         {mm_msg.lbl set_localized_text
+            {sprintf
+               {localize
+                  {if_else $enable
+                     cheat_enabled_fmt
+                     cheat_disabled_fmt
+                  }
+               }
+               {localize $cheat}
+            }
+         }
+         {$this set msg_last_frame {'+' {taskmgr ui_seconds} 5}}
+      )
+   )
+}
+; The main screen, as the game's own but for fade_panel, which Quit fades
+; through.
+{retype main_screen
+   (
+      (panels meta main_panel helpbar fade_panel)
+      (focus main_panel)
+      (helpbar
+         (default
+            (
+               (fret1 help_continue)
+               (strum help_updown)
+            )
+         )
+      )
+      (access_all {main_panel reset_player_settings})
+      (enter {$this turn_off_ambient})
+   )
+}
