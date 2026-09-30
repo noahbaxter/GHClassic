@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.21)
+cmake_minimum_required(VERSION 3.25)
 
 project(ghrecomp LANGUAGES C CXX)
 
@@ -53,12 +53,15 @@ set(PS2X_RUNTIME_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib/PS2Recomp/ps2xRuntime")
 find_package(SDL3 CONFIG REQUIRED)
 find_package(Vulkan REQUIRED)
 include(FetchContent)
+# SYSTEM: their headers' warnings are not ours to fix.
 FetchContent_Declare(vk-bootstrap
     GIT_REPOSITORY https://github.com/charles-lunarg/vk-bootstrap.git
-    GIT_TAG v1.4.357)
+    GIT_TAG v1.4.357
+    SYSTEM)
 FetchContent_Declare(VulkanMemoryAllocator
     GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
-    GIT_TAG v3.4.0)
+    GIT_TAG v3.4.0
+    SYSTEM)
 FetchContent_MakeAvailable(vk-bootstrap VulkanMemoryAllocator)
 
 # The game layer: GH2's hooks, installed through the runtime's override

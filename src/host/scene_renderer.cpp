@@ -60,7 +60,8 @@ namespace gh2
         // A draw's environ tex gen block: see writeEnvTexGen.
         constexpr uint32_t kEnvTexGenVec4s = 4u;
 
-        constexpr uint32_t kPipelineCount = milo::mat::kBlendCount * milo::mat::kZModeCount;
+        constexpr uint32_t kPipelineCount =
+            static_cast<uint32_t>(milo::mat::kBlendCount) * static_cast<uint32_t>(milo::mat::kZModeCount);
 
         // The GS's ALPHA_1 for each blend, as PsMat::Update sets it.
         VkPipelineColorBlendAttachmentState blendState(uint32_t blend)
