@@ -197,6 +197,68 @@ namespace gh2
             return out;
         }
 
+        // GH2's help bar icon for the yellow fret is an unfinished placeholder:
+        // an opaque black ground, a flat fill and a white column down each
+        // side. Vanilla never shows it (its help bars use green, red and the
+        // strum); the lag screen does, so it is drawn as the green fret's icon
+        // in yellow. Both are known by their pixels, the same every run.
+        constexpr uint64_t kGreenFretIcon = 0x30e390c3437871eaull;
+        constexpr uint64_t kYellowFretIcon = 0x0cb4603bf60186c0ull;
+        std::shared_ptr<const TextureData> s_greenFretIcon;
+        std::vector<uint32_t> s_yellowFretIcons; // redrawn once green is seen
+
+        uint64_t pixelHash(const TextureData &data)
+        {
+            uint64_t hash = 1469598103934665603ull; // FNV-1a
+            for (uint8_t c : data.rgba)
+                hash = (hash ^ c) * 1099511628211ull;
+            return hash;
+        }
+
+        // The green fret icon in another colour: its fill (green 139) becomes
+        // `fill`, and its shading, carried by the green channel, scales it.
+        std::shared_ptr<const TextureData> tinted(const TextureData &green, const float (&fill)[3])
+        {
+            constexpr float kGreenFill = 139.0f;
+            auto out = std::make_shared<TextureData>(green);
+            for (size_t i = 0; i < out->rgba.size(); i += 4u)
+            {
+                const float shade = out->rgba[i + 1u] / kGreenFill;
+                for (size_t c = 0; c < 3u; ++c)
+                    out->rgba[i + c] = static_cast<uint8_t>(std::min(255.0f, shade * fill[c]));
+            }
+            return out;
+        }
+
+        constexpr float kYellowFill[3] = {222.0f, 201.0f, 62.0f};
+
+        std::shared_ptr<const TextureData> yellowed(const TextureData &green)
+        {
+            return tinted(green, kYellowFill);
+        }
+
+        void store(uint32_t tex, std::shared_ptr<const TextureData> data)
+        {
+            if (data && data->width == 32u && data->height == 32u)
+            {
+                const uint64_t hash = pixelHash(*data);
+                if (hash == kGreenFretIcon)
+                {
+                    s_greenFretIcon = data;
+                    for (uint32_t yellow : s_yellowFretIcons)
+                        s_textures[yellow] = yellowed(*data);
+                }
+                else if (hash == kYellowFretIcon)
+                {
+                    if (std::find(s_yellowFretIcons.begin(), s_yellowFretIcons.end(), tex) == s_yellowFretIcons.end())
+                        s_yellowFretIcons.push_back(tex);
+                    if (s_greenFretIcon)
+                        data = yellowed(*s_greenFretIcon);
+                }
+            }
+            s_textures[tex] = std::move(data);
+        }
+
         struct SyncTag;
         struct DestroyTag;
 
@@ -217,12 +279,14 @@ namespace gh2
             if (load<uint32_t>(rdram, tex + milo::tex::kType) & milo::tex::kTypeNoPixels)
                 s_textures.erase(tex);
             else
-                s_textures[tex] = decode(rdram, tex + milo::tex::kBitmap);
+                store(tex, decode(rdram, tex + milo::tex::kBitmap));
         }
 
         void onDestroy(uint8_t *, R5900Context *ctx, PS2Runtime *)
         {
-            s_textures.erase(GPR_U32(ctx, 4));
+            const uint32_t tex = GPR_U32(ctx, 4);
+            s_textures.erase(tex);
+            std::erase(s_yellowFretIcons, tex);
         }
     }
 

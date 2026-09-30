@@ -1,0 +1,5 @@
+#pragma once
+
+// The port's scripts, from src/dta/, compiled in by CMake.
+
+inline constexpr const char kLagPanelDta[] = R"dta(@GHRECOMP_LAG_PANEL_DTA@)dta";

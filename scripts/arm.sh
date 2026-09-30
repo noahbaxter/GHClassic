@@ -91,7 +91,11 @@ else
   [ -x "$BIN" ] && [ -f "$ELF" ] || { echo "no build; run scripts/build.sh" >&2; exit 1; }
   [ -n "$DISC" ] || DISC="$(python3 "$ROOT/tools/disc.py" find SLUS-21447 "$ROOT"/game/*)"
   DISC="$(cd "$(dirname "$DISC")" && pwd)/$(basename "$DISC")"
-  (cd "$OUT" && exec "$BIN" "$ELF" "$DISC" --hidden --mute --mc "$CARD" \
+  # A copy of the player's settings, so a run plays like theirs and never
+  # writes to them.
+  USER_SETTINGS="$HOME/Library/Application Support/ghrecomp/settings.ini"
+  [ -f "$USER_SETTINGS" ] && cp "$USER_SETTINGS" "$OUT/settings.ini"
+  (cd "$OUT" && exec "$BIN" "$ELF" "$DISC" --hidden --mute --mc "$CARD" --settings "$OUT/settings.ini" \
     --shots "$OUT/frames" --shot-every "$EVERY") > "$OUT/run.log" 2>&1 &
   PID=$!
   RUNNER=$PID
