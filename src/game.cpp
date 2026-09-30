@@ -4,6 +4,7 @@
 #include "game_overrides.h"
 #include "null_movie.h"
 #include "null_rnd.h"
+#include "pad.h"
 #include "render/mesh_capture.h"
 #include "render/native_environ.h"
 #include "render/native_mat.h"
@@ -27,6 +28,7 @@ namespace
         gh2::installSilentSynth(runtime, gh2::kSlus21447);
         gh2::installNullMovie(runtime, gh2::kSlus21447);
         gh2::installVideoOptions(runtime, gh2::kSlus21447);
+        gh2::installPad(runtime, gh2::kSlus21447);
     }
 }
 

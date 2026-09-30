@@ -68,8 +68,10 @@ set(GHRECOMP_GAME_SOURCES
     src/game.cpp
     src/null_movie.cpp
     src/null_rnd.cpp
+    src/pad.cpp
     src/silent_synth.cpp
     src/video_options.cpp
+    src/host/input.cpp
     src/host/vulkan_frontend.cpp
     src/host/vma.cpp
     src/host/scene_renderer.cpp
@@ -110,6 +112,9 @@ endforeach()
 add_custom_target(ghrecomp_shaders DEPENDS ${GHRECOMP_SHADER_HEADERS})
 add_dependencies(ghrecomp ghrecomp_shaders)
 target_include_directories(ghrecomp PRIVATE "${GHRECOMP_SHADER_DIR}")
+
+# The window icon, next to the binary where SDL_GetBasePath finds it.
+configure_file(assets/icon.png "${CMAKE_CURRENT_BINARY_DIR}/icon.png" COPYONLY)
 
 # Unity batches are for the generated code; game files stay separate units.
 set_source_files_properties(${GHRECOMP_GAME_SOURCES} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

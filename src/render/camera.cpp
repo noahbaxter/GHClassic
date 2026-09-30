@@ -39,7 +39,10 @@ namespace gh2
         const float f = camera.farPlane;
         const float zr0 = camera.zRange[0];
         const float zr1 = camera.zRange[1];
-        // aspect = (rect h / rect w) * YRatio (UpdateLocal 0x1b1f70).
+        // aspect = (rect h / rect w) * YRatio (UpdateLocal 0x1b1f70), or the
+        // target texture's height over width in place of YRatio.
+        if (camera.target != 0u && camera.targetWidth != 0u)
+            yRatio = static_cast<float>(camera.targetHeight) / static_cast<float>(camera.targetWidth);
         const float aspect = camera.rect[2] != 0.0f ? camera.rect[3] / camera.rect[2] * yRatio : yRatio;
         const float k = (zr1 - zr0) * 0.5f;
         const float cz = 1.0f - zr0 - k;

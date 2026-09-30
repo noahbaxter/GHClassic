@@ -23,6 +23,7 @@ namespace milo
         constexpr uint32_t kYFov = 0x2c8u;  // 0 is orthographic
         constexpr uint32_t kZRange = 0x2ccu; // 2 floats
         constexpr uint32_t kRect = 0x2d4u;  // normalized x, y, w, h
+        constexpr uint32_t kTargetTex = 0x2ecu; // RndTex* (ObjPtr at +0x2e4), null for the screen
     }
 
     // RndMat, 0x120 bytes; PsMat adds its GS state after. Enums read from
@@ -123,6 +124,9 @@ namespace milo
     {
         constexpr uint32_t kBitmap = 0x28u; // RndBitmap
         constexpr uint32_t kType = 0x48u;   // Type bits
+        constexpr uint32_t kWidth = 0x4cu;  // int
+        constexpr uint32_t kHeight = 0x50u; // int
+        constexpr uint32_t kTypeRendered = 0x2u; // drawn into through a camera's target
         // Only regular textures have pixels in RAM (SyncBitmap 0x1a13c0).
         constexpr uint32_t kTypeNoPixels = 0x2u | 0x4u | 0x8u; // rendered, movie, frame buffer
     }
@@ -158,5 +162,17 @@ namespace milo
         // Sync flags: which parts changed.
         constexpr uint32_t kSyncVerts = 0x1fu;
         constexpr uint32_t kSyncFaces = 0x20u;
+        // PsMultiMesh::DrawShowing turns each instance to face the camera
+        // when this is kFaceCamera (0x1a31c8). The field's name is unknown.
+        constexpr uint32_t kInstanceMode = 0xe4u;
+        constexpr uint32_t kFaceCamera = 8u;
+    }
+
+    // RndMultiMesh: one mesh drawn at each of a list of transforms.
+    namespace multimesh
+    {
+        constexpr uint32_t kMesh = 0x48u;      // RndMesh* (ObjPtr at +0x40)
+        constexpr uint32_t kInstances = 0x50u; // the instance list's sentinel node; its first word is the first node
+        constexpr uint32_t kInstanceXfm = 0x10u; // a node's Transform
     }
 }

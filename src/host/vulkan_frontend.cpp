@@ -1,5 +1,6 @@
 #include "host/vulkan_frontend.h"
 
+#include "host/input.h"
 #include "host/scene_renderer.h"
 #include "render/frame.h"
 
@@ -8,10 +9,13 @@
 #include <VkBootstrap.h>
 #include <vk_mem_alloc.h>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <iostream>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -68,7 +72,7 @@ namespace gh2
         std::vector<VkSemaphore> renderFinished; // one per swapchain image
         bool swapchainStale = false;
 
-        // The guest picture, at the guest's resolution.
+        // The picture: at the window's size when shown, else the guest's.
         VkImage target = VK_NULL_HANDLE;
         VmaAllocation targetMemory = VK_NULL_HANDLE;
         uint32_t targetWidth = 0;
@@ -180,18 +184,11 @@ namespace gh2
             readback = VK_NULL_HANDLE;
         }
 
-        // The guest picture into the window, centred at the frame's display
-        // aspect.
-        void blitToSwapchain(VkCommandBuffer cmd, VkImage image, float displayAspect)
+        // Where the picture sits in the window: the frame's display aspect,
+        // as large as fits, centred.
+        VkRect2D pictureRect(float displayAspect) const
         {
             const VkExtent2D extent = swapchain.extent;
-            imageBarrier(cmd, image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0,
-                         VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                         VK_PIPELINE_STAGE_TRANSFER_BIT);
-            const VkClearColorValue black{{0.0f, 0.0f, 0.0f, 1.0f}};
-            const VkImageSubresourceRange range{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-            vkCmdClearColorImage(cmd, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &black, 1, &range);
-
             float width = static_cast<float>(extent.width);
             float height = width / displayAspect;
             if (height > static_cast<float>(extent.height))
@@ -201,13 +198,27 @@ namespace gh2
             }
             const int32_t x = static_cast<int32_t>((static_cast<float>(extent.width) - width) * 0.5f);
             const int32_t y = static_cast<int32_t>((static_cast<float>(extent.height) - height) * 0.5f);
+            return {{x, y}, {static_cast<uint32_t>(width), static_cast<uint32_t>(height)}};
+        }
 
+        // The picture into the window at pictureRect.
+        void blitToSwapchain(VkCommandBuffer cmd, VkImage image, float displayAspect)
+        {
+            imageBarrier(cmd, image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0,
+                         VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT);
+            const VkClearColorValue black{{0.0f, 0.0f, 0.0f, 1.0f}};
+            const VkImageSubresourceRange range{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+            vkCmdClearColorImage(cmd, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &black, 1, &range);
+
+            const VkRect2D rect = pictureRect(displayAspect);
             VkImageBlit blit{};
             blit.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
             blit.srcOffsets[1] = {static_cast<int32_t>(targetWidth), static_cast<int32_t>(targetHeight), 1};
             blit.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-            blit.dstOffsets[0] = {x, y, 0};
-            blit.dstOffsets[1] = {x + static_cast<int32_t>(width), y + static_cast<int32_t>(height), 1};
+            blit.dstOffsets[0] = {rect.offset.x, rect.offset.y, 0};
+            blit.dstOffsets[1] = {rect.offset.x + static_cast<int32_t>(rect.extent.width),
+                                  rect.offset.y + static_cast<int32_t>(rect.extent.height), 1};
             vkCmdBlitImage(cmd, target, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image,
                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
 
@@ -237,7 +248,7 @@ namespace gh2
         }
     };
 
-    VulkanFrontend::VulkanFrontend() = default;
+    VulkanFrontend::VulkanFrontend(RenderSize renderSize) : m_renderSize(renderSize) {}
     VulkanFrontend::~VulkanFrontend() = default;
 
     bool VulkanFrontend::initialize(PS2Runtime &runtime, const char *title)
@@ -262,6 +273,18 @@ namespace gh2
         {
             std::cerr << "[sdl] window: " << SDL_GetError() << std::endl;
             return false;
+        }
+        // Also the Dock icon on macOS. A missing one leaves SDL's default.
+        const char *base = SDL_GetBasePath();
+        const std::string iconPath = std::string(base ? base : "") + "icon.png";
+        if (SDL_Surface *icon = SDL_LoadPNG(iconPath.c_str()))
+        {
+            SDL_SetWindowIcon(s.window, icon);
+            SDL_DestroySurface(icon);
+        }
+        else
+        {
+            std::cerr << "[sdl] icon: " << SDL_GetError() << std::endl;
         }
 
         Uint32 extensionCount = 0;
@@ -334,6 +357,9 @@ namespace gh2
             return false;
         if (!s.hidden && !s.createSwapchain())
             return false;
+        // A hidden run is scripted; the player's controller stays out of it.
+        if (!s.hidden)
+            openInput();
         s.nextHiddenFrame = std::chrono::steady_clock::now();
         return true;
     }
@@ -342,17 +368,19 @@ namespace gh2
     {
         State &s = *m_state;
         SDL_Event event;
+        bool devicesChanged = false;
         while (SDL_PollEvent(&event))
         {
             if (event.type == SDL_EVENT_QUIT)
                 return false;
             if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED)
                 s.swapchainStale = true;
+            if (event.type == SDL_EVENT_GAMEPAD_ADDED || event.type == SDL_EVENT_GAMEPAD_REMOVED)
+                devicesChanged = true;
         }
+        pollInput(devicesChanged);
 
         const Frame frame = frames().latest();
-        if (!s.ensureTarget(frame.width, frame.height))
-            return false;
 
         State::Slot &slot = s.slots[s.slot];
         vkWaitForFences(s.device.device, 1, &slot.done, VK_TRUE, UINT64_MAX);
@@ -377,6 +405,26 @@ namespace gh2
             if (acquired != VK_SUCCESS && acquired != VK_SUBOPTIMAL_KHR)
                 return check(acquired, "acquire");
         }
+
+        // Every draw goes through the game's cameras and nothing is tied to
+        // the guest's pixels, so the scene can be drawn at any size. A hidden
+        // run drawing at the window's keeps the guest's, so its shots compare
+        // with the reference's.
+        uint32_t width = frame.width;
+        uint32_t height = frame.height;
+        if (m_renderSize.mode == RenderSize::kHeight)
+        {
+            height = m_renderSize.height;
+            width = static_cast<uint32_t>(std::lround(height * frame.displayAspect / 2.0f)) * 2u;
+        }
+        else if (m_renderSize.mode == RenderSize::kWindow && present)
+        {
+            const VkRect2D rect = s.pictureRect(frame.displayAspect);
+            width = std::max(rect.extent.width, 1u);
+            height = std::max(rect.extent.height, 1u);
+        }
+        if (!s.ensureTarget(width, height))
+            return false;
         vkResetFences(s.device.device, 1, &slot.done);
 
         ++s.presented;
@@ -475,6 +523,7 @@ namespace gh2
             vkb::destroy_surface(s.instance, s.surface);
         if (s.instance.instance != VK_NULL_HANDLE)
             vkb::destroy_instance(s.instance);
+        closeInput();
         if (s.window)
             SDL_DestroyWindow(s.window);
         SDL_Quit();

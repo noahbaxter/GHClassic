@@ -29,10 +29,12 @@ namespace gh2
             kColorAmbient,     // 0x7c5 with the environ: base * ambient
             kColorDirectional, // 0x6ec: base * ambient + lights * material
             kColorMaterial,    // 0x7c5 without the environ or prelit: the material's
+            kColorPoint,       // 0x436: base * ambient + a point light * material, within its range
         };
-        constexpr uint32_t kFlagPrelit = 1u << 2;    // base is the vertex colour, else the material's
-        constexpr uint32_t kFlagAlphaCut = 1u << 3;  // discard alpha below the GS's 1
-        constexpr uint32_t kFlagIntensify = 1u << 4; // textured rgb scale 255 over 128
+        constexpr uint32_t kFlagPrelit = 1u << 3;    // base is the vertex colour, else the material's
+        constexpr uint32_t kFlagAlphaCut = 1u << 4;  // discard alpha below the GS's 1
+        constexpr uint32_t kFlagIntensify = 1u << 5; // textured rgb scale 255 over 128
+        constexpr uint32_t kFlagBlended = 1u << 6;   // lit and tex-genned from the skinned vert
 
         struct PushConstants
         {
@@ -42,7 +44,8 @@ namespace gh2
             float uvOffset[2];
             int32_t boneBase;  // the draw's first bone vec4 in the frame data, -1 when rigid
             int32_t lightBase; // the draw's lighting block in the frame data
-            uint32_t flags;    // ColorMode in bits 0-1, then the kFlag bits
+            uint32_t flags;    // ColorMode in bits 0-2, then the kFlag bits
+            int32_t envBase;   // the draw's environ tex gen block in the frame data, -1 for none
         };
         static_assert(sizeof(PushConstants) <= 128, "past Vulkan's guaranteed push constant size");
 
@@ -53,6 +56,8 @@ namespace gh2
         // A draw's lighting block: ambient, three light colours, then the
         // three directions to the lights in the mesh's own space.
         constexpr uint32_t kLightingVec4s = 7u;
+        // A draw's environ tex gen block: see writeEnvTexGen.
+        constexpr uint32_t kEnvTexGenVec4s = 4u;
 
         constexpr uint32_t kPipelineCount = milo::mat::kBlendCount * milo::mat::kZModeCount;
 
@@ -161,6 +166,25 @@ namespace gh2
             uint64_t lastUsed = 0;
         };
 
+        // One image a camera drew into: a rendered RndTex as it stood after
+        // one run of draws. A target drawn, sampled, then drawn again within
+        // a frame is two of these, so each sampler reads the one current at
+        // its place in draw order: the crowd renders each character type into
+        // one sheet in turn, drawing that type's cards between.
+        struct TargetImage
+        {
+            VkImage color = VK_NULL_HANDLE;
+            VmaAllocation colorMemory = VK_NULL_HANDLE;
+            VkImageView colorView = VK_NULL_HANDLE;
+            VkImage depth = VK_NULL_HANDLE;
+            VmaAllocation depthMemory = VK_NULL_HANDLE;
+            VkImageView depthView = VK_NULL_HANDLE;
+            VkFramebuffer framebuffer = VK_NULL_HANDLE;
+            VkDescriptorSet sets[2]{}; // clamped, wrapped
+            uint32_t width = 0;
+            uint32_t height = 0;
+        };
+
         // Room for this many live textures before the pool refuses.
         constexpr uint32_t kMaxTextures = 4096;
 
@@ -188,6 +212,8 @@ namespace gh2
         {
             if (!draw.material.useEnviron)
                 return draw.material.prelit ? kColorVertex : kColorMaterial;
+            if (draw.environ.kind == Environ::kPoint)
+                return kColorPoint;
             return draw.environ.kind == Environ::kDirectional ? kColorDirectional : kColorAmbient;
         }
 
@@ -195,10 +221,30 @@ namespace gh2
         // then each light's direction taken into the mesh's space through the
         // rows of its lighting matrix, as the directional program does before
         // its loop (0x3788..0x37c8): d = n . direction.
+        //
+        // A point light fills the same block as the point program reads it
+        // (0x21b0..0x2238): its colour in [1], its position taken relative to
+        // the mesh's origin (qw679) and into the mesh's space through the rows
+        // in [4] with -1/range in w, and range squared in [5] w.
         void writeLighting(const DrawCall &draw, Vec4 *out)
         {
             const Environ &e = draw.environ;
             out[0] = {{e.ambient[0], e.ambient[1], e.ambient[2], 1.0f}};
+            if (e.kind == Environ::kPoint)
+            {
+                out[1] = {{e.color[0][0], e.color[0][1], e.color[0][2], 0.0f}};
+                out[2] = out[3] = out[6] = {{0.0f, 0.0f, 0.0f, 0.0f}};
+                float rel[3];
+                for (uint32_t c = 0; c < 3; ++c)
+                    rel[c] = e.position[c] - draw.lightWorld[12 + c];
+                Vec4 local{{0.0f, 0.0f, 0.0f, e.range != 0.0f ? -1.0f / e.range : 0.0f}};
+                for (uint32_t row = 0; row < 3; ++row)
+                    local.v[row] = draw.lightWorld[row * 4 + 0] * rel[0] + draw.lightWorld[row * 4 + 1] * rel[1] +
+                                   draw.lightWorld[row * 4 + 2] * rel[2];
+                out[4] = local;
+                out[5] = {{0.0f, 0.0f, 0.0f, e.range * e.range}};
+                return;
+            }
             for (uint32_t i = 0; i < 3; ++i)
             {
                 const bool present = i < e.lightCount;
@@ -212,6 +258,30 @@ namespace gh2
                                            draw.lightWorld[row * 4 + 2] * e.toLight[i][2];
                 out[4 + i] = direction;
             }
+        }
+
+        // Program 0x139, the environ tex gen (0x09c8..0x0bd8), takes the vert
+        // and its normal through the lighting matrix W (qw676..679) and then
+        // the material's rows M (qw691..693), the eye (qw698) through M alone,
+        // and reflects the vert-to-eye vector about the normal:
+        //   v = E.M - (p.W).M,  n' = n.W.M,  r = 2n'(n'.v) - v
+        //   uv = r.xy * 0.5 / |v| + (0.5, 0.5)
+        // The block holds W.M as three rows, then (E - W's position).M, so
+        // v = [3] - p.[0..2].
+        void writeEnvTexGen(const DrawCall &draw, const float eye[3], Vec4 *out)
+        {
+            const Matrix &w = draw.lightWorld;
+            const float(&m)[3][3] = draw.material.envRows;
+            for (uint32_t r = 0; r < 3; ++r)
+            {
+                out[r] = {{0.0f, 0.0f, 0.0f, 0.0f}};
+                for (uint32_t c = 0; c < 3; ++c)
+                    out[r].v[c] = w[r * 4 + 0] * m[0][c] + w[r * 4 + 1] * m[1][c] + w[r * 4 + 2] * m[2][c];
+            }
+            out[3] = {{0.0f, 0.0f, 0.0f, 0.0f}};
+            for (uint32_t c = 0; c < 3; ++c)
+                for (uint32_t k = 0; k < 3; ++k)
+                    out[3].v[c] += (eye[k] - w[12 + k]) * m[k][c];
         }
 
         bool check(VkResult result, const char *what)
@@ -256,6 +326,171 @@ namespace gh2
 
         VkDescriptorSetLayout frameDataSetLayout = VK_NULL_HANDLE;
         FrameDataSlot frameData[kFrameSlots];
+
+        // Rendered textures by RndTex, one image per generation within a
+        // frame, kept for the run. Their pass has the main pass's formats, so
+        // every pipeline draws into either.
+        VkRenderPass targetPass = VK_NULL_HANDLE;
+        std::unordered_map<uint32_t, std::vector<TargetImage>> targets;
+
+        // Clears to transparent black, as the GS reads memory nothing drew.
+        // The previous frame's samplers read the image before it is drawn
+        // again, and this frame's read it after.
+        bool createTargetPass()
+        {
+            VkAttachmentDescription attachments[2]{};
+            attachments[0].format = kColorFormat;
+            attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+            attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            attachments[1] = attachments[0];
+            attachments[1].format = kDepthFormat;
+            attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+            VkAttachmentReference colorRef{0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
+            VkAttachmentReference depthRef{1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
+            VkSubpassDescription subpass{};
+            subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+            subpass.colorAttachmentCount = 1;
+            subpass.pColorAttachments = &colorRef;
+            subpass.pDepthStencilAttachment = &depthRef;
+
+            VkSubpassDependency before{};
+            before.srcSubpass = VK_SUBPASS_EXTERNAL;
+            before.dstSubpass = 0;
+            before.srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+            before.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                                  VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+            before.srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            before.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+                                   VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            VkSubpassDependency after{};
+            after.srcSubpass = 0;
+            after.dstSubpass = VK_SUBPASS_EXTERNAL;
+            after.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            after.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            after.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            after.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            const VkSubpassDependency dependencies[] = {before, after};
+
+            VkRenderPassCreateInfo info{VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};
+            info.attachmentCount = 2;
+            info.pAttachments = attachments;
+            info.subpassCount = 1;
+            info.pSubpasses = &subpass;
+            info.dependencyCount = 2;
+            info.pDependencies = dependencies;
+            return check(vkCreateRenderPass(device, &info, nullptr, &targetPass), "target pass");
+        }
+
+        void destroyTarget(TargetImage &t)
+        {
+            if (t.sets[0] != VK_NULL_HANDLE)
+                vkFreeDescriptorSets(device, pool, 2, t.sets);
+            if (t.framebuffer != VK_NULL_HANDLE)
+                vkDestroyFramebuffer(device, t.framebuffer, nullptr);
+            if (t.colorView != VK_NULL_HANDLE)
+                vkDestroyImageView(device, t.colorView, nullptr);
+            if (t.depthView != VK_NULL_HANDLE)
+                vkDestroyImageView(device, t.depthView, nullptr);
+            if (t.color != VK_NULL_HANDLE)
+                vmaDestroyImage(allocator, t.color, t.colorMemory);
+            if (t.depth != VK_NULL_HANDLE)
+                vmaDestroyImage(allocator, t.depth, t.depthMemory);
+            t = TargetImage{};
+        }
+
+        // The image for a target's generation, made or remade at its size.
+        TargetImage *targetImage(uint32_t tex, uint32_t generation, uint32_t w, uint32_t h)
+        {
+            std::vector<TargetImage> &images = targets[tex];
+            if (images.size() <= generation)
+                images.resize(generation + 1u);
+            TargetImage &t = images[generation];
+            if (t.framebuffer != VK_NULL_HANDLE && t.width == w && t.height == h)
+                return &t;
+            if (t.framebuffer != VK_NULL_HANDLE)
+            {
+                vkDeviceWaitIdle(device);
+                destroyTarget(t);
+            }
+
+            VkImageCreateInfo imageInfo{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
+            imageInfo.imageType = VK_IMAGE_TYPE_2D;
+            imageInfo.format = kColorFormat;
+            imageInfo.extent = {w, h, 1};
+            imageInfo.mipLevels = 1;
+            imageInfo.arrayLayers = 1;
+            imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+            imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+            imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+            VmaAllocationCreateInfo alloc{};
+            alloc.usage = VMA_MEMORY_USAGE_AUTO;
+            if (!check(vmaCreateImage(allocator, &imageInfo, &alloc, &t.color, &t.colorMemory, nullptr), "target"))
+                return nullptr;
+            imageInfo.format = kDepthFormat;
+            imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+            if (!check(vmaCreateImage(allocator, &imageInfo, &alloc, &t.depth, &t.depthMemory, nullptr), "target depth"))
+            {
+                destroyTarget(t);
+                return nullptr;
+            }
+
+            VkImageViewCreateInfo view{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+            view.image = t.color;
+            view.viewType = VK_IMAGE_VIEW_TYPE_2D;
+            view.format = kColorFormat;
+            view.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+            bool ok = check(vkCreateImageView(device, &view, nullptr, &t.colorView), "target view");
+            view.image = t.depth;
+            view.format = kDepthFormat;
+            view.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+            ok = ok && check(vkCreateImageView(device, &view, nullptr, &t.depthView), "target depth view");
+            if (ok)
+            {
+                const VkImageView views[] = {t.colorView, t.depthView};
+                VkFramebufferCreateInfo fb{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
+                fb.renderPass = targetPass;
+                fb.attachmentCount = 2;
+                fb.pAttachments = views;
+                fb.width = w;
+                fb.height = h;
+                fb.layers = 1;
+                ok = check(vkCreateFramebuffer(device, &fb, nullptr, &t.framebuffer), "target framebuffer");
+            }
+            if (ok)
+            {
+                const VkDescriptorSetLayout layouts[2] = {setLayout, setLayout};
+                VkDescriptorSetAllocateInfo setInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+                setInfo.descriptorPool = pool;
+                setInfo.descriptorSetCount = 2;
+                setInfo.pSetLayouts = layouts;
+                ok = check(vkAllocateDescriptorSets(device, &setInfo, t.sets), "target sets");
+            }
+            if (!ok)
+            {
+                destroyTarget(t);
+                return nullptr;
+            }
+            for (int wrap = 0; wrap < 2; ++wrap)
+            {
+                VkDescriptorImageInfo image{samplers[wrap], t.colorView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+                VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+                write.dstSet = t.sets[wrap];
+                write.descriptorCount = 1;
+                write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                write.pImageInfo = &image;
+                vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
+            }
+            t.width = w;
+            t.height = h;
+            return &t;
+        }
 
         bool createDescriptorState()
         {
@@ -774,7 +1009,8 @@ namespace gh2
         m_state = std::make_unique<State>();
         m_state->device = device;
         m_state->allocator = allocator;
-        return m_state->createRenderPass() && m_state->createDescriptorState() && m_state->createLayout();
+        return m_state->createRenderPass() && m_state->createTargetPass() && m_state->createDescriptorState() &&
+               m_state->createLayout();
     }
 
     void SceneRenderer::shutdown()
@@ -788,6 +1024,10 @@ namespace gh2
         for (auto &entry : s.textures)
             s.destroyTexture(entry.second);
         s.textures.clear();
+        for (auto &entry : s.targets)
+            for (TargetImage &image : entry.second)
+                s.destroyTarget(image);
+        s.targets.clear();
         for (VkSampler sampler : s.samplers)
             if (sampler != VK_NULL_HANDLE)
                 vkDestroySampler(s.device, sampler, nullptr);
@@ -812,6 +1052,8 @@ namespace gh2
             vkDestroyPipelineLayout(s.device, s.layout, nullptr);
         if (s.renderPass != VK_NULL_HANDLE)
             vkDestroyRenderPass(s.device, s.renderPass, nullptr);
+        if (s.targetPass != VK_NULL_HANDLE)
+            vkDestroyRenderPass(s.device, s.targetPass, nullptr);
         m_state.reset();
     }
 
@@ -831,11 +1073,12 @@ namespace gh2
             drawTextures[i] = s.gpuTexture(cmd, data, serial);
         }
 
-        // Every skinned draw's four bones and every lit draw's lighting
-        // block, in draw order.
+        // Every skinned draw's four bones, every lit draw's lighting block
+        // and every environ tex gen's block, in draw order.
         FrameDataSlot &data = s.frameData[serial % kFrameSlots];
         std::vector<int32_t> boneBases(frame.draws.size(), -1);
         std::vector<int32_t> lightBases(frame.draws.size(), -1);
+        std::vector<int32_t> envBases(frame.draws.size(), -1);
         std::vector<uint32_t> colorModes(frame.draws.size(), kColorVertex);
         uint32_t used = 0;
         for (size_t i = 0; i < frame.draws.size(); ++i)
@@ -847,10 +1090,15 @@ namespace gh2
                 used += milo::mesh::kBoneCount * 4u;
             }
             colorModes[i] = colorMode(draw);
-            if (colorModes[i] == kColorAmbient || colorModes[i] == kColorDirectional)
+            if (colorModes[i] == kColorAmbient || colorModes[i] == kColorDirectional || colorModes[i] == kColorPoint)
             {
                 lightBases[i] = static_cast<int32_t>(used);
                 used += kLightingVec4s;
+            }
+            if (draw.material.texGen == milo::mat::kTexGenEnviron)
+            {
+                envBases[i] = static_cast<int32_t>(used);
+                used += kEnvTexGenVec4s;
             }
         }
         if (!s.growFrameData(data, used))
@@ -861,42 +1109,102 @@ namespace gh2
                 std::memcpy(data.mapped + boneBases[i], frame.draws[i].bones.data(), sizeof(frame.draws[i].bones));
             if (lightBases[i] >= 0)
                 writeLighting(frame.draws[i], data.mapped + lightBases[i]);
+            if (envBases[i] >= 0)
+                writeEnvTexGen(frame.draws[i], frame.cameras[frame.draws[i].camera].eye, data.mapped + envBases[i]);
         }
         vmaFlushAllocation(s.allocator, data.memory, 0, VK_WHOLE_SIZE);
 
-        VkClearValue clears[2]{};
-        for (int i = 0; i < 4; ++i)
-            clears[0].color.float32[i] = frame.clear[i];
-        clears[1].depthStencil = {0.0f, 0};
-        VkRenderPassBeginInfo begin{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
-        begin.renderPass = s.renderPass;
-        begin.framebuffer = s.framebuffer;
-        begin.renderArea = {{0, 0}, {width, height}};
-        begin.clearValueCount = 2;
-        begin.pClearValues = clears;
-        vkCmdBeginRenderPass(cmd, &begin, VK_SUBPASS_CONTENTS_INLINE);
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, s.layout, 1, 1, &data.set, 0, nullptr);
+        // Which pass each draw goes into and which target image it samples.
+        // A draw through a camera with a target opens that target's next
+        // generation when the current one has been sampled since it was drawn.
+        struct TargetRun
+        {
+            uint32_t tex;
+            uint32_t generation;
+            uint32_t width;
+            uint32_t height;
+            std::vector<size_t> draws;
+            TargetImage *image = nullptr;
+        };
+        std::vector<TargetRun> runs;
+        std::vector<int32_t> drawRun(frame.draws.size(), -1);
+        std::vector<int32_t> sampleRun(frame.draws.size(), -1);
+        {
+            std::unordered_map<uint32_t, int32_t> current;
+            std::unordered_map<uint32_t, bool> sampledSince;
+            std::unordered_map<uint32_t, uint32_t> generations;
+            for (size_t i = 0; i < frame.draws.size(); ++i)
+            {
+                const DrawCall &draw = frame.draws[i];
+                if (draw.camera >= frame.cameras.size())
+                    continue;
+                const uint32_t rt = draw.material.renderTarget;
+                if (rt != 0u)
+                {
+                    const auto found = current.find(rt);
+                    if (found != current.end())
+                    {
+                        sampleRun[i] = found->second;
+                        sampledSince[rt] = true;
+                    }
+                }
+                const Camera &camera = frame.cameras[draw.camera];
+                if (camera.target == 0u)
+                    continue;
+                if (camera.targetWidth == 0u || camera.targetHeight == 0u)
+                {
+                    drawRun[i] = INT32_MAX; // into a target with no size: nowhere
+                    continue;
+                }
+                auto found = current.find(camera.target);
+                if (found == current.end() || sampledSince[camera.target])
+                {
+                    runs.push_back({camera.target, generations[camera.target]++, camera.targetWidth,
+                                    camera.targetHeight, {}});
+                    found = current.insert_or_assign(camera.target, static_cast<int32_t>(runs.size() - 1u)).first;
+                    sampledSince[camera.target] = false;
+                }
+                drawRun[i] = found->second;
+                runs[found->second].draws.push_back(i);
+            }
+        }
+        // Each target's generations are sized before any is taken, since
+        // growing the list would move the ones already handed out.
+        for (const TargetRun &run : runs)
+        {
+            std::vector<TargetImage> &images = s.targets[run.tex];
+            if (images.size() <= run.generation)
+                images.resize(run.generation + 1u);
+        }
+        for (TargetRun &run : runs)
+            run.image = s.targetImage(run.tex, run.generation, run.width, run.height);
 
         std::vector<Matrix> viewProjections;
         viewProjections.reserve(frame.cameras.size());
         for (const Camera &camera : frame.cameras)
             viewProjections.push_back(viewProjection(camera, frame.yRatio));
 
-        const float w = static_cast<float>(width);
-        const float h = static_cast<float>(height);
+        // Bound state outlives a render pass, so the frame data is bound once.
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, s.layout, 1, 1, &data.set, 0, nullptr);
         uint32_t boundCamera = UINT32_MAX;
         VkPipeline boundPipeline = VK_NULL_HANDLE;
-        for (size_t i = 0; i < frame.draws.size(); ++i)
-        {
+        // One draw into whichever pass is open, `w` by `h`.
+        const auto drawOne = [&](size_t i, float w, float h) {
             const DrawCall &draw = frame.draws[i];
-            const GpuTexture *texture = drawTextures[i];
-            if (!draw.mesh || !texture || draw.camera >= viewProjections.size())
-                continue;
+            const VkDescriptorSet *sets = drawTextures[i] ? drawTextures[i]->sets : nullptr;
+            if (draw.material.renderTarget != 0u)
+            {
+                // A rendered texture nothing drew this frame reads as nothing.
+                const TargetImage *image = sampleRun[i] >= 0 ? runs[sampleRun[i]].image : nullptr;
+                sets = image ? image->sets : nullptr;
+            }
+            if (!draw.mesh || !sets || draw.camera >= viewProjections.size())
+                return;
             if (frame.cameras[draw.camera].rect[2] <= 0.0f || frame.cameras[draw.camera].rect[3] <= 0.0f)
-                continue;
+                return;
             GpuMesh *mesh = s.gpuMesh(draw.mesh, serial);
             if (!mesh)
-                continue;
+                return;
             if (draw.camera != boundCamera)
             {
                 // The camera's rect, as PsCam::Select sets its viewport and
@@ -917,7 +1225,7 @@ namespace gh2
             const Material &material = draw.material;
             const VkPipeline pipeline = s.pipeline(material.blend, material.zMode);
             if (pipeline == VK_NULL_HANDLE)
-                continue;
+                return;
             if (pipeline != boundPipeline)
             {
                 vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
@@ -933,22 +1241,61 @@ namespace gh2
             if (material.alphaCut)
                 push.flags |= kFlagAlphaCut;
             // Intensify raises a textured pass's rgb scale from 128 to 255.
-            if (material.texture && material.intensify)
+            if ((material.texture || material.renderTarget != 0u) && material.intensify)
                 push.flags |= kFlagIntensify;
+            if (draw.blended)
+                push.flags |= kFlagBlended;
             push.boneBase = boneBases[i];
             push.lightBase = lightBases[i];
+            push.envBase = envBases[i];
             std::memcpy(push.uvRows, material.uvXfm, sizeof(push.uvRows));
             std::memcpy(push.uvOffset, material.uvXfm + 4, sizeof(push.uvOffset));
             vkCmdPushConstants(cmd, s.layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                                sizeof(push), &push);
             vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, s.layout, 0, 1,
-                                    &texture->sets[material.texWrap ? 1 : 0], 0, nullptr);
+                                    &sets[material.texWrap ? 1 : 0], 0, nullptr);
             const VkDeviceSize offset = 0;
             vkCmdBindVertexBuffers(cmd, 0, 1, &mesh->vertices, &offset);
             vkCmdBindIndexBuffer(cmd, mesh->indices, 0, VK_INDEX_TYPE_UINT16);
             vkCmdDrawIndexed(cmd, mesh->indexCount, 1, 0, 0, 0);
+        };
+
+        // Targets first, so a draw sampling one reads what this frame drew
+        // into it, in order of first use.
+        for (const TargetRun &run : runs)
+        {
+            if (!run.image)
+                continue;
+            VkClearValue clears[2]{};
+            clears[1].depthStencil = {0.0f, 0};
+            VkRenderPassBeginInfo begin{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
+            begin.renderPass = s.targetPass;
+            begin.framebuffer = run.image->framebuffer;
+            begin.renderArea = {{0, 0}, {run.width, run.height}};
+            begin.clearValueCount = 2;
+            begin.pClearValues = clears;
+            vkCmdBeginRenderPass(cmd, &begin, VK_SUBPASS_CONTENTS_INLINE);
+            boundCamera = UINT32_MAX;
+            for (size_t i : run.draws)
+                drawOne(i, static_cast<float>(run.width), static_cast<float>(run.height));
+            vkCmdEndRenderPass(cmd);
         }
 
+        VkClearValue clears[2]{};
+        for (int i = 0; i < 4; ++i)
+            clears[0].color.float32[i] = frame.clear[i];
+        clears[1].depthStencil = {0.0f, 0};
+        VkRenderPassBeginInfo begin{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
+        begin.renderPass = s.renderPass;
+        begin.framebuffer = s.framebuffer;
+        begin.renderArea = {{0, 0}, {width, height}};
+        begin.clearValueCount = 2;
+        begin.pClearValues = clears;
+        vkCmdBeginRenderPass(cmd, &begin, VK_SUBPASS_CONTENTS_INLINE);
+        boundCamera = UINT32_MAX;
+        for (size_t i = 0; i < frame.draws.size(); ++i)
+            if (drawRun[i] < 0)
+                drawOne(i, static_cast<float>(width), static_cast<float>(height));
         vkCmdEndRenderPass(cmd);
         s.retire(serial);
         return true;
