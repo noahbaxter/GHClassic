@@ -79,6 +79,7 @@ namespace gh2
     {
         std::shared_ptr<const MeshData> mesh;
         Matrix world{};      // identity when skinned
+        bool screen = false; // verts already in clip space (PsRnd::DrawRect): no camera
         uint32_t camera = 0; // index into Frame::cameras
         Material material;
         // A skinned vert is sum over b of weight[b] * (pos * bones[b]), its

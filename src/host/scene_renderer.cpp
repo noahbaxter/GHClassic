@@ -1232,7 +1232,7 @@ namespace gh2
                 boundPipeline = pipeline;
             }
             PushConstants push{};
-            const Matrix mvp = multiply(draw.world, viewProjections[draw.camera]);
+            const Matrix mvp = draw.screen ? draw.world : multiply(draw.world, viewProjections[draw.camera]);
             std::memcpy(push.mvp, mvp.data(), sizeof(push.mvp));
             std::memcpy(push.matColor, material.color, sizeof(push.matColor));
             push.flags = colorModes[i];
