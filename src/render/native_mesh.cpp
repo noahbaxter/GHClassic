@@ -26,50 +26,51 @@ namespace gh2
     namespace
     {
         const Addresses *s_addresses = nullptr;
+    }
 
-        // A Transform in guest memory: three 16-byte rows, then the position.
-        Matrix readTransform(uint8_t *rdram, uint32_t address)
-        {
-            Matrix m{};
-            for (uint32_t row = 0; row < 4; ++row)
-                for (uint32_t col = 0; col < 3; ++col)
-                    m[row * 4 + col] = load<float>(rdram, address + row * 16u + col * 4u);
-            m[15] = 1.0f;
-            return m;
-        }
+    Matrix readTransform(uint8_t *rdram, uint32_t address)
+    {
+        Matrix m{};
+        for (uint32_t row = 0; row < 4; ++row)
+            for (uint32_t col = 0; col < 3; ++col)
+                m[row * 4 + col] = load<float>(rdram, address + row * 16u + col * 4u);
+        m[15] = 1.0f;
+        return m;
+    }
 
-        // The camera current when the draw is made, reusing the last entry
-        // when nothing about it has changed.
-        uint32_t currentCamera(uint8_t *rdram)
+    uint32_t currentCamera(uint8_t *rdram)
+    {
+        Frame &frame = building();
+        const uint32_t cam = load<uint32_t>(rdram, s_addresses->rndCamCurrent);
+        Camera camera;
+        camera.id = cam;
+        if (cam != 0u)
         {
-            Frame &frame = building();
-            const uint32_t cam = load<uint32_t>(rdram, s_addresses->rndCamCurrent);
-            Camera camera;
-            camera.id = cam;
-            if (cam != 0u)
+            camera.view = readTransform(rdram, cam + milo::camera::kView);
+            for (uint32_t i = 0; i < 3; ++i)
+                camera.eye[i] = load<float>(rdram, cam + milo::transformable::kWorld + 0x30u + i * 4u);
+            camera.nearPlane = load<float>(rdram, cam + milo::camera::kNear);
+            camera.farPlane = load<float>(rdram, cam + milo::camera::kFar);
+            camera.yFov = load<float>(rdram, cam + milo::camera::kYFov);
+            for (uint32_t i = 0; i < 2; ++i)
+                camera.zRange[i] = load<float>(rdram, cam + milo::camera::kZRange + i * 4u);
+            for (uint32_t i = 0; i < 4; ++i)
+                camera.rect[i] = load<float>(rdram, cam + milo::camera::kRect + i * 4u);
+            camera.target = load<uint32_t>(rdram, cam + milo::camera::kTargetTex);
+            if (camera.target != 0u)
             {
-                camera.view = readTransform(rdram, cam + milo::camera::kView);
-                for (uint32_t i = 0; i < 3; ++i)
-                    camera.eye[i] = load<float>(rdram, cam + milo::transformable::kWorld + 0x30u + i * 4u);
-                camera.nearPlane = load<float>(rdram, cam + milo::camera::kNear);
-                camera.farPlane = load<float>(rdram, cam + milo::camera::kFar);
-                camera.yFov = load<float>(rdram, cam + milo::camera::kYFov);
-                for (uint32_t i = 0; i < 2; ++i)
-                    camera.zRange[i] = load<float>(rdram, cam + milo::camera::kZRange + i * 4u);
-                for (uint32_t i = 0; i < 4; ++i)
-                    camera.rect[i] = load<float>(rdram, cam + milo::camera::kRect + i * 4u);
-                camera.target = load<uint32_t>(rdram, cam + milo::camera::kTargetTex);
-                if (camera.target != 0u)
-                {
-                    camera.targetWidth = load<uint32_t>(rdram, camera.target + milo::tex::kWidth);
-                    camera.targetHeight = load<uint32_t>(rdram, camera.target + milo::tex::kHeight);
-                }
+                camera.targetWidth = load<uint32_t>(rdram, camera.target + milo::tex::kWidth);
+                camera.targetHeight = load<uint32_t>(rdram, camera.target + milo::tex::kHeight);
             }
-            if (!frame.cameras.empty() && std::memcmp(&frame.cameras.back(), &camera, sizeof(Camera)) == 0)
-                return static_cast<uint32_t>(frame.cameras.size() - 1u);
-            frame.cameras.push_back(camera);
-            return static_cast<uint32_t>(frame.cameras.size() - 1u);
         }
+        if (!frame.cameras.empty() && std::memcmp(&frame.cameras.back(), &camera, sizeof(Camera)) == 0)
+            return static_cast<uint32_t>(frame.cameras.size() - 1u);
+        frame.cameras.push_back(camera);
+        return static_cast<uint32_t>(frame.cameras.size() - 1u);
+    }
+
+    namespace
+    {
 
         // One draw per material pass, from this mesh's material, not the
         // owner's.
