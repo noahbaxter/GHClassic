@@ -2,10 +2,10 @@
 
 namespace gh2
 {
-    FrameMailbox &frames()
+    FrameQueue &frames()
     {
-        static FrameMailbox mailbox;
-        return mailbox;
+        static FrameQueue queue;
+        return queue;
     }
 
     Frame &building()

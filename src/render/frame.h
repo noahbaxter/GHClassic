@@ -2,7 +2,10 @@
 
 #include "render/scene.h"
 
+#include <chrono>
+#include <condition_variable>
 #include <cstdint>
+#include <deque>
 #include <mutex>
 #include <vector>
 
@@ -45,29 +48,46 @@ namespace gh2
         std::vector<DrawCall> draws;
     };
 
-    // The latest finished frame. The game thread publishes at EndDrawing; the
-    // host thread takes whatever is newest when it presents.
-    class FrameMailbox
+    // Finished frames, oldest first. The game thread publishes at EndDrawing;
+    // the host thread shows each once, in order. Game frames finish at uneven
+    // host times, so taking only the newest at each vsync showed one in eight
+    // twice and skipped the next, which the scrolling highway shows as judder.
+    class FrameQueue
     {
     public:
         void publish(const Frame &frame)
         {
-            std::lock_guard lock(m_mutex);
-            m_frame = frame;
+            {
+                std::lock_guard lock(m_mutex);
+                // Room for one frame of jitter and no more, so a host stall
+                // leaves at most one frame of extra delay.
+                if (m_frames.size() >= kDepth)
+                    m_frames.pop_front();
+                m_frames.push_back(frame);
+            }
+            m_ready.notify_one();
         }
 
-        Frame latest() const
+        // The next frame not yet shown, waiting up to `wait` for one. False
+        // when none came: the host shows its last again.
+        bool next(Frame &out, std::chrono::microseconds wait)
         {
-            std::lock_guard lock(m_mutex);
-            return m_frame;
+            std::unique_lock lock(m_mutex);
+            if (!m_ready.wait_for(lock, wait, [this] { return !m_frames.empty(); }))
+                return false;
+            out = std::move(m_frames.front());
+            m_frames.pop_front();
+            return true;
         }
 
     private:
-        mutable std::mutex m_mutex;
-        Frame m_frame;
+        static constexpr size_t kDepth = 2;
+        std::mutex m_mutex;
+        std::condition_variable m_ready;
+        std::deque<Frame> m_frames;
     };
 
-    FrameMailbox &frames();
+    FrameQueue &frames();
 
     // The frame the game thread is building between BeginDrawing and
     // EndDrawing. Game thread only.

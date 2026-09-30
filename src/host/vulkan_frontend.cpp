@@ -94,6 +94,8 @@ namespace gh2
         VkDeviceSize readbackSize = 0;
 
         std::chrono::steady_clock::time_point nextHiddenFrame{};
+        Frame shown;                                 // the game frame last drawn
+        std::chrono::microseconds frameWait{8333};   // half a display period
 
         SceneRenderer scene;
 
@@ -370,6 +372,10 @@ namespace gh2
             openInput();
         openAudio(options.mute);
         s.nextHiddenFrame = std::chrono::steady_clock::now();
+        if (!s.hidden)
+            if (const SDL_DisplayMode *mode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(s.window));
+                mode && mode->refresh_rate > 0.0f)
+                s.frameWait = std::chrono::microseconds(static_cast<int64_t>(500000.0f / mode->refresh_rate));
         return true;
     }
 
@@ -389,7 +395,10 @@ namespace gh2
         }
         pollInput(devicesChanged);
 
-        const Frame frame = frames().latest();
+        // Each game frame once, in order: wait up to half a display period for
+        // the next, else show the last again.
+        frames().next(s.shown, s.frameWait);
+        const Frame &frame = s.shown;
 
         State::Slot &slot = s.slots[s.slot];
         vkWaitForFences(s.device.device, 1, &slot.done, VK_TRUE, UINT64_MAX);
