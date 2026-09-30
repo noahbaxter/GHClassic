@@ -36,6 +36,10 @@ namespace gh2::settings
             {"video", "widescreen", Type::kBool, 0, 1, 1, 1, 0, "16:9 picture"},
             {"video", "frame_rate", Type::kInt, 0, 500, 1, 0, 60,
              "Game frames per second, 0 to match the display. The PS2 ran 60"},
+            // Most of GH2's textures have no mip chain (443 of 470 loaded into
+            // a song), so drawn small they shimmer: the highway's far end.
+            {"video", "mipmaps", Type::kBool, 0, 1, 1, 1, 0,
+             "Smooth distant textures, with mipmaps for those the game shipped without"},
             // 5 ms: finer is below what a player can feel.
             {"latency", "video_ms", Type::kInt, -500, 500, 5, 0, 0,
              "How late the picture reaches you, in ms, in steps of 5. Moves the hit window"},
