@@ -11,22 +11,20 @@
 
 #include "guest.h"
 #include "hook.h"
+#include "settings.h"
 #include "ps2_runtime_macros.h"
 
 namespace gh2
 {
     namespace
     {
-        // Until the settings table exists, widescreen is on, as ghpc ships it.
-        constexpr bool kWidescreen = true;
-
         constexpr uint32_t kWideScreen = 0x38u; // Options::mWideScreen
 
         struct SyncTag;
 
         void onSync(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
-            store<uint32_t>(rdram, GPR_U32(ctx, 4) + kWideScreen, kWidescreen ? 1u : 0u);
+            store<uint32_t>(rdram, GPR_U32(ctx, 4) + kWideScreen, settings::get(settings::kWidescreen) ? 1u : 0u);
         }
     }
 
