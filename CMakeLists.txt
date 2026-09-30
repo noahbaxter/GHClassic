@@ -66,6 +66,7 @@ FetchContent_MakeAvailable(vk-bootstrap VulkanMemoryAllocator)
 set(GHRECOMP_GAME_SOURCES
     src/main.cpp
     src/game.cpp
+    src/meta_music.cpp
     src/null_movie.cpp
     src/null_rnd.cpp
     src/pad.cpp

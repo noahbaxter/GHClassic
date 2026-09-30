@@ -28,6 +28,7 @@ namespace gh2
         uint32_t playMovie;
         uint32_t optionsSyncVideo; // Options::SyncVideoOptions
         uint32_t ctlClientPoll;
+        uint32_t metaMusicPoll;
         uint32_t scePadRead;
         uint32_t scePadInfoAct;
         // Data
@@ -36,6 +37,7 @@ namespace gh2
         uint32_t rndEnvironCurrent; // RndEnviron::sCurrent
         uint32_t synthServerHandler; // the handler CtlServerInit stores
         uint32_t synthServerBuffer;  // its RPC server's receive buffer
+        uint32_t theTaskMgr;
         // RndBitmap::PixelOffset's swizzle tables, by (y / 4) & 1: 64 bytes
         // each for 8bpp, 128 for 4bpp.
         uint32_t swizzle8[2];
@@ -64,6 +66,7 @@ namespace gh2
         .playMovie = 0x21bb60u,
         .optionsSyncVideo = 0x10db80u,
         .ctlClientPoll = 0x22dc68u,
+        .metaMusicPoll = 0x21f180u,
         .scePadRead = 0x2f2c48u,
         .scePadInfoAct = 0x2f2e58u,
         .rndCamCurrent = 0x3de348u,
@@ -71,6 +74,7 @@ namespace gh2
         .rndEnvironCurrent = 0x3de358u,
         .synthServerHandler = 0x3de454u,
         .synthServerBuffer = 0x484340u,
+        .theTaskMgr = 0x51ee40u,
         .swizzle8 = {0x3de1c8u, 0x3de208u},
         .swizzle4 = {0x3de248u, 0x3de2c8u},
     };

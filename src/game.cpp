@@ -2,6 +2,7 @@
 
 #include "addresses.h"
 #include "game_overrides.h"
+#include "meta_music.h"
 #include "null_movie.h"
 #include "null_rnd.h"
 #include "pad.h"
@@ -30,6 +31,7 @@ namespace
         gh2::installNativeRect(runtime, gh2::kSlus21447);
         gh2::installNativeParticles(runtime, gh2::kSlus21447);
         gh2::installSynth(runtime, gh2::kSlus21447);
+        gh2::installMetaMusic(runtime, gh2::kSlus21447);
         gh2::installNullMovie(runtime, gh2::kSlus21447);
         gh2::installVideoOptions(runtime, gh2::kSlus21447);
         gh2::installPad(runtime, gh2::kSlus21447);
