@@ -70,6 +70,8 @@ set(GHRECOMP_GAME_SOURCES
     src/null_rnd.cpp
     src/pad.cpp
     src/silent_synth.cpp
+    src/synth/reverb.cpp
+    src/synth/spu.cpp
     src/video_options.cpp
     src/host/bind.cpp
     src/host/bindings.cpp
