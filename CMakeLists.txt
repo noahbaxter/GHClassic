@@ -66,11 +66,16 @@ FetchContent_MakeAvailable(vk-bootstrap VulkanMemoryAllocator)
 set(GHRECOMP_GAME_SOURCES
     src/main.cpp
     src/game.cpp
+    src/meta_music.cpp
     src/null_movie.cpp
     src/null_rnd.cpp
     src/pad.cpp
-    src/silent_synth.cpp
+    src/synth/module.cpp
+    src/synth/reverb.cpp
+    src/synth/spu.cpp
+    src/synth/synth.cpp
     src/video_options.cpp
+    src/host/audio.cpp
     src/host/bind.cpp
     src/host/bindings.cpp
     src/host/input.cpp
