@@ -43,6 +43,9 @@ namespace gh2
         uint32_t metaMusicPoll;
         uint32_t scePadRead;
         uint32_t scePadInfoAct;
+        uint32_t charHairPoll;
+        uint32_t camShotShake;
+        uint32_t rndFlareDrawFlare;
         // Data
         uint32_t rndCamCurrent;  // RndCam::sCurrent
         uint32_t defaultMat;     // the RndMat a mesh without one draws with
@@ -94,6 +97,9 @@ namespace gh2
         .metaMusicPoll = 0x21f180u,
         .scePadRead = 0x2f2c48u,
         .scePadInfoAct = 0x2f2e58u,
+        .charHairPoll = 0x176fb8u,
+        .camShotShake = 0x262f38u,
+        .rndFlareDrawFlare = 0x1f9330u,
         .rndCamCurrent = 0x3de348u,
         .defaultMat = 0x3da4f0u,
         .rndEnvironCurrent = 0x3de358u,
