@@ -26,3 +26,14 @@ magick -size 1024x1024 xc:none \
   "$TMP/body.png" -geometry +100+100 -compose Over -composite \
   -depth 8 "$OUT"
 echo "wrote $OUT"
+
+# The app bundle's icon, which Finder and other apps read (the Dock's comes
+# from the window at runtime): every size iconutil wants, from the same art.
+ICNS="$ROOT/assets/icon.icns"
+mkdir "$TMP/icon.iconset"
+for size in 16 32 128 256 512; do
+  magick "$OUT" -resize "${size}x${size}" "$TMP/icon.iconset/icon_${size}x${size}.png"
+  magick "$OUT" -resize "$((size * 2))x$((size * 2))" "$TMP/icon.iconset/icon_${size}x${size}@2x.png"
+done
+iconutil -c icns "$TMP/icon.iconset" -o "$ICNS"
+echo "wrote $ICNS"

@@ -86,7 +86,7 @@ if [ "$REF" = 1 ]; then
     sleep 0.5
   done
 else
-  BIN="$ROOT/build/game/ghrecomp"
+  BIN="$ROOT/build/game/ghrecomp.app/Contents/MacOS/ghrecomp"
   ELF="$ROOT/build/recomp/gh2.elf"
   [ -x "$BIN" ] && [ -f "$ELF" ] || { echo "no build; run scripts/build.sh" >&2; exit 1; }
   [ -n "$DISC" ] || DISC="$(python3 "$ROOT/tools/disc.py" find SLUS-21447 "$ROOT"/game/*)"

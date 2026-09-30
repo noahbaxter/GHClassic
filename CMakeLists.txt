@@ -142,9 +142,21 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
 configure_file(src/dta/dta.h.in "${GHRECOMP_DTA_DIR}/dta.h" @ONLY)
 target_include_directories(ghrecomp PRIVATE "${GHRECOMP_DTA_DIR}")
 
-# The window icons, next to the binary where SDL_GetBasePath finds them.
-configure_file(assets/icon.png "${CMAKE_CURRENT_BINARY_DIR}/icon.png" COPYONLY)
-configure_file(assets/icon_macos.png "${CMAKE_CURRENT_BINARY_DIR}/icon_macos.png" COPYONLY)
+# The window icons, where SDL_GetBasePath finds them. On macOS the game is an
+# app bundle, so other apps (Finder, audio mixers) see its icon too, and the
+# base path is the bundle's Resources.
+if(APPLE)
+    target_sources(ghrecomp PRIVATE assets/icon.icns assets/icon_macos.png)
+    set_source_files_properties(assets/icon.icns assets/icon_macos.png
+        PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+    set_target_properties(ghrecomp PROPERTIES
+        MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_BUNDLE_NAME ghrecomp
+        MACOSX_BUNDLE_GUI_IDENTIFIER com.noahbaxter.ghrecomp
+        MACOSX_BUNDLE_ICON_FILE icon.icns)
+else()
+    configure_file(assets/icon.png "${CMAKE_CURRENT_BINARY_DIR}/icon.png" COPYONLY)
+endif()
 
 # Unity batches are for the generated code; game files stay separate units.
 set_source_files_properties(${GHRECOMP_GAME_SOURCES} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

@@ -62,4 +62,4 @@ fi
 cmake -S "$ROOT" -B "$BUILD" -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DGHRECOMP_GENERATED_DIR="$RECOMP_DIR/output" -DGHRECOMP_ENABLE_LTO="$LTO" > /dev/null
 cmake --build "$BUILD" --target ghrecomp -j "$JOBS"
-echo "run: $BUILD/ghrecomp $RECOMP_DIR/gh2.elf \"${DISC:-<GH2 disc image>}\""
+echo "run: scripts/play.sh${DISC:+ \"$DISC\"}"
