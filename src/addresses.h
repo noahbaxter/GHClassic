@@ -24,6 +24,7 @@ namespace gh2
         uint32_t psEnvironSelect;
         uint32_t psTexSyncBitmap;
         uint32_t psTexDestroy;
+        uint32_t rndTextDrawShowing;
         uint32_t worldXfm;       // RndTransformable::WorldXfm
         uint32_t playMovie;
         uint32_t optionsSyncVideo; // Options::SyncVideoOptions
@@ -78,6 +79,7 @@ namespace gh2
         .psEnvironSelect = 0x1a2060u,
         .psTexSyncBitmap = 0x1a13a8u,
         .psTexDestroy = 0x1a0f18u,
+        .rndTextDrawShowing = 0x1dc380u,
         .worldXfm = 0x3d8ea0u,
         .playMovie = 0x21bb60u,
         .optionsSyncVideo = 0x10db80u,

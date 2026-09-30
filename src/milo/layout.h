@@ -132,6 +132,18 @@ namespace milo
         constexpr uint32_t kTypeNoPixels = 0x2u | 0x4u | 0x8u; // rendered, movie, frame buffer
     }
 
+    // RndText: its font's ObjPtr at +0x114, the pointer 8 in.
+    namespace text
+    {
+        constexpr uint32_t kFont = 0x11cu; // RndFont*
+    }
+
+    // RndFont: glyphs are its material's texture (ValidTexture 0x22e4f8).
+    namespace font
+    {
+        constexpr uint32_t kMat = 0x30u; // RndMat*
+    }
+
     // RndMesh, 0x180 bytes; PsMesh adds its packet at +0x150.
     namespace mesh
     {

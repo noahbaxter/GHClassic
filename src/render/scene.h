@@ -35,6 +35,9 @@ namespace gh2
         std::vector<uint8_t> rgba;
         // The game's own smaller levels, each half the one before.
         std::vector<std::vector<uint8_t>> mips;
+        // A font's glyphs, drawn near their own size: generated levels would
+        // only blur them.
+        bool text = false;
     };
 
     // One material pass as the engine held it at draw time.

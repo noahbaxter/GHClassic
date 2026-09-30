@@ -620,10 +620,11 @@ namespace gh2
             gpu.uploaded = serial;
             gpu.lastUsed = serial;
             // The game's levels are uploaded; with the mipmaps setting, the
-            // rest down to 1x1 are blitted from the smallest of them.
+            // rest down to 1x1 are blitted from the smallest of them, fonts
+            // aside.
             const uint32_t stored = 1u + static_cast<uint32_t>(data->mips.size());
             uint32_t levels = stored;
-            if (settings::get(settings::kMipmaps))
+            if (settings::get(settings::kMipmaps) && !data->text)
                 while ((std::max(data->width, data->height) >> (levels - 1u)) > 1u)
                     ++levels;
             std::vector<uint8_t> staged = data->rgba;

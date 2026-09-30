@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace gh2
 {
@@ -264,8 +265,24 @@ namespace gh2
             return tinted(green, kYellowFill);
         }
 
+        // Textures a font draws with, by RndTex: found at RndText::DrawShowing
+        // (0x1dc380), through its font (+0x11c), the font's material (+0x30)
+        // and that material's texture.
+        std::unordered_set<uint32_t> s_textTextures;
+
+        std::shared_ptr<const TextureData> asText(std::shared_ptr<const TextureData> data)
+        {
+            if (!data || data->text)
+                return data;
+            auto out = std::make_shared<TextureData>(*data);
+            out->text = true;
+            return out;
+        }
+
         void store(uint32_t tex, std::shared_ptr<const TextureData> data)
         {
+            if (s_textTextures.contains(tex))
+                data = asText(std::move(data));
             if (data && data->width == 32u && data->height == 32u)
             {
                 const uint64_t hash = pixelHash(*data);
@@ -313,7 +330,21 @@ namespace gh2
         {
             const uint32_t tex = GPR_U32(ctx, 4);
             s_textures.erase(tex);
+            s_textTextures.erase(tex);
             std::erase(s_yellowFretIcons, tex);
+        }
+
+        struct TextDrawTag;
+        void onTextDraw(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
+        {
+            const uint32_t font = load<uint32_t>(rdram, GPR_U32(ctx, 4) + milo::text::kFont);
+            const uint32_t mat = font != 0u ? load<uint32_t>(rdram, font + milo::font::kMat) : 0u;
+            const uint32_t tex = mat != 0u ? load<uint32_t>(rdram, mat + milo::mat::kDiffuseTex) : 0u;
+            if (tex == 0u || !s_textTextures.insert(tex).second)
+                return;
+            const auto found = s_textures.find(tex);
+            if (found != s_textures.end())
+                found->second = asText(found->second);
         }
     }
 
@@ -328,5 +359,6 @@ namespace gh2
         s_addresses = &addresses;
         EntryHook<SyncTag>::install(runtime, addresses.psTexSyncBitmap, onSync);
         EntryHook<DestroyTag>::install(runtime, addresses.psTexDestroy, onDestroy);
+        EntryHook<TextDrawTag>::install(runtime, addresses.rndTextDrawShowing, onTextDraw);
     }
 }
