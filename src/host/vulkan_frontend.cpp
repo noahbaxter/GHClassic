@@ -375,7 +375,7 @@ namespace gh2
                 return false;
             if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED)
                 s.swapchainStale = true;
-            if (event.type == SDL_EVENT_GAMEPAD_ADDED || event.type == SDL_EVENT_GAMEPAD_REMOVED)
+            if (event.type == SDL_EVENT_JOYSTICK_ADDED || event.type == SDL_EVENT_JOYSTICK_REMOVED)
                 devicesChanged = true;
         }
         pollInput(devicesChanged);

@@ -3,10 +3,14 @@
 //
 //   ghrecomp <elf> [disc] [--hidden] [--mute] [--mc <dir>] [--shots <dir>] [--shot-every <n>]
 //            [--res window|native|480p|720p|1080p|1440p|2160p]
+//   ghrecomp --bind [keyboard | <n>]
 //
 // --res is what the scene is drawn at: the window's size (the default), the
-// game's own (512x448), or that height at the picture's aspect.
+// game's own (512x448), or that height at the picture's aspect. --bind
+// sets up a controller or the keyboard in input.ini; with no device it
+// lists them.
 
+#include "host/bind.h"
 #include "host/vulkan_frontend.h"
 #include "ps2_runtime.h"
 #include "runtime/ps2_disc_image.h"
@@ -19,6 +23,8 @@
 
 int main(int argc, char *argv[])
 {
+    if (argc >= 2 && std::string(argv[1]) == "--bind")
+        return gh2::runBind(argc, argv);
     if (argc < 2)
     {
         std::cerr << "usage: ghrecomp <elf> [disc] [--hidden] [--mute] [--mc <dir>]"

@@ -22,7 +22,7 @@ namespace gh2
     }
 
     // The frontend's side, on the thread that pumps SDL events. Poll after
-    // each pump; `devicesChanged` when a gamepad came or went.
+    // each pump; `devicesChanged` when a joystick came or went.
     void openInput();
     void pollInput(bool devicesChanged);
     void closeInput();
