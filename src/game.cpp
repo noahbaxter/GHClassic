@@ -14,6 +14,7 @@
 #include "render/native_rect.h"
 #include "render/native_rnd.h"
 #include "render/texture_capture.h"
+#include "script.h"
 #include "synth/synth.h"
 #include "video_options.h"
 
@@ -34,6 +35,7 @@ namespace
         gh2::installMetaMusic(runtime, gh2::kSlus21447);
         gh2::installNullMovie(runtime, gh2::kSlus21447);
         gh2::installVideoOptions(runtime, gh2::kSlus21447);
+        gh2::script::install(runtime, gh2::kSlus21447);
         gh2::installPad(runtime, gh2::kSlus21447);
     }
 }

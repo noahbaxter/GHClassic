@@ -27,6 +27,15 @@ namespace gh2
         uint32_t worldXfm;       // RndTransformable::WorldXfm
         uint32_t playMovie;
         uint32_t optionsSyncVideo; // Options::SyncVideoOptions
+        uint32_t ghUtlInit;        // where GH2 registers its DataFuncs
+        uint32_t dataRegisterFunc;
+        uint32_t dataReadString;
+        uint32_t dataNodeEvaluate; // DataNode::Evaluate
+        uint32_t symbolCtor;       // Symbol::Symbol(const char *)
+        uint32_t builtinNew;
+        uint32_t builtinDelete;
+        uint32_t dataNodeGetObj;   // DataNode::GetObj
+        uint32_t uiGotoScreen;     // UIManager::GotoScreen
         uint32_t ctlClientPoll;
         uint32_t metaMusicPoll;
         uint32_t scePadRead;
@@ -65,6 +74,15 @@ namespace gh2
         .worldXfm = 0x3d8ea0u,
         .playMovie = 0x21bb60u,
         .optionsSyncVideo = 0x10db80u,
+        .ghUtlInit = 0x11fbf0u,
+        .dataRegisterFunc = 0x2b2c80u,
+        .dataReadString = 0x2b28d0u,
+        .dataNodeEvaluate = 0x2b7d38u,
+        .symbolCtor = 0x2d3a48u,
+        .builtinNew = 0x2cf138u,
+        .builtinDelete = 0x2cf160u,
+        .dataNodeGetObj = 0x2b7f80u,
+        .uiGotoScreen = 0x214d48u,
         .ctlClientPoll = 0x22dc68u,
         .metaMusicPoll = 0x21f180u,
         .scePadRead = 0x2f2c48u,

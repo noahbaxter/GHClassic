@@ -70,6 +70,7 @@ set(GHRECOMP_GAME_SOURCES
     src/null_movie.cpp
     src/null_rnd.cpp
     src/pad.cpp
+    src/script.cpp
     src/settings.cpp
     src/synth/module.cpp
     src/synth/reverb.cpp
