@@ -101,6 +101,33 @@ namespace gh2
         std::chrono::nanoseconds gamePeriod{16667000};
         bool newestOnly = false;                     // the game outruns the display
 
+        // Frame rates in the window title, every half second: new game
+        // frames shown, and frames the game finished.
+        std::string title;
+        std::chrono::steady_clock::time_point rateSince{};
+        uint64_t shownCount = 0;
+        uint64_t publishedSince = 0;
+
+        void countFrame(bool isNew)
+        {
+            shownCount += isNew ? 1u : 0u;
+            const auto now = std::chrono::steady_clock::now();
+            const double elapsed = std::chrono::duration<double>(now - rateSince).count();
+            if (elapsed < 0.5)
+                return;
+            const uint64_t published = frames().published();
+            if (window && rateSince != std::chrono::steady_clock::time_point{})
+            {
+                char text[160];
+                std::snprintf(text, sizeof(text), "%s - %.0f fps (game %.0f)", title.c_str(),
+                              shownCount / elapsed, (published - publishedSince) / elapsed);
+                SDL_SetWindowTitle(window, text);
+            }
+            rateSince = now;
+            shownCount = 0;
+            publishedSince = published;
+        }
+
         // The game's frame rate from settings, as the runtime's vblank: one
         // game frame a vblank.
         void applyFrameRate(PS2Runtime &runtime)
@@ -286,6 +313,7 @@ namespace gh2
         s.hidden = options.hidden;
         s.shotDir = options.shotDir;
         s.shotEvery = options.shotEvery;
+        s.title = title;
 
         if (!SDL_Init(SDL_INIT_VIDEO))
         {
@@ -421,10 +449,8 @@ namespace gh2
         // Each game frame once, in order: wait up to half a display period for
         // the next, else show the last again. A game faster than the display
         // shows its newest.
-        if (s.newestOnly)
-            frames().latest(s.shown);
-        else
-            frames().next(s.shown, s.frameWait);
+        const bool isNew = s.newestOnly ? frames().latest(s.shown) : frames().next(s.shown, s.frameWait);
+        s.countFrame(isNew);
         const Frame &frame = s.shown;
 
         State::Slot &slot = s.slots[s.slot];

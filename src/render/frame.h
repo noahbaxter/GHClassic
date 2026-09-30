@@ -64,8 +64,16 @@ namespace gh2
                 if (m_frames.size() >= kDepth)
                     m_frames.pop_front();
                 m_frames.push_back(frame);
+                ++m_published;
             }
             m_ready.notify_one();
+        }
+
+        // Frames published so far.
+        uint64_t published()
+        {
+            std::lock_guard lock(m_mutex);
+            return m_published;
         }
 
         // The next frame not yet shown, waiting up to `wait` for one. False
@@ -97,6 +105,7 @@ namespace gh2
         std::mutex m_mutex;
         std::condition_variable m_ready;
         std::deque<Frame> m_frames;
+        uint64_t m_published = 0;
     };
 
     FrameQueue &frames();
