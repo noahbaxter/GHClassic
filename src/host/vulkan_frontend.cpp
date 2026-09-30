@@ -415,7 +415,17 @@ namespace gh2
             vkCreateSemaphore(s.device.device, &semInfo, nullptr, &slot.imageAvailable);
         }
 
-        if (!s.scene.initialize(s.device.device, s.allocator))
+        // The msaa setting's samples, or the most below it the GPU draws
+        // colour and depth at both.
+        VkPhysicalDeviceProperties properties{};
+        vkGetPhysicalDeviceProperties(s.device.physical_device.physical_device, &properties);
+        const VkSampleCountFlags supported =
+            properties.limits.framebufferColorSampleCounts & properties.limits.framebufferDepthSampleCounts;
+        uint32_t samples = 1;
+        while (samples * 2u <= static_cast<uint32_t>(settings::get(settings::kMsaa)) && (supported & (samples * 2u)))
+            samples *= 2u;
+        std::cerr << "[video] msaa " << samples << "x" << std::endl;
+        if (!s.scene.initialize(s.device.device, s.allocator, static_cast<VkSampleCountFlagBits>(samples)))
             return false;
         if (!s.hidden && !s.createSwapchain())
             return false;

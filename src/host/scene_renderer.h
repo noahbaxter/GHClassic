@@ -17,7 +17,9 @@ namespace gh2
         SceneRenderer();
         ~SceneRenderer();
 
-        bool initialize(VkDevice device, VmaAllocator allocator);
+        // `samples` per pixel in every pass, resolved before anything reads
+        // the result.
+        bool initialize(VkDevice device, VmaAllocator allocator, VkSampleCountFlagBits samples);
         void shutdown();
 
         // Renders into `target` (R8G8B8A8, width x height), which ends in

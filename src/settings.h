@@ -12,6 +12,7 @@ namespace gh2::settings
         kWidescreen,
         kFrameRate, // game frames per second, 0 for the display's rate
         kMipmaps,   // smaller copies for textures the game shipped without
+        kMsaa,      // samples per pixel
         kVideoLagMs, // how late the picture reaches the player
         kAudioLagMs, // how late the sound does
         kKeyCount,

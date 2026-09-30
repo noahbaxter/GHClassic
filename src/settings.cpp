@@ -40,6 +40,8 @@ namespace gh2::settings
             // a song), so drawn small they shimmer: the highway's far end.
             {"video", "mipmaps", Type::kBool, 0, 1, 1, 1, 0,
              "Smooth distant textures, with mipmaps for those the game shipped without"},
+            {"video", "msaa", Type::kInt, 1, 16, 1, 4, 1,
+             "Anti-aliasing samples per pixel: 1 (off), 2, 4, 8 or 16, down to what the GPU can do"},
             // 5 ms: finer is below what a player can feel.
             {"latency", "video_ms", Type::kInt, -500, 500, 5, 0, 0,
              "How late the picture reaches you, in ms, in steps of 5. Moves the hit window"},

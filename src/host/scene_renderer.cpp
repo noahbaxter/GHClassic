@@ -181,6 +181,10 @@ namespace gh2
             VkImage depth = VK_NULL_HANDLE;
             VmaAllocation depthMemory = VK_NULL_HANDLE;
             VkImageView depthView = VK_NULL_HANDLE;
+            // Multisampled colour, resolved into `color`; none at one sample.
+            VkImage msaa = VK_NULL_HANDLE;
+            VmaAllocation msaaMemory = VK_NULL_HANDLE;
+            VkImageView msaaView = VK_NULL_HANDLE;
             VkFramebuffer framebuffer = VK_NULL_HANDLE;
             VkDescriptorSet sets[2]{}; // clamped, wrapped
             uint32_t width = 0;
@@ -312,6 +316,9 @@ namespace gh2
         VkImage depth = VK_NULL_HANDLE;
         VmaAllocation depthMemory = VK_NULL_HANDLE;
         VkImageView depthView = VK_NULL_HANDLE;
+        VkImage msaa = VK_NULL_HANDLE; // resolved into the target; none at one sample
+        VmaAllocation msaaMemory = VK_NULL_HANDLE;
+        VkImageView msaaView = VK_NULL_HANDLE;
         VkFramebuffer framebuffer = VK_NULL_HANDLE;
         uint32_t width = 0;
         uint32_t height = 0;
@@ -335,59 +342,109 @@ namespace gh2
         VkRenderPass targetPass = VK_NULL_HANDLE;
         std::unordered_map<uint32_t, std::vector<TargetImage>> targets;
 
-        // Clears to transparent black, as the GS reads memory nothing drew.
-        // The previous frame's samplers read the image before it is drawn
-        // again, and this frame's read it after.
-        bool createTargetPass()
+        // Samples per pixel for every pass, from the msaa setting.
+        VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
+
+        // The main pass and the target pass, alike but for the finished
+        // image's layout, so every pipeline draws into either: passes are
+        // only compatible when their attachments and dependencies match.
+        // Colour and depth are multisampled when `samples` is above one and
+        // resolve into the finished image, attachment 2; else colour is it.
+        // The finished image is read before a pass draws into it again and
+        // after: blit and readback for the main pass, samplers for a target.
+        bool createPass(VkImageLayout finished, VkRenderPass &out)
         {
-            VkAttachmentDescription attachments[2]{};
+            const bool resolve = samples != VK_SAMPLE_COUNT_1_BIT;
+            VkAttachmentDescription attachments[3]{};
             attachments[0].format = kColorFormat;
-            attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+            attachments[0].samples = samples;
             attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-            attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            attachments[0].storeOp = resolve ? VK_ATTACHMENT_STORE_OP_DONT_CARE : VK_ATTACHMENT_STORE_OP_STORE;
             attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
             attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
             attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            attachments[0].finalLayout = resolve ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : finished;
             attachments[1] = attachments[0];
             attachments[1].format = kDepthFormat;
             attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
             attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            attachments[2] = attachments[0];
+            attachments[2].samples = VK_SAMPLE_COUNT_1_BIT;
+            attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            attachments[2].finalLayout = finished;
 
             VkAttachmentReference colorRef{0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
             VkAttachmentReference depthRef{1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
+            VkAttachmentReference resolveRef{2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
             VkSubpassDescription subpass{};
             subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
             subpass.colorAttachmentCount = 1;
             subpass.pColorAttachments = &colorRef;
+            subpass.pResolveAttachments = resolve ? &resolveRef : nullptr;
             subpass.pDepthStencilAttachment = &depthRef;
 
             VkSubpassDependency before{};
             before.srcSubpass = VK_SUBPASS_EXTERNAL;
             before.dstSubpass = 0;
-            before.srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+            before.srcStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                                  VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
             before.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
                                   VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-            before.srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            before.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_SHADER_READ_BIT |
+                                   VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
             before.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
                                    VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
             VkSubpassDependency after{};
             after.srcSubpass = 0;
             after.dstSubpass = VK_SUBPASS_EXTERNAL;
             after.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-            after.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            after.dstStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
             after.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-            after.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            after.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_SHADER_READ_BIT;
             const VkSubpassDependency dependencies[] = {before, after};
 
             VkRenderPassCreateInfo info{VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};
-            info.attachmentCount = 2;
+            info.attachmentCount = resolve ? 3u : 2u;
             info.pAttachments = attachments;
             info.subpassCount = 1;
             info.pSubpasses = &subpass;
             info.dependencyCount = 2;
             info.pDependencies = dependencies;
-            return check(vkCreateRenderPass(device, &info, nullptr, &targetPass), "target pass");
+            return check(vkCreateRenderPass(device, &info, nullptr, &out), "render pass");
+        }
+
+        // Clears to transparent black, as the GS reads memory nothing drew.
+        bool createTargetPass()
+        {
+            return createPass(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, targetPass);
+        }
+
+        // A colour or depth attachment at `samples` that no one reads after
+        // its pass: depth, and colour that resolves into another image.
+        bool createAttachment(VkFormat format, VkImageUsageFlags usage, uint32_t w, uint32_t h, VkImage &image,
+                           VmaAllocation &memory, VkImageView &view)
+        {
+            VkImageCreateInfo imageInfo{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
+            imageInfo.imageType = VK_IMAGE_TYPE_2D;
+            imageInfo.format = format;
+            imageInfo.extent = {w, h, 1};
+            imageInfo.mipLevels = 1;
+            imageInfo.arrayLayers = 1;
+            imageInfo.samples = samples;
+            imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+            imageInfo.usage = usage | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
+            VmaAllocationCreateInfo alloc{};
+            alloc.usage = VMA_MEMORY_USAGE_AUTO;
+            if (!check(vmaCreateImage(allocator, &imageInfo, &alloc, &image, &memory, nullptr), "attachment"))
+                return false;
+            VkImageViewCreateInfo viewInfo{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+            viewInfo.image = image;
+            viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+            viewInfo.format = format;
+            viewInfo.subresourceRange = {format == kDepthFormat ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
+                                         0, 1, 0, 1};
+            return check(vkCreateImageView(device, &viewInfo, nullptr, &view), "attachment view");
         }
 
         void destroyTarget(TargetImage &t)
@@ -400,10 +457,14 @@ namespace gh2
                 vkDestroyImageView(device, t.colorView, nullptr);
             if (t.depthView != VK_NULL_HANDLE)
                 vkDestroyImageView(device, t.depthView, nullptr);
+            if (t.msaaView != VK_NULL_HANDLE)
+                vkDestroyImageView(device, t.msaaView, nullptr);
             if (t.color != VK_NULL_HANDLE)
                 vmaDestroyImage(allocator, t.color, t.colorMemory);
             if (t.depth != VK_NULL_HANDLE)
                 vmaDestroyImage(allocator, t.depth, t.depthMemory);
+            if (t.msaa != VK_NULL_HANDLE)
+                vmaDestroyImage(allocator, t.msaa, t.msaaMemory);
             t = TargetImage{};
         }
 
@@ -435,31 +496,27 @@ namespace gh2
             alloc.usage = VMA_MEMORY_USAGE_AUTO;
             if (!check(vmaCreateImage(allocator, &imageInfo, &alloc, &t.color, &t.colorMemory, nullptr), "target"))
                 return nullptr;
-            imageInfo.format = kDepthFormat;
-            imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-            if (!check(vmaCreateImage(allocator, &imageInfo, &alloc, &t.depth, &t.depthMemory, nullptr), "target depth"))
-            {
-                destroyTarget(t);
-                return nullptr;
-            }
-
             VkImageViewCreateInfo view{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
             view.image = t.color;
             view.viewType = VK_IMAGE_VIEW_TYPE_2D;
             view.format = kColorFormat;
             view.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
             bool ok = check(vkCreateImageView(device, &view, nullptr, &t.colorView), "target view");
-            view.image = t.depth;
-            view.format = kDepthFormat;
-            view.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
-            ok = ok && check(vkCreateImageView(device, &view, nullptr, &t.depthView), "target depth view");
+
+            const bool resolve = samples != VK_SAMPLE_COUNT_1_BIT;
+            if (resolve)
+                ok = ok && createAttachment(kColorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, w, h, t.msaa,
+                                            t.msaaMemory, t.msaaView);
+            ok = ok && createAttachment(kDepthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, w, h, t.depth,
+                                        t.depthMemory, t.depthView);
             if (ok)
             {
-                const VkImageView views[] = {t.colorView, t.depthView};
+                const VkImageView plain[] = {t.colorView, t.depthView};
+                const VkImageView resolved[] = {t.msaaView, t.depthView, t.colorView};
                 VkFramebufferCreateInfo fb{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
                 fb.renderPass = targetPass;
-                fb.attachmentCount = 2;
-                fb.pAttachments = views;
+                fb.attachmentCount = resolve ? 3u : 2u;
+                fb.pAttachments = resolve ? resolved : plain;
                 fb.width = w;
                 fb.height = h;
                 fb.layers = 1;
@@ -759,60 +816,7 @@ namespace gh2
 
         bool createRenderPass()
         {
-            VkAttachmentDescription attachments[2]{};
-            attachments[0].format = kColorFormat;
-            attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
-            attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-            attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-            attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-            attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-            attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            attachments[0].finalLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-            attachments[1].format = kDepthFormat;
-            attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
-            attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-            attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-            attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-            attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-            attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-            VkAttachmentReference colorRef{0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
-            VkAttachmentReference depthRef{1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
-            VkSubpassDescription subpass{};
-            subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-            subpass.colorAttachmentCount = 1;
-            subpass.pColorAttachments = &colorRef;
-            subpass.pDepthStencilAttachment = &depthRef;
-
-            // The previous frame's blit and readback read the target.
-            VkSubpassDependency before{};
-            before.srcSubpass = VK_SUBPASS_EXTERNAL;
-            before.dstSubpass = 0;
-            before.srcStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-            before.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-                                  VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-            before.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-            before.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
-                                   VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-            // This frame's blit and readback read it after.
-            VkSubpassDependency after{};
-            after.srcSubpass = 0;
-            after.dstSubpass = VK_SUBPASS_EXTERNAL;
-            after.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-            after.dstStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
-            after.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-            after.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-            const VkSubpassDependency dependencies[] = {before, after};
-
-            VkRenderPassCreateInfo info{VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};
-            info.attachmentCount = 2;
-            info.pAttachments = attachments;
-            info.subpassCount = 1;
-            info.pSubpasses = &subpass;
-            info.dependencyCount = 2;
-            info.pDependencies = dependencies;
-            return check(vkCreateRenderPass(device, &info, nullptr, &renderPass), "render pass");
+            return createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, renderPass);
         }
 
         bool createLayout()
@@ -875,7 +879,7 @@ namespace gh2
             raster.lineWidth = 1.0f;
 
             VkPipelineMultisampleStateCreateInfo multisample{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
-            multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+            multisample.rasterizationSamples = samples;
 
             const VkPipelineDepthStencilStateCreateInfo depth = depthState(zMode);
 
@@ -916,10 +920,16 @@ namespace gh2
                 vkDestroyImageView(device, depthView, nullptr);
             if (depth != VK_NULL_HANDLE)
                 vmaDestroyImage(allocator, depth, depthMemory);
+            if (msaaView != VK_NULL_HANDLE)
+                vkDestroyImageView(device, msaaView, nullptr);
+            if (msaa != VK_NULL_HANDLE)
+                vmaDestroyImage(allocator, msaa, msaaMemory);
             framebuffer = VK_NULL_HANDLE;
             targetView = VK_NULL_HANDLE;
             depthView = VK_NULL_HANDLE;
             depth = VK_NULL_HANDLE;
+            msaaView = VK_NULL_HANDLE;
+            msaa = VK_NULL_HANDLE;
             target = VK_NULL_HANDLE;
         }
 
@@ -938,30 +948,20 @@ namespace gh2
             if (!check(vkCreateImageView(device, &view, nullptr, &targetView), "target view"))
                 return false;
 
-            VkImageCreateInfo depthInfo{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
-            depthInfo.imageType = VK_IMAGE_TYPE_2D;
-            depthInfo.format = kDepthFormat;
-            depthInfo.extent = {w, h, 1};
-            depthInfo.mipLevels = 1;
-            depthInfo.arrayLayers = 1;
-            depthInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-            depthInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-            depthInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-            VmaAllocationCreateInfo alloc{};
-            alloc.usage = VMA_MEMORY_USAGE_AUTO;
-            if (!check(vmaCreateImage(allocator, &depthInfo, &alloc, &depth, &depthMemory, nullptr), "depth image"))
+            const bool resolve = samples != VK_SAMPLE_COUNT_1_BIT;
+            if (resolve && !createAttachment(kColorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, w, h, msaa,
+                                             msaaMemory, msaaView))
                 return false;
-            view.image = depth;
-            view.format = kDepthFormat;
-            view.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
-            if (!check(vkCreateImageView(device, &view, nullptr, &depthView), "depth view"))
+            if (!createAttachment(kDepthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, w, h, depth, depthMemory,
+                                  depthView))
                 return false;
 
-            const VkImageView views[] = {targetView, depthView};
+            const VkImageView plain[] = {targetView, depthView};
+            const VkImageView resolved[] = {msaaView, depthView, targetView};
             VkFramebufferCreateInfo fb{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
             fb.renderPass = renderPass;
-            fb.attachmentCount = 2;
-            fb.pAttachments = views;
+            fb.attachmentCount = resolve ? 3u : 2u;
+            fb.pAttachments = resolve ? resolved : plain;
             fb.width = w;
             fb.height = h;
             fb.layers = 1;
@@ -1060,11 +1060,12 @@ namespace gh2
     SceneRenderer::SceneRenderer() = default;
     SceneRenderer::~SceneRenderer() = default;
 
-    bool SceneRenderer::initialize(VkDevice device, VmaAllocator allocator)
+    bool SceneRenderer::initialize(VkDevice device, VmaAllocator allocator, VkSampleCountFlagBits samples)
     {
         m_state = std::make_unique<State>();
         m_state->device = device;
         m_state->allocator = allocator;
+        m_state->samples = samples;
         return m_state->createRenderPass() && m_state->createTargetPass() && m_state->createDescriptorState() &&
                m_state->createLayout();
     }
