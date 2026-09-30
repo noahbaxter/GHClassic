@@ -3,8 +3,9 @@
 // The device must be left alone while its resting state is taken. Each
 // action then takes the first control that moves: a key, a button, a hat
 // direction, or an axis moved over half its travel. Escape, or ten seconds
-// untouched, skips an action. Whammy is the axis pushed furthest while the
-// prompt is up, from its rest to the furthest point.
+// untouched, skips an action, which keeps what input.ini had for it. Whammy
+// is the axis pushed furthest while the prompt is up, from its rest to the
+// furthest point.
 
 #include "host/bind.h"
 
@@ -250,14 +251,18 @@ namespace gh2
         }
 
         int result = 0;
-        if (quit)
+        if (quit || bound.empty())
         {
             std::cout << "nothing written" << std::endl;
         }
         else
         {
+            // A skipped action keeps what the section already had.
             const std::string path = bindingFilePath();
-            if (writeSection(path, section, bound))
+            std::map<Action, std::vector<Source>> merged = loadBindingFile(path).sections[section];
+            for (auto &[action, sources] : bound)
+                merged[action] = std::move(sources);
+            if (writeSection(path, section, merged))
                 std::cout << "wrote [" << section << "] to " << path << std::endl;
             else
             {
