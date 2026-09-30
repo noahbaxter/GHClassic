@@ -27,6 +27,9 @@ namespace gh2
         uint32_t worldXfm;       // RndTransformable::WorldXfm
         uint32_t playMovie;
         uint32_t optionsSyncVideo; // Options::SyncVideoOptions
+        uint32_t optionsSetSyncOffset;
+        uint32_t beatMatchCtor;
+        uint32_t playerMatcherGetSongMs;
         uint32_t ghUtlInit;        // where GH2 registers its DataFuncs
         uint32_t dataRegisterFunc;
         uint32_t dataReadString;
@@ -47,6 +50,7 @@ namespace gh2
         uint32_t synthServerHandler; // the handler CtlServerInit stores
         uint32_t synthServerBuffer;  // its RPC server's receive buffer
         uint32_t theTaskMgr;
+        uint32_t theOptions; // Options*
         // RndBitmap::PixelOffset's swizzle tables, by (y / 4) & 1: 64 bytes
         // each for 8bpp, 128 for 4bpp.
         uint32_t swizzle8[2];
@@ -74,6 +78,9 @@ namespace gh2
         .worldXfm = 0x3d8ea0u,
         .playMovie = 0x21bb60u,
         .optionsSyncVideo = 0x10db80u,
+        .optionsSetSyncOffset = 0x10ded8u,
+        .beatMatchCtor = 0x120f48u,
+        .playerMatcherGetSongMs = 0x115738u,
         .ghUtlInit = 0x11fbf0u,
         .dataRegisterFunc = 0x2b2c80u,
         .dataReadString = 0x2b28d0u,
@@ -93,6 +100,7 @@ namespace gh2
         .synthServerHandler = 0x3de454u,
         .synthServerBuffer = 0x484340u,
         .theTaskMgr = 0x51ee40u,
+        .theOptions = 0x3da2e8u,
         .swizzle8 = {0x3de1c8u, 0x3de208u},
         .swizzle4 = {0x3de248u, 0x3de2c8u},
     };

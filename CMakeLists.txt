@@ -66,6 +66,7 @@ FetchContent_MakeAvailable(vk-bootstrap VulkanMemoryAllocator)
 set(GHRECOMP_GAME_SOURCES
     src/main.cpp
     src/game.cpp
+    src/latency.cpp
     src/meta_music.cpp
     src/null_movie.cpp
     src/null_rnd.cpp
@@ -124,6 +125,14 @@ endforeach()
 add_custom_target(ghrecomp_shaders DEPENDS ${GHRECOMP_SHADER_HEADERS})
 add_dependencies(ghrecomp ghrecomp_shaders)
 target_include_directories(ghrecomp PRIVATE "${GHRECOMP_SHADER_DIR}")
+
+# The port's own game scripts, compiled in as strings (dta.h); editing one
+# reconfigures.
+set(GHRECOMP_DTA_DIR "${CMAKE_CURRENT_BINARY_DIR}/dta")
+file(READ src/dta/lag_panel.dta GHRECOMP_LAG_PANEL_DTA)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS src/dta/lag_panel.dta)
+configure_file(src/dta/dta.h.in "${GHRECOMP_DTA_DIR}/dta.h" @ONLY)
+target_include_directories(ghrecomp PRIVATE "${GHRECOMP_DTA_DIR}")
 
 # The window icons, next to the binary where SDL_GetBasePath finds them.
 configure_file(assets/icon.png "${CMAKE_CURRENT_BINARY_DIR}/icon.png" COPYONLY)

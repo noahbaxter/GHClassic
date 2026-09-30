@@ -1,0 +1,199 @@
+; The lag screen, replaced: video and audio latency set by number, in 5 ms
+; steps, over a preview that keeps running. The layout, the hit animation and
+; the click are the game's own (lag.milo); the values live in settings.ini,
+; through {latency ...}.
+;
+; A beat comes once a [period]. The disc starts early by the video value and
+; the click plays early by the audio value, so on a screen and speakers that
+; late they reach the player together. The preview can show only whether the
+; two agree; how both sit against your strums is felt in a song.
+{retype lag_panel
+   (
+      ; From the ARK root: a path resolves against the file its array came
+      ; from, and this one comes from no file.
+      (file ui/lag.milo)
+      (focus autocalibrate.btn)
+      (from_panel "")
+      (state browse)
+      (impact 0.6) ; the animation lands this long after it starts
+      (period 0.733)
+      (previewing FALSE)
+      ; When the preview loop last ran a beat. A song start clears every task,
+      ; the loop's too, so a stale tick means it has to be started again.
+      (last_tick -100.0)
+      ; A held strum repeats: the direction, the step, the wait to the next.
+      (hold_dir up)
+      (hold_step 0)
+      (hold_wait 0.0)
+      (hold_running FALSE)
+      (update_text
+         ; Buttons redraw from their token; one with no string reads as itself.
+         {autocalibrate.btn set text_token {sprintf "Video: %d ms" {latency get video}}}
+         {reset_to_zero.btn set text_token {sprintf "Audio: %d ms" {latency get audio}}}
+         {countdown.lbl set_localized ""}
+         {setting.lbl set_localized ""}
+         {switch [state]
+            ; In the game's own voice: its lag_info_why, then lines written to
+            ; match (two spaces between sentences, the disc called a note).
+            (browse
+               {instructions.lbl set text_token lag_info_why}
+               {instructions2.lbl set_localized "Set Video and Audio so the note and the click land together."}
+            )
+            (video
+               {instructions.lbl set_localized "How late your TV shows the picture."}
+               {instructions2.lbl set_localized "Strum up or down to change the offset."}
+            )
+            (audio
+               {instructions.lbl set_localized "How late your TV or speakers play the sound."}
+               {instructions2.lbl set_localized "Strum up or down to change the offset."}
+            )
+         }
+      )
+      (update_helpbar
+         {do
+            ($array)
+            {set $array ()}
+            {resize $array 0}
+            ; Frets first, the strum last: the help bar lays them out left to
+            ; right in that order, the strum on the far right.
+            {if {== [state] browse}
+               {push_back $array (fret1 help_select)}
+            }
+            {push_back $array (fret2 help_back)}
+            {if {!= [state] browse}
+               {push_back $array (fret3 help_reset)}
+            }
+            ; Help bar labels must be locale tokens; unknown ones draw blank.
+            {push_back $array
+               {if_else {== [state] browse}
+                  (strum help_updown)
+                  (strum help_adjsync)
+               }
+            }
+            {helpbar set_display $array}
+         }
+      )
+      (set_state
+         ($s)
+         {set [state] $s}
+         {$this update_helpbar}
+         {$this update_text}
+      )
+      (enter
+         {set [hold_running] FALSE}
+         {$this set_state browse}
+         {set [previewing] TRUE}
+         {if {> {- {taskmgr ui_seconds} [last_tick]} {* 2 [period]}}
+            {$this start_preview}
+         }
+      )
+      (exit {set [previewing] FALSE})
+      (nudge
+         ($d)
+         {latency set [state] {+ {latency get [state]} $d}}
+         {synth play_sequence button_toggle}
+         {$this update_text}
+      )
+      (reset_value
+         {latency set [state] 0}
+         {synth play_sequence button_toggle}
+         {$this update_text}
+      )
+      ; One step now, then more while the strum stays held.
+      (strum_step
+         ($dir $d)
+         {$this nudge $d}
+         {set [hold_dir] $dir}
+         {set [hold_step] $d}
+         {set [hold_wait] 0.35}
+         {if {! [hold_running]}
+            {do
+               {set [hold_running] TRUE}
+               {thread_task
+                  (units kTaskUISeconds)
+                  (script
+                     {if {'||' {== [state] browse} {! {pad_held [hold_dir]}}}
+                        {do
+                           {set [hold_running] FALSE}
+                           {$task exit}
+                        }
+                     }
+                     {$task sleep [hold_wait]}
+                     {if {&& {!= [state] browse} {pad_held [hold_dir]}}
+                        {do
+                           {$this nudge [hold_step]}
+                           {set [hold_wait] 0.06}
+                        }
+                     }
+                     {$task loop}
+                  )
+               }
+            }
+         }
+      )
+      (SELECT_START_MSG
+         {if_else {== [state] browse}
+            {switch $component
+               (autocalibrate.btn {$this set_state video})
+               (reset_to_zero.btn {$this set_state audio})
+            }
+            {$this set_state browse}
+         }
+      )
+      ; Setting: strum steps, yellow zeroes, red goes back to the rows, green
+      ; falls through to SELECT_START_MSG.
+      (BUTTON_DOWN_MSG
+         {if_else {== [state] browse}
+            {if_else {== $button kPad_Tri}
+               {if_else {== [from_panel] video_settings_panel}
+                  {ui goto_screen video_settings_screen}
+                  {ui goto_screen pause_video_settings_screen}
+               }
+               kDataUnhandled
+            }
+            {cond
+               ({== $button kPad_DUp} {$this strum_step up 5})
+               ({== $button kPad_DDown} {$this strum_step down -5})
+               ({== $button kPad_Circle} {$this reset_value})
+               ({== $button kPad_Tri} {$this set_state browse})
+               (TRUE kDataUnhandled)
+            }
+         }
+      )
+      (play_sync_animation {lag animate})
+      ; Both events of a beat, in the order they fall. Sleeps stay at the top
+      ; level of the script, where the task can wait on them.
+      (start_preview
+         {set [last_tick] {taskmgr ui_seconds}}
+         {thread_task
+            (units kTaskUISeconds)
+            (script
+               {if {! [previewing]}
+                  {do
+                     {set [last_tick] -100.0}
+                     {$task exit}
+                  }
+               }
+               {set [last_tick] {taskmgr ui_seconds}}
+               {set $lag_disc {latency preview_at video [impact] [period]}}
+               {set $lag_click {latency preview_at audio [impact] [period]}}
+               {set $lag_disc_first {< $lag_disc $lag_click}}
+               {set $lag_first {if_else $lag_disc_first $lag_disc $lag_click}}
+               {set $lag_second {if_else $lag_disc_first $lag_click $lag_disc}}
+               {$task sleep $lag_first}
+               {if_else $lag_disc_first
+                  {$this play_sync_animation}
+                  {sync_click.cue play}
+               }
+               {$task sleep {- $lag_second $lag_first}}
+               {if_else $lag_disc_first
+                  {sync_click.cue play}
+                  {$this play_sync_animation}
+               }
+               {$task sleep {- [period] $lag_second}}
+               {$task loop}
+            )
+         }
+      )
+   )
+}

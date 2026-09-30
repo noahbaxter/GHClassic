@@ -10,6 +10,8 @@ namespace gh2::settings
     enum Key
     {
         kWidescreen,
+        kVideoLagMs, // how late the picture reaches the player
+        kAudioLagMs, // how late the sound does
         kKeyCount,
     };
 

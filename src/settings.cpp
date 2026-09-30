@@ -34,6 +34,14 @@ namespace gh2::settings
 
         const Entry kEntries[kKeyCount] = {
             {"video", "widescreen", Type::kBool, 0, 1, 1, 1, 0, "16:9 picture"},
+            // 5 ms: finer is below what a player can feel.
+            {"latency", "video_ms", Type::kInt, -500, 500, 5, 0, 0,
+             "How late the picture reaches you, in ms, in steps of 5. Moves the hit window"},
+            // 65 by default: the port's own delay, measured on macOS (the song
+            // clock about 22 ms ahead of what is rendered, SDL's CoreAudio queue
+            // about 43 ms). Not measured on Windows or Linux yet.
+            {"latency", "audio_ms", Type::kInt, -500, 500, 5, 65, 0,
+             "How late the sound reaches you, in ms, in steps of 5. Moves the song against the picture"},
         };
 
         int snap(const Entry &entry, int value)

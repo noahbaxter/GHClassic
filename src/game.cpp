@@ -2,6 +2,7 @@
 
 #include "addresses.h"
 #include "game_overrides.h"
+#include "latency.h"
 #include "meta_music.h"
 #include "null_movie.h"
 #include "null_rnd.h"
@@ -36,6 +37,7 @@ namespace
         gh2::installNullMovie(runtime, gh2::kSlus21447);
         gh2::installVideoOptions(runtime, gh2::kSlus21447);
         gh2::script::install(runtime, gh2::kSlus21447);
+        gh2::installLatency(runtime, gh2::kSlus21447);
         gh2::installPad(runtime, gh2::kSlus21447);
     }
 }
