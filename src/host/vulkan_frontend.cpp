@@ -274,9 +274,16 @@ namespace gh2
             std::cerr << "[sdl] window: " << SDL_GetError() << std::endl;
             return false;
         }
-        // Also the Dock icon on macOS. A missing one leaves SDL's default.
+        // Also the Dock icon on macOS, which shows it as given, so it gets the
+        // version already shaped like a macOS icon (tools/make_icons.sh). A
+        // missing one leaves SDL's default.
+#ifdef __APPLE__
+        constexpr const char *kIcon = "icon_macos.png";
+#else
+        constexpr const char *kIcon = "icon.png";
+#endif
         const char *base = SDL_GetBasePath();
-        const std::string iconPath = std::string(base ? base : "") + "icon.png";
+        const std::string iconPath = std::string(base ? base : "") + kIcon;
         if (SDL_Surface *icon = SDL_LoadPNG(iconPath.c_str()))
         {
             SDL_SetWindowIcon(s.window, icon);

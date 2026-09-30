@@ -116,8 +116,9 @@ add_custom_target(ghrecomp_shaders DEPENDS ${GHRECOMP_SHADER_HEADERS})
 add_dependencies(ghrecomp ghrecomp_shaders)
 target_include_directories(ghrecomp PRIVATE "${GHRECOMP_SHADER_DIR}")
 
-# The window icon, next to the binary where SDL_GetBasePath finds it.
+# The window icons, next to the binary where SDL_GetBasePath finds them.
 configure_file(assets/icon.png "${CMAKE_CURRENT_BINARY_DIR}/icon.png" COPYONLY)
+configure_file(assets/icon_macos.png "${CMAKE_CURRENT_BINARY_DIR}/icon_macos.png" COPYONLY)
 
 # Unity batches are for the generated code; game files stay separate units.
 set_source_files_properties(${GHRECOMP_GAME_SOURCES} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
