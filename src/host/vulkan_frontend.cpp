@@ -4,6 +4,8 @@
 #include "host/input.h"
 #include "host/scene_renderer.h"
 #include "render/frame.h"
+#include "runtime/ee_scheduler.h"
+#include "settings.h"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
@@ -96,6 +98,28 @@ namespace gh2
         std::chrono::steady_clock::time_point nextHiddenFrame{};
         Frame shown;                                 // the game frame last drawn
         std::chrono::microseconds frameWait{8333};   // half a display period
+        std::chrono::nanoseconds gamePeriod{16667000};
+        bool newestOnly = false;                     // the game outruns the display
+
+        // The game's frame rate from settings, as the runtime's vblank: one
+        // game frame a vblank.
+        void applyFrameRate(PS2Runtime &runtime)
+        {
+            float displayHz = 0.0f;
+            if (!hidden)
+                if (const SDL_DisplayMode *mode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(window)))
+                    displayHz = mode->refresh_rate;
+            float hz = static_cast<float>(settings::get(settings::kFrameRate));
+            if (hz == 0.0f)
+                hz = displayHz > 0.0f ? displayHz : 60.0f;
+            // frame_step replays at most four PS2 frames in one of ours.
+            hz = std::max(hz, 15.0f);
+            gamePeriod = std::chrono::nanoseconds(static_cast<int64_t>(1e9 / hz));
+            runtime.eeScheduler().setVBlankPeriod(gamePeriod);
+            if (displayHz > 0.0f)
+                frameWait = std::chrono::microseconds(static_cast<int64_t>(500000.0f / displayHz));
+            newestOnly = displayHz > 0.0f && hz > displayHz * 1.01f;
+        }
 
         SceneRenderer scene;
 
@@ -372,14 +396,11 @@ namespace gh2
             openInput();
         openAudio(options.mute);
         s.nextHiddenFrame = std::chrono::steady_clock::now();
-        if (!s.hidden)
-            if (const SDL_DisplayMode *mode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(s.window));
-                mode && mode->refresh_rate > 0.0f)
-                s.frameWait = std::chrono::microseconds(static_cast<int64_t>(500000.0f / mode->refresh_rate));
+        s.applyFrameRate(runtime);
         return true;
     }
 
-    bool VulkanFrontend::frame(PS2Runtime &)
+    bool VulkanFrontend::frame(PS2Runtime &runtime)
     {
         State &s = *m_state;
         SDL_Event event;
@@ -390,14 +411,20 @@ namespace gh2
                 return false;
             if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED)
                 s.swapchainStale = true;
+            if (event.type == SDL_EVENT_WINDOW_DISPLAY_CHANGED)
+                s.applyFrameRate(runtime);
             if (event.type == SDL_EVENT_JOYSTICK_ADDED || event.type == SDL_EVENT_JOYSTICK_REMOVED)
                 devicesChanged = true;
         }
         pollInput(devicesChanged);
 
         // Each game frame once, in order: wait up to half a display period for
-        // the next, else show the last again.
-        frames().next(s.shown, s.frameWait);
+        // the next, else show the last again. A game faster than the display
+        // shows its newest.
+        if (s.newestOnly)
+            frames().latest(s.shown);
+        else
+            frames().next(s.shown, s.frameWait);
         const Frame &frame = s.shown;
 
         State::Slot &slot = s.slots[s.slot];
@@ -504,10 +531,10 @@ namespace gh2
 
         s.slot = (s.slot + 1u) % kFramesInFlight;
 
-        // No swapchain paces a hidden window, so hold it to 60 Hz.
+        // No swapchain paces a hidden window, so hold it to the game's rate.
         if (!present)
         {
-            s.nextHiddenFrame += std::chrono::microseconds(16667);
+            s.nextHiddenFrame += s.gamePeriod;
             const auto now = std::chrono::steady_clock::now();
             if (s.nextHiddenFrame < now)
                 s.nextHiddenFrame = now;

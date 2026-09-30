@@ -80,6 +80,18 @@ namespace gh2
             return true;
         }
 
+        // The newest frame, dropping any older not yet shown, for a game
+        // running faster than the display. False when none came.
+        bool latest(Frame &out)
+        {
+            std::lock_guard lock(m_mutex);
+            if (m_frames.empty())
+                return false;
+            out = std::move(m_frames.back());
+            m_frames.clear();
+            return true;
+        }
+
     private:
         static constexpr size_t kDepth = 2;
         std::mutex m_mutex;

@@ -10,6 +10,7 @@ namespace gh2::settings
     enum Key
     {
         kWidescreen,
+        kFrameRate, // game frames per second, 0 for the display's rate
         kVideoLagMs, // how late the picture reaches the player
         kAudioLagMs, // how late the sound does
         kKeyCount,
