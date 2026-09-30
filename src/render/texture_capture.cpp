@@ -161,7 +161,7 @@ namespace gh2
             }
         }
 
-        std::shared_ptr<const TextureData> decode(uint8_t *rdram, uint32_t address)
+        std::shared_ptr<TextureData> decode(uint8_t *rdram, uint32_t address)
         {
             Bitmap b;
             b.width = load<uint16_t>(rdram, address + milo::bitmap::kWidth);
@@ -197,6 +197,27 @@ namespace gh2
             return out;
         }
 
+        // The bitmap and the mip chain it heads, while each level halves the
+        // one before, as the GS's mip addressing assumes.
+        std::shared_ptr<TextureData> decodeWithMips(uint8_t *rdram, uint32_t address)
+        {
+            std::shared_ptr<TextureData> out = decode(rdram, address);
+            if (!out)
+                return nullptr;
+            uint32_t width = out->width, height = out->height;
+            for (uint32_t mip = load<uint32_t>(rdram, address + milo::bitmap::kMip); mip != 0u;
+                 mip = load<uint32_t>(rdram, mip + milo::bitmap::kMip))
+            {
+                width = std::max(width / 2u, 1u);
+                height = std::max(height / 2u, 1u);
+                std::shared_ptr<TextureData> level = decode(rdram, mip);
+                if (!level || level->width != width || level->height != height)
+                    break;
+                out->mips.push_back(std::move(level->rgba));
+            }
+            return out;
+        }
+
         // GH2's help bar icon for the yellow fret is an unfinished placeholder:
         // an opaque black ground, a flat fill and a white column down each
         // side. Vanilla never shows it (its help bars use green, red and the
@@ -221,12 +242,18 @@ namespace gh2
         {
             constexpr float kGreenFill = 139.0f;
             auto out = std::make_shared<TextureData>(green);
-            for (size_t i = 0; i < out->rgba.size(); i += 4u)
+            auto tint = [&](std::vector<uint8_t> &rgba)
             {
-                const float shade = out->rgba[i + 1u] / kGreenFill;
-                for (size_t c = 0; c < 3u; ++c)
-                    out->rgba[i + c] = static_cast<uint8_t>(std::min(255.0f, shade * fill[c]));
-            }
+                for (size_t i = 0; i < rgba.size(); i += 4u)
+                {
+                    const float shade = rgba[i + 1u] / kGreenFill;
+                    for (size_t c = 0; c < 3u; ++c)
+                        rgba[i + c] = static_cast<uint8_t>(std::min(255.0f, shade * fill[c]));
+                }
+            };
+            tint(out->rgba);
+            for (std::vector<uint8_t> &mip : out->mips)
+                tint(mip);
             return out;
         }
 
@@ -279,7 +306,7 @@ namespace gh2
             if (load<uint32_t>(rdram, tex + milo::tex::kType) & milo::tex::kTypeNoPixels)
                 s_textures.erase(tex);
             else
-                store(tex, decode(rdram, tex + milo::tex::kBitmap));
+                store(tex, decodeWithMips(rdram, tex + milo::tex::kBitmap));
         }
 
         void onDestroy(uint8_t *, R5900Context *ctx, PS2Runtime *)

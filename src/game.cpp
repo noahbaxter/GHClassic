@@ -1,6 +1,7 @@
 // GH2's hooks, installed once the runtime has loaded a matching executable.
 
 #include "addresses.h"
+#include "frame_step.h"
 #include "game_overrides.h"
 #include "latency.h"
 #include "meta_music.h"
@@ -39,6 +40,7 @@ namespace
         gh2::script::install(runtime, gh2::kSlus21447);
         gh2::installLatency(runtime, gh2::kSlus21447);
         gh2::installPad(runtime, gh2::kSlus21447);
+        gh2::installFrameStep(runtime, gh2::kSlus21447);
     }
 }
 

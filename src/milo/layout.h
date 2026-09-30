@@ -108,6 +108,7 @@ namespace milo
         constexpr uint32_t kOrder = 0x08u;    // u32, Order bits
         constexpr uint32_t kPixels = 0x0cu;   // u8*
         constexpr uint32_t kPalette = 0x10u;  // u8*, 4 bytes an entry
+        constexpr uint32_t kMip = 0x18u;      // RndBitmap*, the next smaller level (NumMips 0x1ae3a8)
 
         // Read from ConvertColor (0x1ae538), PaletteOffset (0x1b0f08) and
         // PixelOffset (0x1aed38).

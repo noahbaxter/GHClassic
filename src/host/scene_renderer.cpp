@@ -2,6 +2,7 @@
 
 #include "milo/layout.h"
 #include "render/camera.h"
+#include "settings.h"
 
 #include <vk_mem_alloc.h>
 
@@ -531,7 +532,9 @@ namespace gh2
                     return false;
             }
 
-            // PsTex sets TEX1 to bilinear with no mips (SyncBitmap 0x1a14b8).
+            // PsTex's TEX1: bilinear, and for a texture with mips (RndTex
+            // +0x6c) nearest mip (MMIN 4, SyncBitmap 0x1a1a94). The GS picks
+            // the level by distance and a per-texture K; derivatives here.
             for (int wrap = 0; wrap < 2; ++wrap)
             {
                 const VkSamplerAddressMode mode =
@@ -543,7 +546,7 @@ namespace gh2
                 info.addressModeU = mode;
                 info.addressModeV = mode;
                 info.addressModeW = mode;
-                info.maxLod = 0.0f;
+                info.maxLod = VK_LOD_CLAMP_NONE;
                 if (!check(vkCreateSampler(device, &info, nullptr, &samplers[wrap]), "sampler"))
                     return false;
             }
@@ -615,8 +618,17 @@ namespace gh2
             gpu.source = data;
             gpu.uploaded = serial;
             gpu.lastUsed = serial;
-            const VkDeviceSize bytes = data->rgba.size();
-            if (!createBuffer(data->rgba.data(), bytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, gpu.staging,
+            // The game's levels are uploaded; with the mipmaps setting, the
+            // rest down to 1x1 are blitted from the smallest of them.
+            const uint32_t stored = 1u + static_cast<uint32_t>(data->mips.size());
+            uint32_t levels = stored;
+            if (settings::get(settings::kMipmaps))
+                while ((std::max(data->width, data->height) >> (levels - 1u)) > 1u)
+                    ++levels;
+            std::vector<uint8_t> staged = data->rgba;
+            for (const std::vector<uint8_t> &mip : data->mips)
+                staged.insert(staged.end(), mip.begin(), mip.end());
+            if (!createBuffer(staged.data(), staged.size(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, gpu.staging,
                               gpu.stagingMemory))
                 return nullptr;
 
@@ -624,11 +636,12 @@ namespace gh2
             imageInfo.imageType = VK_IMAGE_TYPE_2D;
             imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
             imageInfo.extent = {data->width, data->height, 1};
-            imageInfo.mipLevels = 1;
+            imageInfo.mipLevels = levels;
             imageInfo.arrayLayers = 1;
             imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
             imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-            imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+            imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                              VK_IMAGE_USAGE_SAMPLED_BIT;
             VmaAllocationCreateInfo alloc{};
             alloc.usage = VMA_MEMORY_USAGE_AUTO;
             if (!check(vmaCreateImage(allocator, &imageInfo, &alloc, &gpu.image, &gpu.memory, nullptr), "texture"))
@@ -641,7 +654,7 @@ namespace gh2
             view.image = gpu.image;
             view.viewType = VK_IMAGE_VIEW_TYPE_2D;
             view.format = VK_FORMAT_R8G8B8A8_UNORM;
-            view.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+            view.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, levels, 0, 1};
             check(vkCreateImageView(device, &view, nullptr, &gpu.view), "texture view");
 
             const VkDescriptorSetLayout layouts[2] = {setLayout, setLayout};
@@ -671,22 +684,63 @@ namespace gh2
             barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             barrier.image = gpu.image;
-            barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+            barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, levels, 0, 1};
             barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
             barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
             vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
                                  nullptr, 0, nullptr, 1, &barrier);
-            VkBufferImageCopy copy{};
-            copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-            copy.imageExtent = {data->width, data->height, 1};
-            vkCmdCopyBufferToImage(cmd, gpu.staging, gpu.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
-            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0,
-                                 nullptr, 0, nullptr, 1, &barrier);
+            std::vector<VkBufferImageCopy> copies(stored);
+            VkDeviceSize offset = 0;
+            for (uint32_t level = 0; level < stored; ++level)
+            {
+                copies[level].bufferOffset = offset;
+                copies[level].imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, level, 0, 1};
+                copies[level].imageExtent = {std::max(data->width >> level, 1u), std::max(data->height >> level, 1u),
+                                             1};
+                offset += (level == 0 ? data->rgba : data->mips[level - 1u]).size();
+            }
+            vkCmdCopyBufferToImage(cmd, gpu.staging, gpu.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, stored,
+                                   copies.data());
+
+            // Each level is final once the next is filled: blitted levels read
+            // the one above as a transfer source first.
+            auto toShaderRead = [&](uint32_t level, VkImageLayout from, VkAccessFlags access)
+            {
+                barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, level, 1, 0, 1};
+                barrier.oldLayout = from;
+                barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                barrier.srcAccessMask = access;
+                barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+                vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0,
+                                     nullptr, 0, nullptr, 1, &barrier);
+            };
+            for (uint32_t level = 1; level < levels; ++level)
+            {
+                if (level < stored)
+                {
+                    toShaderRead(level - 1u, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_ACCESS_TRANSFER_WRITE_BIT);
+                    continue;
+                }
+                barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, level - 1u, 1, 0, 1};
+                barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+                barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+                barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+                vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
+                                     nullptr, 0, nullptr, 1, &barrier);
+                VkImageBlit blit{};
+                blit.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, level - 1u, 0, 1};
+                blit.srcOffsets[1] = {static_cast<int32_t>(std::max(data->width >> (level - 1u), 1u)),
+                                      static_cast<int32_t>(std::max(data->height >> (level - 1u), 1u)), 1};
+                blit.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, level, 0, 1};
+                blit.dstOffsets[1] = {static_cast<int32_t>(std::max(data->width >> level, 1u)),
+                                      static_cast<int32_t>(std::max(data->height >> level, 1u)), 1};
+                vkCmdBlitImage(cmd, gpu.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, gpu.image,
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
+                toShaderRead(level - 1u, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_ACCESS_TRANSFER_READ_BIT);
+            }
+            toShaderRead(levels - 1u, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_ACCESS_TRANSFER_WRITE_BIT);
 
             return &textures.emplace(data.get(), std::move(gpu)).first->second;
         }
