@@ -68,6 +68,7 @@ set(GHRECOMP_GAME_SOURCES
     src/game.cpp
     src/frame_step.cpp
     src/latency.cpp
+    src/menus.cpp
     src/meta_music.cpp
     src/null_movie.cpp
     src/null_rnd.cpp
@@ -131,7 +132,9 @@ target_include_directories(ghrecomp PRIVATE "${GHRECOMP_SHADER_DIR}")
 # reconfigures.
 set(GHRECOMP_DTA_DIR "${CMAKE_CURRENT_BINARY_DIR}/dta")
 file(READ src/dta/lag_panel.dta GHRECOMP_LAG_PANEL_DTA)
-set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS src/dta/lag_panel.dta)
+file(READ src/dta/highscore_panel.dta GHRECOMP_HIGHSCORE_PANEL_DTA)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    src/dta/lag_panel.dta src/dta/highscore_panel.dta)
 configure_file(src/dta/dta.h.in "${GHRECOMP_DTA_DIR}/dta.h" @ONLY)
 target_include_directories(ghrecomp PRIVATE "${GHRECOMP_DTA_DIR}")
 

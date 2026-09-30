@@ -1,0 +1,140 @@
+; The high score screen, as the game's own (endgame.dta) but for its wait: once
+; a name is in, the game flushed and then held the screen for 7 seconds with
+; an empty help bar. It now moves on when the flush animation ends, 1 second
+; in, and leaves the flush sound playing.
+{retype highscore_panel
+   (
+      ; From the ARK root: a path resolves against the file its array came
+      ; from, and this one comes from no file.
+      (file ui/highscore.milo)
+      (active_ten 0)
+      (auto_add TRUE)
+      (flushed FALSE)
+      (enter
+         {set [auto_add] {== career {gamecfg get mode}}}
+         {set [flushed] FALSE}
+         {hs_stats.lbl set_localized_text
+            {sprintf
+               {localize highscore_score_fmt}
+               {game get_song_text}
+               {localize {game get_difficulty_sym 0}}
+            }
+         }
+         {do
+            ($score {player0 score})
+            ($index {get_highscore_index $score})
+            {$this fill_scores $index $score {$this get_default_name}}
+            {if_else {!= $index 0}
+               {$this enter_score $index}
+               {if_else [auto_add]
+                  {ui goto_screen complete_screen}
+                  {$this view_scores}
+               }
+            }
+         }
+         {highscore_screen update_help_bar}
+      )
+      (fill_scores
+         ($new_index $new_score $new_name)
+         {do
+            ($slot 0)
+            {foreach_int $i 1 6
+               {do
+                  ($name 0)
+                  ($score 0)
+                  {if_else {== $i $new_index}
+                     {$this set_entry $i $new_name $new_score}
+                     {do
+                        {highscores get_highscore $slot $name $score}
+                        {$this set_entry $i $name $score}
+                        {'++' $slot}
+                     }
+                  }
+               }
+            }
+         }
+      )
+      (get_default_name
+         {if_else [auto_add]
+            {campaign profile_name {campaign profile_slot}}
+            {highscores get_default_name}
+         }
+      )
+      (set_entry
+         ($index $name $score)
+         {do
+            ($name_lbl {sprintf "hs_name%d.lbl" $index})
+            ($score_lbl {sprintf "hs_score%d.lbl" $index})
+            {$name_lbl set_localized_text $name}
+            {$score_lbl set_text {sprintf "%d" $score}}
+         }
+      )
+      (get_text_entry
+         ($index)
+         {sprintf "hs_entry%d.ten" $index}
+      )
+      (get_name_label
+         ($index)
+         {sprintf "hs_name%d.lbl" $index}
+      )
+      (enter_score
+         ($index)
+         {hs_flush.tnm set_frame 0}
+         {do
+            ($ten {$this get_text_entry $index})
+            {$ten set_text {$this get_default_name}}
+            {if_else [auto_add]
+               {do
+                  {set [active_ten] 0}
+                  {$this set_text_entry -1}
+                  {hs_start.lbl set_showing FALSE}
+                  {highscores add {$ten get_text} {player0 score}}
+               }
+               {do
+                  {set [active_ten] $ten}
+                  {$this set_text_entry $index}
+                  {$this set_focus $ten}
+               }
+            }
+            {printf {$ten get_text}}
+         }
+      )
+      (view_scores
+         {printf "view_scores\n"}
+         {set [active_ten] 0}
+         {$this set_text_entry -1}
+         {hs_start.lbl set_showing FALSE}
+      )
+      (set_text_entry
+         ($index)
+         {foreach_int $i 1 6
+            {{$this get_text_entry $i} set_showing {== $i $index}}
+            {{$this get_name_label $i} set_showing {!= $i $index}}
+         }
+      )
+      (get_active_ten
+         {if_else [active_ten]
+            {$this find [active_ten]}
+            NULL
+         }
+      )
+      (poll
+         {if
+            {&&
+               {!= {$this get_active_ten} NULL}
+               {{$this get_active_ten} is_done}
+               {! [flushed]}
+            }
+            {set [flushed] TRUE}
+            {hs_flush.tnm animate (range 0 17) (period 1) (units kTaskUISeconds)}
+            {play_sfx flush}
+            {highscore_screen update_help_bar}
+            {script_task
+               (delay 1) ; the game's 7
+               (units kTaskUISeconds)
+               (script {ui goto_screen complete_screen})
+            }
+         }
+      )
+   )
+}

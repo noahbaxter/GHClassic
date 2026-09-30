@@ -4,6 +4,7 @@
 #include "frame_step.h"
 #include "game_overrides.h"
 #include "latency.h"
+#include "menus.h"
 #include "meta_music.h"
 #include "null_movie.h"
 #include "null_rnd.h"
@@ -41,6 +42,7 @@ namespace
         gh2::installLatency(runtime, gh2::kSlus21447);
         gh2::installPad(runtime, gh2::kSlus21447);
         gh2::installFrameStep(runtime, gh2::kSlus21447);
+        gh2::installMenus(runtime);
     }
 }
 
