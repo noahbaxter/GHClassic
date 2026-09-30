@@ -13,7 +13,7 @@
 #include "render/native_rect.h"
 #include "render/native_rnd.h"
 #include "render/texture_capture.h"
-#include "silent_synth.h"
+#include "synth/synth.h"
 #include "video_options.h"
 
 namespace
@@ -29,7 +29,7 @@ namespace
         gh2::installNativeEnviron(runtime, gh2::kSlus21447);
         gh2::installNativeRect(runtime, gh2::kSlus21447);
         gh2::installNativeParticles(runtime, gh2::kSlus21447);
-        gh2::installSilentSynth(runtime, gh2::kSlus21447);
+        gh2::installSynth(runtime, gh2::kSlus21447);
         gh2::installNullMovie(runtime, gh2::kSlus21447);
         gh2::installVideoOptions(runtime, gh2::kSlus21447);
         gh2::installPad(runtime, gh2::kSlus21447);
