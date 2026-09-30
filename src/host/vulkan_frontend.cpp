@@ -443,6 +443,18 @@ namespace gh2
                 s.applyFrameRate(runtime);
             if (event.type == SDL_EVENT_JOYSTICK_ADDED || event.type == SDL_EVENT_JOYSTICK_REMOVED)
                 devicesChanged = true;
+            // Fullscreen: Cmd+F on macOS, F11 elsewhere. Not Alt+Enter, since
+            // Enter is Start on the keyboard.
+            if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && s.window)
+            {
+#ifdef __APPLE__
+                const bool toggle = event.key.key == SDLK_F && (event.key.mod & SDL_KMOD_GUI);
+#else
+                const bool toggle = event.key.key == SDLK_F11;
+#endif
+                if (toggle)
+                    SDL_SetWindowFullscreen(s.window, !(SDL_GetWindowFlags(s.window) & SDL_WINDOW_FULLSCREEN));
+            }
         }
         pollInput(devicesChanged);
 
