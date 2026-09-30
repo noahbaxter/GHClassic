@@ -1,5 +1,6 @@
 #include "host/vulkan_frontend.h"
 
+#include "host/audio.h"
 #include "host/input.h"
 #include "host/scene_renderer.h"
 #include "render/frame.h"
@@ -367,6 +368,7 @@ namespace gh2
         // A hidden run is scripted; the player's controller stays out of it.
         if (!s.hidden)
             openInput();
+        openAudio(options.mute);
         s.nextHiddenFrame = std::chrono::steady_clock::now();
         return true;
     }
@@ -530,6 +532,7 @@ namespace gh2
             vkb::destroy_surface(s.instance, s.surface);
         if (s.instance.instance != VK_NULL_HANDLE)
             vkb::destroy_instance(s.instance);
+        closeAudio();
         closeInput();
         if (s.window)
             SDL_DestroyWindow(s.window);

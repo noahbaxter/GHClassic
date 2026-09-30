@@ -73,6 +73,7 @@ set(GHRECOMP_GAME_SOURCES
     src/synth/reverb.cpp
     src/synth/spu.cpp
     src/video_options.cpp
+    src/host/audio.cpp
     src/host/bind.cpp
     src/host/bindings.cpp
     src/host/input.cpp
