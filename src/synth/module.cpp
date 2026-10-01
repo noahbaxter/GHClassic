@@ -191,14 +191,12 @@ namespace gh2::synth
         m_spu.reset();
         m_streams.clear();
         m_samples.clear();
-        m_freeVoices.clear();
-        for (uint32_t v = 0; v < Spu::kVoices; ++v)
-            m_freeVoices.push_back(static_cast<int32_t>(v));
+        freeAllVoices();
         m_voiceState = {};
         m_keyOn.assign(Spu::kVoices, false);
         m_keyOff.assign(Spu::kVoices, false);
         m_voicesOnCore1 = false;
-        m_spuBlocks = m_slipMs = 0;
+        m_slipMs = 0;
         m_spuBlockUsed.clear();
         m_uploadDone = m_terminate = false;
         m_dataStream = m_dataChannel = -1;
@@ -256,6 +254,13 @@ namespace gh2::synth
         else
             m_keyOff[voice] = true;
         m_freeVoices.push_back(voice);
+    }
+
+    void Module::freeAllVoices()
+    {
+        m_freeVoices.clear();
+        for (uint32_t v = 0; v < Spu::kVoices; ++v)
+            m_freeVoices.push_back(static_cast<int32_t>(v));
     }
 
     void Module::keyOn(int32_t voice)
@@ -331,9 +336,8 @@ namespace gh2::synth
         case 0x0: // SynthConfig {?, max samples, max streams, SPU blocks, ?, slip ms}
             if (len >= 24u)
             {
-                m_spuBlocks = u32(d, 12);
                 m_slipMs = u32(d, 20);
-                m_spuBlockUsed.assign(m_spuBlocks, false);
+                m_spuBlockUsed.assign(u32(d, 12), false);
             }
             m_spu.setMasterVolume(kFullVolume >> 1, kFullVolume >> 1);
             break;
@@ -933,9 +937,7 @@ namespace gh2::synth
             m_samples.clear();
             for (uint32_t v = 0; v < Spu::kVoices; ++v)
                 m_spu.keyOff(v);
-            m_freeVoices.clear();
-            for (uint32_t v = 0; v < Spu::kVoices; ++v)
-                m_freeVoices.push_back(static_cast<int32_t>(v));
+            freeAllVoices();
             std::fill(m_spuBlockUsed.begin(), m_spuBlockUsed.end(), false);
             queue(kReplyTerminated);
         }
