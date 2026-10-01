@@ -147,14 +147,6 @@ namespace gh2
             uint64_t lastUsed = 0;
         };
 
-        struct PackedVertex
-        {
-            float pos[3];
-            float normal[3];
-            float color[4];
-            float uv[2];
-        };
-
         struct GpuTexture
         {
             std::shared_ptr<const TextureData> source; // keeps the key alive
@@ -846,12 +838,13 @@ namespace gh2
             stages[1].module = fragmentShader;
             stages[1].pName = "main";
 
-            VkVertexInputBindingDescription binding{0, sizeof(PackedVertex), VK_VERTEX_INPUT_RATE_VERTEX};
+            // Captured vertices upload as they are.
+            VkVertexInputBindingDescription binding{0, sizeof(Vertex), VK_VERTEX_INPUT_RATE_VERTEX};
             VkVertexInputAttributeDescription attributes[4] = {
-                {0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(PackedVertex, pos)},
-                {1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(PackedVertex, color)},
-                {2, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(PackedVertex, uv)},
-                {3, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(PackedVertex, normal)},
+                {0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, pos)},
+                {1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(Vertex, color)},
+                {2, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, uv)},
+                {3, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, normal)},
             };
             VkPipelineVertexInputStateCreateInfo vertexInput{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
             vertexInput.vertexBindingDescriptionCount = 1;
@@ -989,20 +982,12 @@ namespace gh2
             auto found = meshes.find(mesh.get());
             if (found == meshes.end())
             {
+                if (mesh->verts.empty() || mesh->indices.empty())
+                    return nullptr;
                 GpuMesh gpu;
                 gpu.source = mesh;
-                std::vector<PackedVertex> packed(mesh->verts.size());
-                for (size_t i = 0; i < packed.size(); ++i)
-                {
-                    std::memcpy(packed[i].pos, mesh->verts[i].pos, sizeof(packed[i].pos));
-                    std::memcpy(packed[i].normal, mesh->verts[i].normal, sizeof(packed[i].normal));
-                    std::memcpy(packed[i].color, mesh->verts[i].color, sizeof(packed[i].color));
-                    std::memcpy(packed[i].uv, mesh->verts[i].uv, sizeof(packed[i].uv));
-                }
-                if (packed.empty() || mesh->indices.empty())
-                    return nullptr;
-                if (!createBuffer(packed.data(), packed.size() * sizeof(PackedVertex), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                                  gpu.vertices, gpu.vertexMemory) ||
+                if (!createBuffer(mesh->verts.data(), mesh->verts.size() * sizeof(Vertex),
+                                  VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, gpu.vertices, gpu.vertexMemory) ||
                     !createBuffer(mesh->indices.data(), mesh->indices.size() * sizeof(uint16_t),
                                   VK_BUFFER_USAGE_INDEX_BUFFER_BIT, gpu.indices, gpu.indexMemory))
                     return nullptr;
