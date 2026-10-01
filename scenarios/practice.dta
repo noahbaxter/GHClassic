@@ -1,0 +1,26 @@
+; Practice on two sections at the slowest speed, autoplayed, to its end
+; screen: the slowed stream path and practice's own screens. The section
+; screen loads the song's sections from its MIDI.
+(wait_screen splash_screen)
+{gamecfg set mode practice}
+{game set_song shoutatthedevil}
+{gamecfg set_track 0 0}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{ui goto_screen practice_sel_section_screen}
+(wait_screen practice_sel_section_screen)
+(wait 2)
+{gamecfg set (practice_sections 0) 0}
+{gamecfg set (practice_sections 1) 1}
+{gamecfg set practice_speed 3}
+{ui goto_screen practice_loading_screen}
+(wait_screen practice_game_screen 60)
+(print start {taskmgr seconds} {taskmgr ui_seconds})
+(wait 10)
+(print t10 {taskmgr seconds} {taskmgr ui_seconds})
+(shot playing)
+(wait_screen practice_end_screen 180)
+(wait 2)
+(print end {taskmgr seconds} {taskmgr ui_seconds})
+(shot end)
+(quit)

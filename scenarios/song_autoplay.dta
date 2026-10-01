@@ -1,0 +1,28 @@
+; A whole quickplay song on expert, played by autoplay, to the results.
+; Song time ({taskmgr seconds}) against UI time every 30 s shows the audio
+; clock keeping pace, and an autoplayed song ends on the same score every
+; run.
+(wait_screen splash_screen)
+{gamecfg set mode quickplay}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(print start {taskmgr seconds} {taskmgr ui_seconds})
+(wait 30)
+(print t30 {taskmgr seconds} {taskmgr ui_seconds} {player0 score})
+(shot t30)
+(wait 30)
+(print t60 {taskmgr seconds} {taskmgr ui_seconds} {player0 score})
+(shot t60)
+(wait 30)
+(print t90 {taskmgr seconds} {taskmgr ui_seconds} {player0 score})
+(wait 30)
+(print t120 {taskmgr seconds} {taskmgr ui_seconds} {player0 score})
+(wait_screen endgame_screen 300)
+(wait 3)
+(print end {player0 score} {player0 longest_streak})
+(shot end)
+(quit)

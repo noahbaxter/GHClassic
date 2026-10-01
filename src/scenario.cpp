@@ -9,6 +9,7 @@
 
 #include "ps2_runtime.h"
 #include "runtime/ee_scheduler.h"
+#include "runtime/host_clock.h"
 
 #include <atomic>
 #include <chrono>
@@ -25,7 +26,7 @@ namespace gh2::scenario
         using Clock = std::chrono::steady_clock;
 
         constexpr uint32_t kString = 0x12u;
-        constexpr auto kScreenTimeout = std::chrono::seconds(30);
+        constexpr int kTimeout = 30; // seconds
 
         std::string s_text;
         uint32_t s_steps = 0u; // the parsed file, a DataArray
@@ -36,11 +37,16 @@ namespace gh2::scenario
         uint32_t s_condition = 0u;    // a wait_until's step array
         bool s_shooting = false;      // a shot's frame not yet written
         Clock::time_point s_deadline; // and when either fails
+        int s_timeout = kTimeout;     // that deadline's seconds, to report
         std::atomic<bool> s_done{false};
+
+        // Steps wait in game time, which --speed runs faster than real. The
+        // timeouts stay real: a game behind its clock is not hung.
+        Clock::time_point now() { return ps2x::host_clock::now(); }
 
         double seconds()
         {
-            return std::chrono::duration<double>(Clock::now() - s_start).count();
+            return std::chrono::duration<double>(now() - s_start).count();
         }
 
         void quit()
@@ -107,8 +113,8 @@ namespace gh2::scenario
                 {
                     if (Clock::now() > s_deadline)
                     {
-                        std::cerr << "[scenario] FAIL: no " << s_screen << " after 30 s, on '" << current << "'"
-                                  << std::endl;
+                        std::cerr << "[scenario] FAIL: no " << s_screen << " after " << s_timeout << " s, on '"
+                                  << current << "'" << std::endl;
                         quit();
                     }
                     return;
@@ -123,14 +129,15 @@ namespace gh2::scenario
                 {
                     if (Clock::now() > s_deadline)
                     {
-                        std::cerr << "[scenario] FAIL: wait_until still false after 30 s" << std::endl;
+                        std::cerr << "[scenario] FAIL: wait_until still false after " << s_timeout << " s"
+                                  << std::endl;
                         quit();
                     }
                     return;
                 }
                 s_condition = 0u;
             }
-            if (Clock::now() < s_until)
+            if (now() < s_until)
                 return;
 
             while (s_next < steps.size())
@@ -144,19 +151,17 @@ namespace gh2::scenario
                 std::cerr << "[scenario] " << seconds() << " s: (" << verb << ")" << std::endl;
                 if (verb == "wait")
                 {
-                    s_until = Clock::now() + std::chrono::milliseconds(static_cast<int>(array.number(1) * 1000.0f));
+                    s_until = now() + std::chrono::milliseconds(static_cast<int>(array.number(1) * 1000.0f));
                     return;
                 }
-                if (verb == "wait_screen")
+                if (verb == "wait_screen" || verb == "wait_until")
                 {
-                    s_screen = array.symbol(1);
-                    s_deadline = Clock::now() + kScreenTimeout;
-                    return;
-                }
-                if (verb == "wait_until")
-                {
-                    s_condition = node.value;
-                    s_deadline = Clock::now() + kScreenTimeout;
+                    if (verb == "wait_screen")
+                        s_screen = array.symbol(1);
+                    else
+                        s_condition = node.value;
+                    s_timeout = array.size() > 2 ? static_cast<int>(array.number(2)) : kTimeout;
+                    s_deadline = Clock::now() + std::chrono::seconds(s_timeout);
                     return;
                 }
                 if (verb == "print")
@@ -230,7 +235,7 @@ namespace gh2::scenario
             const R5900Context saved = *ctx;
             if (s_steps == 0u)
             {
-                s_start = Clock::now();
+                s_start = now();
                 s_steps = script::parse(rdram, ctx, runtime, s_text);
                 if (s_steps == 0u)
                 {

@@ -5,6 +5,7 @@
 #include "host/scene_renderer.h"
 #include "render/frame.h"
 #include "runtime/ee_scheduler.h"
+#include "runtime/host_clock.h"
 #include "settings.h"
 
 #include <SDL3/SDL.h>
@@ -454,7 +455,7 @@ namespace gh2
         if (!s.hidden)
             openInput();
         openAudio(options.mute);
-        s.nextHiddenFrame = std::chrono::steady_clock::now();
+        s.nextHiddenFrame = ps2x::host_clock::now();
         s.applyFrameRate(runtime);
         return true;
     }
@@ -616,10 +617,10 @@ namespace gh2
         if (!present)
         {
             s.nextHiddenFrame += s.gamePeriod;
-            const auto now = std::chrono::steady_clock::now();
+            const auto now = ps2x::host_clock::now();
             if (s.nextHiddenFrame < now)
                 s.nextHiddenFrame = now;
-            std::this_thread::sleep_until(s.nextHiddenFrame);
+            std::this_thread::sleep_until(ps2x::host_clock::real(s.nextHiddenFrame));
         }
         return true;
     }

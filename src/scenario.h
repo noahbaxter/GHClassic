@@ -11,9 +11,9 @@
 //   (shot metal_1)                     the next frame, as shot_metal_1 (--shots)
 //   (quit)                             closes the app
 //
-// A wait_screen or wait_until that takes more than 30 s fails the run and
-// quits, as does
-// the UI going 8 s without a poll, after naming what each thread waits on.
+// A wait_screen or wait_until that takes more than 30 s, or the seconds
+// given after its screen or condition, fails the run and quits, as does the
+// UI going 8 s without a poll, after naming what each thread waits on.
 // {ghc_log ...} prints values and their types from any script.
 
 #include "addresses.h"

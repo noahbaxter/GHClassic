@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Run the game once, unattended, and keep what it did.
 #
-#   scripts/arm.sh [out] [--secs 30] [--disc <image>] [--shot-every 60] [--scenario <file>]
+#   scripts/arm.sh [out] [--secs 30] [--disc <image>] [--shot-every 60] [--scenario <file>] [--speed <x>]
 #
 # out defaults to runs/<scenario's name>, or runs/run, in the repo (ignored).
 #
 # --scenario runs a file of steps (src/scenario.h); one ending in (quit)
 # stops the run before --secs, and its (shot name) steps land in shots/.
+# --speed runs the game's clock that many times real time; --secs stays real.
 #
 # The window stays hidden, no audio device opens, the memory card is a
 # throwaway copy of the player's, and only the process this script started
@@ -26,9 +27,11 @@ DISC=""
 EVERY=60
 SCENARIO=()
 SCENARIO_NAME=""
+SPEED=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --secs)      SECS="$2"; shift ;;
+    --speed)     SPEED=(--speed "$2"); shift ;;
     --scenario)
       SCENARIO=(--scenario "$(cd "$(dirname "$2")" && pwd)/$(basename "$2")")
       SCENARIO_NAME="$(basename "$2" .dta)"
@@ -72,7 +75,7 @@ DISC="$(cd "$(dirname "$DISC")" && pwd)/$(basename "$DISC")"
 # never writes to them.
 [ -d "$DATA/mc0" ] && cp -Rp "$DATA/mc0/." "$CARD/"
 [ -f "$DATA/settings.ini" ] && cp "$DATA/settings.ini" "$OUT/settings.ini"
-(cd "$OUT" && exec "$BIN" "$ELF" "$DISC" ${SCENARIO[@]+"${SCENARIO[@]}"} --hidden --mute --mc "$CARD" --settings "$OUT/settings.ini" \
+(cd "$OUT" && exec "$BIN" "$ELF" "$DISC" ${SCENARIO[@]+"${SCENARIO[@]}"} ${SPEED[@]+"${SPEED[@]}"} --hidden --mute --mc "$CARD" --settings "$OUT/settings.ini" \
   --shots "$OUT/frames" --shot-every "$EVERY") > "$OUT/run.log" 2>&1 &
 PID=$!
 RUNNER=$PID
