@@ -24,5 +24,6 @@ namespace gh2
         script::addCommand("quit_app", quitApp);
         script::runWhenUiReady(kMainMenuDta);
         script::runWhenUiReady(kHighscorePanelDta);
+        script::runWhenUiReady(kSelCharacterDta);
     }
 }

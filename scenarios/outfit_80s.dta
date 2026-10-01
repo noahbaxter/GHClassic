@@ -1,0 +1,45 @@
+; The 80s outfits in the career outfit picker: each character's list holds
+; only unlocked outfits, and the 80s one shows on the door when focused.
+; A new career in profile slot 0.
+;
+; Buttons are focused as objects: a bare name means nothing outside the
+; panel, and focus would go nowhere.
+#include common/first_boot.dta
+{gamecfg set mode career}
+{campaign set_profile_slot 0}
+{ui goto_screen career_screen}
+(wait_screen career_screen)
+(wait 2)
+{ui goto_screen sel_character_edit_screen}
+(wait_screen sel_character_edit_screen)
+(wait 2)
+
+; As the list's scroll brings a character on, then select opens the picker.
+{sel_character_panel set char_focus metal}
+{sel_character_panel set char_outfit metal1}
+{char_single show_char 0 metal1}
+{char_single char_event 0 animate}
+(wait 8)
+{sel_character_panel choose_skins}
+(wait 2)
+(print metal {size {sel_character_panel get outfits}} {elem {sel_character_panel get outfits} 0}
+   {elem {sel_character_panel get outfits} 1} {elem {sel_character_panel get outfits} 2})
+{sel_character_panel set_focus {{sel_character_panel loaded_dir} find outfit3.btn}}
+(wait 10)
+(print shot metal {sel_character_panel get char_outfit})
+{sel_character_panel unchoose_skins}
+(wait 2)
+
+{sel_character_panel set char_focus punk}
+{sel_character_panel set char_outfit punk1}
+{char_single show_char 0 punk1}
+{char_single char_event 0 animate}
+(wait 8)
+{sel_character_panel choose_skins}
+(wait 2)
+(print punk {size {sel_character_panel get outfits}} {elem {sel_character_panel get outfits} 0}
+   {elem {sel_character_panel get outfits} 1})
+{sel_character_panel set_focus {{sel_character_panel loaded_dir} find outfit2.btn}}
+(wait 10)
+(print shot punk {sel_character_panel get char_outfit})
+(quit)

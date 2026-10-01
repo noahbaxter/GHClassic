@@ -1,0 +1,103 @@
+; Every character's every outfit in the career outfit picker, after the
+; unlock-all cheat (long_cheats.dta's own lines, saving off with it).
+; arm.sh puts one shot per outfit in shots/, named character_slot, and the
+; log pairs each name with the outfit the panel picked.
+;
+; Buttons are focused as objects: a bare name means nothing outside the
+; panel, and focus would go nowhere. A load waits on the panel's own
+; are_chars_loaded, then a moment for the door to open.
+{func ghc_char ($c)
+   {sel_character_panel unchoose_skins}
+   {sel_character_panel set char_focus $c}
+   {sel_character_panel set char_outfit {character_provider get_outfit $c 0}}
+   {char_single show_char 0 {character_provider get_outfit $c 0}}
+   {char_single char_event 0 animate}
+}
+{func ghc_pick ($i)
+   {sel_character_panel set_focus
+      {{sel_character_panel loaded_dir} find {elem {sel_character_panel get outfit_buttons} $i}}}
+}
+
+#include common/first_boot.dta
+{set $cheat_enabled_unlock_all 1}
+{campaign set_all_access 1}
+{set $disable_save 1}
+{set $disable_career 1}
+{gamecfg set mode career}
+{campaign set_profile_slot 0}
+{ui goto_screen career_screen}
+(wait_screen career_screen)
+{ui goto_screen sel_character_edit_screen}
+(wait_screen sel_character_edit_screen)
+
+{ghc_char punk} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_pick 0} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print punk_1 {sel_character_panel get char_outfit}) (shot punk_1)
+{ghc_pick 1} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print punk_2 {sel_character_panel get char_outfit}) (shot punk_2)
+{ghc_pick 2} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print punk_3 {sel_character_panel get char_outfit}) (shot punk_3)
+
+{ghc_char alterna} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_pick 0} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print alterna_1 {sel_character_panel get char_outfit}) (shot alterna_1)
+{ghc_pick 1} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print alterna_2 {sel_character_panel get char_outfit}) (shot alterna_2)
+{ghc_pick 2} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print alterna_3 {sel_character_panel get char_outfit}) (shot alterna_3)
+
+{ghc_char glam} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_pick 0} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print glam_1 {sel_character_panel get char_outfit}) (shot glam_1)
+{ghc_pick 1} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print glam_2 {sel_character_panel get char_outfit}) (shot glam_2)
+{ghc_pick 2} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print glam_3 {sel_character_panel get char_outfit}) (shot glam_3)
+
+{ghc_char goth} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_pick 0} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print goth_1 {sel_character_panel get char_outfit}) (shot goth_1)
+{ghc_pick 1} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print goth_2 {sel_character_panel get char_outfit}) (shot goth_2)
+{ghc_pick 2} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print goth_3 {sel_character_panel get char_outfit}) (shot goth_3)
+
+{ghc_char metal} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_pick 0} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print metal_1 {sel_character_panel get char_outfit}) (shot metal_1)
+{ghc_pick 1} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print metal_2 {sel_character_panel get char_outfit}) (shot metal_2)
+{ghc_pick 2} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print metal_3 {sel_character_panel get char_outfit}) (shot metal_3)
+
+{ghc_char rockabill} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_pick 0} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print rockabill_1 {sel_character_panel get char_outfit}) (shot rockabill_1)
+{ghc_pick 1} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print rockabill_2 {sel_character_panel get char_outfit}) (shot rockabill_2)
+
+{ghc_char rock} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_pick 0} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print rock_1 {sel_character_panel get char_outfit}) (shot rock_1)
+{ghc_pick 1} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print rock_2 {sel_character_panel get char_outfit}) (shot rock_2)
+
+{ghc_char deathmetal} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_pick 0} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print deathmetal_1 {sel_character_panel get char_outfit}) (shot deathmetal_1)
+{ghc_pick 1} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print deathmetal_2 {sel_character_panel get char_outfit}) (shot deathmetal_2)
+
+; One outfit each: no picker, as select goes straight on.
+{ghc_char classic} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print classic_1 {sel_character_panel get char_outfit}) (shot classic_1)
+{ghc_char funk1} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print funk1_1 {sel_character_panel get char_outfit}) (shot funk1_1)
+
+{ghc_char grim} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_pick 0} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print grim_1 {sel_character_panel get char_outfit}) (shot grim_1)
+{ghc_pick 1} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print grim_2 {sel_character_panel get char_outfit}) (shot grim_2)
+(wait 1)
+(quit)
