@@ -6,6 +6,7 @@
 
 #include "guest.h"
 #include "hook.h"
+#include "milo/layout.h"
 #include "ps2_runtime_macros.h"
 #include "render/frame.h"
 
@@ -13,16 +14,7 @@ namespace gh2
 {
     namespace
     {
-        // Rnd fields: clear colour (Hmx::Color, 4 floats) at +0x30, which
-        // PsRnd::SwapBuffers clears with (0x19ad44); width and height at
-        // +0x40/+0x44 (0x19ad84, 0x19ad7c).
-        constexpr uint32_t kClearColor = 0x30u;
-        constexpr uint32_t kWidth = 0x40u;
-        constexpr uint32_t kHeight = 0x44u;
-        // Aspect index (+0xd4), which Rnd::YRatio (0x1d4c20) looks up in
-        // {1, 0.75, 0.5625}.
-        constexpr uint32_t kAspect = 0xd4u;
-        constexpr float kYRatios[] = {1.0f, 0.75f, 0.5625f};
+        constexpr float kYRatios[] = {1.0f, 0.75f, 0.5625f}; // Rnd::YRatio, by aspect index
         constexpr uint32_t kAspectWidescreen = 2u; // what Options::SetWideScreen(true) sets
 
         struct BeginTag;
@@ -36,15 +28,15 @@ namespace gh2
             frame = Frame{};
             frame.serial = serial;
             for (uint32_t i = 0; i < 4; ++i)
-                frame.clear[i] = load<float>(rdram, rnd + kClearColor + i * 4u);
-            const int32_t width = load<int32_t>(rdram, rnd + kWidth);
-            const int32_t height = load<int32_t>(rdram, rnd + kHeight);
+                frame.clear[i] = load<float>(rdram, rnd + milo::rnd::kClearColor + i * 4u);
+            const int32_t width = load<int32_t>(rdram, rnd + milo::rnd::kWidth);
+            const int32_t height = load<int32_t>(rdram, rnd + milo::rnd::kHeight);
             if (width > 0 && height > 0)
             {
                 frame.width = static_cast<uint32_t>(width);
                 frame.height = static_cast<uint32_t>(height);
             }
-            const uint32_t aspect = load<uint32_t>(rdram, rnd + kAspect);
+            const uint32_t aspect = load<uint32_t>(rdram, rnd + milo::rnd::kAspect);
             if (aspect < 3u)
                 frame.yRatio = kYRatios[aspect];
             frame.displayAspect = aspect == kAspectWidescreen ? 16.0f / 9.0f : 4.0f / 3.0f;

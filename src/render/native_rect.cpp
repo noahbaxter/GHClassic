@@ -32,9 +32,6 @@ namespace gh2
 {
     namespace
     {
-        constexpr uint32_t kRndWidth = 0x40u;  // Rnd: the frame's width in pixels
-        constexpr uint32_t kRndHeight = 0x44u; // and height
-
         void readColor(uint8_t *rdram, uint32_t address, float out[4])
         {
             for (uint32_t i = 0; i < 4; ++i)
@@ -51,8 +48,8 @@ namespace gh2
             const uint32_t color2 = GPR_U32(ctx, 8);
             const uint32_t color3 = GPR_U32(ctx, 9);
 
-            const float width = static_cast<float>(load<int32_t>(rdram, rnd + kRndWidth));
-            const float height = static_cast<float>(load<int32_t>(rdram, rnd + kRndHeight));
+            const float width = static_cast<float>(load<int32_t>(rdram, rnd + milo::rnd::kWidth));
+            const float height = static_cast<float>(load<int32_t>(rdram, rnd + milo::rnd::kHeight));
             const float x = load<float>(rdram, rect + 0x0u);
             const float y = load<float>(rdram, rect + 0x4u);
             const float w = load<float>(rdram, rect + 0x8u);
