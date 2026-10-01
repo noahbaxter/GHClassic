@@ -11,7 +11,6 @@
 #include "pad.h"
 #include "render/mesh_capture.h"
 #include "render/native_environ.h"
-#include "render/native_mat.h"
 #include "render/native_mesh.h"
 #include "render/native_particles.h"
 #include "render/native_rect.h"
@@ -30,7 +29,6 @@ namespace
         gh2::installMeshCapture(runtime, gh2::kSlus21447);
         gh2::installTextureCapture(runtime, gh2::kSlus21447);
         gh2::installNativeMesh(runtime, gh2::kSlus21447);
-        gh2::installNativeMat(runtime, gh2::kSlus21447);
         gh2::installNativeEnviron(runtime, gh2::kSlus21447);
         gh2::installNativeRect(runtime, gh2::kSlus21447);
         gh2::installNativeParticles(runtime, gh2::kSlus21447);

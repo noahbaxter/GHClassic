@@ -20,7 +20,6 @@ namespace gh2
         uint32_t psMultiMeshDrawShowing;
         uint32_t psParticleSysDrawShowing;
         uint32_t updateRelativeXfm; // RndParticleSys::UpdateRelativeXfm
-        uint32_t psMatSelect;
         uint32_t psEnvironSelect;
         uint32_t psTexSyncBitmap;
         uint32_t psTexDestroy;
@@ -75,7 +74,6 @@ namespace gh2
         .psMultiMeshDrawShowing = 0x1a2f00u,
         .psParticleSysDrawShowing = 0x1a2c28u,
         .updateRelativeXfm = 0x1cf7b0u,
-        .psMatSelect = 0x3d8348u,
         .psEnvironSelect = 0x1a2060u,
         .psTexSyncBitmap = 0x1a13a8u,
         .psTexDestroy = 0x1a0f18u,

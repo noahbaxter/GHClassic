@@ -27,7 +27,6 @@ namespace gh2::synth
 
         void reset();
         void write(uint32_t address, const uint8_t *bytes, uint32_t len);
-        uint8_t *ram(uint32_t address);
 
         // VOLL/VOLR as written: 15 bits of volume/2, bit 14 its sign.
         void setVolume(uint32_t voice, uint16_t left, uint16_t right);

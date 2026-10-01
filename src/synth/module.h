@@ -101,7 +101,7 @@ namespace gh2::synth
 
         std::array<VoiceState, Spu::kVoices> m_voiceState;
         std::deque<int32_t> m_freeVoices; // least recently freed first
-        std::vector<bool> m_keyOn, m_keyOff, m_keyOnLater;
+        std::vector<bool> m_keyOn, m_keyOff;
         bool m_voicesOnCore1 = false; // command 5
 
         std::vector<bool> m_spuBlockUsed;
