@@ -1,8 +1,8 @@
 // GH Classic's entry point: the player's GH2 disc, and options for unattended
 // runs.
 //
-//   GHClassic [disc] [--content <disc>]... [--scenario <file>] [--hidden] [--mute] [--speed <x>] [--fast-boot]
-//            [--seed <n>] [--save <file>] [--import-card <ps2>] [--export-card <ps2>]
+//   GHClassic [disc] [--content <disc>]... [--mods <dir>] [--scenario <file>] [--hidden] [--mute] [--speed <x>]
+//            [--fast-boot] [--seed <n>] [--save <file>] [--import-card <ps2>] [--export-card <ps2>]
 //            [--settings <file>] [--shots <dir>] [--shot-every <n>]
 //            [--res window|native|480p|720p|1080p|1440p|2160p]
 //   GHClassic --bind [keyboard | <n>]
@@ -10,12 +10,13 @@
 // Without a disc, the first image in PUT_DISC_HERE (disc/disc.h) with this
 // build's executable. The game runs from that executable, read off the disc.
 // --content adds another disc's archive, searched after the game disc's, in
-// the order given. --scenario runs a file of steps (dev/scenario.h). --speed
-// runs the game's clock that many times real time, hidden and muted only, as
-// nothing else paces it. --fast-boot boots straight to the main menu, past
-// the logos' padding, the intro movie and the press-start splash, whatever
-// settings.ini's fast_boot says. --seed starts the
-// game's random numbers from n rather than the time of day.
+// the order given. --mods serves the files under a folder by their paths in
+// the archive, ahead of every disc. --scenario runs a file of steps
+// (dev/scenario.h). --speed runs the game's clock that many times real time,
+// hidden and muted only, as nothing else paces it. --fast-boot boots
+// straight to the main menu, past the logos' padding, the intro movie and
+// the press-start splash, whatever settings.ini's fast_boot says. --seed
+// starts the game's random numbers from n rather than the time of day.
 // --res is what the scene is drawn at: the window's size (the default), the
 // game's own (512x448), or that height at the picture's aspect. --settings
 // and --save read and write that file in place of the user data directory's.
@@ -130,6 +131,11 @@ int main(int argc, char *argv[])
         else if (arg == "--content" && hasValue)
         {
             if (!gh2::ark::addDisc(argv[++i]))
+                return 1;
+        }
+        else if (arg == "--mods" && hasValue)
+        {
+            if (!gh2::ark::addFolder(argv[++i]))
                 return 1;
         }
         else if (arg == "--scenario" && hasValue)

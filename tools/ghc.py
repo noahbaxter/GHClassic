@@ -244,7 +244,8 @@ CONTENT_SERIALS = ["SLUS-21586"]
 
 
 def content(env):
-    """GHClassic's --content for each content disc in game/."""
+    """GHClassic's --content for each content disc in game/, and --mods for
+    mods/ when it exists."""
     images = sorted(str(p) for p in (ROOT / "game").glob("*"))
     args = []
     for serial in CONTENT_SERIALS:
@@ -252,6 +253,8 @@ def content(env):
                                 env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
         if not result.returncode:
             args += ["--content", result.stdout.strip()]
+    if (ROOT / "mods").is_dir():
+        args += ["--mods", str(ROOT / "mods")]
     return args
 
 
