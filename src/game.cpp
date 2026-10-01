@@ -2,6 +2,7 @@
 
 #include "addresses.h"
 #include "disc/ark.h"
+#include "eighties.h"
 #include "ui/fast_boot.h"
 #include "frame_step.h"
 #include "game_overrides.h"
@@ -38,6 +39,7 @@ namespace
     void applySlus21447(PS2Runtime &runtime)
     {
         gh2::ark::install(runtime, gh2::kSlus21447);
+        gh2::installEighties(runtime, gh2::kSlus21447);
         gh2::installNullRnd(runtime, gh2::kSlus21447);
         gh2::installNativeRnd(runtime, gh2::kSlus21447);
         gh2::installMeshCapture(runtime, gh2::kSlus21447);

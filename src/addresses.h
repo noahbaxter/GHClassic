@@ -104,6 +104,9 @@ namespace gh2
         uint32_t archiveGetFileInfo;
         uint32_t archiveIsValidBlock;
         uint32_t cdRead;
+        uint32_t profileStateInitChars;
+        uint32_t charsysPanelSetTypeDef;
+        uint32_t dataVariable; // DataVariable(Symbol)
         // Data
         uint32_t rndCamCurrent;  // RndCam::sCurrent
         uint32_t defaultMat;     // the RndMat a mesh without one draws with
@@ -229,6 +232,9 @@ namespace gh2
         .archiveGetFileInfo = 0x2ac618u,
         .archiveIsValidBlock = 0x2ac9e8u,
         .cdRead = 0x2ae9c0u,
+        .profileStateInitChars = 0x13ad80u,
+        .charsysPanelSetTypeDef = 0x141bf8u,
+        .dataVariable = 0x2b7b00u,
         .rndCamCurrent = 0x3de348u,
         .defaultMat = 0x3da4f0u,
         .rndEnvironCurrent = 0x3de358u,
