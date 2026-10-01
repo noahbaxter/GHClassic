@@ -26,7 +26,6 @@
 #include "render/frame.h"
 #include "render/native_mat.h"
 
-#include <cstring>
 #include <memory>
 
 namespace gh2
@@ -40,17 +39,6 @@ namespace gh2
         {
             for (uint32_t i = 0; i < 4; ++i)
                 out[i] = load<float>(rdram, address + i * 4u);
-        }
-
-        // A camera that covers the whole screen, for draws already in clip space.
-        uint32_t screenCamera()
-        {
-            Frame &frame = building();
-            Camera camera;
-            if (!frame.cameras.empty() && std::memcmp(&frame.cameras.back(), &camera, sizeof(Camera)) == 0)
-                return static_cast<uint32_t>(frame.cameras.size() - 1u);
-            frame.cameras.push_back(camera);
-            return static_cast<uint32_t>(frame.cameras.size() - 1u);
         }
 
         void drawRect(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
@@ -118,7 +106,7 @@ namespace gh2
             DrawCall draw;
             draw.mesh = mesh;
             draw.screen = true;
-            draw.camera = screenCamera();
+            draw.camera = internCamera(Camera{}); // the whole screen: the verts are in clip space
             draw.world = identity();
             draw.lightWorld = identity();
             if (mat == 0u)

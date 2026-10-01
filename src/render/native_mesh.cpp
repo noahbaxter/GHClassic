@@ -19,7 +19,6 @@
 #include "render/native_mat.h"
 
 #include <algorithm>
-#include <cstring>
 
 namespace gh2
 {
@@ -40,7 +39,6 @@ namespace gh2
 
     uint32_t currentCamera(uint8_t *rdram)
     {
-        Frame &frame = building();
         const uint32_t cam = load<uint32_t>(rdram, s_addresses->rndCamCurrent);
         Camera camera;
         camera.id = cam;
@@ -63,10 +61,7 @@ namespace gh2
                 camera.targetHeight = load<uint32_t>(rdram, camera.target + milo::tex::kHeight);
             }
         }
-        if (!frame.cameras.empty() && std::memcmp(&frame.cameras.back(), &camera, sizeof(Camera)) == 0)
-            return static_cast<uint32_t>(frame.cameras.size() - 1u);
-        frame.cameras.push_back(camera);
-        return static_cast<uint32_t>(frame.cameras.size() - 1u);
+        return internCamera(camera);
     }
 
     namespace

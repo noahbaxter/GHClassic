@@ -113,4 +113,8 @@ namespace gh2
     // The frame the game thread is building between BeginDrawing and
     // EndDrawing. Game thread only.
     Frame &building();
+
+    // `camera`'s index in the building frame; consecutive draws through the
+    // same camera share one.
+    uint32_t internCamera(const Camera &camera);
 }
