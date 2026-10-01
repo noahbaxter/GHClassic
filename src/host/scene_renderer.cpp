@@ -714,7 +714,12 @@ namespace gh2
             view.viewType = VK_IMAGE_VIEW_TYPE_2D;
             view.format = VK_FORMAT_R8G8B8A8_UNORM;
             view.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, levels, 0, 1};
-            check(vkCreateImageView(device, &view, nullptr, &gpu.view), "texture view");
+            if (!check(vkCreateImageView(device, &view, nullptr, &gpu.view), "texture view"))
+            {
+                vmaDestroyImage(allocator, gpu.image, gpu.memory);
+                vmaDestroyBuffer(allocator, gpu.staging, gpu.stagingMemory);
+                return nullptr;
+            }
 
             const VkDescriptorSetLayout layouts[2] = {setLayout, setLayout};
             VkDescriptorSetAllocateInfo setInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};

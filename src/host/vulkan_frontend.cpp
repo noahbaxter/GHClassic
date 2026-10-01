@@ -174,7 +174,8 @@ namespace gh2
             for (VkSemaphore &semaphore : renderFinished)
             {
                 VkSemaphoreCreateInfo info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-                vkCreateSemaphore(device.device, &info, nullptr, &semaphore);
+                if (!check(vkCreateSemaphore(device.device, &info, nullptr, &semaphore), "semaphore"))
+                    return false;
             }
             swapchainStale = false;
             return true;
@@ -407,12 +408,13 @@ namespace gh2
             cmdInfo.commandPool = s.commandPool;
             cmdInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
             cmdInfo.commandBufferCount = 1;
-            vkAllocateCommandBuffers(s.device.device, &cmdInfo, &slot.cmd);
             VkFenceCreateInfo fenceInfo{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
             fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-            vkCreateFence(s.device.device, &fenceInfo, nullptr, &slot.done);
             VkSemaphoreCreateInfo semInfo{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-            vkCreateSemaphore(s.device.device, &semInfo, nullptr, &slot.imageAvailable);
+            if (!check(vkAllocateCommandBuffers(s.device.device, &cmdInfo, &slot.cmd), "command buffer") ||
+                !check(vkCreateFence(s.device.device, &fenceInfo, nullptr, &slot.done), "fence") ||
+                !check(vkCreateSemaphore(s.device.device, &semInfo, nullptr, &slot.imageAvailable), "semaphore"))
+                return false;
         }
 
         // The msaa setting's samples, or the most below it the GPU draws
