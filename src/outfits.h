@@ -13,7 +13,8 @@ namespace gh2::outfits
     // One more outfit of `character`, after its own in config's
     // (characters ...): unlocked, as an outfit the store doesn't sell is,
     // and cached by the previews wherever `beside` is. `label` is the
-    // picker's (sel_character.dta). Its files are the caller's to serve.
+    // picker's (sel_character.dta). The caller serves its og/gen files; this
+    // serves them again playing beside's anims.
     void add(const std::string &character, const std::string &outfit, const std::string &beside,
              const std::string &label);
 
