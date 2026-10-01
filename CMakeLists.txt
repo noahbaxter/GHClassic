@@ -161,6 +161,7 @@ endif()
 # The game layer: GH2's hooks, installed through the runtime's override
 # registry, and the host window and renderer they draw through.
 set(GHC_GAME_SOURCES
+    src/eighties.cpp
     src/main.cpp
     src/game.cpp
     src/frame_step.cpp
