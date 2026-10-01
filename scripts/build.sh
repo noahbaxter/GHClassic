@@ -60,6 +60,6 @@ fi
 
 # Configured after recompiling, so the glob in CMakeLists.txt sees the output.
 cmake -S "$ROOT" -B "$BUILD" -G Ninja -DCMAKE_BUILD_TYPE=Release \
-  -DGHRECOMP_GENERATED_DIR="$RECOMP_DIR/output" -DGHRECOMP_ENABLE_LTO="$LTO" > /dev/null
-cmake --build "$BUILD" --target ghrecomp -j "$JOBS"
+  -DGHC_GENERATED_DIR="$RECOMP_DIR/output" -DGHC_ENABLE_LTO="$LTO" > /dev/null
+cmake --build "$BUILD" --target GHClassic -j "$JOBS"
 echo "run: scripts/play.sh${DISC:+ \"$DISC\"}"

@@ -1,9 +1,9 @@
-// ghrecomp's entry point: the symbolized GH2 ELF, the disc it came from, and
+// GH Classic's entry point: the symbolized GH2 ELF, the disc it came from, and
 // options for unattended runs.
 //
-//   ghrecomp <elf> [disc] [--hidden] [--mute] [--mc <dir>] [--settings <file>] [--shots <dir>] [--shot-every <n>]
+//   GHClassic <elf> [disc] [--hidden] [--mute] [--mc <dir>] [--settings <file>] [--shots <dir>] [--shot-every <n>]
 //            [--res window|native|480p|720p|1080p|1440p|2160p]
-//   ghrecomp --bind [keyboard | <n>]
+//   GHClassic --bind [keyboard | <n>]
 //
 // --res is what the scene is drawn at: the window's size (the default), the
 // game's own (512x448), or that height at the picture's aspect. --settings
@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
         return gh2::runBind(argc, argv);
     if (argc < 2)
     {
-        std::cerr << "usage: ghrecomp <elf> [disc] [--hidden] [--mute] [--mc <dir>]"
+        std::cerr << "usage: GHClassic <elf> [disc] [--hidden] [--mute] [--mc <dir>]"
                      " [--shots <dir>] [--shot-every <n>] [--res window|native|480p|720p|1080p|1440p|2160p]"
                   << std::endl;
         return 2;
@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
     PS2Runtime runtime;
     runtime.setHostOptions(hostOptions);
     runtime.setHostFrontend(std::make_unique<gh2::VulkanFrontend>(renderSize));
-    if (!runtime.initialize("Guitar Hero II"))
+    if (!runtime.initialize("GH Classic"))
     {
         std::cerr << "failed to initialize the runtime" << std::endl;
         return 1;

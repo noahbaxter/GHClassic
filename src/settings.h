@@ -26,4 +26,7 @@ namespace gh2::settings
     // Read and write `path` in place of the user data directory's
     // settings.ini. Before the first get or set.
     void usePath(const std::string &path);
+
+    // `file` in the user data directory, which is made if missing.
+    std::string userDataPath(const std::string &file);
 }

@@ -1,5 +1,7 @@
 #include "host/bindings.h"
 
+#include "settings.h"
+
 #include <SDL3/SDL.h>
 
 #include <algorithm>
@@ -271,9 +273,6 @@ namespace gh2::input
 
     std::string bindingFilePath()
     {
-        char *pref = SDL_GetPrefPath("", "ghrecomp");
-        std::string path = pref ? std::string(pref) + "input.ini" : "input.ini";
-        SDL_free(pref);
-        return path;
+        return settings::userDataPath("input.ini");
     }
 }

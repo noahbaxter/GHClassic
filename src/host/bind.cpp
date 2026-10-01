@@ -86,7 +86,7 @@ namespace gh2
         void prompt(const std::string &text)
         {
             std::cout << "  " << text << " ... " << std::flush;
-            SDL_SetWindowTitle(s_window, ("ghrecomp bind: " + text).c_str());
+            SDL_SetWindowTitle(s_window, ("GH Classic bind: " + text).c_str());
         }
 
         // The first control away from rest, as a source.
@@ -168,7 +168,7 @@ namespace gh2
                 std::cout << "  " << i << "  " << (SDL_GetJoystickNameForID(ids[i]) ? SDL_GetJoystickNameForID(ids[i]) : "?")
                           << (SDL_IsGamepad(ids[i]) ? "  (gamepad)" : "") << "\n";
             SDL_free(ids);
-            std::cout << "bind one with: ghrecomp --bind keyboard | ghrecomp --bind <n>" << std::endl;
+            std::cout << "bind one with: GHClassic --bind keyboard | GHClassic --bind <n>" << std::endl;
             return 0;
         }
     }
@@ -212,7 +212,7 @@ namespace gh2
             section = deviceSection(SDL_GetJoystickName(joy) ? SDL_GetJoystickName(joy) : "");
         }
 
-        s_window = SDL_CreateWindow("ghrecomp bind", 480, 120, 0);
+        s_window = SDL_CreateWindow("GH Classic bind", 480, 120, 0);
         std::cout << "binding [" << section << "]. Escape or 10 seconds skips an action.\n";
         Snapshot rest;
         if (joy)

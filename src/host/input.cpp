@@ -110,7 +110,7 @@ namespace gh2
                 std::cerr << "[input] " << name << ": " << (builtin ? builtin->label : "no built-in layout")
                           << (own ? ", with input.ini" : "") << std::endl;
                 if (!builtin && !own)
-                    std::cerr << "[input]   unbound; run ghrecomp --bind to set it up" << std::endl;
+                    std::cerr << "[input]   unbound; run GHClassic --bind to set it up" << std::endl;
                 s_devices.push_back(d);
             }
             SDL_free(ids);

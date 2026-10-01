@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(ghrecomp LANGUAGES C CXX)
+project(GHClassic LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -9,11 +9,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Output of ps2_recomp, written by scripts/build.sh. The target below only
 # exists once it is populated, so a fresh tree can configure and build the
 # tools first.
-set(GHRECOMP_GENERATED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build/recomp/output"
+set(GHC_GENERATED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build/recomp/output"
     CACHE PATH "Directory holding the recompiler's generated C++")
 
 # Relinking 12k functions with LTO costs about 90s. Off while iterating.
-option(GHRECOMP_ENABLE_LTO "Link-time optimisation for release builds" ON)
+option(GHC_ENABLE_LTO "Link-time optimisation for release builds" ON)
 
 # Runtime only. The analyzer and recompiler are host tools, built by
 # scripts/build.sh as a top-level build of lib/PS2Recomp, which their CMake
@@ -35,15 +35,15 @@ set(CHDR_WANT_TESTS OFF CACHE BOOL "" FORCE)
 add_subdirectory(lib/libchdr EXCLUDE_FROM_ALL)
 
 # EXCLUDE_FROM_ALL keeps upstream's own ps2EntryRunner out of the default
-# build, leaving ghrecomp and what it links.
+# build, leaving GHClassic and what it links.
 add_subdirectory(lib/PS2Recomp EXCLUDE_FROM_ALL)
 
-file(GLOB GHRECOMP_GENERATED_SOURCES CONFIGURE_DEPENDS
-    "${GHRECOMP_GENERATED_DIR}/*.cpp"
+file(GLOB GHC_GENERATED_SOURCES CONFIGURE_DEPENDS
+    "${GHC_GENERATED_DIR}/*.cpp"
 )
 
-if(NOT GHRECOMP_GENERATED_SOURCES)
-    message(STATUS "No generated code in ${GHRECOMP_GENERATED_DIR}; ghrecomp target skipped")
+if(NOT GHC_GENERATED_SOURCES)
+    message(STATUS "No generated code in ${GHC_GENERATED_DIR}; GHClassic target skipped")
     return()
 endif()
 
@@ -66,7 +66,7 @@ FetchContent_MakeAvailable(vk-bootstrap VulkanMemoryAllocator)
 
 # The game layer: GH2's hooks, installed through the runtime's override
 # registry, and the host window and renderer they draw through.
-set(GHRECOMP_GAME_SOURCES
+set(GHC_GAME_SOURCES
     src/main.cpp
     src/game.cpp
     src/frame_step.cpp
@@ -103,66 +103,66 @@ set(GHRECOMP_GAME_SOURCES
     src/render/texture_capture.cpp
 )
 
-add_executable(ghrecomp
-    ${GHRECOMP_GENERATED_SOURCES}
-    ${GHRECOMP_GAME_SOURCES}
+add_executable(GHClassic
+    ${GHC_GENERATED_SOURCES}
+    ${GHC_GAME_SOURCES}
 )
 
 # Shaders compile to SPIR-V headers, each a uint32_t array named after it
 # (mesh.vert -> kMeshVert in mesh_vert.h).
 find_program(GLSLANG_VALIDATOR glslangValidator REQUIRED)
-set(GHRECOMP_SHADER_DIR "${CMAKE_CURRENT_BINARY_DIR}/shaders")
-file(MAKE_DIRECTORY "${GHRECOMP_SHADER_DIR}")
-set(GHRECOMP_SHADER_HEADERS)
+set(GHC_SHADER_DIR "${CMAKE_CURRENT_BINARY_DIR}/shaders")
+file(MAKE_DIRECTORY "${GHC_SHADER_DIR}")
+set(GHC_SHADER_HEADERS)
 foreach(SHADER mesh.vert mesh.frag)
     string(REPLACE "." "_" SHADER_ID "${SHADER}")
     string(REPLACE "mesh_vert" "kMeshVert" SHADER_VAR "${SHADER_ID}")
     string(REPLACE "mesh_frag" "kMeshFrag" SHADER_VAR "${SHADER_VAR}")
-    set(SHADER_HEADER "${GHRECOMP_SHADER_DIR}/${SHADER_ID}.h")
+    set(SHADER_HEADER "${GHC_SHADER_DIR}/${SHADER_ID}.h")
     add_custom_command(
         OUTPUT "${SHADER_HEADER}"
         COMMAND "${GLSLANG_VALIDATOR}" -V --vn "${SHADER_VAR}" -o "${SHADER_HEADER}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/src/host/shaders/${SHADER}"
         DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/host/shaders/${SHADER}"
         VERBATIM)
-    list(APPEND GHRECOMP_SHADER_HEADERS "${SHADER_HEADER}")
+    list(APPEND GHC_SHADER_HEADERS "${SHADER_HEADER}")
 endforeach()
-add_custom_target(ghrecomp_shaders DEPENDS ${GHRECOMP_SHADER_HEADERS})
-add_dependencies(ghrecomp ghrecomp_shaders)
-target_include_directories(ghrecomp PRIVATE "${GHRECOMP_SHADER_DIR}")
+add_custom_target(GHClassic_shaders DEPENDS ${GHC_SHADER_HEADERS})
+add_dependencies(GHClassic GHClassic_shaders)
+target_include_directories(GHClassic PRIVATE "${GHC_SHADER_DIR}")
 
 # The port's own game scripts, compiled in as strings (dta.h); editing one
 # reconfigures.
-set(GHRECOMP_DTA_DIR "${CMAKE_CURRENT_BINARY_DIR}/dta")
-file(READ src/dta/lag_panel.dta GHRECOMP_LAG_PANEL_DTA)
-file(READ src/dta/highscore_panel.dta GHRECOMP_HIGHSCORE_PANEL_DTA)
-file(READ src/dta/main_menu.dta GHRECOMP_MAIN_MENU_DTA)
+set(GHC_DTA_DIR "${CMAKE_CURRENT_BINARY_DIR}/dta")
+file(READ src/dta/lag_panel.dta GHC_LAG_PANEL_DTA)
+file(READ src/dta/highscore_panel.dta GHC_HIGHSCORE_PANEL_DTA)
+file(READ src/dta/main_menu.dta GHC_MAIN_MENU_DTA)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     src/dta/lag_panel.dta src/dta/highscore_panel.dta src/dta/main_menu.dta)
-configure_file(src/dta/dta.h.in "${GHRECOMP_DTA_DIR}/dta.h" @ONLY)
-target_include_directories(ghrecomp PRIVATE "${GHRECOMP_DTA_DIR}")
+configure_file(src/dta/dta.h.in "${GHC_DTA_DIR}/dta.h" @ONLY)
+target_include_directories(GHClassic PRIVATE "${GHC_DTA_DIR}")
 
 # The window icons, where SDL_GetBasePath finds them. On macOS the game is an
 # app bundle, so other apps (Finder, audio mixers) see its icon too, and the
 # base path is the bundle's Resources.
 if(APPLE)
-    target_sources(ghrecomp PRIVATE assets/icon.icns assets/icon_macos.png)
+    target_sources(GHClassic PRIVATE assets/icon.icns assets/icon_macos.png)
     set_source_files_properties(assets/icon.icns assets/icon_macos.png
         PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-    set_target_properties(ghrecomp PROPERTIES
+    set_target_properties(GHClassic PROPERTIES
         MACOSX_BUNDLE TRUE
-        MACOSX_BUNDLE_BUNDLE_NAME ghrecomp
-        MACOSX_BUNDLE_GUI_IDENTIFIER com.noahbaxter.ghrecomp
+        MACOSX_BUNDLE_BUNDLE_NAME "GH Classic"
+        MACOSX_BUNDLE_GUI_IDENTIFIER com.noahbaxter.ghclassic
         MACOSX_BUNDLE_ICON_FILE icon.icns)
 else()
     configure_file(assets/icon.png "${CMAKE_CURRENT_BINARY_DIR}/icon.png" COPYONLY)
 endif()
 
 # Unity batches are for the generated code; game files stay separate units.
-set_source_files_properties(${GHRECOMP_GAME_SOURCES} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+set_source_files_properties(${GHC_GAME_SOURCES} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 
-target_include_directories(ghrecomp PRIVATE "${GHRECOMP_GENERATED_DIR}" src)
-target_link_libraries(ghrecomp PRIVATE
+target_include_directories(GHClassic PRIVATE "${GHC_GENERATED_DIR}" src)
+target_link_libraries(GHClassic PRIVATE
     ps2_runtime
     SDL3::SDL3
     Vulkan::Vulkan
@@ -175,29 +175,29 @@ target_link_libraries(ghrecomp PRIVATE
 foreach(PROP INCLUDE_DIRECTORIES COMPILE_DEFINITIONS COMPILE_OPTIONS)
     get_property(PS2X_DIR_${PROP} DIRECTORY lib/PS2Recomp PROPERTY ${PROP})
 endforeach()
-target_include_directories(ghrecomp PRIVATE ${PS2X_DIR_INCLUDE_DIRECTORIES})
-target_compile_definitions(ghrecomp PRIVATE ${PS2X_DIR_COMPILE_DEFINITIONS})
-target_compile_options(ghrecomp PRIVATE ${PS2X_DIR_COMPILE_OPTIONS})
+target_include_directories(GHClassic PRIVATE ${PS2X_DIR_INCLUDE_DIRECTORIES})
+target_compile_definitions(GHClassic PRIVATE ${PS2X_DIR_COMPILE_DEFINITIONS})
+target_compile_options(GHClassic PRIVATE ${PS2X_DIR_COMPILE_OPTIONS})
 
 # Same batching and precompiled headers upstream uses for its runner. Without
 # them a cold build of the generated code takes several times longer.
-set_target_properties(ghrecomp PROPERTIES
+set_target_properties(GHClassic PROPERTIES
     UNITY_BUILD ON
     UNITY_BUILD_BATCH_SIZE 32
 )
-target_precompile_headers(ghrecomp PRIVATE
+target_precompile_headers(GHClassic PRIVATE
     "${PS2X_RUNTIME_DIR}/include/ps2_runtime_macros.h"
     "${PS2X_RUNTIME_DIR}/include/ps2_runtime.h"
-    "${GHRECOMP_GENERATED_DIR}/ps2_recompiled_functions.h"
-    "${GHRECOMP_GENERATED_DIR}/ps2_recompiled_stubs.h"
+    "${GHC_GENERATED_DIR}/ps2_recompiled_functions.h"
+    "${GHC_GENERATED_DIR}/ps2_recompiled_stubs.h"
     "${PS2X_RUNTIME_DIR}/include/ps2_syscalls.h"
     "${PS2X_RUNTIME_DIR}/include/ps2_stubs.h"
 )
 
-if(GHRECOMP_ENABLE_LTO AND CMAKE_BUILD_TYPE STREQUAL "Release")
+if(GHC_ENABLE_LTO AND CMAKE_BUILD_TYPE STREQUAL "Release")
     # EnableFastReleaseMode reads IPO_SUPPORTED, which upstream sets only in
     # its own directory scope. Without this check LTO is silently skipped.
     include(CheckIPOSupported)
     check_ipo_supported(RESULT IPO_SUPPORTED LANGUAGES CXX)
-    EnableFastReleaseMode(ghrecomp)
+    EnableFastReleaseMode(GHClassic)
 endif()

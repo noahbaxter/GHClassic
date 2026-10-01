@@ -66,12 +66,7 @@ namespace gh2::settings
 
         std::string path()
         {
-            if (!s_path.empty())
-                return s_path;
-            char *pref = SDL_GetPrefPath("", "ghrecomp");
-            std::string p = pref ? std::string(pref) + "settings.ini" : "settings.ini";
-            SDL_free(pref);
-            return p;
+            return s_path.empty() ? userDataPath("settings.ini") : s_path;
         }
 
         std::string trim(const std::string &s)
@@ -198,6 +193,38 @@ namespace gh2::settings
     void usePath(const std::string &path)
     {
         s_path = path;
+    }
+
+    // The project was ghrecomp: its directory, when it is the only one, is
+    // moved over whole the first time.
+    std::string userDataPath(const std::string &file)
+    {
+        static const std::string dir = []
+        {
+            char *pref = SDL_GetPrefPath("", "GHClassic");
+            if (!pref)
+                return std::string();
+            const std::string made = pref;
+            SDL_free(pref);
+            namespace fs = std::filesystem;
+            std::error_code error;
+            const fs::path current = fs::path(made).parent_path();
+            const fs::path old = current.parent_path() / "ghrecomp";
+            if (fs::is_directory(old, error) && fs::is_empty(current, error))
+            {
+                fs::remove(current, error);
+                fs::rename(old, current, error);
+                if (error)
+                {
+                    std::cerr << "[settings] could not move " << old << ": " << error.message() << std::endl;
+                    fs::create_directories(current, error);
+                }
+                else
+                    std::cerr << "[settings] moved " << old << " to " << current << std::endl;
+            }
+            return made;
+        }();
+        return dir + file;
     }
 
     void set(Key key, int value)
