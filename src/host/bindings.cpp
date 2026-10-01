@@ -1,12 +1,12 @@
 #include "host/bindings.h"
 
+#include "ini.h"
 #include "settings.h"
 
 #include <SDL3/SDL.h>
 
 #include <algorithm>
 #include <cstdio>
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -29,13 +29,7 @@ namespace gh2::input
             {"up", SDL_HAT_UP}, {"right", SDL_HAT_RIGHT}, {"down", SDL_HAT_DOWN}, {"left", SDL_HAT_LEFT},
         };
 
-        std::string trim(const std::string &s)
-        {
-            const size_t begin = s.find_first_not_of(" \t\r");
-            if (begin == std::string::npos)
-                return "";
-            return s.substr(begin, s.find_last_not_of(" \t\r") - begin + 1);
-        }
+        using ini::trim;
 
         std::vector<std::string> splitCommas(const std::string &s)
         {
@@ -46,14 +40,6 @@ namespace gh2::input
                 if (!trim(part).empty())
                     out.push_back(trim(part));
             return out;
-        }
-
-        // "[device "name"]" -> device "name"; the name may hold spaces.
-        std::optional<std::string> sectionName(const std::string &line)
-        {
-            if (line.size() < 2 || line.front() != '[' || line.back() != ']')
-                return std::nullopt;
-            return line.substr(1, line.size() - 2);
         }
 
         bool parseAxisRange(std::istringstream &in, Source &s)
@@ -211,9 +197,9 @@ namespace gh2::input
             ++number;
             // Comments take whole lines: ';' and '#' are key names too.
             const std::string text = trim(number == 1 ? withoutBom(line) : line);
-            if (text.empty() || text[0] == ';' || text[0] == '#')
+            if (ini::skipped(text))
                 continue;
-            if (const auto name = sectionName(text))
+            if (const auto name = ini::sectionName(text))
             {
                 section = *name;
                 file.sections[section];
@@ -262,7 +248,7 @@ namespace gh2::input
                 if (first)
                     line = withoutBom(line);
                 first = false;
-                if (const auto name = sectionName(trim(line)))
+                if (const auto name = ini::sectionName(trim(line)))
                     inside = *name == section;
                 if (!inside)
                     kept.push_back(line);
@@ -271,13 +257,7 @@ namespace gh2::input
         while (!kept.empty() && trim(kept.back()).empty())
             kept.pop_back();
 
-        // Written beside the old file and renamed over it, so a failed write
-        // leaves the old one whole.
-        const std::string temp = path + ".tmp";
-        {
-            std::ofstream out(temp, std::ios::trunc);
-            if (!out)
-                return false;
+        return !ini::writeReplacing(path, [&](std::ofstream &out) {
             for (const std::string &line : kept)
                 out << line << "\n";
             if (!kept.empty())
@@ -290,12 +270,7 @@ namespace gh2::input
                     out << (i == 0 ? " " : ", ") << formatSource(sources[i]);
                 out << "\n";
             }
-            if (!out)
-                return false;
-        }
-        std::error_code error;
-        std::filesystem::rename(temp, path, error);
-        return !error;
+        });
     }
 
     Profile overlay(Profile base, const std::map<Action, std::vector<Source>> *section)
