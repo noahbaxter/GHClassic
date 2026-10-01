@@ -64,19 +64,20 @@ namespace gh2::input
                 line.erase(0, 3);
             return line;
         }
-    }
 
-    const char *actionKey(Action action)
-    {
-        return action < kActionCount ? kActionKeys[action] : "";
-    }
+        // The file key for an action: "green", "strum_up", ...
+        const char *actionKey(Action action)
+        {
+            return action < kActionCount ? kActionKeys[action] : "";
+        }
 
-    std::optional<Action> actionFromKey(const std::string &key)
-    {
-        for (int a = 0; a < kActionCount; ++a)
-            if (key == kActionKeys[a])
-                return static_cast<Action>(a);
-        return std::nullopt;
+        std::optional<Action> actionFromKey(const std::string &key)
+        {
+            for (int a = 0; a < kActionCount; ++a)
+                if (key == kActionKeys[a])
+                    return static_cast<Action>(a);
+            return std::nullopt;
+        }
     }
 
     std::optional<Source> parseSource(const std::string &text)

@@ -41,10 +41,6 @@ namespace gh2::input
         kActionCount,
     };
 
-    // The file key for an action: "green", "strum_up", ...
-    const char *actionKey(Action action);
-    std::optional<Action> actionFromKey(const std::string &key);
-
     struct Source
     {
         enum Kind
