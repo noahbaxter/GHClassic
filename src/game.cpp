@@ -6,6 +6,7 @@
 #include "ui/fast_boot.h"
 #include "frame_step.h"
 #include "game_overrides.h"
+#include "gh1.h"
 #include "settings/latency.h"
 #include "ui/locale.h"
 #include "ui/menus.h"
@@ -41,6 +42,7 @@ namespace
     {
         gh2::ark::install(runtime, gh2::kSlus21447);
         gh2::installEighties();
+        gh2::installGh1();
         gh2::outfits::install(runtime, gh2::kSlus21447);
         gh2::installNullRnd(runtime, gh2::kSlus21447);
         gh2::installNativeRnd(runtime, gh2::kSlus21447);

@@ -239,8 +239,9 @@ def find_disc(env):
     return result.stdout.strip()
 
 
-# Discs whose archives come along when their images are in game/: Rocks the 80s.
-CONTENT_SERIALS = ["SLUS-21586"]
+# Discs whose archives come along when their images are in game/: Rocks the
+# 80s, then GH1.
+CONTENT_SERIALS = ["SLUS-21586", "SLUS-21224"]
 
 
 def content(env):
