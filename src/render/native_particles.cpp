@@ -13,9 +13,10 @@
 // camera, then puts the sprite's corners half a size either way along the
 // camera's right and up axes, in clip space, so the square keeps its world
 // size at any distance. The first corner, left and above, takes uv (0, 0) and
-// the other (1, 1): v runs down the screen, as a texture's rows do. The colour is the particle's times the material's colour
-// scale (qw695), and times the environ's ambient when the material uses the
-// environ (qw688 w): nothing else lights a particle.
+// the other (1, 1): v runs down the screen, as a texture's rows do. The
+// colour is the particle's times the material's colour scale (qw695), and
+// times the environ's ambient when the material uses the environ (qw688 w):
+// nothing else lights a particle.
 
 #include "render/native_particles.h"
 
