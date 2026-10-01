@@ -19,6 +19,7 @@
 #include "render/native_mat.h"
 
 #include <algorithm>
+#include <iterator>
 
 namespace gh2
 {
@@ -27,34 +28,37 @@ namespace gh2
         const Addresses *s_addresses = nullptr;
     }
 
-    Matrix readTransform(uint8_t *rdram, uint32_t address)
+    Matrix toMatrix(const milo::Transform &xfm)
     {
         Matrix m{};
-        for (uint32_t row = 0; row < 4; ++row)
+        for (uint32_t row = 0; row < 3; ++row)
             for (uint32_t col = 0; col < 3; ++col)
-                m[row * 4 + col] = load<float>(rdram, address + row * 16u + col * 4u);
+                m[row * 4 + col] = xfm.rows[row][col];
+        for (uint32_t col = 0; col < 3; ++col)
+            m[12 + col] = xfm.pos[col];
         m[15] = 1.0f;
         return m;
     }
 
     uint32_t currentCamera(uint8_t *rdram)
     {
-        const uint32_t cam = load<uint32_t>(rdram, s_addresses->rndCamCurrent);
+        const auto current = load<milo::Ptr<milo::RndCam>>(rdram, s_addresses->rndCamCurrent);
         Camera camera;
-        camera.id = cam;
-        if (cam != 0u)
+        camera.id = current.address;
+        if (current)
         {
-            camera.view = readTransform(rdram, cam + milo::camera::kView);
-            for (uint32_t i = 0; i < 3; ++i)
-                camera.eye[i] = load<float>(rdram, cam + milo::transformable::kWorld + 0x30u + i * 4u);
-            camera.nearPlane = load<float>(rdram, cam + milo::camera::kNear);
-            camera.farPlane = load<float>(rdram, cam + milo::camera::kFar);
-            camera.yFov = load<float>(rdram, cam + milo::camera::kYFov);
-            for (uint32_t i = 0; i < 2; ++i)
-                camera.zRange[i] = load<float>(rdram, cam + milo::camera::kZRange + i * 4u);
-            for (uint32_t i = 0; i < 4; ++i)
-                camera.rect[i] = load<float>(rdram, cam + milo::camera::kRect + i * 4u);
-            camera.target = load<uint32_t>(rdram, cam + milo::camera::kTargetTex);
+            const milo::RndCam cam = load(rdram, current);
+            camera.view = toMatrix(cam.view);
+            std::copy(cam.transformable.world.pos, cam.transformable.world.pos + 3, camera.eye);
+            camera.nearPlane = cam.nearPlane;
+            camera.farPlane = cam.farPlane;
+            camera.yFov = cam.yFov;
+            std::copy(std::begin(cam.zRange), std::end(cam.zRange), camera.zRange);
+            camera.rect[0] = cam.rect.x;
+            camera.rect[1] = cam.rect.y;
+            camera.rect[2] = cam.rect.w;
+            camera.rect[3] = cam.rect.h;
+            camera.target = cam.targetTex.ptr.address;
             if (camera.target != 0u)
             {
                 camera.targetWidth = load<uint32_t>(rdram, camera.target + milo::tex::kWidth);
@@ -84,8 +88,8 @@ namespace gh2
         // A transformable's world transform, through the engine's own WorldXfm.
         Matrix worldXfm(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t transformable)
         {
-            return readTransform(rdram, static_cast<uint32_t>(runtime->callGuestFunction(
-                                            rdram, ctx, s_addresses->worldXfm, {transformable})));
+            return toMatrix(load<milo::Transform>(rdram, static_cast<uint32_t>(runtime->callGuestFunction(
+                                                             rdram, ctx, s_addresses->worldXfm, {transformable}))));
         }
 
         // The bone palette DrawShowing uploads for a skinned mesh (0x3d8974):
@@ -108,8 +112,8 @@ namespace gh2
                     continue;
                 }
                 several |= b != 0u;
-                const Matrix bind =
-                    readTransform(rdram, bones + milo::mesh::kBoneBind + b * milo::mesh::kBoneBindStride);
+                const Matrix bind = toMatrix(
+                    load<milo::Transform>(rdram, bones + milo::mesh::kBoneBind + b * milo::mesh::kBoneBindStride));
                 draw.bones[b] = multiply(bind, worldXfm(rdram, ctx, runtime, object));
             }
             draw.skinned = true;
@@ -177,7 +181,7 @@ namespace gh2
                 draw.camera = currentCamera(rdram);
                 for (uint32_t node = first; node != sentinel; node = load<uint32_t>(rdram, node))
                 {
-                    draw.world = readTransform(rdram, node + milo::multimesh::kInstanceXfm);
+                    draw.world = toMatrix(load<milo::Transform>(rdram, node + milo::multimesh::kInstanceXfm));
                     if (faceCamera)
                         std::copy(cameraWorld.begin(), cameraWorld.begin() + 12, draw.world.begin());
                     draw.lightWorld = draw.world;

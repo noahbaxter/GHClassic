@@ -73,7 +73,7 @@ namespace gh2
                 return;
             }
 
-            const Matrix world = readTransform(rdram, sys + kWorld);
+            const Matrix world = toMatrix(load<milo::Transform>(rdram, sys + kWorld));
             const uint32_t cameraIndex = currentCamera(rdram);
             const Matrix &view = building().cameras[cameraIndex].view;
             // The camera's world axes: the columns of its inverse.

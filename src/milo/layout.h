@@ -79,24 +79,38 @@ namespace milo
     static_assert(offsetof(Rnd, height) == 0x44);
     static_assert(offsetof(Rnd, aspect) == 0xd4);
 
-    // RndTransformable: local transform at +0x20, world at +0x60. A
-    // transform is three 16-byte rows then the position.
-    namespace transformable
+    // RndTransformable, as far as anything reads it.
+    struct RndTransformable
     {
-        constexpr uint32_t kWorld = 0x60u;
-    }
+        uint8_t unk0[0x60]; // the local Transform at +0x20
+        Transform world;
+    };
+    static_assert(sizeof(RndTransformable) == 0xa0);
+    static_assert(offsetof(RndTransformable, world) == 0x60);
 
     // RndCam, 0x320 bytes (PsCam adds nothing).
-    namespace camera
+    struct RndCam
     {
-        constexpr uint32_t kView = 0xc0u;   // Transform: inverse of the camera's world
-        constexpr uint32_t kNear = 0x2c0u;
-        constexpr uint32_t kFar = 0x2c4u;
-        constexpr uint32_t kYFov = 0x2c8u;  // 0 is orthographic
-        constexpr uint32_t kZRange = 0x2ccu; // 2 floats
-        constexpr uint32_t kRect = 0x2d4u;  // normalized x, y, w, h
-        constexpr uint32_t kTargetTex = 0x2ecu; // RndTex* (ObjPtr at +0x2e4), null for the screen
-    }
+        RndTransformable transformable;
+        uint8_t unkA0[0x20];
+        Transform view;  // the inverse of its world
+        uint8_t unk100[0x1c0];
+        float nearPlane;
+        float farPlane;
+        float yFov;      // 0 is orthographic
+        float zRange[2];
+        Rect rect;       // normalized
+        ObjPtr<RndTex> targetTex; // null for the screen
+        uint8_t unk2F0[0x30];
+    };
+    static_assert(sizeof(RndCam) == 0x320);
+    static_assert(offsetof(RndCam, view) == 0xc0);
+    static_assert(offsetof(RndCam, nearPlane) == 0x2c0);
+    static_assert(offsetof(RndCam, farPlane) == 0x2c4);
+    static_assert(offsetof(RndCam, yFov) == 0x2c8);
+    static_assert(offsetof(RndCam, zRange) == 0x2cc);
+    static_assert(offsetof(RndCam, rect) == 0x2d4);
+    static_assert(offsetof(RndCam, targetTex) == 0x2e4);
 
     // RndMat, 0x120 bytes; PsMat adds its GS state after. Enums read from
     // PsMat::Update (0x19cfe0) and its jump tables at 0x418910 and 0x418930.
