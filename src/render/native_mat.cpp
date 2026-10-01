@@ -1,13 +1,10 @@
 // PsMat, native: materials are read at draw time instead of turned into GS
 // state.
 //
-// Retail PsMat::Select (0x3d8348) rebuilds the GS registers from the RndMat
-// through PsMat::Update when the material is dirty, writes them and a VU1
-// block (the colour at +0x30, then a colour scale) into the current packet,
-// ORs PRIM bits into the caller's tag and returns the next pass (+0xb0). The
-// packet is never sent, so the native one only returns the next pass. Its
-// other callers (PsMultiMesh, PsParticleSys and PsRnd::DrawRect) still build
-// packets around it, which nothing reads.
+// Retail PsMat::Select (0x3d8348) turns a material into GS registers and a
+// VU1 block in the current packet. Every draw that selects a material
+// (PsMesh, PsMultiMesh, PsParticleSys, PsRnd::DrawRect) is native, so Select
+// is never reached; the draws read the RndMat through readMaterial instead.
 //
 // The colour VU1 hands the GS is vertex colour x material colour x the scale
 // PsMat::Update sets at +0x160: 255 for rgb without a texture or with
@@ -19,8 +16,6 @@
 
 #include "guest.h"
 #include "milo/layout.h"
-#include "ps2_runtime.h"
-#include "ps2_runtime_macros.h"
 #include "render/texture_capture.h"
 
 namespace gh2
@@ -71,12 +66,6 @@ namespace gh2
                 m.envRows[i][2] = load<float>(rdram, xfm + 0x10u + i * 4u);
             }
         }
-
-        void select(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
-        {
-            SET_GPR_U32(ctx, 2, nextPass(rdram, GPR_U32(ctx, 4)));
-            ctx->pc = GPR_U32(ctx, 31);
-        }
     }
 
     Material readMaterial(uint8_t *rdram, uint32_t mat)
@@ -114,10 +103,5 @@ namespace gh2
     uint32_t nextPass(uint8_t *rdram, uint32_t mat)
     {
         return load<uint32_t>(rdram, mat + milo::mat::kNextPass);
-    }
-
-    void installNativeMat(PS2Runtime &runtime, const Addresses &addresses)
-    {
-        runtime.replaceFunction(addresses.psMatSelect, select);
     }
 }

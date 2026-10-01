@@ -129,11 +129,6 @@ namespace gh2::synth
             m_ram[(address + i) % kRamBytes] = bytes[i];
     }
 
-    uint8_t *Spu::ram(uint32_t address)
-    {
-        return m_ram.data() + address % kRamBytes;
-    }
-
     void Spu::setVolume(uint32_t voice, uint16_t left, uint16_t right)
     {
         m_voices[voice].volL = fixedVolume(left);

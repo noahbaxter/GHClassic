@@ -1,9 +1,8 @@
 #pragma once
 
-#include "addresses.h"
 #include "render/scene.h"
 
-class PS2Runtime;
+#include <cstdint>
 
 namespace gh2
 {
@@ -12,6 +11,4 @@ namespace gh2
 
     // The pass after `mat`, or 0.
     uint32_t nextPass(uint8_t *rdram, uint32_t mat);
-
-    void installNativeMat(PS2Runtime &runtime, const Addresses &addresses);
 }

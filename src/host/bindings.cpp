@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -66,6 +67,17 @@ namespace gh2::input
             std::snprintf(buf, sizeof(buf), "%.2f", v);
             return buf;
         }
+
+        // SDL names the comma key ",", which the list would split on.
+        constexpr const char *kCommaName = "comma";
+
+        // A UTF-8 byte order mark, which some editors put before the first line.
+        std::string withoutBom(std::string line)
+        {
+            if (line.rfind("\xEF\xBB\xBF", 0) == 0)
+                line.erase(0, 3);
+            return line;
+        }
     }
 
     const char *actionKey(Action action)
@@ -91,7 +103,9 @@ namespace gh2::input
         {
             std::string name;
             std::getline(in, name);
-            const SDL_Scancode code = SDL_GetScancodeFromName(trim(name).c_str());
+            name = trim(name);
+            const SDL_Scancode code =
+                name == kCommaName ? SDL_SCANCODE_COMMA : SDL_GetScancodeFromName(name.c_str());
             if (code == SDL_SCANCODE_UNKNOWN)
                 return std::nullopt;
             s.kind = Source::kKey;
@@ -155,7 +169,8 @@ namespace gh2::input
         switch (s.kind)
         {
         case Source::kKey:
-            return std::string("key ") + SDL_GetScancodeName(static_cast<SDL_Scancode>(s.index));
+            return std::string("key ") +
+                   (s.index == SDL_SCANCODE_COMMA ? kCommaName : SDL_GetScancodeName(static_cast<SDL_Scancode>(s.index)));
         case Source::kButton:
             return "button " + std::to_string(s.index);
         case Source::kHat:
@@ -195,7 +210,7 @@ namespace gh2::input
         {
             ++number;
             // Comments take whole lines: ';' and '#' are key names too.
-            const std::string text = trim(line);
+            const std::string text = trim(number == 1 ? withoutBom(line) : line);
             if (text.empty() || text[0] == ';' || text[0] == '#')
                 continue;
             if (const auto name = sectionName(text))
@@ -211,16 +226,23 @@ namespace gh2::input
                 std::cerr << "[input] " << path << ":" << number << ": not a binding, skipped" << std::endl;
                 continue;
             }
-            std::vector<Source> &sources = file.sections[section][*action];
-            sources.clear();
+            // One control it cannot read skips the line, so the action keeps
+            // what it had rather than losing the rest.
+            std::vector<Source> sources;
+            bool readable = true;
             for (const std::string &part : splitCommas(text.substr(eq + 1)))
             {
                 if (const auto source = parseSource(part))
                     sources.push_back(*source);
                 else
-                    std::cerr << "[input] " << path << ":" << number << ": \"" << part << "\" is not a control"
-                              << std::endl;
+                {
+                    std::cerr << "[input] " << path << ":" << number << ": \"" << part
+                              << "\" is not a control, line skipped" << std::endl;
+                    readable = false;
+                }
             }
+            if (readable)
+                file.sections[section][*action] = std::move(sources);
         }
         return file;
     }
@@ -234,8 +256,12 @@ namespace gh2::input
             std::ifstream in(path);
             std::string line;
             bool inside = false;
+            bool first = true;
             while (std::getline(in, line))
             {
+                if (first)
+                    line = withoutBom(line);
+                first = false;
                 if (const auto name = sectionName(trim(line)))
                     inside = *name == section;
                 if (!inside)
@@ -245,22 +271,31 @@ namespace gh2::input
         while (!kept.empty() && trim(kept.back()).empty())
             kept.pop_back();
 
-        std::ofstream out(path, std::ios::trunc);
-        if (!out)
-            return false;
-        for (const std::string &line : kept)
-            out << line << "\n";
-        if (!kept.empty())
-            out << "\n";
-        out << "[" << section << "]\n";
-        for (const auto &[action, sources] : bindings)
+        // Written beside the old file and renamed over it, so a failed write
+        // leaves the old one whole.
+        const std::string temp = path + ".tmp";
         {
-            out << actionKey(action) << " =";
-            for (size_t i = 0; i < sources.size(); ++i)
-                out << (i == 0 ? " " : ", ") << formatSource(sources[i]);
-            out << "\n";
+            std::ofstream out(temp, std::ios::trunc);
+            if (!out)
+                return false;
+            for (const std::string &line : kept)
+                out << line << "\n";
+            if (!kept.empty())
+                out << "\n";
+            out << "[" << section << "]\n";
+            for (const auto &[action, sources] : bindings)
+            {
+                out << actionKey(action) << " =";
+                for (size_t i = 0; i < sources.size(); ++i)
+                    out << (i == 0 ? " " : ", ") << formatSource(sources[i]);
+                out << "\n";
+            }
+            if (!out)
+                return false;
         }
-        return static_cast<bool>(out);
+        std::error_code error;
+        std::filesystem::rename(temp, path, error);
+        return !error;
     }
 
     Profile overlay(Profile base, const std::map<Action, std::vector<Source>> *section)

@@ -192,7 +192,6 @@ namespace gh2::synth
         m_voiceState = {};
         m_keyOn.assign(Spu::kVoices, false);
         m_keyOff.assign(Spu::kVoices, false);
-        m_keyOnLater.assign(Spu::kVoices, false);
         m_voicesOnCore1 = false;
         m_spuBlocks = m_slipMs = 0;
         m_spuBlockUsed.clear();
