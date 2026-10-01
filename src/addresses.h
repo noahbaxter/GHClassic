@@ -40,6 +40,8 @@ namespace gh2
         uint32_t builtinDelete;
         uint32_t dataNodeGetObj;   // DataNode::GetObj
         uint32_t uiGotoScreen;     // UIManager::GotoScreen
+        uint32_t debugModal; // DebugModal(bool &, char *)
+        uint32_t abort;
         uint32_t ctlClientPoll;
         uint32_t metaMusicPoll;
         uint32_t scePadRead;
@@ -95,6 +97,8 @@ namespace gh2
         .builtinDelete = 0x2cf160u,
         .dataNodeGetObj = 0x2b7f80u,
         .uiGotoScreen = 0x214d48u,
+        .debugModal = 0x105a88u,
+        .abort = 0x307b80u,
         .ctlClientPoll = 0x22dc68u,
         .metaMusicPoll = 0x21f180u,
         .scePadRead = 0x2f2c48u,
