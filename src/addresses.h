@@ -25,6 +25,7 @@ namespace gh2
         uint32_t psTexDestroy;
         uint32_t rndTextDrawShowing;
         uint32_t worldXfm;       // RndTransformable::WorldXfm
+        uint32_t setWorldXfm;    // RndTransformable::SetWorldXfm
         uint32_t playMovie;
         uint32_t optionsSyncVideo; // Options::SyncVideoOptions
         uint32_t optionsSetSyncOffset;
@@ -79,6 +80,7 @@ namespace gh2
         .psTexDestroy = 0x1a0f18u,
         .rndTextDrawShowing = 0x1dc380u,
         .worldXfm = 0x3d8ea0u,
+        .setWorldXfm = 0x1dd7b8u,
         .playMovie = 0x21bb60u,
         .optionsSyncVideo = 0x10db80u,
         .optionsSetSyncOffset = 0x10ded8u,
