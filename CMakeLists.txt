@@ -174,6 +174,7 @@ set(GHC_GAME_SOURCES
     src/dev/scenario.cpp
     src/dev/seed.cpp
     src/dev/transplant.cpp
+    src/disc/ark.cpp
     src/disc/disc.cpp
     src/disc/sha1.cpp
     src/movie/movie.cpp
