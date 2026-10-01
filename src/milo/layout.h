@@ -1,12 +1,52 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 
 // Where Milo keeps its renderer objects' fields, read from GH2 retail. These
 // describe the engine rather than one executable (GH2 and 80s share it), so
 // they live apart from the per-executable function addresses.
+//
+// A struct here is a guest object as retail lays it out, read whole with
+// load<T>. Only the fields something reads are named; the spans between are
+// unkXX, by offset. The names are this project's, from what the code that
+// touches a field does with it: no symbols for them survive. A base class is
+// the span it occupies, not a C++ base.
+//
+// A loaded struct is a copy: load it after any guest call that may change
+// the object, not before.
 namespace milo
 {
+    // A guest pointer to a T, followed with load(rdram, ptr).
+    template <typename T>
+    struct Ptr
+    {
+        uint32_t address;
+
+        explicit operator bool() const
+        {
+            return address != 0u;
+        }
+    };
+
+    // ObjPtr<T>: the object it points to is 8 in.
+    template <typename T>
+    struct ObjPtr
+    {
+        uint32_t unk0[2];
+        Ptr<T> ptr;
+    };
+    static_assert(sizeof(ObjPtr<void>) == 0xc);
+
+    // Three 16-byte rows, then the position, w unused throughout.
+    struct Transform
+    {
+        float rows[3][4];
+        float pos[4];
+    };
+    static_assert(sizeof(Transform) == 0x40);
+
+    struct RndTex;
     // Rnd, the renderer. PsRnd::SwapBuffers clears with the clear colour
     // (0x19ad44) and reads the size (0x19ad84, 0x19ad7c); Rnd::YRatio
     // (0x1d4c20) looks the aspect index up in {1, 0.75, 0.5625}.
@@ -39,21 +79,8 @@ namespace milo
 
     // RndMat, 0x120 bytes; PsMat adds its GS state after. Enums read from
     // PsMat::Update (0x19cfe0) and its jump tables at 0x418910 and 0x418930.
-    namespace mat
+    struct RndMat
     {
-        constexpr uint32_t kIntensify = 0x28u;  // bool: textured colour scale 255, not 128
-        constexpr uint32_t kBlend = 0x2cu;      // Blend
-        constexpr uint32_t kColor = 0x30u;      // 4 floats
-        constexpr uint32_t kUseEnviron = 0x40u; // bool: lit by the current environ
-        constexpr uint32_t kZMode = 0x44u;      // ZMode
-        constexpr uint32_t kTexGen = 0x48u;     // TexGen
-        constexpr uint32_t kTexWrap = 0x4cu;    // 0 clamps
-        constexpr uint32_t kTexXfm = 0x50u;     // Transform
-        constexpr uint32_t kDiffuseTex = 0x98u; // RndTex* (ObjPtr at +0x90)
-        constexpr uint32_t kPrelit = 0x9cu;     // bool: vertex colour is baked light
-        constexpr uint32_t kAlphaCut = 0xa0u;   // bool: ATST greater, AREF 0
-        constexpr uint32_t kNextPass = 0xb0u;   // RndMat* (ObjPtr at +0xa8)
-
         enum Blend : uint32_t
         {
             kBlendDest,          // Cd
@@ -85,7 +112,36 @@ namespace milo
             kZDecal,         // gequal, write
             kZModeCount,
         };
-    }
+
+        uint8_t unk0[0x28];
+        uint32_t intensify;  // bool: textured colour scale 255, not 128
+        Blend blend;
+        float color[4];
+        uint32_t useEnviron; // bool: lit by the current environ
+        ZMode zMode;
+        TexGen texGen;
+        uint32_t texWrap;    // 0 clamps
+        Transform texXfm;
+        ObjPtr<RndTex> diffuseTex;
+        uint32_t prelit;     // bool: vertex colour is baked light
+        uint32_t alphaCut;   // bool: ATST greater, AREF 0
+        uint8_t unkA4[0x4];
+        ObjPtr<RndMat> nextPass;
+        uint8_t unkB4[0x6c];
+    };
+    static_assert(sizeof(RndMat) == 0x120);
+    static_assert(offsetof(RndMat, intensify) == 0x28);
+    static_assert(offsetof(RndMat, blend) == 0x2c);
+    static_assert(offsetof(RndMat, color) == 0x30);
+    static_assert(offsetof(RndMat, useEnviron) == 0x40);
+    static_assert(offsetof(RndMat, zMode) == 0x44);
+    static_assert(offsetof(RndMat, texGen) == 0x48);
+    static_assert(offsetof(RndMat, texWrap) == 0x4c);
+    static_assert(offsetof(RndMat, texXfm) == 0x50);
+    static_assert(offsetof(RndMat, diffuseTex) == 0x90);
+    static_assert(offsetof(RndMat, prelit) == 0x9c);
+    static_assert(offsetof(RndMat, alphaCut) == 0xa0);
+    static_assert(offsetof(RndMat, nextPass) == 0xa8);
 
     // RndEnviron; PsEnviron adds nothing it reads. From PsEnviron::Select
     // (0x1a2060).

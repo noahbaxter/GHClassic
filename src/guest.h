@@ -5,6 +5,12 @@
 
 #include "runtime/ps2_memory.h"
 
+namespace milo
+{
+    template <typename T>
+    struct Ptr;
+}
+
 namespace gh2
 {
     // Guest memory by guest address, RDRAM or scratchpad alike. Copies rather
@@ -15,6 +21,13 @@ namespace gh2
         T value;
         std::memcpy(&value, getMemPtr(rdram, address), sizeof(T));
         return value;
+    }
+
+    // What a guest pointer points to.
+    template <typename T>
+    T load(uint8_t *rdram, milo::Ptr<T> ptr)
+    {
+        return load<T>(rdram, ptr.address);
     }
 
     template <typename T>

@@ -83,7 +83,7 @@ namespace gh2
             uint32_t mat = load<uint32_t>(rdram, sys + kMat);
             if (mat == 0u)
                 mat = load<uint32_t>(rdram, s_addresses->defaultMat);
-            const bool lit = mat != 0u && load<uint32_t>(rdram, mat + milo::mat::kUseEnviron) != 0u;
+            const bool lit = mat != 0u && load<milo::RndMat>(rdram, mat).useEnviron != 0u;
             const float *ambient = currentEnviron().ambient;
 
             auto mesh = std::make_shared<MeshData>();
@@ -137,7 +137,7 @@ namespace gh2
                     // The colours are final; sprites take their uvs as given.
                     draw.material.useEnviron = false;
                     draw.material.prelit = true;
-                    draw.material.texGen = milo::mat::kTexGenNone;
+                    draw.material.texGen = milo::RndMat::kTexGenNone;
                     draw.material.uvXfm[0] = 1.0f;
                     draw.material.uvXfm[1] = 0.0f;
                     draw.material.uvXfm[2] = 0.0f;

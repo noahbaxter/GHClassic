@@ -334,7 +334,7 @@ namespace gh2
         {
             const uint32_t font = load<uint32_t>(rdram, GPR_U32(ctx, 4) + milo::text::kFont);
             const uint32_t mat = font != 0u ? load<uint32_t>(rdram, font + milo::font::kMat) : 0u;
-            const uint32_t tex = mat != 0u ? load<uint32_t>(rdram, mat + milo::mat::kDiffuseTex) : 0u;
+            const uint32_t tex = mat != 0u ? load<milo::RndMat>(rdram, mat).diffuseTex.ptr.address : 0u;
             if (tex == 0u || !s_textTextures.insert(tex).second)
                 return;
             const auto found = s_textures.find(tex);

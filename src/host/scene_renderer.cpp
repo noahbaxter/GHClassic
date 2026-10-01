@@ -61,7 +61,7 @@ namespace gh2
         constexpr uint32_t kEnvTexGenVec4s = 4u;
 
         constexpr uint32_t kPipelineCount =
-            static_cast<uint32_t>(milo::mat::kBlendCount) * static_cast<uint32_t>(milo::mat::kZModeCount);
+            static_cast<uint32_t>(milo::RndMat::kBlendCount) * static_cast<uint32_t>(milo::RndMat::kZModeCount);
 
         // The GS's ALPHA_1 for each blend, as PsMat::Update sets it.
         VkPipelineColorBlendAttachmentState blendState(uint32_t blend)
@@ -76,24 +76,24 @@ namespace gh2
                                    VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
             switch (blend)
             {
-            case milo::mat::kBlendDest:
+            case milo::RndMat::kBlendDest:
                 state.srcColorBlendFactor = VK_BLEND_FACTOR_ZERO;
                 state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
                 state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
                 state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
                 break;
-            case milo::mat::kBlendSrc:
+            case milo::RndMat::kBlendSrc:
                 state.blendEnable = VK_FALSE;
                 break;
-            case milo::mat::kBlendAdd:
+            case milo::RndMat::kBlendAdd:
                 state.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
                 state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
                 break;
-            case milo::mat::kBlendSrcAlphaAdd:
+            case milo::RndMat::kBlendSrcAlphaAdd:
                 state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
                 state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
                 break;
-            case milo::mat::kBlendSubtract:
+            case milo::RndMat::kBlendSubtract:
                 state.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
                 state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
                 state.colorBlendOp = VK_BLEND_OP_REVERSE_SUBTRACT;
@@ -114,17 +114,17 @@ namespace gh2
             state.depthTestEnable = VK_TRUE;
             switch (zMode)
             {
-            case milo::mat::kZDisable:
+            case milo::RndMat::kZDisable:
                 state.depthCompareOp = VK_COMPARE_OP_ALWAYS;
                 break;
-            case milo::mat::kZTransparent:
+            case milo::RndMat::kZTransparent:
                 state.depthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
                 break;
-            case milo::mat::kZForce:
+            case milo::RndMat::kZForce:
                 state.depthCompareOp = VK_COMPARE_OP_ALWAYS;
                 state.depthWriteEnable = VK_TRUE;
                 break;
-            case milo::mat::kZDecal:
+            case milo::RndMat::kZDecal:
                 state.depthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
                 state.depthWriteEnable = VK_TRUE;
                 break;
@@ -824,7 +824,7 @@ namespace gh2
 
         VkPipeline pipeline(uint32_t blend, uint32_t zMode)
         {
-            VkPipeline &slot = pipelines[blend * milo::mat::kZModeCount + zMode];
+            VkPipeline &slot = pipelines[blend * milo::RndMat::kZModeCount + zMode];
             if (slot != VK_NULL_HANDLE)
                 return slot;
 
@@ -1132,7 +1132,7 @@ namespace gh2
                 lightBases[i] = static_cast<int32_t>(used);
                 used += kLightingVec4s;
             }
-            if (draw.material.texGen == milo::mat::kTexGenEnviron)
+            if (draw.material.texGen == milo::RndMat::kTexGenEnviron)
             {
                 envBases[i] = static_cast<int32_t>(used);
                 used += kEnvTexGenVec4s;

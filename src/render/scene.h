@@ -1,5 +1,7 @@
 #pragma once
 
+#include "milo/layout.h"
+
 #include <array>
 #include <cstdint>
 #include <memory>
@@ -43,8 +45,8 @@ namespace gh2
     // One material pass as the engine held it at draw time.
     struct Material
     {
-        uint32_t blend = 1;  // milo::mat::Blend
-        uint32_t zMode = 1;  // milo::mat::ZMode
+        milo::RndMat::Blend blend = milo::RndMat::kBlendSrc;
+        milo::RndMat::ZMode zMode = milo::RndMat::kZNormal;
         float color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
         bool intensify = false;
         bool alphaCut = false;
@@ -53,7 +55,7 @@ namespace gh2
         bool prelit = false;
         std::shared_ptr<const TextureData> texture; // null for none
         uint32_t renderTarget = 0; // the rendered RndTex sampled in place of texture, 0 for none
-        uint32_t texGen = 0; // milo::mat::TexGen
+        milo::RndMat::TexGen texGen = milo::RndMat::kTexGenNone;
         // uv' = u * uvXfm[0..1] + v * uvXfm[2..3] + uvXfm[4..5]
         float uvXfm[6] = {1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f};
         // The environ tex gen's 3x3 (rows), which the reflection is taken

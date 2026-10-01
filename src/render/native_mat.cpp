@@ -18,6 +18,9 @@
 #include "milo/layout.h"
 #include "render/texture_capture.h"
 
+#include <algorithm>
+#include <iterator>
+
 namespace gh2
 {
     namespace
@@ -26,20 +29,19 @@ namespace gh2
         // gens (0x19d510), rows at +0x170/+0x180 and offset at +0x1a0. The
         // off-diagonals flip sign, and xfm turns about the texture's centre
         // where xfm origin keeps tex_xfm's position as is.
-        void readUvXfm(uint8_t *rdram, uint32_t mat, Material &m)
+        void readUvXfm(const milo::Transform &xfm, Material &m)
         {
-            const uint32_t xfm = mat + milo::mat::kTexXfm;
-            const float m00 = load<float>(rdram, xfm + 0x00u);
-            const float m01 = load<float>(rdram, xfm + 0x04u);
-            const float m10 = load<float>(rdram, xfm + 0x10u);
-            const float m11 = load<float>(rdram, xfm + 0x14u);
-            const float px = load<float>(rdram, xfm + 0x30u);
-            const float py = load<float>(rdram, xfm + 0x34u);
+            const float m00 = xfm.rows[0][0];
+            const float m01 = xfm.rows[0][1];
+            const float m10 = xfm.rows[1][0];
+            const float m11 = xfm.rows[1][1];
+            const float px = xfm.pos[0];
+            const float py = xfm.pos[1];
             m.uvXfm[0] = m00;
             m.uvXfm[1] = -m01;
             m.uvXfm[2] = -m10;
             m.uvXfm[3] = m11;
-            if (m.texGen == milo::mat::kTexGenXfm)
+            if (m.texGen == milo::RndMat::kTexGenXfm)
             {
                 const float x = -px - 0.5f;
                 const float y = py - 0.5f;
@@ -56,52 +58,51 @@ namespace gh2
         // What PsMat::Update's environ case (0x19d60c) leaves at +0x170: tex_xfm's
         // rotation transposed, times rows (1 0 0) (0 0 1) (0 -1 0). Select hands
         // it to VU1 as qw691..693 for program 0x139.
-        void readEnvRows(uint8_t *rdram, uint32_t mat, Material &m)
+        void readEnvRows(const milo::Transform &xfm, Material &m)
         {
-            const uint32_t xfm = mat + milo::mat::kTexXfm;
             for (uint32_t i = 0; i < 3; ++i)
             {
-                m.envRows[i][0] = load<float>(rdram, xfm + 0x00u + i * 4u);
-                m.envRows[i][1] = -load<float>(rdram, xfm + 0x20u + i * 4u);
-                m.envRows[i][2] = load<float>(rdram, xfm + 0x10u + i * 4u);
+                m.envRows[i][0] = xfm.rows[0][i];
+                m.envRows[i][1] = -xfm.rows[2][i];
+                m.envRows[i][2] = xfm.rows[1][i];
             }
         }
     }
 
-    Material readMaterial(uint8_t *rdram, uint32_t mat)
+    Material readMaterial(uint8_t *rdram, uint32_t address)
     {
+        const auto mat = load<milo::RndMat>(rdram, address);
         Material m;
-        m.blend = load<uint32_t>(rdram, mat + milo::mat::kBlend);
-        m.zMode = load<uint32_t>(rdram, mat + milo::mat::kZMode);
-        for (uint32_t i = 0; i < 4; ++i)
-            m.color[i] = load<float>(rdram, mat + milo::mat::kColor + i * 4u);
-        m.intensify = load<uint32_t>(rdram, mat + milo::mat::kIntensify) != 0u;
-        m.alphaCut = load<uint32_t>(rdram, mat + milo::mat::kAlphaCut) != 0u;
-        m.texWrap = load<uint32_t>(rdram, mat + milo::mat::kTexWrap) != 0u;
-        m.useEnviron = load<uint32_t>(rdram, mat + milo::mat::kUseEnviron) != 0u;
-        m.prelit = load<uint32_t>(rdram, mat + milo::mat::kPrelit) != 0u;
+        m.blend = mat.blend;
+        m.zMode = mat.zMode;
+        std::copy(std::begin(mat.color), std::end(mat.color), m.color);
+        m.intensify = mat.intensify != 0u;
+        m.alphaCut = mat.alphaCut != 0u;
+        m.texWrap = mat.texWrap != 0u;
+        m.useEnviron = mat.useEnviron != 0u;
+        m.prelit = mat.prelit != 0u;
         // Update drops the texture for a dest-blended material.
-        if (m.blend != milo::mat::kBlendDest)
+        if (m.blend != milo::RndMat::kBlendDest)
         {
-            const uint32_t tex = load<uint32_t>(rdram, mat + milo::mat::kDiffuseTex);
+            const uint32_t tex = mat.diffuseTex.ptr.address;
             m.texture = capturedTexture(tex);
             if (tex != 0u && (load<uint32_t>(rdram, tex + milo::tex::kType) & milo::tex::kTypeRendered) != 0u)
                 m.renderTarget = tex;
         }
-        m.texGen = load<uint32_t>(rdram, mat + milo::mat::kTexGen);
-        if (m.texGen == milo::mat::kTexGenXfm || m.texGen == milo::mat::kTexGenXfmOrigin)
-            readUvXfm(rdram, mat, m);
-        else if (m.texGen == milo::mat::kTexGenEnviron)
-            readEnvRows(rdram, mat, m);
-        if (m.blend >= milo::mat::kBlendCount)
-            m.blend = milo::mat::kBlendSrcAlpha; // Update's default case
-        if (m.zMode >= milo::mat::kZModeCount)
-            m.zMode = milo::mat::kZNormal;
+        m.texGen = mat.texGen;
+        if (m.texGen == milo::RndMat::kTexGenXfm || m.texGen == milo::RndMat::kTexGenXfmOrigin)
+            readUvXfm(mat.texXfm, m);
+        else if (m.texGen == milo::RndMat::kTexGenEnviron)
+            readEnvRows(mat.texXfm, m);
+        if (m.blend >= milo::RndMat::kBlendCount)
+            m.blend = milo::RndMat::kBlendSrcAlpha; // Update's default case
+        if (m.zMode >= milo::RndMat::kZModeCount)
+            m.zMode = milo::RndMat::kZNormal;
         return m;
     }
 
     uint32_t nextPass(uint8_t *rdram, uint32_t mat)
     {
-        return load<uint32_t>(rdram, mat + milo::mat::kNextPass);
+        return load<milo::RndMat>(rdram, mat).nextPass.ptr.address;
     }
 }

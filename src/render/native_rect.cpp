@@ -26,6 +26,8 @@
 #include "render/frame.h"
 #include "render/native_mat.h"
 
+#include <algorithm>
+#include <iterator>
 #include <memory>
 
 namespace gh2
@@ -60,11 +62,12 @@ namespace gh2
                 return;
             }
 
+            const milo::RndMat material = mat != 0u ? load<milo::RndMat>(rdram, mat) : milo::RndMat{};
             float corner[4][4];
-            if (mat != 0u && load<uint32_t>(rdram, mat + milo::mat::kPrelit) == 0u)
+            if (mat != 0u && material.prelit == 0u)
             {
                 for (auto &c : corner)
-                    readColor(rdram, mat + milo::mat::kColor, c);
+                    std::copy(std::begin(material.color), std::end(material.color), c);
             }
             else
             {
@@ -108,8 +111,8 @@ namespace gh2
             draw.lightWorld = identity();
             if (mat == 0u)
             {
-                draw.material.blend = milo::mat::kBlendSrcAlpha;
-                draw.material.zMode = milo::mat::kZDisable;
+                draw.material.blend = milo::RndMat::kBlendSrcAlpha;
+                draw.material.zMode = milo::RndMat::kZDisable;
                 draw.material.prelit = true;
                 building().draws.push_back(draw);
             }
@@ -119,8 +122,8 @@ namespace gh2
                 // Never lit: the colours are final. Only tex_xfm moves the uvs.
                 draw.material.useEnviron = false;
                 draw.material.prelit = true;
-                if (draw.material.texGen != milo::mat::kTexGenXfm && draw.material.texGen != milo::mat::kTexGenXfmOrigin)
-                    draw.material.texGen = milo::mat::kTexGenNone;
+                if (draw.material.texGen != milo::RndMat::kTexGenXfm && draw.material.texGen != milo::RndMat::kTexGenXfmOrigin)
+                    draw.material.texGen = milo::RndMat::kTexGenNone;
                 building().draws.push_back(draw);
             }
             ctx->pc = returnTo;
