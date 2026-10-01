@@ -219,19 +219,24 @@ namespace gh2::script
         s_pending.push_back({name, command});
     }
 
-    void run(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &text)
+    uint32_t parse(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &text)
     {
         const Call call{rdram, ctx, runtime, 0u};
         const uint32_t source = guestString(call, text);
-        // The parsed array is kept: handlers defined in it stay referenced.
         const uint32_t root =
             static_cast<uint32_t>(runtime->callGuestFunction(rdram, ctx, s_addresses->dataReadString, {source}));
         runtime->callGuestFunction(rdram, ctx, s_addresses->builtinDelete, {source});
         if (root == 0u)
-        {
             std::cerr << "[script] parse failed" << std::endl;
+        return root;
+    }
+
+    void run(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &text)
+    {
+        // The parsed array is kept: handlers defined in it stay referenced.
+        const uint32_t root = parse(rdram, ctx, runtime, text);
+        if (root == 0u)
             return;
-        }
         const Call rootCall{rdram, ctx, runtime, root};
         for (int i = 0; i < rootCall.size(); ++i)
             rootCall.arg(i);

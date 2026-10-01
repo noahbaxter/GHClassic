@@ -1,11 +1,12 @@
 // GH Classic's entry point: the symbolized GH2 ELF, the disc it came from, and
 // options for unattended runs.
 //
-//   GHClassic <elf> [disc] [--hidden] [--mute] [--mc <dir>] [--settings <file>] [--shots <dir>] [--shot-every <n>]
-//            [--res window|native|480p|720p|1080p|1440p|2160p]
+//   GHClassic <elf> [disc] [--scenario <file>] [--hidden] [--mute] [--mc <dir>] [--settings <file>]
+//            [--shots <dir>] [--shot-every <n>] [--res window|native|480p|720p|1080p|1440p|2160p]
 //   GHClassic --bind [keyboard | <n>]
 //
-// --res is what the scene is drawn at: the window's size (the default), the
+// --scenario runs a file of steps (scenario.h). --res is what the scene is
+// drawn at: the window's size (the default), the
 // game's own (512x448), or that height at the picture's aspect. --settings
 // reads and writes that file in place of the user data directory's. --bind
 // sets up a controller or the keyboard in input.ini; with no device it
@@ -13,6 +14,7 @@
 
 #include "host/bind.h"
 #include "host/vulkan_frontend.h"
+#include "scenario.h"
 #include "settings.h"
 #include "ps2_runtime.h"
 #include "runtime/ps2_disc_image.h"
@@ -50,6 +52,11 @@ int main(int argc, char *argv[])
             hostOptions.mute = true;
         else if (arg == "--mc" && hasValue)
             mcRoot = argv[++i];
+        else if (arg == "--scenario" && hasValue)
+        {
+            if (!gh2::scenario::load(argv[++i]))
+                return 1;
+        }
         else if (arg == "--settings" && hasValue)
             gh2::settings::usePath(argv[++i]);
         else if (arg == "--shots" && hasValue)

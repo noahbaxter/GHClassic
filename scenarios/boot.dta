@@ -1,0 +1,13 @@
+; Boots to the main menu, then quickplay's song list. The splash waits for
+; Start, so the menu is gone to directly.
+(wait 10)
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+(wait 2)
+(shot main)
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 2)
+(shot songs)
+(quit)

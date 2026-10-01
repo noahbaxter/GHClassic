@@ -81,6 +81,7 @@ set(GHC_GAME_SOURCES
     src/null_movie.cpp
     src/null_rnd.cpp
     src/pad.cpp
+    src/scenario.cpp
     src/script.cpp
     src/settings.cpp
     src/synth/module.cpp

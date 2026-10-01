@@ -18,6 +18,7 @@
 #include <cmath>
 #include <cstdio>
 #include <iostream>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -26,6 +27,10 @@ namespace gh2
 {
     namespace
     {
+        std::mutex s_shotMutex;
+        std::string s_shotRequest;
+        bool s_shotWriting = false; // taken from the request, not yet on disk
+
         constexpr uint32_t kFramesInFlight = 2;
         constexpr int kWindowWidth = 960;
         constexpr int kWindowHeight = 720;
@@ -283,14 +288,16 @@ namespace gh2
         }
 
         // Harness screenshots, as binary PPM; scripts/arm.sh converts them.
-        void writeShot()
+        // A requested one is named, the periodic ones numbered.
+        void writeShot(const std::string &requested)
         {
             void *mapped = nullptr;
             if (vmaMapMemory(allocator, readbackMemory, &mapped) != VK_SUCCESS)
                 return;
             vmaInvalidateAllocation(allocator, readbackMemory, 0, VK_WHOLE_SIZE);
-            char name[32];
-            std::snprintf(name, sizeof(name), "frame_%06llu.ppm", static_cast<unsigned long long>(presented));
+            char numbered[32];
+            std::snprintf(numbered, sizeof(numbered), "frame_%06llu.ppm", static_cast<unsigned long long>(presented));
+            const std::string name = requested.empty() ? numbered : "shot_" + requested + ".ppm";
             if (FILE *file = std::fopen((shotDir / name).string().c_str(), "wb"))
             {
                 std::fprintf(file, "P6\n%u %u\n255\n", targetWidth, targetHeight);
@@ -302,6 +309,18 @@ namespace gh2
             vmaUnmapMemory(allocator, readbackMemory);
         }
     };
+
+    void requestShot(const std::string &name)
+    {
+        std::lock_guard<std::mutex> lock(s_shotMutex);
+        s_shotRequest = name;
+    }
+
+    bool shotPending()
+    {
+        std::lock_guard<std::mutex> lock(s_shotMutex);
+        return !s_shotRequest.empty() || s_shotWriting;
+    }
 
     VulkanFrontend::VulkanFrontend(RenderSize renderSize) : m_renderSize(renderSize) {}
     VulkanFrontend::~VulkanFrontend() = default;
@@ -523,7 +542,14 @@ namespace gh2
         vkResetFences(s.device.device, 1, &slot.done);
 
         ++s.presented;
-        const bool shot = s.shotEvery != 0u && !s.shotDir.empty() && s.presented % s.shotEvery == 0u;
+        std::string requested;
+        {
+            std::lock_guard<std::mutex> lock(s_shotMutex);
+            requested.swap(s_shotRequest);
+            s_shotWriting = !requested.empty();
+        }
+        const bool shot = !s.shotDir.empty() &&
+                          (!requested.empty() || (s.shotEvery != 0u && s.presented % s.shotEvery == 0u));
 
         VkCommandBuffer cmd = slot.cmd;
         vkResetCommandBuffer(cmd, 0);
@@ -576,7 +602,12 @@ namespace gh2
         if (shot)
         {
             vkWaitForFences(s.device.device, 1, &slot.done, VK_TRUE, UINT64_MAX);
-            s.writeShot();
+            s.writeShot(requested);
+        }
+        if (!requested.empty())
+        {
+            std::lock_guard<std::mutex> lock(s_shotMutex);
+            s_shotWriting = false;
         }
 
         s.slot = (s.slot + 1u) % kFramesInFlight;
