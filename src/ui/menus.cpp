@@ -30,5 +30,6 @@ namespace gh2
         script::runWhenUiReady(version.c_str());
         script::runWhenUiReady(kMainMenuDta);
         script::runWhenUiReady(kHighscorePanelDta);
+        script::runWhenUiReady(kSelCharacterDta);
     }
 }
