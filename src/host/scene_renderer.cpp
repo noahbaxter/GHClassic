@@ -414,12 +414,6 @@ namespace gh2
             return check(vkCreateRenderPass(device, &info, nullptr, &out), "render pass");
         }
 
-        // Clears to transparent black, as the GS reads memory nothing drew.
-        bool createTargetPass()
-        {
-            return createPass(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, targetPass);
-        }
-
         // A colour or depth attachment at `samples` that no one reads after
         // its pass: depth, and colour that resolves into another image.
         bool createAttachment(VkFormat format, VkImageUsageFlags usage, uint32_t w, uint32_t h, VkImage &image,
@@ -819,11 +813,6 @@ namespace gh2
             return module;
         }
 
-        bool createRenderPass()
-        {
-            return createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, renderPass);
-        }
-
         bool createLayout()
         {
             VkPushConstantRange range{VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
@@ -1071,8 +1060,9 @@ namespace gh2
         m_state->device = device;
         m_state->allocator = allocator;
         m_state->samples = samples;
-        return m_state->createRenderPass() && m_state->createTargetPass() && m_state->createDescriptorState() &&
-               m_state->createLayout();
+        return m_state->createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_state->renderPass) &&
+               m_state->createPass(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_state->targetPass) &&
+               m_state->createDescriptorState() && m_state->createLayout();
     }
 
     void SceneRenderer::shutdown()
@@ -1273,11 +1263,10 @@ namespace gh2
                 // scissor (0x19c504).
                 const float *rect = frame.cameras[draw.camera].rect;
                 VkViewport viewport{rect[0] * w, rect[1] * h, rect[2] * w, rect[3] * h, 0.0f, 1.0f};
-                const auto clamp01 = [](float v) { return v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v); };
-                const int32_t x0 = static_cast<int32_t>(clamp01(rect[0]) * w);
-                const int32_t y0 = static_cast<int32_t>(clamp01(rect[1]) * h);
-                const int32_t x1 = static_cast<int32_t>(clamp01(rect[0] + rect[2]) * w);
-                const int32_t y1 = static_cast<int32_t>(clamp01(rect[1] + rect[3]) * h);
+                const int32_t x0 = static_cast<int32_t>(std::clamp(rect[0], 0.0f, 1.0f) * w);
+                const int32_t y0 = static_cast<int32_t>(std::clamp(rect[1], 0.0f, 1.0f) * h);
+                const int32_t x1 = static_cast<int32_t>(std::clamp(rect[0] + rect[2], 0.0f, 1.0f) * w);
+                const int32_t y1 = static_cast<int32_t>(std::clamp(rect[1] + rect[3], 0.0f, 1.0f) * h);
                 VkRect2D scissor{{x0, y0}, {static_cast<uint32_t>(x1 > x0 ? x1 - x0 : 0),
                                             static_cast<uint32_t>(y1 > y0 ? y1 - y0 : 0)}};
                 vkCmdSetViewport(cmd, 0, 1, &viewport);
@@ -1328,6 +1317,7 @@ namespace gh2
         {
             if (!run.image)
                 continue;
+            // Transparent black, as the GS reads memory nothing drew.
             VkClearValue clears[2]{};
             clears[1].depthStencil = {0.0f, 0};
             VkRenderPassBeginInfo begin{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};

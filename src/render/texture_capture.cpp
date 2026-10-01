@@ -237,32 +237,27 @@ namespace gh2
             return hash;
         }
 
-        // The green fret icon in another colour: its fill (green 139) becomes
-        // `fill`, and its shading, carried by the green channel, scales it.
-        std::shared_ptr<const TextureData> tinted(const TextureData &green, const float (&fill)[3])
+        // The green fret icon in yellow: its fill (green 139) becomes yellow,
+        // and its shading, carried by the green channel, scales it.
+        void tintYellow(std::vector<uint8_t> &rgba)
         {
             constexpr float kGreenFill = 139.0f;
-            auto out = std::make_shared<TextureData>(green);
-            auto tint = [&](std::vector<uint8_t> &rgba)
+            constexpr float kYellowFill[3] = {222.0f, 201.0f, 62.0f};
+            for (size_t i = 0; i < rgba.size(); i += 4u)
             {
-                for (size_t i = 0; i < rgba.size(); i += 4u)
-                {
-                    const float shade = rgba[i + 1u] / kGreenFill;
-                    for (size_t c = 0; c < 3u; ++c)
-                        rgba[i + c] = static_cast<uint8_t>(std::min(255.0f, shade * fill[c]));
-                }
-            };
-            tint(out->rgba);
-            for (std::vector<uint8_t> &mip : out->mips)
-                tint(mip);
-            return out;
+                const float shade = rgba[i + 1u] / kGreenFill;
+                for (size_t c = 0; c < 3u; ++c)
+                    rgba[i + c] = static_cast<uint8_t>(std::min(255.0f, shade * kYellowFill[c]));
+            }
         }
-
-        constexpr float kYellowFill[3] = {222.0f, 201.0f, 62.0f};
 
         std::shared_ptr<const TextureData> yellowed(const TextureData &green)
         {
-            return tinted(green, kYellowFill);
+            auto out = std::make_shared<TextureData>(green);
+            tintYellow(out->rgba);
+            for (std::vector<uint8_t> &mip : out->mips)
+                tintYellow(mip);
+            return out;
         }
 
         // Textures a font draws with, by RndTex: found at RndText::DrawShowing
