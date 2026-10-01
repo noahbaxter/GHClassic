@@ -43,6 +43,10 @@ namespace gh2
             const std::string name = outfit.name;
             const std::string source = outfit.source;
             ark::rename("char/" + name + "/og/gen/" + name, *disc, "char/" + source + "/og/gen/" + source);
+            // The highway (track/surfaces/%s_keep.bmp) and photos go by
+            // outfit too.
+            ark::rename("track/surfaces/gen/" + name + "_keep", *disc, "track/surfaces/gen/" + source + "_keep");
+            outfits::photosFrom(name, *disc, source);
             // The 80s outfit replaced GH2's default one, so source also names
             // the outfit it is cached beside.
             outfits::add(outfit.character, name, source, outfit.label);

@@ -18,6 +18,10 @@ namespace gh2::outfits
     void add(const std::string &character, const std::string &outfit, const std::string &beside,
              const std::string &label);
 
+    // The outfit's photos (ui/image/og/photo_%s%i_keep.bmp, by outfit and
+    // index) as source's on that disc.
+    void photosFrom(const std::string &outfit, size_t disc, const std::string &source);
+
     // A label for one of config's own outfits that the locale doesn't name
     // (a one-outfit character's never showed in a picker).
     void label(const std::string &character, const std::string &outfit, const std::string &label);
