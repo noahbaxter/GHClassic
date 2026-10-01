@@ -20,6 +20,7 @@
 #include <iostream>
 #include <memory>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace gh2::ark
@@ -41,11 +42,41 @@ namespace gh2::ark
             uint32_t uncompressedSize;
         };
 
+        struct Disc
+        {
+            std::string serial; // as SYSTEM.CNF boots it, "SLUS_214.47"
+            std::unordered_map<std::string, Entry> files; // dir/name -> entry
+        };
+
+        // Paths under `as` are `source`'s on one disc, and nowhere else.
+        struct Rename
+        {
+            std::string as;
+            size_t disc;
+            std::string source;
+        };
+
         std::vector<std::unique_ptr<DiscImage>> s_added;
         std::vector<Part> s_parts;
-        // One per disc, searched in order: dir/name -> entry.
-        std::vector<std::unordered_map<std::string, Entry>> s_indexes;
+        std::vector<Disc> s_discs; // searched in order, the game disc first
+        std::vector<Rename> s_renames;
         uint32_t s_blockSizeAddress = 0u;
+
+        // The boot executable's name from SYSTEM.CNF's BOOT2 line.
+        std::string serialOf(DiscImage &disc)
+        {
+            DiscImage::Extent extent;
+            if (!disc.find("SYSTEM.CNF", extent))
+                return {};
+            std::string text(extent.size, '\0');
+            text.resize(disc.readExtent(extent, 0u, reinterpret_cast<uint8_t *>(text.data()), text.size()));
+            const size_t boot = text.find("BOOT2");
+            const size_t start = text.find('\\', boot);
+            const size_t end = text.find(';', start);
+            if (boot == std::string::npos || start == std::string::npos || end == std::string::npos)
+                return {};
+            return text.substr(start + 1u, end - start - 1u);
+        }
 
         uint32_t word(const std::vector<uint8_t> &data, size_t &at)
         {
@@ -131,9 +162,10 @@ namespace gh2::ark
                     offset -= partSizes[part++];
                 files[slotString(dir) + "/" + slotString(name)] = {firstPart + part, offset, size, uncompressedSize};
             }
-            std::cerr << "[ark] " << label << ": " << files.size() << " files in " << partCount << " part"
-                      << (partCount == 1u ? "" : "s") << std::endl;
-            s_indexes.push_back(std::move(files));
+            const std::string serial = serialOf(disc);
+            std::cerr << "[ark] " << label << " (" << serial << "): " << files.size() << " files in " << partCount
+                      << " part" << (partCount == 1u ? "" : "s") << std::endl;
+            s_discs.push_back({serial, std::move(files)});
             return true;
         }
 
@@ -153,6 +185,25 @@ namespace gh2::ark
 
         // Archive::GetFileInfo(this, path, &part, &offset, &size,
         // &uncompressedSize), true when found.
+        const Entry *find(const std::string &name)
+        {
+            for (const Rename &rename : s_renames)
+            {
+                if (name.compare(0u, rename.as.size(), rename.as) != 0)
+                    continue;
+                const auto &files = s_discs[rename.disc].files;
+                const auto it = files.find(rename.source + name.substr(rename.as.size()));
+                return it != files.end() ? &it->second : nullptr;
+            }
+            for (const Disc &disc : s_discs)
+            {
+                const auto it = disc.files.find(name);
+                if (it != disc.files.end())
+                    return &it->second;
+            }
+            return nullptr;
+        }
+
         void getFileInfo(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
             const uint32_t path = GPR_U32(ctx, 5);
@@ -160,15 +211,10 @@ namespace gh2::ark
             if (path != 0u)
             {
                 const std::string name = key(reinterpret_cast<const char *>(getMemPtr(rdram, path)));
-                for (const auto &files : s_indexes)
-                {
-                    const auto it = files.find(name);
-                    if (it != files.end())
-                    {
-                        found = &it->second;
-                        break;
-                    }
-                }
+                found = find(name);                // Retail asks only for files it has, so a miss is news.
+                static std::unordered_set<std::string> s_missed;
+                if (!found && s_missed.insert(name).second)
+                    std::cerr << "[ark] no file " << name << std::endl;
             }
             const Entry entry = found ? *found : Entry{};
             store<uint32_t>(rdram, GPR_U32(ctx, 6), entry.part);
@@ -231,6 +277,20 @@ namespace gh2::ark
         s_added.push_back(std::move(disc));
         return true;
     }
+
+    std::optional<size_t> discWithSerial(const std::string &serial)
+    {
+        for (size_t i = 0u; i < s_discs.size(); ++i)
+        {
+            if (s_discs[i].serial == serial)
+                return i;
+        }
+        return std::nullopt;
+    }
+
+    void rename(const std::string &as, size_t disc, const std::string &source)
+    {
+        s_renames.push_back({as, disc, source});    }
 
     void install(PS2Runtime &runtime, const Addresses &addresses)
     {
