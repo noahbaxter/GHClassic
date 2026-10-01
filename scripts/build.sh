@@ -52,6 +52,8 @@ if [ "$RECOMP" = 1 ]; then
   awk -v deny="stub_denylist = [$DENY]" '{ print } /^\[general\]$/ { print deny }' \
     "$RECOMP_DIR/gh2.toml" > "$RECOMP_DIR/gh2.toml.tmp"
   mv "$RECOMP_DIR/gh2.toml.tmp" "$RECOMP_DIR/gh2.toml"
+  grep -q '^stub_denylist = ' "$RECOMP_DIR/gh2.toml" ||
+    { echo "no [general] table in gh2.toml; the stub denylist was not applied" >&2; exit 1; }
 
   "$TOOLS/ps2xRecomp/ps2_recomp" "$RECOMP_DIR/gh2.toml" > "$RECOMP_DIR/recomp.log" 2>&1 ||
     { tail -20 "$RECOMP_DIR/recomp.log"; exit 1; }

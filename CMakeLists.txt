@@ -24,6 +24,11 @@ set(PS2X_BUILD_TEST OFF CACHE BOOL "" FORCE)
 set(PS2X_BUILD_STUDIO OFF CACHE BOOL "" FORCE)
 set(PS2X_ENABLE_DEBUG_UI OFF CACHE BOOL "" FORCE)
 
+# The runtime's logs are on upstream. With them on, song select misses a
+# press every run. Off unless asked for with -D.
+set(PS2X_ENABLE_RUNTIME_LOGS OFF CACHE BOOL "")
+set(PS2X_ENABLE_AGRESSIVE_LOGS OFF CACHE BOOL "")
+
 # A dev unit's 128MB rather than retail's 32MB. GH2 sizes its own heaps and
 # leaves the rest to libc, so the extra room keeps later additions out of
 # the out-of-memory paths retail runs close to.
