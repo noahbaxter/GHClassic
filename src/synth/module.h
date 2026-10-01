@@ -74,6 +74,7 @@ namespace gh2::synth
 
         int32_t allocVoice(int32_t core);
         void freeVoice(int32_t voice);
+        void freeAllVoices(); // in voice order
         void keyOn(int32_t voice);
         void setVolumePan(int32_t voice, int16_t volume, int16_t pan);
         void setPitch(int32_t voice, uint16_t pitch);
@@ -96,7 +97,6 @@ namespace gh2::synth
         Spu m_spu;
 
         // Command 0's SynthConfig.
-        uint32_t m_spuBlocks = 0;
         uint32_t m_slipMs = 0;
 
         std::array<VoiceState, Spu::kVoices> m_voiceState;

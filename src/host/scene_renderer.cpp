@@ -147,14 +147,6 @@ namespace gh2
             uint64_t lastUsed = 0;
         };
 
-        struct PackedVertex
-        {
-            float pos[3];
-            float normal[3];
-            float color[4];
-            float uv[2];
-        };
-
         struct GpuTexture
         {
             std::shared_ptr<const TextureData> source; // keeps the key alive
@@ -412,12 +404,6 @@ namespace gh2
             info.dependencyCount = 2;
             info.pDependencies = dependencies;
             return check(vkCreateRenderPass(device, &info, nullptr, &out), "render pass");
-        }
-
-        // Clears to transparent black, as the GS reads memory nothing drew.
-        bool createTargetPass()
-        {
-            return createPass(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, targetPass);
         }
 
         // A colour or depth attachment at `samples` that no one reads after
@@ -714,7 +700,12 @@ namespace gh2
             view.viewType = VK_IMAGE_VIEW_TYPE_2D;
             view.format = VK_FORMAT_R8G8B8A8_UNORM;
             view.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, levels, 0, 1};
-            check(vkCreateImageView(device, &view, nullptr, &gpu.view), "texture view");
+            if (!check(vkCreateImageView(device, &view, nullptr, &gpu.view), "texture view"))
+            {
+                vmaDestroyImage(allocator, gpu.image, gpu.memory);
+                vmaDestroyBuffer(allocator, gpu.staging, gpu.stagingMemory);
+                return nullptr;
+            }
 
             const VkDescriptorSetLayout layouts[2] = {setLayout, setLayout};
             VkDescriptorSetAllocateInfo setInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
@@ -814,11 +805,6 @@ namespace gh2
             return module;
         }
 
-        bool createRenderPass()
-        {
-            return createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, renderPass);
-        }
-
         bool createLayout()
         {
             VkPushConstantRange range{VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
@@ -852,12 +838,13 @@ namespace gh2
             stages[1].module = fragmentShader;
             stages[1].pName = "main";
 
-            VkVertexInputBindingDescription binding{0, sizeof(PackedVertex), VK_VERTEX_INPUT_RATE_VERTEX};
+            // Captured vertices upload as they are.
+            VkVertexInputBindingDescription binding{0, sizeof(Vertex), VK_VERTEX_INPUT_RATE_VERTEX};
             VkVertexInputAttributeDescription attributes[4] = {
-                {0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(PackedVertex, pos)},
-                {1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(PackedVertex, color)},
-                {2, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(PackedVertex, uv)},
-                {3, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(PackedVertex, normal)},
+                {0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, pos)},
+                {1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(Vertex, color)},
+                {2, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, uv)},
+                {3, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, normal)},
             };
             VkPipelineVertexInputStateCreateInfo vertexInput{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
             vertexInput.vertexBindingDescriptionCount = 1;
@@ -995,20 +982,12 @@ namespace gh2
             auto found = meshes.find(mesh.get());
             if (found == meshes.end())
             {
+                if (mesh->verts.empty() || mesh->indices.empty())
+                    return nullptr;
                 GpuMesh gpu;
                 gpu.source = mesh;
-                std::vector<PackedVertex> packed(mesh->verts.size());
-                for (size_t i = 0; i < packed.size(); ++i)
-                {
-                    std::memcpy(packed[i].pos, mesh->verts[i].pos, sizeof(packed[i].pos));
-                    std::memcpy(packed[i].normal, mesh->verts[i].normal, sizeof(packed[i].normal));
-                    std::memcpy(packed[i].color, mesh->verts[i].color, sizeof(packed[i].color));
-                    std::memcpy(packed[i].uv, mesh->verts[i].uv, sizeof(packed[i].uv));
-                }
-                if (packed.empty() || mesh->indices.empty())
-                    return nullptr;
-                if (!createBuffer(packed.data(), packed.size() * sizeof(PackedVertex), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                                  gpu.vertices, gpu.vertexMemory) ||
+                if (!createBuffer(mesh->verts.data(), mesh->verts.size() * sizeof(Vertex),
+                                  VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, gpu.vertices, gpu.vertexMemory) ||
                     !createBuffer(mesh->indices.data(), mesh->indices.size() * sizeof(uint16_t),
                                   VK_BUFFER_USAGE_INDEX_BUFFER_BIT, gpu.indices, gpu.indexMemory))
                     return nullptr;
@@ -1066,8 +1045,9 @@ namespace gh2
         m_state->device = device;
         m_state->allocator = allocator;
         m_state->samples = samples;
-        return m_state->createRenderPass() && m_state->createTargetPass() && m_state->createDescriptorState() &&
-               m_state->createLayout();
+        return m_state->createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_state->renderPass) &&
+               m_state->createPass(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_state->targetPass) &&
+               m_state->createDescriptorState() && m_state->createLayout();
     }
 
     void SceneRenderer::shutdown()
@@ -1268,11 +1248,10 @@ namespace gh2
                 // scissor (0x19c504).
                 const float *rect = frame.cameras[draw.camera].rect;
                 VkViewport viewport{rect[0] * w, rect[1] * h, rect[2] * w, rect[3] * h, 0.0f, 1.0f};
-                const auto clamp01 = [](float v) { return v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v); };
-                const int32_t x0 = static_cast<int32_t>(clamp01(rect[0]) * w);
-                const int32_t y0 = static_cast<int32_t>(clamp01(rect[1]) * h);
-                const int32_t x1 = static_cast<int32_t>(clamp01(rect[0] + rect[2]) * w);
-                const int32_t y1 = static_cast<int32_t>(clamp01(rect[1] + rect[3]) * h);
+                const int32_t x0 = static_cast<int32_t>(std::clamp(rect[0], 0.0f, 1.0f) * w);
+                const int32_t y0 = static_cast<int32_t>(std::clamp(rect[1], 0.0f, 1.0f) * h);
+                const int32_t x1 = static_cast<int32_t>(std::clamp(rect[0] + rect[2], 0.0f, 1.0f) * w);
+                const int32_t y1 = static_cast<int32_t>(std::clamp(rect[1] + rect[3], 0.0f, 1.0f) * h);
                 VkRect2D scissor{{x0, y0}, {static_cast<uint32_t>(x1 > x0 ? x1 - x0 : 0),
                                             static_cast<uint32_t>(y1 > y0 ? y1 - y0 : 0)}};
                 vkCmdSetViewport(cmd, 0, 1, &viewport);
@@ -1323,6 +1302,7 @@ namespace gh2
         {
             if (!run.image)
                 continue;
+            // Transparent black, as the GS reads memory nothing drew.
             VkClearValue clears[2]{};
             clears[1].depthStencil = {0.0f, 0};
             VkRenderPassBeginInfo begin{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};

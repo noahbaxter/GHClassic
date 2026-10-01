@@ -19,7 +19,6 @@
 #include "render/native_mat.h"
 
 #include <algorithm>
-#include <cstring>
 
 namespace gh2
 {
@@ -40,7 +39,6 @@ namespace gh2
 
     uint32_t currentCamera(uint8_t *rdram)
     {
-        Frame &frame = building();
         const uint32_t cam = load<uint32_t>(rdram, s_addresses->rndCamCurrent);
         Camera camera;
         camera.id = cam;
@@ -63,10 +61,7 @@ namespace gh2
                 camera.targetHeight = load<uint32_t>(rdram, camera.target + milo::tex::kHeight);
             }
         }
-        if (!frame.cameras.empty() && std::memcmp(&frame.cameras.back(), &camera, sizeof(Camera)) == 0)
-            return static_cast<uint32_t>(frame.cameras.size() - 1u);
-        frame.cameras.push_back(camera);
-        return static_cast<uint32_t>(frame.cameras.size() - 1u);
+        return internCamera(camera);
     }
 
     namespace
@@ -86,13 +81,19 @@ namespace gh2
             }
         }
 
+        // A transformable's world transform, through the engine's own WorldXfm.
+        Matrix worldXfm(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t transformable)
+        {
+            return readTransform(rdram, static_cast<uint32_t>(runtime->callGuestFunction(
+                                            rdram, ctx, s_addresses->worldXfm, {transformable})));
+        }
+
         // The bone palette DrawShowing uploads for a skinned mesh (0x3d8974):
         // each bone's bind transform, then its object's world. A missing bone
         // after the first repeats the first. The fifth matrix, which the
         // lighting programs take normals through, is identity when a second
         // bone exists, else the first bone's.
-        template <typename WorldXfm>
-        bool readBones(uint8_t *rdram, uint32_t bones, const WorldXfm &worldXfm, DrawCall &draw)
+        bool readBones(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t bones, DrawCall &draw)
         {
             bool several = false;
             for (uint32_t b = 0; b < milo::mesh::kBoneCount; ++b)
@@ -109,7 +110,7 @@ namespace gh2
                 several |= b != 0u;
                 const Matrix bind =
                     readTransform(rdram, bones + milo::mesh::kBoneBind + b * milo::mesh::kBoneBindStride);
-                draw.bones[b] = multiply(bind, worldXfm(object));
+                draw.bones[b] = multiply(bind, worldXfm(rdram, ctx, runtime, object));
             }
             draw.skinned = true;
             draw.blended = several;
@@ -129,18 +130,14 @@ namespace gh2
             const bool synced = load<uint32_t>(rdram, owner + milo::mesh::kPacket) != 0u;
             if (synced && geometry && !geometry->indices.empty())
             {
-                const auto worldXfm = [&](uint32_t transformable) {
-                    return readTransform(rdram, static_cast<uint32_t>(runtime->callGuestFunction(
-                                                    rdram, ctx, s_addresses->worldXfm, {transformable})));
-                };
                 DrawCall draw;
                 const uint32_t bones = load<uint32_t>(rdram, mesh + milo::mesh::kBones);
                 if (bones == 0u)
                 {
-                    draw.world = worldXfm(mesh + milo::mesh::kTransform);
+                    draw.world = worldXfm(rdram, ctx, runtime, mesh + milo::mesh::kTransform);
                     draw.lightWorld = draw.world;
                 }
-                else if (!readBones(rdram, bones, worldXfm, draw))
+                else if (!readBones(rdram, ctx, runtime, bones, draw))
                 {
                     ctx->pc = returnTo;
                     return;
@@ -171,9 +168,8 @@ namespace gh2
             if (synced && geometry && !geometry->indices.empty() && first != sentinel)
             {
                 // Retail asks for the camera's world on every draw (0x1a31d0).
-                const Matrix cameraWorld = readTransform(
-                    rdram, static_cast<uint32_t>(runtime->callGuestFunction(
-                               rdram, ctx, s_addresses->worldXfm, {load<uint32_t>(rdram, s_addresses->rndCamCurrent)})));
+                const Matrix cameraWorld =
+                    worldXfm(rdram, ctx, runtime, load<uint32_t>(rdram, s_addresses->rndCamCurrent));
                 const bool faceCamera = load<uint32_t>(rdram, mesh + milo::mesh::kInstanceMode) == milo::mesh::kFaceCamera;
                 DrawCall draw;
                 draw.mesh = std::move(geometry);

@@ -10,7 +10,7 @@ typedef struct VmaAllocator_T *VmaAllocator;
 
 namespace gh2
 {
-    // Draws a Frame's recorded draws into the guest-resolution target.
+    // Draws a Frame's recorded draws into a target image, at the size given.
     class SceneRenderer
     {
     public:

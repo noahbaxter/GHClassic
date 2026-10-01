@@ -28,6 +28,9 @@
 
 namespace gh2
 {
+    // The device is opened at the rate the SPU2 mixes at; nothing resamples.
+    static_assert(kAudioRate == synth::Spu::kRate);
+
     namespace
     {
         // The SID SynthEE binds in CtlClientInit (0x22db68), looping until

@@ -1,5 +1,7 @@
 #include "settings.h"
 
+#include "ini.h"
+
 #include <SDL3/SDL.h>
 
 #include <algorithm>
@@ -71,14 +73,6 @@ namespace gh2::settings
             return s_path.empty() ? userDataPath("settings.ini") : s_path;
         }
 
-        std::string trim(const std::string &s)
-        {
-            const size_t begin = s.find_first_not_of(" \t\r");
-            if (begin == std::string::npos)
-                return "";
-            return s.substr(begin, s.find_last_not_of(" \t\r") - begin + 1);
-        }
-
         bool parse(const Entry &entry, const std::string &text, int &out)
         {
             if (entry.type == Type::kBool && (text == "true" || text == "false"))
@@ -114,21 +108,21 @@ namespace gh2::settings
             while (std::getline(in, line))
             {
                 ++number;
-                line = trim(line);
-                if (line.empty() || line[0] == ';' || line[0] == '#')
+                line = ini::trim(line);
+                if (ini::skipped(line))
                     continue;
-                if (line.front() == '[' && line.back() == ']')
+                if (const auto name = ini::sectionName(line))
                 {
-                    section = line.substr(1, line.size() - 2);
+                    section = *name;
                     continue;
                 }
                 const size_t eq = line.find('=');
-                const std::string name = eq == std::string::npos ? "" : trim(line.substr(0, eq));
+                const std::string name = eq == std::string::npos ? "" : ini::trim(line.substr(0, eq));
                 const Entry *entry = std::find_if(std::begin(kEntries), std::end(kEntries), [&](const Entry &e) {
                     return section == e.section && name == e.name;
                 });
                 int value = 0;
-                if (entry == std::end(kEntries) || !parse(*entry, trim(line.substr(eq + 1)), value))
+                if (entry == std::end(kEntries) || !parse(*entry, ini::trim(line.substr(eq + 1)), value))
                 {
                     std::cerr << "[settings] " << file << ":" << number << ": ignored: " << line << std::endl;
                     continue;
@@ -146,15 +140,11 @@ namespace gh2::settings
             return s;
         }
 
-        // Every entry, set or not, so the file lists what can be set. Written
-        // beside the old file and renamed over it, so a failed write loses
-        // nothing.
+        // Every entry, set or not, so the file lists what can be set.
         void save()
         {
             const std::string file = path();
-            const std::string temp = file + ".tmp";
-            {
-                std::ofstream out(temp);
+            const std::error_code error = ini::writeReplacing(file, [](std::ofstream &out) {
                 const char *section = "";
                 for (int k = 0; k < kKeyCount; ++k)
                 {
@@ -169,16 +159,9 @@ namespace gh2::settings
                         << e.name << " = " << (e.type == Type::kBool ? (v ? "true" : "false") : std::to_string(v))
                         << "\n";
                 }
-                if (!out)
-                {
-                    std::cerr << "[settings] could not write " << temp << std::endl;
-                    return;
-                }
-            }
-            std::error_code error;
-            std::filesystem::rename(temp, file, error);
+            });
             if (error)
-                std::cerr << "[settings] could not replace " << file << ": " << error.message() << std::endl;
+                std::cerr << "[settings] could not write " << file << ": " << error.message() << std::endl;
         }
     }
 

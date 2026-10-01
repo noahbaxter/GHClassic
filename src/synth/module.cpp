@@ -1,5 +1,8 @@
 #include "synth/module.h"
 
+#include "synth/adpcm.h"
+#include "synth/fixed.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -11,7 +14,9 @@ namespace gh2::synth
 {
     namespace
     {
-        constexpr uint32_t kTickFrames = 240u; // 5 ms at 48 kHz
+        constexpr uint32_t kTickFrames = Spu::kRate / 200u; // 5 ms
+        constexpr int32_t kSpeedOne = 1000;      // speeds are in thousandths
+        constexpr int16_t kFullVolume = 0x7fff;
 
         // Stream buffers: an IOP ring per channel the EE fills on request, and
         // a ring of 2 KB blocks in sound RAM that the channel's voice loops
@@ -94,7 +99,7 @@ namespace gh2::synth
         // inverted gains, the rear positions. Centre is 180/255 each side.
         int32_t panGain(int32_t volume, int32_t p)
         {
-            const int32_t x = ((p % 1016) + 1016) % 1016;
+            const int32_t x = wrap(p, 1016);
             const int32_t q = x / 254;
             const int32_t r = x % 254;
             const std::array<int32_t, 255> &t = panCurve();
@@ -105,8 +110,8 @@ namespace gh2::synth
         // SD_VPARAM_PITCH for a rate at a speed in thousandths (0x5764).
         uint16_t pitchFor(uint32_t rate, int32_t speed)
         {
-            const int32_t base = static_cast<int32_t>(static_cast<uint64_t>(rate) * 4096u / 48000u);
-            return static_cast<uint16_t>(base * speed / 1000);
+            const int32_t base = static_cast<int32_t>(static_cast<uint64_t>(rate) * Spu::kPitchOne / Spu::kRate);
+            return static_cast<uint16_t>(base * speed / kSpeedOne);
         }
 
         std::vector<uint8_t> words(std::initializer_list<uint32_t> list)
@@ -126,12 +131,12 @@ namespace gh2::synth
         bool slip = false;
         int32_t state = kPriming;
 
-        int16_t volume = 0x7fff;
+        int16_t volume = kFullVolume;
         int16_t pan = 0;
         bool fx = false;
         int32_t core = -1;
-        int32_t speed = 1000;
-        int32_t slipSpeed = 1000;
+        int32_t speed = kSpeedOne;
+        int32_t slipSpeed = kSpeedOne;
         uint16_t adsr1 = kAdsr1, adsr2 = kAdsr2;
 
         std::deque<uint8_t> iop;
@@ -165,9 +170,9 @@ namespace gh2::synth
         uint32_t address = 0;
         uint32_t rate = 0;
         uint32_t startOffset = 0;
-        int16_t volume = 0x7fff;
+        int16_t volume = kFullVolume;
         int16_t pan = 0;
-        int32_t speed = 1000;
+        int32_t speed = kSpeedOne;
         uint16_t adsr1 = kAdsr1, adsr2 = kAdsr2;
         int32_t core = -1;
         int32_t voice = -1;
@@ -186,14 +191,12 @@ namespace gh2::synth
         m_spu.reset();
         m_streams.clear();
         m_samples.clear();
-        m_freeVoices.clear();
-        for (uint32_t v = 0; v < Spu::kVoices; ++v)
-            m_freeVoices.push_back(static_cast<int32_t>(v));
+        freeAllVoices();
         m_voiceState = {};
         m_keyOn.assign(Spu::kVoices, false);
         m_keyOff.assign(Spu::kVoices, false);
         m_voicesOnCore1 = false;
-        m_spuBlocks = m_slipMs = 0;
+        m_slipMs = 0;
         m_spuBlockUsed.clear();
         m_uploadDone = m_terminate = false;
         m_dataStream = m_dataChannel = -1;
@@ -229,7 +232,7 @@ namespace gh2::synth
             core = 1;
         for (auto it = m_freeVoices.begin(); it != m_freeVoices.end(); ++it)
         {
-            if (core < 0 || *it / 24 == core)
+            if (core < 0 || *it / static_cast<int32_t>(Spu::kVoicesPerCore) == core)
             {
                 const int32_t v = *it;
                 m_freeVoices.erase(it);
@@ -251,6 +254,13 @@ namespace gh2::synth
         else
             m_keyOff[voice] = true;
         m_freeVoices.push_back(voice);
+    }
+
+    void Module::freeAllVoices()
+    {
+        m_freeVoices.clear();
+        for (uint32_t v = 0; v < Spu::kVoices; ++v)
+            m_freeVoices.push_back(static_cast<int32_t>(v));
     }
 
     void Module::keyOn(int32_t voice)
@@ -326,11 +336,10 @@ namespace gh2::synth
         case 0x0: // SynthConfig {?, max samples, max streams, SPU blocks, ?, slip ms}
             if (len >= 24u)
             {
-                m_spuBlocks = u32(d, 12);
                 m_slipMs = u32(d, 20);
-                m_spuBlockUsed.assign(m_spuBlocks, false);
+                m_spuBlockUsed.assign(u32(d, 12), false);
             }
-            m_spu.setMasterVolume(0x7fffu >> 1, 0x7fffu >> 1);
+            m_spu.setMasterVolume(kFullVolume >> 1, kFullVolume >> 1);
             break;
         case 0x1: // Terminate, taken at the next tick
             m_terminate = true;
@@ -481,11 +490,11 @@ namespace gh2::synth
             for (uint32_t off = 0; off < len; ++off)
             {
                 uint8_t b = d[off];
-                if ((off & 15u) == 1u)
+                if (off % kAdpcmBlockBytes == 1u)
                 {
                     if (b & 0x80u)
                         ch.endOfData = true;
-                    b = 0x02u;
+                    b = kAdpcmRepeat;
                 }
                 ch.iop.push_back(b);
             }
@@ -595,7 +604,7 @@ namespace gh2::synth
             break;
         case 0x2c5: // {id, int byte offset}, for the next start
             if (Sample *s = sample(u32(d, 0)))
-                s->startOffset = u32(d, 4) & ~15u;
+                s->startOffset = u32(d, 4) / kAdpcmBlockBytes * kAdpcmBlockBytes;
             break;
         default:
             // 0x6 input FX and 0x12c..0x136 mics: nothing sounds from them.
@@ -650,7 +659,7 @@ namespace gh2::synth
             {
                 resume(ch.main);
                 setVolumePan(ch.main, ch.volume, ch.pan);
-                setPitch(ch.main, pitchFor(ch.rate, ch.speed * ch.slipSpeed / 1000));
+                setPitch(ch.main, pitchFor(ch.rate, ch.speed * ch.slipSpeed / kSpeedOne));
                 m_spu.setReverbSend(static_cast<uint32_t>(ch.main), ch.fx);
             }
             if (ch.slip && ch.reference >= 0)
@@ -682,7 +691,7 @@ namespace gh2::synth
         if (ch.state != kPlaying)
             return;
         if (ch.main >= 0)
-            setPitch(ch.main, pitchFor(ch.rate, ch.speed * ch.slipSpeed / 1000));
+            setPitch(ch.main, pitchFor(ch.rate, ch.speed * ch.slipSpeed / kSpeedOne));
         if (ch.slip && ch.reference >= 0)
             setPitch(ch.reference, pitchFor(ch.rate, ch.speed));
     }
@@ -697,7 +706,7 @@ namespace gh2::synth
             return;
         freeVoice(ch.main);
         ch.main = -1;
-        const uint32_t from = ch.readAt & ~15u;
+        const uint32_t from = ch.readAt / kAdpcmBlockBytes * kAdpcmBlockBytes;
         if (from < ch.base || from >= ch.base + ch.blocks * kBlockBytes)
             return;
         const int32_t ring = static_cast<int32_t>(ch.blocks * kBlockBytes);
@@ -705,8 +714,8 @@ namespace gh2::synth
         if (ch.link >= 0)
             at = static_cast<int32_t>(s.channels[static_cast<uint32_t>(ch.link)].target);
         else
-            at = static_cast<int32_t>(from - ch.base) + offset / 28 * 16;
-        at = ((at % ring) + ring) % ring;
+            at = static_cast<int32_t>(from - ch.base) + adpcmBytes(offset);
+        at = wrap(at, ring);
         ch.target = static_cast<uint32_t>(at);
         ch.main = keyChannel(ch, ch.base + ch.target);
         if (ch.main < 0)
@@ -718,8 +727,8 @@ namespace gh2::synth
     // 0x32a8: 16-byte lines played, from the NAX the last refill read.
     uint32_t Module::position(const Channel &ch) const
     {
-        const uint32_t ringLines = ch.blocks * (kBlockBytes / 16u);
-        int32_t lines = static_cast<int32_t>(ch.readAt - ch.base) >> 4;
+        const uint32_t ringLines = ch.blocks * (kBlockBytes / kAdpcmBlockBytes);
+        int32_t lines = static_cast<int32_t>(ch.readAt - ch.base) / static_cast<int32_t>(kAdpcmBlockBytes);
         if (lines < 0 || lines > static_cast<int32_t>(ringLines))
             lines = 0;
         return ch.laps * ringLines + static_cast<uint32_t>(lines);
@@ -737,13 +746,13 @@ namespace gh2::synth
         if (take < kBlockBytes)
         {
             for (uint32_t off = take; off < kBlockBytes; ++off)
-                block[off] = (off & 15u) == 1u ? 0x02u : 0x00u;
+                block[off] = off % kAdpcmBlockBytes == 1u ? kAdpcmRepeat : 0u;
             ++ch.padded;
         }
         if (ch.next == ch.blocks - 1u)
-            block[kBlockBytes - 16u + 1u] |= 0x01u;
+            block[kBlockBytes - kAdpcmBlockBytes + 1u] |= kAdpcmLoopEnd;
         if (ch.next == 0u)
-            block[1] |= 0x04u;
+            block[1] |= kAdpcmLoopStart;
         m_spu.write(ch.base + ch.next * kBlockBytes, block, kBlockBytes);
         ch.next = (ch.next + 1u) % ch.blocks;
     }
@@ -865,7 +874,7 @@ namespace gh2::synth
                     off -= ring;
                 else if (off < -ring / 2)
                     off += ring;
-                queue(kReplySlipOffset, {s.id, ch.index, static_cast<uint32_t>(off * 28 / 16)});
+                queue(kReplySlipOffset, {s.id, ch.index, static_cast<uint32_t>(adpcmSamples(off))});
             }
         }
     }
@@ -928,9 +937,7 @@ namespace gh2::synth
             m_samples.clear();
             for (uint32_t v = 0; v < Spu::kVoices; ++v)
                 m_spu.keyOff(v);
-            m_freeVoices.clear();
-            for (uint32_t v = 0; v < Spu::kVoices; ++v)
-                m_freeVoices.push_back(static_cast<int32_t>(v));
+            freeAllVoices();
             std::fill(m_spuBlockUsed.begin(), m_spuBlockUsed.end(), false);
             queue(kReplyTerminated);
         }

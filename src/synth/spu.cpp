@@ -1,6 +1,7 @@
 #include "synth/spu.h"
 
 #include "synth/adpcm.h"
+#include "synth/fixed.h"
 
 #include <algorithm>
 #include <cstring>
@@ -76,11 +77,6 @@ namespace gh2::synth
             22842, 22857, 22872, 22885, 22897, 22908, 22918, 22927,
             22935, 22942, 22948, 22953, 22957, 22960, 22962, 22963,
         };
-
-        int32_t clamp16(int32_t v)
-        {
-            return std::clamp(v, -32768, 32767);
-        }
 
         // A volume register's 15 bits, as the -0x8000..+0x7ffe it stands for.
         int32_t fixedVolume(uint16_t reg)
@@ -172,7 +168,7 @@ namespace gh2::synth
         v.nax = v.start;
         v.loopWritten = false;
         v.ended = false;
-        v.blockPos = 28u;
+        v.blockPos = kAdpcmBlockSamples;
         v.hist1 = v.hist2 = 0;
         std::fill(std::begin(v.fifo), std::end(v.fifo), int16_t{0});
         v.counter = 0u;
@@ -223,7 +219,7 @@ namespace gh2::synth
     // without the repeat flag stops the voice there.
     int16_t Spu::nextSample(Voice &v)
     {
-        if (v.blockPos == 28u)
+        if (v.blockPos == kAdpcmBlockSamples)
         {
             const uint8_t *block = m_ram.data() + v.nax;
             v.flags = block[1];
@@ -236,7 +232,7 @@ namespace gh2::synth
             v.blockPos = 0u;
         }
         const int16_t s = v.block[v.blockPos++];
-        if (v.blockPos == 28u)
+        if (v.blockPos == kAdpcmBlockSamples)
         {
             if (v.flags & kAdpcmLoopEnd)
             {
@@ -260,10 +256,10 @@ namespace gh2::synth
     int32_t Spu::sample(Voice &v)
     {
         const uint32_t i = (v.counter >> 4) & 0xffu;
-        int32_t out = (kGauss[0x0ff - i] * v.fifo[0]) >> 15;
-        out += (kGauss[0x1ff - i] * v.fifo[1]) >> 15;
-        out += (kGauss[0x100 + i] * v.fifo[2]) >> 15;
-        out += (kGauss[0x000 + i] * v.fifo[3]) >> 15;
+        int32_t out = mul15(kGauss[0x0ff - i], v.fifo[0]);
+        out += mul15(kGauss[0x1ff - i], v.fifo[1]);
+        out += mul15(kGauss[0x100 + i], v.fifo[2]);
+        out += mul15(kGauss[0x000 + i], v.fifo[3]);
         return out;
     }
 
@@ -311,7 +307,7 @@ namespace gh2::synth
 
     void Spu::mix(float *out, size_t frames)
     {
-        for (uint32_t core = 0; core < 2u; ++core)
+        for (uint32_t core = 0; core < kCores; ++core)
         {
             m_dry[core].assign(frames * 2u, 0);
             m_send[core].assign(frames * 2u, 0);
@@ -323,15 +319,15 @@ namespace gh2::synth
             Voice &v = m_voices[n];
             if (v.phase == Phase::kOff)
                 continue;
-            const uint32_t core = n / 24u;
+            const uint32_t core = n / kVoicesPerCore;
             int32_t *coreDry = m_dry[core].data();
             int32_t *send = m_send[core].data();
             const uint32_t step = std::min<uint32_t>(v.pitch, 0x3fffu);
             for (size_t f = 0; f < frames && v.phase != Phase::kOff; ++f)
             {
-                const int32_t s = (sample(v) * v.level) >> 15;
-                const int32_t l = (s * v.volL) >> 15;
-                const int32_t r = (s * v.volR) >> 15;
+                const int32_t s = mul15(sample(v), v.level);
+                const int32_t l = mul15(s, v.volL);
+                const int32_t r = mul15(s, v.volR);
                 coreDry[f * 2u] += l;
                 coreDry[f * 2u + 1u] += r;
                 if (v.reverbSend)
@@ -341,9 +337,9 @@ namespace gh2::synth
                 }
                 envelope(v);
                 v.counter += step;
-                while (v.counter >= 0x1000u && v.phase != Phase::kOff)
+                while (v.counter >= kPitchOne && v.phase != Phase::kOff)
                 {
-                    v.counter -= 0x1000u;
+                    v.counter -= kPitchOne;
                     v.fifo[0] = v.fifo[1];
                     v.fifo[1] = v.fifo[2];
                     v.fifo[2] = v.fifo[3];
@@ -352,7 +348,7 @@ namespace gh2::synth
             }
         }
 
-        for (uint32_t core = 0; core < 2u; ++core)
+        for (uint32_t core = 0; core < kCores; ++core)
             if (m_reverb[core].active())
                 m_reverb[core].process(m_send[core].data(), m_wet[core].data(), frames);
         for (size_t f = 0; f < frames; ++f)
@@ -361,10 +357,10 @@ namespace gh2::synth
             {
                 const int32_t master = c == 0u ? m_masterL : m_masterR;
                 int32_t sum = 0;
-                for (uint32_t core = 0; core < 2u; ++core)
+                for (uint32_t core = 0; core < kCores; ++core)
                 {
                     const int32_t in = clamp16(m_dry[core][f * 2u + c] + m_wet[core][f * 2u + c]);
-                    sum += (in * master) >> 15;
+                    sum += mul15(in, master);
                 }
                 out[f * 2u + c] += clamp16(sum) / 32768.0f;
             }

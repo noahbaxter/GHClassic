@@ -26,31 +26,16 @@
 #include "render/frame.h"
 #include "render/native_mat.h"
 
-#include <cstring>
 #include <memory>
 
 namespace gh2
 {
     namespace
     {
-        constexpr uint32_t kRndWidth = 0x40u;  // Rnd: the frame's width in pixels
-        constexpr uint32_t kRndHeight = 0x44u; // and height
-
         void readColor(uint8_t *rdram, uint32_t address, float out[4])
         {
             for (uint32_t i = 0; i < 4; ++i)
                 out[i] = load<float>(rdram, address + i * 4u);
-        }
-
-        // A camera that covers the whole screen, for draws already in clip space.
-        uint32_t screenCamera()
-        {
-            Frame &frame = building();
-            Camera camera;
-            if (!frame.cameras.empty() && std::memcmp(&frame.cameras.back(), &camera, sizeof(Camera)) == 0)
-                return static_cast<uint32_t>(frame.cameras.size() - 1u);
-            frame.cameras.push_back(camera);
-            return static_cast<uint32_t>(frame.cameras.size() - 1u);
         }
 
         void drawRect(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
@@ -63,8 +48,8 @@ namespace gh2
             const uint32_t color2 = GPR_U32(ctx, 8);
             const uint32_t color3 = GPR_U32(ctx, 9);
 
-            const float width = static_cast<float>(load<int32_t>(rdram, rnd + kRndWidth));
-            const float height = static_cast<float>(load<int32_t>(rdram, rnd + kRndHeight));
+            const float width = static_cast<float>(load<int32_t>(rdram, rnd + milo::rnd::kWidth));
+            const float height = static_cast<float>(load<int32_t>(rdram, rnd + milo::rnd::kHeight));
             const float x = load<float>(rdram, rect + 0x0u);
             const float y = load<float>(rdram, rect + 0x4u);
             const float w = load<float>(rdram, rect + 0x8u);
@@ -118,7 +103,7 @@ namespace gh2
             DrawCall draw;
             draw.mesh = mesh;
             draw.screen = true;
-            draw.camera = screenCamera();
+            draw.camera = internCamera(Camera{}); // the whole screen: the verts are in clip space
             draw.world = identity();
             draw.lightWorld = identity();
             if (mat == 0u)

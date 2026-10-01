@@ -40,7 +40,7 @@ namespace gh2::input
         }
 
         // A Wii guitar through a raphnet WUSBMote v2.2, as bound on real
-        // hardware for ghpc. The adapter has no tilt sensor.
+        // hardware. The adapter has no tilt sensor.
         Profile raphnetWiiGuitar()
         {
             return make({
