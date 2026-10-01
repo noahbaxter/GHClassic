@@ -46,17 +46,38 @@ namespace milo
     };
     static_assert(sizeof(Transform) == 0x40);
 
+    // Hmx::Color.
+    struct Color
+    {
+        float rgba[4];
+    };
+    static_assert(sizeof(Color) == 0x10);
+
+    // Hmx::Rect.
+    struct Rect
+    {
+        float x, y, w, h;
+    };
+    static_assert(sizeof(Rect) == 0x10);
+
     struct RndTex;
+
     // Rnd, the renderer. PsRnd::SwapBuffers clears with the clear colour
     // (0x19ad44) and reads the size (0x19ad84, 0x19ad7c); Rnd::YRatio
     // (0x1d4c20) looks the aspect index up in {1, 0.75, 0.5625}.
-    namespace rnd
+    struct Rnd
     {
-        constexpr uint32_t kClearColor = 0x30u; // Hmx::Color, 4 floats
-        constexpr uint32_t kWidth = 0x40u;      // the frame's width in pixels
-        constexpr uint32_t kHeight = 0x44u;     // and height
-        constexpr uint32_t kAspect = 0xd4u;     // index
-    }
+        uint8_t unk0[0x30];
+        Color clearColor;
+        int32_t width;   // the frame's, in pixels
+        int32_t height;
+        uint8_t unk48[0x8c];
+        uint32_t aspect; // index
+    };
+    static_assert(offsetof(Rnd, clearColor) == 0x30);
+    static_assert(offsetof(Rnd, width) == 0x40);
+    static_assert(offsetof(Rnd, height) == 0x44);
+    static_assert(offsetof(Rnd, aspect) == 0xd4);
 
     // RndTransformable: local transform at +0x20, world at +0x60. A
     // transform is three 16-byte rows then the position.
@@ -116,7 +137,7 @@ namespace milo
         uint8_t unk0[0x28];
         uint32_t intensify;  // bool: textured colour scale 255, not 128
         Blend blend;
-        float color[4];
+        Color color;
         uint32_t useEnviron; // bool: lit by the current environ
         ZMode zMode;
         TexGen texGen;

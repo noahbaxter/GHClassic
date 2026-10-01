@@ -10,6 +10,9 @@
 #include "ps2_runtime_macros.h"
 #include "render/frame.h"
 
+#include <algorithm>
+#include <iterator>
+
 namespace gh2
 {
     namespace
@@ -22,24 +25,20 @@ namespace gh2
 
         void onBeginDrawing(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
-            const uint32_t rnd = GPR_U32(ctx, 4);
+            const auto rnd = load<milo::Rnd>(rdram, GPR_U32(ctx, 4));
             Frame &frame = building();
             const uint64_t serial = frame.serial + 1u;
             frame = Frame{};
             frame.serial = serial;
-            for (uint32_t i = 0; i < 4; ++i)
-                frame.clear[i] = load<float>(rdram, rnd + milo::rnd::kClearColor + i * 4u);
-            const int32_t width = load<int32_t>(rdram, rnd + milo::rnd::kWidth);
-            const int32_t height = load<int32_t>(rdram, rnd + milo::rnd::kHeight);
-            if (width > 0 && height > 0)
+            std::copy(std::begin(rnd.clearColor.rgba), std::end(rnd.clearColor.rgba), frame.clear);
+            if (rnd.width > 0 && rnd.height > 0)
             {
-                frame.width = static_cast<uint32_t>(width);
-                frame.height = static_cast<uint32_t>(height);
+                frame.width = static_cast<uint32_t>(rnd.width);
+                frame.height = static_cast<uint32_t>(rnd.height);
             }
-            const uint32_t aspect = load<uint32_t>(rdram, rnd + milo::rnd::kAspect);
-            if (aspect < 3u)
-                frame.yRatio = kYRatios[aspect];
-            frame.displayAspect = aspect == kAspectWidescreen ? 16.0f / 9.0f : 4.0f / 3.0f;
+            if (rnd.aspect < 3u)
+                frame.yRatio = kYRatios[rnd.aspect];
+            frame.displayAspect = rnd.aspect == kAspectWidescreen ? 16.0f / 9.0f : 4.0f / 3.0f;
         }
 
         // Every draw of the frame has been recorded by the time EndDrawing

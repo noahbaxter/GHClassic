@@ -29,65 +29,46 @@
 #include <algorithm>
 #include <iterator>
 #include <memory>
+#include <optional>
 
 namespace gh2
 {
     namespace
     {
-        void readColor(uint8_t *rdram, uint32_t address, float out[4])
-        {
-            for (uint32_t i = 0; i < 4; ++i)
-                out[i] = load<float>(rdram, address + i * 4u);
-        }
-
         void drawRect(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
             const uint32_t returnTo = GPR_U32(ctx, 31);
-            const uint32_t rnd = GPR_U32(ctx, 4);
-            const uint32_t rect = GPR_U32(ctx, 5);
+            const auto rnd = load<milo::Rnd>(rdram, GPR_U32(ctx, 4));
+            const auto rect = load<milo::Rect>(rdram, GPR_U32(ctx, 5));
             const uint32_t color = GPR_U32(ctx, 6);
             const uint32_t mat = GPR_U32(ctx, 7);
             const uint32_t color2 = GPR_U32(ctx, 8);
             const uint32_t color3 = GPR_U32(ctx, 9);
 
-            const float width = static_cast<float>(load<int32_t>(rdram, rnd + milo::rnd::kWidth));
-            const float height = static_cast<float>(load<int32_t>(rdram, rnd + milo::rnd::kHeight));
-            const float x = load<float>(rdram, rect + 0x0u);
-            const float y = load<float>(rdram, rect + 0x4u);
-            const float w = load<float>(rdram, rect + 0x8u);
-            const float h = load<float>(rdram, rect + 0xcu);
+            const float width = static_cast<float>(rnd.width);
+            const float height = static_cast<float>(rnd.height);
             if (width <= 0.0f || height <= 0.0f)
             {
                 ctx->pc = returnTo;
                 return;
             }
 
-            const milo::RndMat material = mat != 0u ? load<milo::RndMat>(rdram, mat) : milo::RndMat{};
-            float corner[4][4];
-            if (mat != 0u && material.prelit == 0u)
-            {
-                for (auto &c : corner)
-                    std::copy(std::begin(material.color), std::end(material.color), c);
-            }
+            const auto material = mat != 0u ? std::optional(load<milo::RndMat>(rdram, mat)) : std::nullopt;
+            milo::Color corner[4];
+            if (material && material->prelit == 0u)
+                std::fill(std::begin(corner), std::end(corner), material->color);
             else
             {
-                for (auto &c : corner)
-                    readColor(rdram, color, c);
+                std::fill(std::begin(corner), std::end(corner), load<milo::Color>(rdram, color));
                 if (color2 != 0u)
-                {
-                    readColor(rdram, color2, corner[2]);
-                    readColor(rdram, color2, corner[3]);
-                }
+                    corner[2] = corner[3] = load<milo::Color>(rdram, color2);
                 else if (color3 != 0u)
-                {
-                    readColor(rdram, color3, corner[1]);
-                    readColor(rdram, color3, corner[3]);
-                }
+                    corner[1] = corner[3] = load<milo::Color>(rdram, color3);
             }
 
             auto mesh = std::make_shared<MeshData>();
-            const float px[4] = {x, x, x + w, x + w};
-            const float py[4] = {y, y + h, y, y + h};
+            const float px[4] = {rect.x, rect.x, rect.x + rect.w, rect.x + rect.w};
+            const float py[4] = {rect.y, rect.y + rect.h, rect.y, rect.y + rect.h};
             const float uv[4][2] = {{0.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}};
             for (int i = 0; i < 4; ++i)
             {
@@ -96,7 +77,7 @@ namespace gh2
                 v.pos[1] = py[i] / height * 2.0f - 1.0f;
                 v.pos[2] = 1.0f; // Z 0xffff: the nearest
                 for (int c = 0; c < 4; ++c)
-                    v.color[c] = corner[i][c];
+                    v.color[c] = corner[i].rgba[c];
                 v.uv[0] = uv[i][0];
                 v.uv[1] = uv[i][1];
                 mesh->verts.push_back(v);

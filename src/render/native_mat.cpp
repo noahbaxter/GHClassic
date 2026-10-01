@@ -75,7 +75,7 @@ namespace gh2
         Material m;
         m.blend = mat.blend;
         m.zMode = mat.zMode;
-        std::copy(std::begin(mat.color), std::end(mat.color), m.color);
+        std::copy(std::begin(mat.color.rgba), std::end(mat.color.rgba), m.color);
         m.intensify = mat.intensify != 0u;
         m.alphaCut = mat.alphaCut != 0u;
         m.texWrap = mat.texWrap != 0u;
