@@ -13,7 +13,6 @@ sometimes merges two functions into one, which then matches nothing, so
 figures involving a stripped ELF are lower bounds. Functions under four
 instructions are left out as too generic to mean anything.
 """
-import hashlib
 import sys
 
 import disc
@@ -23,7 +22,7 @@ MIN_WORDS = 4
 
 
 def profile(label, data):
-    elf, sections, headers, name_at = ms.parse_elf(data)
+    sections, headers, name_at = ms.parse_elf(data)
     entry = ms.entry_point(data)
     code = ms.code_words(data, sections)
     words = dict(code)
@@ -48,8 +47,7 @@ def profile(label, data):
         key = hash(tuple(body))
         bodies[key] = bodies.get(key, 0) + 4 * len(body)
 
-    sha1 = hashlib.sha1(data).hexdigest()
-    known = disc.lookup(sha1)
+    sha1, known = disc.identify_bytes(data)
     return {
         "label": label,
         "name": known["name"] if known else "unknown",

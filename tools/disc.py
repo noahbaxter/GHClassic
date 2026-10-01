@@ -225,6 +225,12 @@ def lookup(sha1):
     return next((e for e in known() if e["sha1"] == sha1), None)
 
 
+def identify_bytes(data):
+    """An executable's SHA-1 and its known entry, or None."""
+    sha1 = hashlib.sha1(data).hexdigest()
+    return sha1, lookup(sha1)
+
+
 def release(boot_name):
     """The release a boot executable belongs to, from the serial in its name:
     SLUS_214.47 is SLUS-21447."""
@@ -234,6 +240,14 @@ def release(boot_name):
 
 def is_image(path):
     return Path(path).suffix.lower() in IMAGE_SUFFIXES
+
+
+def load_elf(path):
+    """An ELF file, or the boot executable of a disc image."""
+    if is_image(path):
+        with Image(path) as img:
+            return img.read(img.boot_name())
+    return Path(path).read_bytes()
 
 
 def executables_in(path):
@@ -257,8 +271,7 @@ def identify(paths, image_hash=False):
             else:
                 print(f"{Path(path).name}: not a known Guitar Hero release")
         for label, data in executables_in(path):
-            sha1 = hashlib.sha1(data).hexdigest()
-            entry = lookup(sha1)
+            sha1, entry = identify_bytes(data)
             name = entry["name"] if entry else "UNKNOWN"
             print(f"  {sha1}  {len(data):>9}  {name:<16} {label}")
         if image_hash and is_image(path):
@@ -299,8 +312,8 @@ def boot_elf(image, out):
     if not rel or rel.get("role") != "engine":
         what = f"{rel['name']} v{rel['version']}" if rel else name
         sys.exit(f"{image}: {what} is not the engine disc (Guitar Hero II (USA))")
-    sha1 = hashlib.sha1(data).hexdigest()
-    if not lookup(sha1):
+    sha1, entry = identify_bytes(data)
+    if not entry:
         sys.exit(f"{image}: {name} has SHA-1 {sha1}, not the known retail executable; "
                  "the dump may be damaged or modified")
     Path(out).write_bytes(data)

@@ -13,6 +13,7 @@ import struct
 import sys
 from pathlib import Path
 
+import disc
 import match_symbols as ms
 
 STB_GLOBAL, STT_FUNC = 1, 2
@@ -32,8 +33,8 @@ def align(buf, n):
     buf.extend(b"\0" * (-len(buf) % n))
 
 
-def symbolize(elf, names):
-    data, sections, headers, _ = ms.parse_elf(elf)
+def symbolize(data, names):
+    sections, headers, _ = ms.parse_elf(data)
     if ".symtab" in sections:
         raise ValueError("ELF already has a symbol table")
     code = ms.code_words(data, sections)
@@ -57,7 +58,6 @@ def symbolize(elf, names):
 
     # New .shstrtab with the two names added, then .strtab, .symtab and a
     # section header table, all appended after the original contents.
-    shoff, = struct.unpack_from("<I", data, 0x20)
     shnum, shstrndx = struct.unpack_from("<HH", data, 0x30)
     old_shstr = headers[shstrndx]
     shstr = bytearray(data[old_shstr[4]:old_shstr[4] + old_shstr[5]])
@@ -99,7 +99,7 @@ def symbolize(elf, names):
 def main():
     if len(sys.argv) != 4:
         sys.exit(__doc__)
-    elf = ms.load_elf(sys.argv[1])
+    elf = disc.load_elf(sys.argv[1])
     out, named, total = symbolize(elf, read_symbols(sys.argv[2]))
     Path(sys.argv[3]).write_bytes(out)
     print(f"{total} functions, {named} named, {total - named} func_XXXXXXXX")

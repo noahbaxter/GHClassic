@@ -32,7 +32,6 @@ import random
 import struct
 import sys
 from collections import Counter, defaultdict
-from pathlib import Path
 
 import disc
 
@@ -66,7 +65,7 @@ def parse_elf(data):
         return data[table_off + off:end].decode("latin-1")
 
     sections = {name_at(strtab_off, h[0]): h for h in headers}
-    return data, sections, headers, name_at
+    return sections, headers, name_at
 
 
 def code_sections(sections):
@@ -242,9 +241,9 @@ def longest_increasing(pairs):
 
 
 class Matcher:
-    def __init__(self, debug_elf, retail_elf):
-        d_data, d_secs, d_hdrs, d_name = parse_elf(debug_elf)
-        r_data, r_secs, _, _ = parse_elf(retail_elf)
+    def __init__(self, d_data, r_data):
+        d_secs, d_hdrs, d_name = parse_elf(d_data)
+        r_secs, _, _ = parse_elf(r_data)
         self.d_secs, self.r_secs = d_secs, r_secs
         self.d_data, self.r_data = d_data, r_data
         self.funcs = debug_functions(d_data, d_secs, d_hdrs, d_name)
@@ -412,14 +411,6 @@ def write_symbols(m, path):
         f.writelines(f"{r:08x} {named[r]}\n" for r in sorted(named))
 
 
-def load_elf(path):
-    """An ELF file, or the boot executable of a disc image."""
-    if disc.is_image(path):
-        with disc.Image(path) as img:
-            return img.read(img.boot_name())
-    return Path(path).read_bytes()
-
-
 def string_literals(words, data, sections):
     """C strings a function builds with lui/addiu into .rodata."""
     _, _, _, ro_addr, ro_off, ro_size, *_ = sections[".rodata"]
@@ -477,7 +468,7 @@ def main():
     args = [a for a in sys.argv[1:] if a != "--check"]
     if len(args) < 2:
         sys.exit(__doc__)
-    m = Matcher(load_elf(args[0]), load_elf(args[1]))
+    m = Matcher(disc.load_elf(args[0]), disc.load_elf(args[1]))
     rounds = m.run()
     report(m, rounds)
     if "--check" in sys.argv:
