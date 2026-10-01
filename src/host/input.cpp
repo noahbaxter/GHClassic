@@ -116,11 +116,6 @@ namespace gh2
             SDL_free(ids);
         }
 
-        float axisValue(Sint16 v)
-        {
-            return v < 0 ? v / 32768.0f : v / 32767.0f;
-        }
-
         float travel(float value, const Source &s)
         {
             return std::clamp((value - s.rest) / (s.full - s.rest), 0.0f, 1.0f);

@@ -53,11 +53,6 @@ namespace gh2
 
         SDL_Window *s_window = nullptr;
 
-        float axisValue(Sint16 v)
-        {
-            return v < 0 ? v / 32768.0f : v / 32767.0f;
-        }
-
         Snapshot read(SDL_Joystick *joy)
         {
             Snapshot s;

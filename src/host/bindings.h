@@ -59,6 +59,12 @@ namespace gh2::input
         float full = 1.0f;  // axes: the value fully pressed
     };
 
+    // An SDL axis reading as -1..1, the scale rest and full are in.
+    inline float axisValue(int16_t v)
+    {
+        return v < 0 ? v / 32768.0f : v / 32767.0f;
+    }
+
     std::optional<Source> parseSource(const std::string &text);
     std::string formatSource(const Source &source);
 
