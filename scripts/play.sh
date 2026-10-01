@@ -3,10 +3,11 @@
 #
 #   scripts/play.sh [--no-build] [disc] [GHClassic options, e.g. --res native]
 #
-# Brings the binary up to date first (the C++ build only, not the recompile;
-# a no-op when nothing changed), unless --no-build. The memory card lives in the user data directory and persists between
-# runs. The first run seeds it from ghpc's card, so both boot the same save.
-# The disc defaults to the GH2 image in game/.
+# The first run does the whole build (scripts/build.sh) from the disc. After
+# that it brings the binary up to date first (the C++ build only, not the
+# recompile; a no-op when nothing changed), unless --no-build. The memory
+# card lives in the user data directory and persists between runs. The disc
+# defaults to the GH2 image in game/.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -26,7 +27,18 @@ if [ "${1:-}" = "--no-build" ]; then
   shift
 fi
 
-if [ "$BUILD" = 1 ]; then
+DISC=""
+if [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; then
+  DISC="$1"
+  shift
+fi
+[ -n "$DISC" ] || DISC="$(python3 "$ROOT/tools/disc.py" find SLUS-21447 "$ROOT"/game/*)"
+
+if [ ! -f "$ELF" ] || [ ! -x "$BIN" ]; then
+  # First run: the whole build, recompile included.
+  [ "$BUILD" = 1 ] || { echo "no build; run scripts/build.sh" >&2; exit 1; }
+  "$ROOT/scripts/build.sh" "$DISC"
+elif [ "$BUILD" = 1 ]; then
   LOG="$(mktemp)"
   if ! cmake --build "$ROOT/build/game" > "$LOG" 2>&1; then
     cat "$LOG" >&2
@@ -35,18 +47,7 @@ if [ "$BUILD" = 1 ]; then
   fi
   rm -f "$LOG"
 fi
-[ -x "$BIN" ] && [ -f "$ELF" ] || { echo "no build; run scripts/build.sh" >&2; exit 1; }
-DISC=""
-if [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; then
-  DISC="$1"
-  shift
-fi
-[ -n "$DISC" ] || DISC="$(python3 "$ROOT/tools/disc.py" find SLUS-21447 "$ROOT"/game/*)"
 
-if [ ! -d "$CARD" ]; then
-  mkdir -p "$CARD"
-  GHPC_CARD="$ROOT/../ghpc/work/mc0"
-  [ -d "$GHPC_CARD" ] && cp -Rp "$GHPC_CARD/." "$CARD/"
-fi
+mkdir -p "$CARD"
 
 exec "$BIN" "$ELF" "$DISC" --mc "$CARD" "$@"
