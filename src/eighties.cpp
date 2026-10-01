@@ -1,11 +1,10 @@
 // The 80s guitarists are GH2's characters in new outfits, built on the same
 // rigs (every anim but goth1_main is byte-identical), and they sit at GH2's
 // outfit paths. Each goes in under a name of its own as one more outfit of
-// its character, served from the 80s disc.
+// its character, served from the 80s disc and playing GH2's anims.
 //
 // An outfit loads char/<outfit>/og/<outfit>.milo (AddLoadChar, 0x128778),
-// with _ui and _horse beside it, and finds its anims by a path relative to
-// itself: ../../anims/ for 80s punk1, ../../../goth1/anims/ for 80s goth2.
+// with _ui and _horse beside it.
 
 #include "eighties.h"
 
@@ -44,7 +43,6 @@ namespace gh2
             const std::string name = outfit.name;
             const std::string source = outfit.source;
             ark::rename("char/" + name + "/og/gen/" + name, *disc, "char/" + source + "/og/gen/" + source);
-            ark::rename("char/" + name + "/anims/", *disc, "char/" + source + "/anims/");
             // The 80s outfit replaced GH2's default one, so source also names
             // the outfit it is cached beside.
             outfits::add(outfit.character, name, source, outfit.label);

@@ -1,11 +1,14 @@
 #include "outfits.h"
 
+#include "disc/ark.h"
 #include "hook.h"
+#include "milo/milo.h"
 #include "script.h"
 
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
 
+#include <iostream>
 #include <set>
 #include <unordered_set>
 
@@ -53,6 +56,24 @@ namespace gh2::outfits
     void add(const std::string &character, const std::string &outfit, const std::string &beside,
              const std::string &label)
     {
+        // The picker hands the playing clips from one outfit's driver to the
+        // next (CharDriver::Transfer, 0x170db0), so they must share beside's
+        // clip set, as metal2 shares metal1's: the same anims, by one path.
+        for (const char *suffix : {"", "_ui", "_horse"})
+        {
+            const std::string path = "char/" + outfit + "/og/gen/" + outfit + suffix + ".milo_ps2";
+            const auto file = ark::readFile(path);
+            const auto raw = file ? milo::inflate(*file) : std::nullopt;
+            auto dir = raw ? milo::parse(*raw) : std::nullopt;
+            if (!dir)
+            {
+                std::cerr << "[outfits] cannot read " << path << std::endl;
+                continue;
+            }
+            milo::replacePrefix(*dir, "../../anims/", "../../../" + beside + "/anims/");
+            ark::addFile(path, milo::write(*dir));
+        }
+
         s_config += "{push_back {find $syscfg characters " + character + "} (" + outfit + " (name \"" + label +
                     "\"))}\n";
         // Panels can share one list, so only once, and only where beside is.
