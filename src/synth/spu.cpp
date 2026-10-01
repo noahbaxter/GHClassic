@@ -307,7 +307,7 @@ namespace gh2::synth
 
     void Spu::mix(float *out, size_t frames)
     {
-        for (uint32_t core = 0; core < 2u; ++core)
+        for (uint32_t core = 0; core < kCores; ++core)
         {
             m_dry[core].assign(frames * 2u, 0);
             m_send[core].assign(frames * 2u, 0);
@@ -319,7 +319,7 @@ namespace gh2::synth
             Voice &v = m_voices[n];
             if (v.phase == Phase::kOff)
                 continue;
-            const uint32_t core = n / 24u;
+            const uint32_t core = n / kVoicesPerCore;
             int32_t *coreDry = m_dry[core].data();
             int32_t *send = m_send[core].data();
             const uint32_t step = std::min<uint32_t>(v.pitch, 0x3fffu);
@@ -337,9 +337,9 @@ namespace gh2::synth
                 }
                 envelope(v);
                 v.counter += step;
-                while (v.counter >= 0x1000u && v.phase != Phase::kOff)
+                while (v.counter >= kPitchOne && v.phase != Phase::kOff)
                 {
-                    v.counter -= 0x1000u;
+                    v.counter -= kPitchOne;
                     v.fifo[0] = v.fifo[1];
                     v.fifo[1] = v.fifo[2];
                     v.fifo[2] = v.fifo[3];
@@ -348,7 +348,7 @@ namespace gh2::synth
             }
         }
 
-        for (uint32_t core = 0; core < 2u; ++core)
+        for (uint32_t core = 0; core < kCores; ++core)
             if (m_reverb[core].active())
                 m_reverb[core].process(m_send[core].data(), m_wet[core].data(), frames);
         for (size_t f = 0; f < frames; ++f)
@@ -357,7 +357,7 @@ namespace gh2::synth
             {
                 const int32_t master = c == 0u ? m_masterL : m_masterR;
                 int32_t sum = 0;
-                for (uint32_t core = 0; core < 2u; ++core)
+                for (uint32_t core = 0; core < kCores; ++core)
                 {
                     const int32_t in = clamp16(m_dry[core][f * 2u + c] + m_wet[core][f * 2u + c]);
                     sum += mul15(in, master);

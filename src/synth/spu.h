@@ -21,7 +21,11 @@ namespace gh2::synth
     {
     public:
         static constexpr uint32_t kRamBytes = 2u * 1024u * 1024u;
-        static constexpr uint32_t kVoices = 48u; // 0..23 core 0, 24..47 core 1
+        static constexpr uint32_t kRate = 48000u; // Hz
+        static constexpr uint32_t kCores = 2u;
+        static constexpr uint32_t kVoicesPerCore = 24u;
+        static constexpr uint32_t kVoices = kCores * kVoicesPerCore; // core 0's first
+        static constexpr uint32_t kPitchOne = 0x1000u; // a pitch of one sample per output frame
 
         Spu();
 
@@ -90,10 +94,10 @@ namespace gh2::synth
         std::vector<uint8_t> m_ram;
         std::array<Voice, kVoices> m_voices;
         int32_t m_masterL = 0, m_masterR = 0;
-        Reverb m_reverb[2];
+        Reverb m_reverb[kCores];
         // Scratch for mix: per core, stereo.
-        std::vector<int32_t> m_dry[2];
-        std::vector<int32_t> m_send[2];
-        std::vector<int32_t> m_wet[2];
+        std::vector<int32_t> m_dry[kCores];
+        std::vector<int32_t> m_send[kCores];
+        std::vector<int32_t> m_wet[kCores];
     };
 }
