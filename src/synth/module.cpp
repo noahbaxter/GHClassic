@@ -1,5 +1,7 @@
 #include "synth/module.h"
 
+#include "synth/adpcm.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -481,11 +483,11 @@ namespace gh2::synth
             for (uint32_t off = 0; off < len; ++off)
             {
                 uint8_t b = d[off];
-                if ((off & 15u) == 1u)
+                if (off % kAdpcmBlockBytes == 1u)
                 {
                     if (b & 0x80u)
                         ch.endOfData = true;
-                    b = 0x02u;
+                    b = kAdpcmRepeat;
                 }
                 ch.iop.push_back(b);
             }
@@ -595,7 +597,7 @@ namespace gh2::synth
             break;
         case 0x2c5: // {id, int byte offset}, for the next start
             if (Sample *s = sample(u32(d, 0)))
-                s->startOffset = u32(d, 4) & ~15u;
+                s->startOffset = u32(d, 4) / kAdpcmBlockBytes * kAdpcmBlockBytes;
             break;
         default:
             // 0x6 input FX and 0x12c..0x136 mics: nothing sounds from them.
@@ -697,7 +699,7 @@ namespace gh2::synth
             return;
         freeVoice(ch.main);
         ch.main = -1;
-        const uint32_t from = ch.readAt & ~15u;
+        const uint32_t from = ch.readAt / kAdpcmBlockBytes * kAdpcmBlockBytes;
         if (from < ch.base || from >= ch.base + ch.blocks * kBlockBytes)
             return;
         const int32_t ring = static_cast<int32_t>(ch.blocks * kBlockBytes);
@@ -705,7 +707,7 @@ namespace gh2::synth
         if (ch.link >= 0)
             at = static_cast<int32_t>(s.channels[static_cast<uint32_t>(ch.link)].target);
         else
-            at = static_cast<int32_t>(from - ch.base) + offset / 28 * 16;
+            at = static_cast<int32_t>(from - ch.base) + adpcmBytes(offset);
         at = ((at % ring) + ring) % ring;
         ch.target = static_cast<uint32_t>(at);
         ch.main = keyChannel(ch, ch.base + ch.target);
@@ -718,8 +720,8 @@ namespace gh2::synth
     // 0x32a8: 16-byte lines played, from the NAX the last refill read.
     uint32_t Module::position(const Channel &ch) const
     {
-        const uint32_t ringLines = ch.blocks * (kBlockBytes / 16u);
-        int32_t lines = static_cast<int32_t>(ch.readAt - ch.base) >> 4;
+        const uint32_t ringLines = ch.blocks * (kBlockBytes / kAdpcmBlockBytes);
+        int32_t lines = static_cast<int32_t>(ch.readAt - ch.base) / static_cast<int32_t>(kAdpcmBlockBytes);
         if (lines < 0 || lines > static_cast<int32_t>(ringLines))
             lines = 0;
         return ch.laps * ringLines + static_cast<uint32_t>(lines);
@@ -737,13 +739,13 @@ namespace gh2::synth
         if (take < kBlockBytes)
         {
             for (uint32_t off = take; off < kBlockBytes; ++off)
-                block[off] = (off & 15u) == 1u ? 0x02u : 0x00u;
+                block[off] = off % kAdpcmBlockBytes == 1u ? kAdpcmRepeat : 0u;
             ++ch.padded;
         }
         if (ch.next == ch.blocks - 1u)
-            block[kBlockBytes - 16u + 1u] |= 0x01u;
+            block[kBlockBytes - kAdpcmBlockBytes + 1u] |= kAdpcmLoopEnd;
         if (ch.next == 0u)
-            block[1] |= 0x04u;
+            block[1] |= kAdpcmLoopStart;
         m_spu.write(ch.base + ch.next * kBlockBytes, block, kBlockBytes);
         ch.next = (ch.next + 1u) % ch.blocks;
     }
@@ -865,7 +867,7 @@ namespace gh2::synth
                     off -= ring;
                 else if (off < -ring / 2)
                     off += ring;
-                queue(kReplySlipOffset, {s.id, ch.index, static_cast<uint32_t>(off * 28 / 16)});
+                queue(kReplySlipOffset, {s.id, ch.index, static_cast<uint32_t>(adpcmSamples(off))});
             }
         }
     }

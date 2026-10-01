@@ -16,6 +16,16 @@ namespace gh2::synth
     constexpr uint8_t kAdpcmRepeat = 0x02u;
     constexpr uint8_t kAdpcmLoopStart = 0x04u;
 
+    // Samples and bytes in whole blocks, signed so offsets can run backwards.
+    constexpr int32_t adpcmBytes(int32_t samples)
+    {
+        return samples / static_cast<int32_t>(kAdpcmBlockSamples) * static_cast<int32_t>(kAdpcmBlockBytes);
+    }
+    constexpr int32_t adpcmSamples(int32_t bytes)
+    {
+        return bytes * static_cast<int32_t>(kAdpcmBlockSamples) / static_cast<int32_t>(kAdpcmBlockBytes);
+    }
+
     struct AdpcmState
     {
         int32_t hist1 = 0;

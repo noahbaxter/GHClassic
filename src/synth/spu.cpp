@@ -172,7 +172,7 @@ namespace gh2::synth
         v.nax = v.start;
         v.loopWritten = false;
         v.ended = false;
-        v.blockPos = 28u;
+        v.blockPos = kAdpcmBlockSamples;
         v.hist1 = v.hist2 = 0;
         std::fill(std::begin(v.fifo), std::end(v.fifo), int16_t{0});
         v.counter = 0u;
@@ -223,7 +223,7 @@ namespace gh2::synth
     // without the repeat flag stops the voice there.
     int16_t Spu::nextSample(Voice &v)
     {
-        if (v.blockPos == 28u)
+        if (v.blockPos == kAdpcmBlockSamples)
         {
             const uint8_t *block = m_ram.data() + v.nax;
             v.flags = block[1];
@@ -236,7 +236,7 @@ namespace gh2::synth
             v.blockPos = 0u;
         }
         const int16_t s = v.block[v.blockPos++];
-        if (v.blockPos == 28u)
+        if (v.blockPos == kAdpcmBlockSamples)
         {
             if (v.flags & kAdpcmLoopEnd)
             {
