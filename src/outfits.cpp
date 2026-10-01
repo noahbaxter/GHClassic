@@ -134,6 +134,16 @@ namespace gh2::outfits
                        outfit + "}}}}\n";
     }
 
+    void photosFrom(const std::string &outfit, size_t disc, const std::string &source)
+    {
+        // Whole names: grim2's photo 0 is photo_grim20, grim's 2 photo_grim2.
+        for (int i = 0; i < 4; ++i)
+        {
+            const std::string index = std::to_string(i) + "_keep";
+            ark::rename("ui/image/og/gen/photo_" + outfit + index, disc, "ui/image/og/gen/photo_" + source + index);
+        }
+    }
+
     void label(const std::string &character, const std::string &outfit, const std::string &label)
     {
         if (!s_labelled.insert({character, outfit}).second)
