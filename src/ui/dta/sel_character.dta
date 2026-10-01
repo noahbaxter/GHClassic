@@ -140,6 +140,7 @@
                      {do
                         {{{$this loaded_dir} find $btn} set_showing FALSE}
                         {$this disable $btn}
+                        {{{$this loaded_dir} find $btn} set nav_down {{$this loaded_dir} find $btn}}
                      }
                   }
                }
@@ -160,8 +161,10 @@
                {sc_char_outfit_blurb.lbl set_local_pos $bx $by
                   {'+' [blurb_z] {min 0 {'-' $last [outfit_step]}}}}
             }
-            ; Down steps through the listed ones and wraps; up follows the
-            ; links backwards.
+            ; Down steps through the listed ones and wraps. Up is the first
+            ; component whose nav_down is the focus, or past it while that is
+            ; disabled (PanelDir::ComponentNav, 0x211040), so a hidden button
+            ; links to itself above, out of the way.
             {foreach_int $i 0 $count
                {{{$this loaded_dir} find {elem [outfit_buttons] $i}} set nav_down
                   {{$this loaded_dir} find {elem [outfit_buttons] {mod {'+' $i 1} $count}}}
