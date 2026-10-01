@@ -1,6 +1,7 @@
 #include "synth/spu.h"
 
 #include "synth/adpcm.h"
+#include "synth/fixed.h"
 
 #include <algorithm>
 #include <cstring>
@@ -76,11 +77,6 @@ namespace gh2::synth
             22842, 22857, 22872, 22885, 22897, 22908, 22918, 22927,
             22935, 22942, 22948, 22953, 22957, 22960, 22962, 22963,
         };
-
-        int32_t clamp16(int32_t v)
-        {
-            return std::clamp(v, -32768, 32767);
-        }
 
         // A volume register's 15 bits, as the -0x8000..+0x7ffe it stands for.
         int32_t fixedVolume(uint16_t reg)
@@ -260,10 +256,10 @@ namespace gh2::synth
     int32_t Spu::sample(Voice &v)
     {
         const uint32_t i = (v.counter >> 4) & 0xffu;
-        int32_t out = (kGauss[0x0ff - i] * v.fifo[0]) >> 15;
-        out += (kGauss[0x1ff - i] * v.fifo[1]) >> 15;
-        out += (kGauss[0x100 + i] * v.fifo[2]) >> 15;
-        out += (kGauss[0x000 + i] * v.fifo[3]) >> 15;
+        int32_t out = mul15(kGauss[0x0ff - i], v.fifo[0]);
+        out += mul15(kGauss[0x1ff - i], v.fifo[1]);
+        out += mul15(kGauss[0x100 + i], v.fifo[2]);
+        out += mul15(kGauss[0x000 + i], v.fifo[3]);
         return out;
     }
 
@@ -329,9 +325,9 @@ namespace gh2::synth
             const uint32_t step = std::min<uint32_t>(v.pitch, 0x3fffu);
             for (size_t f = 0; f < frames && v.phase != Phase::kOff; ++f)
             {
-                const int32_t s = (sample(v) * v.level) >> 15;
-                const int32_t l = (s * v.volL) >> 15;
-                const int32_t r = (s * v.volR) >> 15;
+                const int32_t s = mul15(sample(v), v.level);
+                const int32_t l = mul15(s, v.volL);
+                const int32_t r = mul15(s, v.volR);
                 coreDry[f * 2u] += l;
                 coreDry[f * 2u + 1u] += r;
                 if (v.reverbSend)
@@ -364,7 +360,7 @@ namespace gh2::synth
                 for (uint32_t core = 0; core < 2u; ++core)
                 {
                     const int32_t in = clamp16(m_dry[core][f * 2u + c] + m_wet[core][f * 2u + c]);
-                    sum += (in * master) >> 15;
+                    sum += mul15(in, master);
                 }
                 out[f * 2u + c] += clamp16(sum) / 32768.0f;
             }

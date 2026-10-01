@@ -3,6 +3,8 @@
 // PS-ADPCM, the SPU2's sample format: 16-byte blocks of a shift and filter
 // byte, a flag byte, then 28 four-bit samples, low nibble first.
 
+#include "synth/fixed.h"
+
 #include <algorithm>
 #include <cstdint>
 
@@ -45,7 +47,7 @@ namespace gh2::synth
             const int32_t nibble = (i & 1u) ? (byte >> 4) : (byte & 0x0f);
             int32_t s = static_cast<int16_t>(static_cast<uint16_t>(nibble << 12)) >> shift;
             s += (state.hist1 * kF0[filter] + state.hist2 * kF1[filter] + 32) >> 6;
-            s = std::clamp(s, -32768, 32767);
+            s = clamp16(s);
             state.hist2 = state.hist1;
             state.hist1 = s;
             out[i] = static_cast<int16_t>(s);

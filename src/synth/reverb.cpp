@@ -1,5 +1,7 @@
 #include "synth/reverb.h"
 
+#include "synth/fixed.h"
+
 #include <algorithm>
 
 namespace gh2::synth
@@ -69,16 +71,6 @@ namespace gh2::synth
             -1, 0, 2, 0, -10, 0, 35, 0, -103, 0, 266, 0, -616, 0, 1332, 0, -2960, 0, 10246, 16384,
             10246, 0, -2960, 0, 1332, 0, -616, 0, 266, 0, -103, 0, 35, 0, -10, 0, 2, 0, -1,
         };
-
-        int32_t clamp16(int32_t v)
-        {
-            return std::clamp(v, -32768, 32767);
-        }
-
-        int32_t mul(int32_t a, int32_t b)
-        {
-            return (a * b) >> 15;
-        }
     }
 
     void Reverb::setMode(uint32_t mode)
@@ -111,10 +103,7 @@ namespace gh2::synth
     // [m-2] (bytes) is one sample back.
     int16_t &Reverb::at(int32_t offset)
     {
-        const int32_t n = static_cast<int32_t>(m_buffer.size());
-        int32_t i = (static_cast<int32_t>(m_pos) + offset) % n;
-        if (i < 0)
-            i += n;
+        const int32_t i = wrap(static_cast<int32_t>(m_pos) + offset, static_cast<int32_t>(m_buffer.size()));
         return m_buffer[static_cast<size_t>(i)];
     }
 
@@ -136,14 +125,14 @@ namespace gh2::synth
         const int32_t comb3 = m(right ? 21 : 20), comb4 = m(right ? 23 : 22);
         const int32_t apf1 = m(right ? 27 : 26), apf2 = m(right ? 29 : 28);
 
-        in = mul(v(right ? 31 : 30), in);
-        const int32_t same = mul(vIIR, in + mul(vWALL, at(sameSrc)) - at(sameDst - 1)) + at(sameDst - 1);
-        const int32_t diff = mul(vIIR, in + mul(vWALL, at(diffSrc)) - at(diffDst - 1)) + at(diffDst - 1);
-        int32_t out = mul(v(3), at(comb1)) + mul(v(4), at(comb2)) + mul(v(5), at(comb3)) + mul(v(6), at(comb4));
-        const int32_t a1 = out - mul(vAPF1, at(apf1 - dAPF1));
-        out = at(apf1 - dAPF1) + mul(vAPF1, a1);
-        const int32_t a2 = out - mul(vAPF2, at(apf2 - dAPF2));
-        out = at(apf2 - dAPF2) + mul(vAPF2, a2);
+        in = mul15(v(right ? 31 : 30), in);
+        const int32_t same = mul15(vIIR, in + mul15(vWALL, at(sameSrc)) - at(sameDst - 1)) + at(sameDst - 1);
+        const int32_t diff = mul15(vIIR, in + mul15(vWALL, at(diffSrc)) - at(diffDst - 1)) + at(diffDst - 1);
+        int32_t out = mul15(v(3), at(comb1)) + mul15(v(4), at(comb2)) + mul15(v(5), at(comb3)) + mul15(v(6), at(comb4));
+        const int32_t a1 = out - mul15(vAPF1, at(apf1 - dAPF1));
+        out = at(apf1 - dAPF1) + mul15(vAPF1, a1);
+        const int32_t a2 = out - mul15(vAPF2, at(apf2 - dAPF2));
+        out = at(apf2 - dAPF2) + mul15(vAPF2, a2);
         at(sameDst) = static_cast<int16_t>(clamp16(same));
         at(diffDst) = static_cast<int16_t>(clamp16(diff));
         at(apf1) = static_cast<int16_t>(clamp16(a1));
@@ -181,8 +170,8 @@ namespace gh2::synth
                 l += m_up[0][first + i] * tap;
                 r += m_up[1][first + i] * tap;
             }
-            out[f * 2u] += mul(clamp16(l >> 15), m_depthL);
-            out[f * 2u + 1u] += mul(clamp16(r >> 15), m_depthR);
+            out[f * 2u] += mul15(clamp16(l >> 15), m_depthL);
+            out[f * 2u + 1u] += mul15(clamp16(r >> 15), m_depthR);
 
             if (right)
                 m_pos = (m_pos + 1u) % static_cast<uint32_t>(m_buffer.size());

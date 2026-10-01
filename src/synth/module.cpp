@@ -1,6 +1,7 @@
 #include "synth/module.h"
 
 #include "synth/adpcm.h"
+#include "synth/fixed.h"
 
 #include <algorithm>
 #include <cmath>
@@ -96,7 +97,7 @@ namespace gh2::synth
         // inverted gains, the rear positions. Centre is 180/255 each side.
         int32_t panGain(int32_t volume, int32_t p)
         {
-            const int32_t x = ((p % 1016) + 1016) % 1016;
+            const int32_t x = wrap(p, 1016);
             const int32_t q = x / 254;
             const int32_t r = x % 254;
             const std::array<int32_t, 255> &t = panCurve();
@@ -708,7 +709,7 @@ namespace gh2::synth
             at = static_cast<int32_t>(s.channels[static_cast<uint32_t>(ch.link)].target);
         else
             at = static_cast<int32_t>(from - ch.base) + adpcmBytes(offset);
-        at = ((at % ring) + ring) % ring;
+        at = wrap(at, ring);
         ch.target = static_cast<uint32_t>(at);
         ch.main = keyChannel(ch, ch.base + ch.target);
         if (ch.main < 0)
