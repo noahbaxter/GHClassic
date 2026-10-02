@@ -162,6 +162,8 @@ set(GHC_GAME_SOURCES
     src/movie/screen.cpp
     src/null_rnd.cpp
     src/pad.cpp
+    src/save/gh2_stream.cpp
+    src/save/gh2_text.cpp
     src/save/store.cpp
     src/scenario.cpp
     src/script.cpp
