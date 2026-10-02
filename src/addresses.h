@@ -114,6 +114,12 @@ namespace gh2
         uint32_t charsysPanelTrySetPriority; // (Symbol outfit, int priority)
         uint32_t playerConfigCharacterOfOutfit; // static (Symbol outfit, int &index)
         uint32_t dataVariable; // DataVariable(Symbol)
+        uint32_t songProviderInitData;
+        uint32_t songProviderGapSize;
+        uint32_t songProviderGetSongData; // (Symbol)
+        uint32_t campaignDataGetVenueForSong;
+        uint32_t songsInsertOverflow;     // vector<DataArray *>::_M_insert_overflow
+        uint32_t headersInsertOverflow;   // vector<SongHeader>::_M_insert_overflow_aux
         uint32_t helpBarFinishLoad;
         uint32_t helpBarSetDisplay;
         uint32_t helpBarAddElement;
@@ -125,8 +131,9 @@ namespace gh2
         uint32_t synthServerBuffer;  // its RPC server's receive buffer
         uint32_t theTaskMgr;
         uint32_t theOptions; // Options*
-        uint32_t theCampaign; // Campaign*
         uint32_t theGameConfig; // GameConfig*
+        uint32_t theCampaign;   // Campaign*
+        uint32_t theLocale;
         uint32_t mcBuffer;    // the save's bytes between the two halves of a load or save
         uint32_t mcOverwrite; // GHMCSaveData's overwrite argument: replace a save already there
         uint32_t mcBaseDir;   // char*, the save's directory on the card
@@ -252,6 +259,12 @@ namespace gh2
         .charsysPanelTrySetPriority = 0x142790u,
         .playerConfigCharacterOfOutfit = 0x114030u,
         .dataVariable = 0x2b7b00u,
+        .songProviderInitData = 0x117448u,
+        .songProviderGapSize = 0x1181d8u,
+        .songProviderGetSongData = 0x118318u,
+        .campaignDataGetVenueForSong = 0x1312a0u,
+        .songsInsertOverflow = 0x3177e0u,
+        .headersInsertOverflow = 0x3175d8u,
         .helpBarFinishLoad = 0x149f40u,
         .helpBarSetDisplay = 0x14a2f0u,
         .helpBarAddElement = 0x14a1e0u,
@@ -262,8 +275,9 @@ namespace gh2
         .synthServerBuffer = 0x484340u,
         .theTaskMgr = 0x51ee40u,
         .theOptions = 0x3da2e8u,
-        .theCampaign = 0x3da31cu,
         .theGameConfig = 0x3da308u,
+        .theCampaign = 0x3da31cu,
+        .theLocale = 0x51f1b8u,
         .mcBuffer = 0x3da368u,
         .mcOverwrite = 0x3da394u,
         .mcBaseDir = 0x3da374u,

@@ -72,8 +72,9 @@ namespace gh2
 
     namespace
     {
-        // {pad_held up|down|left|right}: 1 while that direction is held, for
-        // menus that repeat on a hold. The UI gets only presses.
+        // {pad_held up|down|left|right|<fret colour>}: 1 while that is held,
+        // for menus that repeat on a hold. The UI gets only presses, and
+        // gets blue and orange both as kPad_Square.
         script::Node padHeld(const script::Call &call)
         {
             const uint16_t bit = padButton(call.symbol(1));

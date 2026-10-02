@@ -1,6 +1,7 @@
 #include "ui/menus.h"
 
 #include "build_info.h"
+#include "content/locale.h"
 #include "dta.h"
 #include "script.h"
 
@@ -31,5 +32,9 @@ namespace gh2
         script::runWhenUiReady(kMainMenuDta);
         script::runWhenUiReady(kHighscorePanelDta);
         script::runWhenUiReady(kSelCharacterDta);
+        script::runWhenUiReady(kQuickplayDta);
+        locale::add("setlist_gh1", "GH1");
+        locale::add("setlist_gh2", "GH2");
+        locale::add("setlist_gh80s", "80s");
     }
 }
