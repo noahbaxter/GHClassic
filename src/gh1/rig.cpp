@@ -116,21 +116,6 @@ namespace gh2
             return out;
         }
 
-        // The first mesh an object's body names (bone_head.mesh).
-        std::string namedMesh(const Bytes &body)
-        {
-            for (size_t o = 0; o + 4u <= body.size(); ++o)
-            {
-                const uint32_t n = u32(body, o);
-                if (n < 6u || n > 64u || o + 4u + n > body.size())
-                    continue;
-                const std::string s(reinterpret_cast<const char *>(body.data() + o + 4u), n);
-                if (s.compare(n - 5u, 5u, ".mesh") == 0)
-                    return s;
-            }
-            return {};
-        }
-
         // A GH2 Mesh 28 left out of drawing: rev, object header, Trans 9
         // (rev, local, world, constraint, target, preserve, parent), then
         // Draw's rev and its showing flag.
@@ -145,21 +130,51 @@ namespace gh2
                 mesh[o] = 0u;
         }
 
-        // A GH1 Mesh 25 left out of drawing: rev, then Trans 8 (rev, local,
-        // world, children, constraint, target, preserve, parent), then Draw's
-        // rev and its showing flag.
-        void hideGh1(Bytes &mesh)
+        // Where a GH1 Mesh 25's Draw starts: rev, then Trans 8 (rev, local,
+        // world, children, constraint, target, preserve, parent), or the
+        // Trans 9 reparent writes (no children).
+        size_t gh1Draw(const Bytes &mesh)
         {
-            size_t o = 108u;
-            for (uint32_t i = 0, n = u32(mesh, 104u); i < n; ++i)
-                str(mesh, o);
+            size_t o = 104u;
+            if (u32(mesh, 4u) == 8u)
+            {
+                o += 4u;
+                for (uint32_t i = 0, n = u32(mesh, 104u); i < n; ++i)
+                    str(mesh, o);
+            }
             o += 4u;
             str(mesh, o);
             o += 1u;
             str(mesh, o);
-            o += 4u;
+            return o;
+        }
+
+        // A GH1 Mesh 25 left out of drawing: Draw's rev, then its showing flag.
+        void hideGh1(Bytes &mesh)
+        {
+            const size_t o = gh1Draw(mesh) + 4u;
             if (o < mesh.size())
                 mesh[o] = 0u;
+        }
+
+        // GH1's Draw 1 (showing, an empty draw list, sphere) as Draw 3, which
+        // RndDrawable::Load (0x3d5090) gives a draw order. A character's lod
+        // group sorts by it, then by material address (SortDraws, 0x214fa0).
+        void setDrawOrder(Bytes &mesh, float order)
+        {
+            const size_t o = gh1Draw(mesh);
+            if (u32(mesh, o) != 1u || u32(mesh, o + 5u) != 0u || o + 25u > mesh.size())
+                return;
+            Bytes draw;
+            putU32(draw, 3u);
+            draw.push_back(mesh[o + 4u]);
+            draw.insert(draw.end(), mesh.begin() + static_cast<std::ptrdiff_t>(o + 9u),
+                        mesh.begin() + static_cast<std::ptrdiff_t>(o + 25u));
+            uint32_t bits;
+            std::memcpy(&bits, &order, 4u);
+            putU32(draw, bits);
+            mesh.erase(mesh.begin() + static_cast<std::ptrdiff_t>(o), mesh.begin() + static_cast<std::ptrdiff_t>(o + 25u));
+            mesh.insert(mesh.begin() + static_cast<std::ptrdiff_t>(o), draw.begin(), draw.end());
         }
 
         // GH1's Morph 3 as GH2's RndMorph::Load (0x201800) reads it, which
@@ -405,10 +420,6 @@ namespace gh2
             // stay, unshown, for those to name (eye-L.mesh, goth2_EyeL.mesh;
             // classic has none); GH1's draw fixed to the head, as in GH1,
             // under names nothing of GH2's looks for.
-            std::set<std::string> gh2Eyes{"eye-L.mesh", "eye-R.mesh"};
-            for (size_t i = 0; i < gh2.entries.size(); ++i)
-                if (gh2.entries[i].first == "CharLookAt")
-                    gh2Eyes.insert(namedMesh(gh2.bodies[i]));
             for (Object &o : added)
                 if (o.name == "L-eye.mesh" || o.name == "R-eye.mesh")
                     o.name = "gh1_" + o.name;
@@ -426,12 +437,16 @@ namespace gh2
                 else if (c == "View" && startsWith(n, "top"))
                     top = viewMeshes(gh1.bodies[i], meshes);
             }
+            // GH1 drew the lod view, then top.view in its order: the face
+            // before its eyes, the eyes before glasses over them.
             if (lod1.empty())
                 lod1 = lod0;
+            std::map<std::string, float> topOrder;
             for (std::string n : top)
             {
                 if (n == "L-eye.mesh" || n == "R-eye.mesh")
                     n = "gh1_" + n;
+                topOrder.emplace(n, static_cast<float>(topOrder.size() + 1u));
                 for (auto *lod : {&lod0, &lod1})
                     if (std::find(lod->begin(), lod->end(), n) == lod->end())
                         lod->push_back(n);
@@ -439,7 +454,11 @@ namespace gh2
 
             // GH2's skin goes but the eyes (CharEyes and the lip servo name
             // them) and the shadow; GH1's objects win any name both have.
-            std::set<std::string> addedNames;
+            // A character dir draws every showing mesh no group holds
+            // (grim_ui's one group is empty; GH1's glasses and earrings are
+            // in no view). A _ui has no lod1 group, so a view's meshes no
+            // group takes stay unshown.
+            std::set<std::string> addedNames, grouped;
             for (const Object &o : added)
                 addedNames.insert(o.name);
             milo::Dir out = gh2;
@@ -454,10 +473,15 @@ namespace gh2
                 if (skin || addedNames.count(n))
                     continue;
                 out.entries.push_back(gh2.entries[i]);
-                out.bodies.push_back(c == "Group" && n.find("shadow") == std::string::npos
-                                         ? groupWith(gh2.bodies[i], n.find("lod1") != std::string::npos ? lod1 : lod0)
-                                         : gh2.bodies[i]);
-                if (c == "Mesh" && gh2Eyes.count(n))
+                if (c == "Group" && n.find("shadow") == std::string::npos)
+                {
+                    const auto &lod = n.find("lod1") != std::string::npos ? lod1 : lod0;
+                    grouped.insert(lod.begin(), lod.end());
+                    out.bodies.push_back(groupWith(gh2.bodies[i], lod));
+                }
+                else
+                    out.bodies.push_back(gh2.bodies[i]);
+                if (c == "Mesh" && !shadow.count(n))
                     hide(out.bodies.back());
                 if (const auto g = gh2Bones.find(n); g != gh2Bones.end() && g->second.index == i)
                 {
@@ -468,6 +492,12 @@ namespace gh2
             }
             for (Object &o : added)
             {
+                if (o.cls == "Mesh" && !grouped.count(o.name) &&
+                    (std::find(lod0.begin(), lod0.end(), o.name) != lod0.end() ||
+                     std::find(lod1.begin(), lod1.end(), o.name) != lod1.end()))
+                    hideGh1(o.body);
+                if (const auto t = topOrder.find(o.name); o.cls == "Mesh" && t != topOrder.end())
+                    setDrawOrder(o.body, t->second);
                 out.tableCount += 2u;
                 out.tableSize += static_cast<uint32_t>(o.cls.size() + o.name.size() + 2u);
                 out.entries.emplace_back(o.cls, o.name);
