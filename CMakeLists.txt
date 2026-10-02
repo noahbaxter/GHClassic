@@ -153,6 +153,7 @@ set(GHC_GAME_SOURCES
     src/game.cpp
     src/frame_step.cpp
     src/script.cpp
+    src/track_start.cpp
     src/dev/null_rnd.cpp
     src/dev/scenario.cpp
     src/dev/seed.cpp

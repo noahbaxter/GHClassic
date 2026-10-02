@@ -57,6 +57,7 @@ namespace gh2::settings
             {"game", "lefty_p2", Type::kBool, 0, 1, 1, 0, 0},
             // Off: PCSX2 holds a card it has loaded open.
             {"save", "export_card", Type::kBool, 0, 1, 1, 0, 0},
+            {"game", "track_on_at_start", Type::kBool, 0, 1, 1, 1, 0},
         };
 
         int snap(const Entry &entry, int value)

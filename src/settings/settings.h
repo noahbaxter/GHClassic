@@ -23,6 +23,7 @@ namespace gh2::settings
         kLefty,      // player 1's frets mirrored
         kLeftyP2,
         kExportCard, // each save also written to GHClassic.ps2, a PCSX2 card
+        kTrackOnAtStart, // the player's track heard before its first hit
         kKeyCount,
     };
 
