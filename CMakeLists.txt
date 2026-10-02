@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.25)
 
+# Else the build machine's macOS, which locks out every older one. MoltenVK's
+# own floor.
+set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Oldest macOS the game runs on")
+
 project(GHClassic LANGUAGES C CXX)
 # SDL's Cocoa backend is Objective-C, and a subproject cannot enable it.
 if(APPLE)
