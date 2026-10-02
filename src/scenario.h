@@ -8,6 +8,8 @@
 //   (wait 2)                           seconds
 //   (wait_until {char_single are_chars_loaded})  until not 0, checked each poll
 //   (print {game get_character} ...)   each value, to stderr
+//   (expect {player0 score} 158678)    fails the run unless the value matches
+//   (expect {taskmgr seconds} 33.47 0.1)  or, numbers, is within the third
 //   (shot metal_1)                     the next frame, as shot_metal_1 (--shots)
 //   (quit)                             closes the app
 //

@@ -1,6 +1,6 @@
 ; A whole quickplay song on expert, played by autoplay, to the results.
-; Song time ({taskmgr seconds}) against UI time every 30 s shows the audio
-; clock keeping pace, and an autoplayed song ends on the same score every
+; Song time ({taskmgr seconds}), which follows the audio, moves 30 s in each
+; 30 s of game time, and an autoplayed song ends on the same score every
 ; run.
 (wait_screen main_screen)
 {gamecfg set mode quickplay}
@@ -10,19 +10,21 @@
 {game set_quickplay}
 {ui goto_screen loading_screen}
 (wait_screen game_screen 60)
-(print start {taskmgr seconds} {taskmgr ui_seconds})
+(wait 10)
+{set $t {taskmgr seconds}}
 (wait 30)
-(print t30 {taskmgr seconds} {taskmgr ui_seconds} {player0 score})
-(shot t30)
+(expect {- {taskmgr seconds} $t} 30 0.1)
+(shot t40)
+{set $t {taskmgr seconds}}
 (wait 30)
-(print t60 {taskmgr seconds} {taskmgr ui_seconds} {player0 score})
-(shot t60)
+(expect {- {taskmgr seconds} $t} 30 0.1)
+(shot t70)
+{set $t {taskmgr seconds}}
 (wait 30)
-(print t90 {taskmgr seconds} {taskmgr ui_seconds} {player0 score})
-(wait 30)
-(print t120 {taskmgr seconds} {taskmgr ui_seconds} {player0 score})
+(expect {- {taskmgr seconds} $t} 30 0.1)
 (wait_screen endgame_screen 300)
 (wait 3)
-(print end {player0 score} {player0 longest_streak})
+(expect {player0 score} 158678)
+(expect {player0 longest_streak} 518)
 (shot end)
 (quit)

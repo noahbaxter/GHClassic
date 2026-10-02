@@ -15,12 +15,11 @@
 {gamecfg set practice_speed 3}
 {ui goto_screen practice_loading_screen}
 (wait_screen practice_game_screen 60)
-(print start {taskmgr seconds} {taskmgr ui_seconds})
 (wait 10)
-(print t10 {taskmgr seconds} {taskmgr ui_seconds})
 (shot playing)
 (wait_screen practice_end_screen 180)
 (wait 2)
-(print end {taskmgr seconds} {taskmgr ui_seconds})
+(expect {taskmgr seconds} 36.75 0.1)
+(expect {player0 gems_hit} 56)
 (shot end)
 (quit)

@@ -13,6 +13,8 @@
 
 #include <atomic>
 #include <chrono>
+#include <cmath>
+#include <cstdlib>
 #include <thread>
 #include <cstring>
 #include <fstream>
@@ -170,6 +172,23 @@ namespace gh2::scenario
                     for (int j = 1; j < array.size(); ++j)
                         line += (j > 1 ? " " : "") + text(rdram, array.arg(j));
                     std::cerr << "[scenario] " << line << std::endl;
+                }
+                else if (verb == "expect")
+                {
+                    const std::string got = text(rdram, array.arg(1));
+                    const std::string wanted = text(rdram, array.arg(2));
+                    // With a tolerance, numbers within it; else the same text.
+                    const bool ok = array.size() > 3
+                                        ? std::fabs(std::strtod(got.c_str(), nullptr) -
+                                                    std::strtod(wanted.c_str(), nullptr)) <= array.number(3)
+                                        : got == wanted;
+                    if (!ok)
+                    {
+                        std::cerr << "[scenario] FAIL: expected " << wanted << ", got " << got << std::endl;
+                        quit();
+                        return;
+                    }
+                    std::cerr << "[scenario] ok " << got << std::endl;
                 }
                 else if (verb == "shot")
                 {
