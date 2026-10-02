@@ -2,7 +2,9 @@
 
 #include "addresses.h"
 #include "disc/ark.h"
+#include "content/locale.h"
 #include "content/outfits.h"
+#include "content/setlists.h"
 #include "ui/fast_boot.h"
 #include "frame_step.h"
 #include "game_overrides.h"
@@ -73,6 +75,8 @@ namespace
         gh2::installFrameStep(runtime, gh2::kSlus21447);
         gh2::installMenus(runtime);
         gh2::installHelpBar(runtime, gh2::kSlus21447);
+        gh2::setlists::install(runtime, gh2::kSlus21447);
+        gh2::locale::install(runtime, gh2::kSlus21447);
         gh2::scenario::install(runtime, gh2::kSlus21447);
         gh2::transplant::install(runtime, gh2::kSlus21447);
         gh2::fast_boot::install(runtime, gh2::kSlus21447);

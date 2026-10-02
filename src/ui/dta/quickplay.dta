@@ -1,0 +1,141 @@
+; Quickplay's song list, as the game's own (quickplay.dta, career.dta) but
+; showing one of the setlists ({setlist}): yellow GH1, blue GH2, orange 80s.
+; Each shows in its own game's scene, which the panel takes at load, so a
+; switch goes to the twin screen, whose own panel loads the new one. Both
+; leave for the main menu, never for each other. The help bar has room for
+; the setlist frets or the strum, not both.
+{set $ghc_sel_song_panel
+   (
+      ; From the ARK root: a path resolves against the file its array came
+      ; from, and this one comes from no file.
+      (file
+         {switch {gamecfg get mode}
+            ((career multi_coop) ui/sel_song.milo)
+            (quickplay {setlist look})
+            ui/sel_song_quickplay.milo
+         }
+      )
+      (metamusic_on_exit TRUE)
+      (focus ss_song.lst)
+      (joypad (hold_ms 500) (repeat_ms 80))
+      (enter
+         {{ui current_screen} turn_off_ambient}
+         {if {! {{ui current_screen} sel_song_career}} {song_provider set_quickplay TRUE}}
+         {ss_song.lst set_provider song_provider}
+         {if {== {game get_song_index} -1} {game set_song_index 0}}
+         {$this update_song_info}
+      )
+      (update_song_info
+         {if {== 0 {song_provider get_quickplay}} {game set_career_song}}
+         {ss_song.lst set_selected {game get_song_index}}
+         {meta_music stop}
+         {$this update_pos}
+      )
+      (exit
+         {song_preview }
+         {if [metamusic_on_exit] {meta_music start}}
+         {set [metamusic_on_exit] TRUE}
+         {song_provider set_quickplay FALSE}
+      )
+      (SCROLL_MSG {$this update_pos})
+      (update_pos
+         {do
+            ($pos {ss_song.lst selected_pos})
+            ($frame {+ $pos {song_provider num_headers $pos}})
+            {game set_song_index $pos}
+            {song_preview {game get_song}}
+            {sel_song.view set_frame $frame}
+         }
+      )
+      (beat_song
+         ($score)
+         {if {$this is_up}
+            {do
+               ($index {ss_song.lst selected_pos})
+               ($song {song_provider get_symbol $index})
+               {campaign cheat_beat_song $song $score}
+               {$this refresh}
+            }
+         }
+      )
+      (gold_song
+         {if {$this is_up}
+            {campaign cheat_gold_song {song_provider get_symbol {ss_song.lst selected_pos}}}
+            {$this refresh}
+         }
+      )
+      (refresh
+         {if {! {{ui current_screen} sel_song_career}} {song_provider set_quickplay TRUE}}
+         {ss_song.lst set_provider song_provider}
+         {if {== {game get_song_index} -1} {game set_song_index 0}}
+         {$this update_song_info}
+      )
+   )
+}
+{retype sel_song_panel $ghc_sel_song_panel}
+{new GHPanel sel_song_twin_panel}
+{retype sel_song_twin_panel $ghc_sel_song_panel}
+; The UI gets blue and orange both as kPad_Square (yellow as kPad_Circle,
+; red as kPad_Tri), so the pad tells them apart.
+{func ghc_qp_button ($panel $twin $button)
+   {cond
+      ({== $button kPad_Tri}
+         {synth play_sequence button_back.cue}
+         {ui goto_screen main_screen FALSE TRUE}
+         TRUE
+      )
+      ({&& {|| {== $button kPad_Circle} {== $button kPad_Square}}
+            {setlist select
+               {cond ({== $button kPad_Circle} gh1) ({pad_held blue} gh2) (TRUE gh80s)}
+            }
+         }
+         {synth play_sequence button_select}
+         {$panel set metamusic_on_exit FALSE}
+         {game set_song_index 0}
+         {ui goto_screen $twin}
+         TRUE
+      )
+      (TRUE kDataUnhandled)
+   }
+}
+{retype qp_selsong_screen
+   (
+      (panels meta sel_song_panel helpbar)
+      (focus sel_song_panel)
+      (helpbar
+         (default
+            (
+               (fret1 help_continue)
+               (fret2 help_back)
+               (fret3 setlist_gh1)
+               (fret4 setlist_gh2)
+               (fret5 setlist_gh80s)
+            )
+         )
+      )
+      (sel_song_career FALSE)
+      (SELECT_START_MSG {ui goto_screen qp_diff_screen} kDataUnhandled)
+      (BUTTON_DOWN_MSG {ghc_qp_button sel_song_panel qp_selsong_twin_screen $button})
+   )
+}
+{new GHScreen qp_selsong_twin_screen}
+{retype qp_selsong_twin_screen
+   (
+      (panels meta sel_song_twin_panel helpbar)
+      (focus sel_song_twin_panel)
+      (helpbar
+         (default
+            (
+               (fret1 help_continue)
+               (fret2 help_back)
+               (fret3 setlist_gh1)
+               (fret4 setlist_gh2)
+               (fret5 setlist_gh80s)
+            )
+         )
+      )
+      (sel_song_career FALSE)
+      (SELECT_START_MSG {ui goto_screen qp_diff_screen} kDataUnhandled)
+      (BUTTON_DOWN_MSG {ghc_qp_button sel_song_twin_panel qp_selsong_screen $button})
+   )
+}
