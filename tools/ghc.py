@@ -6,6 +6,7 @@
     tools/ghc.py bind [keyboard | <n>]       set up a controller; with no device, list them
     tools/ghc.py arm [out] [--scenario <file>] [--speed <x>] [--secs 30] [--disc <image>] [--shot-every 60]
     tools/ghc.py scenarios [-j 4] [--speed 2] [name ...]
+    tools/ghc.py release [--skip-build]      this platform's player package, into build/release
 
 play builds everything from the disc on its first run, then brings the C++
 build up to date before each launch (not the recompile) unless --no-build.
@@ -24,6 +25,10 @@ since launch), shots/ and shots.png from the scenario's (shot name) steps,
 and on macOS stack.txt, a 3 s sample taken if it is still alive at --secs.
 scenarios runs the files in scenarios/ through arm side by side: a run
 passes when it quits on its own with no FAIL or STALL in its log.
+
+release packages a build for players, who bring their own disc: a zip of
+the game beside PUT_DISC_HERE on Windows and Linux, a disk image on macOS.
+It only writes build/release; publishing is a separate, deliberate step.
 """
 import argparse
 import hashlib
@@ -351,7 +356,130 @@ def cmd_bind(argv):
     return subprocess.run([str(game_binary()), "--bind", *argv]).returncode
 
 
-COMMANDS = {"play": cmd_play, "build": cmd_build, "bind": cmd_bind, "arm": cmd_arm, "scenarios": cmd_scenarios}
+PLACEHOLDER = "Put your Guitar Hero II (USA) disc image here (.iso, .chd or .bin).txt"
+SOURCE_URL = "https://github.com/noahbaxter/GHClassic"
+
+
+def notices():
+    """Each library built into this platform's game, and its license file.
+    glslang only compiles shaders at build time; lzma and miniz are public
+    domain; GCC's and LLVM's runtimes waive notices for compiled programs."""
+    deps = GAME / "_deps"
+    found = [
+        ("SDL", deps / "sdl3-src" / "LICENSE.txt"),
+        ("volk", deps / "volk-src" / "LICENSE.md"),
+        ("vk-bootstrap", deps / "vk-bootstrap-src" / "LICENSE.txt"),
+        ("Vulkan Memory Allocator", deps / "vulkanmemoryallocator-src" / "LICENSE.txt"),
+        ("Vulkan-Headers", deps / "vulkanheaders-src" / "LICENSE.md"),
+        ("raylib", deps / "raylib-src" / "LICENSE"),
+        ("GLFW", deps / "raylib-src" / "src" / "external" / "glfw" / "LICENSE.md"),
+        ("libchdr", ROOT / "lib" / "libchdr" / "LICENSE.txt"),
+        ("zstd", ROOT / "config" / "licenses" / "zstd.txt"),
+        ("PS2Recomp", ROOT / "lib" / "PS2Recomp" / "LICENSE"),
+    ]
+    if MACOS:
+        found += [("MoltenVK", deps / "moltenvk-src" / "LICENSE"),
+                  ("sse2neon", deps / "sse2neon-src" / "LICENSE")]
+    if WINDOWS:
+        runtime = BUILD / "toolchain" / LLVM_MINGW / "x86_64-w64-mingw32" / "share" / "mingw32"
+        found += [("mingw-w64 runtime", runtime / "COPYING.MinGW-w64-runtime.txt"),
+                  ("winpthreads", runtime / "COPYING.winpthreads.txt")]
+    return found
+
+
+def write_licenses(dest, version):
+    """LICENSES.txt into dest: GH Classic's own license, then each bundled
+    library's."""
+    parts = [f"GH Classic {version}. Source: {SOURCE_URL}\n"
+             "GH Classic is GPL-3.0; the libraries in it are under their own licenses.\n"]
+    for name, path in [("GH Classic", ROOT / "LICENSE"), *notices()]:
+        if not path.is_file():
+            sys.exit(f"no license file for {name}: {path}")
+        text = path.read_text(encoding="utf-8", errors="replace").strip()
+        parts.append(f"\n{'=' * 78}\n{name}\n{'=' * 78}\n\n{text}\n")
+    # UTF-8 everywhere: Windows' default is cp1252, which some licenses' names
+    # do not fit.
+    (dest / "LICENSES.txt").write_text("".join(parts), encoding="utf-8")
+
+
+def release_portable(out, version):
+    """A folder to unzip anywhere: the game, its icon and PUT_DISC_HERE, whose
+    presence makes the game keep its settings and saves beside it too."""
+    stage = out / "GHClassic"
+    (stage / "PUT_DISC_HERE").mkdir(parents=True)
+    (stage / "PUT_DISC_HERE" / PLACEHOLDER).write_text("")
+    shutil.copy2(game_binary(), stage)
+    shutil.copy2(GAME / "icon.png", stage)
+    write_licenses(stage, version)
+    archive = out / f"GHClassic-{'windows' if WINDOWS else 'linux'}-x64-{version}.zip"
+    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:
+        for path in sorted([stage, *stage.rglob("*")]):
+            info = zipfile.ZipInfo.from_file(path, path.relative_to(out).as_posix())
+            if path.is_dir():
+                zf.writestr(info, "")
+            else:
+                info.compress_type = zipfile.ZIP_DEFLATED
+                zf.writestr(info, path.read_bytes())
+    return archive
+
+
+def release_macos(out, version):
+    """A disk image of the app beside an Applications link: dragged across, it
+    leaves quarantine and App Translocation behind, and keeps its disc and
+    saves in Application Support. Signed with GHC_SIGN_IDENTITY (else ad hoc)
+    and notarized when APPLE_ID, APPLE_TEAM_ID and APPLE_APP_PASSWORD are set."""
+    stage = out / "dmg"
+    stage.mkdir()
+    app = stage / "GHClassic.app"
+    shutil.copytree(GAME / "GHClassic.app", app, symlinks=True)
+    write_licenses(app / "Contents" / "Resources", version)
+    (stage / "Applications").symlink_to("/Applications")
+    identity = os.environ.get("GHC_SIGN_IDENTITY", "-")
+    sign = ["codesign", "--force", "--sign", identity]
+    # The hardened runtime notarization needs only with a real identity: its
+    # library validation turns away an ad hoc MoltenVK, having no team ID.
+    if identity != "-":
+        sign += ["--options", "runtime", "--timestamp"]
+    env = dict(os.environ)
+    run([*sign, app / "Contents" / "Frameworks" / "libMoltenVK.dylib"], env)
+    run([*sign, app], env)
+    archive = out / f"GHClassic-macos-arm64-{version}.dmg"
+    run(["hdiutil", "create", "-volname", "GH Classic", "-srcfolder", stage, "-ov", "-format", "UDZO", archive],
+        env, quiet=True)
+    shutil.rmtree(stage)
+    if identity == "-":
+        print("ad hoc signed: set GHC_SIGN_IDENTITY to a Developer ID to sign", file=sys.stderr)
+        return archive
+    run([*sign[:2], "--sign", identity, "--timestamp", archive], env)
+    notary = [os.environ.get(k) for k in ("APPLE_ID", "APPLE_TEAM_ID", "APPLE_APP_PASSWORD")]
+    if not all(notary):
+        print("not notarized: set APPLE_ID, APPLE_TEAM_ID and APPLE_APP_PASSWORD", file=sys.stderr)
+        return archive
+    run(["xcrun", "notarytool", "submit", archive, "--apple-id", notary[0], "--team-id", notary[1],
+         "--password", notary[2], "--wait"], env)
+    run(["xcrun", "stapler", "staple", archive], env)
+    return archive
+
+
+def cmd_release(argv):
+    parser = argparse.ArgumentParser(prog="ghc.py release")
+    parser.add_argument("--skip-build", action="store_true", help="package the existing build")
+    args = parser.parse_args(argv)
+    if not args.skip_build:
+        build(recomp=not (RECOMP / "output").is_dir())
+    if not game_binary().exists():
+        sys.exit("no build; run tools/ghc.py build")
+    version = subprocess.run(["git", "describe", "--always", "--dirty"], cwd=ROOT, stdout=subprocess.PIPE,
+                             text=True).stdout.strip() or "unknown"
+    out = BUILD / "release"
+    shutil.rmtree(out, ignore_errors=True)
+    out.mkdir(parents=True)
+    archive = release_macos(out, version) if MACOS else release_portable(out, version)
+    print(f"made {archive} (local only; nothing is uploaded)")
+
+
+COMMANDS = {"play": cmd_play, "build": cmd_build, "bind": cmd_bind, "arm": cmd_arm, "scenarios": cmd_scenarios,
+            "release": cmd_release}
 
 
 def main():
