@@ -21,6 +21,12 @@
 // sets the two through {latency ...}. The first save load seeds video from
 // the save's offset, which leaves the hit window as it was; audio starts at
 // its default, the port's own delay (settings.cpp).
+//
+// A sound the game times off that clock would come out video - audio late
+// against the music. The one musical case: game.dta's beat handler claps in
+// star power through a script task 0.9 beats on. So a script task on the
+// beat clock that plays a sound starts that much sooner, back on the music's
+// timeline; ones on song seconds (an explosion) stay with the picture.
 
 #include "settings/latency.h"
 
@@ -32,13 +38,18 @@
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
 
+#include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <iostream>
 namespace gh2
 {
     namespace
     {
         constexpr uint32_t kSyncOffset = 0x3cu; // Options::mSyncOffset
+        constexpr uint32_t kTaskBeats = 1u;     // Task::Units
+        constexpr uint32_t kScript = 0x4cu;     // ScriptTask's DataArray, from its ctor (0x2c5040)
+        constexpr uint32_t kCommand = 0x11u, kProperty = 0x13u; // DataNode types holding an array
 
         const Addresses *s_addresses = nullptr;
         PS2Runtime::RecompiledFunction s_getSongMs = nullptr;
@@ -80,6 +91,47 @@ namespace gh2
             ctx->f[0] += static_cast<float>(settings::get(settings::kVideoLagMs) -
                                             settings::get(settings::kAudioLagMs));
             ctx->pc = returnTo;
+        }
+
+        // DataArray: nodes at +0, size at +8; a node is {value, type}.
+        bool playsSound(uint8_t *rdram, uint32_t array, int depth = 0)
+        {
+            if (array == 0u || depth > 8)
+                return false;
+            const uint32_t nodes = load<uint32_t>(rdram, array);
+            const int16_t size = load<int16_t>(rdram, array + 8u);
+            for (int16_t i = 0; i < size; ++i)
+            {
+                const uint32_t value = load<uint32_t>(rdram, nodes + 8u * static_cast<uint32_t>(i));
+                const uint32_t type = load<uint32_t>(rdram, nodes + 8u * static_cast<uint32_t>(i) + 4u);
+                if (type == script::kSymbol && value != 0u &&
+                    std::strcmp(reinterpret_cast<const char *>(getMemPtr(rdram, value)), "play_sfx") == 0)
+                    return true;
+                if ((type == script::kArray || type == kCommand || type == kProperty) && playsSound(rdram, value, depth + 1))
+                    return true;
+            }
+            return false;
+        }
+
+        // TaskMgr::AddTask(task, units, delay), retail 0x2c6b18: the delay
+        // counts on the clock at [+0x28] + units * 0x14, now at +0xC and the
+        // last poll's at +0x10.
+        struct AddTaskTag;
+        void onAddTask(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
+        {
+            const uint32_t task = GPR_U32(ctx, 5);
+            if (GPR_U32(ctx, 6) != kTaskBeats || load<uint32_t>(rdram, task) != s_addresses->scriptTaskVtable ||
+                !playsSound(rdram, load<uint32_t>(rdram, task + kScript)))
+                return;
+            const uint32_t clocks = load<uint32_t>(rdram, s_addresses->theTaskMgr + 0x28u);
+            const uint32_t seconds = clocks, beats = clocks + 0x14u * kTaskBeats;
+            const float dBeat = load<float>(rdram, beats + 0xcu) - load<float>(rdram, beats + 0x10u);
+            const float dSec = load<float>(rdram, seconds + 0xcu) - load<float>(rdram, seconds + 0x10u);
+            if (dBeat <= 0.0f || dSec <= 0.0f)
+                return;
+            const float lateS = static_cast<float>(settings::get(settings::kAudioLagMs) -
+                                                   settings::get(settings::kVideoLagMs)) / 1000.0f;
+            ctx->f[12] = std::max(0.0f, ctx->f[12] - lateS * dBeat / dSec);
         }
 
         // {latency get video|audio}, {latency set video|audio <ms>}: the value
@@ -136,5 +188,6 @@ namespace gh2
         EntryHook<BeatMatchTag>::install(runtime, addresses.beatMatchCtor, onBeatMatch);
         s_getSongMs = runtime.lookupFunction(addresses.playerMatcherGetSongMs);
         runtime.replaceFunction(addresses.playerMatcherGetSongMs, &getSongMs);
+        EntryHook<AddTaskTag>::install(runtime, addresses.taskMgrAddTask, onAddTask);
     }
 }
