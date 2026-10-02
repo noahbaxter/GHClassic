@@ -5,6 +5,7 @@
 #include "milo/milo.h"
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <optional>
 #include <string>
@@ -49,11 +50,14 @@ namespace gh2
         // Macros by name: the nodes a symbol of that name stands for.
         using Macros = std::map<std::string, std::vector<Node>>;
 
-        // A .dtb's root array as GH1 loads it (DataArray::Load, GH1
-        // 0x2451a0): conditionals applied, macros defined into `macros` and
-        // spliced in where their symbols stand. Includes and merges are not
-        // followed.
-        std::optional<Node> read(const milo::Bytes &file, Macros &macros);
+        // A built file's bytes (charsys/gen/charsys.dtb), or none.
+        using Files = std::function<std::optional<milo::Bytes>(const std::string &path)>;
+
+        // A script (charsys/charsys.dta, read from its built .dtb) as GH1
+        // loads it (DataArray::Load, GH1 0x2451a0): conditionals applied,
+        // includes spliced in, macros defined into `macros` and spliced in
+        // where their symbols stand. Merges are not followed.
+        std::optional<Node> read(const std::string &script, Macros &macros, const Files &files);
 
         // The array in `array` whose first node is `key`, as
         // DataArray::FindArray.

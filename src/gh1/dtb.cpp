@@ -125,11 +125,53 @@ namespace gh2
             }
         };
 
-        // DataArray::Load's directives over one array's nodes. The
-        // conditionals are one stack across arrays, as GH1's is global.
-        std::vector<Node> apply(const std::vector<Node> &in, Macros &macros, std::vector<bool> &conditions)
+        // A script's name (charsys/hair_anims.dta) to its built file
+        // (charsys/gen/hair_anims.dtb), with "dir/../" folded away.
+        std::string built(const std::string &script)
+        {
+            std::vector<std::string> parts;
+            for (size_t start = 0u; start <= script.size();)
+            {
+                size_t end = script.find('/', start);
+                if (end == std::string::npos)
+                    end = script.size();
+                const std::string part = script.substr(start, end - start);
+                if (part == ".." && !parts.empty() && parts.back() != "..")
+                    parts.pop_back();
+                else if (!part.empty() && part != ".")
+                    parts.push_back(part);
+                start = end + 1u;
+            }
+            std::string path;
+            for (size_t i = 0; i + 1u < parts.size(); ++i)
+                path += parts[i] + "/";
+            std::string name = parts.empty() ? std::string() : parts.back();
+            name = name.substr(0, name.rfind('.'));
+            return path + "gen/" + name + ".dtb";
+        }
+
+        std::string directory(const std::string &script)
+        {
+            const size_t slash = script.rfind('/');
+            return slash == std::string::npos ? std::string() : script.substr(0, slash + 1u);
+        }
+
+        struct Load
+        {
+            Macros &macros;
+            const gh1::dtb::Files &files;
+            std::vector<bool> conditions;
+        };
+
+        std::optional<std::vector<Node>> readFile(const std::string &script, Load &load);
+
+        // DataArray::Load's directives over one array's nodes, in `script`.
+        // The conditionals are one stack across arrays, as GH1's is global.
+        std::vector<Node> apply(const std::vector<Node> &in, Load &load, const std::string &script)
         {
             using namespace gh1::dtb;
+            Macros &macros = load.macros;
+            std::vector<bool> &conditions = load.conditions;
             std::vector<Node> out;
             const auto active = [&] {
                 for (const bool c : conditions)
@@ -164,10 +206,17 @@ namespace gh2
                 if (n.type == kDefine)
                 {
                     if (i + 1u < in.size())
-                        macros[n.text] = apply(in[++i].nodes, macros, conditions);
+                        macros[n.text] = apply(in[++i].nodes, load, script);
                 }
                 else if (n.type == kUndef)
                     macros.erase(n.text);
+                else if (n.type == kInclude)
+                {
+                    // Spliced in, its path next to this script's
+                    // (FileMakePath(FileGetPath(...)), GH1 0x245568).
+                    if (auto nodes = readFile(directory(script) + n.text, load))
+                        out.insert(out.end(), nodes->begin(), nodes->end());
+                }
                 else if (n.type == kSymbol && macros.count(n.text))
                 {
                     const std::vector<Node> &body = macros.at(n.text);
@@ -176,30 +225,40 @@ namespace gh2
                 else if (n.type == kArray || n.type == kCommand || n.type == kProperty)
                 {
                     Node array{n.type};
-                    array.nodes = apply(n.nodes, macros, conditions);
+                    array.nodes = apply(n.nodes, load, script);
                     out.push_back(std::move(array));
                 }
-                else if (n.type != kInclude && n.type != kMerge && n.type != kAutorun)
+                else if (n.type != kMerge && n.type != kAutorun)
                     out.push_back(n);
             }
             return out;
+        }
+
+        std::optional<std::vector<Node>> readFile(const std::string &script, Load &load)
+        {
+            const auto file = load.files(built(script));
+            if (!file)
+                return std::nullopt;
+            const Bytes plain = decrypt(*file);
+            if (plain.empty() || plain[0] != 1u)
+                return std::nullopt;
+            Reader reader{plain, 1u};
+            auto root = reader.array(gh1::dtb::kArray);
+            if (!root)
+                return std::nullopt;
+            return apply(root->nodes, load, script);
         }
     }
 
     namespace gh1::dtb
     {
-        std::optional<Node> read(const milo::Bytes &file, Macros &macros)
+        std::optional<Node> read(const std::string &script, Macros &macros, const Files &files)
         {
-            const Bytes plain = decrypt(file);
-            if (plain.empty() || plain[0] != 1u)
+            Load load{macros, files, {}};
+            auto nodes = readFile(script, load);
+            if (!nodes)
                 return std::nullopt;
-            Reader reader{plain, 1u};
-            auto root = reader.array(kArray);
-            if (!root)
-                return std::nullopt;
-            std::vector<bool> conditions;
-            root->nodes = apply(root->nodes, macros, conditions);
-            return root;
+            return Node{kArray, 0, 0.0f, {}, std::move(*nodes)};
         }
 
         const Node *find(const Node &array, const std::string &key)
