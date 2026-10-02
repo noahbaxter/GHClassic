@@ -1,6 +1,7 @@
 #include "content/setlists.h"
 
 #include "guest.h"
+#include "save/save.h"
 #include "script.h"
 
 #include "ps2_runtime.h"
@@ -59,24 +60,6 @@ namespace gh2::setlists
                 return nullptr;
             const auto it = s_setlists.find(s_selected);
             return it == s_setlists.end() ? nullptr : &it->second;
-        }
-
-        // An STLport vector's push_back as InitData inlines it: in place
-        // while there is room, else through its _M_insert_overflow, which
-        // takes the value and a type tag by reference.
-        void pushBack(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t vector, const void *value,
-                      uint32_t size, uint32_t insertOverflow, uint32_t scratch)
-        {
-            const uint32_t finish = load<uint32_t>(rdram, vector + 4u);
-            if (finish != load<uint32_t>(rdram, vector + 0xcu))
-            {
-                std::memcpy(getMemPtr(rdram, finish), value, size);
-                store<uint32_t>(rdram, vector + 4u, finish + size);
-                return;
-            }
-            std::memcpy(getMemPtr(rdram, scratch), value, size);
-            store<uint8_t>(rdram, scratch + 8u, 0u);
-            runtime->callGuestFunction(rdram, ctx, insertOverflow, {vector, finish, scratch, scratch + 8u, 1u, 1u});
         }
 
         // SongProvider::InitData(RndDir *) (0x117448) fills its songs
@@ -190,8 +173,13 @@ namespace gh2::setlists
         }
     }
 
-    void add(const std::string &name, std::vector<Tier> tiers, const std::string &look)
+    void add(const std::string &name, std::vector<Tier> tiers, const std::string &look,
+             const std::array<std::string, 5> &scoreNames)
     {
+        std::vector<std::string> songs;
+        for (const Tier &tier : tiers)
+            songs.insert(songs.end(), tier.songs.begin(), tier.songs.end());
+        save::addScoreSongs(name, songs, scoreNames);
         s_setlists[name] = {std::move(tiers), look};
     }
 

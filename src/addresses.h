@@ -105,6 +105,8 @@ namespace gh2
         uint32_t bufStreamCtor; // BufStream::BufStream(void *, int, bool)
         uint32_t binStreamDtor; // BinStream::~BinStream
         uint32_t setupMcIcon;   // builds the card icon below from config/mc.dta and the disc
+        uint32_t highScoreDbCtor; // HighScoreDB::HighScoreDB(const SymbolVec &songs)
+        uint32_t symbolsInsertOverflow; // vector<Symbol>::_M_insert_overflow_aux
         uint32_t archiveGetFileInfo;
         uint32_t archiveIsValidBlock;
         uint32_t cdRead;
@@ -251,6 +253,8 @@ namespace gh2
         .bufStreamCtor = 0x2c9268u,
         .binStreamDtor = 0x2c8b78u,
         .setupMcIcon = 0x14b098u,
+        .highScoreDbCtor = 0x13cef0u,
+        .symbolsInsertOverflow = 0x313a40u,
         .archiveGetFileInfo = 0x2ac618u,
         .archiveIsValidBlock = 0x2ac9e8u,
         .cdRead = 0x2ae9c0u,

@@ -83,7 +83,12 @@ namespace gh2
             // The 80s archive whole under gh80s/, so its song list scene
             // finds what it refers to on its own disc.
             ark::rename("gh80s/", disc, "");
-            setlists::add("gh80s", std::move(tiers), "gh80s/ui/sel_song_quickplay.milo");
+            std::array<std::string, 5> scoreNames;
+            for (size_t i = 0; i < scoreNames.size(); ++i)
+                if (const dtb::Node *name = dtb::find(*strings, "highscore_dummy_" + std::to_string(i));
+                    name && name->nodes.size() > 1u)
+                    scoreNames[i] = name->nodes[1].text;
+            setlists::add("gh80s", std::move(tiers), "gh80s/ui/sel_song_quickplay.milo", scoreNames);
         }
     }
 
