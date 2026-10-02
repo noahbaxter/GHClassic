@@ -143,13 +143,15 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // loadELF points the memory card beside the ELF, so this goes after.
-    if (!mcRoot.empty())
-    {
-        PS2Runtime::IoPaths paths = PS2Runtime::getIoPaths();
-        paths.mcRoot = mcRoot;
-        PS2Runtime::setIoPaths(paths);
-    }
+    // loadELF points the memory card beside the ELF, so this goes after. The
+    // player's card lives in the user data directory, beside settings.ini.
+    if (mcRoot.empty())
+        mcRoot = gh2::settings::userDataPath("mc0");
+    std::error_code mcError;
+    std::filesystem::create_directories(mcRoot, mcError);
+    PS2Runtime::IoPaths paths = PS2Runtime::getIoPaths();
+    paths.mcRoot = mcRoot;
+    PS2Runtime::setIoPaths(paths);
 
     runtime.run();
 
