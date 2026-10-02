@@ -328,18 +328,34 @@ namespace gh2::ark
         return true;
     }
 
+    namespace
+    {
+        std::optional<std::vector<uint8_t>> read(const Entry *entry)
+        {
+            if (!entry)
+                return std::nullopt;
+            const Part &part = s_parts[entry->part];
+            std::vector<uint8_t> bytes(entry->size);
+            if (!part.disc)
+                std::memcpy(bytes.data(), part.bytes->data() + entry->offset, entry->size);
+            else if (part.disc->readExtent(part.extent, entry->offset, bytes.data(), bytes.size()) != bytes.size())
+                return std::nullopt;
+            return bytes;
+        }
+    }
+
     std::optional<std::vector<uint8_t>> readFile(const std::string &path)
     {
-        const Entry *entry = find(key(path.c_str()));
-        if (!entry)
+        return read(find(key(path.c_str())));
+    }
+
+    std::optional<std::vector<uint8_t>> readFile(size_t disc, const std::string &path)
+    {
+        if (disc >= s_discs.size())
             return std::nullopt;
-        const Part &part = s_parts[entry->part];
-        std::vector<uint8_t> bytes(entry->size);
-        if (!part.disc)
-            std::memcpy(bytes.data(), part.bytes->data() + entry->offset, entry->size);
-        else if (part.disc->readExtent(part.extent, entry->offset, bytes.data(), bytes.size()) != bytes.size())
-            return std::nullopt;
-        return bytes;
+        const auto &files = s_discs[disc].files;
+        const auto it = files.find(key(path.c_str()));
+        return read(it != files.end() ? &it->second : nullptr);
     }
 
     std::optional<size_t> discWithSerial(const std::string &serial)

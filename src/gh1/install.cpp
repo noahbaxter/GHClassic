@@ -17,6 +17,8 @@
 #include "disc/ark.h"
 #include "content/outfits.h"
 #include "gh1/clips.h"
+#include "gh1/dtb.h"
+#include "gh1/face.h"
 #include "gh1/guitarist.h"
 #include "gh1/rig.h"
 #include "milo/milo.h"
@@ -42,7 +44,7 @@ namespace gh2
             {.gh1Folder = "alterna", .gh2Character = "alterna", .baseOutfit = "alterna1", .label = "GH1 SKULLS"},
             {.gh1Folder = "metal", .gh2Character = "metal", .baseOutfit = "metal1", .label = "GH1 SHIRT"},
             {.gh1Folder = "hair_metal", .gh2Character = "glam", .baseOutfit = "glam1", .label = "GH1 CODPIECE",
-             .clipPrefix = "hair", .highway = "hair", .faceFile = "hairmetal_face"},
+             .clipPrefix = "hair", .highway = "hair"},
             {.gh1Folder = "nu_metal", .gh2Character = "goth", .baseOutfit = "goth2", .label = "GH1 LEATHERS",
              .clipPrefix = "nu"},
             {.gh1Folder = "hiphop", .gh2Character = "funk1", .baseOutfit = "funk1", .label = "GH1"},
@@ -52,6 +54,30 @@ namespace gh2
 
         // Characters whose one outfit the locale never named.
         constexpr const char *kUnnamed[] = {"funk1", "classic", "grim"};
+
+        // GH1's archetypes (charsys.dta), with the macros GH1 loads at boot
+        // first.
+        std::optional<gh1::dtb::Node> archetypes(size_t gh1Disc)
+        {
+            gh1::dtb::Macros macros;
+            const auto macroFile = ark::readFile(gh1Disc, "../../system/run/config/gen/macros.dtb");
+            const auto charsysFile = ark::readFile(gh1Disc, "charsys/gen/charsys.dtb");
+            if (!macroFile || !charsysFile || !gh1::dtb::read(*macroFile, macros))
+                return std::nullopt;
+            const auto charsys = gh1::dtb::read(*charsysFile, macros);
+            if (!charsys)
+                return std::nullopt;
+            const gh1::dtb::Node *found = gh1::dtb::find(*charsys, "archetypes");
+            return found ? std::optional(*found) : std::nullopt;
+        }
+
+        // A scene as GH1's scripts name it (charsys/metal/metal_face.rnd)
+        // where its built file is (charsys/metal/gen/metal_face.rnd_ps2).
+        std::string built(const std::string &path)
+        {
+            const size_t slash = path.rfind('/');
+            return path.substr(0, slash) + "/gen/" + path.substr(slash + 1) + "_ps2";
+        }
     }
 
     void installGh1()
@@ -61,12 +87,27 @@ namespace gh2
         if (!gh1Disc || !gh2Disc)
             return;
         const auto start = std::chrono::steady_clock::now();
-        size_t built = 0u;
+        const auto types = archetypes(*gh1Disc);
+        if (!types)
+        {
+            std::cerr << "[gh1] cannot read GH1's charsys" << std::endl;
+            return;
+        }
+        size_t count = 0u;
         for (const Guitarist &guitarist : kGuitarists)
         {
             const std::string folder = guitarist.gh1Folder, base = guitarist.baseOutfit, outfit = guitarist.outfit();
+            // CharFace reads both from the archetype (GH1 0x2a6cb0).
+            const gh1::dtb::Node *archetype = gh1::dtb::find(*types, folder);
+            const gh1::dtb::Node *faceFile = archetype ? gh1::dtb::find(*archetype, "face_file") : nullptr;
+            const gh1::dtb::Node *faceData = archetype ? gh1::dtb::find(*archetype, "face_data") : nullptr;
+            if (!faceFile || faceFile->nodes.size() < 2u || !faceData || !gh1::addFace(outfit, *faceData))
+            {
+                std::cerr << "[gh1] cannot read " << folder << "'s face" << std::endl;
+                continue;
+            }
             const auto gh1 = load("charsys/" + folder + "/gen/" + folder + ".rnd_ps2");
-            const auto face = load("charsys/" + folder + "/gen/" + guitarist.face() + ".rnd_ps2");
+            const auto face = load(built(faceFile->nodes[1].text));
             const auto gh2 = load("char/" + base + "/og/gen/" + base + ".milo_ps2");
             const auto gh2Ui = load("char/" + base + "/og/gen/" + base + "_ui.milo_ps2");
             // The base's _ui plays its picker clips by a path relative to
@@ -84,9 +125,10 @@ namespace gh2
                 std::cerr << "[gh1] cannot build " << folder << "'s picker clips" << std::endl;
                 continue;
             }
-            milo::Dir ui = graft(*gh2Ui, *gh1, *face);
+            milo::Dir ui = graft(*gh2Ui, *gh1, *face, outfit);
             milo::replacePrefix(ui, *uiClips, "../../../" + outfit + "/anims/" + outfit + "_ui.milo");
-            ark::addFile("char/" + outfit + "/og/gen/" + outfit + ".milo_ps2", milo::write(graft(*gh2, *gh1, *face)));
+            ark::addFile("char/" + outfit + "/og/gen/" + outfit + ".milo_ps2",
+                         milo::write(graft(*gh2, *gh1, *face, outfit)));
             ark::addFile("char/" + outfit + "/og/gen/" + outfit + "_ui.milo_ps2", milo::write(ui));
             ark::addFile("char/" + outfit + "/anims/gen/" + outfit + "_ui.milo_ps2", *picker);
             // _horse and anything else beside it is GH2's base outfit's, and
@@ -96,12 +138,12 @@ namespace gh2
             ark::rename("track/surfaces/gen/" + outfit + "_keep", *gh1Disc, "track/surfaces/gen/" + guitarist.track());
             outfits::photosFrom(outfit, *gh2Disc, base);
             outfits::add(guitarist.gh2Character, outfit, base, guitarist.label);
-            ++built;
+            ++count;
         }
         for (const char *character : kUnnamed)
             outfits::label(character, character, "CLASSIC");
         const auto ms =
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
-        std::cerr << "[gh1] " << built << " outfits built in " << ms << " ms" << std::endl;
+        std::cerr << "[gh1] " << count << " outfits built in " << ms << " ms" << std::endl;
     }
 }
