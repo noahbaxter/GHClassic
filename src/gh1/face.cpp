@@ -8,7 +8,8 @@
 // level, never the one it has, and SimpleBlender eases to it over blend_time.
 // Both morphs in a character share one picker, as GH1's chained them under
 // one. GH2's RndMorph::SetFrame (0x201048) does the blending and syncs the
-// target mesh.
+// target mesh. Only songs poll it (CharMan::Poll's one caller is
+// ArenaPanel::Poll, GH1 0x10e73c); elsewhere a face holds Reset's pose, ref.
 
 #include "gh1/face.h"
 
@@ -30,9 +31,6 @@ namespace gh2
 {
     namespace
     {
-        // The level each song starts at (ArenaPanel::Start, GH1 0x10e460).
-        constexpr int kOkay = 2;
-
         // An archetype's face_data, its pose names as frames.
         struct FaceData
         {
@@ -72,10 +70,8 @@ namespace gh2
         std::map<std::string, FaceData> s_data; // by outfit
         std::set<uint32_t> s_morphs;
         std::unordered_map<uint32_t, Face> s_faces; // by the morphs' dir
-        // The level a song set this frame, if one did. Out of songs it is
-        // Okay, as GH1 starts each one (ArenaPanel::Start, GH1 0x10e460).
+        // The level a song set this frame, if one did.
         std::optional<int> s_polled;
-        int s_excitement = kOkay;
         std::minstd_rand s_random;
 
         struct CtorTag;
@@ -107,11 +103,11 @@ namespace gh2
 
         // CharFace::ExcitementPicker (GH1 0x2a7518) then SimpleBlender::Poll
         // (GH1 0x2a77a0).
-        void poll(Face &face, float dt)
+        void poll(Face &face, float dt, int excitement)
         {
             const FaceData &data = *face.data;
             face.timer += dt;
-            const auto level = data.excitementPoses.find(s_excitement);
+            const auto level = data.excitementPoses.find(excitement);
             if (face.timer > data.poseLength && level != data.excitementPoses.end() && !level->second.empty())
             {
                 face.timer = 0.0f;
@@ -119,7 +115,8 @@ namespace gh2
                 size_t i = std::uniform_int_distribution<size_t>(0u, poses.size() - 1u)(s_random);
                 if (poses[i] == face.pose)
                     i = (i + 1u) % poses.size();
-                face.setNewPose(poses[i]);            }
+                face.setNewPose(poses[i]);
+            }
             if (face.blend != 1.0f)
             {
                 face.blend += dt / data.blendTime;
@@ -152,7 +149,7 @@ namespace gh2
         struct BeginTag;
         void onBeginDrawing(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
-            s_excitement = s_polled.value_or(kOkay);
+            const std::optional<int> excitement = s_polled;
             s_polled.reset();
             std::unordered_map<uint32_t, std::pair<const FaceData *, std::vector<uint32_t>>> morphs;
             for (const uint32_t morph : s_morphs)
@@ -179,8 +176,13 @@ namespace gh2
             {
                 const auto &[data, list] = found;
                 Face &face = s_faces[dir];
-                face.data = data;
-                poll(face, dt);
+                if (excitement)
+                {
+                    face.data = data;
+                    poll(face, dt, *excitement);
+                }
+                else
+                    face = Face{data};
                 for (const uint32_t morph : list)
                     draw(rdram, ctx, runtime, morph, face);
             }
