@@ -1,0 +1,5 @@
+# Build tools, installed into build/venv by tools/ghc.py.
+cmake==4.4.3
+ninja==1.13.2
+# Scenario frames and contact sheets.
+pillow==12.3.0
