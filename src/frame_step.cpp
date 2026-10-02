@@ -69,30 +69,10 @@ namespace gh2
         // Runs `original` once per step: all but the last through
         // callGuestFunction with the arguments put back, the last as a tail
         // call, so a yield in it resumes as it would unhooked.
-        struct Args
-        {
-            uint32_t a[4];
-            float f12, f13;
-
-            explicit Args(const R5900Context *ctx)
-                : a{GPR_U32(ctx, 4), GPR_U32(ctx, 5), GPR_U32(ctx, 6), GPR_U32(ctx, 7)}, f12(ctx->f[12]),
-                  f13(ctx->f[13])
-            {
-            }
-
-            void restore(R5900Context *ctx) const
-            {
-                for (int i = 0; i < 4; ++i)
-                    SET_GPR_U32(ctx, 4 + i, a[i]);
-                ctx->f[12] = f12;
-                ctx->f[13] = f13;
-            }
-        };
-
         void runSteps(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t address,
                       PS2Runtime::RecompiledFunction original)
         {
-            const Args args(ctx);
+            const EntryArgs args(ctx);
             for (int i = 1; i < s_steps; ++i)
             {
                 runtime->callGuestFunction(rdram, ctx, address, {args.a[0], args.a[1], args.a[2], args.a[3]},
