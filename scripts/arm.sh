@@ -11,8 +11,8 @@
 #
 # The window stays hidden, no audio device opens, boot goes straight to the
 # main menu (--fast-boot), random numbers start from one seed (--seed 1), the
-# memory card is a throwaway copy of the player's, and only the process this
-# script started is ever killed.
+# memory card is blank and the settings default (a first boot), and only the
+# process this script started is ever killed.
 # out gets run.log, frames/ (the guest picture every --shot-every presented
 # frames) and stack.txt, a 3s sample taken just before the stop. The summary
 # names where the game thread spends its time, by recompiled function.
@@ -21,7 +21,6 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DATA="$HOME/Library/Application Support/GHClassic"
 OUT=""
 SECS=30
 DISC=""
@@ -72,10 +71,6 @@ ELF="$ROOT/build/recomp/gh2.elf"
 [ -x "$BIN" ] && [ -f "$ELF" ] || { echo "no build; run scripts/build.sh" >&2; exit 1; }
 [ -n "$DISC" ] || DISC="$(python3 "$ROOT/tools/disc.py" find SLUS-21447 "$ROOT"/game/*)"
 DISC="$(cd "$(dirname "$DISC")" && pwd)/$(basename "$DISC")"
-# Copies of the player's card and settings, so a run plays like theirs and
-# never writes to them.
-[ -d "$DATA/mc0" ] && cp -Rp "$DATA/mc0/." "$CARD/"
-[ -f "$DATA/settings.ini" ] && cp "$DATA/settings.ini" "$OUT/settings.ini"
 (cd "$OUT" && exec "$BIN" "$ELF" "$DISC" ${SCENARIO[@]+"${SCENARIO[@]}"} ${SPEED[@]+"${SPEED[@]}"} --fast-boot --seed 1 --hidden --mute --mc "$CARD" --settings "$OUT/settings.ini" \
   --shots "$OUT/frames" --shot-every "$EVERY") > "$OUT/run.log" 2>&1 &
 PID=$!

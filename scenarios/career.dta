@@ -1,6 +1,6 @@
-; Career's screens on the card's first profile: the tour, venue, song list,
-; store and character pick.
-(wait_screen main_screen)
+; Career's screens on a new career in profile slot 0: the tour, venue, song
+; list, store and character pick.
+#include common/first_boot.dta
 {gamecfg set mode career}
 {campaign set_profile_slot 0}
 {ui goto_screen career_screen}

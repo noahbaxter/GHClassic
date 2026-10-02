@@ -12,6 +12,7 @@
 //   (expect {taskmgr seconds} 33.47 0.1)  or, numbers, is within the third
 //   (shot metal_1)                     the next frame, as shot_metal_1 (--shots)
 //   (quit)                             closes the app
+//   #include common/first_boot.dta     that file's steps, from beside this one
 //
 // A wait_screen or wait_until that takes more than 30 s, or the seconds
 // given after its screen or condition, fails the run and quits, as does the

@@ -17,9 +17,9 @@
 #include <cstdlib>
 #include <thread>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <sstream>
 
 namespace gh2::scenario
 {
@@ -57,6 +57,30 @@ namespace gh2::scenario
             event.type = SDL_EVENT_QUIT;
             SDL_PushEvent(&event);
             s_done = true;
+        }
+
+        // A line "#include <file>" is replaced by that file, beside this one.
+        // The game's parser would look for it on the disc.
+        bool read(const std::filesystem::path &path, std::string &out)
+        {
+            std::ifstream in(path);
+            if (!in)
+            {
+                std::cerr << "[scenario] cannot read " << path.string() << std::endl;
+                return false;
+            }
+            std::string line;
+            while (std::getline(in, line))
+            {
+                if (line.rfind("#include ", 0) == 0)
+                {
+                    if (!read(path.parent_path() / line.substr(9), out))
+                        return false;
+                }
+                else
+                    out += line + "\n";
+            }
+            return true;
         }
 
         std::string text(uint8_t *rdram, const script::Node &node)
@@ -270,16 +294,8 @@ namespace gh2::scenario
 
     bool load(const std::string &path)
     {
-        std::ifstream in(path);
-        if (!in)
-        {
-            std::cerr << "[scenario] cannot read " << path << std::endl;
-            return false;
-        }
-        std::ostringstream text;
-        text << in.rdbuf();
-        s_text = text.str();
-        return true;
+        s_text.clear();
+        return read(path, s_text);
     }
 
     void install(PS2Runtime &runtime, const Addresses &addresses)

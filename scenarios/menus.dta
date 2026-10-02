@@ -1,5 +1,5 @@
 ; Every main menu branch outside career, a shot of each.
-(wait_screen main_screen)
+#include common/first_boot.dta
 (wait 1)
 (shot main)
 {ui goto_screen options_screen}
