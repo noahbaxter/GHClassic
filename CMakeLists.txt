@@ -236,6 +236,19 @@ target_include_directories(GHClassic PRIVATE ${PS2X_DIR_INCLUDE_DIRECTORIES})
 target_compile_definitions(GHClassic PRIVATE ${PS2X_DIR_COMPILE_DEFINITIONS})
 target_compile_options(GHClassic PRIVATE ${PS2X_DIR_COMPILE_OPTIONS})
 
+# Generated code and the runtime use SSE4.1 intrinsics (_mm_extract_epi32),
+# which x86_64 compilers other than MSVC leave off by default.
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$" AND NOT MSVC)
+    target_compile_options(GHClassic PRIVATE -msse4.1)
+    target_compile_options(ps2_runtime PRIVATE -msse4.1)
+endif()
+# Unity batches outgrow COFF's 32k sections. A static runtime leaves the exe
+# needing nothing of llvm-mingw's beside it.
+if(MINGW)
+    target_compile_options(GHClassic PRIVATE -Wa,-mbig-obj)
+    target_link_options(GHClassic PRIVATE -static)
+endif()
+
 # Same batching and precompiled headers upstream uses for its runner. Without
 # them a cold build of the generated code takes several times longer.
 set_target_properties(GHClassic PROPERTIES
