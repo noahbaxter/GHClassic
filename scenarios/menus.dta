@@ -1,6 +1,4 @@
 ; Every main menu branch outside career, a shot of each.
-(wait_screen splash_screen)
-{ui goto_screen main_screen}
 (wait_screen main_screen)
 (wait 1)
 (shot main)

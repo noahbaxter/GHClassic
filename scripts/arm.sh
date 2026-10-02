@@ -9,9 +9,9 @@
 # stops the run before --secs, and its (shot name) steps land in shots/.
 # --speed runs the game's clock that many times real time; --secs stays real.
 #
-# The window stays hidden, no audio device opens, the memory card is a
-# throwaway copy of the player's, and only the process this script started
-# is ever killed.
+# The window stays hidden, no audio device opens, boot skips the logos'
+# padding (--fast-boot), the memory card is a throwaway copy of the
+# player's, and only the process this script started is ever killed.
 # out gets run.log, frames/ (the guest picture every --shot-every presented
 # frames) and stack.txt, a 3s sample taken just before the stop. The summary
 # names where the game thread spends its time, by recompiled function.
@@ -75,7 +75,7 @@ DISC="$(cd "$(dirname "$DISC")" && pwd)/$(basename "$DISC")"
 # never writes to them.
 [ -d "$DATA/mc0" ] && cp -Rp "$DATA/mc0/." "$CARD/"
 [ -f "$DATA/settings.ini" ] && cp "$DATA/settings.ini" "$OUT/settings.ini"
-(cd "$OUT" && exec "$BIN" "$ELF" "$DISC" ${SCENARIO[@]+"${SCENARIO[@]}"} ${SPEED[@]+"${SPEED[@]}"} --hidden --mute --mc "$CARD" --settings "$OUT/settings.ini" \
+(cd "$OUT" && exec "$BIN" "$ELF" "$DISC" ${SCENARIO[@]+"${SCENARIO[@]}"} ${SPEED[@]+"${SPEED[@]}"} --fast-boot --hidden --mute --mc "$CARD" --settings "$OUT/settings.ini" \
   --shots "$OUT/frames" --shot-every "$EVERY") > "$OUT/run.log" 2>&1 &
 PID=$!
 RUNNER=$PID

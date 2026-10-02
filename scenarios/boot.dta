@@ -1,7 +1,4 @@
-; Boots to the main menu, then quickplay's song list. The splash waits for
-; Start, so the menu is gone to directly.
-(wait_screen splash_screen)
-{ui goto_screen main_screen}
+; Boots to the main menu, then quickplay's song list.
 (wait_screen main_screen)
 (wait 2)
 (shot main)

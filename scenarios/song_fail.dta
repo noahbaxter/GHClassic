@@ -1,6 +1,6 @@
 ; A quickplay song on expert with nobody playing: the rock meter empties
 ; and the song is lost at the same song time every run.
-(wait_screen splash_screen)
+(wait_screen main_screen)
 {gamecfg set mode quickplay}
 {game set_song shoutatthedevil}
 {{game get_player_config 0} set_difficulty expert}

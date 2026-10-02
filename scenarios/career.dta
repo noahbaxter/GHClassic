@@ -1,6 +1,6 @@
 ; Career's screens on the card's first profile: the tour, venue, song list,
 ; store and character pick.
-(wait_screen splash_screen)
+(wait_screen main_screen)
 {gamecfg set mode career}
 {campaign set_profile_slot 0}
 {ui goto_screen career_screen}

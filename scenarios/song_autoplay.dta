@@ -2,7 +2,7 @@
 ; Song time ({taskmgr seconds}) against UI time every 30 s shows the audio
 ; clock keeping pace, and an autoplayed song ends on the same score every
 ; run.
-(wait_screen splash_screen)
+(wait_screen main_screen)
 {gamecfg set mode quickplay}
 {game set_song shoutatthedevil}
 {{game get_player_config 0} set_difficulty expert}

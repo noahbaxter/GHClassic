@@ -32,6 +32,9 @@ namespace gh2
         uint32_t beatMatchCtor;
         uint32_t playerMatcherGetSongMs;
         uint32_t ghUtlInit;        // where GH2 registers its DataFuncs
+        uint32_t metaInit;
+        uint32_t progressiveScanCheck;
+        uint32_t splashShow;       // Splash::Show
         uint32_t dataRegisterFunc;
         uint32_t dataReadString;
         uint32_t dataNodeEvaluate; // DataNode::Evaluate
@@ -90,6 +93,9 @@ namespace gh2
         .beatMatchCtor = 0x120f48u,
         .playerMatcherGetSongMs = 0x115738u,
         .ghUtlInit = 0x11fbf0u,
+        .metaInit = 0x133f78u,
+        .progressiveScanCheck = 0x100058u,
+        .splashShow = 0x2139f0u,
         .dataRegisterFunc = 0x2b2c80u,
         .dataReadString = 0x2b28d0u,
         .dataNodeEvaluate = 0x2b7d38u,

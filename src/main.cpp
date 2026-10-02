@@ -1,19 +1,21 @@
 // GH Classic's entry point: the symbolized GH2 ELF, the disc it came from, and
 // options for unattended runs.
 //
-//   GHClassic <elf> [disc] [--scenario <file>] [--hidden] [--mute] [--speed <x>] [--mc <dir>]
+//   GHClassic <elf> [disc] [--scenario <file>] [--hidden] [--mute] [--speed <x>] [--fast-boot] [--mc <dir>]
 //            [--settings <file>] [--shots <dir>] [--shot-every <n>] [--res window|native|480p|720p|1080p|1440p|2160p]
 //   GHClassic --bind [keyboard | <n>]
 //
 // --scenario runs a file of steps (scenario.h). --speed runs the game's
 // clock that many times real time, hidden and muted only, as nothing else
-// paces it. --res is what the scene is drawn at: the window's size (the
-// default), the
+// paces it. --fast-boot boots straight to the main menu, past the logos'
+// padding, the intro movie and the press-start splash.
+// --res is what the scene is drawn at: the window's size (the default), the
 // game's own (512x448), or that height at the picture's aspect. --settings
 // reads and writes that file in place of the user data directory's. --bind
 // sets up a controller or the keyboard in input.ini; with no device it
 // lists them.
 
+#include "fast_boot.h"
 #include "host/bind.h"
 #include "host/vulkan_frontend.h"
 #include "scenario.h"
@@ -58,6 +60,8 @@ int main(int argc, char *argv[])
             mcRoot = argv[++i];
         else if (arg == "--speed" && hasValue)
             speed = std::strtod(argv[++i], nullptr);
+        else if (arg == "--fast-boot")
+            gh2::fast_boot::enable();
         else if (arg == "--scenario" && hasValue)
         {
             if (!gh2::scenario::load(argv[++i]))

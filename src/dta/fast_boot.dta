@@ -1,0 +1,15 @@
+; --fast-boot: the save loaded, straight to the main menu, past the intro
+; movie and the press-start splash, whose button only goes there
+; (splash.dta). A card with no profiles still gets the guitar help first.
+{retype cut_scene_screen
+   (
+      (allow_back FALSE)
+      (animate_transition FALSE)
+      (TRANSITION_COMPLETE_MSG
+         {if_else {> {campaign num_profiles} 0}
+            {ui goto_screen main_screen}
+            {ui goto_screen guitar_help_screen}
+         }
+      )
+   )
+}

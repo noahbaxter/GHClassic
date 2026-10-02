@@ -5,3 +5,4 @@
 inline constexpr const char kLagPanelDta[] = R"dta(@GHC_LAG_PANEL_DTA@)dta";
 inline constexpr const char kMainMenuDta[] = R"dta(@GHC_MAIN_MENU_DTA@)dta";
 inline constexpr const char kHighscorePanelDta[] = R"dta(@GHC_HIGHSCORE_PANEL_DTA@)dta";
+inline constexpr const char kFastBootDta[] = R"dta(@GHC_FAST_BOOT_DTA@)dta";
