@@ -55,6 +55,8 @@ namespace gh2::settings
             {"game", "fast_boot", Type::kBool, 0, 1, 1, 1, 0},
             {"game", "lefty", Type::kBool, 0, 1, 1, 0, 0},
             {"game", "lefty_p2", Type::kBool, 0, 1, 1, 0, 0},
+            // Off: PCSX2 holds a card it has loaded open.
+            {"save", "export_card", Type::kBool, 0, 1, 1, 0, 0},
         };
 
         int snap(const Entry &entry, int value)

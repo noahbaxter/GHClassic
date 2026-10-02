@@ -11,14 +11,17 @@
 // builds at boot. LoadData2's first call saves that campaign once as the base
 // every later load and save measures against.
 //
-// The old card folder's save is read when there is no save.bin, and becomes
-// save.bin at once.
+// A card save is read when there is no save.bin, from the old card folder, or
+// from a PCSX2 card given with --import-card, and becomes save.bin at once.
+// --export-card writes the save to a PCSX2 card after the load and each save,
+// as the game would have: the save, its icon and the marker file.
 
 #include "save/save.h"
 
 #include "guest.h"
 #include "hook.h"
 #include "save/gh2_text.h"
+#include "save/ps2_card.h"
 #include "save/store.h"
 #include "settings.h"
 
@@ -32,6 +35,7 @@
 #include <iostream>
 #include <iterator>
 #include <optional>
+#include <utility>
 
 namespace gh2::save
 {
@@ -39,6 +43,7 @@ namespace gh2::save
     {
         constexpr uint32_t kBufferSize = 0x21c00u;
         constexpr uint32_t kStreamSize = 0x40u; // a BufStream; GHMCSaveData's stack holds one in 0x20
+        constexpr uint32_t kIconSysSize = 964;  // sceMcIconSys
 
         // ui/mem_card.dta's codes. Any load error but these two asks to make a save.
         constexpr int32_t kNoError = 0;
@@ -55,6 +60,8 @@ namespace gh2::save
 
         const Addresses *s_addresses = nullptr;
         std::string s_path;
+        std::string s_importCard;
+        std::string s_exportCard;
         Store s_store;
         Loaded s_loaded = Loaded::kNothing;
         std::string s_loadedFrom;
@@ -63,6 +70,15 @@ namespace gh2::save
         std::string path()
         {
             return s_path.empty() ? settings::userDataPath("save.bin") : s_path;
+        }
+
+        // --export-card's, else settings.ini's export_card puts GHClassic.ps2
+        // beside save.bin. Empty when there is none.
+        std::string exportPath()
+        {
+            if (!s_exportCard.empty() || !settings::get(settings::kExportCard))
+                return s_exportCard;
+            return (std::filesystem::path(path()).parent_path() / "GHClassic.ps2").string();
         }
 
         std::string guestString(uint8_t *rdram, uint32_t pointer)
@@ -137,6 +153,46 @@ namespace gh2::save
             return save;
         }
 
+        // The game's card directory: the marker file named after it (holding
+        // "dummydata"), the save padded to the card's size, and the icon
+        // SetupMCIcon (0x14b098) last built.
+        void writeCard(uint8_t *rdram, const std::vector<uint8_t> &stream, const std::string &to)
+        {
+            std::optional<Ps2Card> card = Ps2Card::open(to);
+            if (!card)
+            {
+                std::error_code error;
+                if (std::filesystem::exists(to, error))
+                {
+                    std::cerr << "[save] " << to << " is not an 8 MB PS2 card; not exported" << std::endl;
+                    return;
+                }
+                card = Ps2Card::format();
+            }
+            const uint32_t icon = load<uint32_t>(rdram, s_addresses->mcIconData);
+            if (icon == 0u)
+            {
+                std::cerr << "[save] no card icon built; not exported" << std::endl;
+                return;
+            }
+            const uint8_t *iconSys = getMemPtr(rdram, s_addresses->mcIconSys);
+            const uint8_t *iconData = getMemPtr(rdram, icon);
+            const std::string dir = guestString(rdram, s_addresses->mcBaseDir);
+            std::vector<uint8_t> data(kBufferSize, 0);
+            std::copy(stream.begin(), stream.end(), data.begin());
+            const std::vector<Ps2Card::File> files = {
+                {dir, {'d', 'u', 'm', 'm', 'y', 'd', 'a', 't', 'a', 0}},
+                {guestString(rdram, s_addresses->mcSaveFile), std::move(data)},
+                {"icon.sys", {iconSys, iconSys + kIconSysSize}},
+                {guestString(rdram, s_addresses->mcIconFile),
+                 {iconData, iconData + load<uint32_t>(rdram, s_addresses->mcIconSize)}},
+            };
+            if (!card->replaceDir(dir, files) || !card->save(to))
+                std::cerr << "[save] could not write " << to << std::endl;
+            else
+                std::cout << "[save] exported to " << to << std::endl;
+        }
+
         void saveData1(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
             const uint32_t buffer = load<uint32_t>(rdram, s_addresses->mcBuffer);
@@ -170,23 +226,45 @@ namespace gh2::save
                 std::cerr << "[save] could not write " << path() << std::endl;
                 return finish(ctx, kReadWriteFailed);
             }
+            if (const std::string to = exportPath(); !to.empty())
+                writeCard(rdram, gh2::write(*save), to);
             finish(ctx, kNoError);
         }
 
-        // The old card folder's save into the load buffer, when there is no
-        // save.bin; a damaged one gets the game's dialog instead.
+        // A card save into the load buffer: --import-card's, else the old card
+        // folder's when there is no save.bin; a damaged one gets the game's
+        // dialog instead.
         bool readCardSave(uint8_t *rdram, ReadResult read)
         {
-            if (read != ReadResult::kMissing)
+            const std::string dir = guestString(rdram, s_addresses->mcBaseDir);
+            const std::string file = guestString(rdram, s_addresses->mcSaveFile);
+            std::vector<uint8_t> data;
+            if (!s_importCard.empty())
+            {
+                // Once: a later load in the same run is save.bin's.
+                s_loadedFrom = std::exchange(s_importCard, {});
+                const std::optional<Ps2Card> card = Ps2Card::open(s_loadedFrom);
+                const std::optional<std::vector<uint8_t>> found = card ? card->read(dir, file) : std::nullopt;
+                if (!found)
+                {
+                    std::cerr << "[save] no " << dir << "/" << file << " on " << s_loadedFrom << std::endl;
+                    return false;
+                }
+                data = *found;
+            }
+            else if (read == ReadResult::kMissing)
+            {
+                const std::filesystem::path card = PS2Runtime::getIoPaths().mcRoot / dir / file;
+                std::ifstream in(card, std::ios::binary);
+                if (!in)
+                    return false;
+                data.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+                s_loadedFrom = card.string();
+            }
+            else
+            {
                 return false;
-            const std::filesystem::path card = PS2Runtime::getIoPaths().mcRoot /
-                                               guestString(rdram, s_addresses->mcBaseDir) /
-                                               guestString(rdram, s_addresses->mcSaveFile);
-            std::ifstream in(card, std::ios::binary);
-            if (!in)
-                return false;
-            const std::vector<uint8_t> data(std::istreambuf_iterator<char>(in), {});
-            s_loadedFrom = card.string();
+            }
             std::memcpy(getMemPtr(rdram, load<uint32_t>(rdram, s_addresses->mcBuffer)), data.data(),
                         std::min<size_t>(data.size(), kBufferSize));
             return true;
@@ -219,9 +297,13 @@ namespace gh2::save
             finish(ctx, kReadWriteFailed);
         }
 
-        // A card save becomes save.bin at once.
+        // A card save becomes save.bin at once, the old one kept as save.bin.bak.
         void storeCardSave(const gh2::Save &save)
         {
+            std::error_code error;
+            if (std::filesystem::exists(path(), error))
+                std::filesystem::copy_file(path(), path() + ".bak", std::filesystem::copy_options::overwrite_existing,
+                                           error);
             gh2::toStore(save, *s_fresh, s_store);
             if (writeFile(path(), s_store))
                 std::cout << "[save] " << s_loadedFrom << " is now " << path() << std::endl;
@@ -260,6 +342,11 @@ namespace gh2::save
                     std::memcpy(buffer, bytes.data(), bytes.size());
                     if (s_loaded == Loaded::kCard && s_fresh)
                         storeCardSave(*save);
+                    if (const std::string to = exportPath(); !to.empty())
+                    {
+                        runtime->callGuestFunction(rdram, ctx, s_addresses->setupMcIcon, {});
+                        writeCard(rdram, bytes, to);
+                    }
                 }
             }
             *ctx = saved;
@@ -269,6 +356,16 @@ namespace gh2::save
     void usePath(const std::string &path)
     {
         s_path = path;
+    }
+
+    void importCard(const std::string &path)
+    {
+        s_importCard = path;
+    }
+
+    void exportCard(const std::string &path)
+    {
+        s_exportCard = path;
     }
 
     void install(PS2Runtime &runtime, const Addresses &addresses)
