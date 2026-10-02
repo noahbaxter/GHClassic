@@ -34,6 +34,9 @@ namespace gh2::milo
     // its place.
     void replacePrefix(Dir &dir, const std::string &from, const std::string &to);
 
+    // The first string in the root and bodies ending `suffix`.
+    std::optional<std::string> findSuffix(const Dir &dir, const std::string &suffix);
+
     // A v24 file the game loads: uncompressed blocks, each whole objects.
     Bytes write(const Dir &dir);
 }
