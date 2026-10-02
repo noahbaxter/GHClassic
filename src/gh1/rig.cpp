@@ -369,6 +369,18 @@ namespace gh2
                 o += 1u;
                 gh2Bones[gh2.entries[i].second] = {i, xfm(b, kTransLocal), xfm(b, kTransWorld), str(b, o)};
             }
+            // GH1's clips turn each bone in its GH1 parent's frame, so a bone
+            // both have hangs where GH1 hangs it when that parent is in the
+            // rig: GH2 hangs most clavicles off the neck, GH1 off spine3. The
+            // pelvis stays on the character, which places it.
+            std::set<std::string> rehung;
+            for (auto &[n, g] : gh2Bones)
+                if (const auto o = owner.find(n); bones.count(n) && o != owner.end() && o->second != g.parent &&
+                    gh2Bones.count(g.parent) && (gh2Bones.count(o->second) || bones.count(o->second)))
+                {
+                    g.parent = o->second;
+                    rehung.insert(n);
+                }
             std::map<std::string, std::pair<Xfm, Xfm>> posed; // local, world
             std::function<Xfm(const std::string &)> worldOf = [&](const std::string &n) -> Xfm
             {
@@ -379,8 +391,9 @@ namespace gh2
                 {
                     // A parent outside the bones stays where the stored pair
                     // puts it.
-                    const Xfm parent = gh2Bones.count(g->second.parent) ? worldOf(g->second.parent)
-                                                                        : inverse(g->second.local) * g->second.world;
+                    const std::string &up = g->second.parent;
+                    const Xfm parent = gh2Bones.count(up) || bones.count(up) ? worldOf(up)
+                                                                             : inverse(g->second.local) * g->second.world;
                     if (bones.count(n))
                     {
                         world = xfm(bones[n].world, 0u);
@@ -490,6 +503,19 @@ namespace gh2
                     const Bytes l = bytes(posed[n].first), w = bytes(posed[n].second);
                     std::copy(l.begin(), l.end(), out.bodies.back().begin() + kTransLocal);
                     std::copy(w.begin(), w.end(), out.bodies.back().begin() + kTransWorld);
+                    if (rehung.count(n))
+                    {
+                        Bytes &body = out.bodies.back();
+                        size_t o = kTransWorld + 48u + 4u; // constraint
+                        str(body, o);
+                        o += 1u;
+                        const size_t from = o;
+                        str(body, o);
+                        Bytes parent;
+                        putStr(parent, g->second.parent);
+                        body.erase(body.begin() + static_cast<std::ptrdiff_t>(from), body.begin() + static_cast<std::ptrdiff_t>(o));
+                        body.insert(body.begin() + static_cast<std::ptrdiff_t>(from), parent.begin(), parent.end());
+                    }
                 }
             }
             for (Object &o : added)
