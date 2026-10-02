@@ -355,23 +355,44 @@ namespace gh2
             return true;
         }
 
-        // GH2's picker door swings on its character's clips (bone_door.rotz,
-        // opening through ui_enter, open in ui_loop). GH1's characters stand
-        // where it swings, so theirs is open from the start: the door's last
-        // place in the clip replaced, held in GH1's one-sample set.
+        // GH2's picker door swings open on its character's clips
+        // (bone_door.rotz, through ui_enter, open in ui_loop) as the
+        // character walks out. A GH1 idle stands where that walk ends, in
+        // the door's swing, so the door stands open from the start where the
+        // clip leaves it, a rotation of 1638.4 a radian in an int16 when
+        // compressed (CharBones::ScaleAdd, 0x168320). Grim's never opens in
+        // GH2, and his GH1 wings would cut through it: his opens as most
+        // characters' do, to 4138.
         void openDoor(Gh1Clip &clip, const Gh2Clip &gh2)
         {
             const std::string door = "bone_door.rotz";
-            for (const Samples &from : gh2.sets)
-            {
-                if (from.count == 0u || !from.value(door, 0u))
-                    continue;
-                const Bytes open = *from.value(door, from.count - 1u);
-                Samples &to = clip.sets[1];
-                if (to.count == 1u && to.compressed == from.compressed)
-                    to.appendRotation(door, [&](uint32_t) { return open; });
+            Samples &held = clip.sets[1];
+            if (held.count != 1u)
                 return;
+            float open = 4138.0f / 1638.4f;
+            for (const Samples &from : gh2.sets)
+                if (const auto last = from.count ? from.value(door, from.count - 1u) : std::nullopt)
+                {
+                    float end;
+                    if (from.compressed)
+                    {
+                        int16_t s;
+                        std::memcpy(&s, last->data(), 2u);
+                        end = static_cast<float>(s) / 1638.4f;
+                    }
+                    else
+                        std::memcpy(&end, last->data(), 4u);
+                    if (end > 1.0f)
+                        open = end;
+                }
+            Bytes value(held.compressed ? 2u : 4u);
+            if (held.compressed)
+            {
+                const auto s = static_cast<int16_t>(std::lround(open * 1638.4f));
+                std::memcpy(value.data(), &s, 2u);
             }
+            else
+                std::memcpy(value.data(), &open, 4u);            held.appendRotation(door, [&](uint32_t) { return value; });
         }
 
         // A macro GH1 defines as a number (kGuitarExtreme, config/macros.dta).
