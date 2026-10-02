@@ -51,8 +51,9 @@ class FileFrames:
 
 def _chdr():
     """libchdr as a ctypes library, built from lib/libchdr the first time."""
-    libs = [p for pattern in ("libchdr*.dylib", "libchdr*.so*", "chdr*.dll")
-            for p in CHDR_BUILD.glob(pattern)]
+    # is_file drops symlinks left dangling by a build that never finished.
+    libs = [p for pattern in ("libchdr*.dylib", "libchdr*.so*", "*chdr*.dll")
+            for p in CHDR_BUILD.glob(pattern) if p.is_file()]
     if not libs:
         print("building libchdr", file=sys.stderr)
         subprocess.run(["cmake", "-S", str(CHDR_SRC), "-B", str(CHDR_BUILD),
@@ -292,8 +293,14 @@ def main():
             Path(args[3]).write_bytes(img.read(args[2]))
     elif args[:1] == ["find"] and len(args) >= 3:
         for path in (p for p in args[2:] if is_image(p)):
-            with Image(path) as img:
-                rel = release(img.boot_name())
+            # One unreadable image (another layout, a damaged dump) must not
+            # hide the rest.
+            try:
+                with Image(path) as img:
+                    rel = release(img.boot_name())
+            except (OSError, ValueError) as error:
+                print(f"skipping {error}", file=sys.stderr)
+                continue
             if rel and rel["serial"] == args[1]:
                 print(path)
                 return
