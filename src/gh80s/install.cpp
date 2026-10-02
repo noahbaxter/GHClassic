@@ -6,10 +6,10 @@
 // An outfit loads char/<outfit>/og/<outfit>.milo (AddLoadChar, 0x128778),
 // with _ui and _horse beside it.
 
-#include "eighties.h"
+#include "gh80s/install.h"
 
 #include "disc/ark.h"
-#include "outfits.h"
+#include "content/outfits.h"
 
 #include <string>
 

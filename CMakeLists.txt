@@ -172,7 +172,6 @@ endif()
 # The game layer: GH2's hooks, installed through the runtime's override
 # registry, and the host window and renderer they draw through.
 set(GHC_GAME_SOURCES
-    src/eighties.cpp
     src/main.cpp
     src/build_info.cpp
     src/game.cpp
@@ -181,9 +180,7 @@ set(GHC_GAME_SOURCES
     src/sustain_release.cpp
     src/track_start.cpp
     src/whammy_hold.cpp
-    src/outfits.cpp
-    src/gh1.cpp
-    src/gh1_face.cpp
+    src/content/outfits.cpp
     src/dev/draw_dump.cpp
     src/dev/mesh_packet.cpp
     src/dev/null_rnd.cpp
@@ -193,6 +190,11 @@ set(GHC_GAME_SOURCES
     src/disc/ark.cpp
     src/disc/disc.cpp
     src/disc/sha1.cpp
+    src/gh1/clips.cpp
+    src/gh1/face.cpp
+    src/gh1/install.cpp
+    src/gh1/rig.cpp
+    src/gh80s/install.cpp
     src/milo/milo.cpp
     src/movie/movie.cpp
     src/movie/pss.cpp
