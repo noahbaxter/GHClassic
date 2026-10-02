@@ -20,16 +20,21 @@ namespace gh2
         struct Outfit
         {
             const char *character; // in config's (characters ...)
-            const char *name;      // ours
-            const char *source;    // its folder and file stem on the 80s disc
             const char *label;     // the outfit picker's (sel_character.dta)
+            const char *base;      // GH2's outfit it sits beside, here replaced
+            const char *name;      // ours
         };
 
-        // The 80s disc names its outfits as GH2 does the ones they replaced.
+        // The 80s disc names its outfits as GH2 does the ones they replaced,
+        // so base is also the folder and file stem it is read from.
         constexpr Outfit kOutfits[] = {
-            {"punk", "punk3", "punk1", "'80S MOHAWK"},     {"alterna", "alterna3", "alterna1", "'80S SKULLS"},
-            {"glam", "glam3", "glam1", "'80S CODPIECE"},   {"goth", "goth3", "goth2", "'80S LEATHERS"},
-            {"metal", "metal3", "metal1", "'80S SHIRT"},   {"grim", "grim2", "grim", "'80S"},
+            // character  label          base        name
+            {"punk",      "SIDE SWEEP",  "punk1",    "punk3"},
+            {"alterna",   "LACE",        "alterna1", "alterna3"},
+            {"metal",     "JACKET",      "metal1",   "metal3"},
+            {"glam",      "BANDANAS",    "glam1",    "glam3"},
+            {"goth",      "BLAZERS",     "goth2",    "goth3"},
+            {"grim",      "WATCHIN'",    "grim",     "grim2"},
         };
     }
 
@@ -40,19 +45,13 @@ namespace gh2
             return;
         for (const Outfit &outfit : kOutfits)
         {
-            const std::string name = outfit.name;
-            const std::string source = outfit.source;
-            ark::rename("char/" + name + "/og/gen/" + name, *disc, "char/" + source + "/og/gen/" + source);
+            const std::string base = outfit.base, name = outfit.name;
+            ark::rename("char/" + name + "/og/gen/" + name, *disc, "char/" + base + "/og/gen/" + base);
             // The highway (track/surfaces/%s_keep.bmp) and photos go by
             // outfit too.
-            ark::rename("track/surfaces/gen/" + name + "_keep", *disc, "track/surfaces/gen/" + source + "_keep");
-            outfits::photosFrom(name, *disc, source);
-            // The 80s outfit replaced GH2's default one, so source also names
-            // the outfit it is cached beside.
-            outfits::add(outfit.character, name, source, outfit.label);
+            ark::rename("track/surfaces/gen/" + name + "_keep", *disc, "track/surfaces/gen/" + base + "_keep");
+            outfits::photosFrom(name, *disc, base);
+            outfits::add(outfit.character, name, base, outfit.label);
         }
-        // Grim's one outfit has no name in the locale: his picker never
-        // showed before he had two.
-        outfits::label("grim", "grim", "CLASSIC");
     }
 }
