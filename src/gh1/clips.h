@@ -2,7 +2,7 @@
 
 // GH1's animation clips as GH2's.
 
-#include "gh1/dtb.h"
+#include "formats/dtb.h"
 #include "gh1/guitarist.h"
 #include "milo/milo.h"
 

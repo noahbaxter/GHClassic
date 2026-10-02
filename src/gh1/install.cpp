@@ -16,8 +16,8 @@
 
 #include "disc/ark.h"
 #include "content/outfits.h"
+#include "formats/dtb.h"
 #include "gh1/clips.h"
-#include "gh1/dtb.h"
 #include "gh1/face.h"
 #include "gh1/guitarist.h"
 #include "gh1/rig.h"
@@ -54,18 +54,18 @@ namespace gh2
         // anim sets among them), after those GH1 loads at boot.
         struct Charsys
         {
-            gh1::dtb::Node archetypes;
-            gh1::dtb::Macros macros;
+            dtb::Node archetypes;
+            dtb::Macros macros;
         };
 
         std::optional<Charsys> charsys(size_t gh1Disc)
         {
-            const gh1::dtb::Files files = [gh1Disc](const std::string &path) { return ark::readFile(gh1Disc, path); };
+            const dtb::Files files = [gh1Disc](const std::string &path) { return ark::readFile(gh1Disc, path); };
             Charsys out;
-            if (!gh1::dtb::read("../../system/run/config/macros.dta", out.macros, files))
+            if (!dtb::read("../../system/run/config/macros.dta", out.macros, files))
                 return std::nullopt;
-            const auto root = gh1::dtb::read("charsys/charsys.dta", out.macros, files);
-            const gh1::dtb::Node *found = root ? gh1::dtb::find(*root, "archetypes") : nullptr;
+            const auto root = dtb::read("charsys/charsys.dta", out.macros, files);
+            const dtb::Node *found = root ? dtb::find(*root, "archetypes") : nullptr;
             if (!found)
                 return std::nullopt;
             out.archetypes = *found;
@@ -94,15 +94,15 @@ namespace gh2
             std::cerr << "[gh1] cannot read GH1's charsys" << std::endl;
             return;
         }
-        const gh1::dtb::Node *types = &scripts->archetypes;
+        const dtb::Node *types = &scripts->archetypes;
         size_t count = 0u;
         for (const Guitarist &guitarist : kGuitarists)
         {
             const std::string base = guitarist.base, name = guitarist.name(), folder = guitarist.folder;
             // CharFace reads both from the archetype (GH1 0x2a6cb0).
-            const gh1::dtb::Node *archetype = gh1::dtb::find(*types, folder);
-            const gh1::dtb::Node *faceFile = archetype ? gh1::dtb::find(*archetype, "face_file") : nullptr;
-            const gh1::dtb::Node *faceData = archetype ? gh1::dtb::find(*archetype, "face_data") : nullptr;
+            const dtb::Node *archetype = dtb::find(*types, folder);
+            const dtb::Node *faceFile = archetype ? dtb::find(*archetype, "face_file") : nullptr;
+            const dtb::Node *faceData = archetype ? dtb::find(*archetype, "face_data") : nullptr;
             if (!faceFile || faceFile->nodes.size() < 2u || !faceData || !gh1::addFace(name, *faceData))
             {
                 std::cerr << "[gh1] cannot read " << folder << "'s face" << std::endl;

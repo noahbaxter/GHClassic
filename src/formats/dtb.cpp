@@ -1,19 +1,18 @@
-// A GH1 .dtb is encrypted whole after a 4-byte seed, then a version byte and
+// A .dtb is encrypted whole after a 4-byte seed, then a version byte and
 // the root array. Arrays are a u16 size, line and id, then their nodes; a
 // node is a u32 type and its value. Directives are nodes too, a #define's
 // body the array after it.
 
-#include "gh1/dtb.h"
+#include "formats/dtb.h"
 
 #include <array>
+#include <cstdio>
 #include <cstring>
 
-namespace gh2
+namespace gh2::dtb
 {
     namespace
     {
-        using gh1::dtb::Macros;
-        using gh1::dtb::Node;
         using milo::Bytes;
 
         // BinStream::EnableReadEncryption (GH1 0x2407e8) seeds Rand
@@ -64,7 +63,7 @@ namespace gh2
                 return v;
             }
 
-            std::optional<Node> array(gh1::dtb::Type type)
+            std::optional<Node> array(Type type)
             {
                 Node node{type};
                 const uint16_t size = u16();
@@ -83,7 +82,6 @@ namespace gh2
             {
                 if (o + 4u > b.size())
                     return std::nullopt;
-                using namespace gh1::dtb;
                 const auto type = static_cast<Type>(u32());
                 Node n{type};
                 switch (type)
@@ -159,7 +157,7 @@ namespace gh2
         struct Load
         {
             Macros &macros;
-            const gh1::dtb::Files &files;
+            const Files &files;
             std::vector<bool> conditions;
         };
 
@@ -169,7 +167,6 @@ namespace gh2
         // The conditionals are one stack across arrays, as GH1's is global.
         std::vector<Node> apply(const std::vector<Node> &in, Load &load, const std::string &script)
         {
-            using namespace gh1::dtb;
             Macros &macros = load.macros;
             std::vector<bool> &conditions = load.conditions;
             std::vector<Node> out;
@@ -243,47 +240,92 @@ namespace gh2
             if (plain.empty() || plain[0] != 1u)
                 return std::nullopt;
             Reader reader{plain, 1u};
-            auto root = reader.array(gh1::dtb::kArray);
+            auto root = reader.array(kArray);
             if (!root)
                 return std::nullopt;
             return apply(root->nodes, load, script);
         }
     }
 
-    namespace gh1::dtb
+    std::optional<Node> read(const std::string &script, Macros &macros, const Files &files)
     {
-        std::optional<Node> read(const std::string &script, Macros &macros, const Files &files)
-        {
-            Load load{macros, files, {}};
-            auto nodes = readFile(script, load);
-            if (!nodes)
-                return std::nullopt;
-            return Node{kArray, 0, 0.0f, {}, std::move(*nodes)};
-        }
-
-        const Node *find(const Node &array, const std::string &key)
-        {
-            for (const Node &n : array.nodes)
-                if (n.type == kArray && !n.nodes.empty() && n.nodes[0].type == kSymbol && n.nodes[0].text == key)
-                    return &n;
-            return nullptr;
-        }
-
-        const Node *find(const Node &array, int32_t key)
-        {
-            for (const Node &n : array.nodes)
-                if (n.type == kArray && !n.nodes.empty() && n.nodes[0].type == kInt && n.nodes[0].integer == key)
-                    return &n;
-            return nullptr;
-        }
-
-        std::optional<float> number(const Node &node)
-        {
-            if (node.type == kInt)
-                return static_cast<float>(node.integer);
-            if (node.type == kFloat)
-                return node.real;
+        Load load{macros, files, {}};
+        auto nodes = readFile(script, load);
+        if (!nodes)
             return std::nullopt;
+        return Node{kArray, 0, 0.0f, {}, std::move(*nodes)};
+    }
+
+    const Node *find(const Node &array, const std::string &key)
+    {
+        for (const Node &n : array.nodes)
+            if (n.type == kArray && !n.nodes.empty() && n.nodes[0].type == kSymbol && n.nodes[0].text == key)
+                return &n;
+        return nullptr;
+    }
+
+    const Node *find(const Node &array, int32_t key)
+    {
+        for (const Node &n : array.nodes)
+            if (n.type == kArray && !n.nodes.empty() && n.nodes[0].type == kInt && n.nodes[0].integer == key)
+                return &n;
+        return nullptr;
+    }
+
+    std::optional<float> number(const Node &node)
+    {
+        if (node.type == kInt)
+            return static_cast<float>(node.integer);
+        if (node.type == kFloat)
+            return node.real;
+        return std::nullopt;
+    }
+
+    std::string text(const Node &node)
+    {
+        switch (node.type)
+        {
+        case kInt:
+            return std::to_string(node.integer);
+        case kFloat:
+        {
+            // A point, or the parser reads an int.
+            char buffer[32];
+            std::snprintf(buffer, sizeof(buffer), "%.9g", node.real);
+            std::string out = buffer;
+            if (out.find_first_of(".en") == std::string::npos)
+                out += ".0";
+            return out;
+        }
+        case kVar:
+            return "$" + node.text;
+        case kSymbol:
+            // Quoted when it would not read back as one symbol.
+            if (node.text.empty() || node.text.find_first_of(" \t\n()[]{}\"';") != std::string::npos)
+                return "'" + node.text + "'";
+            return node.text;
+        case kString:
+        {
+            // \q is DataReadString's quote.
+            std::string out = "\"";
+            for (const char c : node.text)
+                out += c == '"' ? "\\q" : std::string(1, c);
+            return out + "\"";
+        }
+        case kUnhandled:
+            return "kDataUnhandled";
+        case kArray:
+        case kCommand:
+        case kProperty:
+        {
+            const char *brackets = node.type == kArray ? "()" : node.type == kCommand ? "{}" : "[]";
+            std::string out(1, brackets[0]);
+            for (size_t i = 0; i < node.nodes.size(); ++i)
+                out += (i ? " " : "") + text(node.nodes[i]);
+            return out + brackets[1];
+        }
+        default:
+            return {};
         }
     }
 }
