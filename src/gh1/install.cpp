@@ -21,6 +21,7 @@
 #include "gh1/face.h"
 #include "gh1/guitarist.h"
 #include "gh1/rig.h"
+#include "gh1/songs.h"
 #include "milo/milo.h"
 
 #include <chrono>
@@ -32,23 +33,9 @@ namespace gh2
     {
         using gh1::graft;
         using gh1::Guitarist;
+        using gh1::kGuitarists;
         using gh1::load;
         using gh1::pickerSet;
-
-        // GH1's locale names the folders: hair_metal Izzy, nu_metal Pandora,
-        // hiphop Xavier. GH1's punk and hiphop idle leaning on the back wall,
-        // where the door opens, so it stays shut behind them.
-        constexpr Guitarist kGuitarists[] = {
-            // character  label          base        folder        door opens
-            {"punk",      "SAFETY PINS", "punk1",    "punk",       false},
-            {"alterna",   "CORSET",      "alterna1", "alterna",    true},
-            {"metal",     "SHORT",       "metal1",   "metal",      true},
-            {"glam",      "BIGGER BOOT", "glam1",    "hair_metal", true},
-            {"goth",      "RAZORS",      "goth2",    "nu_metal",   true},
-            {"funk1",     "JADE",        "funk1",    "hiphop",     false},
-            {"classic",   "BRIT",        "classic",  "classic",    true},
-            {"grim",      "SCHEMIN'",    "grim",     "grim",       true},
-        };
 
         // GH1's archetypes (charsys.dta), and the macros that defines (its
         // anim sets among them), after those GH1 loads at boot.
@@ -88,6 +75,7 @@ namespace gh2
         if (!gh1Disc || !gh2Disc)
             return;
         const auto start = std::chrono::steady_clock::now();
+        gh1::addSetlist(*gh1Disc, *gh2Disc);
         const auto scripts = charsys(*gh1Disc);
         if (!scripts)
         {

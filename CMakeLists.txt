@@ -194,10 +194,12 @@ set(GHC_GAME_SOURCES
     src/disc/disc.cpp
     src/disc/sha1.cpp
     src/formats/dtb.cpp
+    src/formats/midi.cpp
     src/gh1/clips.cpp
     src/gh1/face.cpp
     src/gh1/install.cpp
     src/gh1/rig.cpp
+    src/gh1/songs.cpp
     src/gh80s/install.cpp
     src/milo/milo.cpp
     src/movie/movie.cpp
