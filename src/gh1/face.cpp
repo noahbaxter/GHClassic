@@ -1,12 +1,14 @@
 // GH1's CharFace (GH1 0x2a6cb0-0x2a7930), which GH2 dropped, on GH1's face
-// morphs that gh1/rig.cpp brings over as gh1_face.mrf and gh1_lashes.mrf.
+// morphs that gh1/rig.cpp brings over as <outfit>_face.mrf and
+// <outfit>_lashes.mrf, run by its archetype's face_data.
 //
-// A morph keys each pose at its own frame (ref 0, bad01 1 to blink 9), so a
-// frame is a pose. Every pose_length seconds CharFace::ExcitementPicker picks
-// one at random from the game's excitement level, never the one it has, and
-// SimpleBlender eases to it over blend_time. Both morphs in a character share
-// one picker, as GH1's chained them under one. GH2's RndMorph::SetFrame
-// (0x201048) does the blending and syncs the target mesh.
+// A morph keys each pose at its own frame, its place in face_data's poses
+// (ref 0, bad01 1 to blink 9), so a frame is a pose. Every pose_length seconds
+// CharFace::ExcitementPicker picks one at random from the game's excitement
+// level, never the one it has, and SimpleBlender eases to it over blend_time.
+// Both morphs in a character share one picker, as GH1's chained them under
+// one. GH2's RndMorph::SetFrame (0x201048) does the blending and syncs the
+// target mesh.
 
 #include "gh1/face.h"
 
@@ -17,6 +19,7 @@
 
 #include <cmath>
 #include <cstring>
+#include <map>
 #include <optional>
 #include <random>
 #include <set>
@@ -27,22 +30,21 @@ namespace gh2
 {
     namespace
     {
-        // GH1's charsys.dta HERO_FACES: poses by frame, blend_time 0.5,
-        // pose_length 1, and excitement_poses.
-        constexpr float kBlendTime = 0.5f;
-        constexpr float kPoseLength = 1.0f;
+        // The level each song starts at (ArenaPanel::Start, GH1 0x10e460).
         constexpr int kOkay = 2;
-        const std::vector<int> kExcitementPoses[] = {
-            {1, 2, 3},       // kExcitementBoot: bad01-03
-            {1, 2, 3},       // kExcitementBad
-            {0, 4},          // kExcitementOkay: ref, good01
-            {4, 5, 6, 7, 8}, // kExcitementGreat: good01-05
-            {4, 5, 6, 7, 8}, // kExcitementPeak
+
+        // An archetype's face_data, its pose names as frames.
+        struct FaceData
+        {
+            std::map<int, std::vector<int>> excitementPoses;
+            float blendTime = 0.0f;
+            float poseLength = 1.0f; // CharFace::CharFace's (GH1 0x2a6cb0)
         };
 
         // SimpleBlender: the pose shown, the one it eases to, and how far.
         struct Face
         {
+            const FaceData *data = nullptr;
             float timer = 0.0f;
             int pose = 0;
             int next = 0;
@@ -67,6 +69,7 @@ namespace gh2
         };
 
         const Addresses *s_addresses = nullptr;
+        std::map<std::string, FaceData> s_data; // by outfit
         std::set<uint32_t> s_morphs;
         std::unordered_map<uint32_t, Face> s_faces; // by the morphs' dir
         // The level a song set this frame, if one did. Out of songs it is
@@ -106,20 +109,20 @@ namespace gh2
         // (GH1 0x2a77a0).
         void poll(Face &face, float dt)
         {
+            const FaceData &data = *face.data;
             face.timer += dt;
-            if (face.timer > kPoseLength)
+            const auto level = data.excitementPoses.find(s_excitement);
+            if (face.timer > data.poseLength && level != data.excitementPoses.end() && !level->second.empty())
             {
                 face.timer = 0.0f;
-                const std::vector<int> &poses =
-                    kExcitementPoses[s_excitement >= 0 && s_excitement < 5 ? s_excitement : kOkay];
+                const std::vector<int> &poses = level->second;
                 size_t i = std::uniform_int_distribution<size_t>(0u, poses.size() - 1u)(s_random);
                 if (poses[i] == face.pose)
                     i = (i + 1u) % poses.size();
-                face.setNewPose(poses[i]);
-            }
+                face.setNewPose(poses[i]);            }
             if (face.blend != 1.0f)
             {
-                face.blend += dt / kBlendTime;
+                face.blend += dt / data.blendTime;
                 if (face.blend > 1.0f)
                 {
                     face.blend = 1.0f;
@@ -151,28 +154,70 @@ namespace gh2
         {
             s_excitement = s_polled.value_or(kOkay);
             s_polled.reset();
-            std::unordered_map<uint32_t, std::vector<uint32_t>> morphs;
+            std::unordered_map<uint32_t, std::pair<const FaceData *, std::vector<uint32_t>>> morphs;
             for (const uint32_t morph : s_morphs)
             {
                 const uint32_t object = load<uint32_t>(rdram, morph);
-                const uint32_t name = load<uint32_t>(rdram, object + milo::object::kName);
-                const uint32_t dir = load<uint32_t>(rdram, object + milo::object::kDir);
-                if (name != 0u && dir != 0u && std::strncmp(reinterpret_cast<const char *>(getMemPtr(rdram, name)), "gh1_", 4) == 0)
-                    morphs[dir].push_back(morph);
+                const uint32_t name = load<uint32_t>(rdram, object + ::milo::object::kName);
+                const uint32_t dir = load<uint32_t>(rdram, object + ::milo::object::kDir);
+                if (name == 0u || dir == 0u)
+                    continue;
+                const char *text = reinterpret_cast<const char *>(getMemPtr(rdram, name));
+                for (const auto &[outfit, data] : s_data)
+                    if (std::strncmp(text, outfit.c_str(), outfit.size()) == 0 && text[outfit.size()] == '_')
+                    {
+                        morphs[dir].first = &data;
+                        morphs[dir].second.push_back(morph);
+                    }
             }
             std::erase_if(s_faces, [&](const auto &face) { return !morphs.count(face.first); });
             if (morphs.empty())
                 return;
             const float dt = deltaSeconds(rdram);
             const EntryArgs args(ctx);
-            for (const auto &[dir, list] : morphs)
+            for (const auto &[dir, found] : morphs)
             {
+                const auto &[data, list] = found;
                 Face &face = s_faces[dir];
+                face.data = data;
                 poll(face, dt);
                 for (const uint32_t morph : list)
                     draw(rdram, ctx, runtime, morph, face);
             }
             args.restore(ctx);
+        }
+    }
+
+    namespace gh1
+    {
+        // CharFace::PoseNum (GH1 0x2a7620): a pose's frame is its place in
+        // poses, after the key.
+        bool addFace(const std::string &outfit, const dtb::Node &faceData)
+        {
+            const dtb::Node *poses = dtb::find(faceData, "poses");
+            const dtb::Node *blend = dtb::find(faceData, "blend_time");
+            const dtb::Node *excitement = dtb::find(faceData, "excitement_poses");
+            if (!poses || !blend || blend->nodes.size() < 2u || !dtb::number(blend->nodes[1]) || !excitement)
+                return false;
+            std::map<std::string, int> frames;
+            for (size_t i = 1; i < poses->nodes.size(); ++i)
+                frames[poses->nodes[i].text] = static_cast<int>(i - 1u);
+            FaceData data;
+            data.blendTime = *dtb::number(blend->nodes[1]);
+            if (const dtb::Node *length = dtb::find(faceData, "pose_length");
+                length && length->nodes.size() >= 2u && dtb::number(length->nodes[1]))
+                data.poseLength = *dtb::number(length->nodes[1]);
+            for (const dtb::Node &level : excitement->nodes)
+            {
+                if (level.type != dtb::kArray || level.nodes.empty() || level.nodes[0].type != dtb::kInt)
+                    continue;
+                std::vector<int> &list = data.excitementPoses[level.nodes[0].integer];
+                for (size_t i = 1; i < level.nodes.size(); ++i)
+                    if (const auto f = frames.find(level.nodes[i].text); f != frames.end())
+                        list.push_back(f->second);
+            }
+            s_data[outfit] = std::move(data);
+            return true;
         }
     }
 

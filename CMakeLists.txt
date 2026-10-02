@@ -191,6 +191,7 @@ set(GHC_GAME_SOURCES
     src/disc/disc.cpp
     src/disc/sha1.cpp
     src/gh1/clips.cpp
+    src/gh1/dtb.cpp
     src/gh1/face.cpp
     src/gh1/install.cpp
     src/gh1/rig.cpp

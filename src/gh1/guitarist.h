@@ -16,13 +16,10 @@ namespace gh2
             const char *label;               // the outfit picker's (sel_character.dta)
             const char *clipPrefix = nullptr; // GH1's clip names, <clipPrefix>_idle_ui
             const char *highway = nullptr;   // GH1's, track/surfaces/<highway>.bmp
-            const char *faceFile = nullptr;  // GH1's face scene, charsys/<gh1Folder>/<faceFile>.rnd
             bool pickerDoorOpens = true;     // the picker door swings open behind them
 
             std::string outfit() const { return std::string(gh2Character) + "gh1"; }
             std::string clips() const { return clipPrefix ? clipPrefix : gh1Folder; }
-            std::string track() const { return highway ? highway : gh1Folder; }
-            std::string face() const { return faceFile ? faceFile : std::string(gh1Folder) + "_face"; }
-        };
+            std::string track() const { return highway ? highway : gh1Folder; }        };
     }
 }

@@ -250,7 +250,7 @@ namespace gh2
             return r;
         }
 
-        milo::Dir graft(const milo::Dir &gh2, const milo::Dir &gh1, const milo::Dir &face)
+        milo::Dir graft(const milo::Dir &gh2, const milo::Dir &gh1, const milo::Dir &face, const std::string &outfit)
         {
             std::set<std::string> shadow;
             std::set<std::string> gh2Names;
@@ -282,8 +282,7 @@ namespace gh2
                 }
             }
             // The face's poses (bad01.mesh) and the morphs blending them into
-            // face.mesh and lashes.mesh, named for gh1/face to find. The
-            // poses draw in no group.
+            // face.mesh and lashes.mesh. The poses draw in no group.
             for (size_t i = 0; i < face.entries.size(); ++i)
             {
                 const auto &[c, n] = face.entries[i];
@@ -293,7 +292,7 @@ namespace gh2
                 {
                     auto morph = gh2Morph(face.bodies[i], n.substr(0, n.rfind('.')) + ".mesh");
                     if (morph)
-                        added.push_back({c, "gh1_" + n, std::move(*morph)});
+                        added.push_back({c, outfit + "_" + n, std::move(*morph)});
                     else
                         std::cerr << "[gh1] cannot read morph " << n << std::endl;
                 }
