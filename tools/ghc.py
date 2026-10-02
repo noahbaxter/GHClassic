@@ -7,6 +7,7 @@
     tools/ghc.py arm [out] [--scenario <file>] [--speed <x>] [--secs 30] [--disc <image>] [--shot-every 60]
     tools/ghc.py scenarios [-j 4] [--speed 2] [name ...]
     tools/ghc.py release [--skip-build]      this platform's player package, into build/release
+    tools/ghc.py ci                          what builds without a disc, into build/ci
 
 play builds everything from the disc on its first run, then brings the C++
 build up to date before each launch (not the recompile) unless --no-build.
@@ -153,6 +154,13 @@ def built():
     return ELF.exists() and game_binary().exists()
 
 
+def build_tools(env, jobs):
+    """The analyzer and recompiler, a top-level build of lib/PS2Recomp."""
+    run(["cmake", "-S", ROOT / "lib" / "PS2Recomp", "-B", TOOLS, "-DCMAKE_BUILD_TYPE=Release",
+         "-DPS2X_BUILD_RUNTIME=OFF", "-DPS2X_BUILD_TEST=OFF", "-DPS2X_BUILD_STUDIO=OFF"], env, quiet=True)
+    run(["cmake", "--build", TOOLS, "--target", "ps2_analyzer", "ps2_recomp", "-j", jobs], env)
+
+
 def build(disc=None, recomp=True, lto=True):
     env = tool_env()
     jobs = str(os.cpu_count() or 4)
@@ -164,9 +172,7 @@ def build(disc=None, recomp=True, lto=True):
         run([sys.executable, ROOT / "tools" / "symbolize.py", RECOMP / "retail.elf",
              ROOT / "config" / "gh2-retail.symbols", ELF], env)
 
-        run(["cmake", "-S", ROOT / "lib" / "PS2Recomp", "-B", TOOLS, "-DCMAKE_BUILD_TYPE=Release",
-             "-DPS2X_BUILD_RUNTIME=OFF", "-DPS2X_BUILD_TEST=OFF", "-DPS2X_BUILD_STUDIO=OFF"], env, quiet=True)
-        run(["cmake", "--build", TOOLS, "--target", "ps2_analyzer", "ps2_recomp", "-j", jobs], env)
+        build_tools(env, jobs)
 
         # The analyzer writes the recompiler config, and points the generated
         # code at output/ beside it. Both are verbose, so their output goes to logs.
@@ -350,6 +356,21 @@ def cmd_scenarios(argv):
     return 1 if any(line.startswith("FAIL") for line in lines) else 0
 
 
+def cmd_ci(argv):
+    """Everything that builds without a disc, with the toolchain a player's
+    build uses: the recompiler tools, then the runtime and every library the
+    game links, in build/ci. The game itself needs the generated code."""
+    argparse.ArgumentParser(prog="ghc.py ci").parse_args(argv)
+    env = tool_env()
+    jobs = str(os.cpu_count() or 4)
+    build_tools(env, jobs)
+    ci = BUILD / "ci"
+    run(["cmake", "-S", ROOT, "-B", ci, "-DCMAKE_BUILD_TYPE=Release", f"-DGHC_GENERATED_DIR={ci / 'none'}"],
+        env, quiet=True)
+    run(["cmake", "--build", ci, "-j", jobs, "--target", "ps2_runtime", "chdr-static", "SDL3-static", "volk",
+         "vk-bootstrap", "glslang-standalone"], env)
+
+
 def cmd_bind(argv):
     if not built():
         sys.exit("no build; run tools/ghc.py build")
@@ -479,7 +500,7 @@ def cmd_release(argv):
 
 
 COMMANDS = {"play": cmd_play, "build": cmd_build, "bind": cmd_bind, "arm": cmd_arm, "scenarios": cmd_scenarios,
-            "release": cmd_release}
+            "release": cmd_release, "ci": cmd_ci}
 
 
 def main():

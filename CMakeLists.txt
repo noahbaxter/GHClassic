@@ -53,13 +53,12 @@ add_subdirectory(lib/libchdr EXCLUDE_FROM_ALL)
 # build, leaving GHClassic and what it links.
 add_subdirectory(lib/PS2Recomp EXCLUDE_FROM_ALL)
 
-file(GLOB GHC_GENERATED_SOURCES CONFIGURE_DEPENDS
-    "${GHC_GENERATED_DIR}/*.cpp"
-)
-
-if(NOT GHC_GENERATED_SOURCES)
-    message(STATUS "No generated code in ${GHC_GENERATED_DIR}; GHClassic target skipped")
-    return()
+# The runtime and the generated code use SSE4.1 intrinsics (_mm_extract_epi32),
+# which x86_64 compilers other than MSVC leave off by default. Here, so the
+# runtime builds without generated code too (CI).
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$" AND NOT MSVC)
+    set(GHC_X86_FLAGS -msse4.1)
+    target_compile_options(ps2_runtime PRIVATE ${GHC_X86_FLAGS})
 endif()
 
 set(PS2X_RUNTIME_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib/PS2Recomp/ps2xRuntime")
@@ -115,6 +114,16 @@ if(APPLE)
         URL https://github.com/KhronosGroup/MoltenVK/releases/download/v1.4.2/MoltenVK-macos.tar
         URL_HASH SHA256=f95765a6229cb7b915990a2890ce12ebe36a730b021545d3d52ae69ce4c4024e)
     FetchContent_MakeAvailable(MoltenVK)
+endif()
+
+# Without a disc's generated code, everything above still builds: what CI
+# checks (tools/ghc.py ci).
+file(GLOB GHC_GENERATED_SOURCES CONFIGURE_DEPENDS
+    "${GHC_GENERATED_DIR}/*.cpp"
+)
+if(NOT GHC_GENERATED_SOURCES)
+    message(STATUS "No generated code in ${GHC_GENERATED_DIR}; GHClassic target skipped")
+    return()
 endif()
 
 # The game layer: GH2's hooks, installed through the runtime's override
@@ -251,12 +260,7 @@ target_include_directories(GHClassic PRIVATE ${PS2X_DIR_INCLUDE_DIRECTORIES})
 target_compile_definitions(GHClassic PRIVATE ${PS2X_DIR_COMPILE_DEFINITIONS})
 target_compile_options(GHClassic PRIVATE ${PS2X_DIR_COMPILE_OPTIONS})
 
-# Generated code and the runtime use SSE4.1 intrinsics (_mm_extract_epi32),
-# which x86_64 compilers other than MSVC leave off by default.
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$" AND NOT MSVC)
-    target_compile_options(GHClassic PRIVATE -msse4.1)
-    target_compile_options(ps2_runtime PRIVATE -msse4.1)
-endif()
+target_compile_options(GHClassic PRIVATE ${GHC_X86_FLAGS})
 # Unity batches outgrow COFF's 32k sections. A static runtime leaves the exe
 # needing nothing of llvm-mingw's beside it, and -mwindows no console window
 # beside the game's (output goes to GHClassic.log, main.cpp).
