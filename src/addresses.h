@@ -59,6 +59,7 @@ namespace gh2
         uint32_t loadData2;     // back on the main thread, where Campaign::Load runs
         uint32_t bufStreamCtor; // BufStream::BufStream(void *, int, bool)
         uint32_t binStreamDtor; // BinStream::~BinStream
+        uint32_t setupMcIcon;   // builds the card icon below from config/mc.dta and the disc
         // Data
         uint32_t rndCamCurrent;  // RndCam::sCurrent
         uint32_t defaultMat;     // the RndMat a mesh without one draws with
@@ -72,6 +73,10 @@ namespace gh2
         uint32_t mcOverwrite; // GHMCSaveData's overwrite argument: replace a save already there
         uint32_t mcBaseDir;   // char*, the save's directory on the card
         uint32_t mcSaveFile;  // char*, the save's file in it
+        uint32_t mcIconFile;  // char*, its icon file's name
+        uint32_t mcIconSize;
+        uint32_t mcIconData;  // that file's bytes, read off the disc
+        uint32_t mcIconSys;   // sceMcIconSys, written as icon.sys
         // RndBitmap::PixelOffset's swizzle tables, by (y / 4) & 1: 64 bytes
         // each for 8bpp, 128 for 4bpp.
         uint32_t swizzle8[2];
@@ -131,6 +136,7 @@ namespace gh2
         .loadData2 = 0x14bae0u,
         .bufStreamCtor = 0x2c9268u,
         .binStreamDtor = 0x2c8b78u,
+        .setupMcIcon = 0x14b098u,
         .rndCamCurrent = 0x3de348u,
         .defaultMat = 0x3da4f0u,
         .rndEnvironCurrent = 0x3de358u,
@@ -143,6 +149,10 @@ namespace gh2
         .mcOverwrite = 0x3da394u,
         .mcBaseDir = 0x3da374u,
         .mcSaveFile = 0x3da370u,
+        .mcIconFile = 0x3da378u,
+        .mcIconSize = 0x3da37cu,
+        .mcIconData = 0x3da380u,
+        .mcIconSys = 0x46a908u,
         .swizzle8 = {0x3de1c8u, 0x3de208u},
         .swizzle4 = {0x3de248u, 0x3de2c8u},
     };

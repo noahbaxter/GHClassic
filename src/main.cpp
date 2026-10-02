@@ -2,7 +2,8 @@
 // runs.
 //
 //   GHClassic [disc] [--scenario <file>] [--hidden] [--mute] [--speed <x>] [--fast-boot] [--seed <n>]
-//            [--mc <dir>] [--save <file>] [--settings <file>] [--shots <dir>] [--shot-every <n>]
+//            [--mc <dir>] [--save <file>] [--import-card <ps2>] [--export-card <ps2>]
+//            [--settings <file>] [--shots <dir>] [--shot-every <n>]
 //            [--res window|native|480p|720p|1080p|1440p|2160p]
 //   GHClassic --bind [keyboard | <n>]
 //
@@ -17,7 +18,9 @@
 // --res is what the scene is drawn at: the window's size (the default), the
 // game's own (512x448), or that height at the picture's aspect. --settings
 // and --save read and write that file in place of the user data directory's;
-// --mc is the card, read for a save only when there is no save file. --bind
+// --mc is the card, read for a save only when there is no save file.
+// --import-card loads the save off a PCSX2 card and makes it the save file;
+// --export-card writes it to one (save/save.h). --bind
 // sets up a controller or the keyboard in input.ini; with no device it
 // lists them.
 
@@ -121,6 +124,10 @@ int main(int argc, char *argv[])
             gh2::settings::usePath(argv[++i]);
         else if (arg == "--save" && hasValue)
             gh2::save::usePath(argv[++i]);
+        else if (arg == "--import-card" && hasValue)
+            gh2::save::importCard(argv[++i]);
+        else if (arg == "--export-card" && hasValue)
+            gh2::save::exportCard(argv[++i]);
         else if (arg == "--shots" && hasValue)
             hostOptions.shotDir = argv[++i];
         else if (arg == "--shot-every" && hasValue)

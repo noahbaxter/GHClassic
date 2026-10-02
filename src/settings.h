@@ -22,6 +22,7 @@ namespace gh2::settings
         kFastBoot,   // straight to the main menu, past the logos and splash
         kLefty,      // player 1's frets mirrored
         kLeftyP2,
+        kExportCard, // each save also written to GHClassic.ps2, a PCSX2 card
         kKeyCount,
     };
 
