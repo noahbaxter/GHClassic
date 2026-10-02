@@ -19,7 +19,8 @@
       (outfit_buttons (outfit1.btn outfit2.btn outfit3.btn outfit4.btn))
       (outfit_x 0) (outfit_y 0) (outfit_z 0) ; outfit1.btn's own place
       (outfit_step 0)  ; outfit1 to outfit2, in z (falls going down)
-      (outfit_lift 0)  ; the list's start above outfit1's place: a step for four
+      (outfit_lift 0)  ; the list's start above outfit1's place: half a step for four
+      (outfit_space 0) ; between buttons: a step, closer for four
       (blurb_z 0)      ; sc_char_outfit_blurb.lbl's own z, under two buttons
       (enter
          {$this add_outfit_buttons}
@@ -145,18 +146,20 @@
                   }
                }
             }
-            ; Four start a step higher, into the room under the title, so
-            ; they end where three do and the likes and dislikes still fit.
-            {$this set outfit_lift {if_else {> $count 3} {'-' 0 [outfit_step]} 0}}
+            ; Four start half a step higher, clear of the title, and sit
+            ; closer, so the longest likes and dislikes still fit above the
+            ; controls.
+            {$this set outfit_lift {if_else {> $count 3} {'/' [outfit_step] -2} 0}}
+            {$this set outfit_space {if_else {> $count 3} {'*' [outfit_step] 0.9} [outfit_step]}}
             {foreach_int $i 0 $count
                {{{$this loaded_dir} find {elem [outfit_buttons] $i}} set_local_pos [outfit_x] [outfit_y]
-                  {'+' [outfit_z] {'+' [outfit_lift] {'*' $i [outfit_step]}}}}
+                  {'+' [outfit_z] {'+' [outfit_lift] {'*' $i [outfit_space]}}}}
             }
             ; The likes and dislikes start under the second button: down as
             ; far as the last one is past it.
             {do
                ($bx 0) ($by 0) ($bz 0)
-               ($last {'+' [outfit_lift] {'*' {'-' $count 1} [outfit_step]}})
+               ($last {'+' [outfit_lift] {'*' {'-' $count 1} [outfit_space]}})
                {sc_char_outfit_blurb.lbl get_local_pos $bx $by $bz}
                {sc_char_outfit_blurb.lbl set_local_pos $bx $by
                   {'+' [blurb_z] {min 0 {'-' $last [outfit_step]}}}}
@@ -222,7 +225,7 @@
                      ($x 0) ($y 0) ($z 0)
                      {cs_arrow.mesh get_local_pos $x $y $z}
                      {cs_arrow.mesh set_local_pos $x $y
-                        {'+' $z {'+' [outfit_lift] {'*' $idx [outfit_step]}}}}
+                        {'+' $z {'+' [outfit_lift] {'*' $idx [outfit_space]}}}}
                   }
                   {set $old_char {char_single get_char 0}}
                   {if {char_single show_char 0 [char_outfit]}
