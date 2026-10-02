@@ -20,4 +20,7 @@ namespace gh2
 
     // What is pulled. Silence until one is set; settable any time.
     void setAudioSource(AudioSource source);
+
+    // A movie's soundtrack, mixed over the first source. Null for none.
+    void setMovieAudioSource(AudioSource source);
 }
