@@ -321,10 +321,7 @@ namespace gh2
                     body.insert(body.end(), t.begin() + kTransWorld + 4 + 48, t.begin() + static_cast<std::ptrdiff_t>(parentAt));
                     putStr(body, upName);
                     body.insert(body.end(), t.begin() + static_cast<std::ptrdiff_t>(o), t.end());
-                    set.entries.emplace_back("CharBone", *it + suffix);
-                    set.bodies.push_back(std::move(body));
-                    set.tableCount += 2u;
-                    set.tableSize += static_cast<uint32_t>(std::string("CharBone").size() + it->size() + suffix.size() + 2u);
+                    milo::add(set, "CharBone", *it + suffix, std::move(body));
                     it = missing.erase(it);
                     added = true;
                 }
