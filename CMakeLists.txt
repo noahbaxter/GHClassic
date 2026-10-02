@@ -117,6 +117,7 @@ endif()
 # registry, and the host window and renderer they draw through.
 set(GHC_GAME_SOURCES
     src/main.cpp
+    src/disc.cpp
     src/game.cpp
     src/fast_boot.cpp
     src/frame_step.cpp
@@ -130,6 +131,7 @@ set(GHC_GAME_SOURCES
     src/script.cpp
     src/seed.cpp
     src/settings.cpp
+    src/sha1.cpp
     src/synth/module.cpp
     src/synth/reverb.cpp
     src/synth/spu.cpp
@@ -226,6 +228,15 @@ target_link_libraries(GHClassic PRIVATE
 )
 # Calls go through volk's pointers, never a linked loader.
 target_compile_definitions(GHClassic PRIVATE VK_NO_PROTOTYPES)
+
+# The game runs the executable off the player's disc, which must be the one
+# the generated code came from (disc.cpp).
+set(GHC_RETAIL_ELF "${GHC_GENERATED_DIR}/../retail.elf" CACHE FILEPATH "The ELF the generated code came from")
+if(NOT EXISTS "${GHC_RETAIL_ELF}")
+    message(FATAL_ERROR "No ${GHC_RETAIL_ELF}; run tools/ghc.py build")
+endif()
+file(SHA1 "${GHC_RETAIL_ELF}" GHC_RETAIL_SHA1)
+target_compile_definitions(GHClassic PRIVATE GHC_RETAIL_SHA1="${GHC_RETAIL_SHA1}")
 
 # Upstream sets its platform setup (sse2neon on ARM) at directory scope, so it
 # reaches only targets inside lib/PS2Recomp. Generated code needs it too.

@@ -1,5 +1,6 @@
 #include "settings.h"
 
+#include "disc.h"
 #include "ini.h"
 
 #include <SDL3/SDL.h>
@@ -180,12 +181,15 @@ namespace gh2::settings
         s_path = path;
     }
 
-    // The project was ghrecomp: its directory, when it is the only one, is
-    // moved over whole the first time.
+    // A portable install keeps it all beside the executable. Otherwise the
+    // project was ghrecomp: its directory, when it is the only one, is moved
+    // over whole the first time.
     std::string userDataPath(const std::string &file)
     {
         static const std::string dir = []
         {
+            if (disc::portable())
+                return std::string(SDL_GetBasePath());
             char *pref = SDL_GetPrefPath("", "GHClassic");
             if (!pref)
                 return std::string();

@@ -216,7 +216,7 @@ def cmd_play(argv):
         run(["cmake", "--build", GAME, "--target", "GHClassic"], tool_env(), log=log)
         log.unlink()
     disc = disc or find_disc(tool_env())
-    return subprocess.run([str(game_binary()), str(ELF), disc, *argv]).returncode
+    return subprocess.run([str(game_binary()), disc, *argv]).returncode
 
 
 def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=None):
@@ -235,7 +235,7 @@ def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=N
     # boot on any machine and never touches the player's.
     card = Path(tempfile.mkdtemp(prefix="arm-mc."))
 
-    cmd = [str(game_binary()), str(ELF), disc]
+    cmd = [str(game_binary()), disc]
     if scenario:
         cmd += ["--scenario", str(Path(scenario).resolve())]
     if speed:
