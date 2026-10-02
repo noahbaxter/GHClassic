@@ -33,6 +33,12 @@
 
 #include <SDL3/SDL.h>
 
+#ifdef _WIN32
+#include <io.h> // dup2
+#else
+#include <unistd.h>
+#endif
+
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
@@ -157,6 +163,22 @@ int main(int argc, char *argv[])
     // After --settings, which names the file it is read from.
     if (gh2::settings::get(gh2::settings::kFastBoot))
         gh2::fast_boot::enable();
+
+    // Started from a file manager there is no terminal to read, so the output
+    // goes to GHClassic.log beside the settings. Hidden runs keep theirs. On
+    // Windows the game is a GUI program with no console at all, and isatty
+    // takes the NUL device for one.
+#ifdef _WIN32
+    const bool terminal = false;
+#else
+    const bool terminal = isatty(fileno(stderr));
+#endif
+    if (!hostOptions.hidden && !terminal)
+    {
+        const std::string log = gh2::settings::userDataPath("GHClassic.log");
+        if (std::freopen(log.c_str(), "w", stderr))
+            dup2(fileno(stderr), fileno(stdout));
+    }
 
     // The disc, and this build's executable on it, before any window opens.
     std::string why;

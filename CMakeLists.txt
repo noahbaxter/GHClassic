@@ -258,10 +258,11 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$" AND NOT MSVC)
     target_compile_options(ps2_runtime PRIVATE -msse4.1)
 endif()
 # Unity batches outgrow COFF's 32k sections. A static runtime leaves the exe
-# needing nothing of llvm-mingw's beside it.
+# needing nothing of llvm-mingw's beside it, and -mwindows no console window
+# beside the game's (output goes to GHClassic.log, main.cpp).
 if(MINGW)
     target_compile_options(GHClassic PRIVATE -Wa,-mbig-obj)
-    target_link_options(GHClassic PRIVATE -static)
+    target_link_options(GHClassic PRIVATE -static -mwindows)
 endif()
 
 # Same batching and precompiled headers upstream uses for its runner. Without
