@@ -526,10 +526,7 @@ namespace gh2
                     hideGh1(o.body);
                 if (const auto t = topOrder.find(o.name); o.cls == "Mesh" && t != topOrder.end())
                     setDrawOrder(o.body, t->second);
-                out.tableCount += 2u;
-                out.tableSize += static_cast<uint32_t>(o.cls.size() + o.name.size() + 2u);
-                out.entries.emplace_back(o.cls, o.name);
-                out.bodies.push_back(std::move(o.body));
+                milo::add(out, o.cls, o.name, std::move(o.body));
             }
             return out;
         }
