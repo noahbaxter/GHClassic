@@ -15,6 +15,10 @@
 // is read in place of save.bin by the first load, and becomes save.bin at once.
 // --export-card writes the save to a PCSX2 card after the load and each save,
 // as the game would have: the save, its icon and the marker file.
+//
+// Other games' songs get rows in GH2's high score table (HighScoreDB, built
+// from a song list at 0x13cef0), starting on their own game's names: the
+// fresh campaign takes them, and so does the game, through a load of it.
 
 #include "save/save.h"
 
@@ -23,6 +27,7 @@
 #include "save/gh2_text.h"
 #include "save/ps2_card.h"
 #include "save/store.h"
+#include "script.h"
 #include "settings/settings.h"
 
 #include "ps2_runtime.h"
@@ -33,6 +38,8 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
+#include <map>
 #include <optional>
 #include <utility>
 
@@ -65,6 +72,8 @@ namespace gh2::save
         Loaded s_loaded = Loaded::kNothing;
         std::string s_loadedFrom;
         std::optional<gh2::Save> s_fresh;
+        gh2::SongGames s_songGames;
+        std::map<std::string, std::array<std::string, 5>> s_scoreNames; // by game
 
         std::string path()
         {
@@ -131,25 +140,69 @@ namespace gh2::save
             ctx->pc = GPR_U32(ctx, 31);
         }
 
-        // Campaign::Save into a buffer of our own, as GHMCSaveData does.
-        std::optional<gh2::Save> saveCampaign(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        // Campaign's Save (vtable slot +0x40) or Load (+0x50) over a buffer
+        // of our own, as GHMCSaveData and LoadData2 do. A slot is a this
+        // adjustment, then the function. `bytes` go in first and come back out.
+        void runCampaign(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t slot,
+                         std::vector<uint8_t> &bytes)
         {
             const auto call = [&](uint32_t function, std::initializer_list<uint32_t> args) {
                 return static_cast<uint32_t>(runtime->callGuestFunction(rdram, ctx, function, args));
             };
             const uint32_t buffer = call(s_addresses->builtinNew, {kBufferSize});
+            std::memcpy(getMemPtr(rdram, buffer), bytes.data(), std::min<size_t>(bytes.size(), kBufferSize));
             const uint32_t stream = call(s_addresses->builtinNew, {kStreamSize});
             call(s_addresses->bufStreamCtor, {stream, buffer, kBufferSize, 1u});
-            // The vtable's Save slot (+0x40): a this adjustment, then the function.
             const uint32_t campaign = load<uint32_t>(rdram, s_addresses->theCampaign);
             const uint32_t vtable = load<uint32_t>(rdram, campaign);
-            const uint32_t self = campaign + static_cast<uint32_t>(static_cast<int32_t>(load<int16_t>(rdram, vtable + 0x40u)));
-            call(load<uint32_t>(rdram, vtable + 0x44u), {self, stream});
+            const uint32_t self =
+                campaign + static_cast<uint32_t>(static_cast<int32_t>(load<int16_t>(rdram, vtable + slot)));
+            call(load<uint32_t>(rdram, vtable + slot + 4u), {self, stream});
             call(s_addresses->binStreamDtor, {stream, 2u});
-            std::optional<gh2::Save> save = gh2::parse(getMemPtr(rdram, buffer), kBufferSize);
+            const uint8_t *out = getMemPtr(rdram, buffer);
+            bytes.assign(out, out + kBufferSize);
             call(s_addresses->builtinDelete, {stream});
             call(s_addresses->builtinDelete, {buffer});
-            return save;
+        }
+
+        std::optional<gh2::Save> saveCampaign(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            std::vector<uint8_t> bytes;
+            runCampaign(rdram, ctx, runtime, 0x40u, bytes);
+            return gh2::parse(bytes.data(), bytes.size());
+        }
+
+        void loadCampaign(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const gh2::Save &save)
+        {
+            std::vector<uint8_t> bytes = gh2::write(save);
+            runCampaign(rdram, ctx, runtime, 0x50u, bytes);
+        }
+
+        // Other games' songs start on their own game's names.
+        void nameDefaults(gh2::Save &fresh)
+        {
+            for (gh2::SongScores &song : fresh.scores)
+                if (const auto game = s_songGames.find(song.song); game != s_songGames.end())
+                    for (auto &list : song.lists)
+                        for (int rank = 0; rank < gh2::kScoresPerList; ++rank)
+                            list[rank].name = s_scoreNames[game->second][rank];
+        }
+
+        // The song list HighScoreDB is built from (Campaign's constructor,
+        // 0x12cf00) gains the other games' songs.
+        struct HighScoreDbTag;
+        void onHighScoreDb(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const R5900Context saved = *ctx;
+            const uint32_t songs = GPR_U32(ctx, 5);
+            const uint32_t scratch = GPR_U32(ctx, 29) - 0x20u;
+            SET_GPR_U32(ctx, 29, scratch - 0x10u);
+            for (const auto &[song, game] : s_songGames)
+            {
+                const uint32_t symbol = script::symbol(rdram, ctx, runtime, song);
+                pushBack(rdram, ctx, runtime, songs, &symbol, 4u, s_addresses->symbolsInsertOverflow, scratch);
+            }
+            *ctx = saved;
         }
 
         // The game's card directory: the marker file named after it (holding
@@ -212,7 +265,7 @@ namespace gh2::save
             if (there != ReadResult::kMissing && load<uint32_t>(rdram, s_addresses->mcOverwrite) == 0u)
                 return finish(ctx, kFileExists);
             keepOptions(save->options);
-            gh2::toStore(*save, *s_fresh, s_store);
+            gh2::toStore(*save, *s_fresh, s_store, s_songGames);
             // A damaged save is only ever replaced by choice, and kept aside.
             if (there == ReadResult::kCorrupt)
             {
@@ -278,6 +331,19 @@ namespace gh2::save
             finish(ctx, kReadWriteFailed);
         }
 
+        // A card save is GH2's alone: it takes GH2's progress and the scores of
+        // the songs it has, and the other games' scores stay.
+        void overCard(gh2::Save &save, const gh2::Save &card)
+        {
+            std::vector<gh2::SongScores> scores = card.scores;
+            for (const gh2::SongScores &song : save.scores)
+                if (std::none_of(scores.begin(), scores.end(),
+                                 [&](const gh2::SongScores &s) { return s.song == song.song; }))
+                    scores.push_back(song);
+            save = card;
+            save.scores = std::move(scores);
+        }
+
         // A card save becomes save.bin at once, the old one kept as save.bin.bak.
         void storeCardSave(const gh2::Save &save)
         {
@@ -285,7 +351,7 @@ namespace gh2::save
             if (std::filesystem::exists(path(), error))
                 std::filesystem::copy_file(path(), path() + ".bak", std::filesystem::copy_options::overwrite_existing,
                                            error);
-            gh2::toStore(save, *s_fresh, s_store);
+            gh2::toStore(save, *s_fresh, s_store, s_songGames);
             if (writeFile(path(), s_store))
                 std::cout << "[save] " << s_loadedFrom << " is now " << path() << std::endl;
             else
@@ -298,15 +364,31 @@ namespace gh2::save
         {
             R5900Context saved = *ctx;
             if (!s_fresh)
+            {
                 s_fresh = saveCampaign(rdram, ctx, runtime);
+                // The other games' rows take their names in the game too, so
+                // a save without them leaves them right.
+                if (s_fresh && !s_songGames.empty())
+                {
+                    nameDefaults(*s_fresh);
+                    gh2::Save boot = *s_fresh;
+                    applyOptions(boot.options);
+                    loadCampaign(rdram, ctx, runtime, boot);
+                }
+            }
             if (GPR_S32((&saved), 4) == kNoError && s_loaded != Loaded::kNothing)
             {
                 uint8_t *buffer = getMemPtr(rdram, load<uint32_t>(rdram, s_addresses->mcBuffer));
                 std::optional<gh2::Save> save;
-                if (s_loaded == Loaded::kCard)
-                    save = gh2::parse(buffer, kBufferSize);
-                else if (s_fresh)
-                    save = gh2::fromStore(s_store, *s_fresh);
+                if (s_fresh)
+                    save = gh2::fromStore(s_store, *s_fresh, s_songGames);
+                if (save && s_loaded == Loaded::kCard)
+                {
+                    if (const std::optional<gh2::Save> card = gh2::parse(buffer, kBufferSize))
+                        overCard(*save, *card);
+                    else
+                        save.reset();
+                }
                 std::vector<uint8_t> bytes;
                 if (save)
                 {
@@ -349,11 +431,20 @@ namespace gh2::save
         s_exportCard = path;
     }
 
+    void addScoreSongs(const std::string &game, const std::vector<std::string> &songs,
+                       const std::array<std::string, 5> &names)
+    {
+        for (const std::string &song : songs)
+            s_songGames[song] = game;
+        s_scoreNames[game] = names;
+    }
+
     void install(PS2Runtime &runtime, const Addresses &addresses)
     {
         s_addresses = &addresses;
         runtime.replaceFunction(addresses.saveData1, saveData1);
         runtime.replaceFunction(addresses.loadData1, loadData1);
         EntryHook<LoadData2Tag>::install(runtime, addresses.loadData2, onLoadData2);
+        EntryHook<HighScoreDbTag>::install(runtime, addresses.highScoreDbCtor, onHighScoreDb);
     }
 }

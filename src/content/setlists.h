@@ -12,6 +12,7 @@
 
 #include "addresses.h"
 
+#include <array>
 #include <string>
 #include <vector>
 
@@ -28,7 +29,10 @@ namespace gh2::setlists
     };
 
     // `look` is a milo path from the ARK root (ui/sel_song_quickplay.milo).
-    void add(const std::string &name, std::vector<Tier> tiers, const std::string &look);
+    // Its songs' high scores start on `scoreNames`, its game's own
+    // highscore_dummy_0..4, and save under `name` (save/save.h).
+    void add(const std::string &name, std::vector<Tier> tiers, const std::string &look,
+             const std::array<std::string, 5> &scoreNames);
 
     void install(PS2Runtime &runtime, const Addresses &addresses);
 }

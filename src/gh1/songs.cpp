@@ -267,7 +267,11 @@ namespace gh2::gh1
             }
             tiers.push_back(std::move(tier));
         }
-        setlists::add("gh1", std::move(tiers), "ui/sel_song_quickplay.milo");
+        std::array<std::string, 5> scoreNames;
+        for (size_t i = 0; i < scoreNames.size(); ++i)
+            if (const dtb::Node *name = value(*strings, "highscore_dummy_" + std::to_string(i)))
+                scoreNames[i] = name->text;
+        setlists::add("gh1", std::move(tiers), "ui/sel_song_quickplay.milo", scoreNames);
         std::cerr << "[gh1] " << count << " songs converted" << std::endl;
     }
 }
