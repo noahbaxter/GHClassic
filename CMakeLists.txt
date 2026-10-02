@@ -215,6 +215,7 @@ set(GHC_GAME_SOURCES
     src/synth/synth.cpp
     src/ui/fast_boot.cpp
     src/ui/locale.cpp
+    src/ui/help_bar.cpp
     src/ui/menus.cpp
     src/ui/meta_music.cpp
     src/host/audio.cpp

@@ -114,6 +114,9 @@ namespace gh2
         uint32_t charsysPanelTrySetPriority; // (Symbol outfit, int priority)
         uint32_t playerConfigCharacterOfOutfit; // static (Symbol outfit, int &index)
         uint32_t dataVariable; // DataVariable(Symbol)
+        uint32_t helpBarFinishLoad;
+        uint32_t helpBarSetDisplay;
+        uint32_t helpBarAddElement;
         // Data
         uint32_t rndCamCurrent;  // RndCam::sCurrent
         uint32_t defaultMat;     // the RndMat a mesh without one draws with
@@ -249,6 +252,9 @@ namespace gh2
         .charsysPanelTrySetPriority = 0x142790u,
         .playerConfigCharacterOfOutfit = 0x114030u,
         .dataVariable = 0x2b7b00u,
+        .helpBarFinishLoad = 0x149f40u,
+        .helpBarSetDisplay = 0x14a2f0u,
+        .helpBarAddElement = 0x14a1e0u,
         .rndCamCurrent = 0x3de348u,
         .defaultMat = 0x3da4f0u,
         .rndEnvironCurrent = 0x3de358u,
