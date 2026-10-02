@@ -142,7 +142,7 @@ namespace gh2
             if (!hidden)
                 if (const SDL_DisplayMode *mode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(window)))
                     displayHz = mode->refresh_rate;
-            float hz = static_cast<float>(settings::get(settings::kFrameRate));
+            float hz = static_cast<float>(settings::get(settings::kFrameRateCap));
             if (hz == 0.0f)
                 hz = displayHz > 0.0f ? displayHz : 60.0f;
             // frame_step replays at most four PS2 frames in one of ours.
