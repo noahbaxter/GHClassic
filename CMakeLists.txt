@@ -164,6 +164,7 @@ set(GHC_GAME_SOURCES
     src/pad.cpp
     src/save/gh2_stream.cpp
     src/save/gh2_text.cpp
+    src/save/save.cpp
     src/save/store.cpp
     src/scenario.cpp
     src/script.cpp

@@ -2,7 +2,7 @@
 // runs.
 //
 //   GHClassic [disc] [--scenario <file>] [--hidden] [--mute] [--speed <x>] [--fast-boot] [--seed <n>]
-//            [--mc <dir>] [--settings <file>] [--shots <dir>] [--shot-every <n>]
+//            [--mc <dir>] [--save <file>] [--settings <file>] [--shots <dir>] [--shot-every <n>]
 //            [--res window|native|480p|720p|1080p|1440p|2160p]
 //   GHClassic --bind [keyboard | <n>]
 //
@@ -16,7 +16,8 @@
 // game's random numbers from n rather than the time of day.
 // --res is what the scene is drawn at: the window's size (the default), the
 // game's own (512x448), or that height at the picture's aspect. --settings
-// reads and writes that file in place of the user data directory's. --bind
+// and --save read and write that file in place of the user data directory's;
+// --mc is the card, read for a save only when there is no save file. --bind
 // sets up a controller or the keyboard in input.ini; with no device it
 // lists them.
 
@@ -24,6 +25,7 @@
 #include "fast_boot.h"
 #include "host/bind.h"
 #include "host/vulkan_frontend.h"
+#include "save/save.h"
 #include "scenario.h"
 #include "seed.h"
 #include "settings.h"
@@ -117,6 +119,8 @@ int main(int argc, char *argv[])
         }
         else if (arg == "--settings" && hasValue)
             gh2::settings::usePath(argv[++i]);
+        else if (arg == "--save" && hasValue)
+            gh2::save::usePath(argv[++i]);
         else if (arg == "--shots" && hasValue)
             hostOptions.shotDir = argv[++i];
         else if (arg == "--shot-every" && hasValue)
