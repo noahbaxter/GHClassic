@@ -8,9 +8,9 @@
 // for GH1's objects as they are, which GH2's loaders still read (RndMesh::Load
 // 0x3d5420 and RndMat::Load 0x1bfc00 keep paths for those revisions), its
 // LOD groups listing GH1's meshes from GH1's own lod views, and its bones at
-// GH1's rest. The picker plays GH1's own idle, converted from GH1's clips;
-// songs still play GH2's base clips. GH1's face morphs come along from its
-// face scene (<x>_face.rnd) for gh1/face to pose.
+// GH1's rest. The picker and songs play GH1's own clips, converted into the
+// base outfit's clip sets (gh1/clips.cpp). GH1's face morphs come along from
+// its face scene (<x>_face.rnd) for gh1/face to pose.
 
 #include "gh1/install.h"
 
@@ -55,20 +55,26 @@ namespace gh2
         // Characters whose one outfit the locale never named.
         constexpr const char *kUnnamed[] = {"funk1", "classic", "grim"};
 
-        // GH1's archetypes (charsys.dta), with the macros GH1 loads at boot
-        // first.
-        std::optional<gh1::dtb::Node> archetypes(size_t gh1Disc)
+        // GH1's archetypes (charsys.dta), and the macros that defines (its
+        // anim sets among them), after those GH1 loads at boot.
+        struct Charsys
         {
+            gh1::dtb::Node archetypes;
             gh1::dtb::Macros macros;
-            const auto macroFile = ark::readFile(gh1Disc, "../../system/run/config/gen/macros.dtb");
-            const auto charsysFile = ark::readFile(gh1Disc, "charsys/gen/charsys.dtb");
-            if (!macroFile || !charsysFile || !gh1::dtb::read(*macroFile, macros))
+        };
+
+        std::optional<Charsys> charsys(size_t gh1Disc)
+        {
+            const gh1::dtb::Files files = [gh1Disc](const std::string &path) { return ark::readFile(gh1Disc, path); };
+            Charsys out;
+            if (!gh1::dtb::read("../../system/run/config/macros.dta", out.macros, files))
                 return std::nullopt;
-            const auto charsys = gh1::dtb::read(*charsysFile, macros);
-            if (!charsys)
+            const auto root = gh1::dtb::read("charsys/charsys.dta", out.macros, files);
+            const gh1::dtb::Node *found = root ? gh1::dtb::find(*root, "archetypes") : nullptr;
+            if (!found)
                 return std::nullopt;
-            const gh1::dtb::Node *found = gh1::dtb::find(*charsys, "archetypes");
-            return found ? std::optional(*found) : std::nullopt;
+            out.archetypes = *found;
+            return out;
         }
 
         // A scene as GH1's scripts name it (charsys/metal/metal_face.rnd)
@@ -87,12 +93,13 @@ namespace gh2
         if (!gh1Disc || !gh2Disc)
             return;
         const auto start = std::chrono::steady_clock::now();
-        const auto types = archetypes(*gh1Disc);
-        if (!types)
+        const auto scripts = charsys(*gh1Disc);
+        if (!scripts)
         {
             std::cerr << "[gh1] cannot read GH1's charsys" << std::endl;
             return;
         }
+        const gh1::dtb::Node *types = &scripts->archetypes;
         size_t count = 0u;
         for (const Guitarist &guitarist : kGuitarists)
         {
@@ -113,24 +120,42 @@ namespace gh2
             // The base's _ui plays its picker clips by a path relative to
             // itself: ../../anims/metal1_ui.milo, ../../../goth1/anims/goth1_ui.milo.
             const auto uiClips = gh2Ui ? milo::findSuffix(*gh2Ui, "_ui.milo") : std::nullopt;
-            if (!gh1 || !face || !gh2 || !uiClips)
+            const auto songClips = gh2 ? milo::findSuffix(*gh2, "_main.milo") : std::nullopt;
+            if (!gh1 || !face || !gh2 || !uiClips || !songClips)
             {
                 std::cerr << "[gh1] cannot read " << folder << " or " << base << std::endl;
                 continue;
             }
-            const std::string file = uiClips->substr(uiClips->rfind('/') + 1);
-            const auto picker = pickerSet(guitarist, file.substr(0, file.size() - 8u), *gh1);
-            if (!picker)
+            // Both name their clip sets char/<set>/anims/<set>_<kind>.milo.
+            const auto setOf = [](const std::string &path, size_t kind)
             {
-                std::cerr << "[gh1] cannot build " << folder << "'s picker clips" << std::endl;
+                const std::string file = path.substr(path.rfind('/') + 1);
+                return file.substr(0, file.size() - kind);
+            };
+            const std::string uiSet = setOf(*uiClips, 8u), songSet = setOf(*songClips, 10u);
+            const auto picker = pickerSet(guitarist, uiSet, *gh1);
+            const auto songs = songSets(guitarist, songSet, *gh1, scripts->macros);
+            if (!picker || !songs)
+            {
+                std::cerr << "[gh1] cannot build " << folder << "'s clips" << std::endl;
                 continue;
             }
+            milo::Dir main = graft(*gh2, *gh1, *face, outfit);
             milo::Dir ui = graft(*gh2Ui, *gh1, *face, outfit);
-            milo::replacePrefix(ui, *uiClips, "../../../" + outfit + "/anims/" + outfit + "_ui.milo");
-            ark::addFile("char/" + outfit + "/og/gen/" + outfit + ".milo_ps2",
-                         milo::write(graft(*gh2, *gh1, *face, outfit)));
+            const std::string ours = "../../../" + outfit + "/anims/" + outfit;
+            const std::string base1 = songClips->substr(0, songClips->size() - 10u);
+            for (milo::Dir *dir : {&main, &ui})
+            {
+                milo::replacePrefix(*dir, *uiClips, ours + "_ui.milo");
+                for (const char *kind : {"_main.milo", "_fret.milo", "_strum.milo"})
+                    milo::replacePrefix(*dir, base1 + kind, ours + kind);
+            }
+            ark::addFile("char/" + outfit + "/og/gen/" + outfit + ".milo_ps2", milo::write(main));
             ark::addFile("char/" + outfit + "/og/gen/" + outfit + "_ui.milo_ps2", milo::write(ui));
             ark::addFile("char/" + outfit + "/anims/gen/" + outfit + "_ui.milo_ps2", *picker);
+            ark::addFile("char/" + outfit + "/anims/gen/" + outfit + "_main.milo_ps2", songs->main);
+            ark::addFile("char/" + outfit + "/anims/gen/" + outfit + "_fret.milo_ps2", songs->fret);
+            ark::addFile("char/" + outfit + "/anims/gen/" + outfit + "_strum.milo_ps2", songs->strum);
             // _horse and anything else beside it is GH2's base outfit's, and
             // so are the photos. The highway (track/surfaces/%s_keep.bmp) is
             // GH1's, which GH2's loader reads as its own.
