@@ -368,7 +368,7 @@ def cmd_ci(argv):
     run(["cmake", "-S", ROOT, "-B", ci, "-DCMAKE_BUILD_TYPE=Release", f"-DGHC_GENERATED_DIR={ci / 'none'}"],
         env, quiet=True)
     run(["cmake", "--build", ci, "-j", jobs, "--target", "ps2_runtime", "chdr-static", "SDL3-static", "volk",
-         "vk-bootstrap", "glslang-standalone"], env)
+         "vk-bootstrap", "glslang-standalone", "mpeg2"], env)
 
 
 def cmd_bind(argv):
@@ -395,6 +395,7 @@ def notices():
         ("raylib", deps / "raylib-src" / "LICENSE"),
         ("GLFW", deps / "raylib-src" / "src" / "external" / "glfw" / "LICENSE.md"),
         ("libchdr", ROOT / "lib" / "libchdr" / "LICENSE.txt"),
+        ("libmpeg2", deps / "libmpeg2-src" / "COPYING"),
         ("zstd", ROOT / "config" / "licenses" / "zstd.txt"),
         ("PS2Recomp", ROOT / "lib" / "PS2Recomp" / "LICENSE"),
     ]
