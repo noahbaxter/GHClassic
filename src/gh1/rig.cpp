@@ -454,6 +454,8 @@ namespace gh2
 
             // GH2's skin goes but the eyes (CharEyes and the lip servo name
             // them) and the shadow; GH1's objects win any name both have.
+            // So does its CharHair: GH1 has none, its swings are in its clips
+            // (grim's bone_lantern, which GH2's lantern.hair would settle).
             // A character dir draws every showing mesh no group holds
             // (grim_ui's one group is empty; GH1's glasses and earrings are
             // in no view). A _ui has no lod1 group, so a view's meshes no
@@ -470,7 +472,7 @@ namespace gh2
                 std::string lower = n;
                 std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
                 const bool skin = c == "Mesh" && !shadow.count(n) && lower.find("eye") == std::string::npos;
-                if (skin || addedNames.count(n))
+                if (skin || c == "CharHair" || addedNames.count(n))
                     continue;
                 out.entries.push_back(gh2.entries[i]);
                 if (c == "Group" && n.find("shadow") == std::string::npos)
