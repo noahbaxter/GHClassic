@@ -183,6 +183,7 @@ set(GHC_GAME_SOURCES
     src/content/locale.cpp
     src/content/outfits.cpp
     src/content/setlists.cpp
+    src/content/songs.cpp
     src/dev/draw_dump.cpp
     src/dev/mesh_packet.cpp
     src/dev/null_rnd.cpp
