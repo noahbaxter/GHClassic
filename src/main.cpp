@@ -11,7 +11,8 @@
 // --scenario runs a file of steps (scenario.h). --speed runs the game's
 // clock that many times real time, hidden and muted only, as nothing else
 // paces it. --fast-boot boots straight to the main menu, past the logos'
-// padding, the intro movie and the press-start splash. --seed starts the
+// padding, the intro movie and the press-start splash, whatever settings.ini's
+// fast_boot says. --seed starts the
 // game's random numbers from n rather than the time of day.
 // --res is what the scene is drawn at: the window's size (the default), the
 // game's own (512x448), or that height at the picture's aspect. --settings
@@ -153,6 +154,9 @@ int main(int argc, char *argv[])
         }
         ps2x::host_clock::setSpeed(speed);
     }
+    // After --settings, which names the file it is read from.
+    if (gh2::settings::get(gh2::settings::kFastBoot))
+        gh2::fast_boot::enable();
 
     // The disc, and this build's executable on it, before any window opens.
     std::string why;

@@ -47,6 +47,7 @@ namespace gh2::settings
             // clock about 22 ms ahead of what is rendered, SDL's CoreAudio queue
             // about 43 ms). Not measured on Windows or Linux yet.
             {"latency", "audio_ms", Type::kInt, -500, 500, 5, 65, 0},
+            {"game", "fast_boot", Type::kBool, 0, 1, 1, 1, 0},
         };
 
         int snap(const Entry &entry, int value)

@@ -15,6 +15,7 @@ namespace gh2::settings
         kMsaa,      // samples per pixel
         kVideoLagMs, // how late the picture reaches the player
         kAudioLagMs, // how late the sound does
+        kFastBoot,   // straight to the main menu, past the logos and splash
         kKeyCount,
     };
 
