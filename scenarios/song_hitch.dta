@@ -1,0 +1,23 @@
+; song_autoplay's song through three hitches, the game thread stopped while
+; audio plays on, long enough to starve its streams. The song still ends on
+; the same score.
+#include common/first_boot.dta
+{gamecfg set mode quickplay}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 15)
+(stall 1)
+(wait 15)
+(stall 3)
+(wait 15)
+(stall 2)
+(wait_screen endgame_screen 300)
+(wait 3)
+(expect {player0 score} 158678)
+(expect {player0 longest_streak} 518)
+(shot end)
+(quit)

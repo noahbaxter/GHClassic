@@ -61,6 +61,8 @@ namespace gh2::synth
         void tick();
         void tickStream(Stream &s);
         void serviceChannel(Channel &ch);
+        void starveChannel(Channel &ch);
+        void unstarveChannel(Channel &ch);
         void transfer(Channel &ch);
         void tickSamples();
         void flushKeys();

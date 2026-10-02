@@ -215,6 +215,9 @@ namespace gh2::scenario
                     }
                     std::cerr << "[scenario] ok " << got << std::endl;
                 }
+                else if (verb == "stall")
+                    // A hitch: the game thread stops while audio plays on.
+                    std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(array.number(1) * 1000.0f)));
                 else if (verb == "shot")
                 {
                     // Nothing more runs until that frame is written.

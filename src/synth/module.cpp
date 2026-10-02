@@ -778,7 +778,7 @@ namespace gh2::synth
             }
             return;
         }
-        if ((ch.state != kPlaying && ch.state != kStarved) || ch.reference < 0 || m_keyOn[ch.reference])
+        if (ch.state != kPlaying || ch.reference < 0 || m_keyOn[ch.reference])
             return;
 
         // Refill (0x35b4) while the reference voice plays outside the half of
@@ -791,27 +791,8 @@ namespace gh2::synth
                 return;
             if (ch.iop.size() < kBlockBytes && !ch.endOfData)
             {
-                // Starved (0x37f4): both voices hold still until data comes.
-                if (ch.state != kStarved)
-                {
-                    ch.state = kStarved;
-                    if (ch.main >= 0)
-                        m_spu.setPitch(static_cast<uint32_t>(ch.main), 0u);
-                    if (ch.reference >= 0)
-                        m_spu.setPitch(static_cast<uint32_t>(ch.reference), 0u);
-                }
+                starveChannel(ch);
                 return;
-            }
-            if (ch.state == kStarved)
-            {
-                ch.state = kPlaying;
-                if (ch.main >= 0)
-                {
-                    setVolumePan(ch.main, ch.volume, ch.pan);
-                    m_spu.setPitch(static_cast<uint32_t>(ch.main), m_voiceState[ch.main].pitch);
-                }
-                if (ch.reference >= 0)
-                    m_spu.setPitch(static_cast<uint32_t>(ch.reference), m_voiceState[ch.reference].pitch);
             }
             if ((ch.next + ch.blocks / 2u) % ch.blocks == 0u)
                 ++ch.laps;
@@ -824,10 +805,49 @@ namespace gh2::synth
         }
     }
 
+    // Starved (0x37f4): both voices hold still until data comes.
+    void Module::starveChannel(Channel &ch)
+    {
+        ch.state = kStarved;
+        if (ch.main >= 0)
+            m_spu.setPitch(static_cast<uint32_t>(ch.main), 0u);
+        if (ch.reference >= 0)
+            m_spu.setPitch(static_cast<uint32_t>(ch.reference), 0u);
+    }
+
+    // 0x3874: speed, then volume and pan, put back.
+    void Module::unstarveChannel(Channel &ch)
+    {
+        ch.state = kPlaying;
+        setChannelSpeed(ch, ch.speed);
+        if (ch.main >= 0)
+            setVolumePan(ch.main, ch.volume, ch.pan);
+    }
+
     void Module::tickStream(Stream &s)
     {
+        // A stream's channels starve and come back together. The IRX starves
+        // each on its own, so a hitch that drains one ring before another
+        // leaves them apart for the rest of the song (the guitar off the
+        // band). Here none plays on while another waits for data, and they
+        // come back with half an IOP ring each, not the block the IRX waits
+        // for, so a hitch's backlog doesn't starve them again a block later.
+        const auto starved = [](const Channel &ch) { return ch.state == kStarved; };
+        const bool fed = std::all_of(s.channels.begin(), s.channels.end(), [&](const Channel &ch) {
+            return !starved(ch) || ch.iop.size() >= kRequestBelow || ch.endOfData;
+        });
+        if (fed)
+            for (Channel &ch : s.channels)
+                if (starved(ch))
+                    unstarveChannel(ch);
+
         for (Channel &ch : s.channels)
             serviceChannel(ch);
+
+        if (std::any_of(s.channels.begin(), s.channels.end(), starved))
+            for (Channel &ch : s.channels)
+                if (ch.state == kPlaying)
+                    starveChannel(ch);
 
         const auto all = [&s](int32_t state) {
             return std::all_of(s.channels.begin(), s.channels.end(),
