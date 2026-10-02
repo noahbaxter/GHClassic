@@ -116,6 +116,7 @@ namespace gh2
         uint32_t dataVariable; // DataVariable(Symbol)
         uint32_t songProviderInitData;
         uint32_t songProviderGapSize;
+        uint32_t songProviderIsActive;
         uint32_t songProviderGetSongData; // (Symbol)
         uint32_t campaignDataGetVenueForSong;
         uint32_t songsInsertOverflow;     // vector<DataArray *>::_M_insert_overflow
@@ -261,6 +262,7 @@ namespace gh2
         .dataVariable = 0x2b7b00u,
         .songProviderInitData = 0x117448u,
         .songProviderGapSize = 0x1181d8u,
+        .songProviderIsActive = 0x117a50u,
         .songProviderGetSongData = 0x118318u,
         .campaignDataGetVenueForSong = 0x1312a0u,
         .songsInsertOverflow = 0x3177e0u,
