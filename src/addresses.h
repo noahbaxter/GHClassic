@@ -48,6 +48,7 @@ namespace gh2
         uint32_t debugModal; // DebugModal(bool &, char *)
         uint32_t abort;
         uint32_t ctlClientPoll;
+        uint32_t spuStartSend;
         uint32_t metaMusicPoll;
         uint32_t scePadRead;
         uint32_t scePadInfoAct;
@@ -133,6 +134,7 @@ namespace gh2
         .debugModal = 0x105a88u,
         .abort = 0x307b80u,
         .ctlClientPoll = 0x22dc68u,
+        .spuStartSend = 0x231a78u,
         .metaMusicPoll = 0x21f180u,
         .scePadRead = 0x2f2c48u,
         .scePadInfoAct = 0x2f2e58u,

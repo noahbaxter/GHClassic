@@ -120,6 +120,17 @@ namespace gh2
             }
         }
 
+        // SPUStartSend(data, size, dest), retail 0x231a78, queues an upload
+        // that SPUSendPoll sends 0x5000 bytes a poll, each answered before
+        // the next, and SynthSamplePs::SynthPoll (0x22da78) starts one sample
+        // a frame. Written at once, nothing is pending, so SynthPoll finishes
+        // each sample in the call that starts it.
+        void spuStartSend(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
+        {
+            s_module.writeRam(GPR_U32(ctx, 6), getMemPtr(rdram, GPR_U32(ctx, 4)), GPR_U32(ctx, 5));
+            ctx->pc = GPR_U32(ctx, 31);
+        }
+
         struct PollTag;
     }
 
@@ -129,6 +140,7 @@ namespace gh2
         s_rdram = runtime.memory().getRDRAM();
         runtime.iop().addService(std::make_unique<Synth>());
         EntryHook<PollTag>::install(runtime, addresses.ctlClientPoll, deliver);
+        runtime.replaceFunction(addresses.spuStartSend, spuStartSend);
         setAudioSource(&synth::render);
     }
 

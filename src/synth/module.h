@@ -40,6 +40,10 @@ namespace gh2::synth
         // takes it.
         void command(uint32_t cmd, const uint8_t *data, uint32_t len);
 
+        // Bytes into sound RAM at once, with no reply: an upload the EE need
+        // not wait on.
+        void writeRam(uint32_t address, const uint8_t *data, uint32_t len);
+
         // What the module has sent the EE since the last call.
         void takeReplies(std::vector<Reply> &out);
 

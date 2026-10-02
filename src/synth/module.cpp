@@ -328,6 +328,12 @@ namespace gh2::synth
 
     // Commands ----------------------------------------------------------------
 
+    void Module::writeRam(uint32_t address, const uint8_t *data, uint32_t len)
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_spu.write(address, data, len);
+    }
+
     void Module::command(uint32_t cmd, const uint8_t *d, uint32_t len)
     {
         std::lock_guard<std::mutex> lock(m_mutex);
