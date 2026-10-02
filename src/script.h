@@ -46,6 +46,10 @@ namespace gh2::script
     // Registered with the game when its data system starts (GHUtl::Init).
     void addCommand(const char *name, Command command);
 
+    // The game's DataReadString: the parsed DataArray, kept, or 0. On the
+    // guest thread only.
+    uint32_t parse(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &text);
+
     // Parsed with the game's DataReadString, then each top-level command
     // evaluated. On the guest thread only.
     void run(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &text);

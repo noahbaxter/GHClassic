@@ -32,6 +32,10 @@ namespace gh2
         uint32_t beatMatchCtor;
         uint32_t playerMatcherGetSongMs;
         uint32_t ghUtlInit;        // where GH2 registers its DataFuncs
+        uint32_t metaInit;
+        uint32_t progressiveScanCheck;
+        uint32_t splashShow;       // Splash::Show
+        uint32_t seedRand;
         uint32_t dataRegisterFunc;
         uint32_t dataReadString;
         uint32_t dataNodeEvaluate; // DataNode::Evaluate
@@ -40,6 +44,9 @@ namespace gh2
         uint32_t builtinDelete;
         uint32_t dataNodeGetObj;   // DataNode::GetObj
         uint32_t uiGotoScreen;     // UIManager::GotoScreen
+        uint32_t uiManagerPoll;
+        uint32_t debugModal; // DebugModal(bool &, char *)
+        uint32_t abort;
         uint32_t ctlClientPoll;
         uint32_t metaMusicPoll;
         uint32_t scePadRead;
@@ -87,6 +94,10 @@ namespace gh2
         .beatMatchCtor = 0x120f48u,
         .playerMatcherGetSongMs = 0x115738u,
         .ghUtlInit = 0x11fbf0u,
+        .metaInit = 0x133f78u,
+        .progressiveScanCheck = 0x100058u,
+        .splashShow = 0x2139f0u,
+        .seedRand = 0x2d9cc8u,
         .dataRegisterFunc = 0x2b2c80u,
         .dataReadString = 0x2b28d0u,
         .dataNodeEvaluate = 0x2b7d38u,
@@ -95,6 +106,9 @@ namespace gh2
         .builtinDelete = 0x2cf160u,
         .dataNodeGetObj = 0x2b7f80u,
         .uiGotoScreen = 0x214d48u,
+        .uiManagerPoll = 0x214510u,
+        .debugModal = 0x105a88u,
+        .abort = 0x307b80u,
         .ctlClientPoll = 0x22dc68u,
         .metaMusicPoll = 0x21f180u,
         .scePadRead = 0x2f2c48u,

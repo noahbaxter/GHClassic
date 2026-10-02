@@ -1,6 +1,7 @@
 // GH2's hooks, installed once the runtime has loaded a matching executable.
 
 #include "addresses.h"
+#include "fast_boot.h"
 #include "frame_step.h"
 #include "game_overrides.h"
 #include "latency.h"
@@ -16,7 +17,9 @@
 #include "render/native_rect.h"
 #include "render/native_rnd.h"
 #include "render/texture_capture.h"
+#include "scenario.h"
 #include "script.h"
+#include "seed.h"
 #include "synth/synth.h"
 #include "video_options.h"
 
@@ -41,6 +44,9 @@ namespace
         gh2::installPad(runtime, gh2::kSlus21447);
         gh2::installFrameStep(runtime, gh2::kSlus21447);
         gh2::installMenus(runtime);
+        gh2::scenario::install(runtime, gh2::kSlus21447);
+        gh2::fast_boot::install(runtime, gh2::kSlus21447);
+        gh2::seed::install(runtime, gh2::kSlus21447);
     }
 }
 

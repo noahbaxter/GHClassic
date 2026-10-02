@@ -1,0 +1,16 @@
+; A quickplay song on expert with nobody playing: the rock meter empties
+; and the song is lost at the same song time every run. That time includes
+; the fail sequence, whose length is random (arm.sh fixes the seed).
+(wait_screen main_screen)
+{gamecfg set mode quickplay}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty expert}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait_screen lose_screen 180)
+(expect {player0 gems_passed} 22)
+(expect {taskmgr seconds} 33.47 0.1)
+(wait 2)
+(shot lost)
+(quit)

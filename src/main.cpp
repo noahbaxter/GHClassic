@@ -1,20 +1,30 @@
 // GH Classic's entry point: the symbolized GH2 ELF, the disc it came from, and
 // options for unattended runs.
 //
-//   GHClassic <elf> [disc] [--hidden] [--mute] [--mc <dir>] [--settings <file>] [--shots <dir>] [--shot-every <n>]
+//   GHClassic <elf> [disc] [--scenario <file>] [--hidden] [--mute] [--speed <x>] [--fast-boot] [--seed <n>]
+//            [--mc <dir>] [--settings <file>] [--shots <dir>] [--shot-every <n>]
 //            [--res window|native|480p|720p|1080p|1440p|2160p]
 //   GHClassic --bind [keyboard | <n>]
 //
+// --scenario runs a file of steps (scenario.h). --speed runs the game's
+// clock that many times real time, hidden and muted only, as nothing else
+// paces it. --fast-boot boots straight to the main menu, past the logos'
+// padding, the intro movie and the press-start splash. --seed starts the
+// game's random numbers from n rather than the time of day.
 // --res is what the scene is drawn at: the window's size (the default), the
 // game's own (512x448), or that height at the picture's aspect. --settings
 // reads and writes that file in place of the user data directory's. --bind
 // sets up a controller or the keyboard in input.ini; with no device it
 // lists them.
 
+#include "fast_boot.h"
 #include "host/bind.h"
 #include "host/vulkan_frontend.h"
+#include "scenario.h"
+#include "seed.h"
 #include "settings.h"
 #include "ps2_runtime.h"
+#include "runtime/host_clock.h"
 #include "runtime/ps2_disc_image.h"
 
 #include <cstdlib>
@@ -40,6 +50,7 @@ int main(int argc, char *argv[])
     std::filesystem::path mcRoot;
     PS2Runtime::HostOptions hostOptions;
     gh2::RenderSize renderSize;
+    double speed = 1.0;
     for (int i = 2; i < argc; ++i)
     {
         const std::string arg = argv[i];
@@ -50,6 +61,17 @@ int main(int argc, char *argv[])
             hostOptions.mute = true;
         else if (arg == "--mc" && hasValue)
             mcRoot = argv[++i];
+        else if (arg == "--speed" && hasValue)
+            speed = std::strtod(argv[++i], nullptr);
+        else if (arg == "--fast-boot")
+            gh2::fast_boot::enable();
+        else if (arg == "--seed" && hasValue)
+            gh2::seed::fix(std::atoi(argv[++i]));
+        else if (arg == "--scenario" && hasValue)
+        {
+            if (!gh2::scenario::load(argv[++i]))
+                return 1;
+        }
         else if (arg == "--settings" && hasValue)
             gh2::settings::usePath(argv[++i]);
         else if (arg == "--shots" && hasValue)
@@ -85,6 +107,16 @@ int main(int argc, char *argv[])
     }
     if (!hostOptions.shotDir.empty() && hostOptions.shotEvery == 0u)
         hostOptions.shotEvery = 60u;
+    if (speed != 1.0)
+    {
+        // A window's swapchain and an audio device pace in real time.
+        if (!(speed > 0.0) || !hostOptions.hidden || !hostOptions.mute)
+        {
+            std::cerr << "--speed takes a number above 0, with --hidden and --mute" << std::endl;
+            return 2;
+        }
+        ps2x::host_clock::setSpeed(speed);
+    }
 
     PS2Runtime runtime;
     runtime.setHostOptions(hostOptions);

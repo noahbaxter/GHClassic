@@ -1,4 +1,5 @@
 #include "host/audio.h"
+#include "runtime/host_clock.h"
 
 #include <SDL3/SDL.h>
 
@@ -35,16 +36,16 @@ namespace gh2
             SDL_PutAudioStreamData(stream, buffer.data(), static_cast<int>(frames * 2u * sizeof(float)));
         }
 
-        // Muted: 10 ms at a time against the steady clock, as a device would.
+        // Muted: 10 ms at a time against the host clock, as a device would.
         void runTimer()
         {
             constexpr size_t kFrames = kAudioRate / 100u;
             std::vector<float> buffer;
-            auto next = std::chrono::steady_clock::now();
+            auto next = ps2x::host_clock::now();
             while (s_timerRunning.load(std::memory_order_relaxed))
             {
                 next += std::chrono::milliseconds(10);
-                std::this_thread::sleep_until(next);
+                std::this_thread::sleep_until(ps2x::host_clock::real(next));
                 render(buffer, kFrames);
             }
         }

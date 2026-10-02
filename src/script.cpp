@@ -96,6 +96,38 @@ namespace gh2::script
             *ctx = saved;
         }
 
+        // DebugModal(bool &fail, char *msg), the game's (0x105a88), which it
+        // gives Debug as its modal callback: where a script error or failed
+        // assert ends up, to wait on a button. A ship build shows it nowhere.
+        struct DebugModalTag;
+        void onDebugModal(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
+        {
+            const uint32_t message = GPR_U32(ctx, 5);
+            std::cerr << "[game] " << (load<uint8_t>(rdram, GPR_U32(ctx, 4)) ? "FAIL: " : "")
+                      << (message ? reinterpret_cast<const char *>(getMemPtr(rdram, message)) : "") << std::endl;
+        }
+
+        // abort(), retail 0x307b80, which ends the thread through _Exit: its
+        // caller, then words on the stack that point into code, nearest
+        // first, as a rough backtrace.
+        struct AbortTag;
+        void onAbort(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
+        {
+            std::cerr << "[game] ABORT from 0x" << std::hex << GPR_U32(ctx, 31) << ", stack";
+            const uint32_t sp = GPR_U32(ctx, 29);
+            int shown = 0;
+            for (uint32_t at = sp; at < sp + 0x800u && shown < 16; at += 4u)
+            {
+                const uint32_t word = load<uint32_t>(rdram, at);
+                if (word >= 0x100000u && word < 0x3d0000u && (word & 3u) == 0u)
+                {
+                    std::cerr << " 0x" << word;
+                    ++shown;
+                }
+            }
+            std::cerr << std::dec << std::endl;
+        }
+
         struct GotoScreenTag;
         void onGotoScreen(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
@@ -187,19 +219,24 @@ namespace gh2::script
         s_pending.push_back({name, command});
     }
 
-    void run(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &text)
+    uint32_t parse(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &text)
     {
         const Call call{rdram, ctx, runtime, 0u};
         const uint32_t source = guestString(call, text);
-        // The parsed array is kept: handlers defined in it stay referenced.
         const uint32_t root =
             static_cast<uint32_t>(runtime->callGuestFunction(rdram, ctx, s_addresses->dataReadString, {source}));
         runtime->callGuestFunction(rdram, ctx, s_addresses->builtinDelete, {source});
         if (root == 0u)
-        {
             std::cerr << "[script] parse failed" << std::endl;
+        return root;
+    }
+
+    void run(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &text)
+    {
+        // The parsed array is kept: handlers defined in it stay referenced.
+        const uint32_t root = parse(rdram, ctx, runtime, text);
+        if (root == 0u)
             return;
-        }
         const Call rootCall{rdram, ctx, runtime, root};
         for (int i = 0; i < rootCall.size(); ++i)
             rootCall.arg(i);
@@ -211,5 +248,7 @@ namespace gh2::script
         addCommand("retype", retype);
         EntryHook<InitTag>::install(runtime, addresses.ghUtlInit, onDataReady);
         EntryHook<GotoScreenTag>::install(runtime, addresses.uiGotoScreen, onGotoScreen);
+        EntryHook<DebugModalTag>::install(runtime, addresses.debugModal, onDebugModal);
+        EntryHook<AbortTag>::install(runtime, addresses.abort, onAbort);
     }
 }

@@ -1,0 +1,43 @@
+; Every main menu branch outside career, a shot of each.
+(wait_screen main_screen)
+(wait 1)
+(shot main)
+{ui goto_screen options_screen}
+(wait_screen options_screen)
+(wait 1)
+(shot options)
+{ui goto_screen audio_settings_screen}
+(wait_screen audio_settings_screen)
+(wait 1)
+(shot audio)
+{ui goto_screen video_settings_screen}
+(wait_screen video_settings_screen)
+(wait 1)
+(shot video)
+{ui goto_screen lag_screen}
+(wait_screen lag_screen)
+(wait 1)
+(shot lag)
+{ui goto_screen training_screen}
+(wait_screen training_screen)
+(wait 1)
+(shot training)
+{gamecfg set mode practice}
+{ui goto_screen practice_selsong_screen}
+(wait_screen practice_selsong_screen)
+(wait 1)
+(shot practice_songs)
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 1)
+(shot qp_songs)
+{ui goto_screen qp_diff_screen}
+(wait_screen qp_diff_screen)
+(wait 1)
+(shot qp_diff)
+{ui goto_screen credits_screen}
+(wait_screen credits_screen)
+(wait 5)
+(shot credits)
+(quit)
