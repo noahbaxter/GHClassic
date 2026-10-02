@@ -1,5 +1,5 @@
 ; Boots to the main menu, then quickplay's song list.
-(wait_screen main_screen)
+#include common/first_boot.dta
 (wait 2)
 (shot main)
 {gamecfg set mode quickplay}

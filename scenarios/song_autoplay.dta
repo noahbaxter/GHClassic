@@ -2,7 +2,7 @@
 ; Song time ({taskmgr seconds}), which follows the audio, moves 30 s in each
 ; 30 s of game time, and an autoplayed song ends on the same score every
 ; run.
-(wait_screen main_screen)
+#include common/first_boot.dta
 {gamecfg set mode quickplay}
 {game set_song shoutatthedevil}
 {{game get_player_config 0} set_difficulty expert}

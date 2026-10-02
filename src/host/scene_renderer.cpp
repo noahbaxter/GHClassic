@@ -210,9 +210,9 @@ namespace gh2
         {
             if (!draw.material.useEnviron)
                 return draw.material.prelit ? kColorVertex : kColorMaterial;
-            if (draw.environ.kind == Environ::kPoint)
+            if (draw.environment.kind == Environ::kPoint)
                 return kColorPoint;
-            return draw.environ.kind == Environ::kDirectional ? kColorDirectional : kColorAmbient;
+            return draw.environment.kind == Environ::kDirectional ? kColorDirectional : kColorAmbient;
         }
 
         // Ambient (w 1), the three light colours (w 0, unused slots black),
@@ -226,7 +226,7 @@ namespace gh2
         // in [4] with -1/range in w, and range squared in [5] w.
         void writeLighting(const DrawCall &draw, Vec4 *out)
         {
-            const Environ &e = draw.environ;
+            const Environ &e = draw.environment;
             out[0] = {{e.ambient[0], e.ambient[1], e.ambient[2], 1.0f}};
             if (e.kind == Environ::kPoint)
             {

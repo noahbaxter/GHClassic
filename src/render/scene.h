@@ -95,7 +95,7 @@ namespace gh2
         // them through an identity lightWorld. One bone is left as is.
         bool blended = false;
         std::array<Matrix, 4> bones{};
-        Environ environ;
+        Environ environment; // not environ, a macro in mingw's stdlib.h
         // Takes normals to world space for lighting (qw676..678): the world
         // transform, or for a skinned mesh the palette's fifth matrix.
         Matrix lightWorld{};

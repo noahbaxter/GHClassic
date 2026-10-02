@@ -35,10 +35,10 @@ namespace gh2
 
             Environ e;
             for (uint32_t i = 0; i < 3; ++i)
-                e.ambient[i] = load<float>(rdram, env + milo::environ::kAmbient + i * 4u);
+                e.ambient[i] = load<float>(rdram, env + milo::environment::kAmbient + i * 4u);
 
             uint32_t point = 0u;
-            for (uint32_t node = load<uint32_t>(rdram, env + milo::environ::kFirstLight); node != 0u && point == 0u;
+            for (uint32_t node = load<uint32_t>(rdram, env + milo::environment::kFirstLight); node != 0u && point == 0u;
                  node = load<uint32_t>(rdram, node + 4u))
             {
                 const uint32_t light = load<uint32_t>(rdram, node);
@@ -64,7 +64,7 @@ namespace gh2
             }
             else
             {
-                for (uint32_t node = load<uint32_t>(rdram, env + milo::environ::kFirstLight);
+                for (uint32_t node = load<uint32_t>(rdram, env + milo::environment::kFirstLight);
                      node != 0u && e.lightCount < 3u; node = load<uint32_t>(rdram, node + 4u))
                 {
                     const uint32_t light = load<uint32_t>(rdram, node);

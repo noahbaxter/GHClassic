@@ -143,7 +143,7 @@ namespace gh2
                     return;
                 }
                 draw.mesh = std::move(geometry);
-                draw.environ = currentEnviron();
+                draw.environment =currentEnviron();
                 draw.camera = currentCamera(rdram);
                 pushPasses(rdram, mesh, draw);
             }
@@ -173,7 +173,7 @@ namespace gh2
                 const bool faceCamera = load<uint32_t>(rdram, mesh + milo::mesh::kInstanceMode) == milo::mesh::kFaceCamera;
                 DrawCall draw;
                 draw.mesh = std::move(geometry);
-                draw.environ = currentEnviron();
+                draw.environment =currentEnviron();
                 draw.camera = currentCamera(rdram);
                 for (uint32_t node = first; node != sentinel; node = load<uint32_t>(rdram, node))
                 {

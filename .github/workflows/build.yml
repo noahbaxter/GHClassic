@@ -1,0 +1,59 @@
+# Everything that builds without a disc (tools/ghc.py ci), on each platform:
+# the recompiler tools, the runtime and every library the game links. The
+# game itself needs a disc's generated code. Nothing is uploaded.
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - run: python tools/ghc.py ci
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - run: python tools/ghc.py ci
+
+  # The release baseline: Ubuntu 22.04, glibc 2.35, GCC 12.
+  linux:
+    runs-on: ubuntu-latest
+    container: ubuntu:22.04
+    env:
+      CC: gcc-12
+      CXX: g++-12
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      # Before checkout, which needs git for the submodules. SDL's headers as
+      # its docs/README-linux.md lists them, and Xinerama for raylib's GLFW.
+      - run: |
+          apt-get update
+          apt-get install -y build-essential g++-12 git python3.11 python3.11-venv pkg-config \
+            libasound2-dev libpulse-dev libaudio-dev libfribidi-dev libjack-dev libsndio-dev \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev \
+            libxtst-dev libxinerama-dev libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev \
+            libgles2-mesa-dev libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev libthai-dev \
+            libusb-1.0-0-dev libpipewire-0.3-dev libwayland-dev wayland-protocols libdecor-0-dev liburing-dev
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      # The container runs as root over a checkout owned by the runner.
+      - run: git config --global --add safe.directory '*'
+      - run: python3.11 tools/ghc.py ci

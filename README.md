@@ -2,7 +2,7 @@
 
 ![Guitar Hero II running in GH Classic](assets/gameplay.gif)
 
-This is an ai assisted recompilation project intended to produce a pc port for the ps2 version of guitar hero 2, perhaps with some bells and whistles. This is currently experimental and only tested on macOS so expect missing features and crashes!
+This is an ai assisted recompilation project intended to produce a macOS, Windows and Linux port for the ps2 version of guitar hero 2, perhaps with some added bells and whistles. This is currently experimental so expect missing features and crashes!
 
 To run this **you must provide your own disc image** for SLUS-21447 in either `.chd`, `.iso` or `.bin` format.
 
@@ -19,19 +19,22 @@ Still to come:
 - Multiplayer (not wired up yet)
 - Movies
 - Some rendering effects
-- Windows/Linux builds
 
-## Building & Running (macOS)
+## Building & Running
 
-*I understand this is inaccessible to normies for now... but better setup UX is coming!*
-
-Requires Xcode Command Line Tools and [Homebrew](https://brew.sh).
+Needs Git, Python 3.11+, and Xcode Command Line Tools on macOS. Linux also needs a C++ compiler and SDL's build headers (Fedora below; on Bazzite or SteamOS, build in a distrobox).
 
 ```sh
 git clone --recurse-submodules https://github.com/noahbaxter/GHClassic.git && cd GHClassic
-brew bundle
-scripts/play.sh "/path/to/Guitar Hero II (USA).iso"
+scripts/play.sh "/path/to/Guitar Hero II (USA).iso"   # scripts\play.cmd on Windows
 ```
+
+<details><summary>Linux packages (Fedora)</summary>
+
+```sh
+sudo dnf install gcc-c++ libX11-devel libXext-devel libXrandr-devel libXcursor-devel libXfixes-devel libXi-devel libXScrnSaver-devel libXtst-devel libXinerama-devel libxkbcommon-devel wayland-devel wayland-protocols-devel mesa-libGL-devel mesa-libEGL-devel libdrm-devel mesa-libgbm-devel libdecor-devel alsa-lib-devel pulseaudio-libs-devel pipewire-devel dbus-devel ibus-devel systemd-devel libusb1-devel
+```
+</details>
 
 ## Controls
 
@@ -43,8 +46,7 @@ scripts/play.sh "/path/to/Guitar Hero II (USA).iso"
 | Star power | Right Shift | Select |
 | Whammy | | Left stick up |
 
-Certain guitars with built-in profiles should auto detect: PS3, Wii (through a raphnet adapter), Xbox 360, Rock Band 4 and World Tour PC. Anything else can be mapped with `build/game/GHClassic.app/Contents/MacOS/GHClassic --bind`.
-
+Certain guitars with built-in profiles should auto detect: PS3, Wii (through a raphnet adapter), Xbox 360, Rock Band 4 and World Tour PC. Anything else can be mapped with `python3 tools/ghc.py bind`.
 Fullscreen is `Cmd+F` on macOS, `F11` elsewhere.
 
 ## Credits
@@ -52,9 +54,8 @@ Fullscreen is `Cmd+F` on macOS, `F11` elsewhere.
 All i've done here is build a thin layer over excellent work done by the community. Please give most of the credit to these fine folk.
 
 - [PS2Recomp](https://github.com/ran-j/PS2Recomp) ([fork](https://github.com/noahbaxter/PS2Recomp/tree/ghrecomp))
-- [MiloHax](https://github.com/hmxmilohax): function names ([milo-executable-library](https://github.com/hmxmilohax/milo-executable-library)), menu scripts ([milo-script-library](https://github.com/hmxmilohax/milo-script-library)), and [gh2-calibration-fix](https://github.com/hmxmilohax/gh2-calibration-fix)
+- [MiloHax](https://github.com/hmxmilohax): decompiled function names ([milo-executable-library](https://github.com/hmxmilohax/milo-executable-library)), menu script references ([milo-script-library](https://github.com/hmxmilohax/milo-script-library)), and [gh2-calibration-fix](https://github.com/hmxmilohax/gh2-calibration-fix)
 - [PCSX2](https://github.com/PCSX2/pcsx2) and [psx-spx](https://psx-spx.consoledev.net/): SPU2 reference code/reverb coefficients
-- [Redump](http://redump.org/): disc hashes
 - ([SteamGridDB](https://www.steamgriddb.com/grid/378598)): Temp icon
 
 ## License

@@ -88,8 +88,8 @@ namespace milo
     }
 
     // RndEnviron; PsEnviron adds nothing it reads. From PsEnviron::Select
-    // (0x1a2060).
-    namespace environ
+    // (0x1a2060). Not "environ", which mingw's stdlib.h defines as a macro.
+    namespace environment
     {
         constexpr uint32_t kFirstLight = 0x30u; // light list node*: {RndLight*, next*}
         constexpr uint32_t kAmbient = 0x40u;    // 3 floats
