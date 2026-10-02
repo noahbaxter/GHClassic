@@ -9,7 +9,8 @@
 // 0x3d5420 and RndMat::Load 0x1bfc00 keep paths for those revisions), its
 // LOD groups listing GH1's meshes from GH1's own lod views, and its bones at
 // GH1's rest. The picker plays GH1's own idle, converted from GH1's clips;
-// songs still play GH2's base clips, and GH1's face stays still.
+// songs still play GH2's base clips. GH1's face morphs come along from its
+// face scene (<x>_face.rnd) for gh1_face to pose.
 
 #include "gh1.h"
 
@@ -41,11 +42,14 @@ namespace gh2
             const char *label;               // the outfit picker's (sel_character.dta)
             const char *clipPrefix = nullptr; // GH1's clip names, <clipPrefix>_idle_ui
             const char *highway = nullptr;   // GH1's, track/surfaces/<highway>.bmp
+            const char *faceFile = nullptr;  // GH1's face scene, charsys/<gh1Folder>/<faceFile>.rnd
             bool pickerDoorOpens = true;     // the picker door swings open behind them
 
             std::string outfit() const { return std::string(gh2Character) + "gh1"; }
             std::string clips() const { return clipPrefix ? clipPrefix : gh1Folder; }
-            std::string track() const { return highway ? highway : gh1Folder; }        };
+            std::string track() const { return highway ? highway : gh1Folder; }
+            std::string face() const { return faceFile ? faceFile : std::string(gh1Folder) + "_face"; }
+        };
 
         // GH1's locale names the folders: hair_metal Izzy, nu_metal Pandora,
         // hiphop Xavier.
@@ -56,7 +60,7 @@ namespace gh2
             {.gh1Folder = "alterna", .gh2Character = "alterna", .baseOutfit = "alterna1", .label = "GH1 SKULLS"},
             {.gh1Folder = "metal", .gh2Character = "metal", .baseOutfit = "metal1", .label = "GH1 SHIRT"},
             {.gh1Folder = "hair_metal", .gh2Character = "glam", .baseOutfit = "glam1", .label = "GH1 CODPIECE",
-             .clipPrefix = "hair", .highway = "hair"},
+             .clipPrefix = "hair", .highway = "hair", .faceFile = "hairmetal_face"},
             {.gh1Folder = "nu_metal", .gh2Character = "goth", .baseOutfit = "goth2", .label = "GH1 LEATHERS",
              .clipPrefix = "nu"},
             {.gh1Folder = "hiphop", .gh2Character = "funk1", .baseOutfit = "funk1", .label = "GH1"},
@@ -514,12 +518,43 @@ namespace gh2
                 mesh[o] = 0u;
         }
 
+        // GH1's Morph 3 as GH2's RndMorph::Load (0x201800) reads it, which
+        // still takes rev 3 and its poses (a mesh, then (weight, frame) keys).
+        // Its Animatable goes from GH1's rev 0 (empty filter and child lists)
+        // to GH2's 4 (rate, units). The target and normals are what GH1's
+        // CharFace::PostLoad (GH1 0x2a6f10) set at load: `target`, normals on.
+        std::optional<Bytes> gh2Morph(const Bytes &gh1, const std::string &target)
+        {
+            if (u32(gh1, 0u) != 3u || u32(gh1, 4u) != 0u || u32(gh1, 8u) != 0u || u32(gh1, 12u) != 0u)
+                return std::nullopt;
+            size_t o = 16u;
+            const uint32_t poses = u32(gh1, o);
+            o += 4u;
+            for (uint32_t i = 0; i < poses && o < gh1.size(); ++i)
+            {
+                str(gh1, o);
+                o += 4u + 8u * u32(gh1, o);
+            }
+            const size_t posesEnd = o;
+            str(gh1, o);
+            if (o + 6u != gh1.size())
+                return std::nullopt;
+            Bytes out;
+            for (const uint32_t v : {3u, 4u, 0u, 0u})
+                putU32(out, v);
+            out.insert(out.end(), gh1.begin() + 16, gh1.begin() + static_cast<std::ptrdiff_t>(posesEnd));
+            putStr(out, target);
+            out.push_back(1u);
+            out.insert(out.end(), gh1.begin() + static_cast<std::ptrdiff_t>(o + 1u), gh1.end());
+            return out;
+        }
+
         bool startsWith(const std::string &s, const char *prefix)
         {
             return s.rfind(prefix, 0) == 0;
         }
 
-        milo::Dir graft(const milo::Dir &gh2, const milo::Dir &gh1)
+        milo::Dir graft(const milo::Dir &gh2, const milo::Dir &gh1, const milo::Dir &face)
         {
             std::set<std::string> shadow;
             std::set<std::string> gh2Names;
@@ -548,6 +583,23 @@ namespace gh2
                     added.push_back({c, n, gh1.bodies[i]});
                     if (c == "Mesh")
                         meshes.insert(n);
+                }
+            }
+            // The face's poses (bad01.mesh) and the morphs blending them into
+            // face.mesh and lashes.mesh, named for gh1_face to find. The
+            // poses draw in no group.
+            for (size_t i = 0; i < face.entries.size(); ++i)
+            {
+                const auto &[c, n] = face.entries[i];
+                if (c == "Mesh")
+                    added.push_back({c, n, face.bodies[i]});
+                else if (c == "Morph")
+                {
+                    auto morph = gh2Morph(face.bodies[i], n.substr(0, n.rfind('.')) + ".mesh");
+                    if (morph)
+                        added.push_back({c, "gh1_" + n, std::move(*morph)});
+                    else
+                        std::cerr << "[gh1] cannot read morph " << n << std::endl;
                 }
             }
 
@@ -909,12 +961,13 @@ namespace gh2
         {
             const std::string folder = guitarist.gh1Folder, base = guitarist.baseOutfit, outfit = guitarist.outfit();
             const auto gh1 = load("charsys/" + folder + "/gen/" + folder + ".rnd_ps2");
+            const auto face = load("charsys/" + folder + "/gen/" + guitarist.face() + ".rnd_ps2");
             const auto gh2 = load("char/" + base + "/og/gen/" + base + ".milo_ps2");
             const auto gh2Ui = load("char/" + base + "/og/gen/" + base + "_ui.milo_ps2");
             // The base's _ui plays its picker clips by a path relative to
             // itself: ../../anims/metal1_ui.milo, ../../../goth1/anims/goth1_ui.milo.
             const auto uiClips = gh2Ui ? milo::findSuffix(*gh2Ui, "_ui.milo") : std::nullopt;
-            if (!gh1 || !gh2 || !uiClips)
+            if (!gh1 || !face || !gh2 || !uiClips)
             {
                 std::cerr << "[gh1] cannot read " << folder << " or " << base << std::endl;
                 continue;
@@ -926,9 +979,9 @@ namespace gh2
                 std::cerr << "[gh1] cannot build " << folder << "'s picker clips" << std::endl;
                 continue;
             }
-            milo::Dir ui = graft(*gh2Ui, *gh1);
+            milo::Dir ui = graft(*gh2Ui, *gh1, *face);
             milo::replacePrefix(ui, *uiClips, "../../../" + outfit + "/anims/" + outfit + "_ui.milo");
-            ark::addFile("char/" + outfit + "/og/gen/" + outfit + ".milo_ps2", milo::write(graft(*gh2, *gh1)));
+            ark::addFile("char/" + outfit + "/og/gen/" + outfit + ".milo_ps2", milo::write(graft(*gh2, *gh1, *face)));
             ark::addFile("char/" + outfit + "/og/gen/" + outfit + "_ui.milo_ps2", milo::write(ui));
             ark::addFile("char/" + outfit + "/anims/gen/" + outfit + "_ui.milo_ps2", *picker);
             // _horse and anything else beside it is GH2's base outfit's, and

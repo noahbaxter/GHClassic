@@ -183,6 +183,7 @@ set(GHC_GAME_SOURCES
     src/whammy_hold.cpp
     src/outfits.cpp
     src/gh1.cpp
+    src/gh1_face.cpp
     src/dev/draw_dump.cpp
     src/dev/mesh_packet.cpp
     src/dev/null_rnd.cpp
