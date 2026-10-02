@@ -31,7 +31,7 @@ set(PS2X_BUILD_ANALYZER OFF CACHE BOOL "" FORCE)
 set(PS2X_BUILD_TEST OFF CACHE BOOL "" FORCE)
 set(PS2X_BUILD_STUDIO OFF CACHE BOOL "" FORCE)
 set(PS2X_ENABLE_DEBUG_UI OFF CACHE BOOL "" FORCE)
-# Movies are null_movie for now, so no FFmpeg to find or ship.
+# Movies decode through libmpeg2 (below), so no FFmpeg to find or ship.
 set(PS2X_ENABLE_FFMPEG OFF CACHE BOOL "" FORCE)
 
 # The runtime's logs are on upstream. With them on, song select misses a
@@ -116,6 +116,23 @@ if(APPLE)
     FetchContent_MakeAvailable(MoltenVK)
 endif()
 
+# MPEG-2 video for the movies: libmpeg2 (GPL-2.0-or-later), its portable C
+# only, with no CPU detection or assembly. Upstream builds with autotools, so
+# it is built here; the commit is 0.5.1 plus fixes, past the last tag.
+FetchContent_Declare(libmpeg2
+    GIT_REPOSITORY https://code.videolan.org/videolan/libmpeg2.git
+    GIT_TAG 946bf4b518aacc224f845e73708f99e394744499)
+FetchContent_MakeAvailable(libmpeg2)
+file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/libmpeg2/config.h"
+    CONTENT "#define ATTRIBUTE_ALIGNED_MAX 64\n#define HAVE_BUILTIN_EXPECT 1\n")
+add_library(mpeg2 STATIC)
+foreach(MPEG2_SOURCE alloc cpu_accel cpu_state decode header idct motion_comp slice)
+    target_sources(mpeg2 PRIVATE "${libmpeg2_SOURCE_DIR}/libmpeg2/${MPEG2_SOURCE}.c")
+endforeach()
+target_include_directories(mpeg2 SYSTEM PUBLIC "${libmpeg2_SOURCE_DIR}/include")
+target_include_directories(mpeg2 PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/libmpeg2")
+set_target_properties(mpeg2 PROPERTIES C_STANDARD 99)
+
 # Without a disc's generated code, everything above still builds: what CI
 # checks (tools/ghc.py ci).
 file(GLOB GHC_GENERATED_SOURCES CONFIGURE_DEPENDS
@@ -137,7 +154,9 @@ set(GHC_GAME_SOURCES
     src/latency.cpp
     src/menus.cpp
     src/meta_music.cpp
-    src/null_movie.cpp
+    src/movie/movie.cpp
+    src/movie/pss.cpp
+    src/movie/screen.cpp
     src/null_rnd.cpp
     src/pad.cpp
     src/scenario.cpp
@@ -238,6 +257,7 @@ target_link_libraries(GHClassic PRIVATE
     volk::volk
     vk-bootstrap::vk-bootstrap
     GPUOpen::VulkanMemoryAllocator
+    mpeg2
 )
 # Calls go through volk's pointers, never a linked loader.
 target_compile_definitions(GHClassic PRIVATE VK_NO_PROTOTYPES)

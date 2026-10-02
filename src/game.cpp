@@ -7,7 +7,7 @@
 #include "latency.h"
 #include "menus.h"
 #include "meta_music.h"
-#include "null_movie.h"
+#include "movie/movie.h"
 #include "null_rnd.h"
 #include "pad.h"
 #include "render/mesh_capture.h"
@@ -37,7 +37,7 @@ namespace
         gh2::installNativeParticles(runtime, gh2::kSlus21447);
         gh2::installSynth(runtime, gh2::kSlus21447);
         gh2::installMetaMusic(runtime, gh2::kSlus21447);
-        gh2::installNullMovie(runtime, gh2::kSlus21447);
+        gh2::installMovies(runtime, gh2::kSlus21447);
         gh2::installVideoOptions(runtime, gh2::kSlus21447);
         gh2::script::install(runtime, gh2::kSlus21447);
         gh2::installLatency(runtime, gh2::kSlus21447);

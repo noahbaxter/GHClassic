@@ -14,6 +14,7 @@ namespace gh2
     namespace
     {
         std::atomic<AudioSource> s_source{nullptr};
+        std::atomic<AudioSource> s_movieSource{nullptr};
         SDL_AudioStream *s_stream = nullptr;
         std::thread s_timer;
         std::atomic<bool> s_timerRunning{false};
@@ -23,6 +24,8 @@ namespace gh2
             buffer.assign(frames * 2u, 0.0f);
             if (AudioSource source = s_source.load(std::memory_order_acquire))
                 source(buffer.data(), frames);
+            if (AudioSource movie = s_movieSource.load(std::memory_order_acquire))
+                movie(buffer.data(), frames);
         }
 
         // SDL asks for bytes as the device drains, and gets exactly that many.
@@ -95,5 +98,10 @@ namespace gh2
     void setAudioSource(AudioSource source)
     {
         s_source.store(source, std::memory_order_release);
+    }
+
+    void setMovieAudioSource(AudioSource source)
+    {
+        s_movieSource.store(source, std::memory_order_release);
     }
 }

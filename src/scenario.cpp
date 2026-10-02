@@ -3,6 +3,7 @@
 #include "guest.h"
 #include "hook.h"
 #include "host/vulkan_frontend.h"
+#include "movie/movie.h"
 #include "script.h"
 
 #include <SDL3/SDL.h>
@@ -249,6 +250,12 @@ namespace gh2::scenario
                 PS2Runtime *runtime = s_runtime.load();
                 if (s_done || !runtime)
                     continue;
+                // A movie holds the game thread for its whole length.
+                if (moviePlaying())
+                {
+                    s_lastPoll = Clock::now().time_since_epoch().count();
+                    continue;
+                }
                 const auto idle = Clock::now() - Clock::time_point(Clock::duration(s_lastPoll.load()));
                 // Boot and screen loads pause it a few seconds.
                 if (idle < std::chrono::seconds(8))
