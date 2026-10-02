@@ -3,6 +3,7 @@
 #include "host/audio.h"
 #include "host/input.h"
 #include "host/scene_renderer.h"
+#include "movie/screen.h"
 #include "render/frame.h"
 #include "runtime/ee_scheduler.h"
 #include "runtime/host_clock.h"
@@ -18,6 +19,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <iostream>
 #include <mutex>
 #include <string>
@@ -93,6 +95,11 @@ namespace gh2
             VkCommandBuffer cmd = VK_NULL_HANDLE;
             VkFence done = VK_NULL_HANDLE;
             VkSemaphore imageAvailable = VK_NULL_HANDLE;
+            // A movie picture on its way into the target.
+            VkBuffer upload = VK_NULL_HANDLE;
+            VmaAllocation uploadMemory = VK_NULL_HANDLE;
+            void *uploadMapped = nullptr;
+            VkDeviceSize uploadSize = 0;
         };
         std::array<Slot, kFramesInFlight> slots{};
         uint32_t slot = 0;
@@ -103,6 +110,7 @@ namespace gh2
 
         std::chrono::steady_clock::time_point nextHiddenFrame{};
         Frame shown;                                 // the game frame last drawn
+        movie::Picture moviePicture;                 // the movie's, while one plays
         std::chrono::microseconds frameWait{8333};   // half a display period
         std::chrono::nanoseconds gamePeriod{16667000};
         bool newestOnly = false;                     // the game outruns the display
@@ -243,6 +251,45 @@ namespace gh2
                 vmaDestroyBuffer(allocator, readback, readbackMemory);
             target = VK_NULL_HANDLE;
             readback = VK_NULL_HANDLE;
+        }
+
+        // The movie picture into the target, which is its size, left as the
+        // scene leaves it.
+        bool recordMovie(VkCommandBuffer cmd, Slot &into)
+        {
+            const VkDeviceSize size = moviePicture.rgba.size();
+            if (into.uploadSize < size)
+            {
+                if (into.upload != VK_NULL_HANDLE)
+                    vmaDestroyBuffer(allocator, into.upload, into.uploadMemory);
+                into.upload = VK_NULL_HANDLE;
+                VkBufferCreateInfo buffer{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+                buffer.size = size;
+                buffer.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+                VmaAllocationCreateInfo alloc{};
+                alloc.usage = VMA_MEMORY_USAGE_AUTO;
+                alloc.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+                VmaAllocationInfo info{};
+                if (!check(vmaCreateBuffer(allocator, &buffer, &alloc, &into.upload, &into.uploadMemory, &info),
+                           "movie upload buffer"))
+                    return false;
+                into.uploadMapped = info.pMappedData;
+                into.uploadSize = size;
+            }
+            std::memcpy(into.uploadMapped, moviePicture.rgba.data(), size);
+            vmaFlushAllocation(allocator, into.uploadMemory, 0, size);
+
+            imageBarrier(cmd, target, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0,
+                         VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT);
+            VkBufferImageCopy copy{};
+            copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+            copy.imageExtent = {targetWidth, targetHeight, 1};
+            vkCmdCopyBufferToImage(cmd, into.upload, target, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+            imageBarrier(cmd, target, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                         VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT);
+            return true;
         }
 
         // Where the picture sits in the window: the frame's display aspect,
@@ -502,12 +549,19 @@ namespace gh2
         }
         pollInput(devicesChanged);
 
+        // A playing movie's picture stands in for the game's frames, which
+        // stop while PlayMovie blocks the game thread. Shown at 4:3, a TV's
+        // picture for the 640x448 stream.
+        const bool moviePlaying = movie::latestPicture(s.moviePicture);
         // Each game frame once, in order: wait up to half a display period for
         // the next, else show the last again. A game faster than the display
         // shows its newest.
-        const bool isNew = s.newestOnly ? frames().latest(s.shown) : frames().next(s.shown, s.frameWait);
+        bool isNew = false;
+        if (!moviePlaying)
+            isNew = s.newestOnly ? frames().latest(s.shown) : frames().next(s.shown, s.frameWait);
         s.countFrame(isNew);
         const Frame &frame = s.shown;
+        const float displayAspect = moviePlaying ? 4.0f / 3.0f : frame.displayAspect;
 
         State::Slot &slot = s.slots[s.slot];
         vkWaitForFences(s.device.device, 1, &slot.done, VK_TRUE, UINT64_MAX);
@@ -539,7 +593,12 @@ namespace gh2
         // with the reference's.
         uint32_t width = frame.width;
         uint32_t height = frame.height;
-        if (m_renderSize.mode == RenderSize::kHeight)
+        if (moviePlaying)
+        {
+            width = s.moviePicture.width;
+            height = s.moviePicture.height;
+        }
+        else if (m_renderSize.mode == RenderSize::kHeight)
         {
             height = m_renderSize.height;
             width = static_cast<uint32_t>(std::lround(height * frame.displayAspect / 2.0f)) * 2u;
@@ -570,7 +629,8 @@ namespace gh2
         begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         vkBeginCommandBuffer(cmd, &begin);
 
-        if (!s.scene.record(cmd, frame, s.target, s.targetWidth, s.targetHeight, s.presented))
+        if (moviePlaying ? !s.recordMovie(cmd, slot)
+                         : !s.scene.record(cmd, frame, s.target, s.targetWidth, s.targetHeight, s.presented))
             return false;
 
         if (shot)
@@ -581,7 +641,7 @@ namespace gh2
             vkCmdCopyImageToBuffer(cmd, s.target, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, s.readback, 1, &copy);
         }
         if (present)
-            s.blitToSwapchain(cmd, s.swapchainImages[imageIndex], frame.displayAspect);
+            s.blitToSwapchain(cmd, s.swapchainImages[imageIndex], displayAspect);
         vkEndCommandBuffer(cmd);
 
         const VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
@@ -651,6 +711,8 @@ namespace gh2
             for (State::Slot &slot : s.slots)
             {
                 vkDestroyFence(s.device.device, slot.done, nullptr);
+                if (slot.upload != VK_NULL_HANDLE)
+                    vmaDestroyBuffer(s.allocator, slot.upload, slot.uploadMemory);
                 vkDestroySemaphore(s.device.device, slot.imageAvailable, nullptr);
             }
             vkDestroyCommandPool(s.device.device, s.commandPool, nullptr);

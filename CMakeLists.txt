@@ -154,6 +154,7 @@ set(GHC_GAME_SOURCES
     src/latency.cpp
     src/menus.cpp
     src/meta_music.cpp
+    src/movie/screen.cpp
     src/null_movie.cpp
     src/null_rnd.cpp
     src/pad.cpp
