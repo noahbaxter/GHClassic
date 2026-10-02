@@ -24,6 +24,7 @@ namespace gh2::setlists
         std::string venue;  // where its songs play when their own is locked
         std::string header; // headed by locale token song_header_<header>
         std::vector<std::string> songs;
+        bool encore = true; // its last song is locked as its encore
     };
 
     // `look` is a milo path from the ARK root (ui/sel_song_quickplay.milo).

@@ -26,12 +26,15 @@ namespace gh2::setlists
         std::string s_selected = "gh2";
         std::map<std::string, uint32_t> s_symbols;
 
-        // What the song list shows, when it is ours: each row's tier.
+        // What the song list shows, when it is ours: each row's tier, and
+        // whether it can be picked.
         const Setlist *s_shown = nullptr;
         std::vector<size_t> s_rowTiers;
+        std::vector<bool> s_rowActive;
 
         PS2Runtime::RecompiledFunction s_initData = nullptr;
         PS2Runtime::RecompiledFunction s_gapSize = nullptr;
+        PS2Runtime::RecompiledFunction s_isActive = nullptr;
         PS2Runtime::RecompiledFunction s_venueForSong = nullptr;
 
         uint32_t symbol(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &text)
@@ -86,6 +89,7 @@ namespace gh2::setlists
             const uint32_t provider = GPR_U32(ctx, 4);
             s_shown = ours(rdram, provider);
             s_rowTiers.clear();
+            s_rowActive.clear();
             if (!s_shown)
                 return s_initData(rdram, ctx, runtime);
             const uint32_t returnTo = GPR_U32(ctx, 31);
@@ -98,8 +102,9 @@ namespace gh2::setlists
             store<uint32_t>(rdram, headers + 4u, load<uint32_t>(rdram, headers));
             // As Campaign::GetQuickplaySongs (0x12db78): the first two
             // tiers, or every one with all access (+0x80, the unlock-all
-            // cheat). Career progress opens the rest, and no setlist but
-            // GH2's has a career yet.
+            // cheat). Career progress opens the rest and the encores (each
+            // venue's last song, CampaignState::GetEncoreForVenue 0x132ce0),
+            // and no setlist but GH2's has a career yet.
             const uint32_t campaign = load<uint32_t>(rdram, s_addresses->theCampaign);
             const bool allAccess = campaign != 0u && load<uint32_t>(rdram, campaign + 0x80u) != 0u;
             const size_t open = allAccess ? s_shown->tiers.size() : std::min<size_t>(2u, s_shown->tiers.size());
@@ -109,13 +114,14 @@ namespace gh2::setlists
                 const uint32_t header[2] = {static_cast<uint32_t>(s_rowTiers.size()),
                                             symbol(rdram, ctx, runtime, tier.header)};
                 pushBack(rdram, ctx, runtime, headers, header, 8u, s_addresses->headersInsertOverflow, scratch);
-                for (const std::string &song : tier.songs)
+                for (size_t s = 0; s < tier.songs.size(); ++s)
                 {
                     const uint32_t data = static_cast<uint32_t>(
                         runtime->callGuestFunction(rdram, ctx, s_addresses->songProviderGetSongData,
-                                                   {provider, symbol(rdram, ctx, runtime, song)}));
+                                                   {provider, symbol(rdram, ctx, runtime, tier.songs[s])}));
                     pushBack(rdram, ctx, runtime, songs, &data, 4u, s_addresses->songsInsertOverflow, scratch);
                     s_rowTiers.push_back(t);
+                    s_rowActive.push_back(allAccess || !tier.encore || s + 1u < tier.songs.size());
                 }
             }
             store<int32_t>(rdram, provider + 0x48u, static_cast<int32_t>(s_rowTiers.size()) - 1);
@@ -132,6 +138,17 @@ namespace gh2::setlists
             const size_t row = static_cast<size_t>(static_cast<int32_t>(GPR_U32(ctx, 5)));
             const bool newTier = row + 1u < s_rowTiers.size() && s_rowTiers[row] != s_rowTiers[row + 1u];
             ctx->f[0] = newTier ? 40.0f : 0.0f;
+            ctx->pc = GPR_U32(ctx, 31);
+        }
+
+        // SongProvider::IsActive(int row) (0x117a50): an encore only once the
+        // campaign unlocks it; an inactive row shows blank.
+        void isActive(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            if (!s_shown)
+                return s_isActive(rdram, ctx, runtime);
+            const size_t row = static_cast<size_t>(static_cast<int32_t>(GPR_U32(ctx, 5)));
+            SET_GPR_U32(ctx, 2, row < s_rowActive.size() && s_rowActive[row] ? 1u : 0u);
             ctx->pc = GPR_U32(ctx, 31);
         }
 
@@ -187,6 +204,8 @@ namespace gh2::setlists
         runtime.replaceFunction(addresses.songProviderInitData, &initData);
         s_gapSize = runtime.lookupFunction(addresses.songProviderGapSize);
         runtime.replaceFunction(addresses.songProviderGapSize, &gapSize);
+        s_isActive = runtime.lookupFunction(addresses.songProviderIsActive);
+        runtime.replaceFunction(addresses.songProviderIsActive, &isActive);
         s_venueForSong = runtime.lookupFunction(addresses.campaignDataGetVenueForSong);
         runtime.replaceFunction(addresses.campaignDataGetVenueForSong, &venueForSong);
     }
