@@ -651,12 +651,12 @@ namespace gh2
     {
         std::optional<Bytes> pickerSet(const Guitarist &guitarist, const std::string &gh2Set, const milo::Dir &gh1)
         {
-            const std::string editor = std::string("charsys/") + guitarist.gh1Folder + "/anims/editor/";
+            const std::string editor = std::string("charsys/") + guitarist.folder + "/anims/editor/";
             auto set = load("char/" + gh2Set + "/anims/gen/" + gh2Set + "_ui.milo_ps2");
-            const auto acp = ark::readFile(editor + "gen/" + guitarist.clips() + "_idle_ui.acp");
-            auto acg = ark::readFile(editor + guitarist.gh1Folder + "_ui.acg");
+            const auto acp = ark::readFile(editor + "gen/" + guitarist.prefix() + "_idle_ui.acp");
+            auto acg = ark::readFile(editor + guitarist.folder + "_ui.acg");
             if (!acg)
-                acg = ark::readFile(editor + guitarist.clips() + "_ui.acg");
+                acg = ark::readFile(editor + guitarist.prefix() + "_ui.acg");
             // GH1's graph (AnimSet::LoadGraph, GH1 0x182328): rev, clip
             // count, then per clip its jumps: a clip index, from and to beats.
             if (!set || !acp || !acg || u32(*acg, 4u) != 1u)
@@ -681,7 +681,7 @@ namespace gh2
                 if (!parts)
                     return std::nullopt;
                 Gh1Clip clip = *idle;
-                if (guitarist.pickerDoorOpens)
+                if (guitarist.doorOpens)
                     openDoor(clip, *parts);
                 set->bodies[i] = writeClip(clip, set->bodies[i], *parts, transitions);
             }
@@ -693,12 +693,12 @@ namespace gh2
         std::optional<SongSets> songSets(const Guitarist &guitarist, const std::string &gh2Set, const milo::Dir &gh1,
                                          const dtb::Macros &macros)
         {
-            const std::string anims = std::string("charsys/") + guitarist.gh1Folder + "/anims";
+            const std::string anims = std::string("charsys/") + guitarist.folder + "/anims";
             const auto main = gh1AnimSet(macros, anims);
             const auto hand = gh1AnimSet(macros, anims + "/finger");
             if (!main || !hand)
                 return std::nullopt;
-            const std::string prefix = guitarist.clips() + "_";
+            const std::string prefix = guitarist.prefix() + "_";
             std::map<std::string, const Gh1Anim *> byName;
             for (const Gh1Anim &a : main->anims)
                 byName[a.name.rfind(prefix, 0) == 0 ? a.name.substr(prefix.size()) : a.name] = &a;

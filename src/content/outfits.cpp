@@ -10,6 +10,7 @@
 #include "ps2_runtime_macros.h"
 
 #include <iostream>
+#include <map>
 #include <set>
 #include <unordered_map>
 #include <unordered_set>
@@ -20,7 +21,15 @@ namespace gh2::outfits
     {
         std::string s_config;    // run on config before the profiles are made
         std::string s_loadOrder; // run on each preview panel's type definition
-        std::set<std::pair<std::string, std::string>> s_labelled;
+        std::set<std::string> s_labelled;
+
+        // The one outfit of a GH2 character that had only one, which the
+        // locale never names: its picker never showed.
+        const std::map<std::string, std::string> kOwnNames = {
+            {"funk1", "VELVET"},
+            {"classic", "YANK"},
+            {"grim", "SLAYIN'"},
+        };
         bool s_configured = false;
         std::unordered_set<uint32_t> s_panelDefs;
 
@@ -128,6 +137,9 @@ namespace gh2::outfits
 
         s_config += "{push_back {find $syscfg characters " + character + "} (" + outfit + " (name \"" + label +
                     "\"))}\n";
+        if (const auto own = kOwnNames.find(character); own != kOwnNames.end() && s_labelled.insert(character).second)
+            s_config += "{push_back {find $syscfg characters " + character + " " + character + "} (name \"" +
+                        own->second + "\")}\n";
         // Panels can share one list, so only once, and only where beside is.
         s_loadOrder += "{if {find_exists $ghc_def load_order} {do ($l {elem {find $ghc_def load_order} 1}) "
                        "{if {&& {find_elem $l " + beside + "} {! {find_elem $l " + outfit + "}}} {push_back $l " +
@@ -142,14 +154,6 @@ namespace gh2::outfits
             const std::string index = std::to_string(i) + "_keep";
             ark::rename("ui/image/og/gen/photo_" + outfit + index, disc, "ui/image/og/gen/photo_" + source + index);
         }
-    }
-
-    void label(const std::string &character, const std::string &outfit, const std::string &label)
-    {
-        if (!s_labelled.insert({character, outfit}).second)
-            return;
-        s_config += "{push_back {find $syscfg characters " + character + " " + outfit + "} (name \"" + label +
-                    "\")}\n";
     }
 
     void install(PS2Runtime &runtime, const Addresses &addresses)

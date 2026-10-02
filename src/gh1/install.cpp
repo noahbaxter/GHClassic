@@ -36,24 +36,19 @@ namespace gh2
         using gh1::pickerSet;
 
         // GH1's locale names the folders: hair_metal Izzy, nu_metal Pandora,
-        // hiphop Xavier.
+        // hiphop Xavier. GH1's punk idles leaning on the back wall, where the
+        // door opens, so it stays shut behind him.
         constexpr Guitarist kGuitarists[] = {
-            // GH1's punk idles leaning on the back wall, where the door opens.
-            {.gh1Folder = "punk", .gh2Character = "punk", .baseOutfit = "punk1", .label = "GH1 MOHAWK",
-             .pickerDoorOpens = false},
-            {.gh1Folder = "alterna", .gh2Character = "alterna", .baseOutfit = "alterna1", .label = "GH1 SKULLS"},
-            {.gh1Folder = "metal", .gh2Character = "metal", .baseOutfit = "metal1", .label = "GH1 SHIRT"},
-            {.gh1Folder = "hair_metal", .gh2Character = "glam", .baseOutfit = "glam1", .label = "GH1 CODPIECE",
-             .clipPrefix = "hair", .highway = "hair"},
-            {.gh1Folder = "nu_metal", .gh2Character = "goth", .baseOutfit = "goth2", .label = "GH1 LEATHERS",
-             .clipPrefix = "nu"},
-            {.gh1Folder = "hiphop", .gh2Character = "funk1", .baseOutfit = "funk1", .label = "GH1"},
-            {.gh1Folder = "classic", .gh2Character = "classic", .baseOutfit = "classic", .label = "GH1"},
-            {.gh1Folder = "grim", .gh2Character = "grim", .baseOutfit = "grim", .label = "GH1"},
+            // character  label          base        folder        door opens
+            {"punk",      "SAFETY PINS", "punk1",    "punk",       false},
+            {"alterna",   "CORSET",      "alterna1", "alterna",    true},
+            {"metal",     "SHORT",       "metal1",   "metal",      true},
+            {"glam",      "BIGGER BOOT", "glam1",    "hair_metal", true},
+            {"goth",      "RAZORS",      "goth2",    "nu_metal",   true},
+            {"funk1",     "JADE",        "funk1",    "hiphop",     true},
+            {"classic",   "BRIT",        "classic",  "classic",    true},
+            {"grim",      "SCHEMIN'",    "grim",     "grim",       true},
         };
-
-        // Characters whose one outfit the locale never named.
-        constexpr const char *kUnnamed[] = {"funk1", "classic", "grim"};
 
         // GH1's archetypes (charsys.dta), and the macros that defines (its
         // anim sets among them), after those GH1 loads at boot.
@@ -103,12 +98,12 @@ namespace gh2
         size_t count = 0u;
         for (const Guitarist &guitarist : kGuitarists)
         {
-            const std::string folder = guitarist.gh1Folder, base = guitarist.baseOutfit, outfit = guitarist.outfit();
+            const std::string base = guitarist.base, name = guitarist.name(), folder = guitarist.folder;
             // CharFace reads both from the archetype (GH1 0x2a6cb0).
             const gh1::dtb::Node *archetype = gh1::dtb::find(*types, folder);
             const gh1::dtb::Node *faceFile = archetype ? gh1::dtb::find(*archetype, "face_file") : nullptr;
             const gh1::dtb::Node *faceData = archetype ? gh1::dtb::find(*archetype, "face_data") : nullptr;
-            if (!faceFile || faceFile->nodes.size() < 2u || !faceData || !gh1::addFace(outfit, *faceData))
+            if (!faceFile || faceFile->nodes.size() < 2u || !faceData || !gh1::addFace(name, *faceData))
             {
                 std::cerr << "[gh1] cannot read " << folder << "'s face" << std::endl;
                 continue;
@@ -140,9 +135,9 @@ namespace gh2
                 std::cerr << "[gh1] cannot build " << folder << "'s clips" << std::endl;
                 continue;
             }
-            milo::Dir main = graft(*gh2, *gh1, *face, outfit);
-            milo::Dir ui = graft(*gh2Ui, *gh1, *face, outfit);
-            const std::string ours = "../../../" + outfit + "/anims/" + outfit;
+            milo::Dir main = graft(*gh2, *gh1, *face, name);
+            milo::Dir ui = graft(*gh2Ui, *gh1, *face, name);
+            const std::string ours = "../../../" + name + "/anims/" + name;
             const std::string base1 = songClips->substr(0, songClips->size() - 10u);
             for (milo::Dir *dir : {&main, &ui})
             {
@@ -150,23 +145,25 @@ namespace gh2
                 for (const char *kind : {"_main.milo", "_fret.milo", "_strum.milo"})
                     milo::replacePrefix(*dir, base1 + kind, ours + kind);
             }
-            ark::addFile("char/" + outfit + "/og/gen/" + outfit + ".milo_ps2", milo::write(main));
-            ark::addFile("char/" + outfit + "/og/gen/" + outfit + "_ui.milo_ps2", milo::write(ui));
-            ark::addFile("char/" + outfit + "/anims/gen/" + outfit + "_ui.milo_ps2", *picker);
-            ark::addFile("char/" + outfit + "/anims/gen/" + outfit + "_main.milo_ps2", songs->main);
-            ark::addFile("char/" + outfit + "/anims/gen/" + outfit + "_fret.milo_ps2", songs->fret);
-            ark::addFile("char/" + outfit + "/anims/gen/" + outfit + "_strum.milo_ps2", songs->strum);
+            ark::addFile("char/" + name + "/og/gen/" + name + ".milo_ps2", milo::write(main));
+            ark::addFile("char/" + name + "/og/gen/" + name + "_ui.milo_ps2", milo::write(ui));
+            ark::addFile("char/" + name + "/anims/gen/" + name + "_ui.milo_ps2", *picker);
+            ark::addFile("char/" + name + "/anims/gen/" + name + "_main.milo_ps2", songs->main);
+            ark::addFile("char/" + name + "/anims/gen/" + name + "_fret.milo_ps2", songs->fret);
+            ark::addFile("char/" + name + "/anims/gen/" + name + "_strum.milo_ps2", songs->strum);
             // _horse and anything else beside it is GH2's base outfit's, and
             // so are the photos. The highway (track/surfaces/%s_keep.bmp) is
-            // GH1's, which GH2's loader reads as its own.
-            ark::rename("char/" + outfit + "/og/gen/" + outfit, *gh2Disc, "char/" + base + "/og/gen/" + base);
-            ark::rename("track/surfaces/gen/" + outfit + "_keep", *gh1Disc, "track/surfaces/gen/" + guitarist.track());
-            outfits::photosFrom(outfit, *gh2Disc, base);
-            outfits::add(guitarist.gh2Character, outfit, base, guitarist.label);
+            // GH1's, which GH2's loader reads as its own: the folder's, or
+            // its prefix's (hair.bmp, but nu_metal.bmp).
+            const std::string surfaces = "track/surfaces/gen/";
+            const std::string highway =
+                ark::readFile(*gh1Disc, surfaces + folder + ".bmp_ps2") ? folder : guitarist.prefix();
+            ark::rename("char/" + name + "/og/gen/" + name, *gh2Disc, "char/" + base + "/og/gen/" + base);
+            ark::rename(surfaces + name + "_keep", *gh1Disc, surfaces + highway);
+            outfits::photosFrom(name, *gh2Disc, base);
+            outfits::add(guitarist.character, name, base, guitarist.label);
             ++count;
         }
-        for (const char *character : kUnnamed)
-            outfits::label(character, character, "CLASSIC");
         const auto ms =
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
         std::cerr << "[gh1] " << count << " outfits built in " << ms << " ms" << std::endl;

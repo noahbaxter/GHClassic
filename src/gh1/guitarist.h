@@ -6,20 +6,23 @@ namespace gh2
 {
     namespace gh1
     {
-        // A GH1 guitarist, as one more outfit of a GH2 character. GH1 names
-        // most of its files after the folder; the rest are spelled out.
+        // A GH1 guitarist, as one more outfit of a GH2 character.
         struct Guitarist
         {
-            const char *gh1Folder;           // charsys/<gh1Folder>/
-            const char *gh2Character;        // in config's (characters ...)
-            const char *baseOutfit;          // GH2's, the GH1 model is grafted onto
-            const char *label;               // the outfit picker's (sel_character.dta)
-            const char *clipPrefix = nullptr; // GH1's clip names, <clipPrefix>_idle_ui
-            const char *highway = nullptr;   // GH1's, track/surfaces/<highway>.bmp
-            bool pickerDoorOpens = true;     // the picker door swings open behind them
+            const char *character; // in config's (characters ...)
+            const char *label;     // the outfit picker's (sel_character.dta)
+            const char *base;      // GH2's outfit it sits beside, here grafted onto
+            const char *folder;    // GH1's, charsys/<folder>/
+            bool doorOpens;        // the picker door stands open behind them
 
-            std::string outfit() const { return std::string(gh2Character) + "gh1"; }
-            std::string clips() const { return clipPrefix ? clipPrefix : gh1Folder; }
-            std::string track() const { return highway ? highway : gh1Folder; }        };
+            std::string name() const { return std::string(character) + "gh1"; } // ours
+            // GH1's clip names and some files go by the folder's first word:
+            // hair_idle_ui for hair_metal, nu for nu_metal.
+            std::string prefix() const
+            {
+                const std::string f = folder;
+                return f.substr(0, f.find('_'));
+            }
+        };
     }
 }
