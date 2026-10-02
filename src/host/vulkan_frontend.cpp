@@ -336,6 +336,14 @@ namespace gh2
         s.shotEvery = options.shotEvery;
         s.title = title;
 
+        // MoltenVK is in the app bundle, where SDL's own search does not look.
+        // A path also keeps SDL from taking volk's vkGetInstanceProcAddr
+        // pointer, which the executable exports, for the loader's function.
+#ifdef __APPLE__
+        const char *bundle = SDL_GetBasePath();
+        const std::string moltenVk = std::string(bundle ? bundle : "") + "../Frameworks/libMoltenVK.dylib";
+        SDL_SetHint(SDL_HINT_VULKAN_LIBRARY, moltenVk.c_str());
+#endif
         if (!SDL_Init(SDL_INIT_VIDEO))
         {
             std::cerr << "[sdl] init: " << SDL_GetError() << std::endl;
@@ -370,6 +378,8 @@ namespace gh2
             std::cerr << "[sdl] icon: " << SDL_GetError() << std::endl;
         }
 
+        // The window loaded the Vulkan library; volk takes its entry point.
+        volkInitializeCustom(reinterpret_cast<PFN_vkGetInstanceProcAddr>(SDL_Vulkan_GetVkGetInstanceProcAddr()));
         Uint32 extensionCount = 0;
         const char *const *extensions = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
         auto instance = vkb::InstanceBuilder(vkGetInstanceProcAddr)
@@ -383,6 +393,7 @@ namespace gh2
             return false;
         }
         s.instance = instance.value();
+        volkLoadInstance(s.instance.instance);
         if (!SDL_Vulkan_CreateSurface(s.window, s.instance.instance, nullptr, &s.surface))
         {
             std::cerr << "[sdl] surface: " << SDL_GetError() << std::endl;
@@ -402,6 +413,7 @@ namespace gh2
             return false;
         }
         s.device = device.value();
+        volkLoadDevice(s.device.device);
         s.queue = s.device.get_queue(vkb::QueueType::graphics).value();
         s.queueFamily = s.device.get_queue_index(vkb::QueueType::graphics).value();
 
