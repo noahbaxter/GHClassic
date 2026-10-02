@@ -1,7 +1,7 @@
 #pragma once
 
 #include "addresses.h"
-#include "gh1/dtb.h"
+#include "formats/dtb.h"
 
 #include <string>
 

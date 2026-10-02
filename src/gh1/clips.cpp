@@ -19,7 +19,6 @@ namespace gh2
 {
     namespace
     {
-        namespace dtb = gh1::dtb;
         using gh1::bytes;
         using gh1::gh1Bones;
         using gh1::inverse;
