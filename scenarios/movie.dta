@@ -1,0 +1,7 @@
+; Plays the intro movie through and back to the main menu.
+#include common/first_boot.dta
+{meta play_movie intro.pss}
+(wait_screen main_screen)
+(wait 1)
+(shot after_movie)
+(quit)

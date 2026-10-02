@@ -31,7 +31,7 @@ set(PS2X_BUILD_ANALYZER OFF CACHE BOOL "" FORCE)
 set(PS2X_BUILD_TEST OFF CACHE BOOL "" FORCE)
 set(PS2X_BUILD_STUDIO OFF CACHE BOOL "" FORCE)
 set(PS2X_ENABLE_DEBUG_UI OFF CACHE BOOL "" FORCE)
-# Movies are null_movie for now, so no FFmpeg to find or ship.
+# Movies decode through libmpeg2 (below), so no FFmpeg to find or ship.
 set(PS2X_ENABLE_FFMPEG OFF CACHE BOOL "" FORCE)
 
 # The runtime's logs are on upstream. With them on, song select misses a
@@ -154,8 +154,9 @@ set(GHC_GAME_SOURCES
     src/latency.cpp
     src/menus.cpp
     src/meta_music.cpp
+    src/movie/movie.cpp
+    src/movie/pss.cpp
     src/movie/screen.cpp
-    src/null_movie.cpp
     src/null_rnd.cpp
     src/pad.cpp
     src/scenario.cpp
