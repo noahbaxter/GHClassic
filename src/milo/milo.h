@@ -25,6 +25,13 @@ namespace gh2::milo
         std::vector<Bytes> bodies;     // one per entry
     };
 
+    // Words and length-prefixed strings as bodies keep them. A read past the
+    // end gives 0 or "", and str leaves o at the end.
+    uint32_t u32(const Bytes &b, size_t o);
+    std::string str(const Bytes &b, size_t &o);
+    void putU32(Bytes &out, uint32_t v);
+    void putStr(Bytes &out, const std::string &s);
+
     // A .milo_ps2 / .rnd_ps2 file's blocks, joined.
     std::optional<Bytes> inflate(const Bytes &file);
 

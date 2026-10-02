@@ -31,6 +31,10 @@ namespace gh2
     namespace
     {
         using milo::Bytes;
+        using milo::putStr;
+        using milo::putU32;
+        using milo::str;
+        using milo::u32;
 
         // A GH1 guitarist, as one more outfit of a GH2 character. GH1 names
         // most of its files after the folder; the rest are spelled out.
@@ -70,41 +74,6 @@ namespace gh2
 
         // Characters whose one outfit the locale never named.
         constexpr const char *kUnnamed[] = {"funk1", "classic", "grim"};
-
-        uint32_t u32(const Bytes &b, size_t o)
-        {
-            uint32_t v = 0u;
-            if (o + 4u <= b.size())
-                std::memcpy(&v, b.data() + o, 4u);
-            return v;
-        }
-
-        // A length-prefixed string at o; o moves past it.
-        std::string str(const Bytes &b, size_t &o)
-        {
-            const uint32_t n = u32(b, o);
-            o += 4u;
-            if (o + n > b.size())
-            {
-                o = b.size();
-                return {};
-            }
-            std::string s(reinterpret_cast<const char *>(b.data() + o), n);
-            o += n;
-            return s;
-        }
-
-        void putU32(Bytes &out, uint32_t v)
-        {
-            const auto *p = reinterpret_cast<const uint8_t *>(&v);
-            out.insert(out.end(), p, p + 4);
-        }
-
-        void putStr(Bytes &out, const std::string &s)
-        {
-            putU32(out, static_cast<uint32_t>(s.size()));
-            out.insert(out.end(), s.begin(), s.end());
-        }
 
         // Group rev 12: 163 bytes, a count, the names, then the rest.
         constexpr size_t kGroupNames = 163u;
