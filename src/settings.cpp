@@ -47,7 +47,16 @@ namespace gh2::settings
             // clock about 22 ms ahead of what is rendered, SDL's CoreAudio queue
             // about 43 ms). Not measured on Windows or Linux yet.
             {"latency", "audio_ms", Type::kInt, -500, 500, 5, 65, 0},
+            // OptionData's (retail 0x10d2e0), which the save carried.
+            {"audio", "band_volume", Type::kInt, 0, 11, 1, 11, 11},
+            {"audio", "guitar_volume", Type::kInt, 0, 11, 1, 11, 11},
+            {"audio", "fx_volume", Type::kInt, 0, 11, 1, 11, 11},
+            {"audio", "stereo", Type::kBool, 0, 1, 1, 1, 1},
             {"game", "fast_boot", Type::kBool, 0, 1, 1, 1, 0},
+            {"game", "lefty", Type::kBool, 0, 1, 1, 0, 0},
+            {"game", "lefty_p2", Type::kBool, 0, 1, 1, 0, 0},
+            // Off: PCSX2 holds a card it has loaded open.
+            {"save", "export_card", Type::kBool, 0, 1, 1, 0, 0},
         };
 
         int snap(const Entry &entry, int value)

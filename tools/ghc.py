@@ -242,8 +242,8 @@ def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=N
         sys.exit("no build; run tools/ghc.py build")
     disc = str(Path(disc or find_disc(env or tool_env())).resolve())
 
-    # A blank card and default settings, so every run starts from a first
-    # boot on any machine and never touches the player's.
+    # A blank card, no save and default settings, so every run starts from a
+    # first boot on any machine and never touches the player's.
     card = Path(tempfile.mkdtemp(prefix="arm-mc."))
 
     cmd = [str(game_binary()), disc]
@@ -251,7 +251,7 @@ def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=N
         cmd += ["--scenario", str(Path(scenario).resolve())]
     if speed:
         cmd += ["--speed", str(speed)]
-    cmd += ["--fast-boot", "--seed", "1", "--hidden", "--mute", "--mc", str(card),
+    cmd += ["--fast-boot", "--seed", "1", "--hidden", "--mute", "--mc", str(card), "--save", str(out / "save.bin"),
             "--settings", str(out / "settings.ini"), "--shots", str(out / "frames"), "--shot-every", str(shot_every)]
 
     # Frames are named by seconds since here, on the clock their mtimes use.

@@ -54,6 +54,12 @@ namespace gh2
         uint32_t charHairPoll;
         uint32_t camShotShake;
         uint32_t rndFlareDrawFlare;
+        uint32_t saveData1;     // the card write, on GHMCSaveData's worker thread
+        uint32_t loadData1;     // the card read, on GHMCLoadData's
+        uint32_t loadData2;     // back on the main thread, where Campaign::Load runs
+        uint32_t bufStreamCtor; // BufStream::BufStream(void *, int, bool)
+        uint32_t binStreamDtor; // BinStream::~BinStream
+        uint32_t setupMcIcon;   // builds the card icon below from config/mc.dta and the disc
         // Data
         uint32_t rndCamCurrent;  // RndCam::sCurrent
         uint32_t defaultMat;     // the RndMat a mesh without one draws with
@@ -62,6 +68,15 @@ namespace gh2
         uint32_t synthServerBuffer;  // its RPC server's receive buffer
         uint32_t theTaskMgr;
         uint32_t theOptions; // Options*
+        uint32_t theCampaign; // Campaign*
+        uint32_t mcBuffer;    // the save's bytes between the two halves of a load or save
+        uint32_t mcOverwrite; // GHMCSaveData's overwrite argument: replace a save already there
+        uint32_t mcBaseDir;   // char*, the save's directory on the card
+        uint32_t mcSaveFile;  // char*, the save's file in it
+        uint32_t mcIconFile;  // char*, its icon file's name
+        uint32_t mcIconSize;
+        uint32_t mcIconData;  // that file's bytes, read off the disc
+        uint32_t mcIconSys;   // sceMcIconSys, written as icon.sys
         // RndBitmap::PixelOffset's swizzle tables, by (y / 4) & 1: 64 bytes
         // each for 8bpp, 128 for 4bpp.
         uint32_t swizzle8[2];
@@ -116,6 +131,12 @@ namespace gh2
         .charHairPoll = 0x176fb8u,
         .camShotShake = 0x262f38u,
         .rndFlareDrawFlare = 0x1f9330u,
+        .saveData1 = 0x14b3e0u,
+        .loadData1 = 0x14ba00u,
+        .loadData2 = 0x14bae0u,
+        .bufStreamCtor = 0x2c9268u,
+        .binStreamDtor = 0x2c8b78u,
+        .setupMcIcon = 0x14b098u,
         .rndCamCurrent = 0x3de348u,
         .defaultMat = 0x3da4f0u,
         .rndEnvironCurrent = 0x3de358u,
@@ -123,6 +144,15 @@ namespace gh2
         .synthServerBuffer = 0x484340u,
         .theTaskMgr = 0x51ee40u,
         .theOptions = 0x3da2e8u,
+        .theCampaign = 0x3da31cu,
+        .mcBuffer = 0x3da368u,
+        .mcOverwrite = 0x3da394u,
+        .mcBaseDir = 0x3da374u,
+        .mcSaveFile = 0x3da370u,
+        .mcIconFile = 0x3da378u,
+        .mcIconSize = 0x3da37cu,
+        .mcIconData = 0x3da380u,
+        .mcIconSys = 0x46a908u,
         .swizzle8 = {0x3de1c8u, 0x3de208u},
         .swizzle4 = {0x3de248u, 0x3de2c8u},
     };
