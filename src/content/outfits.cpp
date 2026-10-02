@@ -1,4 +1,4 @@
-#include "outfits.h"
+#include "content/outfits.h"
 
 #include "disc/ark.h"
 #include "guest.h"

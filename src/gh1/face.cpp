@@ -1,5 +1,5 @@
 // GH1's CharFace (GH1 0x2a6cb0-0x2a7930), which GH2 dropped, on GH1's face
-// morphs that gh1.cpp brings over as gh1_face.mrf and gh1_lashes.mrf.
+// morphs that gh1/rig.cpp brings over as gh1_face.mrf and gh1_lashes.mrf.
 //
 // A morph keys each pose at its own frame (ref 0, bad01 1 to blink 9), so a
 // frame is a pose. Every pose_length seconds CharFace::ExcitementPicker picks
@@ -8,7 +8,7 @@
 // one picker, as GH1's chained them under one. GH2's RndMorph::SetFrame
 // (0x201048) does the blending and syncs the target mesh.
 
-#include "gh1_face.h"
+#include "gh1/face.h"
 
 #include "guest.h"
 #include "hook.h"
