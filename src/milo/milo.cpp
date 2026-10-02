@@ -222,6 +222,30 @@ namespace gh2::milo
             replace(b);
     }
 
+    std::optional<std::string> findSuffix(const Dir &dir, const std::string &suffix)
+    {
+        auto find = [&](const Bytes &b) -> std::optional<std::string>
+        {
+            for (size_t o = 0u; o + 4u <= b.size(); ++o)
+            {
+                uint32_t n;
+                std::memcpy(&n, b.data() + o, 4u);
+                if (n < suffix.size() || n > 256u || o + 4u + n > b.size())
+                    continue;
+                const std::string s(reinterpret_cast<const char *>(b.data() + o + 4u), n);
+                if (s.compare(n - suffix.size(), suffix.size(), suffix) == 0)
+                    return s;
+            }
+            return std::nullopt;
+        };
+        if (auto s = find(dir.root))
+            return s;
+        for (const Bytes &b : dir.bodies)
+            if (auto s = find(b))
+                return s;
+        return std::nullopt;
+    }
+
     Bytes write(const Dir &dir)
     {
         Bytes raw;

@@ -228,7 +228,10 @@
                   {if {char_single show_char 0 [char_outfit]}
                      {do
                         ($new_char {char_single get_char 0})
-                        {if_else {&& $old_char $new_char}
+                        ; Transfer copies the playing clips over (0x170db0), so
+                        ; only between outfits on one clip set.
+                        {if_else {&& $old_char $new_char
+                              {== {{$old_char find main.drv} get_clips} {{$new_char find main.drv} get_clips}}}
                            {do
                               {reset_hair $new_char}
                               {{$new_char find main.drv} transfer {$old_char find main.drv}}
