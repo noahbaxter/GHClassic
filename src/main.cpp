@@ -1,14 +1,16 @@
 // GH Classic's entry point: the symbolized GH2 ELF, the disc it came from, and
 // options for unattended runs.
 //
-//   GHClassic <elf> [disc] [--scenario <file>] [--hidden] [--mute] [--speed <x>] [--fast-boot] [--mc <dir>]
-//            [--settings <file>] [--shots <dir>] [--shot-every <n>] [--res window|native|480p|720p|1080p|1440p|2160p]
+//   GHClassic <elf> [disc] [--scenario <file>] [--hidden] [--mute] [--speed <x>] [--fast-boot] [--seed <n>]
+//            [--mc <dir>] [--settings <file>] [--shots <dir>] [--shot-every <n>]
+//            [--res window|native|480p|720p|1080p|1440p|2160p]
 //   GHClassic --bind [keyboard | <n>]
 //
 // --scenario runs a file of steps (scenario.h). --speed runs the game's
 // clock that many times real time, hidden and muted only, as nothing else
 // paces it. --fast-boot boots straight to the main menu, past the logos'
-// padding, the intro movie and the press-start splash.
+// padding, the intro movie and the press-start splash. --seed starts the
+// game's random numbers from n rather than the time of day.
 // --res is what the scene is drawn at: the window's size (the default), the
 // game's own (512x448), or that height at the picture's aspect. --settings
 // reads and writes that file in place of the user data directory's. --bind
@@ -19,6 +21,7 @@
 #include "host/bind.h"
 #include "host/vulkan_frontend.h"
 #include "scenario.h"
+#include "seed.h"
 #include "settings.h"
 #include "ps2_runtime.h"
 #include "runtime/host_clock.h"
@@ -62,6 +65,8 @@ int main(int argc, char *argv[])
             speed = std::strtod(argv[++i], nullptr);
         else if (arg == "--fast-boot")
             gh2::fast_boot::enable();
+        else if (arg == "--seed" && hasValue)
+            gh2::seed::fix(std::atoi(argv[++i]));
         else if (arg == "--scenario" && hasValue)
         {
             if (!gh2::scenario::load(argv[++i]))

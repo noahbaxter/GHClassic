@@ -84,6 +84,7 @@ set(GHC_GAME_SOURCES
     src/pad.cpp
     src/scenario.cpp
     src/script.cpp
+    src/seed.cpp
     src/settings.cpp
     src/synth/module.cpp
     src/synth/reverb.cpp
