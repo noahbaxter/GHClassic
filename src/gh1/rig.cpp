@@ -145,6 +145,23 @@ namespace gh2
                 mesh[o] = 0u;
         }
 
+        // A GH1 Mesh 25 left out of drawing: rev, then Trans 8 (rev, local,
+        // world, children, constraint, target, preserve, parent), then Draw's
+        // rev and its showing flag.
+        void hideGh1(Bytes &mesh)
+        {
+            size_t o = 108u;
+            for (uint32_t i = 0, n = u32(mesh, 104u); i < n; ++i)
+                str(mesh, o);
+            o += 4u;
+            str(mesh, o);
+            o += 1u;
+            str(mesh, o);
+            o += 4u;
+            if (o < mesh.size())
+                mesh[o] = 0u;
+        }
+
         // GH1's Morph 3 as GH2's RndMorph::Load (0x201800) reads it, which
         // still takes rev 3 and its poses (a mesh, then (weight, frame) keys).
         // Its Animatable goes from GH1's rev 0 (empty filter and child lists)
@@ -282,12 +299,16 @@ namespace gh2
                 }
             }
             // The face's poses (bad01.mesh) and the morphs blending them into
-            // face.mesh and lashes.mesh. The poses draw in no group.
+            // face.mesh and lashes.mesh. The poses are data only, hidden: shown,
+            // they draw untextured where they were modelled.
             for (size_t i = 0; i < face.entries.size(); ++i)
             {
                 const auto &[c, n] = face.entries[i];
                 if (c == "Mesh")
+                {
                     added.push_back({c, n, face.bodies[i]});
+                    hideGh1(added.back().body);
+                }
                 else if (c == "Morph")
                 {
                     auto morph = gh2Morph(face.bodies[i], n.substr(0, n.rfind('.')) + ".mesh");
