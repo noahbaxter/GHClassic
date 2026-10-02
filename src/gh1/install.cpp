@@ -36,8 +36,8 @@ namespace gh2
         using gh1::pickerSet;
 
         // GH1's locale names the folders: hair_metal Izzy, nu_metal Pandora,
-        // hiphop Xavier. GH1's punk idles leaning on the back wall, where the
-        // door opens, so it stays shut behind him.
+        // hiphop Xavier. GH1's punk and hiphop idle leaning on the back wall,
+        // where the door opens, so it stays shut behind them.
         constexpr Guitarist kGuitarists[] = {
             // character  label          base        folder        door opens
             {"punk",      "SAFETY PINS", "punk1",    "punk",       false},
@@ -45,7 +45,7 @@ namespace gh2
             {"metal",     "SHORT",       "metal1",   "metal",      true},
             {"glam",      "BIGGER BOOT", "glam1",    "hair_metal", true},
             {"goth",      "RAZORS",      "goth2",    "nu_metal",   true},
-            {"funk1",     "JADE",        "funk1",    "hiphop",     true},
+            {"funk1",     "JADE",        "funk1",    "hiphop",     false},
             {"classic",   "BRIT",        "classic",  "classic",    true},
             {"grim",      "SCHEMIN'",    "grim",     "grim",       true},
         };
