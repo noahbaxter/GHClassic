@@ -11,6 +11,9 @@
 
 namespace gh2::save
 {
+    // GH Classic's own section, no game's: [classic] campaign = gh80s.
+    constexpr const char *kOwnSection = "classic";
+
     struct Section
     {
         std::string name;
