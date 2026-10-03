@@ -1,0 +1,17 @@
+; Quickplay's setlists follow the discs: each game's list can be shown
+; exactly when its disc is mounted, and blue goes to 360 only when it is.
+; Holds with any set of discs (ghc.py scenarios --discs).
+#include common/first_boot.dta
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 2)
+(shot list)
+(expect {setlist shown} gh2)
+(expect {== {ghc_qp_blue} gh2x} {mounted gh2x})
+(expect {setlist select gh1} {mounted gh1})
+{setlist select gh2}
+(expect {setlist select gh80s} {mounted gh80s})
+{setlist select gh2}
+(expect {setlist select gh2x} {mounted gh2x})
+(quit)

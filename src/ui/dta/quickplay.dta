@@ -6,20 +6,35 @@
 ; each other. The help bar has room for the setlist frets or the strum, not
 ; both.
 {func ghc_qp_blue
-   {if_else {&& {== {setlist shown} gh2} {setlist exists gh2x}} gh2x gh2}
+   {if_else {&& {== {setlist shown} gh2} {mounted gh2x}} gh2x gh2}
 }
-; Blue's label names where it goes. Set from the screen's enter, after the
-; help bar's own has put up the screen's default.
+; A setlist fret shows only where it goes somewhere: a game whose disc is
+; mounted ({mounted}, content/games.h), and blue's label names where it goes. With none, the game's own
+; bar. Set from the screen's enter, after the help bar's own has put up the
+; screen's default.
 {func ghc_qp_helpbar
    {do
-      ($array)
+      ($array $frets)
       {set $array ()}
       {resize $array 0}
+      {set $frets FALSE}
       {push_back $array (fret1 help_continue)}
       {push_back $array (fret2 help_back)}
-      {push_back $array (fret3 setlist_gh1)}
-      {push_back $array {if_else {== {ghc_qp_blue} gh2x} (fret4 setlist_gh2x) (fret4 setlist_gh2)}}
-      {push_back $array (fret5 setlist_gh80s)}
+      {if {mounted gh1}
+         {push_back $array (fret3 setlist_gh1)}
+         {set $frets TRUE}
+      }
+      {if {|| {!= {setlist shown} gh2} {mounted gh2x}}
+         {push_back $array {if_else {== {ghc_qp_blue} gh2x} (fret4 setlist_gh2x) (fret4 setlist_gh2)}}
+         {set $frets TRUE}
+      }
+      {if {mounted gh80s}
+         {push_back $array (fret5 setlist_gh80s)}
+         {set $frets TRUE}
+      }
+      {if {! $frets}
+         {push_back $array (strum help_updown)}
+      }
       {helpbar set_display $array}
    }
 }
