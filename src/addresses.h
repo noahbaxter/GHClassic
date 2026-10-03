@@ -106,6 +106,9 @@ namespace gh2
         uint32_t cdRead;
         uint32_t profileStateInitChars;
         uint32_t charsysPanelSetTypeDef;
+        uint32_t charsysPanelPollCharLoading;
+        uint32_t charsysPanelTrySetPriority; // (Symbol outfit, int priority)
+        uint32_t playerConfigCharacterOfOutfit; // static (Symbol outfit, int &index)
         uint32_t dataVariable; // DataVariable(Symbol)
         // Data
         uint32_t rndCamCurrent;  // RndCam::sCurrent
@@ -234,6 +237,9 @@ namespace gh2
         .cdRead = 0x2ae9c0u,
         .profileStateInitChars = 0x13ad80u,
         .charsysPanelSetTypeDef = 0x141bf8u,
+        .charsysPanelPollCharLoading = 0x142ea8u,
+        .charsysPanelTrySetPriority = 0x142790u,
+        .playerConfigCharacterOfOutfit = 0x114030u,
         .dataVariable = 0x2b7b00u,
         .rndCamCurrent = 0x3de348u,
         .defaultMat = 0x3da4f0u,

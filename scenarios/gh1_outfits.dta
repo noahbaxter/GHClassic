@@ -1,0 +1,64 @@
+; The GH1 outfits in the career outfit picker, after the unlock-all cheat
+; (long_cheats.dta's own lines, saving off with it): each character's list,
+; then its GH1 outfit, the last, focused on the door.
+;
+; Buttons are focused as objects: a bare name means nothing outside the
+; panel, and focus would go nowhere.
+{func ghc_char ($c)
+   {sel_character_panel unchoose_skins}
+   {sel_character_panel set char_focus $c}
+   {sel_character_panel set char_outfit {character_provider get_outfit $c 0}}
+   {char_single show_char 0 {character_provider get_outfit $c 0}}
+   {char_single char_event 0 animate}
+}
+{func ghc_pick_last
+   {sel_character_panel set_focus
+      {{sel_character_panel loaded_dir} find
+         {elem {sel_character_panel get outfit_buttons} {'-' {size {sel_character_panel get outfits}} 1}}}}
+}
+
+#include common/first_boot.dta
+{set $cheat_enabled_unlock_all 1}
+{campaign set_all_access 1}
+{set $disable_save 1}
+{set $disable_career 1}
+{gamecfg set mode career}
+{campaign set_profile_slot 0}
+{ui goto_screen career_screen}
+(wait_screen career_screen)
+{ui goto_screen sel_character_edit_screen}
+(wait_screen sel_character_edit_screen)
+
+{ghc_char punk} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_pick_last} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print punk {sel_character_panel get char_outfit} of {size {sel_character_panel get outfits}}) (shot punk)
+
+{ghc_char alterna} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_pick_last} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print alterna {sel_character_panel get char_outfit} of {size {sel_character_panel get outfits}}) (shot alterna)
+
+{ghc_char metal} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_pick_last} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print metal {sel_character_panel get char_outfit} of {size {sel_character_panel get outfits}}) (shot metal)
+
+{ghc_char glam} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_pick_last} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print glam {sel_character_panel get char_outfit} of {size {sel_character_panel get outfits}}) (shot glam)
+
+{ghc_char goth} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_pick_last} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print goth {sel_character_panel get char_outfit} of {size {sel_character_panel get outfits}}) (shot goth)
+
+{ghc_char funk1} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_pick_last} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print funk1 {sel_character_panel get char_outfit} of {size {sel_character_panel get outfits}}) (shot funk1)
+
+{ghc_char classic} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_pick_last} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print classic {sel_character_panel get char_outfit} of {size {sel_character_panel get outfits}}) (shot classic)
+
+{ghc_char grim} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_pick_last} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+(print grim {sel_character_panel get char_outfit} of {size {sel_character_panel get outfits}}) (shot grim)
+(wait 1)
+(quit)

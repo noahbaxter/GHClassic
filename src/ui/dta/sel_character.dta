@@ -3,7 +3,8 @@
 ; config lists, locked or not; a locked one never loads (the door stays on
 ; Loading). Here the picker lists the character's unlocked outfits, one
 ; button each, up to four: outfit3 and outfit4 are outfit2 cloned on entry,
-; stepped down by outfit1 to outfit2's spacing.
+; and all are stepped down by outfit1 to outfit2's spacing, four starting a
+; step higher.
 {retype sel_character_panel
    (
       ; From the ARK root: a path resolves against the file its array came
@@ -16,8 +17,10 @@
       (skin_select FALSE)
       (outfits ()) ; char_focus's unlocked outfits, as the buttons show them
       (outfit_buttons (outfit1.btn outfit2.btn outfit3.btn outfit4.btn))
-      (outfit_step 0) ; outfit1 to outfit2, in z
-      (blurb_z 0)     ; sc_char_outfit_blurb.lbl's own z, under two buttons
+      (outfit_x 0) (outfit_y 0) (outfit_z 0) ; outfit1.btn's own place
+      (outfit_step 0)  ; outfit1 to outfit2, in z (falls going down)
+      (outfit_lift 0)  ; the list's start above outfit1's place: a step for four
+      (blurb_z 0)      ; sc_char_outfit_blurb.lbl's own z, under two buttons
       (enter
          {$this add_outfit_buttons}
          {character.lst set_provider character_provider}
@@ -60,14 +63,18 @@
                ($x1 0) ($y1 0) ($z1 0) ($x2 0) ($y2 0) ($z2 0)
                {outfit1.btn get_local_pos $x1 $y1 $z1}
                {outfit2.btn get_local_pos $x2 $y2 $z2}
+               {$this set outfit_x $x1}
+               {$this set outfit_y $y1}
+               {$this set outfit_z $z1}
                {$this set outfit_step {'-' $z2 $z1}}
                {do
                   ($bx 0) ($by 0) ($bz 0)
                   {sc_char_outfit_blurb.lbl get_local_pos $bx $by $bz}
                   {$this set blurb_z $bz}
                }
-               {$this clone_outfit_button outfit3.btn $x2 $y2 {'+' $z2 [outfit_step]}}
-               {$this clone_outfit_button outfit4.btn $x2 $y2 {'+' $z2 {'*' 2 [outfit_step]}}}
+               ; Placed by choose_skins.
+               {$this clone_outfit_button outfit3.btn $x2 $y2 $z2}
+               {$this clone_outfit_button outfit4.btn $x2 $y2 $z2}
                {{$this loaded_dir} sync_objects}
             }
          }
@@ -133,20 +140,31 @@
                      {do
                         {{{$this loaded_dir} find $btn} set_showing FALSE}
                         {$this disable $btn}
+                        {{{$this loaded_dir} find $btn} set nav_down {{$this loaded_dir} find $btn}}
                      }
                   }
                }
             }
-            ; The likes and dislikes start under the second button: down a
-            ; step for each button past it.
+            ; Four start a step higher, into the room under the title, so
+            ; they end where three do and the likes and dislikes still fit.
+            {$this set outfit_lift {if_else {> $count 3} {'-' 0 [outfit_step]} 0}}
+            {foreach_int $i 0 $count
+               {{{$this loaded_dir} find {elem [outfit_buttons] $i}} set_local_pos [outfit_x] [outfit_y]
+                  {'+' [outfit_z] {'+' [outfit_lift] {'*' $i [outfit_step]}}}}
+            }
+            ; The likes and dislikes start under the second button: down as
+            ; far as the last one is past it.
             {do
                ($bx 0) ($by 0) ($bz 0)
+               ($last {'+' [outfit_lift] {'*' {'-' $count 1} [outfit_step]}})
                {sc_char_outfit_blurb.lbl get_local_pos $bx $by $bz}
                {sc_char_outfit_blurb.lbl set_local_pos $bx $by
-                  {'+' [blurb_z] {'*' {max 0 {'-' $count 2}} [outfit_step]}}}
+                  {'+' [blurb_z] {min 0 {'-' $last [outfit_step]}}}}
             }
-            ; Down steps through the listed ones and wraps; up follows the
-            ; links backwards.
+            ; Down steps through the listed ones and wraps. Up is the first
+            ; component whose nav_down is the focus, or past it while that is
+            ; disabled (PanelDir::ComponentNav, 0x211040), so a hidden button
+            ; links to itself above, out of the way.
             {foreach_int $i 0 $count
                {{{$this loaded_dir} find {elem [outfit_buttons] $i}} set nav_down
                   {{$this loaded_dir} find {elem [outfit_buttons] {mod {'+' $i 1} $count}}}
@@ -197,15 +215,14 @@
                {if {>= $idx 0}
                   {synth play_sequence button_toggle}
                   {set [char_outfit] {elem [outfits] $idx}}
-                  ; The arrow's anim has a key for the first two; past them it
-                  ; steps on as the buttons do.
-                  {cs_arrow.tnm set_frame {min $idx 1}}
-                  {if {> $idx 1}
-                     {do
-                        ($x 0) ($y 0) ($z 0)
-                        {cs_arrow.mesh get_local_pos $x $y $z}
-                        {cs_arrow.mesh set_local_pos $x $y {'+' $z {'*' {'-' $idx 1} [outfit_step]}}}
-                     }
+                  ; The arrow's anim keys outfit1's place; from there it
+                  ; moves as the buttons were placed.
+                  {cs_arrow.tnm set_frame 0}
+                  {do
+                     ($x 0) ($y 0) ($z 0)
+                     {cs_arrow.mesh get_local_pos $x $y $z}
+                     {cs_arrow.mesh set_local_pos $x $y
+                        {'+' $z {'+' [outfit_lift] {'*' $idx [outfit_step]}}}}
                   }
                   {set $old_char {char_single get_char 0}}
                   {if {char_single show_char 0 [char_outfit]}

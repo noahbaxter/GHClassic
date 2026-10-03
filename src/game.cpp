@@ -6,12 +6,14 @@
 #include "ui/fast_boot.h"
 #include "frame_step.h"
 #include "game_overrides.h"
+#include "gh1.h"
 #include "settings/latency.h"
 #include "ui/locale.h"
 #include "ui/menus.h"
 #include "ui/meta_music.h"
 #include "movie/movie.h"
 #include "dev/null_rnd.h"
+#include "outfits.h"
 #include "host/pad.h"
 #include "render/mesh_capture.h"
 #include "render/native_cull.h"
@@ -39,7 +41,9 @@ namespace
     void applySlus21447(PS2Runtime &runtime)
     {
         gh2::ark::install(runtime, gh2::kSlus21447);
-        gh2::installEighties(runtime, gh2::kSlus21447);
+        gh2::installEighties();
+        gh2::installGh1();
+        gh2::outfits::install(runtime, gh2::kSlus21447);
         gh2::installNullRnd(runtime, gh2::kSlus21447);
         gh2::installNativeRnd(runtime, gh2::kSlus21447);
         gh2::installMeshCapture(runtime, gh2::kSlus21447);
