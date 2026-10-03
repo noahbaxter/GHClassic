@@ -67,18 +67,6 @@ namespace gh2::milo
             }
         };
 
-        void putU32(Bytes &out, uint32_t v)
-        {
-            const auto *p = reinterpret_cast<const uint8_t *>(&v);
-            out.insert(out.end(), p, p + 4);
-        }
-
-        void putStr(Bytes &out, const std::string &s)
-        {
-            putU32(out, static_cast<uint32_t>(s.size()));
-            out.insert(out.end(), s.begin(), s.end());
-        }
-
         constexpr size_t kNone = static_cast<size_t>(-1);
 
         size_t findMark(const Bytes &b, size_t from)
@@ -86,6 +74,40 @@ namespace gh2::milo
             const auto it = std::search(b.begin() + static_cast<std::ptrdiff_t>(from), b.end(), kMark, kMark + 4);
             return it == b.end() ? kNone : static_cast<size_t>(it - b.begin());
         }
+    }
+
+    uint32_t u32(const Bytes &b, size_t o)
+    {
+        uint32_t v = 0u;
+        if (o + 4u <= b.size())
+            std::memcpy(&v, b.data() + o, 4u);
+        return v;
+    }
+
+    std::string str(const Bytes &b, size_t &o)
+    {
+        const uint32_t n = u32(b, o);
+        o += 4u;
+        if (o + n > b.size())
+        {
+            o = b.size();
+            return {};
+        }
+        std::string s(reinterpret_cast<const char *>(b.data() + o), n);
+        o += n;
+        return s;
+    }
+
+    void putU32(Bytes &out, uint32_t v)
+    {
+        const auto *p = reinterpret_cast<const uint8_t *>(&v);
+        out.insert(out.end(), p, p + 4);
+    }
+
+    void putStr(Bytes &out, const std::string &s)
+    {
+        putU32(out, static_cast<uint32_t>(s.size()));
+        out.insert(out.end(), s.begin(), s.end());
     }
 
     std::optional<Bytes> inflate(const Bytes &file)
@@ -220,6 +242,30 @@ namespace gh2::milo
         replace(dir.root);
         for (Bytes &b : dir.bodies)
             replace(b);
+    }
+
+    std::optional<std::string> findSuffix(const Dir &dir, const std::string &suffix)
+    {
+        auto find = [&](const Bytes &b) -> std::optional<std::string>
+        {
+            for (size_t o = 0u; o + 4u <= b.size(); ++o)
+            {
+                uint32_t n;
+                std::memcpy(&n, b.data() + o, 4u);
+                if (n < suffix.size() || n > 256u || o + 4u + n > b.size())
+                    continue;
+                const std::string s(reinterpret_cast<const char *>(b.data() + o + 4u), n);
+                if (s.compare(n - suffix.size(), suffix.size(), suffix) == 0)
+                    return s;
+            }
+            return std::nullopt;
+        };
+        if (auto s = find(dir.root))
+            return s;
+        for (const Bytes &b : dir.bodies)
+            if (auto s = find(b))
+                return s;
+        return std::nullopt;
     }
 
     Bytes write(const Dir &dir)

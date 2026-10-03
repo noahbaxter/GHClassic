@@ -21,6 +21,13 @@ namespace milo
         constexpr uint32_t kFocusZ = 0x510u;         // the GS Z depth of field starts at, 0 for none
     }
 
+    // Hmx::Object, the virtual base an object's first word points to.
+    namespace object
+    {
+        constexpr uint32_t kName = 0x14u; // const char*
+        constexpr uint32_t kDir = 0x18u;  // ObjectDir*
+    }
+
     // RndTransformable: local transform at +0x20, world at +0x60. A
     // transform is three 16-byte rows then the position.
     namespace transformable

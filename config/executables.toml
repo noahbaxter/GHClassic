@@ -24,6 +24,40 @@ redump = "http://forum.redump.org/post/131232/"
 name = "Guitar Hero II Deluxe 2.0"
 data_sha1 = "8ef0d0a6e90d46c64a553590ffc27c6e2a2bc447"
 
+# The other releases, from Redump's PS2 DAT (2026-06-15).
+
+[[disc]]
+name = "Guitar Hero (Europe)"
+data_sha1 = "d8d3fa7615e79284119d5e8e9af623e01236d469"
+
+[[disc]]
+name = "Guitar Hero (Europe, Australia) (En,Fr,De,Es,It)"
+data_sha1 = "777aee9142715d1a886d89282f4c6c8be3173109"
+
+[[disc]]
+name = "Guitar Hero (USA) (Demo)"
+data_sha1 = "f257572adebbf98231d4bbc9f508bf7dee7c0b7c"
+
+[[disc]]
+name = "Guitar Hero II (Europe, Australia) (En,Fr,De,Es,It)"
+data_sha1 = "c18c69fdae10b6c329f38245a7ea93a7e6088197"
+
+[[disc]]
+name = "Guitar Hero II (USA) (Demo)"
+data_sha1 = "b2ec787a595bbe72495b5f9307586aaf060aaba5"
+
+[[disc]]
+name = "Guitar Hero II (Europe) (En,Fr,De,Es,It) (Demo)"
+data_sha1 = "bc2ddeb9a392352986c50cfaf60e440d25e21616"
+
+[[disc]]
+name = "Guitar Hero - Rocks the 80s (Europe, Australia)"
+data_sha1 = "4af88d50cbbb404a9d1e33bd0a552ae05a60f501"
+
+[[disc]]
+name = "Guitar Hero - Rocks the 80s (Europe) (Fr,De,Es,It)"
+data_sha1 = "adb7136705a9d4a991b34ebd67853e911432b104"
+
 # Every Milo-engine release Redump lists (GH1, GH2, 80s; GH3 onward is a
 # different engine). Recognised by the serial in the boot executable's name,
 # so a disc we cannot use still gets named. Each is a separate compile with

@@ -27,6 +27,9 @@ namespace gh2::ark
     // A file's bytes as the game would get them, from wherever it lives.
     std::optional<std::vector<uint8_t>> readFile(const std::string &path);
 
+    // A file's bytes from that disc's archive alone.
+    std::optional<std::vector<uint8_t>> readFile(size_t disc, const std::string &path);
+
     // Which indexed disc boots that executable ("SLUS_215.86"), once
     // install has run.
     std::optional<size_t> discWithSerial(const std::string &serial);
