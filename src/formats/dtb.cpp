@@ -1,11 +1,12 @@
-// A .dtb is encrypted whole after a 4-byte seed, then a version byte and
-// the root array. Arrays are a u16 size, line and id, then their nodes; a
-// node is a u32 type and its value. Directives are nodes too, a #define's
-// body the array after it.
+// A .dtb is encrypted whole (disc/crypt.h), then a version byte and the
+// root array. Arrays are a u16 size, line and id, then their nodes; a node
+// is a u32 type and its value. Directives are nodes too, a #define's body
+// the array after it.
 
 #include "formats/dtb.h"
 
-#include <array>
+#include "disc/crypt.h"
+
 #include <cstdio>
 #include <cstring>
 
@@ -14,33 +15,6 @@ namespace gh2::dtb
     namespace
     {
         using milo::Bytes;
-
-        // BinStream::EnableReadEncryption (GH1 0x2407e8) seeds Rand
-        // (0x265940) with the first word; Read (0x2408d0) XORs each byte
-        // with Rand::Int (0x265aa0).
-        Bytes decrypt(const Bytes &file)
-        {
-            uint32_t seed = milo::u32(file, 0u);
-            std::array<uint32_t, 256> table;
-            for (uint32_t &t : table)
-            {
-                const uint32_t a = seed * 0x41c64e6du + 0x3039u;
-                const uint32_t b = a * 0x41c64e6du + 0x3039u;
-                t = (a >> 16) | (b & 0x7fff0000u);
-                seed = b;
-            }
-            Bytes out;
-            out.reserve(file.size() > 4u ? file.size() - 4u : 0u);
-            size_t i = 0u, j = 0x67u;
-            for (size_t o = 4u; o < file.size(); ++o)
-            {
-                table[i] ^= table[j];
-                out.push_back(static_cast<uint8_t>(file[o] ^ (table[i] & 0xffu)));
-                i = i + 1u < 0xf9u ? i + 1u : 0u;
-                j = j + 1u < 0xf9u ? j + 1u : 0u;
-            }
-            return out;
-        }
 
         struct Reader
         {
@@ -236,14 +210,18 @@ namespace gh2::dtb
             const auto file = load.files(built(script));
             if (!file)
                 return std::nullopt;
-            const Bytes plain = decrypt(*file);
-            if (plain.empty() || plain[0] != 1u)
-                return std::nullopt;
-            Reader reader{plain, 1u};
-            auto root = reader.array(kArray);
-            if (!root)
-                return std::nullopt;
-            return apply(root->nodes, load, script);
+            // PS2's cipher, else 360's: the one giving version 1 and a whole
+            // root array.
+            for (const auto decrypt : {crypt::randStream, crypt::parkMiller})
+            {
+                const Bytes plain = decrypt(*file);
+                if (plain.empty() || plain[0] != 1u)
+                    continue;
+                Reader reader{plain, 1u};
+                if (auto root = reader.array(kArray))
+                    return apply(root->nodes, load, script);
+            }
+            return std::nullopt;
         }
     }
 

@@ -6,10 +6,12 @@
 // and a byte offset in it, bounds blocks with Archive::IsValidBlock
 // (0x2ac9e8), and reads them through CDRead (0x2ae9c0), which calls
 // sceCdRead at that part's LBA. Here part numbers run on past the game
-// disc's own, one per part of each added disc.
+// disc's own, one per part of each added disc, and one per loose file.
 
 #include "disc/ark.h"
 
+#include "disc/crypt.h"
+#include "disc/volume.h"
 #include "guest.h"
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
@@ -29,13 +31,13 @@ namespace gh2::ark
 {
     namespace
     {
-        // A disc's ark part, or one loose file held in memory (disc null).
+        // An ark part or one loose file: `length` bytes, read from an
+        // offset.
         struct Part
         {
-            DiscImage *disc;
-            DiscImage::Extent extent;
-            uint32_t size; // from the header, what IsValidBlock bounds by
-            std::shared_ptr<const std::vector<uint8_t>> bytes;
+            std::function<size_t(uint64_t offset, uint8_t *dst, size_t size)> read;
+            uint64_t length = 0u;
+            uint32_t size = 0u; // from the header, what IsValidBlock bounds by
         };
 
         struct Entry
@@ -48,7 +50,7 @@ namespace gh2::ark
 
         struct Disc
         {
-            std::string serial; // as SYSTEM.CNF boots it, "SLUS_214.47"
+            std::string serial; // Volume::serial's
             std::unordered_map<std::string, Entry> files; // dir/name -> entry
         };
 
@@ -60,28 +62,14 @@ namespace gh2::ark
             std::string source;
         };
 
-        std::vector<std::unique_ptr<DiscImage>> s_added;
+        std::unique_ptr<Volume> s_game;
+        std::vector<std::unique_ptr<Volume>> s_added;
         std::vector<Part> s_parts;
         std::vector<Disc> s_discs; // searched in order, the game disc first
         std::vector<Rename> s_renames;
         std::unordered_map<std::string, Entry> s_loose; // searched before all else
+        std::unordered_map<std::string, std::function<std::optional<Made>()>> s_made; // loose once made
         uint32_t s_blockSizeAddress = 0u;
-
-        // The boot executable's name from SYSTEM.CNF's BOOT2 line.
-        std::string serialOf(DiscImage &disc)
-        {
-            DiscImage::Extent extent;
-            if (!disc.find("SYSTEM.CNF", extent))
-                return {};
-            std::string text(extent.size, '\0');
-            text.resize(disc.readExtent(extent, 0u, reinterpret_cast<uint8_t *>(text.data()), text.size()));
-            const size_t boot = text.find("BOOT2");
-            const size_t start = text.find('\\', boot);
-            const size_t end = text.find(';', start);
-            if (boot == std::string::npos || start == std::string::npos || end == std::string::npos)
-                return {};
-            return text.substr(start + 1u, end - start - 1u);
-        }
 
         uint32_t word(const std::vector<uint8_t> &data, size_t &at)
         {
@@ -95,23 +83,26 @@ namespace gh2::ark
         // MAIN.HDR as Archive::Read (0x2ac8e8) reads it: version 3, the part
         // sizes, ArkHash's string buffer and slot table, then 20-byte
         // entries of byte offset over all parts, name slot, dir slot, size
-        // and uncompressed size.
-        bool index(DiscImage &disc, const std::string &label)
+        // and uncompressed size. A 360's is encrypted whole (crypt.h).
+        bool index(Volume &volume, const std::string &label)
         {
-            DiscImage::Extent extent;
-            if (!disc.find("GEN/MAIN.HDR", extent))
+            const auto header = volume.find("GEN/MAIN.HDR");
+            if (!header)
             {
                 std::cerr << "[ark] " << label << ": no GEN/MAIN.HDR" << std::endl;
                 return false;
             }
-            std::vector<uint8_t> hdr(extent.size);
-            if (disc.readExtent(extent, 0u, hdr.data(), hdr.size()) != hdr.size())
+            std::vector<uint8_t> hdr(static_cast<size_t>(header->size));
+            if (volume.read(header->offset, hdr.data(), hdr.size()) != hdr.size())
             {
                 std::cerr << "[ark] " << label << ": short read of MAIN.HDR" << std::endl;
                 return false;
             }
 
             size_t at = 0u;
+            if (word(hdr, at) != 3u)
+                hdr = crypt::parkMiller(hdr);
+            at = 0u;
             const uint32_t version = word(hdr, at);
             if (version != 3u)
             {
@@ -126,15 +117,19 @@ namespace gh2::ark
                 partSizes.push_back(word(hdr, at));
             for (uint32_t i = 0u; i < partCount; ++i)
             {
-                Part part{&disc, {}, partSizes[i]};
                 const std::string path = "GEN/MAIN_" + std::to_string(i) + ".ARK";
-                if (!disc.find(path, part.extent))
+                const auto file = volume.find(path);
+                if (!file)
                 {
                     std::cerr << "[ark] " << label << ": no " << path << std::endl;
                     s_parts.resize(firstPart);
                     return false;
                 }
-                s_parts.push_back(part);
+                Volume *from = &volume;
+                const uint64_t base = file->offset;
+                s_parts.push_back({[from, base](uint64_t offset, uint8_t *dst, size_t size)
+                                   { return from->read(base + offset, dst, size); },
+                                   file->size, partSizes[i]});
             }
 
             const uint32_t stringBytes = word(hdr, at);
@@ -167,7 +162,7 @@ namespace gh2::ark
                     offset -= partSizes[part++];
                 files[slotString(dir) + "/" + slotString(name)] = {firstPart + part, offset, size, uncompressedSize};
             }
-            const std::string serial = serialOf(disc);
+            const std::string serial = volume.serial();
             std::cerr << "[ark] " << label << " (" << serial << "): " << files.size() << " files in " << partCount
                       << " part" << (partCount == 1u ? "" : "s") << std::endl;
             s_discs.push_back({serial, std::move(files)});
@@ -188,12 +183,31 @@ namespace gh2::ark
             return std::string(path, slash + (keep ? 1 : 0)) + "/" + (slash + 1);
         }
 
-        // Loose files first, then renames, then each disc in turn.
+        Entry addPart(const std::string &name, Part part)
+        {
+            const Entry entry{static_cast<uint32_t>(s_parts.size()), 0u, part.size, 0u};
+            s_parts.push_back(std::move(part));
+            return s_loose[name] = entry;
+        }
+
+        // Loose files first, made ones as they are asked for, then renames,
+        // then each disc in turn.
         const Entry *find(const std::string &name)
         {
             const auto loose = s_loose.find(name);
             if (loose != s_loose.end())
                 return &loose->second;
+            if (const auto made = s_made.find(name); made != s_made.end())
+            {
+                auto file = made->second();
+                s_made.erase(made);
+                if (file)
+                {
+                    const uint32_t size = file->size;
+                    addPart(name, {std::move(file->read), size, size});
+                    return &s_loose.at(name);
+                }
+            }
             for (const Rename &rename : s_renames)
             {
                 if (name.compare(0u, rename.as.size(), rename.as) != 0)
@@ -260,20 +274,13 @@ namespace gh2::ark
             const uint64_t offset = static_cast<uint64_t>(GPR_U32(ctx, 5)) * DiscImage::kSectorSize;
             const size_t bytes = static_cast<size_t>(GPR_U32(ctx, 6)) * DiscImage::kSectorSize;
             bool failed = true;
-            if (part < s_parts.size() && offset < s_parts[part].extent.size)
+            if (part < s_parts.size() && offset < s_parts[part].length)
             {
                 const Part &p = s_parts[part];
                 // The last block runs past the part's end; the disc beyond
                 // it is never used, so only the file's bytes are read.
-                const size_t want = std::min<uint64_t>(bytes, p.extent.size - offset);
-                uint8_t *to = getMemPtr(rdram, GPR_U32(ctx, 7));
-                if (p.disc)
-                    failed = p.disc->readExtent(p.extent, offset, to, want) != want;
-                else
-                {
-                    std::memcpy(to, p.bytes->data() + offset, want);
-                    failed = false;
-                }
+                const size_t want = std::min<uint64_t>(bytes, p.length - offset);
+                failed = p.read(offset, getMemPtr(rdram, GPR_U32(ctx, 7)), want) != want;
             }
             if (failed)
                 std::cerr << "[ark] read failed: part " << part << " sector " << GPR_U32(ctx, 5) << std::endl;
@@ -285,7 +292,7 @@ namespace gh2::ark
     bool addDisc(const std::string &path)
     {
         std::string error;
-        std::unique_ptr<DiscImage> disc = DiscImage::open(path, error);
+        std::unique_ptr<Volume> disc = Volume::open(path, error);
         if (!disc)
         {
             std::cerr << "[ark] " << path << ": " << error << std::endl;
@@ -299,10 +306,20 @@ namespace gh2::ark
     {
         auto held = std::make_shared<const std::vector<uint8_t>>(std::move(bytes));
         const uint32_t size = static_cast<uint32_t>(held->size());
-        Part part{nullptr, {}, size, held};
-        part.extent.size = size;
-        s_loose[key(path.c_str())] = {static_cast<uint32_t>(s_parts.size()), 0u, size, 0u};
-        s_parts.push_back(std::move(part));
+        addPart(key(path.c_str()), {[held](uint64_t offset, uint8_t *dst, size_t want)
+                                    {
+                                        const size_t n = offset < held->size()
+                                                             ? std::min<size_t>(want, held->size() - offset)
+                                                             : 0u;
+                                        std::memcpy(dst, held->data() + offset, n);
+                                        return n;
+                                    },
+                                    size, size});
+    }
+
+    void addMade(const std::string &path, std::function<std::optional<Made>()> make)
+    {
+        s_made[key(path.c_str())] = std::move(make);
     }
 
     bool addFolder(const std::string &root)
@@ -334,11 +351,8 @@ namespace gh2::ark
         {
             if (!entry)
                 return std::nullopt;
-            const Part &part = s_parts[entry->part];
             std::vector<uint8_t> bytes(entry->size);
-            if (!part.disc)
-                std::memcpy(bytes.data(), part.bytes->data() + entry->offset, entry->size);
-            else if (part.disc->readExtent(part.extent, entry->offset, bytes.data(), bytes.size()) != bytes.size())
+            if (s_parts[entry->part].read(entry->offset, bytes.data(), bytes.size()) != bytes.size())
                 return std::nullopt;
             return bytes;
         }
@@ -370,19 +384,24 @@ namespace gh2::ark
 
     void rename(const std::string &as, size_t disc, const std::string &source)
     {
-        s_renames.push_back({as, disc, source});    }
+        s_renames.push_back({as, disc, source});
+    }
 
     void install(PS2Runtime &runtime, const Addresses &addresses)
     {
         // Without a disc the game reads GEN/ beside the ELF, and its own
         // archive code stays.
         DiscImage *game = ps2ConfiguredDisc();
-        if (!game || !index(*game, "game disc"))
+        if (!game)
+            return;
+        s_game = Volume::of(*game);
+        if (!index(*s_game, "game disc"))
             return;
         for (size_t i = 0u; i < s_added.size(); ++i)
             index(*s_added[i], "disc " + std::to_string(i + 1u));
 
-        s_blockSizeAddress = addresses.arkBlockSize;        runtime.replaceFunction(addresses.archiveGetFileInfo, getFileInfo);
+        s_blockSizeAddress = addresses.arkBlockSize;
+        runtime.replaceFunction(addresses.archiveGetFileInfo, getFileInfo);
         runtime.replaceFunction(addresses.archiveIsValidBlock, isValidBlock);
         runtime.replaceFunction(addresses.cdRead, cdRead);
     }
