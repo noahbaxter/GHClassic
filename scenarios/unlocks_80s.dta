@@ -8,6 +8,23 @@
 ; the third and the encore are played.
 (needs gh80s)
 #include common/first_boot.dta
+; Before any 80s career, quickplay's 80s list passes over the encore: four
+; rows down from the first is the second tier's first song.
+{gamecfg set mode quickplay}
+{setlist select gh80s}
+{ui goto_screen qp_selsong_twin_screen}
+(wait_screen qp_selsong_twin_screen)
+(wait 2)
+(press down)
+(press down)
+(press down)
+(expect {game get_song} ballstothewall)
+(press down)
+(expect {game get_song} noonelikeyou)
+(shot quickplay_before)
+{setlist select gh2}
+{ui goto_screen main_screen}
+(wait_screen main_screen)
 {set $pick gh80s}
 #include common/career_start.dta
 (press green)
@@ -99,4 +116,29 @@
 (wait_screen qp_selsong_twin_screen)
 (wait 2)
 (shot quickplay)
+; Four rows down is the encore now, and it can be picked. The second
+; tier's, in a venue the career has only opened, is the list's last row
+; and still shut: down stops on the row before it.
+(expect {song_provider get_symbol 4} 18andlife)
+(press down)
+(press down)
+(press down)
+(press down)
+(expect {game get_song} 18andlife)
+(shot encore_row)
+(press down)
+(press down)
+(press down)
+(press down)
+(expect {game get_song} radarlove)
+(press down)
+(expect {game get_song} radarlove)
+(press up)
+(press up)
+(press up)
+(press up)
+(expect {game get_song} 18andlife)
+(press green)
+(wait_screen qp_diff_screen)
+(expect {game get_song} 18andlife)
 (quit)

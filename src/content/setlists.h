@@ -30,11 +30,16 @@ namespace gh2::setlists
         bool encore = true; // its last song is locked as its encore
     };
 
+    // campaign.dta's (required_songs ...), easy first: the songs a venue
+    // asks for, and the last venue's own count.
+    using Required = std::vector<std::array<int, 2>>;
+
     // `look` is a milo path from the ARK root (ui/sel_song_quickplay.milo).
     // Its songs' high scores start on `scoreNames`, its game's own
-    // highscore_dummy_0..4, and save under `name` (save/save.h).
+    // highscore_dummy_0..4, and save under `name` (save/save.h). With
+    // `required`, its career's, an encore opens as that career opens it.
     void add(const std::string &name, std::vector<Tier> tiers, const std::string &look,
-             const std::array<std::string, 5> &scoreNames);
+             const std::array<std::string, 5> &scoreNames, Required required = {});
 
     // A game's career songs: its tiers' own, without the store's.
     std::vector<std::string> careerSongs(const std::string &name);
