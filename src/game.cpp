@@ -12,6 +12,7 @@
 #include "gh1/face.h"
 #include "gh1/install.h"
 #include "gh80s/install.h"
+#include "gh2x/install.h"
 #include "ui/help_bar.h"
 #include "settings/latency.h"
 #include "ui/locale.h"
@@ -48,6 +49,7 @@ namespace
         gh2::ark::install(runtime, gh2::kSlus21447);
         gh2::installEighties();
         gh2::installGh1();
+        gh2::installGh2x();
         gh2::installGh1Face(runtime, gh2::kSlus21447);
         gh2::outfits::install(runtime, gh2::kSlus21447);
         gh2::installNullRnd(runtime, gh2::kSlus21447);
