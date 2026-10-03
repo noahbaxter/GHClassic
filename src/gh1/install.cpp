@@ -16,6 +16,7 @@
 
 #include "disc/ark.h"
 #include "content/card.h"
+#include "content/games.h"
 #include "content/outfits.h"
 #include "formats/dtb.h"
 #include "gh1/clips.h"
@@ -72,8 +73,8 @@ namespace gh2
 
     void installGh1()
     {
-        const auto gh1Disc = ark::discWithSerial("SLUS_212.24");
-        const auto gh2Disc = ark::discWithSerial("SLUS_214.47");
+        const auto gh1Disc = games::disc("gh1");
+        const auto gh2Disc = games::disc("gh2");
         if (!gh1Disc || !gh2Disc)
             return;
         const auto start = std::chrono::steady_clock::now();

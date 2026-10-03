@@ -48,6 +48,7 @@ import shutil
 import subprocess
 import sys
 import time
+import tomllib
 import urllib.request
 import venv
 import zipfile
@@ -241,18 +242,37 @@ def find_disc(env):
     return result.stdout.strip()
 
 
-# Discs whose archives come along when their images are in game/: Rocks the
-# 80s, GH1, then 360 GH2 (its title ID).
-CONTENT_SERIALS = ["SLUS-21586", "SLUS-21224", "415607E7"]
+def content_games():
+    """The games whose discs come along when their images are in game/, in
+    the order their archives are searched: Rocks the 80s, GH1, then 360 GH2,
+    then any other config/executables.toml gives content releases."""
+    with open(ROOT / "config" / "executables.toml", "rb") as f:
+        releases = tomllib.load(f)["release"]
+    games = list(dict.fromkeys(r["game"] for r in releases if r.get("role") == "content"))
+    order = ["gh80s", "gh1", "gh2x"]
+    return sorted(games, key=lambda g: order.index(g) if g in order else len(order))
 
 
-def content(env):
-    """GHClassic's --content for each content disc in game/, and --mods for
-    mods/ when it exists."""
+def discs_arg(value):
+    """--discs gh2,gh1: the content discs to mount; gh2, the game disc, is
+    always there."""
+    games = [g for g in value.split(",") if g and g != "gh2"]
+    unknown = [g for g in games if g not in content_games()]
+    if unknown:
+        raise argparse.ArgumentTypeError(f"unknown {', '.join(unknown)}; games are gh2, {', '.join(content_games())}")
+    return games
+
+
+def content(env, games=None):
+    """GHClassic's --content for each content game's disc in game/, any of
+    its releases (or only those of `games`), and --mods for mods/ when it
+    exists."""
     images = sorted(str(p) for p in (ROOT / "game").glob("*"))
     args = []
-    for serial in CONTENT_SERIALS:
-        result = subprocess.run([sys.executable, ROOT / "tools" / "disc.py", "find", serial, *images],
+    for game in content_games():
+        if games is not None and game not in games:
+            continue
+        result = subprocess.run([sys.executable, ROOT / "tools" / "disc.py", "find", game, *images],
                                 env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
         if not result.returncode:
             args += ["--content", result.stdout.strip()]

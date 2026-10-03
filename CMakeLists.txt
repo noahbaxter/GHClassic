@@ -211,6 +211,7 @@ set(GHC_GAME_SOURCES
     src/track_start.cpp
     src/whammy_hold.cpp
     src/content/card.cpp
+    src/content/games.cpp
     src/content/locale.cpp
     src/content/mogg.cpp
     src/content/outfits.cpp
@@ -343,6 +344,38 @@ if(GHC_EXPERIMENTAL)
 endif()
 set_source_files_properties(src/build_info.cpp PROPERTIES
     COMPILE_DEFINITIONS "GHC_VERSION=\"${GHC_VERSION}\";GHC_BUILT=\"${GHC_BUILT}\";GHC_EXPERIMENTAL=${GHC_EXPERIMENTAL_VALUE}")
+
+# Every supported release in config/executables.toml (role engine or
+# content) as {game, serial} for content/games.cpp, a PS2 serial as
+# SYSTEM.CNF boots it (SLUS-21224 is SLUS_212.24); editing it reconfigures.
+file(STRINGS config/executables.toml GHC_TOML_LINES)
+set(GHC_RELEASES "")
+set(GHC_RELEASE_KIND "")
+foreach(LINE IN LISTS GHC_TOML_LINES ITEMS "[[end]]")
+    if(LINE MATCHES "^\\[\\[(.*)\\]\\]$")
+        set(GHC_NEXT_KIND "${CMAKE_MATCH_1}")
+        if(GHC_RELEASE_KIND STREQUAL "release" AND GHC_RELEASE_ROLE MATCHES "^(engine|content)$")
+            string(REGEX REPLACE "^([A-Z]+)-([0-9][0-9][0-9])([0-9][0-9])$" "\\1_\\2.\\3"
+                GHC_RELEASE_SERIAL "${GHC_RELEASE_SERIAL}")
+            string(APPEND GHC_RELEASES "    {\"${GHC_RELEASE_GAME}\", \"${GHC_RELEASE_SERIAL}\"},\n")
+        endif()
+        set(GHC_RELEASE_KIND "${GHC_NEXT_KIND}")
+        set(GHC_RELEASE_GAME "")
+        set(GHC_RELEASE_SERIAL "")
+        set(GHC_RELEASE_ROLE "")
+    elseif(LINE MATCHES "^(game|serial|role) = \"(.*)\"$")
+        string(TOUPPER "${CMAKE_MATCH_1}" GHC_FIELD)
+        if(GHC_FIELD STREQUAL "GAME")
+            set(GHC_RELEASE_GAME "${CMAKE_MATCH_2}")
+        elseif(GHC_FIELD STREQUAL "SERIAL")
+            set(GHC_RELEASE_SERIAL "${CMAKE_MATCH_2}")
+        else()
+            set(GHC_RELEASE_ROLE "${CMAKE_MATCH_2}")
+        endif()
+    endif()
+endforeach()
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS config/executables.toml)
+file(CONFIGURE OUTPUT "${GHC_DTA_DIR}/releases.inc" CONTENT "${GHC_RELEASES}")
 
 # The window icons, where SDL_GetBasePath finds them. On macOS the game is an
 # app bundle, so other apps (Finder, audio mixers) see its icon too, and the

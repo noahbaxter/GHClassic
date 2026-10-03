@@ -3,7 +3,9 @@
 
     tools/disc.py identify [--image-hash] <image-or-elf>...
     tools/disc.py extract <image> <path-on-disc> <out>
-    tools/disc.py find <serial> <path>...    print the first image of that release
+    tools/disc.py find <serial|game> <path>...  print the first image of that
+                                             release, or of any of a game's
+                                             content releases (gh1)
     tools/disc.py boot-elf <image-or-elf> <out>  extract the boot executable (or take
                                              one already extracted, named as on the
                                              disc), refusing anything but a known
@@ -330,9 +332,12 @@ def main():
         with Image(args[1]) as img:
             Path(args[3]).write_bytes(img.read(args[2]))
     elif args[:1] == ["find"] and len(args) >= 3:
+        # A game (gh1) is any of its content releases; else one serial.
+        serials = [r["serial"] for r in known("release")
+                   if r.get("game") == args[1] and r.get("role") == "content"] or [args[1]]
         for path in (p for p in args[2:] if is_image(p)):
             title_id = xbox_title_id(path)
-            if title_id == args[1]:
+            if title_id in serials:
                 print(path)
                 return
             if title_id:
@@ -345,7 +350,7 @@ def main():
             except (OSError, ValueError) as error:
                 print(f"skipping {error}", file=sys.stderr)
                 continue
-            if rel and rel["serial"] == args[1]:
+            if rel and rel["serial"] in serials:
                 print(path)
                 return
         sys.exit(f"no {args[1]} image among the given paths")
