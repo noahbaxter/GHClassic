@@ -155,6 +155,7 @@ set(GHC_GAME_SOURCES
     src/fast_boot.cpp
     src/frame_step.cpp
     src/latency.cpp
+    src/locale.cpp
     src/menus.cpp
     src/meta_music.cpp
     src/movie/movie.cpp
@@ -232,8 +233,10 @@ file(READ src/dta/lag_panel.dta GHC_LAG_PANEL_DTA)
 file(READ src/dta/highscore_panel.dta GHC_HIGHSCORE_PANEL_DTA)
 file(READ src/dta/main_menu.dta GHC_MAIN_MENU_DTA)
 file(READ src/dta/fast_boot.dta GHC_FAST_BOOT_DTA)
+file(READ src/dta/locale.dta GHC_LOCALE_DTA)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-    src/dta/lag_panel.dta src/dta/highscore_panel.dta src/dta/main_menu.dta src/dta/fast_boot.dta)
+    src/dta/lag_panel.dta src/dta/highscore_panel.dta src/dta/main_menu.dta src/dta/fast_boot.dta
+    src/dta/locale.dta)
 configure_file(src/dta/dta.h.in "${GHC_DTA_DIR}/dta.h" @ONLY)
 target_include_directories(GHClassic PRIVATE "${GHC_DTA_DIR}")
 

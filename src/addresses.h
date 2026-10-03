@@ -64,6 +64,7 @@ namespace gh2
         uint32_t sceMcGetDir;
         uint32_t sceMcFormat;
         uint32_t sceMcFileCalls[6]; // open, mkdir, close, read, write, delete
+        uint32_t localeLocalize;    // Locale::Localize(Symbol, bool)
         uint32_t bufStreamCtor; // BufStream::BufStream(void *, int, bool)
         uint32_t binStreamDtor; // BinStream::~BinStream
         uint32_t setupMcIcon;   // builds the card icon below from config/mc.dta and the disc
@@ -148,6 +149,7 @@ namespace gh2
         .sceMcGetDir = 0x2f43c0u,
         .sceMcFormat = 0x2f4518u,
         .sceMcFileCalls = {0x2f3bc0u, 0x2f3ce8u, 0x2f3d20u, 0x2f3e90u, 0x2f3fa8u, 0x2f45e8u},
+        .localeLocalize = 0x2cbaf8u,
         .bufStreamCtor = 0x2c9268u,
         .binStreamDtor = 0x2c8b78u,
         .setupMcIcon = 0x14b098u,
