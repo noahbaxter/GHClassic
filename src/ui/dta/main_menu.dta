@@ -149,7 +149,7 @@
          {game set_guitar_index 0}
          {do
             ($player2_config {game get_player_config 1})
-            {$player2_config set_character rockabill1 TRUE}
+            {$player2_config set_character {campaigns second_character} TRUE}
             {$player2_config set_guitar_index 0}
             {$player2_config set_difficulty kDifficultyMedium}
          }

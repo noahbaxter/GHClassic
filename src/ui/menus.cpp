@@ -27,12 +27,11 @@ namespace gh2
     {
         script::addCommand("quit_app", quitApp);
         // The main menu's version line (main_menu.dta).
-        static const std::string version = "{set $ghc_version \"" + build::shownVersion() + "\"}";
-        script::runWhenUiReady(version.c_str());
-        script::runWhenUiReady(kMainMenuDta);
-        script::runWhenUiReady(kHighscorePanelDta);
-        script::runWhenUiReady(kSelCharacterDta);
-        script::runWhenUiReady(kQuickplayDta);
+        script::patchUi("{set $ghc_version \"" + build::shownVersion() + "\"}");
+        script::patchUi(kMainMenuDta);
+        script::patchUi(kHighscorePanelDta);
+        script::patchUi(kSelCharacterDta);
+        script::patchUi(kQuickplayDta);
         locale::add("setlist_gh1", "GH1");
         locale::add("setlist_gh2", "GH2");
         locale::add("setlist_gh2x", "360");

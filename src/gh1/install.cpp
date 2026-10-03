@@ -155,7 +155,7 @@ namespace gh2
             ark::rename("char/" + name + "/og/gen/" + name, *gh2Disc, "char/" + base + "/og/gen/" + base);
             ark::rename(surfaces + name + "_keep", *gh1Disc, surfaces + highway);
             outfits::photosFrom(name, *gh2Disc, base);
-            outfits::add(guitarist.character, name, base, guitarist.label);
+            outfits::add("gh1", folder, guitarist.character, name, base, guitarist.label);
             ++count;
         }
         const auto ms =

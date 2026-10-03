@@ -65,5 +65,11 @@ namespace gh2::script
     // the commands are registered.
     void runWhenUiReady(std::string text);
 
+    // The same, for a script that changes the game's screens: run again by
+    // patchUiAgain once they have taken another game's scripts
+    // (content/campaigns.h), so it must stand being run twice.
+    void patchUi(std::string text);
+    void patchUiAgain(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
+
     void install(PS2Runtime &runtime, const Addresses &addresses);
 }

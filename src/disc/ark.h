@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <utility>
 #include <string>
 #include <vector>
 
@@ -49,6 +50,22 @@ namespace gh2::ark
     // Paths starting `as` are found as `source` plus the rest, on that disc
     // alone: "char/punk3/anims/" -> 80s "char/punk1/anims/".
     void rename(const std::string &as, size_t disc, const std::string &source);
+
+    // A layer: files of its own over a disc's archive, or over none. The
+    // one in front is searched before the game disc's, after the loose files
+    // and the renames, which stay what they are whichever is in front
+    // (content/campaigns.h).
+    size_t addLayer(std::optional<size_t> disc);
+    void addFile(size_t layer, const std::string &path, std::vector<uint8_t> bytes);
+    void front(std::optional<size_t> layer);
+
+    // A file's bytes as that layer in front gives them: its own, its
+    // disc's, else the game disc's. With no layer, the game disc's.
+    std::optional<std::vector<uint8_t>> readFront(std::optional<size_t> layer, const std::string &path);
+
+    // Where a file's bytes live, its part and offset there, as it is found
+    // now: one disc's copy differs from another's.
+    std::optional<std::pair<uint32_t, uint32_t>> origin(const std::string &path);
 
     void install(PS2Runtime &runtime, const Addresses &addresses);
 }

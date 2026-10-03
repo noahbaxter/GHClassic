@@ -210,6 +210,7 @@ set(GHC_GAME_SOURCES
     src/sustain_release.cpp
     src/track_start.cpp
     src/whammy_hold.cpp
+    src/content/campaigns.cpp
     src/content/card.cpp
     src/content/games.cpp
     src/content/locale.cpp

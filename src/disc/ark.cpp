@@ -70,6 +70,13 @@ namespace gh2::ark
         std::unordered_map<std::string, Entry> s_loose; // searched before all else
         std::unordered_map<std::string, std::function<std::optional<Made>()>> s_made; // loose once made
         uint32_t s_blockSizeAddress = 0u;
+        struct Layer
+        {
+            std::unordered_map<std::string, Entry> files;
+            std::optional<size_t> disc;
+        };
+        std::vector<Layer> s_layers;
+        std::optional<size_t> s_front; // the layer searched before the game disc
 
         uint32_t word(const std::vector<uint8_t> &data, size_t &at)
         {
@@ -183,15 +190,45 @@ namespace gh2::ark
             return std::string(path, slash + (keep ? 1 : 0)) + "/" + (slash + 1);
         }
 
-        Entry addPart(const std::string &name, Part part)
+        Entry addPart(Part part)
         {
             const Entry entry{static_cast<uint32_t>(s_parts.size()), 0u, part.size, 0u};
             s_parts.push_back(std::move(part));
-            return s_loose[name] = entry;
+            return entry;
+        }
+
+        // Bytes held for as long as the game may read them.
+        Entry addBytes(std::vector<uint8_t> bytes)
+        {
+            auto held = std::make_shared<const std::vector<uint8_t>>(std::move(bytes));
+            const uint32_t size = static_cast<uint32_t>(held->size());
+            return addPart({[held](uint64_t offset, uint8_t *dst, size_t want)
+                            {
+                                const size_t n = offset < held->size()
+                                                     ? std::min<size_t>(want, held->size() - offset)
+                                                     : 0u;
+                                std::memcpy(dst, held->data() + offset, n);
+                                return n;
+                            },
+                            size, size});
+        }
+
+        // A layer's own file, else its disc's.
+        const Entry *findIn(const Layer &layer, const std::string &name)
+        {
+            if (const auto it = layer.files.find(name); it != layer.files.end())
+                return &it->second;
+            if (layer.disc)
+            {
+                const auto &files = s_discs[*layer.disc].files;
+                if (const auto it = files.find(name); it != files.end())
+                    return &it->second;
+            }
+            return nullptr;
         }
 
         // Loose files first, made ones as they are asked for, then renames,
-        // then each disc in turn.
+        // then the layer in front if one is, then each disc in turn.
         const Entry *find(const std::string &name)
         {
             const auto loose = s_loose.find(name);
@@ -204,8 +241,7 @@ namespace gh2::ark
                 if (file)
                 {
                     const uint32_t size = file->size;
-                    addPart(name, {std::move(file->read), size, size});
-                    return &s_loose.at(name);
+                    return &(s_loose[name] = addPart({std::move(file->read), size, size}));
                 }
             }
             for (const Rename &rename : s_renames)
@@ -216,6 +252,9 @@ namespace gh2::ark
                 const auto it = files.find(rename.source + name.substr(rename.as.size()));
                 return it != files.end() ? &it->second : nullptr;
             }
+            if (s_front)
+                if (const Entry *entry = findIn(s_layers[*s_front], name))
+                    return entry;
             for (const Disc &disc : s_discs)
             {
                 const auto it = disc.files.find(name);
@@ -304,17 +343,18 @@ namespace gh2::ark
 
     void addFile(const std::string &path, std::vector<uint8_t> bytes)
     {
-        auto held = std::make_shared<const std::vector<uint8_t>>(std::move(bytes));
-        const uint32_t size = static_cast<uint32_t>(held->size());
-        addPart(key(path.c_str()), {[held](uint64_t offset, uint8_t *dst, size_t want)
-                                    {
-                                        const size_t n = offset < held->size()
-                                                             ? std::min<size_t>(want, held->size() - offset)
-                                                             : 0u;
-                                        std::memcpy(dst, held->data() + offset, n);
-                                        return n;
-                                    },
-                                    size, size});
+        s_loose[key(path.c_str())] = addBytes(std::move(bytes));
+    }
+
+    size_t addLayer(std::optional<size_t> disc)
+    {
+        s_layers.push_back({{}, disc});
+        return s_layers.size() - 1u;
+    }
+
+    void addFile(size_t layer, const std::string &path, std::vector<uint8_t> bytes)
+    {
+        s_layers[layer].files[key(path.c_str())] = addBytes(std::move(bytes));
     }
 
     void addMade(const std::string &path, std::function<std::optional<Made>()> make)
@@ -380,6 +420,23 @@ namespace gh2::ark
                 return i;
         }
         return std::nullopt;
+    }
+
+    void front(std::optional<size_t> layer) { s_front = layer; }
+
+    std::optional<std::vector<uint8_t>> readFront(std::optional<size_t> layer, const std::string &path)
+    {
+        const std::string name = key(path.c_str());
+        if (layer)
+            if (const Entry *entry = findIn(s_layers[*layer], name))
+                return read(entry);
+        return readFile(0u, path);
+    }
+
+    std::optional<std::pair<uint32_t, uint32_t>> origin(const std::string &path)
+    {
+        const Entry *entry = find(key(path.c_str()));
+        return entry ? std::optional(std::pair(entry->part, entry->offset)) : std::nullopt;
     }
 
     void rename(const std::string &as, size_t disc, const std::string &source)

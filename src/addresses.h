@@ -69,6 +69,7 @@ namespace gh2
         uint32_t ctlClientPoll;
         uint32_t spuStartSend;
         uint32_t metaMusicPoll;
+        uint32_t metaMusicStop;
         uint32_t metaPanelPoll;
         uint32_t metaPanelPickLoopIndex; // (int size)
         uint32_t systemConfig3; // SystemConfig(Symbol, Symbol, Symbol)
@@ -128,6 +129,16 @@ namespace gh2
         uint32_t helpBarFinishLoad;
         uint32_t helpBarSetDisplay;
         uint32_t helpBarAddElement;
+        uint32_t dataReadFile;     // DataReadFile(const char *)
+        uint32_t systemConfig;     // SystemConfig()
+        uint32_t dataArrayResize;  // DataArray::Resize(int)
+        uint32_t dataArrayDtor;    // DataArray::~DataArray
+        uint32_t dataNodeAssign;   // DataNode::operator=(const DataNode &)
+        uint32_t venueProviderInitData; // VenueProvider::InitData(RndDir *)
+        uint32_t campaignCtor;
+        uint32_t campaignDtor;
+        uint32_t localeInit;       // Locale::Init
+        uint32_t localeTerminate;  // Locale::Terminate
         // Data
         uint32_t rndCamCurrent;  // RndCam::sCurrent
         uint32_t defaultMat;     // the RndMat a mesh without one draws with
@@ -219,6 +230,7 @@ namespace gh2
         .ctlClientPoll = 0x22dc68u,
         .spuStartSend = 0x231a78u,
         .metaMusicPoll = 0x21f180u,
+        .metaMusicStop = 0x21f668u,
         .metaPanelPoll = 0x134850u,
         .metaPanelPickLoopIndex = 0x1349d8u,
         .systemConfig3 = 0x2a8700u,
@@ -278,6 +290,16 @@ namespace gh2
         .helpBarFinishLoad = 0x149f40u,
         .helpBarSetDisplay = 0x14a2f0u,
         .helpBarAddElement = 0x14a1e0u,
+        .dataReadFile = 0x2b2928u,
+        .systemConfig = 0x2a8680u,
+        .dataArrayResize = 0x2afbd8u,
+        .dataArrayDtor = 0x2b07d0u,
+        .dataNodeAssign = 0x2b8298u,
+        .venueProviderInitData = 0x118a90u,
+        .campaignCtor = 0x12cf00u,
+        .campaignDtor = 0x12d0c0u,
+        .localeInit = 0x2cb798u,
+        .localeTerminate = 0x2cba98u,
         .rndCamCurrent = 0x3de348u,
         .defaultMat = 0x3da4f0u,
         .rndEnvironCurrent = 0x3de358u,
