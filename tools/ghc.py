@@ -576,6 +576,8 @@ def notices():
         ("GLFW", deps / "raylib-src" / "src" / "external" / "glfw" / "LICENSE.md"),
         ("libchdr", ROOT / "lib" / "libchdr" / "LICENSE.txt"),
         ("libmpeg2", deps / "libmpeg2-src" / "COPYING"),
+        ("libogg", deps / "ogg-src" / "COPYING"),
+        ("libvorbis", deps / "vorbis-src" / "COPYING"),
         ("zstd", ROOT / "config" / "licenses" / "zstd.txt"),
         ("PS2Recomp", ROOT / "lib" / "PS2Recomp" / "LICENSE"),
     ]

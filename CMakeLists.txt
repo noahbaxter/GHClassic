@@ -159,6 +159,36 @@ target_link_libraries(save_test PRIVATE miniz)
 add_executable(releases_test EXCLUDE_FROM_ALL tests/releases_test.cpp src/host/releases.cpp)
 target_include_directories(releases_test PRIVATE src)
 
+# Ogg Vorbis for 360 GH2's .mogg audio: libogg and libvorbis (BSD-3-Clause),
+# the decoder and vorbisfile only. Their own CMake wants an older CMake and
+# an installed Ogg, so their sources are built here (the lists in their
+# CMakeLists.txt); SOURCE_SUBDIR names no CMakeLists.txt, so MakeAvailable
+# only fetches. raylib's bundled stb_vorbis rules that one out: its symbols
+# would clash.
+FetchContent_Declare(ogg
+    GIT_REPOSITORY https://github.com/xiph/ogg.git
+    GIT_TAG e1774cd77f471443541596e09078e78fdc342e4f # v1.3.5
+    SOURCE_SUBDIR none)
+FetchContent_Declare(vorbis
+    GIT_REPOSITORY https://github.com/xiph/vorbis.git
+    GIT_TAG 0657aee69dec8508a0011f47f3b69d7538e9d262 # v1.3.7
+    SOURCE_SUBDIR none)
+FetchContent_MakeAvailable(ogg vorbis)
+file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/ogg/ogg/config_types.h"
+    CONTENT "#ifndef __CONFIG_TYPES_H__\n#define __CONFIG_TYPES_H__\n#include <stdint.h>\n\
+typedef int16_t ogg_int16_t;\ntypedef uint16_t ogg_uint16_t;\ntypedef int32_t ogg_int32_t;\n\
+typedef uint32_t ogg_uint32_t;\ntypedef int64_t ogg_int64_t;\ntypedef uint64_t ogg_uint64_t;\n#endif\n")
+add_library(vorbisfile STATIC)
+target_sources(vorbisfile PRIVATE "${ogg_SOURCE_DIR}/src/bitwise.c" "${ogg_SOURCE_DIR}/src/framing.c")
+foreach(VORBIS_SOURCE mdct smallft block envelope window lsp lpc analysis synthesis psy info floor1 floor0
+        res0 mapping0 registry codebook sharedbook lookup bitrate vorbisfile)
+    target_sources(vorbisfile PRIVATE "${vorbis_SOURCE_DIR}/lib/${VORBIS_SOURCE}.c")
+endforeach()
+target_include_directories(vorbisfile SYSTEM PUBLIC
+    "${ogg_SOURCE_DIR}/include" "${CMAKE_CURRENT_BINARY_DIR}/ogg" "${vorbis_SOURCE_DIR}/include")
+target_include_directories(vorbisfile PRIVATE "${vorbis_SOURCE_DIR}/lib")
+set_target_properties(vorbisfile PROPERTIES C_STANDARD 99)
+
 # Without a disc's generated code, everything above still builds: what CI
 # checks (tools/ghc.py ci).
 file(GLOB GHC_GENERATED_SOURCES CONFIGURE_DEPENDS
@@ -182,6 +212,7 @@ set(GHC_GAME_SOURCES
     src/whammy_hold.cpp
     src/content/card.cpp
     src/content/locale.cpp
+    src/content/mogg.cpp
     src/content/outfits.cpp
     src/content/setlists.cpp
     src/content/songs.cpp
@@ -344,6 +375,7 @@ target_link_libraries(GHClassic PRIVATE
     vk-bootstrap::vk-bootstrap
     GPUOpen::VulkanMemoryAllocator
     mpeg2
+    vorbisfile
     miniz # libchdr's, for save.bin
 )
 # Calls go through volk's pointers, never a linked loader.
