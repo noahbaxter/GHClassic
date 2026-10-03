@@ -1,0 +1,230 @@
+; The character screen's panel, as the game's own (career.dta) but for the
+; outfit picker. The game's has two buttons and shows the first two outfits
+; config lists, locked or not; a locked one never loads (the door stays on
+; Loading). Here the picker lists the character's unlocked outfits, one
+; button each, up to four: outfit3 and outfit4 are outfit2 cloned on entry,
+; stepped down by outfit1 to outfit2's spacing.
+{retype sel_character_panel
+   (
+      ; From the ARK root: a path resolves against the file its array came
+      ; from, and this one comes from no file.
+      (file ui/sel_character.milo)
+      (char_focus rockabill)
+      (char_outfit rockabill1)
+      (old_scroll_pos 0)
+      (focus character.lst)
+      (skin_select FALSE)
+      (outfits ()) ; char_focus's unlocked outfits, as the buttons show them
+      (outfit_buttons (outfit1.btn outfit2.btn outfit3.btn outfit4.btn))
+      (outfit_step 0) ; outfit1 to outfit2, in z
+      (blurb_z 0)     ; sc_char_outfit_blurb.lbl's own z, under two buttons
+      (enter
+         {$this add_outfit_buttons}
+         {character.lst set_provider character_provider}
+         {animate_forever_30fps $this sel_character.view}
+         {sel_skin.tnm set_frame 0}
+         {char_highlight.mnm animate (loop 0 3) (period 0.25) (units kTaskUISeconds)}
+         {set [skin_select] FALSE}
+         {$this set_focus character.lst}
+         {text_character.grp set_showing TRUE}
+         {text_skin.grp set_showing FALSE}
+         {do
+            ($character {game get_character})
+            ($outfit {game get_character_outfit})
+            {char_single show_char 0 $outfit}
+            {char_single char_event 0 animate}
+            {sc_char_nm.lbl set_text $character}
+            {sc_char_blurb.lbl set_localized_text {localize {sprint $character "_blurb"}}}
+            {$this set char_focus $character}
+            {$this set char_outfit $outfit}
+            {character.lst set_selected {character_provider get_index $character}}
+            {$this set old_scroll_pos {character.lst selected_pos}}
+            {char_highlight.tnm set_frame [old_scroll_pos]}
+            ; ui.dta's CHARACTERS
+            {foreach $c (punk alterna glam goth metal rockabill rock deathmetal classic funk1 grim)
+               {do
+                  ($mesh {sprint "char_" $c ".mesh"})
+                  {if_else {campaign is_unlocked $c}
+                     {$mesh set_mat {sprint "char_" $c ".mat"}}
+                     {$mesh set_mat char_locked.mat}
+                  }
+               }
+            }
+         }
+      )
+      (poll {scl_loading.lbl set_showing {! {char_single are_chars_loaded}}})
+      (exit {set [skin_select] FALSE})
+      (add_outfit_buttons
+         {if {! {exists outfit3.btn}}
+            {do
+               ($x1 0) ($y1 0) ($z1 0) ($x2 0) ($y2 0) ($z2 0)
+               {outfit1.btn get_local_pos $x1 $y1 $z1}
+               {outfit2.btn get_local_pos $x2 $y2 $z2}
+               {$this set outfit_step {'-' $z2 $z1}}
+               {do
+                  ($bx 0) ($by 0) ($bz 0)
+                  {sc_char_outfit_blurb.lbl get_local_pos $bx $by $bz}
+                  {$this set blurb_z $bz}
+               }
+               {$this clone_outfit_button outfit3.btn $x2 $y2 {'+' $z2 [outfit_step]}}
+               {$this clone_outfit_button outfit4.btn $x2 $y2 {'+' $z2 {'*' 2 [outfit_step]}}}
+               {{$this loaded_dir} sync_objects}
+            }
+         }
+      )
+      (clone_outfit_button
+         ($name $x $y $z)
+         {do
+            ($group {outfit2.btn get trans_parent})
+            ($btn {new {outfit2.btn class_name} $name})
+            {$btn copy outfit2.btn 0}
+            {$btn set trans_parent $group}
+            {$btn set_local_pos $x $y $z}
+            ; text_skin.grp draws cs_arrow.mesh first, then the buttons, so
+            ; the bar sits under the text. Second, after the arrow.
+            {$group insert (objects 1) $btn}
+         }
+      )
+      ; char_focus's outfits that are unlocked, in config's order, into
+      ; outfits' own array (the game has no new_array).
+      (find_outfits
+         {resize [outfits] 0}
+         {do
+            ($entry {find $syscfg characters [char_focus]})
+            {foreach_int $i 1 {size $entry}
+               {do
+                  ($outfit {elem {elem $entry $i} 0})
+                  {if {campaign is_unlocked $outfit} {push_back [outfits] $outfit}}
+               }
+            }
+         }
+      )
+      ; An outfit's (name "...") in config, else its locale token, as the
+      ; game's own outfits have.
+      (label_outfit_button
+         ($btn $outfit)
+         {do
+            ($entry {find $syscfg characters [char_focus] $outfit})
+            {if_else {find_exists $entry name}
+               {$btn set_localized_text {elem {find $entry name} 1}}
+               {$btn set_text {sprint $outfit _outfit}}
+            }
+         }
+      )
+      (choose_skins
+         {$this find_outfits}
+         {set [skin_select] TRUE}
+         {text_character.grp set_showing FALSE}
+         {text_skin.grp set_showing TRUE}
+         {sel_skin.tnm animate (units kTaskUISeconds) (period 0.4) (range 0 10)}
+         {do
+            ($count {size [outfits]})
+            ($focus 0)
+            {foreach_int $i 0 {size [outfit_buttons]}
+               {do
+                  ($btn {elem [outfit_buttons] $i})
+                  {if_else {< $i $count}
+                     {do
+                        {{{$this loaded_dir} find $btn} set_showing TRUE}
+                        {$this enable $btn}
+                        {$this label_outfit_button {{$this loaded_dir} find $btn} {elem [outfits] $i}}
+                        {if {== {elem [outfits] $i} [char_outfit]} {set $focus $i}}
+                     }
+                     {do
+                        {{{$this loaded_dir} find $btn} set_showing FALSE}
+                        {$this disable $btn}
+                     }
+                  }
+               }
+            }
+            ; The likes and dislikes start under the second button: down a
+            ; step for each button past it.
+            {do
+               ($bx 0) ($by 0) ($bz 0)
+               {sc_char_outfit_blurb.lbl get_local_pos $bx $by $bz}
+               {sc_char_outfit_blurb.lbl set_local_pos $bx $by
+                  {'+' [blurb_z] {'*' {max 0 {'-' $count 2}} [outfit_step]}}}
+            }
+            ; Down steps through the listed ones and wraps; up follows the
+            ; links backwards.
+            {foreach_int $i 0 $count
+               {{{$this loaded_dir} find {elem [outfit_buttons] $i}} set nav_down
+                  {{$this loaded_dir} find {elem [outfit_buttons] {mod {'+' $i 1} $count}}}
+               }
+            }
+            {$this set_focus {elem [outfit_buttons] $focus}}
+         }
+      )
+      (unchoose_skins
+         {set [skin_select] FALSE}
+         {text_skin.grp set_showing FALSE}
+         {text_character.grp set_showing TRUE}
+         {sel_skin.tnm animate (units kTaskUISeconds) (period 0.4) (range 10 0)}
+         {$this set_focus character.lst}
+         {synth play_sequence button_back.cue}
+      )
+      (open_door)
+      (SCROLL_MSG
+         {do
+            ($new_scroll_pos {character.lst selected_pos})
+            {if {&& {!= $new_scroll_pos [old_scroll_pos]} {character_provider is_active $new_scroll_pos}}
+               {synth play_sequence button_toggle}
+               {set [char_focus] {character_provider get_symbol $new_scroll_pos}}
+               {if_else {== [char_focus] {game get_character}}
+                  {set [char_outfit] {game get_character_outfit}}
+                  {set [char_outfit] {character_provider get_outfit [char_focus] 0}}
+               }
+               {if [char_focus]
+                  {sc_char_nm.lbl set_text [char_focus]}
+                  {sc_char_blurb.lbl set_localized_text {localize {sprint [char_focus] "_blurb"}}}
+                  {char_single show_char 0 [char_outfit]}
+                  {char_single char_event 0 animate}
+                  {$this set old_scroll_pos $new_scroll_pos}
+                  {char_highlight.tnm set_frame $new_scroll_pos}
+               }
+            }
+         }
+      )
+      (FOCUS_MSG
+         {if [skin_select]
+            {do
+               ($idx -1)
+               ($old_char)
+               ; $new_focus is the button; focus_name still names the old one.
+               {foreach_int $i 0 {size [outfits]}
+                  {if {== {sprint {$new_focus name}} {sprint {elem [outfit_buttons] $i}}} {set $idx $i}}
+               }
+               {if {>= $idx 0}
+                  {synth play_sequence button_toggle}
+                  {set [char_outfit] {elem [outfits] $idx}}
+                  ; The arrow's anim has a key for the first two; past them it
+                  ; steps on as the buttons do.
+                  {cs_arrow.tnm set_frame {min $idx 1}}
+                  {if {> $idx 1}
+                     {do
+                        ($x 0) ($y 0) ($z 0)
+                        {cs_arrow.mesh get_local_pos $x $y $z}
+                        {cs_arrow.mesh set_local_pos $x $y {'+' $z {'*' {'-' $idx 1} [outfit_step]}}}
+                     }
+                  }
+                  {set $old_char {char_single get_char 0}}
+                  {if {char_single show_char 0 [char_outfit]}
+                     {do
+                        ($new_char {char_single get_char 0})
+                        {if_else {&& $old_char $new_char}
+                           {do
+                              {reset_hair $new_char}
+                              {{$new_char find main.drv} transfer {$old_char find main.drv}}
+                           }
+                           {char_single char_event 0 select}
+                        }
+                     }
+                  }
+                  {sc_char_outfit_blurb.lbl set_localized_text {localize {sprint [char_focus] "_outfit_blurb"}}}
+               }
+            }
+         }
+         kDataUnhandled
+      )
+   )
+}

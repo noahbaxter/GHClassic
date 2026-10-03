@@ -153,6 +153,22 @@ def find_disc(env):
     return result.stdout.strip()
 
 
+# Discs whose archives come along when their images are in game/: Rocks the 80s.
+CONTENT_SERIALS = ["SLUS-21586"]
+
+
+def content(env):
+    """GHClassic's --content for each content disc in game/."""
+    images = sorted(str(p) for p in (ROOT / "game").glob("*"))
+    args = []
+    for serial in CONTENT_SERIALS:
+        result = subprocess.run([sys.executable, ROOT / "tools" / "disc.py", "find", serial, *images],
+                                env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        if not result.returncode:
+            args += ["--content", result.stdout.strip()]
+    return args
+
+
 def built():
     return ELF.exists() and game_binary().exists()
 
@@ -230,7 +246,7 @@ def cmd_play(argv):
         run(["cmake", "--build", GAME, "--target", "GHClassic"], tool_env(), log=log)
         log.unlink()
     disc = disc or find_disc(tool_env())
-    return subprocess.run([str(game_binary()), disc, *argv]).returncode
+    return subprocess.run([str(game_binary()), disc, *content(tool_env()), *argv]).returncode
 
 
 def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=None):
@@ -247,7 +263,7 @@ def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=N
 
     # No save and default settings, so every run starts from a first boot on
     # any machine and never touches the player's.
-    cmd = [str(game_binary()), disc]
+    cmd = [str(game_binary()), disc, *content(env or tool_env())]
     if scenario:
         cmd += ["--scenario", str(Path(scenario).resolve())]
     if speed:

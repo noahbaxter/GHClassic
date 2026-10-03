@@ -8,3 +8,4 @@ inline constexpr const char kHighscorePanelDta[] = R"dta(@GHC_HIGHSCORE_PANEL_DT
 inline constexpr const char kFastBootDta[] = R"dta(@GHC_FAST_BOOT_DTA@)dta";
 inline constexpr const char kLocaleDta[] = R"dta(@GHC_LOCALE_DTA@)dta";
 inline constexpr const char kCrowdDta[] = R"dta(@GHC_CROWD_DTA@)dta";
+inline constexpr const char kSelCharacterDta[] = R"dta(@GHC_SEL_CHARACTER_DTA@)dta";
