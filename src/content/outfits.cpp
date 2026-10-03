@@ -1,5 +1,6 @@
 #include "content/outfits.h"
 
+#include "content/campaigns.h"
 #include "disc/ark.h"
 #include "guest.h"
 #include "hook.h"
@@ -19,9 +20,11 @@ namespace gh2::outfits
 {
     namespace
     {
-        std::string s_config;    // run on config before the profiles are made
-        std::string s_loadOrder; // run on each preview panel's type definition
-        std::set<std::string> s_labelled;
+        struct Outfit
+        {
+            std::string game, own, character, outfit, beside, label;
+        };
+        std::vector<Outfit> s_outfits;
 
         // The one outfit of a GH2 character that had only one, which the
         // locale never names: its picker never showed.
@@ -33,17 +36,57 @@ namespace gh2::outfits
         bool s_configured = false;
         std::unordered_set<uint32_t> s_panelDefs;
 
+        // Run on config before the profiles are made: each outfit of another
+        // game than the one being played, where this one has its character
+        // and the outfit it sits beside. (extra <game> <own name>) marks it
+        // as no part of the career, there once its own game's career has it
+        // (sel_character.dta).
+        std::string configText()
+        {
+            std::string text;
+            std::set<std::string> labelled;
+            for (const Outfit &o : s_outfits)
+            {
+                if (o.game == campaigns::active())
+                    continue;
+                const std::string character = "{find $syscfg characters " + o.character + "}";
+                std::string add = "{push_back " + character + " (" + o.outfit + " (name \"" + o.label + "\") (extra " +
+                                  o.game + " " + o.own + "))}";
+                if (const auto own = kOwnNames.find(o.character); own != kOwnNames.end() && labelled.insert(o.character).second)
+                    add += " {if {! {find_exists " + character + " " + o.character + " name}} {push_back {find " +
+                           character + " " + o.character + "} (name \"" + own->second + "\")}}";
+                text += "{if {&& {find_exists $syscfg characters " + o.character + " " + o.beside + "} {! {find_exists " +
+                        character + " " + o.outfit + "}}} " + add + "}\n";
+            }
+            return text;
+        }
+
+        // Run on each preview panel's type definition. Panels can share one
+        // list, so only once, and only where beside is. Not the store's
+        // (store TRUE), which shows only what it sells.
+        std::string loadOrderText()
+        {
+            std::string text;
+            for (const Outfit &o : s_outfits)
+                if (o.game != campaigns::active())
+                    text += "{if {&& {find_exists $ghc_def load_order} {! {find_exists $ghc_def store}}} "
+                            "{do ($l {elem {find $ghc_def load_order} 1}) "
+                            "{if {&& {find_elem $l " + o.beside + "} {! {find_elem $l " + o.outfit + "}}} {push_back $l " +
+                            o.outfit + "}}}}\n";
+            return text;
+        }
+
         // ProfileState::InitChars makes the profile's outfit items, unlocked
         // unless the store sells them (AddCharItem, 0x13ac30), from config's
         // characters, so the outfits join that list before its first run.
         struct InitCharsTag;
         void onInitChars(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
-            if (s_configured || s_config.empty())
+            if (s_configured)
                 return;
             s_configured = true;
             const R5900Context saved = *ctx;
-            script::run(rdram, ctx, runtime, s_config);
+            script::run(rdram, ctx, runtime, configText());
             *ctx = saved;
         }
 
@@ -54,11 +97,11 @@ namespace gh2::outfits
         void onPanelDef(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
             const uint32_t def = GPR_U32(ctx, 5);
-            if (s_loadOrder.empty() || def == 0u || !s_panelDefs.insert(def).second)
+            if (s_outfits.empty() || def == 0u || !s_panelDefs.insert(def).second)
                 return;
             const R5900Context saved = *ctx;
             script::setVariable(rdram, ctx, runtime, "ghc_def", {def, script::kArray});
-            script::run(rdram, ctx, runtime, s_loadOrder);
+            script::run(rdram, ctx, runtime, loadOrderText());
             script::setVariable(rdram, ctx, runtime, "ghc_def", {0u, script::kInt});
             *ctx = saved;
         }
@@ -152,8 +195,8 @@ namespace gh2::outfits
         }
     }
 
-    void add(const std::string &character, const std::string &outfit, const std::string &beside,
-             const std::string &label)
+    void add(const std::string &game, const std::string &own, const std::string &character, const std::string &outfit,
+             const std::string &beside, const std::string &label)
     {
         // The picker hands the playing clips from one outfit's driver to the
         // next (CharDriver::Transfer, 0x170db0), so they must share beside's
@@ -173,15 +216,14 @@ namespace gh2::outfits
             ark::addFile(path, milo::write(*dir));
         }
 
-        s_config += "{push_back {find $syscfg characters " + character + "} (" + outfit + " (name \"" + label +
-                    "\"))}\n";
-        if (const auto own = kOwnNames.find(character); own != kOwnNames.end() && s_labelled.insert(character).second)
-            s_config += "{push_back {find $syscfg characters " + character + " " + character + "} (name \"" +
-                        own->second + "\")}\n";
-        // Panels can share one list, so only once, and only where beside is.
-        s_loadOrder += "{if {find_exists $ghc_def load_order} {do ($l {elem {find $ghc_def load_order} 1}) "
-                       "{if {&& {find_elem $l " + beside + "} {! {find_elem $l " + outfit + "}}} {push_back $l " +
-                       outfit + "}}}}\n";
+        s_outfits.push_back({game, own, character, outfit, beside, label});
+    }
+
+    void campaignChanged()
+    {
+        s_configured = false;
+        s_panelDefs.clear();
+        s_characterOf.clear();
     }
 
     void photosFrom(const std::string &outfit, size_t disc, const std::string &source)

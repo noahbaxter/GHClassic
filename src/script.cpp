@@ -37,7 +37,13 @@ namespace gh2::script
         };
         std::vector<Pending> s_pending;
         std::map<uint32_t, Command> s_bySlot;
-        std::vector<std::string> s_uiScripts;
+        struct UiScript
+        {
+            std::string text;
+            bool again; // after each campaign switch too
+        };
+        std::vector<UiScript> s_uiScripts;
+        bool s_uiRan = false;
         bool s_registered = false;
 
         // A guest copy of `text`, from the game's heap.
@@ -144,12 +150,12 @@ namespace gh2::script
         {
             // bootup_load comes up before GHUtl::Init, so wait for the
             // commands the scripts call.
-            if (!s_registered || s_uiScripts.empty())
+            if (!s_registered || s_uiRan)
                 return;
+            s_uiRan = true;
             const R5900Context saved = *ctx;
-            for (const std::string &text : s_uiScripts)
-                run(rdram, ctx, runtime, text);
-            s_uiScripts.clear();
+            for (const UiScript &script : s_uiScripts)
+                run(rdram, ctx, runtime, script.text);
             *ctx = saved;
         }
 
@@ -222,7 +228,19 @@ namespace gh2::script
 
     void runWhenUiReady(std::string text)
     {
-        s_uiScripts.push_back(std::move(text));
+        s_uiScripts.push_back({std::move(text), false});
+    }
+
+    void patchUi(std::string text)
+    {
+        s_uiScripts.push_back({std::move(text), true});
+    }
+
+    void patchUiAgain(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        for (const UiScript &script : s_uiScripts)
+            if (script.again)
+                run(rdram, ctx, runtime, script.text);
     }
 
     void addCommand(const char *name, Command command)

@@ -4,6 +4,8 @@
 #include "guest.h"
 #include "script.h"
 
+#include "ps2_runtime.h"
+
 namespace gh2::locale
 {
     namespace
@@ -27,6 +29,13 @@ namespace gh2::locale
     void add(const std::string &token, const std::string &text)
     {
         s_text += "{push_back {locale_table} (" + token + " " + dtb::text({dtb::kString, 0, 0.0f, text}) + ")}\n";
+    }
+
+    void reload(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        runtime->callGuestFunction(rdram, ctx, s_addresses->localeTerminate, {s_addresses->theLocale});
+        runtime->callGuestFunction(rdram, ctx, s_addresses->localeInit, {s_addresses->theLocale});
+        script::run(rdram, ctx, runtime, s_text);
     }
 
     void install(PS2Runtime &, const Addresses &addresses)

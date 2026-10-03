@@ -23,10 +23,10 @@ namespace gh2
     void installMenus(PS2Runtime &)
     {
         script::addCommand("quit_app", quitApp);
-        script::runWhenUiReady(kMainMenuDta);
-        script::runWhenUiReady(kHighscorePanelDta);
-        script::runWhenUiReady(kSelCharacterDta);
-        script::runWhenUiReady(kQuickplayDta);
+        script::patchUi(kMainMenuDta);
+        script::patchUi(kHighscorePanelDta);
+        script::patchUi(kSelCharacterDta);
+        script::patchUi(kQuickplayDta);
         locale::add("setlist_gh1", "GH1");
         locale::add("setlist_gh2", "GH2");
         locale::add("setlist_gh2x", "360");
