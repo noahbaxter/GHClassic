@@ -242,8 +242,8 @@ def find_disc(env):
 
 
 # Discs whose archives come along when their images are in game/: Rocks the
-# 80s, then GH1.
-CONTENT_SERIALS = ["SLUS-21586", "SLUS-21224"]
+# 80s, GH1, then 360 GH2 (its title ID).
+CONTENT_SERIALS = ["SLUS-21586", "SLUS-21224", "415607E7"]
 
 
 def content(env):
@@ -576,6 +576,8 @@ def notices():
         ("GLFW", deps / "raylib-src" / "src" / "external" / "glfw" / "LICENSE.md"),
         ("libchdr", ROOT / "lib" / "libchdr" / "LICENSE.txt"),
         ("libmpeg2", deps / "libmpeg2-src" / "COPYING"),
+        ("libogg", deps / "ogg-src" / "COPYING"),
+        ("libvorbis", deps / "vorbis-src" / "COPYING"),
         ("zstd", ROOT / "config" / "licenses" / "zstd.txt"),
         ("PS2Recomp", ROOT / "lib" / "PS2Recomp" / "LICENSE"),
     ]
