@@ -3,6 +3,7 @@
 ; Possum Kingdom, a 360-only song whose audio is made from the disc's mogg,
 ; played whole on expert by autoplay. Song time follows the audio, so it
 ; moves 30 s in each 30 s only while the stream plays.
+(needs gh2x)
 #include common/first_boot.dta
 {gamecfg set mode quickplay}
 {ui goto_screen qp_selsong_screen}

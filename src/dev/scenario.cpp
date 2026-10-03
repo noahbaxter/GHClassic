@@ -1,5 +1,6 @@
 #include "dev/scenario.h"
 
+#include "content/games.h"
 #include "dev/transplant.h"
 #include "frame_step.h"
 #include "dev/draw_dump.h"
@@ -320,6 +321,19 @@ namespace gh2::scenario
                     requestDrawDump(array.symbol(1));
                     s_shooting = true;
                     return;
+                }
+                else if (verb == "needs")
+                {
+                    std::string missing;
+                    for (int j = 1; j < array.size(); ++j)
+                        if (!games::mounted(array.symbol(j)))
+                            missing += (missing.empty() ? "" : " ") + array.symbol(j);
+                    if (!missing.empty())
+                    {
+                        std::cerr << "[scenario] SKIP: needs " << missing << std::endl;
+                        quit();
+                        return;
+                    }
                 }
                 else if (verb == "quit")
                 {

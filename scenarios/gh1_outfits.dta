@@ -17,6 +17,7 @@
          {elem {sel_character_panel get outfit_buttons} {'-' {size {sel_character_panel get outfits}} 1}}}}
 }
 
+(needs gh1)
 #include common/first_boot.dta
 {set $cheat_enabled_unlock_all 1}
 {campaign set_all_access 1}
