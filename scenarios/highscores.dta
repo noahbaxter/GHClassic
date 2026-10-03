@@ -1,6 +1,7 @@
 ; High scores for each game's songs: each starts on its own game's names, a
 ; new score saves to save.bin, and a load from it brings back what was saved
 ; and drops what was not.
+(needs gh1 gh80s gh2x)
 #include common/first_boot.dta
 {game set_song iwannabesedated}
 {{game get_player_config 0} set_difficulty expert}

@@ -22,6 +22,8 @@
 //   (dump menu)                      the next frame's draws, as draws_menu.json (--shots)
 //   (transplant "../x/frame.ram" frame)  the retail game's memory in place of this one's
 //                                      (dev/transplant.h), then its frame as a shot and a dump
+//   (needs gh1 gh2x)                   skips the run unless those games' discs
+//                                      are mounted (content/games.h)
 //   (quit)                           closes the app
 //   #include common/first_boot.dta     that file's steps, from beside this one
 //

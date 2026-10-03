@@ -4,6 +4,7 @@
 ;
 ; Buttons are focused as objects: a bare name means nothing outside the
 ; panel, and focus would go nowhere.
+(needs gh80s)
 #include common/first_boot.dta
 {gamecfg set mode career}
 {campaign set_profile_slot 0}

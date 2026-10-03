@@ -255,9 +255,14 @@ def cmd_build(argv):
 
 def cmd_play(argv):
     rebuild = True
-    if argv[:1] == ["--no-build"]:
-        rebuild = False
-        argv = argv[1:]
+    games = None
+    while argv[:1] in (["--no-build"], ["--discs"]):
+        if argv[0] == "--no-build":
+            rebuild = False
+            argv = argv[1:]
+        else:
+            games = discs_arg(argv[1]) if len(argv) > 1 else sys.exit("--discs needs a list")
+            argv = argv[2:]
     disc = None
     if argv and not argv[0].startswith("-"):
         disc, argv = argv[0], argv[1:]
@@ -272,10 +277,10 @@ def cmd_play(argv):
         run(["cmake", "--build", GAME, "--target", "GHClassic"], tool_env(), log=log)
         log.unlink()
     disc = disc or find_disc(tool_env())
-    return subprocess.run([str(game_binary()), disc, *content(tool_env()), *argv]).returncode
+    return subprocess.run([str(game_binary()), disc, *content(tool_env(), games), *argv]).returncode
 
 
-def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=None, res=None):
+def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=None, res=None, games=None):
     """One unattended run into out. Returns 'exited before Ns' or 'alive at Ns'."""
     from PIL import Image
 
@@ -289,7 +294,7 @@ def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=N
 
     # No save and default settings, so every run starts from a first boot on
     # any machine and never touches the player's.
-    cmd = [str(game_binary()), disc, *content(env or tool_env())]
+    cmd = [str(game_binary()), disc, *content(env or tool_env(), games)]
     if scenario:
         cmd += ["--scenario", str(Path(scenario).resolve())]
     if speed:
@@ -350,10 +355,11 @@ def cmd_arm(argv):
     parser.add_argument("--disc")
     parser.add_argument("--shot-every", type=int, default=60)
     parser.add_argument("--res", help="the game's own --res, the size frames and shots come out at")
+    parser.add_argument("--discs", type=discs_arg, help="content discs to mount, as gh2,gh1; default every one in game/")
     args = parser.parse_args(argv)
     name = Path(args.scenario).stem if args.scenario else "run"
     out = Path(args.out) if args.out else ROOT / "runs" / f"{time.strftime('%Y-%m-%d_%H%M%S')}_{name}"
-    state = arm(out, args.scenario, args.speed, args.secs, args.disc, args.shot_every, res=args.res)
+    state = arm(out, args.scenario, args.speed, args.secs, args.disc, args.shot_every, res=args.res, games=args.discs)
     frames = len(list((out / "frames").iterdir()))
     print(f"{state}, {frames} frames, log {out.resolve() / 'run.log'}")
     stack = out / "stack.txt"
@@ -373,6 +379,9 @@ def cmd_scenarios(argv):
     # Song clock checks hold to about 4x on an M4 Pro and 3x on a Ryzen 7800X3D,
     # bound by the game thread; 2x holds on both, four at once.
     parser.add_argument("--speed", type=float, default=2)
+    parser.add_argument("--discs", type=discs_arg,
+                        help="content discs to mount, as gh2,gh1; default every one in game/. A scenario that "
+                             "(needs) another skips")
     parser.add_argument("names", nargs="*", help="files in scenarios/ without .dta; none means all")
     args = parser.parse_args(argv)
     names = args.names or sorted(p.stem for p in (ROOT / "scenarios").glob("*.dta"))
@@ -382,15 +391,18 @@ def cmd_scenarios(argv):
     def one(name):
         out = ROOT / "runs" / name
         started = time.time()
-        state = arm(out, ROOT / "scenarios" / f"{name}.dta", args.speed, 600, disc, env=env)
+        state = arm(out, ROOT / "scenarios" / f"{name}.dta", args.speed, 600, disc, env=env, games=args.discs)
         log = (out / "run.log").read_text(errors="replace")
         # Anywhere in a line: the watchdog's STALL lands mid-line in the game thread's output.
         failures = [m.group(1) for m in re.finditer(r"\[scenario\] ((?:FAIL|STALL).*)", log)]
+        skips = [line.removeprefix("[scenario] ") for line in log.splitlines()
+                 if line.startswith("[scenario] SKIP")]
         # A game that dies mid-run exits too, with its steps unfinished.
-        if not failures and not re.search(r"^\[scenario\] (done|\S+ s: \(quit\))", log, re.M):
+        if not failures and not skips and not re.search(r"^\[scenario\] (done|\S+ s: \(quit\))", log, re.M):
             failures = ["ended before its last step"]
-        verdict = "pass" if state.startswith("exited") and not failures else "FAIL"
-        return f"{verdict:<4} {name:<16} {round(time.time() - started):4d}s  {failures[0] if failures else ''}".rstrip()
+        verdict = "FAIL" if failures or not state.startswith("exited") else "skip" if skips else "pass"
+        note = failures[0] if failures else skips[0] if skips else ""
+        return f"{verdict:<4} {name:<16} {round(time.time() - started):4d}s  {note}".rstrip()
 
     (ROOT / "runs").mkdir(exist_ok=True)
     lines = []
