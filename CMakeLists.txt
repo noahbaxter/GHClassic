@@ -181,6 +181,8 @@ set(GHC_GAME_SOURCES
     src/sustain_release.cpp
     src/track_start.cpp
     src/whammy_hold.cpp
+    src/outfits.cpp
+    src/gh1.cpp
     src/dev/draw_dump.cpp
     src/dev/mesh_packet.cpp
     src/dev/null_rnd.cpp
@@ -190,6 +192,7 @@ set(GHC_GAME_SOURCES
     src/disc/ark.cpp
     src/disc/disc.cpp
     src/disc/sha1.cpp
+    src/milo/milo.cpp
     src/movie/movie.cpp
     src/movie/pss.cpp
     src/movie/screen.cpp
@@ -316,8 +319,10 @@ endif()
 # Unity batches are for the generated code; game files stay separate units.
 set_source_files_properties(${GHC_GAME_SOURCES} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 
-target_include_directories(GHClassic PRIVATE "${GHC_GENERATED_DIR}" src)
+# miniz comes with libchdr; its target leaves out its own include path.
+target_include_directories(GHClassic PRIVATE "${GHC_GENERATED_DIR}" src lib/libchdr/deps/miniz-3.1.2)
 target_link_libraries(GHClassic PRIVATE
+    miniz
     ps2_runtime
     SDL3::SDL3
     volk::volk

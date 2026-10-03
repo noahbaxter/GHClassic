@@ -26,7 +26,8 @@ requirements.txt; CMake fetches the game's libraries at pinned versions.
 
 arm runs the game once, hidden and muted, with --fast-boot --seed 1, no
 save and default settings: a first boot. out (default
-runs/<scenario's name>) gets run.log, frames/ (frame_0012.30s.png, seconds
+runs/<date>_<time>_<scenario's name>, so runs sort oldest first and none
+overwrites another) gets run.log, frames/ (frame_0012.30s.png, seconds
 since launch), shots/ and shots.png from the scenario's (shot name) steps,
 and on macOS stack.txt, a 3 s sample taken if it is still alive at --secs.
 scenarios runs the files in scenarios/ through arm side by side: a run
@@ -239,12 +240,14 @@ def find_disc(env):
     return result.stdout.strip()
 
 
-# Discs whose archives come along when their images are in game/: Rocks the 80s.
-CONTENT_SERIALS = ["SLUS-21586"]
+# Discs whose archives come along when their images are in game/: Rocks the
+# 80s, then GH1.
+CONTENT_SERIALS = ["SLUS-21586", "SLUS-21224"]
 
 
 def content(env):
-    """GHClassic's --content for each content disc in game/."""
+    """GHClassic's --content for each content disc in game/, and --mods for
+    mods/ when it exists."""
     images = sorted(str(p) for p in (ROOT / "game").glob("*"))
     args = []
     for serial in CONTENT_SERIALS:
@@ -252,6 +255,8 @@ def content(env):
                                 env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
         if not result.returncode:
             args += ["--content", result.stdout.strip()]
+    if (ROOT / "mods").is_dir():
+        args += ["--mods", str(ROOT / "mods")]
     return args
 
 
@@ -469,7 +474,7 @@ def cmd_arm(argv):
     parser.add_argument("--shot-every", type=int, default=60)
     args = parser.parse_args(argv)
     name = Path(args.scenario).stem if args.scenario else "run"
-    out = Path(args.out) if args.out else ROOT / "runs" / name
+    out = Path(args.out) if args.out else ROOT / "runs" / f"{time.strftime('%Y-%m-%d_%H%M%S')}_{name}"
     state = arm(out, args.scenario, args.speed, args.secs, args.disc, args.shot_every)
     frames = len(list((out / "frames").iterdir()))
     print(f"{state}, {frames} frames, log {out.resolve() / 'run.log'}")

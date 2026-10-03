@@ -17,6 +17,8 @@
 
 #include <algorithm>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <unordered_map>
@@ -27,11 +29,13 @@ namespace gh2::ark
 {
     namespace
     {
+        // A disc's ark part, or one loose file held in memory (disc null).
         struct Part
         {
             DiscImage *disc;
             DiscImage::Extent extent;
             uint32_t size; // from the header, what IsValidBlock bounds by
+            std::shared_ptr<const std::vector<uint8_t>> bytes;
         };
 
         struct Entry
@@ -60,6 +64,7 @@ namespace gh2::ark
         std::vector<Part> s_parts;
         std::vector<Disc> s_discs; // searched in order, the game disc first
         std::vector<Rename> s_renames;
+        std::unordered_map<std::string, Entry> s_loose; // searched before all else
         uint32_t s_blockSizeAddress = 0u;
 
         // The boot executable's name from SYSTEM.CNF's BOOT2 line.
@@ -183,10 +188,12 @@ namespace gh2::ark
             return std::string(path, slash + (keep ? 1 : 0)) + "/" + (slash + 1);
         }
 
-        // Archive::GetFileInfo(this, path, &part, &offset, &size,
-        // &uncompressedSize), true when found.
+        // Loose files first, then renames, then each disc in turn.
         const Entry *find(const std::string &name)
         {
+            const auto loose = s_loose.find(name);
+            if (loose != s_loose.end())
+                return &loose->second;
             for (const Rename &rename : s_renames)
             {
                 if (name.compare(0u, rename.as.size(), rename.as) != 0)
@@ -204,6 +211,8 @@ namespace gh2::ark
             return nullptr;
         }
 
+        // Archive::GetFileInfo(this, path, &part, &offset, &size,
+        // &uncompressedSize), true when found.
         void getFileInfo(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
             const uint32_t path = GPR_U32(ctx, 5);
@@ -211,7 +220,8 @@ namespace gh2::ark
             if (path != 0u)
             {
                 const std::string name = key(reinterpret_cast<const char *>(getMemPtr(rdram, path)));
-                found = find(name);                // Retail asks only for files it has, so a miss is news.
+                found = find(name);
+                // Retail asks only for files it has, so a miss is news.
                 static std::unordered_set<std::string> s_missed;
                 if (!found && s_missed.insert(name).second)
                     std::cerr << "[ark] no file " << name << std::endl;
@@ -256,7 +266,14 @@ namespace gh2::ark
                 // The last block runs past the part's end; the disc beyond
                 // it is never used, so only the file's bytes are read.
                 const size_t want = std::min<uint64_t>(bytes, p.extent.size - offset);
-                failed = p.disc->readExtent(p.extent, offset, getMemPtr(rdram, GPR_U32(ctx, 7)), want) != want;
+                uint8_t *to = getMemPtr(rdram, GPR_U32(ctx, 7));
+                if (p.disc)
+                    failed = p.disc->readExtent(p.extent, offset, to, want) != want;
+                else
+                {
+                    std::memcpy(to, p.bytes->data() + offset, want);
+                    failed = false;
+                }
             }
             if (failed)
                 std::cerr << "[ark] read failed: part " << part << " sector " << GPR_U32(ctx, 5) << std::endl;
@@ -276,6 +293,53 @@ namespace gh2::ark
         }
         s_added.push_back(std::move(disc));
         return true;
+    }
+
+    void addFile(const std::string &path, std::vector<uint8_t> bytes)
+    {
+        auto held = std::make_shared<const std::vector<uint8_t>>(std::move(bytes));
+        const uint32_t size = static_cast<uint32_t>(held->size());
+        Part part{nullptr, {}, size, held};
+        part.extent.size = size;
+        s_loose[key(path.c_str())] = {static_cast<uint32_t>(s_parts.size()), 0u, size, 0u};
+        s_parts.push_back(std::move(part));
+    }
+
+    bool addFolder(const std::string &root)
+    {
+        std::error_code error;
+        std::filesystem::recursive_directory_iterator it(root, error);
+        if (error)
+        {
+            std::cerr << "[ark] " << root << ": " << error.message() << std::endl;
+            return false;
+        }
+        size_t count = 0u;
+        for (const auto &entry : it)
+        {
+            if (!entry.is_regular_file())
+                continue;
+            std::ifstream in(entry.path(), std::ios::binary);
+            std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            addFile(std::filesystem::relative(entry.path(), root).generic_string(), std::move(bytes));
+            ++count;
+        }
+        std::cerr << "[ark] " << root << ": " << count << " loose files" << std::endl;
+        return true;
+    }
+
+    std::optional<std::vector<uint8_t>> readFile(const std::string &path)
+    {
+        const Entry *entry = find(key(path.c_str()));
+        if (!entry)
+            return std::nullopt;
+        const Part &part = s_parts[entry->part];
+        std::vector<uint8_t> bytes(entry->size);
+        if (!part.disc)
+            std::memcpy(bytes.data(), part.bytes->data() + entry->offset, entry->size);
+        else if (part.disc->readExtent(part.extent, entry->offset, bytes.data(), bytes.size()) != bytes.size())
+            return std::nullopt;
+        return bytes;
     }
 
     std::optional<size_t> discWithSerial(const std::string &serial)
