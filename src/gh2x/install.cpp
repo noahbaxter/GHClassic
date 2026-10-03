@@ -1,12 +1,13 @@
 // 360 GH2's songs.dta entries are PS2 GH2's form, and its charts and lip
 // sync files PS2's formats; only its audio differs (content/mogg.h). Every
-// song shares a name with PS2's or might, and 15 shared charts differ, so
-// each goes in as x_<name>, its files under songs/x_<name>/. The 360 has
-// no practice audio (it slows the song itself), so its entries drop their
-// practice keys.
+// song shares a name with PS2's or might, and 51 of the 64 shared charts
+// differ (22 in their notes), so each goes in as x_<name>, its files under
+// songs/x_<name>/. The 360 has no practice audio (it slows the song itself),
+// so its entries drop their practice keys.
 
 #include "gh2x/install.h"
 
+#include "content/games.h"
 #include "content/locale.h"
 #include "content/mogg.h"
 #include "content/setlists.h"
@@ -21,9 +22,6 @@ namespace gh2
 {
     namespace
     {
-        // Both 360 releases, World and USA Rev 1.
-        constexpr const char *kTitleId = "415607E7";
-
         std::string ours(const std::string &name) { return "x_" + name; }
 
         // Paths under songs/<name>/ moved to songs/x_<name>/, practice keys
@@ -73,7 +71,7 @@ namespace gh2
 
     void installGh2x()
     {
-        const auto disc = ark::discWithSerial(kTitleId);
+        const auto disc = games::disc("gh2x");
         if (!disc)
             return;
         const dtb::Files files = [disc](const std::string &path) { return ark::readFile(*disc, path); };

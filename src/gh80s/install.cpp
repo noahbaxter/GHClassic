@@ -10,6 +10,7 @@
 
 #include "disc/ark.h"
 #include "content/card.h"
+#include "content/games.h"
 #include "content/locale.h"
 #include "content/outfits.h"
 #include "content/setlists.h"
@@ -95,7 +96,7 @@ namespace gh2
 
     void installEighties()
     {
-        const auto disc = ark::discWithSerial("SLUS_215.86");
+        const auto disc = games::disc("gh80s");
         if (!disc)
             return;
         addSetlist(*disc);

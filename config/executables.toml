@@ -59,68 +59,90 @@ name = "Guitar Hero - Rocks the 80s (Europe) (Fr,De,Es,It)"
 data_sha1 = "adb7136705a9d4a991b34ebd67853e911432b104"
 
 # Every Milo-engine release Redump lists (GH1, GH2, 80s; GH3 onward is a
-# different engine). Recognised by the serial in the boot executable's name,
-# so a disc we cannot use still gets named. Each is a separate compile with
-# its own addresses. role: "engine" is recompiled (required), "content" adds
-# its songs and venues; a release with no role is not supported.
+# different engine), and 360 GH2. Recognised by the serial in the boot
+# executable's name (a 360's title ID), so a disc we cannot use still gets
+# named. game: the name src/content/games.h and ghc.py --discs give it.
+# role: "engine" is recompiled (required), "content" adds its songs and
+# outfits when mounted, any of a game's content releases doing; a release
+# with no role is not supported (not yet checked to work).
 
 [[release]]
 serial = "SLUS-21224"
+game = "gh1"
 name = "Guitar Hero (USA)"
 version = "1.00"
 role = "content"
 
 [[release]]
 serial = "SLES-54093"
+game = "gh1"
 name = "Guitar Hero (Europe)"
 version = "1.00"
 
 [[release]]
 serial = "SLES-54132"
+game = "gh1"
 name = "Guitar Hero (Europe, Australia)"
 version = "1.00"
 
 [[release]]
 serial = "SLUS-29177"
+game = "gh1"
 name = "Guitar Hero (USA) (Demo)"
 version = "1.00"
 
 [[release]]
 serial = "SLUS-21447"
+game = "gh2"
 name = "Guitar Hero II (USA)"
 version = "1.00"
 role = "engine"
 
 [[release]]
 serial = "SLES-54442"
+game = "gh2"
 name = "Guitar Hero II (Europe, Australia)"
 version = "1.01"
 
 [[release]]
 serial = "SLUS-29198"
+game = "gh2"
 name = "Guitar Hero II (USA) (Demo)"
 version = "1.01"
 
 [[release]]
 serial = "SLED-54509"
+game = "gh2"
 name = "Guitar Hero II (Europe) (Demo)"
 version = "1.00"
 
 [[release]]
 serial = "SLUS-21586"
+game = "gh80s"
 name = "Guitar Hero Encore: Rocks the 80s (USA)"
 version = "1.00"
 role = "content"
 
 [[release]]
 serial = "SLES-54859"
+game = "gh80s"
 name = "Guitar Hero: Rocks the 80s (Europe, Australia)"
 version = "1.00"
 
 [[release]]
 serial = "SLES-54860"
+game = "gh80s"
 name = "Guitar Hero: Rocks the 80s (Europe)"
 version = "1.01"
+
+# 360 GH2: World (xex version 1) and USA Rev 1 (version 2) share the title
+# ID; only USA Rev 1 has been run.
+[[release]]
+serial = "415607E7"
+game = "gh2x"
+name = "Guitar Hero II (Xbox 360)"
+version = "1, 2"
+role = "content"
 
 # Retail, from the discs above.
 
