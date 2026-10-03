@@ -114,6 +114,8 @@ namespace gh2
         uint32_t charsysPanelSetTypeDef;
         uint32_t charsysPanelPollCharLoading;
         uint32_t charsysPanelTrySetPriority; // (Symbol outfit, int priority)
+        uint32_t charsysPanelNextCharacter;  // (int index, int direction, Symbol &outfit)
+        uint32_t charsysPanelValidChar;      // (Symbol outfit)
         uint32_t playerConfigCharacterOfOutfit; // static (Symbol outfit, int &index)
         uint32_t dataVariable; // DataVariable(Symbol)
         uint32_t songProviderInitData;
@@ -262,6 +264,8 @@ namespace gh2
         .charsysPanelSetTypeDef = 0x141bf8u,
         .charsysPanelPollCharLoading = 0x142ea8u,
         .charsysPanelTrySetPriority = 0x142790u,
+        .charsysPanelNextCharacter = 0x142c70u,
+        .charsysPanelValidChar = 0x142bc0u,
         .playerConfigCharacterOfOutfit = 0x114030u,
         .dataVariable = 0x2b7b00u,
         .songProviderInitData = 0x117448u,
