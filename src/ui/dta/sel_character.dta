@@ -259,7 +259,12 @@
                   {if {== {sprint {$new_focus name}} {sprint {elem [outfit_buttons] $i}}} {set $idx $i}}
                }
                {if {>= $idx 0}
-                  {synth play_sequence button_toggle}
+                  ; The UI's own FOCUS_MSG (sfx.dta) sounds it on every
+                  ; screen but the career's two.
+                  {if {|| {== {{ui current_screen} name} sel_character_new_screen}
+                        {== {{ui current_screen} name} sel_character_edit_screen}}
+                     {synth play_sequence button_toggle}
+                  }
                   {set [char_outfit] {elem [outfits] $idx}}
                   ; The arrow's anim keys outfit1's place; from there it
                   ; moves as the buttons were placed.

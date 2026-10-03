@@ -1,0 +1,96 @@
+; Quickplay's pickers: after the song and its difficulty, the guitarist
+; and outfit, the guitar and finish, and the venue, each any that a career
+; has opened. The game's own quickplay (quickplay.dta) goes from the
+; difficulty straight to the song, as the song's entry casts it; here that
+; casting is where each screen starts. Outside a career the game counts an
+; item unlocked that any band has (Campaign::IsItemUnlocked, 0x12d490), and
+; another game's outfit is there once its own game's career has it
+; (sel_character.dta).
+;
+; The screens are the career's own, with its handlers
+; (SEL_CHARACTER_COMMON, SEL_GUITAR_COMMON and SEL_VENUE_SCREEN_HANDLERS,
+; career.dta); a handler given before them is the one found.
+{retype qp_diff_screen
+   (
+      (panels meta sel_difficulty_panel helpbar)
+      (focus sel_difficulty_panel)
+      (helpbar
+         (default
+            (
+               (fret1 help_continue)
+               (fret2 help_back)
+               (strum help_updown)
+            )
+         )
+      )
+      (SELECT_START_MSG
+         {game set_quickplay}
+         {ui goto_screen ghc_qp_character_screen}
+         kDataUnhandled
+      )
+   )
+}
+{if {! {exists ghc_qp_character_screen}} {new GHScreen ghc_qp_character_screen}}
+{retype ghc_qp_character_screen
+   (
+      (done_screen ghc_qp_guitar_screen)
+      (back_screen qp_diff_screen)
+      SEL_CHARACTER_COMMON
+      (SELECT_START_MSG {ghc_sel_character $this} kDataUnhandled)
+   )
+}
+{if {! {exists ghc_qp_guitar_screen}} {new GHScreen ghc_qp_guitar_screen}}
+{retype ghc_qp_guitar_screen
+   (
+      ; What a guitar picked leads to, the career's name for it.
+      (goto_career
+         {game set_guitar {sel_guitar_panel get_selected_guitar 0} {sel_guitar_panel get_selected_skin 0}}
+         {ui goto_screen ghc_qp_venue_screen}
+      )
+      (go_back
+         {$this backwards_anim}
+         {synth play_sequence button_back.cue}
+         {ui goto_screen ghc_qp_character_screen}
+      )
+      SEL_GUITAR_COMMON
+   )
+}
+{if {! {exists ghc_qp_venue_screen}} {new GHScreen ghc_qp_venue_screen}}
+{retype ghc_qp_venue_screen
+   (
+      (allow_back FALSE)
+      (next_screen loading_screen)
+      ; As the career's, but that the venue it starts on is the song's
+      ; (the first where no band has reached that one), not the career's
+      ; next.
+      (enter
+         {campaign foreach_venue $venue
+            {do
+               ($button {$this venue_button_name $venue})
+               {if_else {campaign is_unlocked $venue}
+                  {$this enable {sel_venue_panel find $button}}
+                  {$this disable {sel_venue_panel find $button}}
+               }
+            }
+         }
+         {if {! {campaign is_unlocked {game get_venue}}}
+            {game set_venue {elem {find $syscfg venues} 1}}
+         }
+         {do
+            ($index {game get_venue_index})
+            ($venue {game get_venue})
+            {{sel_venue_panel find venue_anims.grp} set_frame {'+' $index 1}}
+            {$this set_focus {$this venue_button $venue}}
+         }
+      )
+      SEL_VENUE_SCREEN_HANDLERS
+      (BUTTON_DOWN_MSG
+         {if {== $button kPad_Tri}
+            {$this backwards_anim}
+            {synth play_sequence button_back.cue}
+            {ui goto_screen ghc_qp_guitar_screen}
+         }
+         kDataUnhandled
+      )
+   )
+}

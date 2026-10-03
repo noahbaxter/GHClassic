@@ -355,10 +355,11 @@ file(READ src/ui/dta/campaigns.dta GHC_CAMPAIGNS_DTA)
 file(READ src/gh1/menus.dta GHC_GH1_MENUS_DTA)
 file(READ src/gh1/scripts.dta GHC_GH1_SCRIPTS_DTA)
 file(READ src/ui/dta/picker.dta GHC_PICKER_DTA)
+file(READ src/ui/dta/quickplay_pickers.dta GHC_QUICKPLAY_PICKERS_DTA)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     src/ui/dta/lag_panel.dta src/ui/dta/highscore_panel.dta src/ui/dta/main_menu.dta src/ui/dta/fast_boot.dta
     src/ui/dta/locale.dta src/ui/dta/crowd.dta src/ui/dta/sel_character.dta src/ui/dta/quickplay.dta
-    src/ui/dta/campaigns.dta src/gh1/menus.dta src/gh1/scripts.dta src/ui/dta/picker.dta)
+    src/ui/dta/campaigns.dta src/gh1/menus.dta src/gh1/scripts.dta src/ui/dta/picker.dta src/ui/dta/quickplay_pickers.dta)
 configure_file(src/ui/dta/dta.h.in "${GHC_DTA_DIR}/dta.h" @ONLY)
 target_include_directories(GHClassic PRIVATE "${GHC_DTA_DIR}")
 

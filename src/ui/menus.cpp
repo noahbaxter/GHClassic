@@ -34,6 +34,7 @@ namespace gh2
         script::patchUi(kSelCharacterDta);
         script::patchUi(kQuickplayDta);
         script::patchUi(kCampaignsDta);
+        script::patchUi(kQuickplayPickersDta);
         locale::add("ghc_select_campaign", "select campaign");
         locale::add("campaign_gh1", "GUITAR HERO");
         locale::add("campaign_gh2", "GUITAR HERO II");
