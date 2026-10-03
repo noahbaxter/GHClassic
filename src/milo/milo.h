@@ -25,6 +25,13 @@ namespace gh2::milo
         std::vector<Bytes> bodies;     // one per entry
     };
 
+    // Words and length-prefixed strings as bodies keep them. A read past the
+    // end gives 0 or "", and str leaves o at the end.
+    uint32_t u32(const Bytes &b, size_t o);
+    std::string str(const Bytes &b, size_t &o);
+    void putU32(Bytes &out, uint32_t v);
+    void putStr(Bytes &out, const std::string &s);
+
     // A .milo_ps2 / .rnd_ps2 file's blocks, joined.
     std::optional<Bytes> inflate(const Bytes &file);
 
@@ -33,6 +40,9 @@ namespace gh2::milo
     // Every string in the root and bodies that starts `from`, with `to` in
     // its place.
     void replacePrefix(Dir &dir, const std::string &from, const std::string &to);
+
+    // The first string in the root and bodies ending `suffix`.
+    std::optional<std::string> findSuffix(const Dir &dir, const std::string &suffix);
 
     // A v24 file the game loads: uncompressed blocks, each whole objects.
     Bytes write(const Dir &dir);

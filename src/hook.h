@@ -1,11 +1,34 @@
 #pragma once
 
 #include "ps2_runtime.h"
+#include "ps2_runtime_macros.h"
 
 #include <cstdint>
 
 namespace gh2
 {
+    // A hooked function's arguments, to put back once callGuestFunction from
+    // its entry has clobbered them.
+    struct EntryArgs
+    {
+        uint32_t a[4];
+        float f12, f13;
+
+        explicit EntryArgs(const R5900Context *ctx)
+            : a{GPR_U32(ctx, 4), GPR_U32(ctx, 5), GPR_U32(ctx, 6), GPR_U32(ctx, 7)}, f12(ctx->f[12]),
+              f13(ctx->f[13])
+        {
+        }
+
+        void restore(R5900Context *ctx) const
+        {
+            for (int i = 0; i < 4; ++i)
+                SET_GPR_U32(ctx, 4 + i, a[i]);
+            ctx->f[12] = f12;
+            ctx->f[13] = f13;
+        }
+    };
+
     // Runs native code on entry to a guest function, then the function itself.
     //
     // Only the entry is ours: when the guest function yields mid-body, the

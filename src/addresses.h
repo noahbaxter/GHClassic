@@ -85,6 +85,10 @@ namespace gh2
         uint32_t scePadRead;
         uint32_t scePadInfoAct;
         uint32_t charHairPoll;
+        uint32_t rndMorphCtor;
+        uint32_t rndMorphDtor;
+        uint32_t rndMorphSetFrame; // (frame, blend)
+        uint32_t gamePanelSetExcitementLevel;
         uint32_t camShotShake;
         uint32_t rndFlareDrawFlare;
         uint32_t saveData1;     // the card write, on GHMCSaveData's worker thread
@@ -216,6 +220,10 @@ namespace gh2
         .scePadRead = 0x2f2c48u,
         .scePadInfoAct = 0x2f2e58u,
         .charHairPoll = 0x176fb8u,
+        .rndMorphCtor = 0x200b98u,
+        .rndMorphDtor = 0x374f90u,
+        .rndMorphSetFrame = 0x201048u,
+        .gamePanelSetExcitementLevel = 0x108978u,
         .camShotShake = 0x262f38u,
         .rndFlareDrawFlare = 0x1f9330u,
         .saveData1 = 0x14b3e0u,

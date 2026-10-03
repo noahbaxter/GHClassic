@@ -2,18 +2,19 @@
 
 #include "addresses.h"
 #include "disc/ark.h"
-#include "eighties.h"
+#include "content/outfits.h"
 #include "ui/fast_boot.h"
 #include "frame_step.h"
 #include "game_overrides.h"
-#include "gh1.h"
+#include "gh1/face.h"
+#include "gh1/install.h"
+#include "gh80s/install.h"
 #include "settings/latency.h"
 #include "ui/locale.h"
 #include "ui/menus.h"
 #include "ui/meta_music.h"
 #include "movie/movie.h"
 #include "dev/null_rnd.h"
-#include "outfits.h"
 #include "host/pad.h"
 #include "render/mesh_capture.h"
 #include "render/native_cull.h"
@@ -43,6 +44,7 @@ namespace
         gh2::ark::install(runtime, gh2::kSlus21447);
         gh2::installEighties();
         gh2::installGh1();
+        gh2::installGh1Face(runtime, gh2::kSlus21447);
         gh2::outfits::install(runtime, gh2::kSlus21447);
         gh2::installNullRnd(runtime, gh2::kSlus21447);
         gh2::installNativeRnd(runtime, gh2::kSlus21447);

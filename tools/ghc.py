@@ -5,6 +5,7 @@
     tools/ghc.py build [disc] [--skip-recomp] [--no-lto]
     tools/ghc.py bind [--isolated] [keyboard | <n>]   set up a controller; with no device, list them
     tools/ghc.py arm [out] [--scenario <file>] [--speed <x>] [--secs 30] [--disc <image>] [--shot-every 60]
+                     [--res 1080p]
     tools/ghc.py scenarios [-j 4] [--speed 2] [name ...]
     tools/ghc.py release [--skip-build] [disc]  this platform's player package, into build/release
     tools/ghc.py ci                          what builds without a disc, into build/ci
@@ -400,7 +401,7 @@ def cmd_play(argv):
     return subprocess.run([str(game_binary()), disc, *args, *argv]).returncode
 
 
-def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=None):
+def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=None, res=None):
     """One unattended run into out. Returns 'exited before Ns' or 'alive at Ns'."""
     from PIL import Image
 
@@ -419,6 +420,8 @@ def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=N
         cmd += ["--scenario", str(Path(scenario).resolve())]
     if speed:
         cmd += ["--speed", str(speed)]
+    if res:
+        cmd += ["--res", res]
     cmd += ["--fast-boot", "--seed", "1", "--hidden", "--mute", "--save", str(out / "save.bin"),
             "--settings", str(out / "settings.ini"), "--shots", str(out / "frames"), "--shot-every", str(shot_every)]
 
@@ -472,10 +475,11 @@ def cmd_arm(argv):
     parser.add_argument("--secs", type=int, default=30, help="real seconds before it is stopped")
     parser.add_argument("--disc")
     parser.add_argument("--shot-every", type=int, default=60)
+    parser.add_argument("--res", help="the game's own --res, the size frames and shots come out at")
     args = parser.parse_args(argv)
     name = Path(args.scenario).stem if args.scenario else "run"
     out = Path(args.out) if args.out else ROOT / "runs" / f"{time.strftime('%Y-%m-%d_%H%M%S')}_{name}"
-    state = arm(out, args.scenario, args.speed, args.secs, args.disc, args.shot_every)
+    state = arm(out, args.scenario, args.speed, args.secs, args.disc, args.shot_every, res=args.res)
     frames = len(list((out / "frames").iterdir()))
     print(f"{state}, {frames} frames, log {out.resolve() / 'run.log'}")
     stack = out / "stack.txt"
