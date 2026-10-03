@@ -239,6 +239,37 @@ def identify_bytes(data):
     return sha1, lookup(sha1)
 
 
+def xbox_title_id(path):
+    """An Xbox 360 disc image's title ID ("415607E7"), else None. As
+    src/disc/volume.cpp reads it: XDVDFS's root directory, then
+    default.xex's execution info."""
+    if Path(path).suffix.lower() != ".iso":
+        return None
+    with open(path, "rb") as f:
+        def read(offset, size):
+            f.seek(offset)
+            return f.read(size)
+
+        base = next((b for b in (0xFD90000, 0x2080000, 0x18300000, 0)
+                     if read(b + 32 * SECTOR, 20) == b"MICROSOFT*XBOX*MEDIA"), None)
+        if base is None:
+            return None
+        root, size = struct.unpack("<II", read(base + 32 * SECTOR + 20, 8))
+        listing = read(base + root * SECTOR, size)
+        at = listing.find(b"\x0bdefault.xex")
+        if at < 13:
+            return None
+        start, length = struct.unpack_from("<II", listing, at - 9)
+        xex = read(base + start * SECTOR, min(length, 0x10000))
+        if xex[:4] != b"XEX2":
+            return None
+        for i in range(struct.unpack_from(">I", xex, 0x14)[0]):
+            key, value = struct.unpack_from(">II", xex, 0x18 + 8 * i)
+            if key == 0x00040006:
+                return f"{struct.unpack_from('>I', xex, value + 12)[0]:08X}"
+    return None
+
+
 def release(boot_name):
     """The release a boot executable belongs to, from the serial in its name:
     SLUS_214.47 is SLUS-21447."""
@@ -300,6 +331,12 @@ def main():
             Path(args[3]).write_bytes(img.read(args[2]))
     elif args[:1] == ["find"] and len(args) >= 3:
         for path in (p for p in args[2:] if is_image(p)):
+            title_id = xbox_title_id(path)
+            if title_id == args[1]:
+                print(path)
+                return
+            if title_id:
+                continue
             # One unreadable image (another layout, a damaged dump) must not
             # hide the rest.
             try:
