@@ -1,0 +1,29 @@
+; From the main menu to a new medium career's career screen in the campaign
+; $pick, by the buttons a player presses: the band in slot 0, that campaign,
+; then the difficulty, character, guitar and sponsor.
+{gamecfg set mode career}
+{campaign set_profile_name "The Testers" 0}
+{ui goto_screen chooseprof_screen}
+(wait_screen chooseprof_screen)
+(press green)
+(wait_screen ghc_campaign_screen)
+(wait 1)
+#include pick_campaign.dta
+(press green)
+(wait_screen sel_difficulty_screen)
+(expect {campaigns active} $pick)
+(wait 1)
+(press down)
+(press green)
+(wait_screen sel_character_new_screen)
+(wait_until {char_single are_chars_loaded})
+(wait 1)
+(press green)
+(wait_screen sel_guitar_new_screen)
+(wait 3)
+(press green)
+(wait_screen tour_start_screen)
+(wait 1)
+(press green)
+(wait_screen career_screen 40)
+(wait 1)

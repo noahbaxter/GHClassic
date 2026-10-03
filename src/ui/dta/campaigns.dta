@@ -1,0 +1,201 @@
+; Career, once a band is picked: which game's campaign to play, each with
+; how far that band is through it. The band is the same band in every game.
+; With one game there is nothing to pick, and the band leads to the
+; difficulty screen as it always did.
+;
+; The picker is the practice speed screen's scene (sel_speed.milo, four
+; buttons), in the skin of the game being played. Picking another game
+; goes through ghc_switch_screen, which has no panels: there the switch
+; happens ({campaigns switch}, content/campaigns.h), with nothing loaded that
+; it changes.
+{func ghc_campaigns {> {campaigns count} 1}}
+{if {! {exists ghc_campaign_panel}} {new GHPanel ghc_campaign_panel}}
+{retype ghc_campaign_panel
+   (
+      ; From the ARK root: a path resolves against the file its array came
+      ; from, and this one comes from no file.
+      (file ui/sel_speed.milo)
+      (focus speed0.btn)
+      (buttons (speed0.btn speed1.btn speed2.btn speed3.btn))
+      (games ()) ; the games with a campaign, as the buttons list them
+      (picked 0)
+      (enter
+         {title.lbl set_text ghc_select_campaign}
+         {resize [games] 0}
+         {foreach $g (gh1 gh2 gh2x gh80s)
+            {if {campaigns has $g} {push_back [games] $g}}
+         }
+         {do
+            ($count {size [games]})
+            ($band {campaign profile_slot})
+            {foreach_int $i 0 {size [buttons]}
+               {do
+                  ($btn {elem [buttons] $i})
+                  {if_else {< $i $count}
+                     {do
+                        ($game {elem [games] $i})
+                        ($percent {campaigns progress $game $band})
+                        {{{$this loaded_dir} find $btn} set_showing TRUE}
+                        {$this enable $btn}
+                        {{{$this loaded_dir} find $btn} set_localized_text
+                           {sprint {localize {sprint "campaign_" $game}} "  " $percent "%"}
+                        }
+                        ; Down steps through the listed ones and wraps.
+                        {{{$this loaded_dir} find $btn} set nav_down
+                           {{$this loaded_dir} find {elem [buttons] {mod {'+' $i 1} $count}}}
+                        }
+                        {if {== $game {campaigns active}} {set [picked] $i}}
+                     }
+                     ; A hidden button links to itself, out of the way
+                     ; (PanelDir::ComponentNav, 0x211040).
+                     {do
+                        {{{$this loaded_dir} find $btn} set_showing FALSE}
+                        {$this disable $btn}
+                        {{{$this loaded_dir} find $btn} set nav_down {{$this loaded_dir} find $btn}}
+                     }
+                  }
+               }
+            }
+            {$this set_focus {elem [buttons] [picked]}}
+         }
+      )
+      (FOCUS_MSG
+         {foreach_int $i 0 {size [games]}
+            {if {== {sprint {$new_focus name}} {sprint {elem [buttons] $i}}} {set [picked] $i}}
+         }
+         kDataUnhandled
+      )
+   )
+}
+{if {! {exists ghc_campaign_screen}} {new GHScreen ghc_campaign_screen}}
+{retype ghc_campaign_screen
+   (
+      (panels meta ghc_campaign_panel helpbar)
+      (focus ghc_campaign_panel)
+      (allow_back FALSE)
+      (helpbar
+         (default
+            (
+               (fret1 help_select)
+               (fret2 help_back)
+               (strum help_updown)
+            )
+         )
+      )
+      (SELECT_START_MSG
+         {do
+            ($game {elem {ghc_campaign_panel get games} {ghc_campaign_panel get picked}})
+            {if_else {== $game {campaigns active}}
+               {ui goto_screen sel_difficulty_screen}
+               {do
+                  {set $ghc_switch $game}
+                  {set $ghc_switch_next sel_difficulty_screen}
+                  {ui goto_screen ghc_switch_screen}
+               }
+            }
+         }
+         kDataUnhandled
+      )
+      (BUTTON_DOWN_MSG
+         {if {== $button kPad_Tri}
+            {$this backwards_anim}
+            {synth play_sequence button_back.cue}
+            {ui goto_screen chooseprof_screen}
+         }
+         kDataUnhandled
+      )
+   )
+}
+{if {! {exists ghc_switch_screen}} {new GHScreen ghc_switch_screen}}
+{retype ghc_switch_screen
+   (
+      (panels)
+      (allow_back FALSE)
+      (animate_transition FALSE)
+      ; With no switch to make (that game is the one played, or is not
+      ; there), straight on.
+      (TRANSITION_COMPLETE_MSG
+         {if {! {campaigns switch $ghc_switch $ghc_switch_next}} {ui goto_screen $ghc_switch_next}}
+      )
+   )
+}
+; The band list, as the game's own (manage_bands.dta) but that a band leads
+; to the campaigns.
+{retype chooseprof_screen
+   (
+      (panels meta chooseprof_panel helpbar)
+      (focus chooseprof_panel)
+      (allow_back FALSE)
+      (helpbar
+         (default
+            (
+               (fret1 help_select)
+               (fret2 help_back)
+               (strum help_updown)
+            )
+         )
+      )
+      (SELECT_START_MSG
+         {do
+            ($index {{ui focus_panel} get button_idx})
+            ($next {if_else {ghc_campaigns} ghc_campaign_screen sel_difficulty_screen})
+            {campaign set_profile_slot $index}
+            {if_else {! {campaign is_empty_profile $index}}
+               {ui goto_screen $next}
+               {do
+                  {nameprof_screen set profile_slot $index}
+                  {nameprof_screen set back_screen chooseprof_screen}
+                  {nameprof_screen set next_screen $next}
+                  {nameprof_screen set is_editing FALSE}
+                  {ui goto_screen nameprof_screen}
+               }
+            }
+         }
+         kDataUnhandled
+      )
+      (BUTTON_DOWN_MSG
+         {if {== $button kPad_Tri}
+            {$this backwards_anim}
+            {synth play_sequence button_back.cue}
+            {ui goto_screen main_screen}
+         }
+         kDataUnhandled
+      )
+   )
+}
+; The difficulty screen, as the game's own (career.dta) but that back leads
+; to the campaigns.
+{retype sel_difficulty_screen
+   (
+      (panels meta sel_diff_career_panel helpbar char_single)
+      (focus sel_diff_career_panel)
+      (helpbar
+         (default
+            (
+               (fret1 help_continue)
+               (fret2 help_back)
+               (strum help_updown)
+            )
+         )
+      )
+      (SELECT_START_MSG
+         {sel_diff_career_panel set_difficulty $component 0}
+         {if_else {campaign new_campaign}
+            {ui goto_screen sel_character_new_screen}
+            {do
+               {campaign get_character_info}
+               {ui goto_screen career_screen}
+            }
+         }
+         kDataUnhandled
+      )
+      (BUTTON_DOWN_MSG
+         {if {== $button kPad_Tri}
+            {$this backwards_anim}
+            {synth play_sequence button_back.cue}
+            {ui goto_screen {if_else {ghc_campaigns} ghc_campaign_screen chooseprof_screen}}
+         }
+         kDataUnhandled
+      )
+   )
+}
