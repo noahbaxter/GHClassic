@@ -47,7 +47,10 @@ set(PS2X_EE_RAM_MB 128 CACHE STRING "" FORCE)
 # The runtime reads .chd images when chdr-static exists, so libchdr comes
 # first. EXCLUDE_FROM_ALL builds only the static library it links.
 set(CHDR_WANT_TESTS OFF CACHE BOOL "" FORCE)
+# Its miniz also deflates save.bin, so it keeps the compressor.
+set(MINIZ_DEFLATE_APIS ON CACHE BOOL "" FORCE)
 add_subdirectory(lib/libchdr EXCLUDE_FROM_ALL)
+target_include_directories(miniz INTERFACE lib/libchdr/deps/miniz-3.1.2)
 
 # EXCLUDE_FROM_ALL keeps upstream's own ps2EntryRunner out of the default
 # build, leaving GHClassic and what it links.
@@ -152,6 +155,7 @@ set(GHC_GAME_SOURCES
     src/fast_boot.cpp
     src/frame_step.cpp
     src/latency.cpp
+    src/locale.cpp
     src/menus.cpp
     src/meta_music.cpp
     src/movie/movie.cpp
@@ -159,6 +163,12 @@ set(GHC_GAME_SOURCES
     src/movie/screen.cpp
     src/null_rnd.cpp
     src/pad.cpp
+    src/save/card.cpp
+    src/save/gh2_stream.cpp
+    src/save/gh2_text.cpp
+    src/save/ps2_card.cpp
+    src/save/save.cpp
+    src/save/store.cpp
     src/scenario.cpp
     src/script.cpp
     src/seed.cpp
@@ -223,8 +233,10 @@ file(READ src/dta/lag_panel.dta GHC_LAG_PANEL_DTA)
 file(READ src/dta/highscore_panel.dta GHC_HIGHSCORE_PANEL_DTA)
 file(READ src/dta/main_menu.dta GHC_MAIN_MENU_DTA)
 file(READ src/dta/fast_boot.dta GHC_FAST_BOOT_DTA)
+file(READ src/dta/locale.dta GHC_LOCALE_DTA)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-    src/dta/lag_panel.dta src/dta/highscore_panel.dta src/dta/main_menu.dta src/dta/fast_boot.dta)
+    src/dta/lag_panel.dta src/dta/highscore_panel.dta src/dta/main_menu.dta src/dta/fast_boot.dta
+    src/dta/locale.dta)
 configure_file(src/dta/dta.h.in "${GHC_DTA_DIR}/dta.h" @ONLY)
 target_include_directories(GHClassic PRIVATE "${GHC_DTA_DIR}")
 
@@ -258,6 +270,7 @@ target_link_libraries(GHClassic PRIVATE
     vk-bootstrap::vk-bootstrap
     GPUOpen::VulkanMemoryAllocator
     mpeg2
+    miniz # libchdr's, for save.bin
 )
 # Calls go through volk's pointers, never a linked loader.
 target_compile_definitions(GHClassic PRIVATE VK_NO_PROTOTYPES)

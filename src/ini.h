@@ -36,11 +36,11 @@ namespace gh2::ini
     // Written beside the old file and renamed over it, so a failed write
     // leaves the old one whole. Empty on success.
     template <typename Write>
-    std::error_code writeReplacing(const std::string &path, Write write)
+    std::error_code writeReplacing(const std::string &path, Write write, std::ios::openmode mode = {})
     {
         const std::string temp = path + ".tmp";
         {
-            std::ofstream out(temp, std::ios::trunc);
+            std::ofstream out(temp, std::ios::trunc | mode);
             if (out)
                 write(out);
             if (!out)

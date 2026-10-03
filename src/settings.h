@@ -15,7 +15,14 @@ namespace gh2::settings
         kMsaa,      // samples per pixel
         kVideoLagMs, // how late the picture reaches the player
         kAudioLagMs, // how late the sound does
+        kBandVolume, // the game's own volumes, 0 to 11
+        kGuitarVolume,
+        kFxVolume,
+        kStereo,
         kFastBoot,   // straight to the main menu, past the logos and splash
+        kLefty,      // player 1's frets mirrored
+        kLeftyP2,
+        kExportCard, // each save also written to GHClassic.ps2, a PCSX2 card
         kKeyCount,
     };
 

@@ -5,6 +5,7 @@
 #include "frame_step.h"
 #include "game_overrides.h"
 #include "latency.h"
+#include "locale.h"
 #include "menus.h"
 #include "meta_music.h"
 #include "movie/movie.h"
@@ -17,6 +18,8 @@
 #include "render/native_rect.h"
 #include "render/native_rnd.h"
 #include "render/texture_capture.h"
+#include "save/card.h"
+#include "save/save.h"
 #include "scenario.h"
 #include "script.h"
 #include "seed.h"
@@ -39,7 +42,10 @@ namespace
         gh2::installMetaMusic(runtime, gh2::kSlus21447);
         gh2::installMovies(runtime, gh2::kSlus21447);
         gh2::installVideoOptions(runtime, gh2::kSlus21447);
+        gh2::card::install(runtime, gh2::kSlus21447);
+        gh2::save::install(runtime, gh2::kSlus21447);
         gh2::script::install(runtime, gh2::kSlus21447);
+        gh2::installLocale(runtime, gh2::kSlus21447);
         gh2::installLatency(runtime, gh2::kSlus21447);
         gh2::installPad(runtime, gh2::kSlus21447);
         gh2::installFrameStep(runtime, gh2::kSlus21447);

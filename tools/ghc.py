@@ -19,8 +19,8 @@ or clang on Linux, nothing on Windows, where llvm-mingw is fetched into
 build/). CMake, Ninja and Pillow come from build/venv, made from
 requirements.txt; CMake fetches the game's libraries at pinned versions.
 
-arm runs the game once, hidden and muted, with --fast-boot --seed 1, on a
-blank memory card and default settings: a first boot. out (default
+arm runs the game once, hidden and muted, with --fast-boot --seed 1, no
+save and default settings: a first boot. out (default
 runs/<scenario's name>) gets run.log, frames/ (frame_0012.30s.png, seconds
 since launch), shots/ and shots.png from the scenario's (shot name) steps,
 and on macOS stack.txt, a 3 s sample taken if it is still alive at --secs.
@@ -38,7 +38,6 @@ import re
 import shutil
 import subprocess
 import sys
-import tempfile
 import time
 import urllib.request
 import venv
@@ -242,16 +241,14 @@ def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=N
         sys.exit("no build; run tools/ghc.py build")
     disc = str(Path(disc or find_disc(env or tool_env())).resolve())
 
-    # A blank card and default settings, so every run starts from a first
-    # boot on any machine and never touches the player's.
-    card = Path(tempfile.mkdtemp(prefix="arm-mc."))
-
+    # No save and default settings, so every run starts from a first boot on
+    # any machine and never touches the player's.
     cmd = [str(game_binary()), disc]
     if scenario:
         cmd += ["--scenario", str(Path(scenario).resolve())]
     if speed:
         cmd += ["--speed", str(speed)]
-    cmd += ["--fast-boot", "--seed", "1", "--hidden", "--mute", "--mc", str(card),
+    cmd += ["--fast-boot", "--seed", "1", "--hidden", "--mute", "--save", str(out / "save.bin"),
             "--settings", str(out / "settings.ini"), "--shots", str(out / "frames"), "--shot-every", str(shot_every)]
 
     # Frames are named by seconds since here, on the clock their mtimes use.
@@ -270,9 +267,6 @@ def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=N
         if proc.poll() is None:
             proc.kill()
             proc.wait()
-        shutil.rmtree(card, ignore_errors=True)
-        for slot in card.parent.glob(card.name + "_slot*"):
-            shutil.rmtree(slot, ignore_errors=True)
 
     for ppm in sorted((out / "frames").glob("frame_" + "[0-9]" * 6 + ".ppm")):
         Image.open(ppm).save(out / "frames" / f"frame_{ppm.stat().st_mtime - start:07.2f}s.png")
