@@ -58,6 +58,9 @@ namespace gh2
         uint32_t systemConfig3; // SystemConfig(Symbol, Symbol, Symbol)
         uint32_t randomInt;     // RandomInt(lo, hi), hi exclusive
         uint32_t taskMgrAddTask; // TaskMgr::AddTask(Task *, Task::Units, float)
+        uint32_t streamEEPoll;
+        uint32_t streamSampleFreq; // StreamEE::GetSampleFreq(int channel)
+        uint32_t varTimerMs;
         uint32_t scePadRead;
         uint32_t scePadInfoAct;
         uint32_t charHairPoll;
@@ -154,6 +157,9 @@ namespace gh2
         .systemConfig3 = 0x2a8700u,
         .randomInt = 0x2d9d10u,
         .taskMgrAddTask = 0x2c6b18u,
+        .streamEEPoll = 0x2308a0u,
+        .streamSampleFreq = 0x2314e8u,
+        .varTimerMs = 0x2d4018u,
         .scePadRead = 0x2f2c48u,
         .scePadInfoAct = 0x2f2e58u,
         .charHairPoll = 0x176fb8u,

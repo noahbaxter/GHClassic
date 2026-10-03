@@ -43,10 +43,10 @@ namespace gh2::settings
             {"video", "msaa", Type::kInt, 1, 16, 1, 4, 1},
             // 5 ms: finer is below what a player can feel.
             {"latency", "video_ms", Type::kInt, -500, 500, 5, 0, 0},
-            // 65 by default: the port's own delay, measured on macOS (the song
-            // clock about 22 ms ahead of what is rendered, SDL's CoreAudio queue
-            // about 43 ms). Not measured on Windows or Linux yet.
-            {"latency", "audio_ms", Type::kInt, -500, 500, 5, 65, 0},
+            // 45 by default: the port's own delay on macOS, SDL's CoreAudio
+            // queue (about 43 ms; the song clock is held to the mixed audio,
+            // synth.cpp). Not measured on Windows or Linux yet.
+            {"latency", "audio_ms", Type::kInt, -500, 500, 5, 45, 0},
             // OptionData's (retail 0x10d2e0), which the save carried.
             {"audio", "band_volume", Type::kInt, 0, 11, 1, 11, 11},
             {"audio", "guitar_volume", Type::kInt, 0, 11, 1, 11, 11},

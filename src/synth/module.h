@@ -11,6 +11,8 @@
 
 #include "synth/spu.h"
 
+#include "runtime/host_clock.h"
+
 #include <array>
 #include <cstdint>
 #include <deque>
@@ -26,6 +28,7 @@ namespace gh2::synth
     {
         uint32_t cmd = 0;
         std::vector<uint8_t> data;
+        ps2x::host_clock::Clock::time_point at{}; // host time of the tick that sent it
     };
 
     class Module

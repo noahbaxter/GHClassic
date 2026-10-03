@@ -976,8 +976,12 @@ namespace gh2::synth
         }
         tickSamples();
         flushKeys();
+        const auto now = ps2x::host_clock::now();
         for (Reply &r : m_tickReplies)
+        {
+            r.at = now;
             m_sent.push_back(std::move(r));
+        }
         m_tickReplies.clear();
     }
 

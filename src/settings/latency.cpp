@@ -11,9 +11,9 @@
 //
 // So the hit window follows the picture, offset = -video, and the song clock
 // runs video - audio ahead of the audio it plays, so the sound and picture of
-// one moment arrive together. The clock is StreamEE's VarTimer, which
-// StreamEE::Poll resets to the IOP's played position only past 100 ms of
-// drift, so the shift goes where the time is read, not into the played count.
+// one moment arrive together. The clock is StreamEE's VarTimer, held to the
+// IOP's played position (synth.cpp), so the shift goes where the time is
+// read, not into the timer.
 //
 // settings.ini owns both values, and every write of the game's offset is
 // replaced, a save load's included. The game's lag screen, which measured
