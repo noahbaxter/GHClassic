@@ -242,8 +242,8 @@ def find_disc(env):
 
 
 # Discs whose archives come along when their images are in game/: Rocks the
-# 80s, then GH1.
-CONTENT_SERIALS = ["SLUS-21586", "SLUS-21224"]
+# 80s, GH1, then 360 GH2 (its title ID).
+CONTENT_SERIALS = ["SLUS-21586", "SLUS-21224", "415607E7"]
 
 
 def content(env):

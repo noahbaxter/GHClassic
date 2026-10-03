@@ -192,8 +192,10 @@ set(GHC_GAME_SOURCES
     src/dev/seed.cpp
     src/dev/transplant.cpp
     src/disc/ark.cpp
+    src/disc/crypt.cpp
     src/disc/disc.cpp
     src/disc/sha1.cpp
+    src/disc/volume.cpp
     src/formats/dtb.cpp
     src/formats/midi.cpp
     src/gh1/clips.cpp
