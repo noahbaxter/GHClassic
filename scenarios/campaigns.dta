@@ -1,0 +1,33 @@
+; Career follows the discs: with another game's campaign mounted a band
+; leads to the campaign picker, and with GH2 alone straight to its
+; difficulty screen, as it always did. Holds with any set of discs
+; (ghc.py scenarios --discs).
+#include common/first_boot.dta
+(expect {campaigns active} gh2)
+(expect {campaigns count} {+ 1 {mounted gh80s}})
+(expect {campaigns has gh80s} {mounted gh80s})
+{set $next {if_else {> {campaigns count} 1} ghc_campaign_screen sel_difficulty_screen}}
+{gamecfg set mode career}
+{campaign set_profile_name "The Testers" 0}
+{ui goto_screen chooseprof_screen}
+(wait_screen chooseprof_screen)
+(press green)
+(wait_screen $next)
+(wait 2)
+(shot after_band)
+(expect {campaign profile_slot} 0)
+(expect {campaigns active} gh2)
+
+; The switch screen with nothing to switch, the game played or one not
+; there, goes straight on.
+{set $ghc_switch gh2}
+{set $ghc_switch_next main_screen}
+{ui goto_screen ghc_switch_screen}
+(wait_screen main_screen)
+{set $ghc_switch nosuchgame}
+{ui goto_screen chooseprof_screen}
+(wait_screen chooseprof_screen)
+{ui goto_screen ghc_switch_screen}
+(wait_screen main_screen)
+(expect {campaigns active} gh2)
+(quit)

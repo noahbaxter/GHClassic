@@ -107,7 +107,8 @@
                      {nameprof_screen set back_screen main_screen}
                      {nameprof_screen set is_editing FALSE}
                      {nameprof_screen set profile_slot 0}
-                     {nameprof_screen set next_screen sel_difficulty_screen}
+                     {nameprof_screen set next_screen
+                        {if_else {ghc_campaigns} ghc_campaign_screen sel_difficulty_screen}}
                      {ui goto_screen nameprof_screen}
                   }
                }

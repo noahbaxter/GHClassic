@@ -1,0 +1,10 @@
+; GH2 to the 80s and back in the running game, four times over, through the
+; main menu, career, venue select, song list, store and character screen
+; each way: each is its own game's every time.
+(needs gh80s)
+#include common/first_boot.dta
+#include common/campaign_cycle.dta
+#include common/campaign_cycle.dta
+#include common/campaign_cycle.dta
+#include common/campaign_cycle.dta
+(quit)

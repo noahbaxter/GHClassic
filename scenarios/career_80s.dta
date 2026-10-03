@@ -1,0 +1,112 @@
+; An 80s career from nothing, by the buttons a player presses: a band, the
+; 80s picked from the campaigns, a new medium career's character, guitar and
+; sponsor, then a song played through to its results and cash. The save
+; holds it under the 80s' own sections: a load brings it back, the campaign
+; picker shows the band's progress, and the band's GH2 career is untouched.
+(needs gh80s)
+#include common/first_boot.dta
+{gamecfg set mode career}
+{campaign set_profile_name "The Testers" 0}
+{ui goto_screen chooseprof_screen}
+(wait_screen chooseprof_screen)
+(press green)
+(wait_screen ghc_campaign_screen)
+(wait 1)
+{set $pick gh80s}
+#include common/pick_campaign.dta
+(press green)
+(wait_screen sel_difficulty_screen)
+(expect {campaigns active} gh80s)
+(expect {campaign profile_slot} 0)
+(wait 1)
+(shot difficulty)
+(press down)
+(press green)
+(wait_screen sel_character_new_screen)
+(wait_until {char_single are_chars_loaded})
+(wait 2)
+(shot character)
+(press green)
+(wait_screen sel_guitar_new_screen)
+(wait 3)
+(shot guitar)
+(press green)
+(wait_screen tour_start_screen)
+(wait 2)
+(shot sponsor)
+(press green)
+(wait_screen career_screen 40)
+(wait 1)
+(shot career)
+(expect {game get_difficulty_sym 0} medium)
+(expect {game get_character_outfit} punk1)
+(expect {game get_guitar} flying_v)
+{set $cash {campaign cash}}
+(expect $cash {campaign starting_cash})
+(press green)
+(wait_screen sel_venue_screen 40)
+(wait 1)
+(shot venue)
+(press green)
+(wait_screen sel_song_screen)
+(wait 2)
+(shot songs)
+{{game get_player_config 0} set autoplay TRUE}
+(press green)
+(wait_screen game_screen 60)
+(expect {gamecfg get_song} bangyourhead)
+(expect {game get_venue} battle)
+(wait 30)
+(shot song)
+(wait_screen endgame_screen 400)
+(wait 4)
+(shot results)
+; Five stars pay each star level's award: 100, 150 and 200 on medium.
+(expect {- {campaign cash} $cash} 450)
+(press green)
+(wait_screen cashaward_screen)
+(wait 2)
+(shot cash)
+(press green)
+(wait_screen complete_screen)
+(wait 1)
+(press green)
+(wait_screen sel_song_screen 40)
+(wait 2)
+(shot songs_after)
+{set $cash {campaign cash}}
+{set $score {campaign career_score}}
+(expect {> $score 0} 1)
+(expect {campaign high_score bangyourhead} $score)
+
+; Not saved: the load must drop it.
+{campaign add_cash 111}
+{ui goto_screen bootup_load}
+(wait_screen main_screen 40)
+(expect {campaigns active} gh80s)
+{gamecfg set mode career}
+{campaign set_profile_slot 0}
+(expect {campaign cash} $cash)
+(expect {campaign career_score} $score)
+(expect {campaign profile_name 0} "The Testers")
+
+; One song of thirty passed, on medium.
+{ui goto_screen ghc_campaign_screen}
+(wait_screen ghc_campaign_screen)
+(wait 2)
+(shot campaigns)
+(expect {campaigns progress gh80s 0} 3)
+(expect {campaigns progress gh2 0} 0)
+
+; The band's GH2 career is a new one.
+{set $pick gh2}
+#include common/pick_campaign.dta
+(press green)
+(wait_screen sel_difficulty_screen)
+(expect {campaigns active} gh2)
+(expect {campaign profile_name 0} "The Testers")
+(expect {campaign new_campaign} 1)
+(expect {campaign cash} 0)
+(wait 1)
+(shot difficulty_gh2)
+(quit)

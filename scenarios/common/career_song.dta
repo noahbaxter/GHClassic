@@ -1,0 +1,8 @@
+; From the career's song list, the song at $index played by autoplay to its
+; results.
+{{game get_player_config 0} set autoplay TRUE}
+{game set_song_index $index}
+{sel_song_panel refresh}
+(wait 1)
+(press green)
+(wait_screen game_screen 60)
