@@ -112,6 +112,44 @@ namespace gh2::outfits
             }
             *ctx = saved;
         }
+
+        // CharsysPanel::NextCharacter(index, direction, Symbol &outfit)
+        // (0x142c70) steps through the models until one is valid
+        // (ValidChar, 0x142bc0) and another character's than `index`'s, and
+        // never ends where none is: the 80s store sells one character. There
+        // the model it started on is the answer.
+        PS2Runtime::RecompiledFunction s_nextCharacter = nullptr;
+        void nextCharacter(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const R5900Context saved = *ctx;
+            const uint32_t panel = GPR_U32(ctx, 4), start = GPR_U32(ctx, 5), out = GPR_U32(ctx, 7);
+            const uint32_t returnTo = GPR_U32(ctx, 31);
+            const uint32_t index = GPR_U32(ctx, 29) - 16u;
+            SET_GPR_U32(ctx, 29, index - 16u);
+            const auto characterOf = [&](uint32_t outfit)
+            {
+                return static_cast<uint32_t>(runtime->callGuestFunction(
+                    rdram, ctx, s_addresses->playerConfigCharacterOfOutfit, {outfit, index}));
+            };
+            // Models at +0x5c, 0x1c each, named at +0x00.
+            const uint32_t models = load<uint32_t>(rdram, panel + 0x5cu);
+            const uint32_t count = (load<uint32_t>(rdram, panel + 0x60u) - models) / 0x1cu;
+            bool other = count == 0u || start >= count;
+            const uint32_t own = other ? 0u : load<uint32_t>(rdram, models + start * 0x1cu);
+            const uint32_t character = other ? 0u : characterOf(own);
+            for (uint32_t m = 0u; m < count && !other; ++m)
+            {
+                const uint32_t outfit = load<uint32_t>(rdram, models + m * 0x1cu);
+                other = characterOf(outfit) != character &&
+                        runtime->callGuestFunction(rdram, ctx, s_addresses->charsysPanelValidChar, {panel, outfit}) != 0u;
+            }
+            *ctx = saved;
+            if (other)
+                return s_nextCharacter(rdram, ctx, runtime);
+            store<uint32_t>(rdram, out, own);
+            SET_GPR_U32(ctx, 2, start);
+            ctx->pc = returnTo;
+        }
     }
 
     void add(const std::string &character, const std::string &outfit, const std::string &beside,
@@ -162,5 +200,7 @@ namespace gh2::outfits
         EntryHook<PanelDefTag>::install(runtime, addresses.charsysPanelSetTypeDef, onPanelDef);
         s_addresses = &addresses;
         EntryHook<PollCharLoadingTag>::install(runtime, addresses.charsysPanelPollCharLoading, onPollCharLoading);
+        s_nextCharacter = runtime.lookupFunction(addresses.charsysPanelNextCharacter);
+        runtime.replaceFunction(addresses.charsysPanelNextCharacter, &nextCharacter);
     }
 }
