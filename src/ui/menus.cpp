@@ -35,6 +35,7 @@ namespace gh2
         script::runWhenUiReady(kQuickplayDta);
         locale::add("setlist_gh1", "GH1");
         locale::add("setlist_gh2", "GH2");
+        locale::add("setlist_gh2x", "360");
         locale::add("setlist_gh80s", "80s");
     }
 }

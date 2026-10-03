@@ -1,0 +1,41 @@
+; 360 GH2's setlist and a song of its own: blue's choice from GH2's list
+; is gh2x, whose list then shows, and blue's from there is GH2 again. Then
+; Possum Kingdom, a 360-only song whose audio is made from the disc's mogg,
+; played whole on expert by autoplay. Song time follows the audio, so it
+; moves 30 s in each 30 s only while the stream plays.
+#include common/first_boot.dta
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 2)
+(print blue_from {setlist shown} goes {ghc_qp_blue})
+(shot list_gh2)
+{setlist select {ghc_qp_blue}}
+{ui goto_screen qp_selsong_twin_screen}
+(wait_screen qp_selsong_twin_screen)
+(wait 3)
+(print blue_from {setlist shown} goes {ghc_qp_blue})
+(shot list)
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+
+{game set_song x_possum}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 10)
+{set $t {taskmgr seconds}}
+(wait 30)
+(expect {- {taskmgr seconds} $t} 30 0.1)
+(shot t40)
+{set $t {taskmgr seconds}}
+(wait 30)
+(expect {- {taskmgr seconds} $t} 30 0.1)
+(wait_screen endgame_screen 300)
+(wait 3)
+(expect {player0 score} 284886)
+(expect {player0 longest_streak} 992)
+(shot end)
+(quit)

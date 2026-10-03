@@ -1,9 +1,28 @@
 ; Quickplay's song list, as the game's own (quickplay.dta, career.dta) but
-; showing one of the setlists ({setlist}): yellow GH1, blue GH2, orange 80s.
-; Each shows in its own game's scene, which the panel takes at load, so a
-; switch goes to the twin screen, whose own panel loads the new one. Both
-; leave for the main menu, never for each other. The help bar has room for
-; the setlist frets or the strum, not both.
+; showing one of the setlists ({setlist}): yellow GH1, blue GH2, orange 80s,
+; and blue again 360 GH2 (gh2x) and back. Each shows in its own game's
+; scene, which the panel takes at load, so a switch goes to the twin screen,
+; whose own panel loads the new one. Both leave for the main menu, never for
+; each other. The help bar has room for the setlist frets or the strum, not
+; both.
+{func ghc_qp_blue
+   {if_else {&& {== {setlist shown} gh2} {setlist exists gh2x}} gh2x gh2}
+}
+; Blue's label names where it goes. Set from the screen's enter, after the
+; help bar's own has put up the screen's default.
+{func ghc_qp_helpbar
+   {do
+      ($array)
+      {set $array ()}
+      {resize $array 0}
+      {push_back $array (fret1 help_continue)}
+      {push_back $array (fret2 help_back)}
+      {push_back $array (fret3 setlist_gh1)}
+      {push_back $array {if_else {== {ghc_qp_blue} gh2x} (fret4 setlist_gh2x) (fret4 setlist_gh2)}}
+      {push_back $array (fret5 setlist_gh80s)}
+      {helpbar set_display $array}
+   }
+}
 {set $ghc_sel_song_panel
    (
       ; From the ARK root: a path resolves against the file its array came
@@ -86,7 +105,7 @@
       )
       ({&& {|| {== $button kPad_Circle} {== $button kPad_Square}}
             {setlist select
-               {cond ({== $button kPad_Circle} gh1) ({pad_held blue} gh2) (TRUE gh80s)}
+               {cond ({== $button kPad_Circle} gh1) ({pad_held blue} {ghc_qp_blue}) (TRUE gh80s)}
             }
          }
          {synth play_sequence button_select}
@@ -102,18 +121,8 @@
    (
       (panels meta sel_song_panel helpbar)
       (focus sel_song_panel)
-      (helpbar
-         (default
-            (
-               (fret1 help_continue)
-               (fret2 help_back)
-               (fret3 setlist_gh1)
-               (fret4 setlist_gh2)
-               (fret5 setlist_gh80s)
-            )
-         )
-      )
       (sel_song_career FALSE)
+      (enter {ghc_qp_helpbar})
       (SELECT_START_MSG {ui goto_screen qp_diff_screen} kDataUnhandled)
       (BUTTON_DOWN_MSG {ghc_qp_button sel_song_panel qp_selsong_twin_screen $button})
    )
@@ -123,18 +132,8 @@
    (
       (panels meta sel_song_twin_panel helpbar)
       (focus sel_song_twin_panel)
-      (helpbar
-         (default
-            (
-               (fret1 help_continue)
-               (fret2 help_back)
-               (fret3 setlist_gh1)
-               (fret4 setlist_gh2)
-               (fret5 setlist_gh80s)
-            )
-         )
-      )
       (sel_song_career FALSE)
+      (enter {ghc_qp_helpbar})
       (SELECT_START_MSG {ui goto_screen qp_diff_screen} kDataUnhandled)
       (BUTTON_DOWN_MSG {ghc_qp_button sel_song_twin_panel qp_selsong_screen $button})
    )

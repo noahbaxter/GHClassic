@@ -7,6 +7,8 @@
 //
 //   {setlist select <name>}  TRUE if it exists and was not already shown
 //   {setlist look}           the shown one's song list scene
+//   {setlist shown}          the shown one's name
+//   {setlist exists <name>}  TRUE if it was added
 //
 // GH2's is gh2.
 
