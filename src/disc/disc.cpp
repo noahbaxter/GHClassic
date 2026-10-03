@@ -1,7 +1,7 @@
-#include "disc.h"
+#include "disc/disc.h"
 
-#include "settings.h"
-#include "sha1.h"
+#include "settings/settings.h"
+#include "disc/sha1.h"
 
 #include "runtime/ps2_disc_image.h"
 

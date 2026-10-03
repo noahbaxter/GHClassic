@@ -1,9 +1,9 @@
 // Locale::Localize (retail 0x2cbaf8) turns a token into the disc's text for
-// it. Tokens in dta/locale.dta get ours instead: the file is the disc's
+// it. Tokens in ui/dta/locale.dta get ours instead: the file is the disc's
 // locale.dta format, `(token "text")`, read by the game's own parser, so the
 // strings are the game's and live as long as the parsed array.
 
-#include "locale.h"
+#include "ui/locale.h"
 
 #include "dta.h"
 #include "guest.h"

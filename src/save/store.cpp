@@ -1,6 +1,6 @@
 #include "save/store.h"
 
-#include "ini.h"
+#include "settings/ini.h"
 
 #include <miniz.h>
 

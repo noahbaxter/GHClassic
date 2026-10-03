@@ -10,7 +10,7 @@
 // With motors reported it reads as kJoypadDualShock, takes the joypad fret
 // layout, and green no longer confirms in menus.
 
-#include "pad.h"
+#include "host/pad.h"
 #include "script.h"
 
 #include "host/input.h"

@@ -1,7 +1,7 @@
 #include "host/bindings.h"
 
-#include "ini.h"
-#include "settings.h"
+#include "settings/ini.h"
+#include "settings/settings.h"
 
 #include <SDL3/SDL.h>
 

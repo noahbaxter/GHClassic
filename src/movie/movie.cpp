@@ -269,7 +269,7 @@ namespace gh2
             // Retail skips on JoypadData buttons once the minimum time is up
             // (0x21bde4): green (kPad_R2, 0x2) on a guitar, else X (0x40), and
             // neither while Start (0x800) is held. Port 0 is always a guitar
-            // (pad.cpp), so green.
+            // (host/pad.cpp), so green.
             bool stopping()
             {
                 if (m_done)

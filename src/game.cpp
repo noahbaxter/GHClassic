@@ -1,16 +1,16 @@
 // GH2's hooks, installed once the runtime has loaded a matching executable.
 
 #include "addresses.h"
-#include "fast_boot.h"
+#include "ui/fast_boot.h"
 #include "frame_step.h"
 #include "game_overrides.h"
-#include "latency.h"
-#include "locale.h"
-#include "menus.h"
-#include "meta_music.h"
+#include "settings/latency.h"
+#include "ui/locale.h"
+#include "ui/menus.h"
+#include "ui/meta_music.h"
 #include "movie/movie.h"
-#include "null_rnd.h"
-#include "pad.h"
+#include "dev/null_rnd.h"
+#include "host/pad.h"
 #include "render/mesh_capture.h"
 #include "render/native_environ.h"
 #include "render/native_mesh.h"
@@ -20,11 +20,11 @@
 #include "render/texture_capture.h"
 #include "save/card.h"
 #include "save/save.h"
-#include "scenario.h"
+#include "dev/scenario.h"
 #include "script.h"
-#include "seed.h"
+#include "dev/seed.h"
 #include "synth/synth.h"
-#include "video_options.h"
+#include "settings/video_options.h"
 
 namespace
 {

@@ -2,7 +2,7 @@
 // still builds packets into the one DmaPacket; this keeps that packet's
 // bookkeeping exactly as retail leaves it and never hands a packet to DMA.
 
-#include "null_rnd.h"
+#include "dev/null_rnd.h"
 
 #include "guest.h"
 #include "ps2_runtime.h"

@@ -7,9 +7,9 @@
 //            [--res window|native|480p|720p|1080p|1440p|2160p]
 //   GHClassic --bind [keyboard | <n>]
 //
-// Without a disc, the first image in PUT_DISC_HERE (disc.h) with this
+// Without a disc, the first image in PUT_DISC_HERE (disc/disc.h) with this
 // build's executable. The game runs from that executable, read off the disc.
-// --scenario runs a file of steps (scenario.h). --speed runs the game's
+// --scenario runs a file of steps (dev/scenario.h). --speed runs the game's
 // clock that many times real time, hidden and muted only, as nothing else
 // paces it. --fast-boot boots straight to the main menu, past the logos'
 // padding, the intro movie and the press-start splash, whatever settings.ini's
@@ -23,14 +23,14 @@
 // sets up a controller or the keyboard in input.ini; with no device it
 // lists them.
 
-#include "disc.h"
-#include "fast_boot.h"
+#include "disc/disc.h"
+#include "ui/fast_boot.h"
 #include "host/bind.h"
 #include "host/vulkan_frontend.h"
 #include "save/save.h"
-#include "scenario.h"
-#include "seed.h"
-#include "settings.h"
+#include "dev/scenario.h"
+#include "dev/seed.h"
+#include "settings/settings.h"
 #include "ps2_runtime.h"
 #include "runtime/host_clock.h"
 #include "runtime/ps2_disc_image.h"

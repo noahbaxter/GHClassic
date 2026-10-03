@@ -1,6 +1,6 @@
 #pragma once
 
-// The port's scripts, from src/dta/, compiled in by CMake.
+// The port's scripts, from src/ui/dta/, compiled in by CMake.
 
 inline constexpr const char kLagPanelDta[] = R"dta(@GHC_LAG_PANEL_DTA@)dta";
 inline constexpr const char kMainMenuDta[] = R"dta(@GHC_MAIN_MENU_DTA@)dta";

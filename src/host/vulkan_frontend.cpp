@@ -7,7 +7,7 @@
 #include "render/frame.h"
 #include "runtime/ee_scheduler.h"
 #include "runtime/host_clock.h"
-#include "settings.h"
+#include "settings/settings.h"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>

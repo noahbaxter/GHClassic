@@ -1,6 +1,6 @@
 #include "save/ps2_card.h"
 
-#include "ini.h"
+#include "settings/ini.h"
 
 #include <algorithm>
 #include <array>

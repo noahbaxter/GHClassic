@@ -1,4 +1,4 @@
-; The port's text, in place of the disc's for the same tokens (locale.cpp).
+; The port's text, in place of the disc's for the same tokens (ui/locale.cpp).
 ;
 ; The save dialogs (ui/mem_card.dta), which spoke of a memory card (8MB) in
 ; MEMORY CARD slot 1. MemcardMgr's localize adds _ps2 to the token the

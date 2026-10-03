@@ -2,7 +2,7 @@
 
 #include "milo/layout.h"
 #include "render/camera.h"
-#include "settings.h"
+#include "settings/settings.h"
 
 #include <vk_mem_alloc.h>
 

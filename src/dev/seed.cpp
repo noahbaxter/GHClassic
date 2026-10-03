@@ -2,7 +2,7 @@
 // numbers with SeedRand(seconds since midnight) (0x2d9cc8), so runs started
 // in different seconds pick differently: a fail sequence's length, for one.
 
-#include "seed.h"
+#include "dev/seed.h"
 
 #include "hook.h"
 

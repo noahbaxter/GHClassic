@@ -23,7 +23,7 @@
 #include "save/gh2_text.h"
 #include "save/ps2_card.h"
 #include "save/store.h"
-#include "settings.h"
+#include "settings/settings.h"
 
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
@@ -88,7 +88,7 @@ namespace gh2::save
         // OptionData::Save's (0x10d330) fields that settings.ini holds. A load
         // takes settings.ini's, seeding any it lacks from the save; a save
         // hands back what the options menu changed. Widescreen and the sync
-        // offset are video_options.cpp's and latency.cpp's.
+        // offset are settings/video_options.cpp's and settings/latency.cpp's.
         struct OptionField
         {
             size_t offset;

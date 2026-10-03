@@ -7,11 +7,11 @@
 // Campaign::Load (the save load at boot) and the options DTA handler, so the
 // flag goes in on entry and a save cannot turn it back.
 
-#include "video_options.h"
+#include "settings/video_options.h"
 
 #include "guest.h"
 #include "hook.h"
-#include "settings.h"
+#include "settings/settings.h"
 #include "ps2_runtime_macros.h"
 
 namespace gh2

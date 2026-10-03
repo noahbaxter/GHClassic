@@ -1,7 +1,7 @@
-#include "settings.h"
+#include "settings/settings.h"
 
-#include "disc.h"
-#include "ini.h"
+#include "disc/disc.h"
+#include "settings/ini.h"
 
 #include <SDL3/SDL.h>
 

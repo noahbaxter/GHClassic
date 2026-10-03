@@ -1,4 +1,4 @@
-#include "sha1.h"
+#include "disc/sha1.h"
 
 #include <array>
 #include <cstdio>

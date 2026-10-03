@@ -13,7 +13,7 @@
 // So when the UI clock goes back between polls, the fade's window goes back
 // with it and the fade carries on from where it was.
 
-#include "meta_music.h"
+#include "ui/meta_music.h"
 
 #include "guest.h"
 #include "hook.h"

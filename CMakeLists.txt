@@ -150,39 +150,39 @@ endif()
 # registry, and the host window and renderer they draw through.
 set(GHC_GAME_SOURCES
     src/main.cpp
-    src/disc.cpp
     src/game.cpp
-    src/fast_boot.cpp
     src/frame_step.cpp
-    src/latency.cpp
-    src/locale.cpp
-    src/menus.cpp
-    src/meta_music.cpp
+    src/script.cpp
+    src/dev/null_rnd.cpp
+    src/dev/scenario.cpp
+    src/dev/seed.cpp
+    src/disc/disc.cpp
+    src/disc/sha1.cpp
     src/movie/movie.cpp
     src/movie/pss.cpp
     src/movie/screen.cpp
-    src/null_rnd.cpp
-    src/pad.cpp
     src/save/card.cpp
     src/save/gh2_stream.cpp
     src/save/gh2_text.cpp
     src/save/ps2_card.cpp
     src/save/save.cpp
     src/save/store.cpp
-    src/scenario.cpp
-    src/script.cpp
-    src/seed.cpp
-    src/settings.cpp
-    src/sha1.cpp
+    src/settings/latency.cpp
+    src/settings/settings.cpp
+    src/settings/video_options.cpp
     src/synth/module.cpp
     src/synth/reverb.cpp
     src/synth/spu.cpp
     src/synth/synth.cpp
-    src/video_options.cpp
+    src/ui/fast_boot.cpp
+    src/ui/locale.cpp
+    src/ui/menus.cpp
+    src/ui/meta_music.cpp
     src/host/audio.cpp
     src/host/bind.cpp
     src/host/bindings.cpp
     src/host/input.cpp
+    src/host/pad.cpp
     src/host/profiles.cpp
     src/host/vulkan_frontend.cpp
     src/host/vma.cpp
@@ -229,15 +229,15 @@ target_include_directories(GHClassic PRIVATE "${GHC_SHADER_DIR}")
 # The port's own game scripts, compiled in as strings (dta.h); editing one
 # reconfigures.
 set(GHC_DTA_DIR "${CMAKE_CURRENT_BINARY_DIR}/dta")
-file(READ src/dta/lag_panel.dta GHC_LAG_PANEL_DTA)
-file(READ src/dta/highscore_panel.dta GHC_HIGHSCORE_PANEL_DTA)
-file(READ src/dta/main_menu.dta GHC_MAIN_MENU_DTA)
-file(READ src/dta/fast_boot.dta GHC_FAST_BOOT_DTA)
-file(READ src/dta/locale.dta GHC_LOCALE_DTA)
+file(READ src/ui/dta/lag_panel.dta GHC_LAG_PANEL_DTA)
+file(READ src/ui/dta/highscore_panel.dta GHC_HIGHSCORE_PANEL_DTA)
+file(READ src/ui/dta/main_menu.dta GHC_MAIN_MENU_DTA)
+file(READ src/ui/dta/fast_boot.dta GHC_FAST_BOOT_DTA)
+file(READ src/ui/dta/locale.dta GHC_LOCALE_DTA)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-    src/dta/lag_panel.dta src/dta/highscore_panel.dta src/dta/main_menu.dta src/dta/fast_boot.dta
-    src/dta/locale.dta)
-configure_file(src/dta/dta.h.in "${GHC_DTA_DIR}/dta.h" @ONLY)
+    src/ui/dta/lag_panel.dta src/ui/dta/highscore_panel.dta src/ui/dta/main_menu.dta src/ui/dta/fast_boot.dta
+    src/ui/dta/locale.dta)
+configure_file(src/ui/dta/dta.h.in "${GHC_DTA_DIR}/dta.h" @ONLY)
 target_include_directories(GHClassic PRIVATE "${GHC_DTA_DIR}")
 
 # The window icons, where SDL_GetBasePath finds them. On macOS the game is an
@@ -276,7 +276,7 @@ target_link_libraries(GHClassic PRIVATE
 target_compile_definitions(GHClassic PRIVATE VK_NO_PROTOTYPES)
 
 # The game runs the executable off the player's disc, which must be the one
-# the generated code came from (disc.cpp).
+# the generated code came from (disc/disc.cpp).
 set(GHC_RETAIL_ELF "${GHC_GENERATED_DIR}/../retail.elf" CACHE FILEPATH "The ELF the generated code came from")
 if(NOT EXISTS "${GHC_RETAIL_ELF}")
     message(FATAL_ERROR "No ${GHC_RETAIL_ELF}; run tools/ghc.py build")

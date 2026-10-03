@@ -8,7 +8,7 @@
 // Past the save's load, fast_boot.dta skips the intro movie and the
 // press-start splash.
 
-#include "fast_boot.h"
+#include "ui/fast_boot.h"
 
 #include "dta.h"
 #include "hook.h"

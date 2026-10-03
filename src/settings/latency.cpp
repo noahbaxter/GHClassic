@@ -17,18 +17,18 @@
 //
 // settings.ini owns both values, and every write of the game's offset is
 // replaced, a save load's included. The game's lag screen, which measured
-// audio but set the hit window, is replaced by src/dta/lag_panel.dta, which
+// audio but set the hit window, is replaced by src/ui/dta/lag_panel.dta, which
 // sets the two through {latency ...}. The first save load seeds video from
 // the save's offset, which leaves the hit window as it was; audio starts at
 // its default, the port's own delay (settings.cpp).
 
-#include "latency.h"
+#include "settings/latency.h"
 
 #include "dta.h"
 #include "guest.h"
 #include "hook.h"
 #include "script.h"
-#include "settings.h"
+#include "settings/settings.h"
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
 
