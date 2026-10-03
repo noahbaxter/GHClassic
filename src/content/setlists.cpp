@@ -168,7 +168,11 @@ namespace gh2::setlists
             }
             if (op == "look")
                 return {symbol(call.rdram, call.ctx, call.runtime, s_setlists.at(s_selected).look), script::kSymbol};
-            std::cerr << "[setlist] usage: {setlist select <name>}, {setlist look}" << std::endl;
+            if (op == "shown")
+                return {symbol(call.rdram, call.ctx, call.runtime, s_selected), script::kSymbol};
+            if (op == "exists")
+                return {s_setlists.count(call.symbol(2)) != 0u ? 1u : 0u, script::kInt};
+            std::cerr << "[setlist] usage: {setlist select|exists <name>}, {setlist look|shown}" << std::endl;
             return {};
         }
     }
