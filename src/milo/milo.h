@@ -37,6 +37,9 @@ namespace gh2::milo
 
     std::optional<Dir> parse(const Bytes &raw);
 
+    // One more object, its string table hints grown to fit its names.
+    void add(Dir &dir, const std::string &className, const std::string &name, Bytes body);
+
     // Every string in the root and bodies that starts `from`, with `to` in
     // its place.
     void replacePrefix(Dir &dir, const std::string &from, const std::string &to);

@@ -37,7 +37,7 @@ namespace gh2::script
         };
         std::vector<Pending> s_pending;
         std::map<uint32_t, Command> s_bySlot;
-        std::vector<const char *> s_uiScripts;
+        std::vector<std::string> s_uiScripts;
         bool s_registered = false;
 
         // A guest copy of `text`, from the game's heap.
@@ -147,7 +147,7 @@ namespace gh2::script
             if (!s_registered || s_uiScripts.empty())
                 return;
             const R5900Context saved = *ctx;
-            for (const char *text : s_uiScripts)
+            for (const std::string &text : s_uiScripts)
                 run(rdram, ctx, runtime, text);
             s_uiScripts.clear();
             *ctx = saved;
@@ -220,9 +220,9 @@ namespace gh2::script
         return static_cast<uint32_t>(runtime->callGuestFunction(rdram, ctx, s_addresses->dataNodeGetObj, {node, args}));
     }
 
-    void runWhenUiReady(const char *text)
+    void runWhenUiReady(std::string text)
     {
-        s_uiScripts.push_back(text);
+        s_uiScripts.push_back(std::move(text));
     }
 
     void addCommand(const char *name, Command command)
@@ -253,14 +253,20 @@ namespace gh2::script
             rootCall.arg(i);
     }
 
-    void setVariable(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const char *name, Node node)
+    uint32_t symbol(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &text)
     {
         const Call call{rdram, ctx, runtime, 0u};
-        const uint32_t block = guestString(call, name, 4u);
+        const uint32_t block = guestString(call, text, 4u);
         runtime->callGuestFunction(rdram, ctx, s_addresses->symbolCtor, {block, block + 4u});
-        const uint32_t variable = static_cast<uint32_t>(
-            runtime->callGuestFunction(rdram, ctx, s_addresses->dataVariable, {load<uint32_t>(rdram, block)}));
+        const uint32_t interned = load<uint32_t>(rdram, block);
         runtime->callGuestFunction(rdram, ctx, s_addresses->builtinDelete, {block});
+        return interned;
+    }
+
+    void setVariable(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const char *name, Node node)
+    {
+        const uint32_t variable = static_cast<uint32_t>(runtime->callGuestFunction(
+            rdram, ctx, s_addresses->dataVariable, {symbol(rdram, ctx, runtime, name)}));
         // Raw, as a DataNode's own assignment would take a reference.
         store<uint32_t>(rdram, variable, node.value);
         store<uint32_t>(rdram, variable + 4u, node.type);

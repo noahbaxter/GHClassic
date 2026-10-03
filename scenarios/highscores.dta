@@ -1,0 +1,59 @@
+; High scores for each game's songs: each starts on its own game's names, a
+; new score saves to save.bin, and a load from it brings back what was saved
+; and drops what was not.
+#include common/first_boot.dta
+{game set_song iwannabesedated}
+{{game get_player_config 0} set_difficulty expert}
+{highscores get_highscore 0 $name $score}
+(expect $name Kendall)
+(expect $score 50000)
+{highscores get_highscore 4 $name $score}
+(expect $name Keith)
+(expect $score 10000)
+{highscores add GHONE 123456}
+{game set_song ballstothewall}
+{{game get_player_config 0} set_difficulty hard}
+{highscores get_highscore 0 $name $score}
+(expect $name Christine)
+{highscores add EIGHTIES 45000}
+{game set_song x_surrender}
+{{game get_player_config 0} set_difficulty expert}
+{highscores get_highscore 0 $name $score}
+(expect $name Finn)
+{highscores get_highscore 4 $name $score}
+(expect $name Liana)
+{highscores add XBOX 77000}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty expert}
+{highscores get_highscore 0 $name $score}
+(expect $name Reiko)
+{campaign mark_needs_save}
+{autosave_goto main_screen}
+(wait_screen autosave)
+(wait_screen main_screen)
+; Not saved: the load must drop it.
+{game set_song iwannabesedated}
+{{game get_player_config 0} set_difficulty expert}
+{highscores add UNSAVED 999999}
+{ui goto_screen bootup_load}
+(wait_screen guitar_help_screen)
+{highscores get_highscore 0 $name $score}
+(expect $name GHONE)
+(expect $score 123456)
+{highscores get_highscore 1 $name $score}
+(expect $name Kendall)
+{game set_song ballstothewall}
+{{game get_player_config 0} set_difficulty hard}
+{highscores get_highscore 1 $name $score}
+(expect $name EIGHTIES)
+(expect $score 45000)
+; 360 Surrender's own table; PS2's of the same song is untouched.
+{game set_song x_surrender}
+{{game get_player_config 0} set_difficulty expert}
+{highscores get_highscore 0 $name $score}
+(expect $name XBOX)
+(expect $score 77000)
+{game set_song surrender}
+{highscores get_highscore 0 $name $score}
+(expect $score 50000)
+(quit)

@@ -15,13 +15,16 @@
 #include "gh1/install.h"
 
 #include "disc/ark.h"
+#include "content/card.h"
 #include "content/outfits.h"
+#include "formats/dtb.h"
 #include "gh1/clips.h"
-#include "gh1/dtb.h"
 #include "gh1/face.h"
 #include "gh1/guitarist.h"
 #include "gh1/rig.h"
+#include "gh1/songs.h"
 #include "milo/milo.h"
+#include "save/gh1_stream.h"
 
 #include <chrono>
 #include <iostream>
@@ -32,40 +35,26 @@ namespace gh2
     {
         using gh1::graft;
         using gh1::Guitarist;
+        using gh1::kGuitarists;
         using gh1::load;
         using gh1::pickerSet;
-
-        // GH1's locale names the folders: hair_metal Izzy, nu_metal Pandora,
-        // hiphop Xavier. GH1's punk and hiphop idle leaning on the back wall,
-        // where the door opens, so it stays shut behind them.
-        constexpr Guitarist kGuitarists[] = {
-            // character  label          base        folder        door opens
-            {"punk",      "SAFETY PINS", "punk1",    "punk",       false},
-            {"alterna",   "CORSET",      "alterna1", "alterna",    true},
-            {"metal",     "SHORT",       "metal1",   "metal",      true},
-            {"glam",      "BIGGER BOOT", "glam1",    "hair_metal", true},
-            {"goth",      "RAZORS",      "goth2",    "nu_metal",   true},
-            {"funk1",     "JADE",        "funk1",    "hiphop",     false},
-            {"classic",   "BRIT",        "classic",  "classic",    true},
-            {"grim",      "SCHEMIN'",    "grim",     "grim",       true},
-        };
 
         // GH1's archetypes (charsys.dta), and the macros that defines (its
         // anim sets among them), after those GH1 loads at boot.
         struct Charsys
         {
-            gh1::dtb::Node archetypes;
-            gh1::dtb::Macros macros;
+            dtb::Node archetypes;
+            dtb::Macros macros;
         };
 
         std::optional<Charsys> charsys(size_t gh1Disc)
         {
-            const gh1::dtb::Files files = [gh1Disc](const std::string &path) { return ark::readFile(gh1Disc, path); };
+            const dtb::Files files = [gh1Disc](const std::string &path) { return ark::readFile(gh1Disc, path); };
             Charsys out;
-            if (!gh1::dtb::read("../../system/run/config/macros.dta", out.macros, files))
+            if (!dtb::read("../../system/run/config/macros.dta", out.macros, files))
                 return std::nullopt;
-            const auto root = gh1::dtb::read("charsys/charsys.dta", out.macros, files);
-            const gh1::dtb::Node *found = root ? gh1::dtb::find(*root, "archetypes") : nullptr;
+            const auto root = dtb::read("charsys/charsys.dta", out.macros, files);
+            const dtb::Node *found = root ? dtb::find(*root, "archetypes") : nullptr;
             if (!found)
                 return std::nullopt;
             out.archetypes = *found;
@@ -88,21 +77,25 @@ namespace gh2
         if (!gh1Disc || !gh2Disc)
             return;
         const auto start = std::chrono::steady_clock::now();
+        gh1::addSetlist(*gh1Disc, *gh2Disc);
+        // GH1's own save (save/gh1_stream.h): title 0x309cf8, broken after 6
+        // characters (SetupMCIcon 0x14a500).
+        content::addCardGame(*gh1Disc, "gh1", true, save::gh1::kDataSize, "Guitar Hero", 6);
         const auto scripts = charsys(*gh1Disc);
         if (!scripts)
         {
             std::cerr << "[gh1] cannot read GH1's charsys" << std::endl;
             return;
         }
-        const gh1::dtb::Node *types = &scripts->archetypes;
+        const dtb::Node *types = &scripts->archetypes;
         size_t count = 0u;
         for (const Guitarist &guitarist : kGuitarists)
         {
             const std::string base = guitarist.base, name = guitarist.name(), folder = guitarist.folder;
             // CharFace reads both from the archetype (GH1 0x2a6cb0).
-            const gh1::dtb::Node *archetype = gh1::dtb::find(*types, folder);
-            const gh1::dtb::Node *faceFile = archetype ? gh1::dtb::find(*archetype, "face_file") : nullptr;
-            const gh1::dtb::Node *faceData = archetype ? gh1::dtb::find(*archetype, "face_data") : nullptr;
+            const dtb::Node *archetype = dtb::find(*types, folder);
+            const dtb::Node *faceFile = archetype ? dtb::find(*archetype, "face_file") : nullptr;
+            const dtb::Node *faceData = archetype ? dtb::find(*archetype, "face_data") : nullptr;
             if (!faceFile || faceFile->nodes.size() < 2u || !faceData || !gh1::addFace(name, *faceData))
             {
                 std::cerr << "[gh1] cannot read " << folder << "'s face" << std::endl;
