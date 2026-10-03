@@ -217,6 +217,14 @@ namespace gh2::milo
         return dir;
     }
 
+    void add(Dir &dir, const std::string &className, const std::string &name, Bytes body)
+    {
+        dir.tableCount += 2u;
+        dir.tableSize += static_cast<uint32_t>(className.size() + name.size() + 2u);
+        dir.entries.emplace_back(className, name);
+        dir.bodies.push_back(std::move(body));
+    }
+
     void replacePrefix(Dir &dir, const std::string &from, const std::string &to)
     {
         auto replace = [&](Bytes &b)

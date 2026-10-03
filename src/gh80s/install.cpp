@@ -9,8 +9,14 @@
 #include "gh80s/install.h"
 
 #include "disc/ark.h"
+#include "content/card.h"
+#include "content/locale.h"
 #include "content/outfits.h"
+#include "content/setlists.h"
+#include "content/songs.h"
+#include "formats/dtb.h"
 
+#include <iostream>
 #include <string>
 
 namespace gh2
@@ -36,6 +42,55 @@ namespace gh2
             {"goth",      "BLAZERS",     "goth2",    "goth3"},
             {"grim",      "WATCHIN'",    "grim",     "grim2"},
         };
+
+        // The 80s career's songs (campaign.dta's order), tier by tier, as
+        // quickplay's 80s setlist. Its venues are GH2's names, so its tier
+        // headers go in as gh80s_<venue>, the 80s locale's text.
+        void addSetlist(size_t disc)
+        {
+            const dtb::Files files = [disc](const std::string &path) { return ark::readFile(disc, path); };
+            dtb::Macros macros;
+            const auto campaign = dtb::read("config/campaign.dta", macros, files);
+            const auto songs = dtb::read("config/songs.dta", macros, files);
+            const auto strings = dtb::read("ui/eng/locale.dta", macros, files);
+            const dtb::Node *order = campaign ? dtb::find(*campaign, "order") : nullptr;
+            if (!order || !songs || !strings)
+            {
+                std::cerr << "[gh80s] cannot read the 80s campaign" << std::endl;
+                return;
+            }
+            std::vector<setlists::Tier> tiers;
+            for (size_t i = 1u; i < order->nodes.size(); ++i)
+            {
+                const dtb::Node &venue = order->nodes[i];
+                if (venue.nodes.empty())
+                    continue;
+                setlists::Tier tier{venue.nodes[0].text, "gh80s_" + venue.nodes[0].text, {}};
+                if (const dtb::Node *header = dtb::find(*strings, "song_header_" + venue.nodes[0].text);
+                    header && header->nodes.size() > 1u)
+                    locale::add("song_header_" + tier.header, header->nodes[1].text);
+                for (size_t s = 1u; s < venue.nodes.size(); ++s)
+                {
+                    const std::string &name = venue.nodes[s].text;
+                    const dtb::Node *entry = dtb::find(*songs, name);
+                    if (!entry)
+                        continue;
+                    songs::add(dtb::text(*entry));
+                    ark::rename("songs/" + name + "/", disc, "songs/" + name + "/");
+                    tier.songs.push_back(name);
+                }
+                tiers.push_back(std::move(tier));
+            }
+            // The 80s archive whole under gh80s/, so its song list scene
+            // finds what it refers to on its own disc.
+            ark::rename("gh80s/", disc, "");
+            std::array<std::string, 5> scoreNames;
+            for (size_t i = 0; i < scoreNames.size(); ++i)
+                if (const dtb::Node *name = dtb::find(*strings, "highscore_dummy_" + std::to_string(i));
+                    name && name->nodes.size() > 1u)
+                    scoreNames[i] = name->nodes[1].text;
+            setlists::add("gh80s", std::move(tiers), "gh80s/ui/sel_song_quickplay.milo", scoreNames);
+        }
     }
 
     void installEighties()
@@ -43,6 +98,11 @@ namespace gh2
         const auto disc = ark::discWithSerial("SLUS_215.86");
         if (!disc)
             return;
+        addSetlist(*disc);
+        // GH2's save code at GH2's addresses, its own folder: a 0x29c00-byte
+        // save (GHMCSaveData 0x14b278), title 0x404918 broken after 13
+        // characters (SetupMCIcon 0x14b178).
+        content::addCardGame(*disc, "gh80s", false, 0x29c00u, "Guitar Hero: Rocks the 80s", 13);
         for (const Outfit &outfit : kOutfits)
         {
             const std::string base = outfit.base, name = outfit.name;

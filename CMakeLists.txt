@@ -159,6 +159,36 @@ target_link_libraries(save_test PRIVATE miniz)
 add_executable(releases_test EXCLUDE_FROM_ALL tests/releases_test.cpp src/host/releases.cpp)
 target_include_directories(releases_test PRIVATE src)
 
+# Ogg Vorbis for 360 GH2's .mogg audio: libogg and libvorbis (BSD-3-Clause),
+# the decoder and vorbisfile only. Their own CMake wants an older CMake and
+# an installed Ogg, so their sources are built here (the lists in their
+# CMakeLists.txt); SOURCE_SUBDIR names no CMakeLists.txt, so MakeAvailable
+# only fetches. raylib's bundled stb_vorbis rules that one out: its symbols
+# would clash.
+FetchContent_Declare(ogg
+    GIT_REPOSITORY https://github.com/xiph/ogg.git
+    GIT_TAG e1774cd77f471443541596e09078e78fdc342e4f # v1.3.5
+    SOURCE_SUBDIR none)
+FetchContent_Declare(vorbis
+    GIT_REPOSITORY https://github.com/xiph/vorbis.git
+    GIT_TAG 0657aee69dec8508a0011f47f3b69d7538e9d262 # v1.3.7
+    SOURCE_SUBDIR none)
+FetchContent_MakeAvailable(ogg vorbis)
+file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/ogg/ogg/config_types.h"
+    CONTENT "#ifndef __CONFIG_TYPES_H__\n#define __CONFIG_TYPES_H__\n#include <stdint.h>\n\
+typedef int16_t ogg_int16_t;\ntypedef uint16_t ogg_uint16_t;\ntypedef int32_t ogg_int32_t;\n\
+typedef uint32_t ogg_uint32_t;\ntypedef int64_t ogg_int64_t;\ntypedef uint64_t ogg_uint64_t;\n#endif\n")
+add_library(vorbisfile STATIC)
+target_sources(vorbisfile PRIVATE "${ogg_SOURCE_DIR}/src/bitwise.c" "${ogg_SOURCE_DIR}/src/framing.c")
+foreach(VORBIS_SOURCE mdct smallft block envelope window lsp lpc analysis synthesis psy info floor1 floor0
+        res0 mapping0 registry codebook sharedbook lookup bitrate vorbisfile)
+    target_sources(vorbisfile PRIVATE "${vorbis_SOURCE_DIR}/lib/${VORBIS_SOURCE}.c")
+endforeach()
+target_include_directories(vorbisfile SYSTEM PUBLIC
+    "${ogg_SOURCE_DIR}/include" "${CMAKE_CURRENT_BINARY_DIR}/ogg" "${vorbis_SOURCE_DIR}/include")
+target_include_directories(vorbisfile PRIVATE "${vorbis_SOURCE_DIR}/lib")
+set_target_properties(vorbisfile PROPERTIES C_STANDARD 99)
+
 # Without a disc's generated code, everything above still builds: what CI
 # checks (tools/ghc.py ci).
 file(GLOB GHC_GENERATED_SOURCES CONFIGURE_DEPENDS
@@ -180,7 +210,12 @@ set(GHC_GAME_SOURCES
     src/sustain_release.cpp
     src/track_start.cpp
     src/whammy_hold.cpp
+    src/content/card.cpp
+    src/content/locale.cpp
+    src/content/mogg.cpp
     src/content/outfits.cpp
+    src/content/setlists.cpp
+    src/content/songs.cpp
     src/dev/draw_dump.cpp
     src/dev/mesh_packet.cpp
     src/dev/null_rnd.cpp
@@ -188,19 +223,25 @@ set(GHC_GAME_SOURCES
     src/dev/seed.cpp
     src/dev/transplant.cpp
     src/disc/ark.cpp
+    src/disc/crypt.cpp
     src/disc/disc.cpp
     src/disc/sha1.cpp
+    src/disc/volume.cpp
+    src/formats/dtb.cpp
+    src/formats/midi.cpp
     src/gh1/clips.cpp
-    src/gh1/dtb.cpp
     src/gh1/face.cpp
     src/gh1/install.cpp
     src/gh1/rig.cpp
+    src/gh1/songs.cpp
+    src/gh2x/install.cpp
     src/gh80s/install.cpp
     src/milo/milo.cpp
     src/movie/movie.cpp
     src/movie/pss.cpp
     src/movie/screen.cpp
     src/save/card.cpp
+    src/save/gh1_stream.cpp
     src/save/gh2_stream.cpp
     src/save/gh2_text.cpp
     src/save/ps2_card.cpp
@@ -215,6 +256,7 @@ set(GHC_GAME_SOURCES
     src/synth/synth.cpp
     src/ui/fast_boot.cpp
     src/ui/locale.cpp
+    src/ui/help_bar.cpp
     src/ui/menus.cpp
     src/ui/meta_music.cpp
     src/host/audio.cpp
@@ -279,9 +321,10 @@ file(READ src/ui/dta/fast_boot.dta GHC_FAST_BOOT_DTA)
 file(READ src/ui/dta/locale.dta GHC_LOCALE_DTA)
 file(READ src/ui/dta/crowd.dta GHC_CROWD_DTA)
 file(READ src/ui/dta/sel_character.dta GHC_SEL_CHARACTER_DTA)
+file(READ src/ui/dta/quickplay.dta GHC_QUICKPLAY_DTA)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     src/ui/dta/lag_panel.dta src/ui/dta/highscore_panel.dta src/ui/dta/main_menu.dta src/ui/dta/fast_boot.dta
-    src/ui/dta/locale.dta src/ui/dta/crowd.dta src/ui/dta/sel_character.dta)
+    src/ui/dta/locale.dta src/ui/dta/crowd.dta src/ui/dta/sel_character.dta src/ui/dta/quickplay.dta)
 configure_file(src/ui/dta/dta.h.in "${GHC_DTA_DIR}/dta.h" @ONLY)
 target_include_directories(GHClassic PRIVATE "${GHC_DTA_DIR}")
 
@@ -333,6 +376,7 @@ target_link_libraries(GHClassic PRIVATE
     vk-bootstrap::vk-bootstrap
     GPUOpen::VulkanMemoryAllocator
     mpeg2
+    vorbisfile
     miniz # libchdr's, for save.bin
 )
 # Calls go through volk's pointers, never a linked loader.

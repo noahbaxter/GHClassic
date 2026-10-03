@@ -2,13 +2,18 @@
 
 #include "addresses.h"
 #include "disc/ark.h"
+#include "content/locale.h"
 #include "content/outfits.h"
+#include "content/setlists.h"
+#include "content/songs.h"
 #include "ui/fast_boot.h"
 #include "frame_step.h"
 #include "game_overrides.h"
 #include "gh1/face.h"
 #include "gh1/install.h"
 #include "gh80s/install.h"
+#include "gh2x/install.h"
+#include "ui/help_bar.h"
 #include "settings/latency.h"
 #include "ui/locale.h"
 #include "ui/menus.h"
@@ -44,6 +49,7 @@ namespace
         gh2::ark::install(runtime, gh2::kSlus21447);
         gh2::installEighties();
         gh2::installGh1();
+        gh2::installGh2x();
         gh2::installGh1Face(runtime, gh2::kSlus21447);
         gh2::outfits::install(runtime, gh2::kSlus21447);
         gh2::installNullRnd(runtime, gh2::kSlus21447);
@@ -71,6 +77,10 @@ namespace
         gh2::installPad(runtime, gh2::kSlus21447);
         gh2::installFrameStep(runtime, gh2::kSlus21447);
         gh2::installMenus(runtime);
+        gh2::installHelpBar(runtime, gh2::kSlus21447);
+        gh2::setlists::install(runtime, gh2::kSlus21447);
+        gh2::songs::install();
+        gh2::locale::install(runtime, gh2::kSlus21447);
         gh2::scenario::install(runtime, gh2::kSlus21447);
         gh2::transplant::install(runtime, gh2::kSlus21447);
         gh2::fast_boot::install(runtime, gh2::kSlus21447);

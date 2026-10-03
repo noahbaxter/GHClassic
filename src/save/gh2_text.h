@@ -11,15 +11,22 @@
 //   [gh2 scores expert]      <song>.<rank> = <score> <name>
 //
 // An item's value lists its flags (store, unlocked, passed, or locked) and,
-// for a song, score=, stars=, gold and trickle=.
+// for a song, score=, stars=, gold and trickle=. A song another game brings
+// keeps its scores in that game's sections: [gh1 scores expert].
 
 #include "save/gh2_stream.h"
 #include "save/store.h"
 
+#include <map>
+#include <string>
+
 namespace gh2::save::gh2
 {
+    // Song to the game it came from; songs missing are GH2's.
+    using SongGames = std::map<std::string, std::string>;
+
     // Replaces every GH2 section in store with save's differences from fresh.
-    void toStore(const Save &save, const Save &fresh, Store &store);
+    void toStore(const Save &save, const Save &fresh, Store &store, const SongGames &games = {});
     // fresh with store's GH2 sections laid over it.
-    Save fromStore(const Store &store, const Save &fresh);
+    Save fromStore(const Store &store, const Save &fresh, const SongGames &games = {});
 }
