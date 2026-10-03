@@ -57,6 +57,13 @@ namespace gh2
         uint32_t saveData1;     // the card write, on GHMCSaveData's worker thread
         uint32_t loadData1;     // the card read, on GHMCLoadData's
         uint32_t loadData2;     // back on the main thread, where Campaign::Load runs
+        uint32_t sceMcInit;
+        uint32_t sceMcEnd;
+        uint32_t sceMcGetInfo;
+        uint32_t sceMcSync;
+        uint32_t sceMcGetDir;
+        uint32_t sceMcFormat;
+        uint32_t sceMcFileCalls[6]; // open, mkdir, close, read, write, delete
         uint32_t bufStreamCtor; // BufStream::BufStream(void *, int, bool)
         uint32_t binStreamDtor; // BinStream::~BinStream
         uint32_t setupMcIcon;   // builds the card icon below from config/mc.dta and the disc
@@ -134,6 +141,13 @@ namespace gh2
         .saveData1 = 0x14b3e0u,
         .loadData1 = 0x14ba00u,
         .loadData2 = 0x14bae0u,
+        .sceMcInit = 0x2f3860u,
+        .sceMcEnd = 0x2f3af8u,
+        .sceMcGetInfo = 0x2f4240u,
+        .sceMcSync = 0x2f4120u,
+        .sceMcGetDir = 0x2f43c0u,
+        .sceMcFormat = 0x2f4518u,
+        .sceMcFileCalls = {0x2f3bc0u, 0x2f3ce8u, 0x2f3d20u, 0x2f3e90u, 0x2f3fa8u, 0x2f45e8u},
         .bufStreamCtor = 0x2c9268u,
         .binStreamDtor = 0x2c8b78u,
         .setupMcIcon = 0x14b098u,

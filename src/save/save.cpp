@@ -11,8 +11,8 @@
 // builds at boot. LoadData2's first call saves that campaign once as the base
 // every later load and save measures against.
 //
-// A card save is read when there is no save.bin, from the old card folder, or
-// from a PCSX2 card given with --import-card, and becomes save.bin at once.
+// The game's card holds nothing (save/card.cpp). --import-card's PCSX2 card
+// is read in place of save.bin by the first load, and becomes save.bin at once.
 // --export-card writes the save to a PCSX2 card after the load and each save,
 // as the game would have: the save, its icon and the marker file.
 
@@ -33,7 +33,6 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <iterator>
 #include <optional>
 #include <utility>
 
@@ -231,42 +230,24 @@ namespace gh2::save
             finish(ctx, kNoError);
         }
 
-        // A card save into the load buffer: --import-card's, else the old card
-        // folder's when there is no save.bin; a damaged one gets the game's
-        // dialog instead.
-        bool readCardSave(uint8_t *rdram, ReadResult read)
+        // --import-card's save into the load buffer, once: a later load in
+        // the same run is save.bin's.
+        bool readCardSave(uint8_t *rdram)
         {
+            if (s_importCard.empty())
+                return false;
+            s_loadedFrom = std::exchange(s_importCard, {});
             const std::string dir = guestString(rdram, s_addresses->mcBaseDir);
             const std::string file = guestString(rdram, s_addresses->mcSaveFile);
-            std::vector<uint8_t> data;
-            if (!s_importCard.empty())
+            const std::optional<Ps2Card> card = Ps2Card::open(s_loadedFrom);
+            const std::optional<std::vector<uint8_t>> found = card ? card->read(dir, file) : std::nullopt;
+            if (!found)
             {
-                // Once: a later load in the same run is save.bin's.
-                s_loadedFrom = std::exchange(s_importCard, {});
-                const std::optional<Ps2Card> card = Ps2Card::open(s_loadedFrom);
-                const std::optional<std::vector<uint8_t>> found = card ? card->read(dir, file) : std::nullopt;
-                if (!found)
-                {
-                    std::cerr << "[save] no " << dir << "/" << file << " on " << s_loadedFrom << std::endl;
-                    return false;
-                }
-                data = *found;
-            }
-            else if (read == ReadResult::kMissing)
-            {
-                const std::filesystem::path card = PS2Runtime::getIoPaths().mcRoot / dir / file;
-                std::ifstream in(card, std::ios::binary);
-                if (!in)
-                    return false;
-                data.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
-                s_loadedFrom = card.string();
-            }
-            else
-            {
+                std::cerr << "[save] no " << dir << "/" << file << " on " << s_loadedFrom << std::endl;
                 return false;
             }
-            std::memcpy(getMemPtr(rdram, load<uint32_t>(rdram, s_addresses->mcBuffer)), data.data(),
-                        std::min<size_t>(data.size(), kBufferSize));
+            std::memcpy(getMemPtr(rdram, load<uint32_t>(rdram, s_addresses->mcBuffer)), found->data(),
+                        std::min<size_t>(found->size(), kBufferSize));
             return true;
         }
 
@@ -277,7 +258,7 @@ namespace gh2::save
             const ReadResult read = readFile(path(), store);
             if (read == ReadResult::kOk)
                 s_store = std::move(store);
-            if (readCardSave(rdram, read))
+            if (readCardSave(rdram))
             {
                 s_loaded = Loaded::kCard;
                 return finish(ctx, kNoError);

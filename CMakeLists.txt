@@ -162,6 +162,7 @@ set(GHC_GAME_SOURCES
     src/movie/screen.cpp
     src/null_rnd.cpp
     src/pad.cpp
+    src/save/card.cpp
     src/save/gh2_stream.cpp
     src/save/gh2_text.cpp
     src/save/ps2_card.cpp

@@ -2,7 +2,7 @@
 // runs.
 //
 //   GHClassic [disc] [--scenario <file>] [--hidden] [--mute] [--speed <x>] [--fast-boot] [--seed <n>]
-//            [--mc <dir>] [--save <file>] [--import-card <ps2>] [--export-card <ps2>]
+//            [--save <file>] [--import-card <ps2>] [--export-card <ps2>]
 //            [--settings <file>] [--shots <dir>] [--shot-every <n>]
 //            [--res window|native|480p|720p|1080p|1440p|2160p]
 //   GHClassic --bind [keyboard | <n>]
@@ -17,8 +17,7 @@
 // game's random numbers from n rather than the time of day.
 // --res is what the scene is drawn at: the window's size (the default), the
 // game's own (512x448), or that height at the picture's aspect. --settings
-// and --save read and write that file in place of the user data directory's;
-// --mc is the card, read for a save only when there is no save file.
+// and --save read and write that file in place of the user data directory's.
 // --import-card loads the save off a PCSX2 card and makes it the save file;
 // --export-card writes it to one (save/save.h). --bind
 // sets up a controller or the keyboard in input.ini; with no device it
@@ -95,7 +94,6 @@ int main(int argc, char *argv[])
         return gh2::runBind(argc, argv);
 
     std::filesystem::path discPath;
-    std::filesystem::path mcRoot;
     PS2Runtime::HostOptions hostOptions;
     gh2::RenderSize renderSize;
     double speed = 1.0;
@@ -107,8 +105,6 @@ int main(int argc, char *argv[])
             hostOptions.hidden = true;
         else if (arg == "--mute")
             hostOptions.mute = true;
-        else if (arg == "--mc" && hasValue)
-            mcRoot = argv[++i];
         else if (arg == "--speed" && hasValue)
             speed = std::strtod(argv[++i], nullptr);
         else if (arg == "--fast-boot")
@@ -234,16 +230,6 @@ int main(int argc, char *argv[])
     std::filesystem::remove(elfPath, removeError);
     if (!loaded)
         return fail(hostOptions, "could not load the executable from " + discPath.string());
-
-    // loadELF points the memory card beside the ELF, so this goes after. The
-    // player's card lives in the user data directory, beside settings.ini.
-    if (mcRoot.empty())
-        mcRoot = gh2::settings::userDataPath("mc0");
-    std::error_code mcError;
-    std::filesystem::create_directories(mcRoot, mcError);
-    PS2Runtime::IoPaths paths = PS2Runtime::getIoPaths();
-    paths.mcRoot = mcRoot;
-    PS2Runtime::setIoPaths(paths);
 
     runtime.run();
 

@@ -1,5 +1,5 @@
-; A first boot on the blank card arm.sh gives every run: create the save
-; (YES, mem_card.dta), then past the guitar help a card with no profiles
+; A first boot, as every arm run is with no save: create the save
+; (YES, mem_card.dta), then past the guitar help a save with no profiles
 ; gets, to the main menu (splash.dta's continue only leads there).
 (wait_screen bootup_create_save_check)
 {ui goto_screen bootup_create_save}
