@@ -26,9 +26,11 @@ namespace gh2::setlists
         {
             std::vector<Tier> tiers; // none for GH2's, which the game lists
             std::string look;
+            Required required;
         };
 
         constexpr const char *kOwnLook = "ui/sel_song_quickplay.milo";
+        constexpr int kBands = 8; // the save's band slots
 
         const Addresses *s_addresses = nullptr;
         std::map<std::string, Setlist> s_setlists;
@@ -102,16 +104,59 @@ namespace gh2::setlists
             store<uint32_t>(rdram, songs + 4u, load<uint32_t>(rdram, songs));
             store<uint32_t>(rdram, headers + 4u, load<uint32_t>(rdram, headers));
             // As Campaign::GetQuickplaySongs (0x12db78): the first two
-            // tiers, or every one with all access (+0x80, the unlock-all
-            // cheat). Career progress opens the rest and the encores (each
-            // venue's last song, CampaignState::GetEncoreForVenue 0x132ce0),
-            // and no setlist but GH2's has a career yet.
+            // tiers, and every song a band has unlocked in the game's career
+            // on any difficulty, which the save's sections say for a game
+            // not being played: its later tiers, its encores (each venue's
+            // last song, CampaignState::GetEncoreForVenue 0x132ce0) and the
+            // store songs bought. All access (+0x80, the unlock-all cheat)
+            // opens every one. A game with no career yet has its store's
+            // songs open.
             const uint32_t campaign = load<uint32_t>(rdram, s_addresses->theCampaign);
             const bool allAccess = campaign != 0u && load<uint32_t>(rdram, campaign + 0x80u) != 0u;
-            const size_t open = allAccess ? s_shown->tiers.size() : std::min<size_t>(2u, s_shown->tiers.size());
-            for (size_t t = 0; t < open; ++t)
+            const std::vector<std::string> careers = campaigns::games();
+            const bool career = std::find(careers.begin(), careers.end(), selected()) != careers.end();
+            const std::set<std::string> unlocked = save::unlockedSongs(selected());
+            // A venue unlocked marks its encore unlocked with the rest. The
+            // encore opens once a band has passed one short of the songs
+            // the venue asks for on a difficulty (IsEncoreUnlocked,
+            // 0x132c10; GetRequiredSongs, 0x1313d8).
+            std::vector<bool> encoreOpen(s_shown->tiers.size(), false);
+            for (int band = 0; band < kBands && !s_shown->required.empty(); ++band)
+            {
+                const auto passed = save::passedSongs(selected(), band);
+                for (size_t d = 0; d < passed.size() && d < s_shown->required.size(); ++d)
+                    for (size_t t = 0; t < s_shown->tiers.size(); ++t)
+                    {
+                        const Tier &tier = s_shown->tiers[t];
+                        const bool last = t + 1u == s_shown->tiers.size() || !s_shown->tiers[t + 1u].encore;
+                        int count = 0;
+                        for (const std::string &song : tier.songs)
+                            count += static_cast<int>(passed[d].count(song));
+                        if (tier.encore && count >= s_shown->required[d][last ? 1 : 0] - 1)
+                            encoreOpen[t] = true;
+                    }
+            }
+            const auto open = [&](size_t t, size_t s)
             {
                 const Tier &tier = s_shown->tiers[t];
+                if (allAccess)
+                    return true;
+                if (tier.encore && s + 1u == tier.songs.size() && !s_shown->required.empty())
+                    return static_cast<bool>(encoreOpen[t]);
+                if (unlocked.count(tier.songs[s]) != 0u)
+                    return true;
+                if (!tier.encore)
+                    return !career;
+                return t < 2u && s + 1u < tier.songs.size();
+            };
+            for (size_t t = 0; t < s_shown->tiers.size(); ++t)
+            {
+                const Tier &tier = s_shown->tiers[t];
+                bool any = false;
+                for (size_t s = 0; s < tier.songs.size(); ++s)
+                    any = any || open(t, s);
+                if (!any)
+                    continue;
                 const uint32_t header[2] = {static_cast<uint32_t>(s_rowTiers.size()),
                                             symbol(rdram, ctx, runtime, tier.header)};
                 pushBack(rdram, ctx, runtime, headers, header, 8u, s_addresses->headersInsertOverflow, scratch);
@@ -122,7 +167,7 @@ namespace gh2::setlists
                                                    {provider, symbol(rdram, ctx, runtime, tier.songs[s])}));
                     pushBack(rdram, ctx, runtime, songs, &data, 4u, s_addresses->songsInsertOverflow, scratch);
                     s_rowTiers.push_back(t);
-                    s_rowActive.push_back(allAccess || !tier.encore || s + 1u < tier.songs.size());
+                    s_rowActive.push_back(open(t, s));
                 }
             }
             store<int32_t>(rdram, provider + 0x48u, static_cast<int32_t>(s_rowTiers.size()) - 1);
@@ -211,13 +256,13 @@ namespace gh2::setlists
     }
 
     void add(const std::string &name, std::vector<Tier> tiers, const std::string &look,
-             const std::array<std::string, 5> &scoreNames)
+             const std::array<std::string, 5> &scoreNames, Required required)
     {
         std::vector<std::string> songs;
         for (const Tier &tier : tiers)
             songs.insert(songs.end(), tier.songs.begin(), tier.songs.end());
         save::addScoreSongs(name, songs, scoreNames);
-        s_setlists[name] = {std::move(tiers), look};
+        s_setlists[name] = {std::move(tiers), look, std::move(required)};
     }
 
     std::vector<std::string> careerSongs(const std::string &name)
@@ -286,7 +331,12 @@ namespace gh2::setlists
         std::array<std::string, 5> scoreNames;
         for (size_t i = 0; i < scoreNames.size(); ++i)
             scoreNames[i] = text("highscore_dummy_" + std::to_string(i));
-        add(game, std::move(tiers), game + "/" + kOwnLook, scoreNames);
+        Required required;
+        if (const dtb::Node *counts = dtb::find(*campaign, "required_songs"))
+            for (size_t d = 1u; d < counts->nodes.size(); ++d)
+                if (counts->nodes[d].nodes.size() > 2u)
+                    required.push_back({counts->nodes[d].nodes[1].integer, counts->nodes[d].nodes[2].integer});
+        add(game, std::move(tiers), game + "/" + kOwnLook, scoreNames, std::move(required));
     }
 
     void install(PS2Runtime &runtime, const Addresses &addresses)
