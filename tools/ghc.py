@@ -27,7 +27,8 @@ runs/<scenario's name>) gets run.log, frames/ (frame_0012.30s.png, seconds
 since launch), shots/ and shots.png from the scenario's (shot name) steps,
 and on macOS stack.txt, a 3 s sample taken if it is still alive at --secs.
 scenarios runs the files in scenarios/ through arm side by side: a run
-passes when it quits on its own with no FAIL or STALL in its log.
+passes when it reaches its last step and quits with no FAIL or STALL in its
+log.
 
 release packages a build for players, who bring their own disc: a zip of
 the game beside PUT_DISC_HERE on Windows and Linux, a disk image on macOS.
@@ -338,8 +339,11 @@ def cmd_scenarios(argv):
         started = time.time()
         state = arm(out, ROOT / "scenarios" / f"{name}.dta", args.speed, 600, disc, env=env)
         log = (out / "run.log").read_text(errors="replace")
-        failures = [line.removeprefix("[scenario] ") for line in log.splitlines()
-                    if re.match(r"\[scenario\] (FAIL|STALL)", line)]
+        # Anywhere in a line: the watchdog's STALL lands mid-line in the game thread's output.
+        failures = [m.group(1) for m in re.finditer(r"\[scenario\] ((?:FAIL|STALL).*)", log)]
+        # A game that dies mid-run exits too, with its steps unfinished.
+        if not failures and not re.search(r"^\[scenario\] (done|\S+ s: \(quit\))", log, re.M):
+            failures = ["ended before its last step"]
         verdict = "pass" if state.startswith("exited") and not failures else "FAIL"
         return f"{verdict:<4} {name:<16} {round(time.time() - started):4d}s  {failures[0] if failures else ''}".rstrip()
 

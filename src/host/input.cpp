@@ -47,11 +47,6 @@ namespace gh2
         std::mutex s_mutex;
         HostPad s_pad;
 
-        constexpr uint16_t kActionButtons[kActionCount] = {
-            pad::kR2, pad::kCircle, pad::kTriangle, pad::kCross, pad::kSquare, pad::kUp,
-            pad::kDown, pad::kStart, pad::kSelect, pad::kL2, 0,
-        };
-
         const std::map<Action, std::vector<Source>> *section(const std::string &name)
         {
             const auto found = s_file.sections.find(name);
@@ -211,7 +206,7 @@ namespace gh2
         HostPad pad;
         for (int a = 0; a < kActionCount; ++a)
             if (held[a] > 0.5f)
-                pad.pressed |= kActionButtons[a];
+                pad.pressed |= kActions[a].button;
         pad.ly = static_cast<uint8_t>(std::lround(128.0f * (1.0f - held[kWhammy])));
         std::lock_guard<std::mutex> lock(s_mutex);
         s_pad = pad;

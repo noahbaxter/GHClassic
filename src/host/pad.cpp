@@ -13,6 +13,7 @@
 #include "host/pad.h"
 #include "script.h"
 
+#include "host/bindings.h"
 #include "host/input.h"
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
@@ -57,18 +58,25 @@ namespace gh2
         }
     }
 
+    uint16_t padButton(const std::string &name)
+    {
+        if (name == "up" || name == "down")
+            return input::kActions[name == "up" ? input::kStrumUp : input::kStrumDown].button;
+        if (name == "left" || name == "right")
+            return name == "left" ? pad::kLeft : pad::kRight;
+        for (const input::ActionInfo &action : input::kActions)
+            if (name == action.name)
+                return action.button;
+        return 0u;
+    }
+
     namespace
     {
         // {pad_held up|down|left|right}: 1 while that direction is held, for
         // menus that repeat on a hold. The UI gets only presses.
         script::Node padHeld(const script::Call &call)
         {
-            const std::string dir = call.symbol(1);
-            const uint16_t bit = dir == "up"      ? pad::kUp
-                                 : dir == "down"  ? pad::kDown
-                                 : dir == "left"  ? pad::kLeft
-                                 : dir == "right" ? pad::kRight
-                                                  : 0u;
+            const uint16_t bit = padButton(call.symbol(1));
             const uint16_t pressed = hostPad().pressed | s_scripted.load(std::memory_order_relaxed);
             return {bit != 0u && (pressed & bit) != 0u ? 1u : 0u, script::kInt};
         }

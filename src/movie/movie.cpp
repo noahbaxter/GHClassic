@@ -7,6 +7,7 @@
 #include "movie/screen.h"
 
 #include "host/audio.h"
+#include "host/bindings.h"
 #include "host/input.h"
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
@@ -277,7 +278,8 @@ namespace gh2
                 if (m_done)
                     return true;
                 const uint16_t pressed = hostPad().pressed;
-                const bool skip = Clock::now() >= m_skipAfter && (pressed & pad::kR2) && !(pressed & pad::kStart);
+                const bool skip = Clock::now() >= m_skipAfter && (pressed & input::kActions[input::kGreen].button) &&
+                                  !(pressed & input::kActions[input::kStart].button);
                 m_done = skip || m_runtime.isStopRequested();
                 return m_done;
             }

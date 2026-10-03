@@ -41,6 +41,8 @@ namespace gh2::scenario
         int s_next = 0;
         Clock::time_point s_start;
         Clock::time_point s_until;    // a wait's end
+        bool s_pressed = false;       // a press's button still held
+        Clock::time_point s_release;  // and when it lets go
         std::string s_screen;         // a wait_screen's screen
         uint32_t s_condition = 0u;    // a wait_until's step array
         bool s_shooting = false;      // a shot's frame not yet written
@@ -179,6 +181,11 @@ namespace gh2::scenario
                 }
                 s_condition = 0u;
             }
+            if (s_pressed && now() >= s_release)
+            {
+                setScriptedPad(0u);
+                s_pressed = false;
+            }
             if (now() < s_until)
                 return;
 
@@ -194,6 +201,16 @@ namespace gh2::scenario
                 if (verb == "wait")
                 {
                     s_until = now() + std::chrono::milliseconds(static_cast<int>(array.number(1) * 1000.0f));
+                    return;
+                }
+                if (verb == "press")
+                {
+                    // Held long enough for the pad to be read, then let go
+                    // before the next step.
+                    setScriptedPad(padButton(array.symbol(1)));
+                    s_pressed = true;
+                    s_release = now() + std::chrono::milliseconds(150);
+                    s_until = now() + std::chrono::milliseconds(400);
                     return;
                 }
                 if (verb == "wait_screen" || verb == "wait_until")
@@ -318,6 +335,7 @@ namespace gh2::scenario
 
         std::atomic<int64_t> s_lastPoll{0}; // steady_clock ticks
         std::atomic<PS2Runtime *> s_runtime{nullptr};
+        std::atomic<uint8_t *> s_rdram{nullptr};
 
         // The UI stops polling when the game thread blocks: say on what,
         // once, from the kernel's own view of its threads, and end the run.
@@ -349,6 +367,46 @@ namespace gh2::scenario
                               << kStatus[static_cast<int>(t.status)] << " " << kWait[static_cast<int>(t.waitReason)]
                               << " " << t.waitId << std::hex << " pc 0x" << t.pc << " ra 0x" << t.ra << std::dec
                               << std::endl;
+                // A running thread's stack, nearest first: the words that
+                // point into code, as a rough backtrace, and each script
+                // array there by its leading symbols.
+                for (const EeThreadSnapshot &t : snapshot.threads)
+                {
+                    uint8_t *rdram = s_rdram.load();
+                    if (t.status != EeThreadStatus::Running || !rdram || t.sp == 0u)
+                        continue;
+                    std::cerr << "[scenario]   stack" << std::hex;
+                    int shown = 0;
+                    for (uint32_t at = t.sp; at < t.sp + 0x1000u && shown < 24; at += 4u)
+                        if (const uint32_t word = gh2::load<uint32_t>(rdram, at);
+                            word >= 0x100000u && word < 0x3d0000u && (word & 3u) == 0u)
+                            std::cerr << " 0x" << word, ++shown;
+                    std::cerr << std::dec << std::endl;
+                    shown = 0;
+                    for (uint32_t at = t.sp; at < t.sp + 0x1000u && shown < 12; at += 4u)
+                    {
+                        const uint32_t array = gh2::load<uint32_t>(rdram, at);
+                        if (array < 0x400000u || array >= 0x2000000u || (array & 3u))
+                            continue;
+                        const uint32_t nodes = gh2::load<uint32_t>(rdram, array);
+                        const int count = gh2::load<int16_t>(rdram, array + 8u);
+                        if (nodes < 0x400000u || nodes >= 0x2000000u || (nodes & 3u) || count < 1 || count > 64 ||
+                            gh2::load<uint32_t>(rdram, nodes + 4u) != script::kSymbol)
+                            continue;
+                        std::cerr << "[scenario]   script {";
+                        for (int i = 0; i < count && i < 4; ++i)
+                        {
+                            const uint32_t value = gh2::load<uint32_t>(rdram, nodes + 8u * i);
+                            if (gh2::load<uint32_t>(rdram, nodes + 8u * i + 4u) != script::kSymbol || value < 0x100000u ||
+                                value >= 0x2000000u)
+                                break;
+                            const char *text = reinterpret_cast<const char *>(getMemPtr(rdram, value));
+                            std::cerr << " " << std::string(text, strnlen(text, 40));
+                        }
+                        std::cerr << " ...}" << std::endl;
+                        ++shown;
+                    }
+                }
                 for (const EeSemaphoreSnapshot &s : snapshot.semaphores)
                     std::cerr << "[scenario]   sema " << s.id << " count " << s.count << std::endl;
                 s_done = true;
@@ -384,6 +442,7 @@ namespace gh2::scenario
                 return;
             s_lastPoll = Clock::now().time_since_epoch().count();
             s_runtime = runtime;
+            s_rdram = rdram;
             ++s_clockPolls;
             if (transplant::active())
             {
