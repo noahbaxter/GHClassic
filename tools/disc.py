@@ -208,6 +208,21 @@ class Image:
             lba, length = self._find(lba, length, part, want_dir=i < len(parts) - 1)
         return self._read(lba, length)
 
+    def walk(self, lba=None, length=None, prefix=""):
+        """(path, lba, length) for every file, depth first."""
+        if lba is None:
+            lba, length = self._root()
+        for name, ent_lba, ent_len, is_dir in self._entries(lba, length):
+            if is_dir:
+                yield from self.walk(ent_lba, ent_len, f"{prefix}{name}/")
+            else:
+                yield f"{prefix}{name}", ent_lba, ent_len
+
+    def read_range(self, lba, offset, size):
+        """`size` bytes from `offset` into the file starting at sector `lba`."""
+        skip = offset % SECTOR
+        return self._read(lba + offset // SECTOR, skip + size)[skip:]
+
     def boot_name(self):
         for line in self.read("SYSTEM.CNF").decode("latin-1").splitlines():
             if line.strip().startswith("BOOT2"):
