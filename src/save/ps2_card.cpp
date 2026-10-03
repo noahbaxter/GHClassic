@@ -130,6 +130,65 @@ namespace gh2::save
             const char *n = reinterpret_cast<const char *>(e.data() + kName);
             return std::string(n, std::find(n, n + 32, '\0'));
         }
+
+        // Ascii2Sjis (GH2 0x2d2580): punctuation from its table (0x3de808),
+        // digits and letters from their runs (0x3de890), anything else 0.
+        uint16_t sjis(unsigned char c)
+        {
+            static const uint16_t kPunctuation[] = {
+                0x8140, 0x8149, 0x8168, 0x8194, 0x8190, 0x8193, 0x8195, 0x8166, 0x8169, 0x816a, 0x8196,
+                0x817b, 0x8143, 0x817c, 0x8144, 0x815e, 0x8146, 0x8147, 0x8171, 0x8181, 0x8172, 0x8148,
+                0x8197, 0x816d, 0x818f, 0x816e, 0x814f, 0x8151, 0x8165, 0x816f, 0x8162, 0x8170, 0x8150,
+            };
+            if (c >= 0x20 && c <= 0x2f)
+                return kPunctuation[c - 0x20];
+            if (c >= 0x30 && c <= 0x39)
+                return static_cast<uint16_t>(0x824f + c - 0x30);
+            if (c >= 0x3a && c <= 0x40)
+                return kPunctuation[c - 0x2a];
+            if (c >= 0x41 && c <= 0x5a)
+                return static_cast<uint16_t>(0x8260 + c - 0x41);
+            if (c >= 0x5b && c <= 0x60)
+                return kPunctuation[c - 0x44];
+            if (c >= 0x61 && c <= 0x7a)
+                return static_cast<uint16_t>(0x8281 + c - 0x61);
+            if (c >= 0x7b && c <= 0x7e)
+                return kPunctuation[c - 0x5c];
+            return 0;
+        }
+    }
+
+    // sceMcIconSys: "PS2D", the title's line break in bytes (+6), the
+    // background's transparency (+0xc), four colours (+0x10), three light
+    // directions (+0x50) and colours (+0x80), the ambient light (+0xb0), the
+    // title (+0xc0, strcpy'd, so it ends at its first 0) and the icon for
+    // each of list, copy and delete (+0x104, +0x144, +0x184).
+    std::vector<uint8_t> makeIconSys(const IconSys &icon)
+    {
+        std::vector<uint8_t> out(964, 0);
+        std::memcpy(out.data(), "PS2D", 4);
+        const uint16_t lineBreak = static_cast<uint16_t>(icon.lineBreak * 2);
+        std::memcpy(out.data() + 6, &lineBreak, 2);
+        putU32(out.data() + 0xc, icon.transparency);
+        for (int i = 0; i < 4; ++i)
+            std::memcpy(out.data() + 0x10 + 16 * i, icon.colors[i].data(), 12);
+        for (int i = 0; i < 3; ++i)
+        {
+            std::memcpy(out.data() + 0x50 + 16 * i, icon.lightDirs[i].data(), 12);
+            std::memcpy(out.data() + 0x80 + 16 * i, icon.lightColors[i].data(), 12);
+        }
+        std::memcpy(out.data() + 0xb0, icon.ambient.data(), 12);
+        for (size_t i = 0; i < icon.title.size() && i < 33; ++i)
+        {
+            const uint16_t c = sjis(static_cast<unsigned char>(icon.title[i]));
+            if (c == 0)
+                break;
+            out[0xc0 + 2 * i] = static_cast<uint8_t>(c >> 8);
+            out[0xc0 + 2 * i + 1] = static_cast<uint8_t>(c);
+        }
+        for (uint32_t at : {0x104u, 0x144u, 0x184u})
+            std::memcpy(out.data() + at, icon.iconFile.data(), std::min<size_t>(icon.iconFile.size(), 63));
+        return out;
     }
 
     std::optional<Ps2Card> Ps2Card::open(const std::string &path)
