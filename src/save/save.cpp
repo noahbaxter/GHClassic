@@ -24,6 +24,7 @@
 
 #include "guest.h"
 #include "hook.h"
+#include "save/gh1_stream.h"
 #include "save/gh2_text.h"
 #include "save/ps2_card.h"
 #include "save/store.h"
@@ -74,6 +75,10 @@ namespace gh2::save
         std::optional<gh2::Save> s_fresh;
         gh2::SongGames s_songGames;
         std::map<std::string, std::array<std::string, 5>> s_scoreNames; // by game
+        std::vector<CardGame> s_cardGames;
+        // An import's high scores from the other games' folders, by song.
+        using Lists = std::array<std::array<gh2::ScoreEntry, gh2::kScoresPerList>, gh2::kDifficulties>;
+        std::map<std::string, Lists> s_imported;
 
         std::string path()
         {
@@ -205,10 +210,76 @@ namespace gh2::save
             *ctx = saved;
         }
 
-        // The game's card directory: the marker file named after it (holding
-        // "dummydata"), the save padded to the card's size, and the icon
-        // SetupMCIcon (0x14b098) last built.
-        void writeCard(uint8_t *rdram, const std::vector<uint8_t> &stream, const std::string &to)
+        std::string gameOf(const std::string &song)
+        {
+            const auto it = s_songGames.find(song);
+            return it == s_songGames.end() ? "gh2" : it->second;
+        }
+
+        // A game's save folder as each game writes it: the marker file named
+        // after it (holding "dummydata"), the save padded to its size, then
+        // icon.sys and the icon.
+        std::vector<Ps2Card::File> saveFolder(const std::string &dir, const std::string &saveFile,
+                                              std::vector<uint8_t> stream, uint32_t size,
+                                              std::vector<uint8_t> iconSys, const std::string &iconFile,
+                                              std::vector<uint8_t> icon)
+        {
+            stream.resize(size, 0);
+            return {
+                {dir, {'d', 'u', 'm', 'm', 'y', 'd', 'a', 't', 'a', 0}},
+                {saveFile, std::move(stream)},
+                {"icon.sys", std::move(iconSys)},
+                {iconFile, std::move(icon)},
+            };
+        }
+
+        // `game`'s save for its folder: the one already there, or one of no
+        // progress, with its songs' high scores from `save`. GH1 keeps a table
+        // per band, and each gets the same.
+        std::vector<uint8_t> otherSave(const CardGame &game, const gh2::Save &save,
+                                       const std::optional<std::vector<uint8_t>> &there)
+        {
+            if (game.gh1Layout)
+            {
+                std::optional<gh1::Save> out = there ? gh1::parse(there->data(), there->size()) : std::nullopt;
+                if (!out)
+                    out = gh1::blank();
+                for (const gh2::SongScores &song : save.scores)
+                {
+                    if (gameOf(song.song) != game.game)
+                        continue;
+                    auto it = std::find_if(out->scores.begin(), out->scores.end(),
+                                           [&](const gh1::SongScores &s) { return s.song == song.song; });
+                    if (it == out->scores.end())
+                        it = out->scores.insert(out->scores.end(), gh1::SongScores{song.song, {}});
+                    for (int band = 0; band < gh1::kProfiles; ++band)
+                        for (int d = 0; d < gh1::kDifficulties; ++d)
+                            for (int rank = 0; rank < gh1::kScoresPerList; ++rank)
+                                it->lists[band * gh1::kDifficulties + d][rank] = {song.lists[d][rank].name,
+                                                                                  song.lists[d][rank].score};
+                }
+                return gh1::write(*out);
+            }
+            std::optional<gh2::Save> out = there ? gh2::parse(there->data(), there->size()) : std::nullopt;
+            if (!out)
+                out = gh2::blank();
+            for (const gh2::SongScores &song : save.scores)
+            {
+                if (gameOf(song.song) != game.game)
+                    continue;
+                auto it = std::find_if(out->scores.begin(), out->scores.end(),
+                                       [&](const gh2::SongScores &s) { return s.song == song.song; });
+                if (it == out->scores.end())
+                    out->scores.push_back(song);
+                else
+                    it->lists = song.lists;
+            }
+            return gh2::write(*out);
+        }
+
+        // GH2's folder with the icon SetupMCIcon (0x14b098) last built, and
+        // each added game's.
+        void writeCard(uint8_t *rdram, const gh2::Save &save, const std::string &to)
         {
             std::optional<Ps2Card> card = Ps2Card::open(to);
             if (!card)
@@ -229,17 +300,27 @@ namespace gh2::save
             }
             const uint8_t *iconSys = getMemPtr(rdram, s_addresses->mcIconSys);
             const uint8_t *iconData = getMemPtr(rdram, icon);
-            const std::string dir = guestString(rdram, s_addresses->mcBaseDir);
-            std::vector<uint8_t> data(kBufferSize, 0);
-            std::copy(stream.begin(), stream.end(), data.begin());
-            const std::vector<Ps2Card::File> files = {
-                {dir, {'d', 'u', 'm', 'm', 'y', 'd', 'a', 't', 'a', 0}},
-                {guestString(rdram, s_addresses->mcSaveFile), std::move(data)},
-                {"icon.sys", {iconSys, iconSys + kIconSysSize}},
-                {guestString(rdram, s_addresses->mcIconFile),
-                 {iconData, iconData + load<uint32_t>(rdram, s_addresses->mcIconSize)}},
-            };
-            if (!card->replaceDir(dir, files) || !card->save(to))
+            const std::string saveFile = guestString(rdram, s_addresses->mcSaveFile);
+            // GH2's own songs alone: GH2 would drop the rest on loading.
+            gh2::Save own = save;
+            std::erase_if(own.scores, [](const gh2::SongScores &s) { return gameOf(s.song) != "gh2"; });
+            bool ok = card->replaceDir(guestString(rdram, s_addresses->mcBaseDir),
+                                       saveFolder(guestString(rdram, s_addresses->mcBaseDir), saveFile,
+                                                  gh2::write(own), kBufferSize, {iconSys, iconSys + kIconSysSize},
+                                                  guestString(rdram, s_addresses->mcIconFile),
+                                                  {iconData, iconData + load<uint32_t>(rdram, s_addresses->mcIconSize)}));
+            for (const CardGame &game : s_cardGames)
+            {
+                const std::vector<uint8_t> stream = otherSave(game, save, card->read(game.dir, saveFile));
+                if (stream.size() > game.dataSize)
+                {
+                    std::cerr << "[save] " << game.game << "'s save does not fit its card file; not exported" << std::endl;
+                    continue;
+                }
+                ok = ok && card->replaceDir(game.dir, saveFolder(game.dir, saveFile, stream, game.dataSize, game.iconSys,
+                                                                 game.iconFile, game.icon));
+            }
+            if (!ok || !card->save(to))
                 std::cerr << "[save] could not write " << to << std::endl;
             else
                 std::cout << "[save] exported to " << to << std::endl;
@@ -279,7 +360,7 @@ namespace gh2::save
                 return finish(ctx, kReadWriteFailed);
             }
             if (const std::string to = exportPath(); !to.empty())
-                writeCard(rdram, gh2::write(*save), to);
+                writeCard(rdram, *save, to);
             finish(ctx, kNoError);
         }
 
@@ -304,6 +385,65 @@ namespace gh2::save
             return true;
         }
 
+        // GH1 keeps a table per band; a song takes its best five across them.
+        Lists bestOfBands(const gh1::SongScores &song)
+        {
+            Lists lists;
+            for (int d = 0; d < gh1::kDifficulties; ++d)
+            {
+                std::vector<gh2::ScoreEntry> all;
+                for (int band = 0; band < gh1::kProfiles; ++band)
+                    for (const gh1::ScoreEntry &e : song.lists[band * gh1::kDifficulties + d])
+                        if (std::none_of(all.begin(), all.end(), [&](const gh2::ScoreEntry &a) { return a == gh2::ScoreEntry{e.name, e.score}; }))
+                            all.push_back({e.name, e.score});
+                std::stable_sort(all.begin(), all.end(), [](const auto &a, const auto &b) { return a.score > b.score; });
+                for (int rank = 0; rank < gh1::kScoresPerList && rank < static_cast<int>(all.size()); ++rank)
+                    lists[d][rank] = all[rank];
+            }
+            return lists;
+        }
+
+        // An import's other games: each one's folder on the card gives its
+        // songs' high scores.
+        void readImportedScores(uint8_t *rdram)
+        {
+            s_imported.clear();
+            const std::optional<Ps2Card> card = Ps2Card::open(s_importCard);
+            if (!card)
+                return;
+            const std::string saveFile = guestString(rdram, s_addresses->mcSaveFile);
+            for (const CardGame &game : s_cardGames)
+            {
+                const std::optional<std::vector<uint8_t>> data = card->read(game.dir, saveFile);
+                if (!data)
+                    continue;
+                size_t songs = 0;
+                bool parsed = false;
+                if (game.gh1Layout)
+                {
+                    if (const std::optional<gh1::Save> save = gh1::parse(data->data(), data->size()))
+                    {
+                        parsed = true;
+                        for (const gh1::SongScores &song : save->scores)
+                            if (gameOf(song.song) == game.game)
+                                s_imported[song.song] = bestOfBands(song), ++songs;
+                    }
+                }
+                else if (const std::optional<gh2::Save> save = gh2::parse(data->data(), data->size()))
+                {
+                    parsed = true;
+                    for (const gh2::SongScores &song : save->scores)
+                        if (gameOf(song.song) == game.game)
+                            s_imported[song.song] = song.lists, ++songs;
+                }
+                if (parsed)
+                    std::cout << "[save] " << game.game << ": high scores for " << songs << " songs from "
+                              << s_importCard << std::endl;
+                else
+                    std::cerr << "[save] " << game.dir << " on " << s_importCard << " is damaged" << std::endl;
+            }
+        }
+
         void loadData1(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
             s_loaded = Loaded::kNothing;
@@ -311,16 +451,26 @@ namespace gh2::save
             const ReadResult read = readFile(path(), store);
             if (read == ReadResult::kOk)
                 s_store = std::move(store);
+            if (!s_importCard.empty())
+                readImportedScores(rdram);
             if (readCardSave(rdram))
             {
                 s_loaded = Loaded::kCard;
                 return finish(ctx, kNoError);
             }
+            // Only the other games' scores on the card: over save.bin, or a
+            // fresh campaign.
+            if (read == ReadResult::kOk || (read == ReadResult::kMissing && !s_imported.empty()))
+            {
+                s_loaded = Loaded::kStore;
+                if (!s_imported.empty())
+                    s_loadedFrom = s_importCard;
+                return finish(ctx, kNoError);
+            }
             switch (read)
             {
             case ReadResult::kOk:
-                s_loaded = Loaded::kStore;
-                return finish(ctx, kNoError);
+                break;
             case ReadResult::kCorrupt:
                 // The game's damaged-save dialog, which offers to make a new one.
                 std::cerr << "[save] " << path() << " is damaged" << std::endl;
@@ -389,6 +539,10 @@ namespace gh2::save
                     else
                         save.reset();
                 }
+                if (save)
+                    for (gh2::SongScores &song : save->scores)
+                        if (const auto it = s_imported.find(song.song); it != s_imported.end())
+                            song.lists = it->second;
                 std::vector<uint8_t> bytes;
                 if (save)
                 {
@@ -403,12 +557,12 @@ namespace gh2::save
                 else
                 {
                     std::memcpy(buffer, bytes.data(), bytes.size());
-                    if (s_loaded == Loaded::kCard && s_fresh)
+                    if ((s_loaded == Loaded::kCard || !s_imported.empty()) && s_fresh)
                         storeCardSave(*save);
                     if (const std::string to = exportPath(); !to.empty())
                     {
                         runtime->callGuestFunction(rdram, ctx, s_addresses->setupMcIcon, {});
-                        writeCard(rdram, bytes, to);
+                        writeCard(rdram, *save, to);
                     }
                 }
             }
@@ -429,6 +583,11 @@ namespace gh2::save
     void exportCard(const std::string &path)
     {
         s_exportCard = path;
+    }
+
+    void addCardGame(CardGame game)
+    {
+        s_cardGames.push_back(std::move(game));
     }
 
     void addScoreSongs(const std::string &game, const std::vector<std::string> &songs,

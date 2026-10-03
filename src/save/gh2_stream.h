@@ -78,6 +78,11 @@ namespace gh2::save::gh2
         std::array<uint8_t, kOptionsSize> options{}; // OptionData::Save (0x10d330)
     };
 
+    // A save of no progress: the bands empty as Campaign's constructor leaves
+    // them, OptionData's defaults (0x10d2e0), no items or co-op songs (the game
+    // keeps its own) and no high scores.
+    Save blank();
+
     // Nothing when the bytes are not a whole save: all access on, Campaign::Save
     // writes none.
     std::optional<Save> parse(const uint8_t *data, size_t size);

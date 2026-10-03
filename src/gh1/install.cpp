@@ -15,6 +15,7 @@
 #include "gh1/install.h"
 
 #include "disc/ark.h"
+#include "content/card.h"
 #include "content/outfits.h"
 #include "formats/dtb.h"
 #include "gh1/clips.h"
@@ -23,6 +24,7 @@
 #include "gh1/rig.h"
 #include "gh1/songs.h"
 #include "milo/milo.h"
+#include "save/gh1_stream.h"
 
 #include <chrono>
 #include <iostream>
@@ -76,6 +78,9 @@ namespace gh2
             return;
         const auto start = std::chrono::steady_clock::now();
         gh1::addSetlist(*gh1Disc, *gh2Disc);
+        // GH1's own save (save/gh1_stream.h): title 0x309cf8, broken after 6
+        // characters (SetupMCIcon 0x14a500).
+        content::addCardGame(*gh1Disc, "gh1", true, save::gh1::kDataSize, "Guitar Hero", 6);
         const auto scripts = charsys(*gh1Disc);
         if (!scripts)
         {

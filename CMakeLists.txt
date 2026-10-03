@@ -180,6 +180,7 @@ set(GHC_GAME_SOURCES
     src/sustain_release.cpp
     src/track_start.cpp
     src/whammy_hold.cpp
+    src/content/card.cpp
     src/content/locale.cpp
     src/content/outfits.cpp
     src/content/setlists.cpp
@@ -206,6 +207,7 @@ set(GHC_GAME_SOURCES
     src/movie/pss.cpp
     src/movie/screen.cpp
     src/save/card.cpp
+    src/save/gh1_stream.cpp
     src/save/gh2_stream.cpp
     src/save/gh2_text.cpp
     src/save/ps2_card.cpp

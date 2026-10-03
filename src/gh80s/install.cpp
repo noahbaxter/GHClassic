@@ -9,6 +9,7 @@
 #include "gh80s/install.h"
 
 #include "disc/ark.h"
+#include "content/card.h"
 #include "content/locale.h"
 #include "content/outfits.h"
 #include "content/setlists.h"
@@ -98,6 +99,10 @@ namespace gh2
         if (!disc)
             return;
         addSetlist(*disc);
+        // GH2's save code at GH2's addresses, its own folder: a 0x29c00-byte
+        // save (GHMCSaveData 0x14b278), title 0x404918 broken after 13
+        // characters (SetupMCIcon 0x14b178).
+        content::addCardGame(*disc, "gh80s", false, 0x29c00u, "Guitar Hero: Rocks the 80s", 13);
         for (const Outfit &outfit : kOutfits)
         {
             const std::string base = outfit.base, name = outfit.name;
