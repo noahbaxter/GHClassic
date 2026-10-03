@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <iostream>
 #include <numbers>
 #include <set>
 #include <utility>
@@ -153,6 +154,7 @@ namespace gh2::synth
         int32_t reference = -1; // the voice refills follow; main unless slipping
         int32_t link = -1;      // 0x19e: the channel whose slip target this one takes
         uint32_t target = 0;    // the last slip target, from base
+        int32_t slipOffset = 0; // +0x4060: the last reported, in samples
     };
 
     struct Module::Stream
@@ -376,6 +378,17 @@ namespace gh2::synth
 
         case 0x190: // StreamInfoArg {id, s16 channels, int rate[15], s8 slip[15]}
         {
+            // The IRX (0x3e48) never checks the id and its lookup (0x3c3c)
+            // finds the first, so a second stream under one id is never
+            // reached: the first plays on.
+            if (stream(u32(d, 0)))
+            {
+                static bool s_logged = false;
+                if (!s_logged)
+                    std::cerr << "[synth] stream id " << u32(d, 0) << " created twice; the first kept" << std::endl;
+                s_logged = true;
+                break;
+            }
             auto s = std::make_unique<Stream>();
             s->id = u32(d, 0);
             const uint32_t count = std::min<uint32_t>(static_cast<uint16_t>(s16(d, 4)), 15u);
@@ -436,8 +449,11 @@ namespace gh2::synth
             }
             else
             {
+                // 0x3404: kept, and set on the heard voice if there is one.
                 ch.adsr1 = static_cast<uint16_t>(s16(d, 6));
                 ch.adsr2 = static_cast<uint16_t>(s16(d, 8));
+                if (ch.main >= 0)
+                    m_spu.setAdsr(static_cast<uint32_t>(ch.main), ch.adsr1, ch.adsr2);
             }
             break;
         }
@@ -460,10 +476,11 @@ namespace gh2::synth
         case 0x194: // destroy
             if (Stream *s = stream(u32(d, 0)))
             {
+                // The reference is a voice of its own only when slipping (0x2e18).
                 for (Channel &ch : s->channels)
                 {
                     freeVoice(ch.main);
-                    if (ch.reference != ch.main)
+                    if (ch.slip)
                         freeVoice(ch.reference);
                 }
                 for (auto [first, count] : s->spuBlocks)
@@ -888,19 +905,26 @@ namespace gh2::synth
             const uint32_t pos = s.channels.empty() || s.channels[0].reference < 0 ? 0u : position(s.channels[0]);
             queue(kReplyStreamPosition, {s.id, pos});
             // Slip offsets in samples, the heard voice against the reference
-            // (0x3644), wrapped to half the ring either way.
-            for (const Channel &ch : s.channels)
+            // (0x3644), wrapped to half the ring either way. Taken only while
+            // the heard voice plays inside the ring (0x2c54): one keyed on
+            // and not yet started keeps the last.
+            for (Channel &ch : s.channels)
             {
                 if (!ch.slip || ch.main < 0 || ch.reference < 0)
                     continue;
                 const int32_t ring = static_cast<int32_t>(ch.blocks * kBlockBytes);
-                int32_t off = static_cast<int32_t>(m_spu.nextAddress(static_cast<uint32_t>(ch.main))) -
-                              static_cast<int32_t>(m_spu.nextAddress(static_cast<uint32_t>(ch.reference)));
-                if (off > ring / 2)
-                    off -= ring;
-                else if (off < -ring / 2)
-                    off += ring;
-                queue(kReplySlipOffset, {s.id, ch.index, static_cast<uint32_t>(adpcmSamples(off))});
+                const uint32_t heard = m_spu.nextAddress(static_cast<uint32_t>(ch.main));
+                if (heard >= ch.base && heard < ch.base + static_cast<uint32_t>(ring))
+                {
+                    int32_t off = static_cast<int32_t>(heard) -
+                                  static_cast<int32_t>(m_spu.nextAddress(static_cast<uint32_t>(ch.reference)));
+                    if (off > ring / 2)
+                        off -= ring;
+                    else if (off < -ring / 2)
+                        off += ring;
+                    ch.slipOffset = adpcmSamples(off);
+                }
+                queue(kReplySlipOffset, {s.id, ch.index, static_cast<uint32_t>(ch.slipOffset)});
             }
         }
     }
@@ -964,6 +988,10 @@ namespace gh2::synth
             for (uint32_t v = 0; v < Spu::kVoices; ++v)
                 m_spu.keyOff(v);
             freeAllVoices();
+            // The IRX skips this tick's key flush (0x17fc): nothing pending
+            // lands on a voice no stream owns any more.
+            std::fill(m_keyOn.begin(), m_keyOn.end(), false);
+            std::fill(m_keyOff.begin(), m_keyOff.end(), false);
             std::fill(m_spuBlockUsed.begin(), m_spuBlockUsed.end(), false);
             queue(kReplyTerminated);
         }
