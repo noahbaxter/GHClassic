@@ -172,6 +172,7 @@ endif()
 # The game layer: GH2's hooks, installed through the runtime's override
 # registry, and the host window and renderer they draw through.
 set(GHC_GAME_SOURCES
+    src/eighties.cpp
     src/main.cpp
     src/build_info.cpp
     src/game.cpp
@@ -186,6 +187,7 @@ set(GHC_GAME_SOURCES
     src/dev/scenario.cpp
     src/dev/seed.cpp
     src/dev/transplant.cpp
+    src/disc/ark.cpp
     src/disc/disc.cpp
     src/disc/sha1.cpp
     src/movie/movie.cpp
@@ -269,9 +271,10 @@ file(READ src/ui/dta/main_menu.dta GHC_MAIN_MENU_DTA)
 file(READ src/ui/dta/fast_boot.dta GHC_FAST_BOOT_DTA)
 file(READ src/ui/dta/locale.dta GHC_LOCALE_DTA)
 file(READ src/ui/dta/crowd.dta GHC_CROWD_DTA)
+file(READ src/ui/dta/sel_character.dta GHC_SEL_CHARACTER_DTA)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     src/ui/dta/lag_panel.dta src/ui/dta/highscore_panel.dta src/ui/dta/main_menu.dta src/ui/dta/fast_boot.dta
-    src/ui/dta/locale.dta src/ui/dta/crowd.dta)
+    src/ui/dta/locale.dta src/ui/dta/crowd.dta src/ui/dta/sel_character.dta)
 configure_file(src/ui/dta/dta.h.in "${GHC_DTA_DIR}/dta.h" @ONLY)
 target_include_directories(GHClassic PRIVATE "${GHC_DTA_DIR}")
 

@@ -54,6 +54,10 @@ namespace gh2::script
     // evaluated. On the guest thread only.
     void run(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &text);
 
+    // $name = node, written raw: no reference taken or released, so an
+    // array set here must outlive the variable or be cleared after use.
+    void setVariable(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const char *name, Node node);
+
     // Run once the game's UI objects exist: at the first screen change after
     // the commands are registered.
     void runWhenUiReady(const char *text);

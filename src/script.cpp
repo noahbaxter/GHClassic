@@ -253,6 +253,19 @@ namespace gh2::script
             rootCall.arg(i);
     }
 
+    void setVariable(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const char *name, Node node)
+    {
+        const Call call{rdram, ctx, runtime, 0u};
+        const uint32_t block = guestString(call, name, 4u);
+        runtime->callGuestFunction(rdram, ctx, s_addresses->symbolCtor, {block, block + 4u});
+        const uint32_t variable = static_cast<uint32_t>(
+            runtime->callGuestFunction(rdram, ctx, s_addresses->dataVariable, {load<uint32_t>(rdram, block)}));
+        runtime->callGuestFunction(rdram, ctx, s_addresses->builtinDelete, {block});
+        // Raw, as a DataNode's own assignment would take a reference.
+        store<uint32_t>(rdram, variable, node.value);
+        store<uint32_t>(rdram, variable + 4u, node.type);
+    }
+
     void install(PS2Runtime &runtime, const Addresses &addresses)
     {
         s_addresses = &addresses;
