@@ -208,21 +208,27 @@ namespace gh2::dtb
         std::optional<std::vector<Node>> readFile(const std::string &script, Load &load)
         {
             const auto file = load.files(built(script));
-            if (!file)
+            const auto root = file ? raw(*file) : std::nullopt;
+            if (!root)
                 return std::nullopt;
-            // PS2's cipher, else 360's: the one giving version 1 and a whole
-            // root array.
-            for (const auto decrypt : {crypt::randStream, crypt::parkMiller})
-            {
-                const Bytes plain = decrypt(*file);
-                if (plain.empty() || plain[0] != 1u)
-                    continue;
-                Reader reader{plain, 1u};
-                if (auto root = reader.array(kArray))
-                    return apply(root->nodes, load, script);
-            }
-            return std::nullopt;
+            return apply(root->nodes, load, script);
         }
+    }
+
+    std::optional<Node> raw(const Bytes &file)
+    {
+        // PS2's cipher, else 360's: the one giving version 1 and a whole
+        // root array.
+        for (const auto decrypt : {crypt::randStream, crypt::parkMiller})
+        {
+            const Bytes plain = decrypt(file);
+            if (plain.empty() || plain[0] != 1u)
+                continue;
+            Reader reader{plain, 1u};
+            if (auto root = reader.array(kArray))
+                return root;
+        }
+        return std::nullopt;
     }
 
     std::optional<Node> read(const std::string &script, Macros &macros, const Files &files)

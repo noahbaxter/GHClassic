@@ -231,6 +231,7 @@ set(GHC_GAME_SOURCES
     src/disc/volume.cpp
     src/formats/dtb.cpp
     src/formats/midi.cpp
+    src/gh1/career.cpp
     src/gh1/clips.cpp
     src/gh1/face.cpp
     src/gh1/install.cpp

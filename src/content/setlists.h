@@ -32,7 +32,7 @@ namespace gh2::setlists
     };
 
     // campaign.dta's (required_songs ...), easy first: the songs a venue
-    // asks for, and the last venue's own count.
+    // asks for, and the last venue's own count (GH1 keeps one for all).
     using Required = std::vector<std::array<int, 2>>;
     Required required(const dtb::Node &campaign);
 
