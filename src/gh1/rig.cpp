@@ -555,5 +555,12 @@ namespace gh2
                 return std::nullopt;
             return milo::parse(*raw);
         }
+
+        std::optional<milo::Dir> load(size_t disc, const std::string &path)
+        {
+            const auto file = ark::readFile(disc, path);
+            const auto raw = file ? milo::inflate(*file) : std::nullopt;
+            return raw ? milo::parse(*raw) : std::nullopt;
+        }
     }
 }

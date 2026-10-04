@@ -235,6 +235,7 @@ set(GHC_GAME_SOURCES
     src/formats/dtb.cpp
     src/formats/dtb_text.cpp
     src/formats/midi.cpp
+    src/gh1/cameras.cpp
     src/gh1/career.cpp
     src/gh1/clips.cpp
     src/gh1/face.cpp

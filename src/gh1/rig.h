@@ -58,5 +58,8 @@ namespace gh2
 
         // A scene from the mounted discs.
         std::optional<milo::Dir> load(const std::string &path);
+
+        // A scene from that disc's archive alone.
+        std::optional<milo::Dir> load(size_t disc, const std::string &path);
     }
 }

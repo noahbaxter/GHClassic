@@ -11,11 +11,13 @@
 // 3 and Environ 1 objects, which GH2's loaders still read, and its Views as
 // Groups. The chars dir is GH2's with its waypoints on GH1's spots, and the
 // lighting dir GH2's with its spotlights and fixtures unshown. The camera
-// shots, the presets that light the band, and the crowd are GH2's still.
+// shots are GH1's (gh1/cameras.cpp); the presets that light the band, and
+// the crowd, are GH2's still.
 
 #include "gh1/venues.h"
 
 #include "disc/ark.h"
+#include "gh1/cameras.h"
 #include "gh1/rig.h"
 #include "gh1/songs.h"
 #include "milo/milo.h"
@@ -37,13 +39,6 @@ namespace gh2::gh1
         using milo::putU32;
         using milo::str;
         using milo::u32;
-
-        std::optional<milo::Dir> scene(size_t disc, const std::string &path)
-        {
-            const auto file = ark::readFile(disc, path);
-            const auto raw = file ? milo::inflate(*file) : std::nullopt;
-            return raw ? milo::parse(*raw) : std::nullopt;
-        }
 
         // The end of a DataArray at `o` (DataArray::Load, 0x2b0d88: a u16
         // size, line and id, then its nodes), or none for a node not known.
@@ -429,7 +424,8 @@ namespace gh2::gh1
         // flags (macros.dta): the band's starts on GH1's, the guitarist's on
         // walk spot 01, and the waypoints it walks to on the rest, a solo's
         // first. GH1 has no second guitarist: the two start on 02 and 01.
-        std::optional<milo::Dir> chars(const milo::Dir &gh2, const Spots &at)
+        // `onWalk` gets the names of those put on each walk spot.
+        std::optional<milo::Dir> chars(const milo::Dir &gh2, const Spots &at, std::vector<std::vector<std::string>> &onWalk)
         {
             if (at.stage.size() < 3u || at.walk.empty())
                 return std::nullopt;
@@ -445,6 +441,7 @@ namespace gh2::gh1
                 kStartGuitarist0Mp = 512u,
             };
             milo::Dir out = gh2;
+            onWalk.assign(at.walk.size(), {});
             std::vector<std::pair<size_t, size_t>> walks; // entry, its Trans
             for (size_t i = 0; i < out.entries.size(); ++i)
             {
@@ -457,7 +454,10 @@ namespace gh2::gh1
                 const uint32_t flags = u32(b, transEnd(b, *trans));
                 const Bytes *spot = nullptr;
                 if (flags & kStartGuitarist0)
+                {
                     spot = &at.walk[0];
+                    onWalk[0].push_back(out.entries[i].second);
+                }
                 else if (flags & (kStartSinger | kStartKeyboardist))
                     spot = &at.stage[0];
                 else if (flags & kStartBassist)
@@ -478,7 +478,9 @@ namespace gh2::gh1
             }
             for (size_t w = 0; w < walks.size(); ++w)
             {
-                const Bytes &spot = at.walk[at.walk.size() > 1u ? 1u + w % (at.walk.size() - 1u) : 0u];
+                const size_t on = at.walk.size() > 1u ? 1u + w % (at.walk.size() - 1u) : 0u;
+                const Bytes &spot = at.walk[on];
+                onWalk[on].push_back(out.entries[walks[w].first].second);
                 for (const size_t o : {walks[w].second + 4u, walks[w].second + 52u})
                     std::copy(spot.begin(), spot.end(),
                               out.bodies[walks[w].first].begin() + static_cast<std::ptrdiff_t>(o));
@@ -501,18 +503,20 @@ namespace gh2::gh1
             const std::string geomPath = world + "og/gen/" + ours + "_geom.milo_ps2";
             const std::string lightsPath = world + "og/gen/" + ours + "_lighting.milo_ps2";
             const std::string charsPath = world + "gen/" + ours + "_chars.milo_ps2";
-            const auto gh2Geom = scene(0u, geomPath);
-            const auto gh2Lights = scene(0u, lightsPath);
-            const auto gh2Chars = scene(0u, charsPath);
-            const auto room = scene(disc, theirs + name + ".rnd_ps2");
-            const auto lighting = scene(disc, theirs + "lighting.rnd_ps2");
+            const auto gh2Geom = load(0u, geomPath);
+            const auto gh2Lights = load(0u, lightsPath);
+            const auto gh2Chars = load(0u, charsPath);
+            const auto room = load(disc, theirs + name + ".rnd_ps2");
+            const auto lighting = load(disc, theirs + "lighting.rnd_ps2");
             if (!gh2Geom || !gh2Lights || !gh2Chars || !room || !lighting)
             {
                 std::cerr << "[gh1] cannot read " << name << "'s venue" << std::endl;
                 continue;
             }
             const auto madeGeom = geom(*gh2Geom, *room, *lighting, kit);
-            const auto madeChars = chars(*gh2Chars, spots({&*lighting, &*room}));
+            const Spots at = spots({&*lighting, &*room});
+            Stage stage;
+            const auto madeChars = chars(*gh2Chars, at, stage.walks);
             if (!madeGeom || !madeChars)
             {
                 std::cerr << "[gh1] cannot build " << name << "'s venue" << std::endl;
@@ -521,6 +525,8 @@ namespace gh2::gh1
             ark::addFile(layer, geomPath, milo::write(*madeGeom));
             ark::addFile(layer, lightsPath, milo::write(lights(*gh2Lights)));
             ark::addFile(layer, charsPath, milo::write(*madeChars));
+            stage.spot = at.stage[0];
+            addCameras(layer, disc, name, ours, stage);
         }
     }
 }
