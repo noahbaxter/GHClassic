@@ -1,0 +1,9 @@
+; world/crowd.dta's crowd_update fills a widescreen crowd only to 0.7 at its
+; fullest, {if {== {rnd aspect} kWidescreenAspect} {set $peak_fullness 0.7}},
+; to spare the PS2. That 0.7 becomes 1, in the type every WorldCrowd shares:
+; crowd_update's {if}, its {do}, the aspect {if}, its {set}.
+{set_elem
+   {elem {elem {elem {elem {find $syscfg objects WorldCrowd types gh2 crowd_update} 1} 3} 2} 2}
+   2
+   1.0
+}

@@ -235,9 +235,10 @@ file(READ src/ui/dta/highscore_panel.dta GHC_HIGHSCORE_PANEL_DTA)
 file(READ src/ui/dta/main_menu.dta GHC_MAIN_MENU_DTA)
 file(READ src/ui/dta/fast_boot.dta GHC_FAST_BOOT_DTA)
 file(READ src/ui/dta/locale.dta GHC_LOCALE_DTA)
+file(READ src/ui/dta/crowd.dta GHC_CROWD_DTA)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     src/ui/dta/lag_panel.dta src/ui/dta/highscore_panel.dta src/ui/dta/main_menu.dta src/ui/dta/fast_boot.dta
-    src/ui/dta/locale.dta)
+    src/ui/dta/locale.dta src/ui/dta/crowd.dta)
 configure_file(src/ui/dta/dta.h.in "${GHC_DTA_DIR}/dta.h" @ONLY)
 target_include_directories(GHClassic PRIVATE "${GHC_DTA_DIR}")
 
