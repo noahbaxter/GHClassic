@@ -88,6 +88,10 @@ namespace gh2::input
     bool writeSection(const std::string &path, const std::string &section,
                       const std::map<Action, std::vector<Source>> &bindings);
 
+    // Adds the section with `profile` as comment lines, for the player to
+    // uncomment and change; a new file starts with how to.
+    bool writeTemplate(const std::string &path, const std::string &section, const Profile &profile);
+
     // `base` with every action the section names replaced.
     Profile overlay(Profile base, const std::map<Action, std::vector<Source>> *section);
 
