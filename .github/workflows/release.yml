@@ -1,0 +1,130 @@
+# A pushed tag (v0.5) builds the game on each platform and drafts a GitHub
+# Release holding the packages (tools/ghc.py release); nothing is public
+# until the draft is published by hand. Run by hand it only builds and
+# packages, uploading nothing.
+#
+# The recompile reads GH2's boot executable, which is no part of this repo:
+# it comes from a private one through a read-only deploy key (ELF_DEPLOY_KEY).
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  ELF_REPO: noahbaxter/GHClassic-elf
+  ELF: build/elf/SLUS_214.47
+
+jobs:
+  # Signed and notarized when the Apple secrets are set, else ad hoc.
+  macos:
+    runs-on: macos-latest
+    env:
+      APPLE_CERTIFICATE_APPLICATION: ${{ secrets.APPLE_CERTIFICATE_APPLICATION }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ env.ELF_REPO }}
+          ssh-key: ${{ secrets.ELF_DEPLOY_KEY }}
+          path: build/elf
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Import signing certificate
+        if: env.APPLE_CERTIFICATE_APPLICATION != ''
+        run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          echo "$APPLE_CERTIFICATE_APPLICATION" | base64 --decode > "$RUNNER_TEMP/application.p12"
+          security create-keychain -p "$APPLE_CERTIFICATE_PASSWORD" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$APPLE_CERTIFICATE_PASSWORD" "$keychain"
+          security import "$RUNNER_TEMP/application.p12" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          security set-key-partition-list -S apple-tool:,apple: -k "$APPLE_CERTIFICATE_PASSWORD" "$keychain"
+          security list-keychain -d user -s "$keychain"
+          echo "GHC_SIGN_IDENTITY=Developer ID Application: Noah Baxter (KUP5WU7WPC)" >> "$GITHUB_ENV"
+      - run: python tools/ghc.py release "$ELF"
+      - uses: actions/upload-artifact@v7
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          name: macos
+          path: build/release/*.dmg
+          if-no-files-found: error
+          retention-days: 1
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ env.ELF_REPO }}
+          ssh-key: ${{ secrets.ELF_DEPLOY_KEY }}
+          path: build/elf
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - run: python tools/ghc.py release $env:ELF
+      - uses: actions/upload-artifact@v7
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          name: windows
+          path: build/release/*.zip
+          if-no-files-found: error
+          retention-days: 1
+
+  linux:
+    runs-on: ubuntu-latest
+    container: ubuntu:22.04
+    env:
+      CC: gcc-12
+      CXX: g++-12
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      # Before checkout, which needs git for the submodules and ssh for the key.
+      - run: apt-get update && apt-get install -y git openssh-client
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ env.ELF_REPO }}
+          ssh-key: ${{ secrets.ELF_DEPLOY_KEY }}
+          path: build/elf
+      # The container runs as root over a checkout owned by the runner.
+      - run: git config --global --add safe.directory '*'
+      - run: .github/linux-deps.sh
+      - run: python3.11 tools/ghc.py release "$ELF"
+      - uses: actions/upload-artifact@v7
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          name: linux
+          path: build/release/*.zip
+          if-no-files-found: error
+          retention-days: 1
+
+  draft:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [macos, windows, linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: packages
+          merge-multiple: true
+      - run: >
+          gh release create "$GITHUB_REF_NAME" packages/* --repo "$GITHUB_REPOSITORY" --draft
+          --title "GH Classic ${GITHUB_REF_NAME#v}" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}

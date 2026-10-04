@@ -6,13 +6,15 @@
     tools/ghc.py bind [keyboard | <n>]       set up a controller; with no device, list them
     tools/ghc.py arm [out] [--scenario <file>] [--speed <x>] [--secs 30] [--disc <image>] [--shot-every 60]
     tools/ghc.py scenarios [-j 4] [--speed 2] [name ...]
-    tools/ghc.py release [--skip-build]      this platform's player package, into build/release
+    tools/ghc.py release [--skip-build] [disc]  this platform's player package, into build/release
     tools/ghc.py ci                          what builds without a disc, into build/ci
 
 play builds everything from the disc on its first run, then brings the C++
 build up to date before each launch (not the recompile) unless --no-build.
 The disc defaults to the GH2 image in game/, which is only ever read;
-everything made lands in build/, which is safe to delete.
+everything made lands in build/, which is safe to delete. build and release
+also take the disc's boot executable alone (SLUS_214.47), which is all the
+recompile reads.
 
 From the system: Python 3.11+, git, and a C++ compiler (Xcode's on macOS, gcc
 or clang on Linux, nothing on Windows, where llvm-mingw is fetched into
@@ -29,7 +31,8 @@ passes when it quits on its own with no FAIL or STALL in its log.
 
 release packages a build for players, who bring their own disc: a zip of
 the game beside PUT_DISC_HERE on Windows and Linux, a disk image on macOS.
-It only writes build/release; publishing is a separate, deliberate step.
+It only writes build/release, named for the tag it is built at (v0.5);
+.github/workflows/release.yml runs it on each platform when a tag is pushed.
 """
 import argparse
 import hashlib
@@ -481,18 +484,19 @@ def release_macos(out, version):
 def cmd_release(argv):
     parser = argparse.ArgumentParser(prog="ghc.py release")
     parser.add_argument("--skip-build", action="store_true", help="package the existing build")
+    parser.add_argument("disc", nargs="?")
     args = parser.parse_args(argv)
     if not args.skip_build:
-        build(recomp=not (RECOMP / "output").is_dir())
+        build(args.disc, recomp=not (RECOMP / "output").is_dir())
     if not game_binary().exists():
         sys.exit("no build; run tools/ghc.py build")
-    version = subprocess.run(["git", "describe", "--always", "--dirty"], cwd=ROOT, stdout=subprocess.PIPE,
+    version = subprocess.run(["git", "describe", "--tags", "--always", "--dirty"], cwd=ROOT, stdout=subprocess.PIPE,
                              text=True).stdout.strip() or "unknown"
     out = BUILD / "release"
     shutil.rmtree(out, ignore_errors=True)
     out.mkdir(parents=True)
     archive = release_macos(out, version) if MACOS else release_portable(out, version)
-    print(f"made {archive} (local only; nothing is uploaded)")
+    print(f"made {archive}")
 
 
 COMMANDS = {"play": cmd_play, "build": cmd_build, "bind": cmd_bind, "arm": cmd_arm, "scenarios": cmd_scenarios,

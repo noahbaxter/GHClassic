@@ -4,8 +4,10 @@
     tools/disc.py identify [--image-hash] <image-or-elf>...
     tools/disc.py extract <image> <path-on-disc> <out>
     tools/disc.py find <serial> <path>...    print the first image of that release
-    tools/disc.py boot-elf <image> <out>     extract the boot executable, refusing
-                                             anything but a known supported one
+    tools/disc.py boot-elf <image-or-elf> <out>  extract the boot executable (or take
+                                             one already extracted, named as on the
+                                             disc), refusing anything but a known
+                                             supported one
 
 Images are .iso or .bin (ISO 9660, cooked or raw sectors) or .chd, read in
 place through libchdr from lib/libchdr, which is built into build/chdr on
@@ -312,9 +314,12 @@ def main():
 
 
 def boot_elf(image, out):
-    with Image(image) as img:
-        name = img.boot_name()
-        data = img.read(name)
+    if is_image(image):
+        with Image(image) as img:
+            name = img.boot_name()
+            data = img.read(name)
+    else:
+        name, data = Path(image).name, Path(image).read_bytes()
     rel = release(name)
     if not rel or rel.get("role") != "engine":
         what = f"{rel['name']} v{rel['version']}" if rel else name

@@ -41,19 +41,12 @@ jobs:
       CXX: g++-12
       DEBIAN_FRONTEND: noninteractive
     steps:
-      # Before checkout, which needs git for the submodules. SDL's headers as
-      # its docs/README-linux.md lists them, and Xinerama for raylib's GLFW.
-      - run: |
-          apt-get update
-          apt-get install -y build-essential g++-12 git python3.11 python3.11-venv pkg-config \
-            libasound2-dev libpulse-dev libaudio-dev libfribidi-dev libjack-dev libsndio-dev \
-            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev \
-            libxtst-dev libxinerama-dev libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev \
-            libgles2-mesa-dev libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev libthai-dev \
-            libusb-1.0-0-dev libpipewire-0.3-dev libwayland-dev wayland-protocols libdecor-0-dev liburing-dev
+      # Before checkout, which needs git for the submodules.
+      - run: apt-get update && apt-get install -y git
       - uses: actions/checkout@v7
         with:
           submodules: recursive
       # The container runs as root over a checkout owned by the runner.
       - run: git config --global --add safe.directory '*'
+      - run: .github/linux-deps.sh
       - run: python3.11 tools/ghc.py ci
