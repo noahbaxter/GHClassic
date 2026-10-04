@@ -87,7 +87,16 @@ namespace gh2::disc
             if (entry.is_regular_file(error) && (ext == ".iso" || ext == ".chd" || ext == ".bin"))
                 images.push_back(entry.path());
         }
-        std::sort(images.begin(), images.end());
+        // settings.ini's [disc] prefer first, then by name.
+        const std::string preferred = settings::get(settings::kDiscPrefer) == settings::kIso ? ".iso" : ".chd";
+        const auto rank = [&](const std::filesystem::path &image) {
+            std::string ext = image.extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return std::tolower(c); });
+            return ext != preferred;
+        };
+        std::sort(images.begin(), images.end(), [&](const std::filesystem::path &a, const std::filesystem::path &b) {
+            return rank(a) != rank(b) ? rank(a) < rank(b) : a < b;
+        });
         why.clear();
         for (const std::filesystem::path &image : images)
         {

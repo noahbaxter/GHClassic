@@ -139,9 +139,9 @@ def run(cmd, env, log=None, quiet=False):
 
 
 def find_disc(env):
-    """The GH2 image in game/. Builds libchdr on first use, so callers that
-    go parallel call this first."""
-    images = sorted(str(p) for p in (ROOT / "game").glob("*"))
+    """The GH2 image in game/, a .chd before any other. Builds libchdr on
+    first use, so callers that go parallel call this first."""
+    images = sorted((str(p) for p in (ROOT / "game").glob("*")), key=lambda p: (not p.lower().endswith(".chd"), p))
     result = subprocess.run([sys.executable, ROOT / "tools" / "disc.py", "find", SERIAL, *images],
                             env=env, stdout=subprocess.PIPE, text=True)
     if result.returncode:
