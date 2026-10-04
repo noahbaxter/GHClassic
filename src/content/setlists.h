@@ -13,6 +13,7 @@
 // Each is named for its game: gh2, gh80s.
 
 #include "addresses.h"
+#include "formats/dtb.h"
 
 #include <array>
 #include <string>
@@ -33,6 +34,7 @@ namespace gh2::setlists
     // campaign.dta's (required_songs ...), easy first: the songs a venue
     // asks for, and the last venue's own count.
     using Required = std::vector<std::array<int, 2>>;
+    Required required(const dtb::Node &campaign);
 
     // `look` is a milo path from the ARK root (ui/sel_song_quickplay.milo).
     // Its songs' high scores start on `scoreNames`, its game's own
