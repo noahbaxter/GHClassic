@@ -11,6 +11,8 @@
 
 #include "synth/spu.h"
 
+#include "runtime/host_clock.h"
+
 #include <array>
 #include <cstdint>
 #include <deque>
@@ -26,6 +28,7 @@ namespace gh2::synth
     {
         uint32_t cmd = 0;
         std::vector<uint8_t> data;
+        ps2x::host_clock::Clock::time_point at{}; // host time of the tick that sent it
     };
 
     class Module
@@ -39,6 +42,10 @@ namespace gh2::synth
         // One of the EE's records, as the RPC thread's dispatcher (0x185c)
         // takes it.
         void command(uint32_t cmd, const uint8_t *data, uint32_t len);
+
+        // Bytes into sound RAM at once, with no reply: an upload the EE need
+        // not wait on.
+        void writeRam(uint32_t address, const uint8_t *data, uint32_t len);
 
         // What the module has sent the EE since the last call.
         void takeReplies(std::vector<Reply> &out);
@@ -57,6 +64,8 @@ namespace gh2::synth
         void tick();
         void tickStream(Stream &s);
         void serviceChannel(Channel &ch);
+        void starveChannel(Channel &ch);
+        void unstarveChannel(Channel &ch);
         void transfer(Channel &ch);
         void tickSamples();
         void flushKeys();

@@ -73,13 +73,13 @@ namespace gh2::synth
         };
     }
 
+    // Always clears the work area: the module ORs SD_REV_MODE_CLEAR_WA
+    // (0x100) into every mode it sets (0x7dc), the same mode or not.
     void Reverb::setMode(uint32_t mode)
     {
-        mode &= 0xffu; // SD_REV_MODE_CLEAR_WA is 0x100
+        mode &= 0xffu;
         if (mode >= 10u)
             mode = 0u;
-        if (mode == m_mode && !m_buffer.empty())
-            return;
         m_mode = mode;
         m_buffer.assign(std::max<uint32_t>(kPresets[mode].bytes / 2u, 8u), 0);
         m_pos = 0;

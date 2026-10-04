@@ -274,6 +274,44 @@ namespace gh2::input
         });
     }
 
+    bool writeTemplate(const std::string &path, const std::string &section, const Profile &profile)
+    {
+        std::vector<std::string> kept;
+        {
+            std::ifstream in(path);
+            for (std::string line; std::getline(in, line);)
+                kept.push_back(line);
+        }
+        while (!kept.empty() && trim(kept.back()).empty())
+            kept.pop_back();
+
+        return !ini::writeReplacing(path, [&](std::ofstream &out) {
+            if (kept.empty())
+                out << "; GH Classic's controls. Each section lists what its device is bound to\n"
+                       "; already. To change a line, remove its ; and edit it, or run\n"
+                       "; GHClassic --bind to set a device up by pressing its controls.\n"
+                       ";\n"
+                       ";   key 1                  a keyboard key, by name (Right Shift)\n"
+                       ";   button 0               a controller button\n"
+                       ";   hat 0 up               a controller hat direction\n"
+                       ";   axis 2 -0.11 0.70      a controller axis, from its rest value to its full one\n"
+                       ";   pad a                  a gamepad button (a, b, x, y, back, start, leftshoulder, dpup...)\n"
+                       ";   pad axis righty 0 -1   a gamepad axis (leftx ... righttrigger), rest then full\n"
+                       ";\n"
+                       "; An action takes several controls, comma separated, and none unbinds it.\n";
+            for (const std::string &line : kept)
+                out << line << "\n";
+            out << "\n[" << section << "]\n";
+            for (int a = 0; a < kActionCount; ++a)
+            {
+                out << "; " << kActionKeys[a] << " =";
+                for (size_t i = 0; i < profile[a].size(); ++i)
+                    out << (i == 0 ? " " : ", ") << formatSource(profile[a][i]);
+                out << "\n";
+            }
+        });
+    }
+
     Profile overlay(Profile base, const std::map<Action, std::vector<Source>> *section)
     {
         if (section)

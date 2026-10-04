@@ -19,10 +19,15 @@
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
 #include "ps2x/iop/iop_subsystem.h"
+#include "synth/adpcm.h"
 #include "synth/module.h"
 
+#include <algorithm>
 #include <array>
+#include <chrono>
+#include <cmath>
 #include <cstring>
+#include <map>
 #include <memory>
 #include <vector>
 
@@ -37,10 +42,14 @@ namespace gh2
         // the bind finds a server.
         constexpr uint32_t kSynthSid = 0x75433178u;
 
+        constexpr uint32_t kReplyStreamPosition = 3u; // {id, lines played}
+
         const Addresses *s_addresses = nullptr;
         uint8_t *s_rdram = nullptr;
         synth::Module s_module;
         std::vector<synth::Reply> s_held;
+        // When each stream's last position was taken, by stream id.
+        std::map<uint32_t, ps2x::host_clock::Clock::time_point> s_positionAt;
 
         class Synth final : public ps2x::iop::IopService
         {
@@ -109,6 +118,12 @@ namespace gh2
             replies.swap(s_held);
             for (const synth::Reply &reply : replies)
             {
+                if (reply.cmd == kReplyStreamPosition && reply.data.size() >= 4u)
+                {
+                    uint32_t id;
+                    std::memcpy(&id, reply.data.data(), 4u);
+                    s_positionAt[id] = reply.at;
+                }
                 uint32_t data = 0u;
                 if (!reply.data.empty())
                 {
@@ -120,7 +135,105 @@ namespace gh2
             }
         }
 
+        // SPUStartSend(data, size, dest), retail 0x231a78, queues an upload
+        // that SPUSendPoll sends 0x5000 bytes a poll, each answered before
+        // the next, and SynthSamplePs::SynthPoll (0x22da78) starts one sample
+        // a frame. Written at once, nothing is pending, so SynthPoll finishes
+        // each sample in the call that starts it.
+        void spuStartSend(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
+        {
+            s_module.writeRam(GPR_U32(ctx, 6), getMemPtr(rdram, GPR_U32(ctx, 4)), GPR_U32(ctx, 5));
+            ctx->pc = GPR_U32(ctx, 31);
+        }
+
         struct PollTag;
+
+        // StreamEE::Poll (0x2309dc) holds its VarTimer (+0x130), the song
+        // clock, to the IOP's played position (+0x170, lines) only past
+        // 100 ms of drift. Under that it free-runs, so a hitch that starves
+        // the audio for less than 100 ms leaves the clock ahead of the music
+        // for the rest of the song, and the snap itself lands on a position a
+        // tick and a poll old. Here, before that check: the clock is pulled
+        // to the position plus its age at up to 3% of time, past 50 ms
+        // snapped there at once, and the position is consumed so the check
+        // never fires. Nothing is pulled from a position more than 50 ms old
+        // (one from before a hitch: the audio may have starved since), nor
+        // until the clock and host time have kept together for 100 ms (the
+        // EE stands still in a hitch, then catches up in bursts). The VarTimer
+        // reads base (+0x30) plus elapsed time times rate (+0x34), so moving
+        // the base moves the clock and nothing else.
+        constexpr uint32_t kStreamId = 0x28u, kStreamState = 0x4cu, kStreamPlaying = 4u;
+        constexpr uint32_t kStartMs = 0x124u, kTimer = 0x130u, kPlayed = 0x170u;
+        constexpr uint32_t kTimerBase = 0x30u, kTimerRate = 0x34u;
+        constexpr float kSnapMs = 50.0f;
+        constexpr float kSlew = 0.03f;    // of time passed
+        constexpr float kSettleS = 0.5f;  // the time an error takes to be pulled in, under the slew
+        constexpr float kStaleMs = 50.0f; // a position older (one from before a hitch) is dropped
+        constexpr float kStepMs = 20.0f;  // the clock and host time apart by more since the last report: the EE caught up
+        constexpr auto kSteadyFor = std::chrono::milliseconds(100); // together that long before any pull
+
+        // A playing stream's clock at the last report, after its pull.
+        struct Lock
+        {
+            ps2x::host_clock::Clock::time_point at;
+            float clockMs;
+            ps2x::host_clock::Clock::time_point steadySince; // the clock and host time together since
+        };
+        std::map<uint32_t, Lock> s_locks; // by StreamEE
+
+        struct StreamPollTag;
+        void lockClock(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t self = GPR_U32(ctx, 4);
+            if (load<uint32_t>(rdram, self + kStreamState) != kStreamPlaying)
+            {
+                s_locks.erase(self);
+                return;
+            }
+            const int32_t played = load<int32_t>(rdram, self + kPlayed);
+            if (played < 0)
+                return;
+            const auto at = s_positionAt.find(load<uint32_t>(rdram, self + kStreamId));
+            if (at == s_positionAt.end())
+                return;
+
+            const uint32_t rate =
+                static_cast<uint32_t>(runtime->callGuestFunction(rdram, ctx, s_addresses->streamSampleFreq, {self, 0u}));
+            runtime->callGuestFunction(rdram, ctx, s_addresses->varTimerMs, {self + kTimer});
+            const float clockMs = ctx->f[0];
+            SET_GPR_U32(ctx, 4, self);
+            if (rate == 0u)
+                return;
+
+            const auto now = ps2x::host_clock::now();
+            const float timerRate = load<float>(rdram, self + kTimer + kTimerRate);
+            const float ageMs = std::chrono::duration<float, std::milli>(now - at->second).count() * timerRate;
+            const float audioMs = static_cast<float>(played) * synth::kAdpcmBlockSamples * 1000.0f / static_cast<float>(rate) +
+                                  load<float>(rdram, self + kStartMs) + ageMs;
+            const float error = clockMs - audioMs;
+            store<int32_t>(rdram, self + kPlayed, -1);
+
+            const auto [lock, first] = s_locks.try_emplace(self, Lock{now, clockMs, now});
+            const float dtMs = std::chrono::duration<float, std::milli>(now - lock->second.at).count() * timerRate;
+            const float dClockMs = clockMs - lock->second.clockMs;
+            if (std::fabs(dClockMs - dtMs) > kStepMs)
+                lock->second.steadySince = now;
+            const bool steady = first || now - lock->second.steadySince >= kSteadyFor;
+            float pull = 0.0f;
+            if (ageMs <= kStaleMs && steady)
+            {
+                pull = error;
+                if (std::fabs(error) <= kSnapMs && !first)
+                {
+                    const float limit = kSlew * dtMs;
+                    pull = std::clamp(error * std::min(1.0f, dtMs / (kSettleS * 1000.0f)), -limit, limit);
+                }
+            }
+            lock->second.at = now;
+            lock->second.clockMs = clockMs - pull;
+            const uint32_t base = self + kTimer + kTimerBase;
+            store<float>(rdram, base, load<float>(rdram, base) - pull);
+        }
     }
 
     void installSynth(PS2Runtime &runtime, const Addresses &addresses)
@@ -129,6 +242,8 @@ namespace gh2
         s_rdram = runtime.memory().getRDRAM();
         runtime.iop().addService(std::make_unique<Synth>());
         EntryHook<PollTag>::install(runtime, addresses.ctlClientPoll, deliver);
+        EntryHook<StreamPollTag>::install(runtime, addresses.streamEEPoll, lockClock);
+        runtime.replaceFunction(addresses.spuStartSend, spuStartSend);
         setAudioSource(&synth::render);
     }
 

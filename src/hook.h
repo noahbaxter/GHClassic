@@ -11,6 +11,12 @@ namespace gh2
     // Only the entry is ours: when the guest function yields mid-body, the
     // runtime resumes it at the yielding PC inside the original, so nothing
     // may be done after the call. Each Tag gives one hook its own storage.
+    //
+    // callGuestFunction from an entry keeps only $ra and pc (ps2_runtime.cpp):
+    // it loads its arguments into $a0-$a3 and $t0-$t3, and the callee may
+    // change any register the EE's ABI leaves to the caller ($at, $v0-$v1,
+    // $a0-$a3, $t0-$t9, hi/lo, $f0-$f19). So an entry that calls into the
+    // guest puts back whatever arguments the original still reads.
     template <typename Tag>
     struct EntryHook
     {

@@ -25,6 +25,7 @@
 #include "dev/seed.h"
 #include "synth/synth.h"
 #include "settings/video_options.h"
+#include "track_start.h"
 
 namespace
 {
@@ -40,6 +41,7 @@ namespace
         gh2::installNativeParticles(runtime, gh2::kSlus21447);
         gh2::installSynth(runtime, gh2::kSlus21447);
         gh2::installMetaMusic(runtime, gh2::kSlus21447);
+        gh2::installTrackStart(runtime, gh2::kSlus21447);
         gh2::installMovies(runtime, gh2::kSlus21447);
         gh2::installVideoOptions(runtime, gh2::kSlus21447);
         gh2::card::install(runtime, gh2::kSlus21447);

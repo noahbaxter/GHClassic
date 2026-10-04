@@ -27,6 +27,9 @@ namespace gh2
         uint32_t worldXfm;       // RndTransformable::WorldXfm
         uint32_t setWorldXfm;    // RndTransformable::SetWorldXfm
         uint32_t playMovie;
+        uint32_t muteAllTracks;  // MasterAudio::MuteAllTracks
+        uint32_t muteTrack;      // MasterAudio::MuteTrack
+        uint32_t unmuteTrack;    // MasterAudio::UnmuteTrack
         uint32_t optionsSyncVideo; // Options::SyncVideoOptions
         uint32_t optionsSetSyncOffset;
         uint32_t beatMatchCtor;
@@ -48,7 +51,16 @@ namespace gh2
         uint32_t debugModal; // DebugModal(bool &, char *)
         uint32_t abort;
         uint32_t ctlClientPoll;
+        uint32_t spuStartSend;
         uint32_t metaMusicPoll;
+        uint32_t metaPanelPoll;
+        uint32_t metaPanelPickLoopIndex; // (int size)
+        uint32_t systemConfig3; // SystemConfig(Symbol, Symbol, Symbol)
+        uint32_t randomInt;     // RandomInt(lo, hi), hi exclusive
+        uint32_t taskMgrAddTask; // TaskMgr::AddTask(Task *, Task::Units, float)
+        uint32_t streamEEPoll;
+        uint32_t streamSampleFreq; // StreamEE::GetSampleFreq(int channel)
+        uint32_t varTimerMs;
         uint32_t scePadRead;
         uint32_t scePadInfoAct;
         uint32_t charHairPoll;
@@ -89,6 +101,8 @@ namespace gh2
         // each for 8bpp, 128 for 4bpp.
         uint32_t swizzle8[2];
         uint32_t swizzle4[2];
+        uint32_t streamEndMs; // the float Stream::SetJump takes for a file's end
+        uint32_t scriptTaskVtable;
     };
 
     // Guitar Hero II (USA), SLUS-21447.
@@ -112,6 +126,9 @@ namespace gh2
         .worldXfm = 0x3d8ea0u,
         .setWorldXfm = 0x1dd7b8u,
         .playMovie = 0x21bb60u,
+        .muteAllTracks = 0x23a3e8u,
+        .muteTrack = 0x23a2c0u,
+        .unmuteTrack = 0x23a370u,
         .optionsSyncVideo = 0x10db80u,
         .optionsSetSyncOffset = 0x10ded8u,
         .beatMatchCtor = 0x120f48u,
@@ -133,7 +150,16 @@ namespace gh2
         .debugModal = 0x105a88u,
         .abort = 0x307b80u,
         .ctlClientPoll = 0x22dc68u,
+        .spuStartSend = 0x231a78u,
         .metaMusicPoll = 0x21f180u,
+        .metaPanelPoll = 0x134850u,
+        .metaPanelPickLoopIndex = 0x1349d8u,
+        .systemConfig3 = 0x2a8700u,
+        .randomInt = 0x2d9d10u,
+        .taskMgrAddTask = 0x2c6b18u,
+        .streamEEPoll = 0x2308a0u,
+        .streamSampleFreq = 0x2314e8u,
+        .varTimerMs = 0x2d4018u,
         .scePadRead = 0x2f2c48u,
         .scePadInfoAct = 0x2f2e58u,
         .charHairPoll = 0x176fb8u,
@@ -171,5 +197,7 @@ namespace gh2
         .mcIconSys = 0x46a908u,
         .swizzle8 = {0x3de1c8u, 0x3de208u},
         .swizzle4 = {0x3de248u, 0x3de2c8u},
+        .streamEndMs = 0x43311cu,
+        .scriptTaskVtable = 0x3f3510u, // as ScriptTask's ctor (0x2c5040) stores it
     };
 }

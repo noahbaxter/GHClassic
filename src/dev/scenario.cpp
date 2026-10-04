@@ -2,6 +2,7 @@
 
 #include "guest.h"
 #include "hook.h"
+#include "host/pad.h"
 #include "host/vulkan_frontend.h"
 #include "movie/movie.h"
 #include "script.h"
@@ -215,6 +216,12 @@ namespace gh2::scenario
                     }
                     std::cerr << "[scenario] ok " << got << std::endl;
                 }
+                else if (verb == "hold")
+                    // Pad buttons held until the next (hold), libpad bits: (hold 0) lets go.
+                    setScriptedPad(static_cast<uint16_t>(array.number(1)));
+                else if (verb == "stall")
+                    // A hitch: the game thread stops while audio plays on.
+                    std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(array.number(1) * 1000.0f)));
                 else if (verb == "shot")
                 {
                     // Nothing more runs until that frame is written.

@@ -136,6 +136,17 @@ target_include_directories(mpeg2 SYSTEM PUBLIC "${libmpeg2_SOURCE_DIR}/include")
 target_include_directories(mpeg2 PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/libmpeg2")
 set_target_properties(mpeg2 PROPERTIES C_STANDARD 99)
 
+# The save code's round trips, which need no disc and no game.
+add_executable(save_test EXCLUDE_FROM_ALL
+    tests/save_test.cpp
+    src/save/gh2_stream.cpp
+    src/save/gh2_text.cpp
+    src/save/ps2_card.cpp
+    src/save/store.cpp
+)
+target_include_directories(save_test PRIVATE src)
+target_link_libraries(save_test PRIVATE miniz)
+
 # Without a disc's generated code, everything above still builds: what CI
 # checks (tools/ghc.py ci).
 file(GLOB GHC_GENERATED_SOURCES CONFIGURE_DEPENDS
@@ -153,6 +164,7 @@ set(GHC_GAME_SOURCES
     src/game.cpp
     src/frame_step.cpp
     src/script.cpp
+    src/track_start.cpp
     src/dev/null_rnd.cpp
     src/dev/scenario.cpp
     src/dev/seed.cpp
@@ -234,9 +246,10 @@ file(READ src/ui/dta/highscore_panel.dta GHC_HIGHSCORE_PANEL_DTA)
 file(READ src/ui/dta/main_menu.dta GHC_MAIN_MENU_DTA)
 file(READ src/ui/dta/fast_boot.dta GHC_FAST_BOOT_DTA)
 file(READ src/ui/dta/locale.dta GHC_LOCALE_DTA)
+file(READ src/ui/dta/crowd.dta GHC_CROWD_DTA)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     src/ui/dta/lag_panel.dta src/ui/dta/highscore_panel.dta src/ui/dta/main_menu.dta src/ui/dta/fast_boot.dta
-    src/ui/dta/locale.dta)
+    src/ui/dta/locale.dta src/ui/dta/crowd.dta)
 configure_file(src/ui/dta/dta.h.in "${GHC_DTA_DIR}/dta.h" @ONLY)
 target_include_directories(GHClassic PRIVATE "${GHC_DTA_DIR}")
 

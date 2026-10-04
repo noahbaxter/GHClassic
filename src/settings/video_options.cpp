@@ -9,8 +9,10 @@
 
 #include "settings/video_options.h"
 
+#include "dta.h"
 #include "guest.h"
 #include "hook.h"
+#include "script.h"
 #include "settings/settings.h"
 #include "ps2_runtime_macros.h"
 
@@ -31,5 +33,7 @@ namespace gh2
     void installVideoOptions(PS2Runtime &runtime, const Addresses &addresses)
     {
         EntryHook<SyncTag>::install(runtime, addresses.optionsSyncVideo, onSync);
+        // Widescreen keeps the whole crowd.
+        script::runWhenUiReady(kCrowdDta);
     }
 }

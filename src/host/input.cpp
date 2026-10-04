@@ -58,6 +58,18 @@ namespace gh2
             return found == s_file.sections.end() ? nullptr : &found->second;
         }
 
+        // A device input.ini has no section for gets one, its built-in
+        // layout as comments, so the file shows what there is to change.
+        void listInFile(const std::string &name, const Profile &profile)
+        {
+            if (section(name))
+                return;
+            if (writeTemplate(bindingFilePath(), name, profile))
+                s_file.sections[name];
+            else
+                std::cerr << "[input] could not write " << bindingFilePath() << std::endl;
+        }
+
         void closeDevices()
         {
             for (Device &d : s_devices)
@@ -107,10 +119,12 @@ namespace gh2
                 const auto builtin = builtinProfile(d.joystick, d.gamepad);
                 const auto *own = section(deviceSection(name));
                 d.profile = overlay(builtin ? builtin->profile : Profile{}, own);
+                const bool bound = own && !own->empty();
                 std::cerr << "[input] " << name << ": " << (builtin ? builtin->label : "no built-in layout")
-                          << (own ? ", with input.ini" : "") << std::endl;
-                if (!builtin && !own)
+                          << (bound ? ", with input.ini" : "") << std::endl;
+                if (!builtin && !bound)
                     std::cerr << "[input]   unbound; run GHClassic --bind to set it up" << std::endl;
+                listInFile(deviceSection(name), builtin ? builtin->profile : Profile{});
                 s_devices.push_back(d);
             }
             SDL_free(ids);
@@ -177,6 +191,7 @@ namespace gh2
         s_file = loadBindingFile(path);
         s_keyboard = overlay(keyboardProfile(), section(keyboardSection()));
         std::cerr << "[input] bindings: " << path << (s_file.sections.empty() ? " (none yet)" : "") << std::endl;
+        listInFile(keyboardSection(), keyboardProfile());
         s_open = true;
         openDevices();
     }

@@ -11,7 +11,10 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
+#include <sstream>
 #include <string>
+#include <vector>
 
 namespace gh2::settings
 {
@@ -21,6 +24,7 @@ namespace gh2::settings
         {
             kBool,
             kInt,
+            kChoice, // one of `choices`, its value the word's position
         };
 
         struct Entry
@@ -32,7 +36,14 @@ namespace gh2::settings
             int step;      // values snap to multiples of it
             int modern;    // the default
             int authentic; // what the PS2 did
+            const char *choices = nullptr; // kChoice's words, space separated
         };
+
+        std::vector<std::string> choices(const Entry &entry)
+        {
+            std::istringstream in(entry.choices ? entry.choices : "");
+            return {std::istream_iterator<std::string>(in), {}};
+        }
 
         const Entry kEntries[kKeyCount] = {
             {"video", "widescreen", Type::kBool, 0, 1, 1, 1, 0},
@@ -43,10 +54,10 @@ namespace gh2::settings
             {"video", "msaa", Type::kInt, 1, 16, 1, 4, 1},
             // 5 ms: finer is below what a player can feel.
             {"latency", "video_ms", Type::kInt, -500, 500, 5, 0, 0},
-            // 65 by default: the port's own delay, measured on macOS (the song
-            // clock about 22 ms ahead of what is rendered, SDL's CoreAudio queue
-            // about 43 ms). Not measured on Windows or Linux yet.
-            {"latency", "audio_ms", Type::kInt, -500, 500, 5, 65, 0},
+            // 45 by default: the port's own delay on macOS, SDL's CoreAudio
+            // queue (about 43 ms; the song clock is held to the mixed audio,
+            // synth.cpp). Not measured on Windows or Linux yet.
+            {"latency", "audio_ms", Type::kInt, -500, 500, 5, 45, 0},
             // OptionData's (retail 0x10d2e0), which the save carried.
             {"audio", "band_volume", Type::kInt, 0, 11, 1, 11, 11},
             {"audio", "guitar_volume", Type::kInt, 0, 11, 1, 11, 11},
@@ -57,6 +68,10 @@ namespace gh2::settings
             {"game", "lefty_p2", Type::kBool, 0, 1, 1, 0, 0},
             // Off: PCSX2 holds a card it has loaded open.
             {"save", "export_card", Type::kBool, 0, 1, 1, 0, 0},
+            {"game", "track_on_at_start", Type::kBool, 0, 1, 1, 1, 0},
+            // With both in PUT_DISC_HERE. A .chd is smaller; an .iso reads
+            // faster, which only shows with the game run far above 1x.
+            {"disc", "prefer", Type::kChoice, 0, 1, 1, kChd, kChd, "chd iso"},
         };
 
         int snap(const Entry &entry, int value)
@@ -84,6 +99,13 @@ namespace gh2::settings
             {
                 out = text == "true";
                 return true;
+            }
+            if (entry.type == Type::kChoice)
+            {
+                const std::vector<std::string> words = choices(entry);
+                const auto word = std::find(words.begin(), words.end(), text);
+                out = static_cast<int>(word - words.begin());
+                return word != words.end();
             }
             try
             {
@@ -160,7 +182,10 @@ namespace gh2::settings
                         section = e.section;
                     }
                     const int v = state().value[k];
-                    out << e.name << " = " << (e.type == Type::kBool ? (v ? "true" : "false") : std::to_string(v))
+                    out << e.name << " = "
+                        << (e.type == Type::kBool     ? (v ? "true" : "false")
+                            : e.type == Type::kChoice ? choices(e)[v]
+                                                      : std::to_string(v))
                         << "\n";
                 }
             });
