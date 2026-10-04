@@ -47,6 +47,11 @@ namespace gh2
         // target, preserve scale, parent.
         constexpr size_t kTransLocal = 13u, kTransWorld = 61u;
 
+        // Where the Trans at `o` ends: GH1's 8 (rev, local, world, children,
+        // constraint, target, preserve scale, parent), or a 9, which has no
+        // children.
+        size_t transEnd(const Bytes &b, size_t o);
+
         // GH2's outfit `gh2` wearing GH1's scene `gh1` and its face scene,
         // the face's morphs named <outfit>_face.mrf for gh1/face.
         milo::Dir graft(const milo::Dir &gh2, const milo::Dir &gh1, const milo::Dir &face, const std::string &outfit);

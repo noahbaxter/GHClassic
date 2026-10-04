@@ -130,23 +130,11 @@ namespace gh2
                 mesh[o] = 0u;
         }
 
-        // Where a GH1 Mesh 25's Draw starts: rev, then Trans 8 (rev, local,
-        // world, children, constraint, target, preserve, parent), or the
-        // Trans 9 reparent writes (no children).
+        // Where a GH1 Mesh 25's Draw starts: rev, then its Trans 8, or the
+        // Trans 9 reparent writes.
         size_t gh1Draw(const Bytes &mesh)
         {
-            size_t o = 104u;
-            if (u32(mesh, 4u) == 8u)
-            {
-                o += 4u;
-                for (uint32_t i = 0, n = u32(mesh, 104u); i < n; ++i)
-                    str(mesh, o);
-            }
-            o += 4u;
-            str(mesh, o);
-            o += 1u;
-            str(mesh, o);
-            return o;
+            return gh1::transEnd(mesh, 4u);
         }
 
         // A GH1 Mesh 25 left out of drawing: Draw's rev, then its showing flag.
@@ -281,6 +269,24 @@ namespace gh2
                 for (int k = 0; k < 3; ++k)
                     r.v[j] -= a.v[k] * r.m[k * 3 + j];
             return r;
+        }
+
+        size_t transEnd(const Bytes &b, size_t o)
+        {
+            const bool children = u32(b, o) == 8u;
+            o += 100u;
+            if (children)
+            {
+                const uint32_t n = u32(b, o);
+                o += 4u;
+                for (uint32_t i = 0; i < n; ++i)
+                    str(b, o);
+            }
+            o += 4u;
+            str(b, o);
+            o += 1u;
+            str(b, o);
+            return o;
         }
 
         milo::Dir graft(const milo::Dir &gh2, const milo::Dir &gh1, const milo::Dir &face, const std::string &outfit)
