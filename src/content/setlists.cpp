@@ -265,6 +265,16 @@ namespace gh2::setlists
         s_setlists[name] = {std::move(tiers), look, std::move(required)};
     }
 
+    Required required(const dtb::Node &campaign)
+    {
+        Required out;
+        if (const dtb::Node *counts = dtb::find(campaign, "required_songs"))
+            for (size_t d = 1u; d < counts->nodes.size(); ++d)
+                if (counts->nodes[d].nodes.size() > 2u)
+                    out.push_back({counts->nodes[d].nodes[1].integer, counts->nodes[d].nodes[2].integer});
+        return out;
+    }
+
     std::vector<std::string> careerSongs(const std::string &name)
     {
         std::vector<std::string> songs;
@@ -331,12 +341,7 @@ namespace gh2::setlists
         std::array<std::string, 5> scoreNames;
         for (size_t i = 0; i < scoreNames.size(); ++i)
             scoreNames[i] = text("highscore_dummy_" + std::to_string(i));
-        Required required;
-        if (const dtb::Node *counts = dtb::find(*campaign, "required_songs"))
-            for (size_t d = 1u; d < counts->nodes.size(); ++d)
-                if (counts->nodes[d].nodes.size() > 2u)
-                    required.push_back({counts->nodes[d].nodes[1].integer, counts->nodes[d].nodes[2].integer});
-        add(game, std::move(tiers), game + "/" + kOwnLook, scoreNames, std::move(required));
+        add(game, std::move(tiers), game + "/" + kOwnLook, scoreNames, required(*campaign));
     }
 
     void install(PS2Runtime &runtime, const Addresses &addresses)
