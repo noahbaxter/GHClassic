@@ -3,7 +3,7 @@
 ; for that band, as the 80s.
 (needs gh80s)
 #include common/first_boot.dta
-(expect {campaigns count} {+ 2 {mounted gh2x}})
+(expect {campaigns count} {+ 2 {+ {mounted gh1} {mounted gh2x}}})
 {gamecfg set mode career}
 {campaign set_profile_name "The Testers" 0}
 {campaign set_profile_slot 0}
@@ -15,7 +15,7 @@
 (wait_screen ghc_campaign_screen)
 (wait 2)
 (shot campaigns)
-(expect {size {ghc_campaign_panel get games}} {+ 2 {mounted gh2x}})
+(expect {size {ghc_campaign_panel get games}} {+ 2 {+ {mounted gh1} {mounted gh2x}}})
 (expect {elem {ghc_campaign_panel get games} {ghc_campaign_panel get picked}} gh2)
 (expect {campaigns progress gh80s 0} 0)
 {set $ghc_switch gh80s}

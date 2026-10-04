@@ -4,7 +4,7 @@
 ; (ghc.py scenarios --discs).
 #include common/first_boot.dta
 (expect {campaigns active} gh2)
-(expect {campaigns count} {+ 1 {+ {mounted gh80s} {mounted gh2x}}})
+(expect {campaigns count} {+ {+ 1 {mounted gh1}} {+ {mounted gh80s} {mounted gh2x}}})
 (expect {campaigns has gh80s} {mounted gh80s})
 {set $next {if_else {> {campaigns count} 1} ghc_campaign_screen sel_difficulty_screen}}
 {gamecfg set mode career}

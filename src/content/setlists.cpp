@@ -270,8 +270,8 @@ namespace gh2::setlists
         Required out;
         if (const dtb::Node *counts = dtb::find(campaign, "required_songs"))
             for (size_t d = 1u; d < counts->nodes.size(); ++d)
-                if (counts->nodes[d].nodes.size() > 2u)
-                    out.push_back({counts->nodes[d].nodes[1].integer, counts->nodes[d].nodes[2].integer});
+                if (counts->nodes[d].nodes.size() > 1u)
+                    out.push_back({counts->nodes[d].nodes[1].integer, counts->nodes[d].nodes.back().integer});
         return out;
     }
 

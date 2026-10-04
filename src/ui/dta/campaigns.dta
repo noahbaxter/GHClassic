@@ -199,3 +199,25 @@
       )
    )
 }
+; The venue map, as the game's own (career.dta) but that a venue the
+; campaign has none of is off it: GH1's career plays in six of GH2's eight.
+{retype sel_venue_panel
+   (
+      ; From the ARK root: a path resolves against the file its array came
+      ; from, and this one comes from no file.
+      (file ui/sel_venue.milo)
+      (focus sv_battle.btn)
+      (enter
+         {foreach $v
+            (
+               (battle sv_battle.btn) (small1 sv_small1.btn) (small2 sv_small2.btn) (big sv_big.btn)
+               (theatre sv_theatre.btn) (fest sv_fest.btn) (arena sv_arena.btn) (stone sv_stone.btn)
+            )
+            {if {&& {exists {elem $v 1}} {! {find_elem {find $syscfg venues} {elem $v 0}}}}
+               {$this disable {elem $v 1}}
+               {{$this find {elem $v 1}} set_showing FALSE}
+            }
+         }
+      )
+   )
+}

@@ -58,6 +58,10 @@ namespace gh2::dtb
     // where their symbols stand. Merges are not followed.
     std::optional<Node> read(const std::string &script, Macros &macros, const Files &files);
 
+    // A built file's root as it is written, directives and all: for one
+    // changed in part and written back.
+    std::optional<Node> raw(const milo::Bytes &file);
+
     // The array in `array` whose first node is `key`, as
     // DataArray::FindArray.
     const Node *find(const Node &array, const std::string &key);
