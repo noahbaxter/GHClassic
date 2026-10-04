@@ -136,6 +136,17 @@ target_include_directories(mpeg2 SYSTEM PUBLIC "${libmpeg2_SOURCE_DIR}/include")
 target_include_directories(mpeg2 PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/libmpeg2")
 set_target_properties(mpeg2 PROPERTIES C_STANDARD 99)
 
+# The save code's round trips, which need no disc and no game.
+add_executable(save_test EXCLUDE_FROM_ALL
+    tests/save_test.cpp
+    src/save/gh2_stream.cpp
+    src/save/gh2_text.cpp
+    src/save/ps2_card.cpp
+    src/save/store.cpp
+)
+target_include_directories(save_test PRIVATE src)
+target_link_libraries(save_test PRIVATE miniz)
+
 # Without a disc's generated code, everything above still builds: what CI
 # checks (tools/ghc.py ci).
 file(GLOB GHC_GENERATED_SOURCES CONFIGURE_DEPENDS
