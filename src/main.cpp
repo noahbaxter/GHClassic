@@ -17,7 +17,8 @@
 // straight to the main menu, past the logos' padding, the intro movie and
 // the press-start splash, whatever settings.ini's fast_boot says. --seed
 // starts the game's random numbers from n rather than the time of day.
-// --cheats turns on the testing keys (dev/cheats.h).
+// --cheats turns on the testing keys (dev/cheats.h) and keeps saves in
+// memory, so nothing won by them reaches the save file.
 // --res is what the scene is drawn at: the window's size (the default), the
 // game's own (512x448), or that height at the picture's aspect. --settings
 // and --save read and write that file in place of the user data directory's.
@@ -131,7 +132,10 @@ int main(int argc, char *argv[])
         else if (arg == "--seed" && hasValue)
             gh2::seed::fix(std::atoi(argv[++i]));
         else if (arg == "--cheats")
+        {
             gh2::cheats::enable();
+            gh2::save::keepInMemory();
+        }
         else if (arg == "--content" && hasValue)
         {
             if (!gh2::ark::addDisc(argv[++i]))
