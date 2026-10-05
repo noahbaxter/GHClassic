@@ -25,6 +25,7 @@ namespace gh2
             const uint32_t rnd = GPR_U32(ctx, 4);
             Frame &frame = building();
             const uint64_t serial = frame.serial + 1u;
+            previous() = std::move(frame);
             frame = Frame{};
             frame.serial = serial;
             for (uint32_t i = 0; i < 4; ++i)

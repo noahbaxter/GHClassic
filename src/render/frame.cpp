@@ -16,6 +16,12 @@ namespace gh2
         return frame;
     }
 
+    Frame &previous()
+    {
+        static Frame frame;
+        return frame;
+    }
+
     uint32_t internCamera(const Camera &camera)
     {
         std::vector<Camera> &cameras = building().cameras;

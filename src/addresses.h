@@ -13,6 +13,8 @@ namespace gh2
         uint32_t psRndBeginDrawing;
         uint32_t psRndEndDrawing;
         uint32_t psRndDrawRect;
+        uint32_t psRndDoPointTests;
+        uint32_t rndTestPoint; // Rnd::TestPoint
         uint32_t psMeshSync;
         uint32_t psMeshFixVerts;
         uint32_t psMeshDestroy;
@@ -112,6 +114,8 @@ namespace gh2
         .psRndBeginDrawing = 0x19af38u,
         .psRndEndDrawing = 0x19b018u,
         .psRndDrawRect = 0x19b050u,
+        .psRndDoPointTests = 0x19a7f0u,
+        .rndTestPoint = 0x1d55b8u,
         .psMeshSync = 0x3d4f08u,
         .psMeshFixVerts = 0x19dbb8u,
         .psMeshDestroy = 0x19dd88u,

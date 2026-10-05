@@ -206,6 +206,7 @@ set(GHC_GAME_SOURCES
     src/render/native_mat.cpp
     src/render/native_mesh.cpp
     src/render/native_particles.cpp
+    src/render/native_points.cpp
     src/render/native_rect.cpp
     src/render/native_rnd.cpp
     src/render/texture_capture.cpp

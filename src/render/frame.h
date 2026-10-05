@@ -46,6 +46,15 @@ namespace gh2
         float displayAspect = 4.0f / 3.0f;
         std::vector<Camera> cameras;
         std::vector<DrawCall> draws;
+        // The points asked about while it was built (Rnd::TestPoint), each
+        // for an object through a camera: render/native_points.cpp.
+        struct PointTest
+        {
+            uint32_t object = 0; // guest address
+            float point[3] = {};
+            uint32_t camera = 0; // index into cameras
+        };
+        std::vector<PointTest> tests;
     };
 
     // Finished frames, oldest first. The game thread publishes at EndDrawing;
@@ -113,6 +122,9 @@ namespace gh2
     // The frame the game thread is building between BeginDrawing and
     // EndDrawing. Game thread only.
     Frame &building();
+
+    // The frame built before it. Game thread only.
+    Frame &previous();
 
     // `camera`'s index in the building frame; consecutive draws through the
     // same camera share one.
