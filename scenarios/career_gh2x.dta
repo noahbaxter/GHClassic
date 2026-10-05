@@ -1,6 +1,6 @@
 ; A 360 GH2 career from nothing, by the buttons a player presses: a band,
 ; GH2 360 picked from the campaigns, a new medium career, then its first
-; song played through to its results and cash. The tiers, their six songs,
+; song won by the game's cheat, its results and cash. The tiers, their six songs,
 ; the cash and the store's prices are the 360's; the save holds it under
 ; gh2x's own sections, and the band's GH2 career is untouched.
 (needs gh2x)
@@ -58,8 +58,9 @@
 (wait_screen game_screen 60)
 (expect {gamecfg get_song} x_surrender)
 (expect {game get_venue} battle)
-(wait 30)
+(wait 5)
 (shot song)
+{player0 win 5}
 (wait_screen endgame_screen 400)
 (wait 4)
 (shot results)

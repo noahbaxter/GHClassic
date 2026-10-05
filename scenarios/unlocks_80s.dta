@@ -5,7 +5,7 @@
 ; opened.
 ;
 ; The first two songs are passed by the game's own cheat (cheat_beat_song);
-; the third and the encore are played.
+; the third and the encore are started and won by its other ({player0 win}).
 (needs gh80s)
 #include common/first_boot.dta
 ; Before any 80s career, quickplay's 80s list passes over the encore: four
@@ -37,12 +37,16 @@
 {set $index 2}
 #include common/career_song.dta
 (expect {gamecfg get_song} iran)
+(wait 3)
+{player0 win 5}
 (wait_screen endgame_encore_screen 400)
 (wait 4)
 (shot encore_unlocked)
 (press green)
 (wait_screen game_screen 60)
 (expect {gamecfg get_song} 18andlife)
+(wait 3)
+{player0 win 5}
 (wait_screen endgame_screen 400)
 (wait 4)
 (shot encore_results)

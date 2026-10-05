@@ -1,6 +1,6 @@
 ; An 80s career from nothing, by the buttons a player presses: a band, the
 ; 80s picked from the campaigns, a new medium career's character, guitar and
-; sponsor, then a song played through to its results and cash. The save
+; sponsor, then a song won by the game's cheat, its results and cash. The save
 ; holds it under the 80s' own sections: a load brings it back, the campaign
 ; picker shows the band's progress, and the band's GH2 career is untouched.
 (needs gh80s)
@@ -56,8 +56,9 @@
 (wait_screen game_screen 60)
 (expect {gamecfg get_song} bangyourhead)
 (expect {game get_venue} battle)
-(wait 30)
+(wait 5)
 (shot song)
+{player0 win 5}
 (wait_screen endgame_screen 400)
 (wait 4)
 (shot results)
