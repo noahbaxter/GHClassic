@@ -57,6 +57,18 @@ namespace gh2
         // Here the picture is copied once and drawn back over itself as the
         // four quarters, under the same Z test. Retail blurs a frame with the
         // depth set while the next was polled; this uses the frame's own.
+        //
+        // Both of retail's copies filter, and the GS filters a sprite about
+        // half a texel before the whole texel coordinate it is given at each
+        // pixel. So a pixel of a quarter is the mean of the texel there and
+        // the one before, each way, and the copy back does that again: per
+        // quarter a mean of four samples a pixel apart, centred a pixel
+        // before where the copy back's uv falls.
+        //
+        // The quarters are sent with vertex alpha 23 under HIGHLIGHT
+        // (0x19a538, 0x19a620), which adds 23 to each: what four adds of a
+        // quarter lose to the 16-bit buffer's five bits, not a brightening.
+        // None is added here.
         void addDepthOfField(uint8_t *rdram, uint32_t rnd, Frame &frame)
         {
             const uint32_t focus = load<uint32_t>(rdram, rnd + milo::rnd::kFocusZ);
@@ -92,14 +104,21 @@ namespace gh2
             draw.material.prelit = true;
             draw.material.texWrap = false;
             draw.material.renderTarget = kScreenCopyTex;
-            draw.material.uvXfm[0] = (width - 1.5f) / width;
-            draw.material.uvXfm[3] = (height - 1.5f) / height;
+            const float scale[2] = {(width - 1.5f) / width, (height - 1.5f) / height};
+            draw.material.uvXfm[0] = scale[0];
+            draw.material.uvXfm[3] = scale[1];
+            draw.material.spread = true;
+            draw.material.color[0] = 1.0f / width;
+            draw.material.color[1] = 1.0f / height;
             const float offset[4][2] = {{0.0f, 0.0f}, {0.0f, 3.0f}, {3.0f, 0.0f}, {3.0f, 3.0f}};
             for (int tap = 0; tap < 4; ++tap)
             {
                 draw.material.blend = tap == 0 ? milo::mat::kBlendSrc : milo::mat::kBlendAdd;
-                draw.material.uvXfm[4] = offset[tap][0] / width;
-                draw.material.uvXfm[5] = offset[tap][1] / height;
+                // The copy back reads pixel x at x * scale - 0.5 of the
+                // quarters, whose own pixels are the picture's a half before
+                // their offset; a uv here is taken at x + 0.5.
+                draw.material.uvXfm[4] = (offset[tap][0] - 0.5f - 0.5f * scale[0]) / width;
+                draw.material.uvXfm[5] = (offset[tap][1] - 0.5f - 0.5f * scale[1]) / height;
                 frame.draws.push_back(draw);
             }
         }

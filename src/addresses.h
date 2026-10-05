@@ -29,6 +29,8 @@ namespace gh2
         uint32_t rndTextDrawShowing;
         uint32_t worldXfm;       // RndTransformable::WorldXfm
         uint32_t setWorldXfm;    // RndTransformable::SetWorldXfm
+        uint32_t psMatUpdateSphereXfm;
+        uint32_t sphereXfm;      // the four quadwords PsMat::UpdateSphereXfm fills
         uint32_t playMovie;
         uint32_t muteAllTracks;  // MasterAudio::MuteAllTracks
         uint32_t muteTrack;      // MasterAudio::MuteTrack
@@ -131,6 +133,8 @@ namespace gh2
         .rndTextDrawShowing = 0x1dc380u,
         .worldXfm = 0x3d8ea0u,
         .setWorldXfm = 0x1dd7b8u,
+        .psMatUpdateSphereXfm = 0x19cb78u,
+        .sphereXfm = 0x46d490u,
         .playMovie = 0x21bb60u,
         .muteAllTracks = 0x23a3e8u,
         .muteTrack = 0x23a2c0u,

@@ -60,6 +60,7 @@ namespace milo
         // draw only where the frame buffer's alpha bit is clear (0x19d114).
         constexpr uint32_t kDestAlphaTest = 0x120u;
         constexpr uint32_t kNextPass = 0xb0u;   // RndMat* (ObjPtr at +0xa8)
+        constexpr uint32_t kPsTexGenRows = 0x170u; // PsMat: three quadwords PsMat::Update derives from tex_xfm
 
         enum Blend : uint32_t
         {
@@ -146,6 +147,7 @@ namespace milo
         constexpr uint32_t kWidth = 0x4cu;  // int
         constexpr uint32_t kHeight = 0x50u; // int
         constexpr uint32_t kTypeRendered = 0x2u; // drawn into through a camera's target
+        constexpr uint32_t kTypeFrameBuffer = 0x8u;
         // Only regular textures have pixels in RAM (SyncBitmap 0x1a13c0).
         constexpr uint32_t kTypeNoPixels = 0x2u | 0x4u | 0x8u; // rendered, movie, frame buffer
     }

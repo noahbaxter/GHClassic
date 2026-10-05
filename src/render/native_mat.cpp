@@ -16,6 +16,7 @@
 
 #include "guest.h"
 #include "milo/layout.h"
+#include "ps2_runtime.h"
 #include "render/texture_capture.h"
 
 namespace gh2
@@ -121,8 +122,12 @@ namespace gh2
         {
             const uint32_t tex = load<uint32_t>(rdram, mat + milo::mat::kDiffuseTex);
             m.texture = capturedTexture(tex);
-            if (tex != 0u && (load<uint32_t>(rdram, tex + milo::tex::kType) & milo::tex::kTypeRendered) != 0u)
+            const uint32_t type = tex != 0u ? load<uint32_t>(rdram, tex + milo::tex::kType) : 0u;
+            if ((type & milo::tex::kTypeRendered) != 0u)
                 m.renderTarget = tex;
+            // Update: the add blend alone (0x19d064), textured and not prelit (0x19d2b0).
+            m.highlight = tex != 0u && (type & milo::tex::kTypeFrameBuffer) == 0u &&
+                          m.blend == milo::mat::kBlendAdd && !m.prelit;
         }
         m.texGen = load<uint32_t>(rdram, mat + milo::mat::kTexGen);
         if (m.texGen == milo::mat::kTexGenXfm || m.texGen == milo::mat::kTexGenXfmOrigin)
@@ -136,6 +141,26 @@ namespace gh2
         if (m.zMode >= milo::mat::kZModeCount)
             m.zMode = milo::mat::kZNormal;
         return m;
+    }
+
+    // Select calls UpdateSphereXfm on every select of a sphere material
+    // (0x3d8638) and hands VU1 what it leaves at 0x46d490 as qw691..694 for
+    // program 0x347. It reads PsMat +0x170, where Update's sphere case
+    // (0x19d5a8) keeps tex_xfm's rotation transposed; Update never runs
+    // here, so that is written first.
+    void readSphereRows(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const Addresses &addresses,
+                        uint32_t mat, Material &m)
+    {
+        const uint32_t xfm = mat + milo::mat::kTexXfm;
+        for (uint32_t row = 0; row < 3; ++row)
+            for (uint32_t c = 0; c < 3; ++c)
+                store<float>(rdram, mat + milo::mat::kPsTexGenRows + row * 0x10u + c * 4u,
+                             load<float>(rdram, xfm + c * 0x10u + row * 4u));
+        runtime->callGuestFunction(rdram, ctx, addresses.psMatUpdateSphereXfm, {mat});
+        for (uint32_t row = 0; row < 4; ++row)
+            for (uint32_t c = 0; c < 3; ++c)
+                m.sphereRows[row][c] = load<float>(rdram, addresses.sphereXfm + row * 0x10u + c * 4u);
+        m.sphere = true;
     }
 
     uint32_t nextPass(uint8_t *rdram, uint32_t mat)

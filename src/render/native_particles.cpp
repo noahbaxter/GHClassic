@@ -149,6 +149,7 @@ namespace gh2
                 for (uint32_t pass = mat; pass != 0u; pass = nextPass(rdram, pass))
                 {
                     draw.material = readMaterial(rdram, pass);
+                    draw.material.highlight = false; // TEX0's TFX is put back to modulate (0x1a2da0)
                     // The colours are final; sprites take their uvs as given.
                     draw.material.useEnviron = false;
                     draw.material.prelit = true;

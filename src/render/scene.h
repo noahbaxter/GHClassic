@@ -53,6 +53,10 @@ namespace gh2
         bool texWrap = true;
         bool useEnviron = false;
         bool prelit = false;
+        bool highlight = false; // GS HIGHLIGHT texturing, PsMat +0x130 == 2
+        // Sampled as the mean of four texels, color[0] and [1] apart in u and
+        // v (addDepthOfField). The colour is then the vertex's alone.
+        bool spread = false;
         std::shared_ptr<const TextureData> texture; // null for none
         uint32_t renderTarget = 0; // the rendered RndTex sampled in place of texture, 0 for none
         uint32_t texGen = 0; // milo::mat::TexGen
@@ -64,6 +68,10 @@ namespace gh2
         // The projected tex gen's 3x3 (rows) and offset, which take a world
         // position to its uv: tex_xfm inverted, then y and z swapped.
         float projRows[4][3] = {};
+        // The sphere tex gen's 3x3 (rows) and offset, which take a normal to
+        // its uv. Set for a mesh's pass only (readSphereRows).
+        bool sphere = false;
+        float sphereRows[4][3] = {};
     };
 
     // What the current environ gives VU1's lighting programs, as
@@ -95,10 +103,11 @@ namespace gh2
         // A skinned vert is sum over b of weight[b] * (pos * bones[b]), its
         // four colour floats being the weights.
         bool skinned = false;
-        // Two or more bones: VU1's skin program leaves the skinned position
-        // and normal in the vert for lighting and tex gen, which then take
-        // them through an identity lightWorld. One bone is left as is.
-        bool blended = false;
+        // The bones of the skin program the mesh runs (UpdateFacePacket
+        // 0x3d484c). With two or more it leaves the skinned position and
+        // normal in the vert for lighting and tex gen, which then take them
+        // through an identity lightWorld. One bone is left as is.
+        uint32_t skinBones = 1;
         std::array<Matrix, 4> bones{};
         Environ environment; // not environ, a macro in mingw's stdlib.h
         // Takes normals to world space for lighting (qw676..678): the world

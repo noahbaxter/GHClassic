@@ -1,5 +1,6 @@
 #include "host/scene_renderer.h"
 
+#include "host/mesh_push.h"
 #include "milo/layout.h"
 #include "render/camera.h"
 #include "settings/settings.h"
@@ -22,35 +23,6 @@ namespace gh2
         constexpr VkFormat kColorFormat = VK_FORMAT_R8G8B8A8_UNORM;
         // Frames a GPU resource must outlive its last use by.
         constexpr uint64_t kRetireAfter = 3;
-
-        // How a vertex gets its colour, by the VU1 lighting program the
-        // material and environ pick (PsMat::Select 0x3d8548).
-        enum ColorMode : uint32_t
-        {
-            kColorVertex,      // 0x614 (prelit, no environ): as is
-            kColorAmbient,     // 0x7c5 with the environ: base * ambient
-            kColorDirectional, // 0x6ec: base * ambient + lights * material
-            kColorMaterial,    // 0x7c5 without the environ or prelit: the material's
-            kColorPoint,       // 0x436: base * ambient + a point light * material, within its range
-        };
-        constexpr uint32_t kFlagPrelit = 1u << 3;    // base is the vertex colour, else the material's
-        constexpr uint32_t kFlagAlphaCut = 1u << 4;  // discard alpha below the GS's 1
-        constexpr uint32_t kFlagIntensify = 1u << 5; // textured rgb scale 255 over 128
-        constexpr uint32_t kFlagBlended = 1u << 6;   // lit and tex-genned from the skinned vert
-        constexpr uint32_t kFlagProjected = 1u << 7; // the tex gen block is the projected one's
-
-        struct PushConstants
-        {
-            float mvp[16];
-            float matColor[4];
-            float uvRows[4]; // Material::uvXfm
-            float uvOffset[2];
-            int32_t boneBase;  // the draw's first bone vec4 in the frame data, -1 when rigid
-            int32_t lightBase; // the draw's lighting block in the frame data
-            uint32_t flags;    // ColorMode in bits 0-2, then the kFlag bits
-            int32_t envBase;   // the draw's environ or projected tex gen block in the frame data, -1 for none
-        };
-        static_assert(sizeof(PushConstants) <= 128, "past Vulkan's guaranteed push constant size");
 
         // Each frame writes its bones and lighting to its own slot's buffer,
         // so a slot is reused only after its frame has retired.
@@ -207,11 +179,6 @@ namespace gh2
         // Room for this many live textures before the pool refuses.
         constexpr uint32_t kMaxTextures = 4096;
 
-        struct Vec4
-        {
-            float v[4];
-        };
-
         struct FrameDataSlot
         {
             VkBuffer buffer = VK_NULL_HANDLE;
@@ -319,6 +286,24 @@ namespace gh2
                     out[r].v[c] = w[r * 4 + 0] * m[0][c] + w[r * 4 + 1] * m[1][c] + w[r * 4 + 2] * m[2][c] +
                                   (r == 3 ? m[3][c] : 0.0f);
             }
+        }
+
+        // Program 0x347, the sphere tex gen (0x347..0x368), takes the normal
+        // through the lighting matrix's rotation W (qw676..678) and the rows
+        // G (qw691..693), keeps x and y and adds the offset (qw694):
+        //   uv = (n.W.G).xy + offset
+        // The block holds W.G as three rows, then the offset.
+        void writeSphereTexGen(const DrawCall &draw, Vec4 *out)
+        {
+            const Matrix &w = draw.lightWorld;
+            const float(&g)[4][3] = draw.material.sphereRows;
+            for (uint32_t r = 0; r < 3; ++r)
+            {
+                out[r] = {{0.0f, 0.0f, 0.0f, 0.0f}};
+                for (uint32_t c = 0; c < 3; ++c)
+                    out[r].v[c] = w[r * 4 + 0] * g[0][c] + w[r * 4 + 1] * g[1][c] + w[r * 4 + 2] * g[2][c];
+            }
+            out[3] = {{g[3][0], g[3][1], g[3][2], 0.0f}};
         }
 
         bool check(VkResult result, const char *what)
@@ -1256,7 +1241,8 @@ namespace gh2
                 lightBases[i] = static_cast<int32_t>(used);
                 used += kLightingVec4s;
             }
-            if (draw.material.texGen == milo::mat::kTexGenEnviron || draw.material.texGen == milo::mat::kTexGenProjected)
+            if (draw.material.texGen == milo::mat::kTexGenEnviron ||
+                draw.material.texGen == milo::mat::kTexGenProjected || draw.material.sphere)
             {
                 envBases[i] = static_cast<int32_t>(used);
                 used += kEnvTexGenVec4s;
@@ -1270,7 +1256,9 @@ namespace gh2
                 std::memcpy(data.mapped + boneBases[i], frame.draws[i].bones.data(), sizeof(frame.draws[i].bones));
             if (lightBases[i] >= 0)
                 writeLighting(frame.draws[i], data.mapped + lightBases[i]);
-            if (envBases[i] >= 0 && frame.draws[i].material.texGen == milo::mat::kTexGenProjected)
+            if (envBases[i] >= 0 && frame.draws[i].material.sphere)
+                writeSphereTexGen(frame.draws[i], data.mapped + envBases[i]);
+            else if (envBases[i] >= 0 && frame.draws[i].material.texGen == milo::mat::kTexGenProjected)
                 writeProjTexGen(frame.draws[i], data.mapped + envBases[i]);
             else if (envBases[i] >= 0)
                 writeEnvTexGen(frame.draws[i], frame.cameras[frame.draws[i].camera].eye, data.mapped + envBases[i]);
@@ -1381,6 +1369,47 @@ namespace gh2
         for (const Camera &camera : frame.cameras)
             viewProjections.push_back(viewProjection(camera, frame.yRatio));
 
+        std::vector<PushConstants> pushes(frame.draws.size());
+        for (size_t i = 0; i < frame.draws.size(); ++i)
+        {
+            const DrawCall &draw = frame.draws[i];
+            if (draw.camera >= viewProjections.size())
+                continue;
+            const Material &material = draw.material;
+            PushConstants &push = pushes[i];
+            const Matrix mvp = draw.screen ? draw.world : multiply(draw.world, viewProjections[draw.camera]);
+            std::memcpy(push.mvp, mvp.data(), sizeof(push.mvp));
+            std::memcpy(push.matColor, material.color, sizeof(push.matColor));
+            push.flags = colorModes[i];
+            if (material.prelit)
+                push.flags |= kFlagPrelit;
+            // A src-alpha blend without alpha_cut tests alpha the same way but
+            // still writes Z where it fails (TEST 0x200d, PsMat::Update
+            // 0x19d10c), leaving colour and the alpha bit alone. With no Z to
+            // write that is alpha_cut's discard. With Z to write the fragment
+            // is kept: its alpha of 0 leaves the colour, but it sets or
+            // clears the bit where retail leaves it.
+            const bool noZWrite = material.zMode == milo::mat::kZDisable || material.zMode == milo::mat::kZTransparent;
+            if (material.alphaCut || (material.blend == milo::mat::kBlendSrcAlpha && noZWrite))
+                push.flags |= kFlagAlphaCut;
+            // Intensify raises a textured pass's rgb scale from 128 to 255.
+            if ((material.texture || material.renderTarget != 0u) && material.intensify)
+                push.flags |= kFlagIntensify;
+            push.flags |= (draw.skinBones - 1u) << kSkinBonesShift;
+            if (material.highlight)
+                push.flags |= kFlagHighlight;
+            push.boneBase = boneBases[i];
+            push.lightBase = lightBases[i];
+            push.envBase = envBases[i];
+            if (material.sphere)
+                push.flags |= kFlagSphere;
+            if (material.spread)
+                push.flags |= kFlagSpread;
+            if (material.texGen == milo::mat::kTexGenProjected)
+                push.flags |= kFlagProjected;
+            std::memcpy(push.uvRows, material.uvXfm, sizeof(push.uvRows));
+            std::memcpy(push.uvOffset, material.uvXfm + 4, sizeof(push.uvOffset));
+        }
         // Bound state outlives a render pass, so the frame data is bound once.
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, s.layout, 1, 1, &data.set, 0, nullptr);
         uint32_t boundCamera = UINT32_MAX;
@@ -1428,36 +1457,8 @@ namespace gh2
                 vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
                 boundPipeline = pipeline;
             }
-            PushConstants push{};
-            const Matrix mvp = draw.screen ? draw.world : multiply(draw.world, viewProjections[draw.camera]);
-            std::memcpy(push.mvp, mvp.data(), sizeof(push.mvp));
-            std::memcpy(push.matColor, material.color, sizeof(push.matColor));
-            push.flags = colorModes[i];
-            if (material.prelit)
-                push.flags |= kFlagPrelit;
-            // A src-alpha blend without alpha_cut tests alpha the same way but
-            // still writes Z where it fails (TEST 0x200d, PsMat::Update
-            // 0x19d10c), leaving colour and the alpha bit alone. With no Z to
-            // write that is alpha_cut's discard. With Z to write the fragment
-            // is kept: its alpha of 0 leaves the colour, but it sets or
-            // clears the bit where retail leaves it.
-            const bool noZWrite = material.zMode == milo::mat::kZDisable || material.zMode == milo::mat::kZTransparent;
-            if (material.alphaCut || (material.blend == milo::mat::kBlendSrcAlpha && noZWrite))
-                push.flags |= kFlagAlphaCut;
-            // Intensify raises a textured pass's rgb scale from 128 to 255.
-            if ((material.texture || material.renderTarget != 0u) && material.intensify)
-                push.flags |= kFlagIntensify;
-            if (draw.blended)
-                push.flags |= kFlagBlended;
-            push.boneBase = boneBases[i];
-            push.lightBase = lightBases[i];
-            push.envBase = envBases[i];
-            if (material.texGen == milo::mat::kTexGenProjected)
-                push.flags |= kFlagProjected;
-            std::memcpy(push.uvRows, material.uvXfm, sizeof(push.uvRows));
-            std::memcpy(push.uvOffset, material.uvXfm + 4, sizeof(push.uvOffset));
             vkCmdPushConstants(cmd, s.layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                               sizeof(push), &push);
+                               sizeof(PushConstants), &pushes[i]);
             vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, s.layout, 0, 1,
                                     &sets[material.texWrap ? 1 : 0], 0, nullptr);
             const VkDeviceSize offset = 0;
