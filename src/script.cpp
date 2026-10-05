@@ -145,6 +145,19 @@ namespace gh2::script
             std::cerr << std::dec << std::endl;
         }
 
+        // DelayThread (0x2f7dd8), whose one caller is sceFsSifCallRpc
+        // (0x2fb048) between tries of a file I/O call that failed: the only
+        // thing to set a timer alarm. That call's number and caller are in
+        // its frame (+0x14, +0xb0), its try count in $s2.
+        struct DelayThreadTag;
+        void onDelayThread(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
+        {
+            const uint32_t sp = GPR_U32(ctx, 29);
+            std::cerr << "[game] file I/O call " << load<uint32_t>(rdram, sp + 0x14u) << " failed, try "
+                      << GPR_U32(ctx, 18) << ", from 0x" << std::hex << load<uint32_t>(rdram, sp + 0xb0u) << std::dec
+                      << std::endl;
+        }
+
         struct GotoScreenTag;
         void onGotoScreen(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
@@ -298,5 +311,6 @@ namespace gh2::script
         EntryHook<GotoScreenTag>::install(runtime, addresses.uiGotoScreen, onGotoScreen);
         EntryHook<DebugModalTag>::install(runtime, addresses.debugModal, onDebugModal);
         EntryHook<AbortTag>::install(runtime, addresses.abort, onAbort);
+        EntryHook<DelayThreadTag>::install(runtime, addresses.delayThread, onDelayThread);
     }
 }

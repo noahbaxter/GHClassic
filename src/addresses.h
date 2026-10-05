@@ -66,6 +66,7 @@ namespace gh2
         uint32_t uiManagerPoll;
         uint32_t debugModal; // DebugModal(bool &, char *)
         uint32_t abort;
+        uint32_t delayThread;
         uint32_t ctlClientPoll;
         uint32_t spuStartSend;
         uint32_t metaMusicPoll;
@@ -240,6 +241,7 @@ namespace gh2
         .uiManagerPoll = 0x214510u,
         .debugModal = 0x105a88u,
         .abort = 0x307b80u,
+        .delayThread = 0x2f7dd8u,
         .ctlClientPoll = 0x22dc68u,
         .spuStartSend = 0x231a78u,
         .metaMusicPoll = 0x21f180u,
