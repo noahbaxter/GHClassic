@@ -30,7 +30,6 @@
 #include "render/native_mat.h"
 #include "render/native_mesh.h"
 
-#include <iostream>
 #include <memory>
 
 namespace gh2
@@ -43,6 +42,8 @@ namespace gh2
         constexpr uint32_t kMat = 0x1e4u;           // RndMat* (ObjPtr at +0x1dc)
         constexpr uint32_t kWorld = 0x1f0u;         // Transform, as UpdateRelativeXfm leaves it
         constexpr uint32_t kPreserved = 0x2d0u;     // MemHandle*, the preserved sprite packet
+        constexpr uint32_t kPreservedQwords = 0x2d4u; // its length
+        constexpr uint32_t kHandleData = 0x10u;     // a MemHandle's first word, plus this, is its memory (Lock 0x2cede8)
         constexpr uint32_t kParticleColor = 0x00u;  // 4 floats
         constexpr uint32_t kParticlePos = 0x20u;    // 3 floats, in the system's space
         constexpr uint32_t kParticleSize = 0x60u;   // float
@@ -53,25 +54,15 @@ namespace gh2
             const uint32_t returnTo = GPR_U32(ctx, 31);
             const uint32_t sys = GPR_U32(ctx, 4);
             const uint32_t first = load<uint32_t>(rdram, sys + kFirstParticle);
-            if (first == 0u && load<uint32_t>(rdram, sys + kPreserved) == 0u)
+            // DrawSprites (0x1a2a64) sends a preserved packet in place of the
+            // live list.
+            const uint32_t preserved = load<uint32_t>(rdram, sys + kPreserved);
+            if (first == 0u && preserved == 0u)
             {
                 ctx->pc = returnTo;
                 return;
             }
             runtime->callGuestFunction(rdram, ctx, s_addresses->updateRelativeXfm, {sys});
-            if (first == 0u)
-            {
-                // A preserved packet with no live list: the particles it holds
-                // are gone from guest memory. Not seen in play yet.
-                static bool reported = false;
-                if (!reported)
-                {
-                    reported = true;
-                    std::cerr << "[particles] a preserved sprite packet is not drawn" << std::endl;
-                }
-                ctx->pc = returnTo;
-                return;
-            }
 
             const Matrix world = readTransform(rdram, sys + kWorld);
             const uint32_t cameraIndex = currentCamera(rdram);
@@ -87,20 +78,19 @@ namespace gh2
             const float *ambient = currentEnviron().ambient;
 
             auto mesh = std::make_shared<MeshData>();
-            for (uint32_t p = first; p != 0u && mesh->verts.size() + 4u <= 0x10000u;
-                 p = load<uint32_t>(rdram, p + kParticleNext))
-            {
+            const auto addSprite = [&](uint32_t colorAt, uint32_t posAt, float half) {
+                if (mesh->verts.size() + 4u > 0x10000u)
+                    return;
                 float local[3];
                 for (uint32_t c = 0; c < 3; ++c)
-                    local[c] = load<float>(rdram, p + kParticlePos + c * 4u);
+                    local[c] = load<float>(rdram, posAt + c * 4u);
                 float center[3];
                 for (uint32_t c = 0; c < 3; ++c)
                     center[c] = local[0] * world[0 * 4 + c] + local[1] * world[1 * 4 + c] +
                                 local[2] * world[2 * 4 + c] + world[3 * 4 + c];
-                const float half = load<float>(rdram, p + kParticleSize) * 0.5f;
                 float color[4];
                 for (uint32_t c = 0; c < 4; ++c)
-                    color[c] = load<float>(rdram, p + kParticleColor + c * 4u);
+                    color[c] = load<float>(rdram, colorAt + c * 4u);
                 if (lit)
                     for (uint32_t c = 0; c < 3; ++c)
                         color[c] *= ambient[c];
@@ -122,6 +112,31 @@ namespace gh2
                 }
                 for (uint16_t i : {0, 1, 2, 2, 1, 3})
                     mesh->indices.push_back(static_cast<uint16_t>(base + i));
+            };
+            if (preserved != 0u)
+            {
+                // The packet as UpdateSpritePacket (0x1a2598) left it, in
+                // batches of up to 127: two header qwords, the count in the
+                // second's first word, a colour qword and a position qword
+                // (half the size in w) for each sprite, then the qword that
+                // runs the program.
+                uint32_t at = load<uint32_t>(rdram, preserved) + kHandleData;
+                const uint32_t end = at + load<uint32_t>(rdram, sys + kPreservedQwords) * 0x10u;
+                while (at + 0x30u <= end)
+                {
+                    const uint32_t count = load<uint32_t>(rdram, at + 0x10u);
+                    at += 0x20u;
+                    if (count > 0x7fu || at + count * 0x20u + 0x10u > end)
+                        break;
+                    for (uint32_t i = 0; i < count; ++i, at += 0x20u)
+                        addSprite(at, at + 0x10u, load<float>(rdram, at + 0x1cu));
+                    at += 0x10u;
+                }
+            }
+            else
+            {
+                for (uint32_t p = first; p != 0u; p = load<uint32_t>(rdram, p + kParticleNext))
+                    addSprite(p + kParticleColor, p + kParticlePos, load<float>(rdram, p + kParticleSize) * 0.5f);
             }
 
             if (!mesh->indices.empty())
