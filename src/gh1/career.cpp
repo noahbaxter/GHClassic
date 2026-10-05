@@ -6,7 +6,7 @@
 //   campaign    GH1's tiers and cash, each tier in the GH2 venue standing in
 //               for its own (gh1/songs.h), with no encores
 //               (content/encores.h)
-//   store       GH1's songs, characters, videos and guitars at GH1's prices,
+//   store       GH1's songs, characters and guitars at GH1's prices,
 //               the guitars GH2's models of the same Gibsons. GH1's finishes
 //               are not GH2's, so each body's finishes are GH2's at the
 //               prices of GH1's for that body, in order.
@@ -209,9 +209,10 @@ namespace gh2::gh1
                 list.nodes.push_back(priced(keyOf(sold->nodes[i]), prices[n]));
             }
         store.nodes.push_back(list);
-        for (const char *kind : {"song", "video"})
-            if (const dtb::Node *sold = dtb::find(*theirStore, kind))
-                store.nodes.push_back(*sold);
+        if (const dtb::Node *sold = dtb::find(*theirStore, "song"))
+            store.nodes.push_back(*sold);
+        // GH1's three videos are not sold until one has been seen to play.
+        store.nodes.push_back(array({symbol("video")}));
         list = array({symbol("character")});
         std::map<std::string, std::string> characters; // GH1's folder to GH2's character
         for (const Guitarist &g : guitarists)
@@ -302,8 +303,9 @@ namespace gh2::gh1
             }
         // The store shows a character it sells by the character's name, as
         // GH2's sold characters' outfits are named: the guitarist again.
+        const dtb::Node *sold = dtb::find(store, "character");
         for (const Guitarist &g : guitarists)
-            if (dtb::find(store.nodes[4], g.character))
+            if (sold && dtb::find(*sold, g.character))
                 for (const char *suffix : {"", "_ui"})
                     if (auto file = ark::readFile("char/" + g.name() + "/og/gen/" + g.name() + suffix + ".milo_ps2"))
                         ark::addFile(layer, std::string("char/") + g.character + "/og/gen/" + g.character + suffix + ".milo_ps2",
