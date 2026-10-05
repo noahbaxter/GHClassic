@@ -61,6 +61,9 @@ namespace gh2
         // The environ tex gen's 3x3 (rows), which the reflection is taken
         // through: tex_xfm's rotation transposed, then y and z swapped.
         float envRows[3][3] = {{1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, -1.0f, 0.0f}};
+        // The projected tex gen's 3x3 (rows) and offset, which take a world
+        // position to its uv: tex_xfm inverted, then y and z swapped.
+        float projRows[4][3] = {};
     };
 
     // What the current environ gives VU1's lighting programs, as

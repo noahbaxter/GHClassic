@@ -37,6 +37,7 @@ namespace gh2
         constexpr uint32_t kFlagAlphaCut = 1u << 4;  // discard alpha below the GS's 1
         constexpr uint32_t kFlagIntensify = 1u << 5; // textured rgb scale 255 over 128
         constexpr uint32_t kFlagBlended = 1u << 6;   // lit and tex-genned from the skinned vert
+        constexpr uint32_t kFlagProjected = 1u << 7; // the tex gen block is the projected one's
 
         struct PushConstants
         {
@@ -47,7 +48,7 @@ namespace gh2
             int32_t boneBase;  // the draw's first bone vec4 in the frame data, -1 when rigid
             int32_t lightBase; // the draw's lighting block in the frame data
             uint32_t flags;    // ColorMode in bits 0-2, then the kFlag bits
-            int32_t envBase;   // the draw's environ tex gen block in the frame data, -1 for none
+            int32_t envBase;   // the draw's environ or projected tex gen block in the frame data, -1 for none
         };
         static_assert(sizeof(PushConstants) <= 128, "past Vulkan's guaranteed push constant size");
 
@@ -300,6 +301,24 @@ namespace gh2
             for (uint32_t c = 0; c < 3; ++c)
                 for (uint32_t k = 0; k < 3; ++k)
                     out[3].v[c] += (eye[k] - w[12 + k]) * m[k][c];
+        }
+
+        // Program 0x410, the projected tex gen (0x2080..0x21b0), takes the
+        // vert through the lighting matrix W (qw676..679) and the material's
+        // rows and offset M (qw691..694), and keeps x and y:
+        //   uv = ((p.W).M).xy
+        // The block holds W.M as three rows, then W's position through M.
+        void writeProjTexGen(const DrawCall &draw, Vec4 *out)
+        {
+            const Matrix &w = draw.lightWorld;
+            const float(&m)[4][3] = draw.material.projRows;
+            for (uint32_t r = 0; r < 4; ++r)
+            {
+                out[r] = {{0.0f, 0.0f, 0.0f, 0.0f}};
+                for (uint32_t c = 0; c < 3; ++c)
+                    out[r].v[c] = w[r * 4 + 0] * m[0][c] + w[r * 4 + 1] * m[1][c] + w[r * 4 + 2] * m[2][c] +
+                                  (r == 3 ? m[3][c] : 0.0f);
+            }
         }
 
         bool check(VkResult result, const char *what)
@@ -1237,7 +1256,7 @@ namespace gh2
                 lightBases[i] = static_cast<int32_t>(used);
                 used += kLightingVec4s;
             }
-            if (draw.material.texGen == milo::mat::kTexGenEnviron)
+            if (draw.material.texGen == milo::mat::kTexGenEnviron || draw.material.texGen == milo::mat::kTexGenProjected)
             {
                 envBases[i] = static_cast<int32_t>(used);
                 used += kEnvTexGenVec4s;
@@ -1251,7 +1270,9 @@ namespace gh2
                 std::memcpy(data.mapped + boneBases[i], frame.draws[i].bones.data(), sizeof(frame.draws[i].bones));
             if (lightBases[i] >= 0)
                 writeLighting(frame.draws[i], data.mapped + lightBases[i]);
-            if (envBases[i] >= 0)
+            if (envBases[i] >= 0 && frame.draws[i].material.texGen == milo::mat::kTexGenProjected)
+                writeProjTexGen(frame.draws[i], data.mapped + envBases[i]);
+            else if (envBases[i] >= 0)
                 writeEnvTexGen(frame.draws[i], frame.cameras[frame.draws[i].camera].eye, data.mapped + envBases[i]);
         }
         vmaFlushAllocation(s.allocator, data.memory, 0, VK_WHOLE_SIZE);
@@ -1431,6 +1452,8 @@ namespace gh2
             push.boneBase = boneBases[i];
             push.lightBase = lightBases[i];
             push.envBase = envBases[i];
+            if (material.texGen == milo::mat::kTexGenProjected)
+                push.flags |= kFlagProjected;
             std::memcpy(push.uvRows, material.uvXfm, sizeof(push.uvRows));
             std::memcpy(push.uvOffset, material.uvXfm + 4, sizeof(push.uvOffset));
             vkCmdPushConstants(cmd, s.layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,

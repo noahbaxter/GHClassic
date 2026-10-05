@@ -15,7 +15,7 @@ layout(push_constant) uniform Push
     vec2 uvOffset;
     int boneBase;
     int lightBase;
-    uint flags; // colour mode in bits 0-2, prelit 8, alpha cut 16, intensify 32, blended 64
+    uint flags; // colour mode in bits 0-2, prelit 8, alpha cut 16, intensify 32, blended 64, projected 128
     int envBase;
 } pc;
 
@@ -35,6 +35,7 @@ const uint kColorPoint = 4u;
 const uint kFlagPrelit = 8u;
 const uint kFlagIntensify = 32u;
 const uint kFlagBlended = 64u;
+const uint kFlagProjected = 128u;
 
 mat4 bone(int b)
 {
@@ -126,7 +127,15 @@ void main()
     if ((pc.flags & kFlagIntensify) != 0u)
         color.rgb *= 255.0 / 128.0;
     vColor = color;
-    if (pc.envBase >= 0)
+    if (pc.envBase >= 0 && (pc.flags & kFlagProjected) != 0u)
+    {
+        // 0x410, the projected tex gen: the vert through the block's rows
+        // and offset, which take it to the projector's space. No divide.
+        int e = pc.envBase;
+        mat3 wm = mat3(data[e].xyz, data[e + 1].xyz, data[e + 2].xyz);
+        vUv = (wm * litPos + data[e + 3].xyz).xy;
+    }
+    else if (pc.envBase >= 0)
     {
         // 0x139, the environ tex gen: the vert-to-eye vector reflected about
         // the normal, both taken through the block's rows.

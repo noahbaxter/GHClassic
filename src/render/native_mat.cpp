@@ -66,6 +66,40 @@ namespace gh2
                 m.envRows[i][2] = load<float>(rdram, xfm + 0x10u + i * 4u);
             }
         }
+
+        // What PsMat::Update's projected case (0x19d374) leaves at +0x170 and
+        // +0x1a0: tex_xfm's rotation through FastInvert (0x2daf60: transposed,
+        // each of its rows over its length squared), tex_xfm's position
+        // negated through that, and both times rows (1 0 0) (0 0 1) (0 -1 0).
+        // Select hands them to VU1 as qw691..694 for program 0x410.
+        void readProjRows(uint8_t *rdram, uint32_t mat, Material &m)
+        {
+            const uint32_t xfm = mat + milo::mat::kTexXfm;
+            float inverse[3][3];
+            for (uint32_t j = 0; j < 3; ++j)
+            {
+                float row[3];
+                for (uint32_t i = 0; i < 3; ++i)
+                    row[i] = load<float>(rdram, xfm + j * 0x10u + i * 4u);
+                const float scale = 1.0f / (row[0] * row[0] + row[1] * row[1] + row[2] * row[2]);
+                for (uint32_t i = 0; i < 3; ++i)
+                    inverse[i][j] = row[i] * scale;
+            }
+            float offset[3] = {};
+            for (uint32_t k = 0; k < 3; ++k)
+            {
+                const float p = -load<float>(rdram, xfm + 0x30u + k * 4u);
+                for (uint32_t c = 0; c < 3; ++c)
+                    offset[c] += p * inverse[k][c];
+            }
+            for (uint32_t i = 0; i < 4; ++i)
+            {
+                const float *row = i < 3 ? inverse[i] : offset;
+                m.projRows[i][0] = row[0];
+                m.projRows[i][1] = -row[2];
+                m.projRows[i][2] = row[1];
+            }
+        }
     }
 
     Material readMaterial(uint8_t *rdram, uint32_t mat)
@@ -95,6 +129,8 @@ namespace gh2
             readUvXfm(rdram, mat, m);
         else if (m.texGen == milo::mat::kTexGenEnviron)
             readEnvRows(rdram, mat, m);
+        else if (m.texGen == milo::mat::kTexGenProjected)
+            readProjRows(rdram, mat, m);
         if (m.blend >= milo::mat::kBlendCount)
             m.blend = milo::mat::kBlendSrcAlpha; // Update's default case
         if (m.zMode >= milo::mat::kZModeCount)
