@@ -74,6 +74,7 @@ namespace gh2::save
         std::string s_path;
         std::string s_importCard;
         std::string s_exportCard;
+        bool s_inMemory = false; // a save goes no further than s_store
         Store s_store;
         Loaded s_loaded = Loaded::kNothing;
         std::string s_loadedFrom;
@@ -362,6 +363,13 @@ namespace gh2::save
                 std::cerr << "[save] no fresh campaign to measure against; not saved" << std::endl;
                 return finish(ctx, kReadWriteFailed);
             }
+            if (s_inMemory)
+            {
+                keepOptions(save->options);
+                gh2::toStore(*save, *s_fresh, s_store, games());
+                std::cout << "[save] kept in memory, not written" << std::endl;
+                return finish(ctx, kNoError);
+            }
             // As retail's (0x14b514): a save already there is replaced only once
             // the player said so, which the menus ask for on this code.
             Store old;
@@ -521,6 +529,11 @@ namespace gh2::save
         // A card save becomes save.bin at once, the old one kept as save.bin.bak.
         void storeCardSave(const gh2::Save &save)
         {
+            if (s_inMemory)
+            {
+                gh2::toStore(save, *s_fresh, s_store, games());
+                return;
+            }
             std::error_code error;
             if (std::filesystem::exists(path(), error))
                 std::filesystem::copy_file(path(), path() + ".bak", std::filesystem::copy_options::overwrite_existing,
@@ -696,6 +709,11 @@ namespace gh2::save
     void usePath(const std::string &path)
     {
         s_path = path;
+    }
+
+    void keepInMemory()
+    {
+        s_inMemory = true;
     }
 
     void importCard(const std::string &path)

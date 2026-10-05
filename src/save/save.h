@@ -37,6 +37,9 @@ namespace gh2::save
 
     // Read and write `path` in place of the user data directory's save.bin.
     void usePath(const std::string &path);
+    // Saves succeed without writing the save file or a card: the run leaves
+    // the player's save as it found it.
+    void keepInMemory();
     // Load the saves on this PCSX2 card (.ps2) instead, making them save.bin:
     // GH2's whole, and every added game's high scores.
     void importCard(const std::string &path);

@@ -1,6 +1,7 @@
 #pragma once
 
-// Keys for testing, off unless --cheats is given:
+// Keys for testing, off unless --cheats is given, which also keeps saves
+// off the disk (main.cpp):
 //
 //   F3, F4, F5   in a song, win it now with that many stars, as the game's
 //                own debug keys do ({player0 win <stars>}, cheats.dta)
