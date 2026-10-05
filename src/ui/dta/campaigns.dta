@@ -221,3 +221,72 @@
       )
    )
 }
+; The store's first screen without the categories the campaign sells nothing
+; in (GH1 has no outfits): each off, and down stepping through the rest.
+{func ghc_store_categories
+   {do
+      ($dir {store_panel loaded_dir})
+      ($shown)
+      {set $shown ()}
+      {resize $shown 0}
+      {foreach $c
+         (
+            (guitar st_guitars.btn) (skin st_skins.btn) (song st_songs.btn)
+            (character st_characters.btn) (outfit st_outfits.btn) (video st_videos.btn)
+         )
+         {if {$dir exists {elem $c 1}}
+            {if_else {&& {find_exists $syscfg store {elem $c 0}} {> {size {find $syscfg store {elem $c 0}}} 1}}
+               {push_back $shown {elem $c 1}}
+               {do
+                  {{$dir find {elem $c 1}} set_showing FALSE}
+                  {store_screen disable {$dir find {elem $c 1}}}
+                  {{$dir find {elem $c 1}} set nav_down {$dir find {elem $c 1}}}
+               }
+            }
+         }
+      }
+      {foreach_int $i 0 {size $shown}
+         {{$dir find {elem $shown $i}} set nav_down
+            {$dir find {elem $shown {mod {'+' $i 1} {size $shown}}}}
+         }
+      }
+   }
+}
+; The store, as the game's own (career.dta) with that on entering.
+{retype store_screen
+   (
+      (panels meta store_back_panel store_guitar_display_panel store_video_panel char_store store_panel helpbar)
+      (focus store_panel)
+      (enter {ghc_store_categories})
+      (BUTTON_DOWN_MSG
+         {cond
+            ({&& {is_updown_button $button} {{store_panel find st_screen2.view} showing}}
+               {store_panel update_index {if_else {== $button kPad_DDown} 1 -1}}
+            )
+            ({== $button kPad_Tri}
+               {synth play_sequence button_back.cue}
+               {if_else {{store_panel find st_screen1.view} showing}
+                  {do {store_screen backwards_anim} {autosave_goto career_screen}}
+                  {do {store_panel hide_models} {store_panel show_store_screen_1}}
+               }
+               kDataUnhandled
+            )
+            ({&& {== $button kPad_X} {{store_panel find st_screen2.view} showing}}
+               {if_else {store_panel can_buy_item}
+                  {do
+                     {campaign buy_item {store_panel get item_name} {store_panel get_item_price}}
+                     {store_panel update_store_item_sold}
+                     {store_panel update_total_cash_display}
+                     {if {== {store_panel get category} guitar} {store_skin_provider init_data}}
+                     {ui push_screen store_bought_screen}
+                     {play_sfx cash_register}
+                  }
+                  {play_sfx button_error}
+               }
+               TRUE
+            )
+            (TRUE kDataUnhandled)
+         }
+      )
+   )
+}
