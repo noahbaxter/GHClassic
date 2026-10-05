@@ -1,5 +1,6 @@
 #include "host/vulkan_frontend.h"
 
+#include "dev/cheats.h"
 #include "host/audio.h"
 #include "dev/draw_dump.h"
 #include "host/input.h"
@@ -555,6 +556,7 @@ namespace gh2
 #endif
                 if (toggle)
                     SDL_SetWindowFullscreen(s.window, !(SDL_GetWindowFlags(s.window) & SDL_WINDOW_FULLSCREEN));
+                cheats::key(event.key.key);
             }
         }
         pollInput(devicesChanged);
