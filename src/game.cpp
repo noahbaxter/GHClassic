@@ -22,6 +22,7 @@
 #include "ui/menus.h"
 #include "ui/meta_music.h"
 #include "movie/movie.h"
+#include "dev/cheats.h"
 #include "dev/null_rnd.h"
 #include "host/pad.h"
 #include "render/mesh_capture.h"
@@ -89,6 +90,7 @@ namespace
         gh2::campaigns::install(runtime, gh2::kSlus21447);
         gh2::scenario::install(runtime, gh2::kSlus21447);
         gh2::transplant::install(runtime, gh2::kSlus21447);
+        gh2::cheats::install(runtime, gh2::kSlus21447);
         gh2::fast_boot::install(runtime, gh2::kSlus21447);
         gh2::seed::install(runtime, gh2::kSlus21447);
     }
