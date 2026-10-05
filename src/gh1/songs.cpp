@@ -14,6 +14,7 @@
 #include "gh1/songs.h"
 
 #include "disc/ark.h"
+#include "content/encores.h"
 #include "content/locale.h"
 #include "content/setlists.h"
 #include "content/songs.h"
@@ -273,6 +274,8 @@ namespace gh2::gh1
             if (const dtb::Node *name = value(*strings, "highscore_dummy_" + std::to_string(i)))
                 scoreNames[i] = name->text;
         setlists::add("gh1", std::move(tiers), "ui/sel_song_quickplay.milo", scoreNames, setlists::required(*campaign));
+        // Its campaign.dta asks a venue only for a count of songs.
+        encores::none("gh1");
         std::cerr << "[gh1] " << count << " songs converted" << std::endl;
     }
 }

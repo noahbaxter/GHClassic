@@ -200,6 +200,7 @@ set(GHC_GAME_SOURCES
     src/whammy_hold.cpp
     src/content/campaigns.cpp
     src/content/card.cpp
+    src/content/encores.cpp
     src/content/games.cpp
     src/content/locale.cpp
     src/content/mogg.cpp

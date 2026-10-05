@@ -1,6 +1,7 @@
 #include "content/setlists.h"
 
 #include "content/campaigns.h"
+#include "content/encores.h"
 #include "content/locale.h"
 #include "content/songs.h"
 #include "disc/ark.h"
@@ -119,9 +120,11 @@ namespace gh2::setlists
             // A venue unlocked marks its encore unlocked with the rest. The
             // encore opens once a band has passed one short of the songs
             // the venue asks for on a difficulty (IsEncoreUnlocked,
-            // 0x132c10; GetRequiredSongs, 0x1313d8).
+            // 0x132c10; GetRequiredSongs, 0x1313d8). A game without encores
+            // has a tier's last song open with the rest.
+            const bool gated = encores::has(selected()) && !s_shown->required.empty();
             std::vector<bool> encoreOpen(s_shown->tiers.size(), false);
-            for (int band = 0; band < kBands && !s_shown->required.empty(); ++band)
+            for (int band = 0; band < kBands && gated; ++band)
             {
                 const auto passed = save::passedSongs(selected(), band);
                 for (size_t d = 0; d < passed.size() && d < s_shown->required.size(); ++d)
@@ -141,13 +144,13 @@ namespace gh2::setlists
                 const Tier &tier = s_shown->tiers[t];
                 if (allAccess)
                     return true;
-                if (tier.encore && s + 1u == tier.songs.size() && !s_shown->required.empty())
+                if (gated && tier.encore && s + 1u == tier.songs.size())
                     return static_cast<bool>(encoreOpen[t]);
                 if (unlocked.count(tier.songs[s]) != 0u)
                     return true;
                 if (!tier.encore)
                     return !career;
-                return t < 2u && s + 1u < tier.songs.size();
+                return t < 2u && (!gated || s + 1u < tier.songs.size());
             };
             for (size_t t = 0; t < s_shown->tiers.size(); ++t)
             {

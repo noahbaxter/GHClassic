@@ -4,8 +4,8 @@
 // made here in GH2's form from GH1's own.
 //
 //   campaign    GH1's tiers and cash, each tier in the GH2 venue standing in
-//               for its own (gh1/songs.h). GH2 gates a tier's last song as
-//               its encore, which GH1 has none of.
+//               for its own (gh1/songs.h), with no encores
+//               (content/encores.h)
 //   store       GH1's songs, characters, videos and guitars at GH1's prices,
 //               the guitars GH2's models of the same Gibsons. GH1's finishes
 //               are not GH2's, so each body's finishes are GH2's at the
