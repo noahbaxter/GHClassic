@@ -1,6 +1,6 @@
 ; A GH1 career from nothing: a band, Guitar Hero picked from the campaigns,
-; a new medium career as a GH1 guitarist, then its first song played
-; through to its results and cash. The tiers, songs, cash, store and names
+; a new medium career as a GH1 guitarist, then its first song won
+; by the game's cheat, its results and cash. The tiers, songs, cash, store and names
 ; are GH1's; the save holds it under gh1's own sections, and the band's GH2
 ; career is untouched.
 (needs gh1)
@@ -59,8 +59,9 @@
 (press green)
 (wait_screen game_screen 60)
 (expect {gamecfg get_song} iloverockandroll)
-(wait 30)
+(wait 5)
 (shot song)
+{player0 win 5}
 (wait_screen endgame_screen 400)
 (wait 4)
 (shot results)
