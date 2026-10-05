@@ -55,6 +55,19 @@ namespace gh2
             uint32_t camera = 0; // index into cameras
         };
         std::vector<PointTest> tests;
+        // Part of the picture copied into a texture (PsTex::CopyFromScreen),
+        // as it stood before draws[before]: the texture's size, from x and y
+        // in the frame's pixels.
+        struct ScreenCopy
+        {
+            size_t before = 0;
+            uint32_t tex = 0; // the RndTex, which later draws sample as a rendered texture
+            int32_t x = 0;
+            int32_t y = 0;
+            uint32_t width = 0;
+            uint32_t height = 0;
+        };
+        std::vector<ScreenCopy> copies;
     };
 
     // Finished frames, oldest first. The game thread publishes at EndDrawing;

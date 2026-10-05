@@ -9,6 +9,8 @@
 #include "mesh_frag.h"
 #include "mesh_vert.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <iostream>
 #include <unordered_map>
@@ -181,6 +183,7 @@ namespace gh2
             VkDescriptorSet sets[2]{}; // clamped, wrapped
             uint32_t width = 0;
             uint32_t height = 0;
+            bool copied = false; // filled by a screen copy: colour only
         };
 
         // Room for this many live textures before the pool refuses.
@@ -296,6 +299,10 @@ namespace gh2
         VkDevice device = VK_NULL_HANDLE;
         VmaAllocator allocator = VK_NULL_HANDLE;
         VkRenderPass renderPass = VK_NULL_HANDLE;
+        // The main pass in parts, around a screen copy: up to the first, and
+        // from each on. Same attachments, so its framebuffer and pipelines.
+        VkRenderPass firstPass = VK_NULL_HANDLE;
+        VkRenderPass resumePass = VK_NULL_HANDLE;
         VkPipelineLayout layout = VK_NULL_HANDLE;
         VkShaderModule vertexShader = VK_NULL_HANDLE;
         VkShaderModule fragmentShader = VK_NULL_HANDLE;
@@ -344,26 +351,31 @@ namespace gh2
         // resolve into the finished image, attachment 2; else colour is it.
         // The finished image is read before a pass draws into it again and
         // after: blit and readback for the main pass, samplers for a target.
-        bool createPass(VkImageLayout finished, VkRenderPass &out)
+        //
+        // A pass stopped for a screen copy and taken up again is two: `keep`
+        // stores what the next needs, `resume` loads it in place of clearing.
+        bool createPass(VkImageLayout finished, bool keep, bool resume, VkRenderPass &out)
         {
             const bool resolve = samples != VK_SAMPLE_COUNT_1_BIT;
             VkAttachmentDescription attachments[3]{};
             attachments[0].format = kColorFormat;
             attachments[0].samples = samples;
-            attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-            attachments[0].storeOp = resolve ? VK_ATTACHMENT_STORE_OP_DONT_CARE : VK_ATTACHMENT_STORE_OP_STORE;
+            attachments[0].loadOp = resume ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR;
+            attachments[0].storeOp = resolve && !keep ? VK_ATTACHMENT_STORE_OP_DONT_CARE : VK_ATTACHMENT_STORE_OP_STORE;
             attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
             attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-            attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             attachments[0].finalLayout = resolve ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : finished;
+            attachments[0].initialLayout = resume ? attachments[0].finalLayout : VK_IMAGE_LAYOUT_UNDEFINED;
             attachments[1] = attachments[0];
             attachments[1].format = kDepthFormat;
-            attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            attachments[1].storeOp = keep ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE;
             attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            attachments[1].initialLayout = resume ? attachments[1].finalLayout : VK_IMAGE_LAYOUT_UNDEFINED;
             attachments[2] = attachments[0];
             attachments[2].samples = VK_SAMPLE_COUNT_1_BIT;
             attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
             attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            attachments[2].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             attachments[2].finalLayout = finished;
 
             VkAttachmentReference colorRef{0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
@@ -406,10 +418,12 @@ namespace gh2
             return check(vkCreateRenderPass(device, &info, nullptr, &out), "render pass");
         }
 
-        // A colour or depth attachment at `samples` that no one reads after
-        // its pass: depth, and colour that resolves into another image.
-        bool createAttachment(VkFormat format, VkImageUsageFlags usage, uint32_t w, uint32_t h, VkImage &image,
-                           VmaAllocation &memory, VkImageView &view)
+        // A colour or depth attachment at `samples` that no one samples:
+        // depth, and colour that resolves into another image. `transient`
+        // when nothing outlives its pass, which the main pass's must to be
+        // taken up again after a screen copy.
+        bool createAttachment(VkFormat format, VkImageUsageFlags usage, bool transient, uint32_t w, uint32_t h,
+                              VkImage &image, VmaAllocation &memory, VkImageView &view)
         {
             VkImageCreateInfo imageInfo{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
             imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -419,7 +433,7 @@ namespace gh2
             imageInfo.arrayLayers = 1;
             imageInfo.samples = samples;
             imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-            imageInfo.usage = usage | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
+            imageInfo.usage = usage | (transient ? VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT : 0u);
             VmaAllocationCreateInfo alloc{};
             alloc.usage = VMA_MEMORY_USAGE_AUTO;
             if (!check(vmaCreateImage(allocator, &imageInfo, &alloc, &image, &memory, nullptr), "attachment"))
@@ -454,20 +468,69 @@ namespace gh2
             t = TargetImage{};
         }
 
+        // Fills a copied image from the main target, which the pass just
+        // ended left in TRANSFER_SRC_OPTIMAL, taking its first pixel from x
+        // and y. What falls outside the picture is black.
+        void copyFromTarget(VkCommandBuffer cmd, const TargetImage &to, int32_t x, int32_t y)
+        {
+            VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.image = to.color;
+            barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr,
+                                 0, nullptr, 1, &barrier);
+
+            const int32_t x0 = std::max(x, 0);
+            const int32_t y0 = std::max(y, 0);
+            const int32_t x1 = std::min(x + static_cast<int32_t>(to.width), static_cast<int32_t>(width));
+            const int32_t y1 = std::min(y + static_cast<int32_t>(to.height), static_cast<int32_t>(height));
+            const bool any = x1 > x0 && y1 > y0;
+            if (!any || static_cast<uint32_t>(x1 - x0) != to.width || static_cast<uint32_t>(y1 - y0) != to.height)
+            {
+                const VkClearColorValue black{};
+                vkCmdClearColorImage(cmd, to.color, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &black, 1,
+                                     &barrier.subresourceRange);
+            }
+            if (any)
+            {
+                VkImageCopy region{};
+                region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+                region.srcOffset = {x0, y0, 0};
+                region.dstSubresource = region.srcSubresource;
+                region.dstOffset = {x0 - x, y0 - y, 0};
+                region.extent = {static_cast<uint32_t>(x1 - x0), static_cast<uint32_t>(y1 - y0), 1};
+                vkCmdCopyImage(cmd, target, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, to.color,
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+            }
+
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0,
+                                 nullptr, 0, nullptr, 1, &barrier);
+        }
+
         // The image for a target's generation, made or remade at its size.
-        TargetImage *targetImage(uint32_t tex, uint32_t generation, uint32_t w, uint32_t h)
+        // `copied` is one a screen copy fills: nothing draws into it.
+        TargetImage *targetImage(uint32_t tex, uint32_t generation, uint32_t w, uint32_t h, bool copied)
         {
             std::vector<TargetImage> &images = targets[tex];
             if (images.size() <= generation)
                 images.resize(generation + 1u);
             TargetImage &t = images[generation];
-            if (t.framebuffer != VK_NULL_HANDLE && t.width == w && t.height == h)
+            if (t.color != VK_NULL_HANDLE && t.width == w && t.height == h && t.copied == copied)
                 return &t;
-            if (t.framebuffer != VK_NULL_HANDLE)
+            if (t.color != VK_NULL_HANDLE)
             {
                 vkDeviceWaitIdle(device);
                 destroyTarget(t);
             }
+            t.copied = copied;
 
             VkImageCreateInfo imageInfo{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
             imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -477,7 +540,8 @@ namespace gh2
             imageInfo.arrayLayers = 1;
             imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
             imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-            imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+            imageInfo.usage = (copied ? VK_IMAGE_USAGE_TRANSFER_DST_BIT : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) |
+                              VK_IMAGE_USAGE_SAMPLED_BIT;
             VmaAllocationCreateInfo alloc{};
             alloc.usage = VMA_MEMORY_USAGE_AUTO;
             if (!check(vmaCreateImage(allocator, &imageInfo, &alloc, &t.color, &t.colorMemory, nullptr), "target"))
@@ -486,16 +550,23 @@ namespace gh2
             view.image = t.color;
             view.viewType = VK_IMAGE_VIEW_TYPE_2D;
             view.format = kColorFormat;
+            // The GS's copy carries the frame buffer's alpha, whose top bit
+            // every material but the highway's own sets (FBA, PsMat::Select
+            // 0x3d8498) and the clear sets too. The picture's alpha here is
+            // the last fragment's, so a copy reads as opaque instead.
+            if (copied)
+                view.components.a = VK_COMPONENT_SWIZZLE_ONE;
             view.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
             bool ok = check(vkCreateImageView(device, &view, nullptr, &t.colorView), "target view");
 
             const bool resolve = samples != VK_SAMPLE_COUNT_1_BIT;
-            if (resolve)
-                ok = ok && createAttachment(kColorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, w, h, t.msaa,
+            if (resolve && !copied)
+                ok = ok && createAttachment(kColorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, true, w, h, t.msaa,
                                             t.msaaMemory, t.msaaView);
-            ok = ok && createAttachment(kDepthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, w, h, t.depth,
-                                        t.depthMemory, t.depthView);
-            if (ok)
+            if (!copied)
+                ok = ok && createAttachment(kDepthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, true, w, h,
+                                            t.depth, t.depthMemory, t.depthView);
+            if (ok && !copied)
             {
                 const VkImageView plain[] = {t.colorView, t.depthView};
                 const VkImageView resolved[] = {t.msaaView, t.depthView, t.colorView};
@@ -936,11 +1007,11 @@ namespace gh2
                 return false;
 
             const bool resolve = samples != VK_SAMPLE_COUNT_1_BIT;
-            if (resolve && !createAttachment(kColorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, w, h, msaa,
+            if (resolve && !createAttachment(kColorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, false, w, h, msaa,
                                              msaaMemory, msaaView))
                 return false;
-            if (!createAttachment(kDepthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, w, h, depth, depthMemory,
-                                  depthView))
+            if (!createAttachment(kDepthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, false, w, h, depth,
+                                  depthMemory, depthView))
                 return false;
 
             const VkImageView plain[] = {targetView, depthView};
@@ -1045,8 +1116,10 @@ namespace gh2
         m_state->device = device;
         m_state->allocator = allocator;
         m_state->samples = samples;
-        return m_state->createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_state->renderPass) &&
-               m_state->createPass(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_state->targetPass) &&
+        return m_state->createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, false, false, m_state->renderPass) &&
+               m_state->createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, true, false, m_state->firstPass) &&
+               m_state->createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, true, true, m_state->resumePass) &&
+               m_state->createPass(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, false, false, m_state->targetPass) &&
                m_state->createDescriptorState() && m_state->createLayout();
     }
 
@@ -1087,8 +1160,9 @@ namespace gh2
             vkDestroyShaderModule(s.device, s.fragmentShader, nullptr);
         if (s.layout != VK_NULL_HANDLE)
             vkDestroyPipelineLayout(s.device, s.layout, nullptr);
-        if (s.renderPass != VK_NULL_HANDLE)
-            vkDestroyRenderPass(s.device, s.renderPass, nullptr);
+        for (VkRenderPass pass : {s.renderPass, s.firstPass, s.resumePass})
+            if (pass != VK_NULL_HANDLE)
+                vkDestroyRenderPass(s.device, pass, nullptr);
         if (s.targetPass != VK_NULL_HANDLE)
             vkDestroyRenderPass(s.device, s.targetPass, nullptr);
         m_state.reset();
@@ -1162,16 +1236,50 @@ namespace gh2
             uint32_t height;
             std::vector<size_t> draws;
             TargetImage *image = nullptr;
+            // For a screen copy, which no draw goes into: where its texture's
+            // first pixel is in the picture, and the draw it is made before.
+            bool copied = false;
+            int32_t x = 0;
+            int32_t y = 0;
+            size_t before = 0;
         };
         std::vector<TargetRun> runs;
         std::vector<int32_t> drawRun(frame.draws.size(), -1);
         std::vector<int32_t> sampleRun(frame.draws.size(), -1);
+        std::vector<size_t> copyRuns; // in the order they are made
         {
             std::unordered_map<uint32_t, int32_t> current;
             std::unordered_map<uint32_t, bool> sampledSince;
             std::unordered_map<uint32_t, uint32_t> generations;
+            // A copy is the size its texture covers of the picture as drawn
+            // here, so the pixels it puts back are the ones it took.
+            const float sx = static_cast<float>(width) / static_cast<float>(frame.width);
+            const float sy = static_cast<float>(height) / static_cast<float>(frame.height);
+            size_t nextCopy = 0;
             for (size_t i = 0; i < frame.draws.size(); ++i)
             {
+                for (; nextCopy < frame.copies.size() && frame.copies[nextCopy].before <= i; ++nextCopy)
+                {
+                    const Frame::ScreenCopy &copy = frame.copies[nextCopy];
+                    const int32_t x0 = static_cast<int32_t>(std::lround(static_cast<float>(copy.x) * sx));
+                    const int32_t y0 = static_cast<int32_t>(std::lround(static_cast<float>(copy.y) * sy));
+                    const int32_t x1 =
+                        static_cast<int32_t>(std::lround(static_cast<float>(copy.x + static_cast<int32_t>(copy.width)) * sx));
+                    const int32_t y1 =
+                        static_cast<int32_t>(std::lround(static_cast<float>(copy.y + static_cast<int32_t>(copy.height)) * sy));
+                    if (x1 <= x0 || y1 <= y0)
+                        continue;
+                    TargetRun run{copy.tex, generations[copy.tex]++, static_cast<uint32_t>(x1 - x0),
+                                  static_cast<uint32_t>(y1 - y0), {}};
+                    run.copied = true;
+                    run.x = x0;
+                    run.y = y0;
+                    run.before = i;
+                    runs.push_back(run);
+                    copyRuns.push_back(runs.size() - 1u);
+                    current.insert_or_assign(copy.tex, static_cast<int32_t>(runs.size() - 1u));
+                    sampledSince[copy.tex] = false;
+                }
                 const DrawCall &draw = frame.draws[i];
                 if (draw.camera >= frame.cameras.size())
                     continue;
@@ -1214,7 +1322,7 @@ namespace gh2
                 images.resize(run.generation + 1u);
         }
         for (TargetRun &run : runs)
-            run.image = s.targetImage(run.tex, run.generation, run.width, run.height);
+            run.image = s.targetImage(run.tex, run.generation, run.width, run.height, run.copied);
 
         std::vector<Matrix> viewProjections;
         viewProjections.reserve(frame.cameras.size());
@@ -1300,7 +1408,7 @@ namespace gh2
         // into it, in order of first use.
         for (const TargetRun &run : runs)
         {
-            if (!run.image)
+            if (!run.image || run.copied)
                 continue;
             // Transparent black, as the GS reads memory nothing drew.
             VkClearValue clears[2]{};
@@ -1323,16 +1431,35 @@ namespace gh2
             clears[0].color.float32[i] = frame.clear[i];
         clears[1].depthStencil = {0.0f, 0};
         VkRenderPassBeginInfo begin{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
-        begin.renderPass = s.renderPass;
+        begin.renderPass = copyRuns.empty() ? s.renderPass : s.firstPass;
         begin.framebuffer = s.framebuffer;
         begin.renderArea = {{0, 0}, {width, height}};
         begin.clearValueCount = 2;
         begin.pClearValues = clears;
         vkCmdBeginRenderPass(cmd, &begin, VK_SUBPASS_CONTENTS_INLINE);
         boundCamera = UINT32_MAX;
+        size_t nextCopy = 0;
         for (size_t i = 0; i < frame.draws.size(); ++i)
-            if (drawRun[i] < 0)
-                drawOne(i, static_cast<float>(width), static_cast<float>(height));
+        {
+            if (drawRun[i] >= 0)
+                continue;
+            if (nextCopy < copyRuns.size() && runs[copyRuns[nextCopy]].before <= i)
+            {
+                // The pass ends with the picture so far in the target, is
+                // copied from, and goes on from what it kept.
+                vkCmdEndRenderPass(cmd);
+                for (; nextCopy < copyRuns.size() && runs[copyRuns[nextCopy]].before <= i; ++nextCopy)
+                {
+                    const TargetRun &run = runs[copyRuns[nextCopy]];
+                    if (run.image)
+                        s.copyFromTarget(cmd, *run.image, run.x, run.y);
+                }
+                begin.renderPass = s.resumePass;
+                vkCmdBeginRenderPass(cmd, &begin, VK_SUBPASS_CONTENTS_INLINE);
+                boundCamera = UINT32_MAX;
+            }
+            drawOne(i, static_cast<float>(width), static_cast<float>(height));
+        }
         vkCmdEndRenderPass(cmd);
         s.retire(serial);
         return true;
