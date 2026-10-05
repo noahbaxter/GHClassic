@@ -48,6 +48,8 @@ namespace gh2
         float color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
         bool intensify = false;
         bool alphaCut = false;
+        bool alphaWrite = false;    // else every pixel it draws gets the frame buffer's alpha bit
+        bool destAlphaTest = false; // drawn only where that bit is clear
         bool texWrap = true;
         bool useEnviron = false;
         bool prelit = false;

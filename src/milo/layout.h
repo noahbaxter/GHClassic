@@ -52,6 +52,10 @@ namespace milo
         constexpr uint32_t kDiffuseTex = 0x98u; // RndTex* (ObjPtr at +0x90)
         constexpr uint32_t kPrelit = 0x9cu;     // bool: vertex colour is baked light
         constexpr uint32_t kAlphaCut = 0xa0u;   // bool: ATST greater, AREF 0
+        constexpr uint32_t kAlphaWrite = 0xa4u; // bool: FBA off, so the frame buffer's alpha is the fragment's (0x3d8498)
+        // PsMat's own, set from outside (Track::SetupFade 0x150ac8): DATE,
+        // draw only where the frame buffer's alpha bit is clear (0x19d114).
+        constexpr uint32_t kDestAlphaTest = 0x120u;
         constexpr uint32_t kNextPass = 0xb0u;   // RndMat* (ObjPtr at +0xa8)
 
         enum Blend : uint32_t

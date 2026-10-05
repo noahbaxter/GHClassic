@@ -20,7 +20,6 @@ namespace gh2
     namespace
     {
         constexpr VkFormat kColorFormat = VK_FORMAT_R8G8B8A8_UNORM;
-        constexpr VkFormat kDepthFormat = VK_FORMAT_D32_SFLOAT;
         // Frames a GPU resource must outlive its last use by.
         constexpr uint64_t kRetireAfter = 3;
 
@@ -62,8 +61,9 @@ namespace gh2
         // A draw's environ tex gen block: see writeEnvTexGen.
         constexpr uint32_t kEnvTexGenVec4s = 4u;
 
+        // By blend, z mode, alpha write and dest alpha test.
         constexpr uint32_t kPipelineCount =
-            static_cast<uint32_t>(milo::mat::kBlendCount) * static_cast<uint32_t>(milo::mat::kZModeCount);
+            static_cast<uint32_t>(milo::mat::kBlendCount) * static_cast<uint32_t>(milo::mat::kZModeCount) * 4u;
 
         // The GS's ALPHA_1 for each blend, as PsMat::Update sets it.
         VkPipelineColorBlendAttachmentState blendState(uint32_t blend)
@@ -110,9 +110,26 @@ namespace gh2
 
         // The GS's ZTST and ZMSK for each z mode. Depth is reversed like the
         // GS's, nearer is larger.
-        VkPipelineDepthStencilStateCreateInfo depthState(uint32_t zMode)
+        //
+        // The stencil is the top bit of the frame buffer's alpha, the one a
+        // 16-bit buffer has. FBA sets it on every pixel a material draws
+        // unless the material has alpha_write, whose own alpha (0.99 on the
+        // highway's) then leaves it clear. DATE draws only where it is clear.
+        VkPipelineDepthStencilStateCreateInfo depthState(uint32_t zMode, bool alphaWrite, bool destAlphaTest)
         {
             VkPipelineDepthStencilStateCreateInfo state{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
+            state.stencilTestEnable = VK_TRUE;
+            state.front.failOp = VK_STENCIL_OP_KEEP;
+            state.front.depthFailOp = VK_STENCIL_OP_KEEP;
+            state.front.compareOp = destAlphaTest ? VK_COMPARE_OP_EQUAL : VK_COMPARE_OP_ALWAYS;
+            state.front.compareMask = 1u;
+            state.front.writeMask = 1u;
+            // A tested pixel's bit is clear, so setting it is one up.
+            state.front.reference = destAlphaTest ? 0u : 1u;
+            state.front.passOp = alphaWrite      ? VK_STENCIL_OP_ZERO
+                                 : destAlphaTest ? VK_STENCIL_OP_INCREMENT_AND_CLAMP
+                                                 : VK_STENCIL_OP_REPLACE;
+            state.back = state.front;
             state.depthTestEnable = VK_TRUE;
             switch (zMode)
             {
@@ -298,6 +315,9 @@ namespace gh2
     {
         VkDevice device = VK_NULL_HANDLE;
         VmaAllocator allocator = VK_NULL_HANDLE;
+        // Depth with a stencil: 32-bit float where the device has it, which
+        // Vulkan promises of one of these two.
+        VkFormat depthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
         VkRenderPass renderPass = VK_NULL_HANDLE;
         // The main pass in parts, around a screen copy: up to the first, and
         // from each on. Same attachments, so its framebuffer and pipelines.
@@ -367,8 +387,10 @@ namespace gh2
             attachments[0].finalLayout = resolve ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : finished;
             attachments[0].initialLayout = resume ? attachments[0].finalLayout : VK_IMAGE_LAYOUT_UNDEFINED;
             attachments[1] = attachments[0];
-            attachments[1].format = kDepthFormat;
+            attachments[1].format = depthFormat;
             attachments[1].storeOp = keep ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            attachments[1].stencilLoadOp = attachments[1].loadOp;
+            attachments[1].stencilStoreOp = attachments[1].storeOp;
             attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
             attachments[1].initialLayout = resume ? attachments[1].finalLayout : VK_IMAGE_LAYOUT_UNDEFINED;
             attachments[2] = attachments[0];
@@ -442,8 +464,10 @@ namespace gh2
             viewInfo.image = image;
             viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
             viewInfo.format = format;
-            viewInfo.subresourceRange = {format == kDepthFormat ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
-                                         0, 1, 0, 1};
+            const VkImageAspectFlags aspect = format == depthFormat
+                                                  ? VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT
+                                                  : VK_IMAGE_ASPECT_COLOR_BIT;
+            viewInfo.subresourceRange = {aspect, 0, 1, 0, 1};
             return check(vkCreateImageView(device, &viewInfo, nullptr, &view), "attachment view");
         }
 
@@ -564,7 +588,7 @@ namespace gh2
                 ok = ok && createAttachment(kColorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, true, w, h, t.msaa,
                                             t.msaaMemory, t.msaaView);
             if (!copied)
-                ok = ok && createAttachment(kDepthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, true, w, h,
+                ok = ok && createAttachment(depthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, true, w, h,
                                             t.depth, t.depthMemory, t.depthView);
             if (ok && !copied)
             {
@@ -893,9 +917,10 @@ namespace gh2
             return vertexShader != VK_NULL_HANDLE && fragmentShader != VK_NULL_HANDLE;
         }
 
-        VkPipeline pipeline(uint32_t blend, uint32_t zMode)
+        VkPipeline pipeline(uint32_t blend, uint32_t zMode, bool alphaWrite, bool destAlphaTest)
         {
-            VkPipeline &slot = pipelines[blend * milo::mat::kZModeCount + zMode];
+            VkPipeline &slot = pipelines[((blend * milo::mat::kZModeCount + zMode) * 2u + (alphaWrite ? 1u : 0u)) * 2u +
+                                         (destAlphaTest ? 1u : 0u)];
             if (slot != VK_NULL_HANDLE)
                 return slot;
 
@@ -939,7 +964,7 @@ namespace gh2
             VkPipelineMultisampleStateCreateInfo multisample{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
             multisample.rasterizationSamples = samples;
 
-            const VkPipelineDepthStencilStateCreateInfo depth = depthState(zMode);
+            const VkPipelineDepthStencilStateCreateInfo depth = depthState(zMode, alphaWrite, destAlphaTest);
 
             const VkPipelineColorBlendAttachmentState attachment = blendState(blend);
             VkPipelineColorBlendStateCreateInfo colorBlend{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
@@ -1010,7 +1035,7 @@ namespace gh2
             if (resolve && !createAttachment(kColorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, false, w, h, msaa,
                                              msaaMemory, msaaView))
                 return false;
-            if (!createAttachment(kDepthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, false, w, h, depth,
+            if (!createAttachment(depthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, false, w, h, depth,
                                   depthMemory, depthView))
                 return false;
 
@@ -1116,6 +1141,12 @@ namespace gh2
         m_state->device = device;
         m_state->allocator = allocator;
         m_state->samples = samples;
+        VmaAllocatorInfo allocatorInfo{};
+        vmaGetAllocatorInfo(allocator, &allocatorInfo);
+        VkFormatProperties depthProperties{};
+        vkGetPhysicalDeviceFormatProperties(allocatorInfo.physicalDevice, m_state->depthFormat, &depthProperties);
+        if ((depthProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) == 0u)
+            m_state->depthFormat = VK_FORMAT_D24_UNORM_S8_UINT;
         return m_state->createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, false, false, m_state->renderPass) &&
                m_state->createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, true, false, m_state->firstPass) &&
                m_state->createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, true, true, m_state->resumePass) &&
@@ -1367,7 +1398,8 @@ namespace gh2
                 boundCamera = draw.camera;
             }
             const Material &material = draw.material;
-            const VkPipeline pipeline = s.pipeline(material.blend, material.zMode);
+            const VkPipeline pipeline =
+                s.pipeline(material.blend, material.zMode, material.alphaWrite, material.destAlphaTest);
             if (pipeline == VK_NULL_HANDLE)
                 return;
             if (pipeline != boundPipeline)
@@ -1382,7 +1414,14 @@ namespace gh2
             push.flags = colorModes[i];
             if (material.prelit)
                 push.flags |= kFlagPrelit;
-            if (material.alphaCut)
+            // A src-alpha blend without alpha_cut tests alpha the same way but
+            // still writes Z where it fails (TEST 0x200d, PsMat::Update
+            // 0x19d10c), leaving colour and the alpha bit alone. With no Z to
+            // write that is alpha_cut's discard. With Z to write the fragment
+            // is kept: its alpha of 0 leaves the colour, but it sets or
+            // clears the bit where retail leaves it.
+            const bool noZWrite = material.zMode == milo::mat::kZDisable || material.zMode == milo::mat::kZTransparent;
+            if (material.alphaCut || (material.blend == milo::mat::kBlendSrcAlpha && noZWrite))
                 push.flags |= kFlagAlphaCut;
             // Intensify raises a textured pass's rgb scale from 128 to 255.
             if ((material.texture || material.renderTarget != 0u) && material.intensify)
@@ -1429,7 +1468,8 @@ namespace gh2
         VkClearValue clears[2]{};
         for (int i = 0; i < 4; ++i)
             clears[0].color.float32[i] = frame.clear[i];
-        clears[1].depthStencil = {0.0f, 0};
+        // The clear writes the clear colour's alpha, whose top bit 1.0 sets.
+        clears[1].depthStencil = {0.0f, frame.clear[3] >= 1.0f ? 1u : 0u};
         VkRenderPassBeginInfo begin{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
         begin.renderPass = copyRuns.empty() ? s.renderPass : s.firstPass;
         begin.framebuffer = s.framebuffer;

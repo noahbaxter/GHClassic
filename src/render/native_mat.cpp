@@ -77,6 +77,8 @@ namespace gh2
             m.color[i] = load<float>(rdram, mat + milo::mat::kColor + i * 4u);
         m.intensify = load<uint32_t>(rdram, mat + milo::mat::kIntensify) != 0u;
         m.alphaCut = load<uint32_t>(rdram, mat + milo::mat::kAlphaCut) != 0u;
+        m.alphaWrite = load<uint32_t>(rdram, mat + milo::mat::kAlphaWrite) != 0u;
+        m.destAlphaTest = load<uint32_t>(rdram, mat + milo::mat::kDestAlphaTest) != 0u;
         m.texWrap = load<uint32_t>(rdram, mat + milo::mat::kTexWrap) != 0u;
         m.useEnviron = load<uint32_t>(rdram, mat + milo::mat::kUseEnviron) != 0u;
         m.prelit = load<uint32_t>(rdram, mat + milo::mat::kPrelit) != 0u;
