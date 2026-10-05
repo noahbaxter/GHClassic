@@ -9,19 +9,20 @@
 // disc's (gh2x/install.cpp).
 //
 // A switch happens between screens, with no panel up (campaigns.dta's
-// ghc_switch_screen), and is retail's own parts run again:
+// ghc_switch_screen), and is retail's own parts run again. What a campaign's
+// files give is read the first time it is switched to and kept, and each
+// switch takes a copy:
 //
 //   files     the campaign's layer searched first (disc/ark.h)
-//   config    the root config read again as those files give it, and the
-//             arrays that differ by game laid over the live tree's in place:
-//             the game keeps pointers into it (VideoProvider's constructor,
-//             0x11b0c8, holds store's video), so an array there stays the
-//             object it was
+//   config    the root config's arrays that differ by game laid over the
+//             live tree's in place: the game keeps pointers into it
+//             (VideoProvider's constructor, 0x11b0c8, holds store's video),
+//             so an array there stays the object it was
 //   scripts   each {new Class name ...} in ui/ui.dta's (init ...) handed to
 //             the object of that name by its virtual SetTypeDef, as DataNew
 //             (0x2b4c40) hands it to a new one
-//   strings   Locale::Terminate and Locale::Init, as SetSystemLanguage
-//             (0x2a8800) changes language
+//   strings   the Locale's table, as Locale::Init (0x2cb798) builds it
+//             (content/locale.h)
 //   campaign  ~Campaign (0x12d0c0) and Campaign() (0x12cf00) where it stands,
 //             as MetaPanel's constructor (0x134178) makes it, then that
 //             game's career out of the save (save/save.h)

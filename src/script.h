@@ -23,6 +23,8 @@ namespace gh2::script
     constexpr uint32_t kFloat = 0x1u;
     constexpr uint32_t kSymbol = 0x5u;
     constexpr uint32_t kArray = 0x10u;
+    constexpr uint32_t kCommand = 0x11u;  // {...}
+    constexpr uint32_t kProperty = 0x13u; // [...]
 
     Node floatNode(float value);
 
@@ -50,8 +52,24 @@ namespace gh2::script
     // guest thread only.
     uint32_t parse(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &text);
 
-    // Parsed with the game's DataReadString, then each top-level command
-    // evaluated. On the guest thread only.
+    // A copy of `array` and of every array, command and property under it,
+    // each with its file and line, holding one reference. Strings are
+    // shared. DataArray::Clone (0x2b0558) copies arrays alone and no file.
+    uint32_t clone(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t array);
+
+    // A copy of `array`, of type `type`, and of all under it, in the
+    // runtime's memory above the game's heap (PS2Runtime::guestMalloc): one
+    // to keep for good at no cost to the game's 32 MB. It holds a reference
+    // that is never let go, so the game frees none of it, and is only for
+    // clone to read.
+    uint32_t park(uint8_t *rdram, PS2Runtime *runtime, uint32_t array, uint32_t type = kArray);
+
+    // As a DataNode lets go of its array (DataNode::~DataNode, 0x2b8110).
+    void release(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t array);
+
+    // Parsed with the game's DataReadString, each top-level command
+    // evaluated, then let go: what a run defines holds its own arrays
+    // (Hmx::Object::SetTypeDef, 0x2c1360). On the guest thread only.
     void run(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &text);
 
     // The game's Symbol for `text`, interned. On the guest thread only.
@@ -67,7 +85,8 @@ namespace gh2::script
 
     // The same, for a script that changes the game's screens: run again by
     // patchUiAgain once they have taken another game's scripts
-    // (content/campaigns.h), so it must stand being run twice.
+    // (content/campaigns.h), so it must stand being run twice. It is parsed
+    // once, and each run is of a copy.
     void patchUi(std::string text);
     void patchUiAgain(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
 

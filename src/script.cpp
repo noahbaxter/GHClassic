@@ -41,6 +41,7 @@ namespace gh2::script
         {
             std::string text;
             bool again; // after each campaign switch too
+            uint32_t root = 0u; // parsed, when run again
         };
         std::vector<UiScript> s_uiScripts;
         bool s_uiRan = false;
@@ -158,6 +159,30 @@ namespace gh2::script
                       << std::endl;
         }
 
+        void evaluate(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t root)
+        {
+            const Call rootCall{rdram, ctx, runtime, root};
+            for (int i = 0; i < rootCall.size(); ++i)
+                rootCall.arg(i);
+        }
+
+        void runUi(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, UiScript &script)
+        {
+            if (!script.again)
+                return run(rdram, ctx, runtime, script.text);
+            if (script.root == 0u)
+            {
+                const uint32_t parsed = parse(rdram, ctx, runtime, script.text);
+                if (parsed == 0u)
+                    return;
+                script.root = park(rdram, runtime, parsed);
+                release(rdram, ctx, runtime, parsed);
+            }
+            const uint32_t copy = clone(rdram, ctx, runtime, script.root);
+            evaluate(rdram, ctx, runtime, copy);
+            release(rdram, ctx, runtime, copy);
+        }
+
         struct GotoScreenTag;
         void onGotoScreen(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
@@ -167,8 +192,8 @@ namespace gh2::script
                 return;
             s_uiRan = true;
             const R5900Context saved = *ctx;
-            for (const UiScript &script : s_uiScripts)
-                run(rdram, ctx, runtime, script.text);
+            for (UiScript &script : s_uiScripts)
+                runUi(rdram, ctx, runtime, script);
             *ctx = saved;
         }
 
@@ -251,9 +276,97 @@ namespace gh2::script
 
     void patchUiAgain(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
     {
-        for (const UiScript &script : s_uiScripts)
+        for (UiScript &script : s_uiScripts)
             if (script.again)
-                run(rdram, ctx, runtime, script.text);
+                runUi(rdram, ctx, runtime, script);
+    }
+
+    uint32_t clone(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t array)
+    {
+        // Each node shared, then each array under it its own copy in turn.
+        const uint32_t copy =
+            static_cast<uint32_t>(runtime->callGuestFunction(rdram, ctx, s_addresses->dataArrayClone, {array, 0u}));
+        store<uint32_t>(rdram, copy + 4u, load<uint32_t>(rdram, array + 4u));
+        store<int16_t>(rdram, copy + 0xcu, load<int16_t>(rdram, array + 0xcu));
+        const int count = load<int16_t>(rdram, copy + 8u);
+        for (int i = 0; i < count; ++i)
+        {
+            const uint32_t node = load<uint32_t>(rdram, copy) + 8u * static_cast<uint32_t>(i);
+            const uint32_t type = load<uint32_t>(rdram, node + 4u);
+            if (type != kArray && type != kCommand && type != kProperty)
+                continue;
+            const uint32_t shared = load<uint32_t>(rdram, node);
+            store<uint32_t>(rdram, node, clone(rdram, ctx, runtime, shared));
+            store<int16_t>(rdram, shared + 0xau, static_cast<int16_t>(load<int16_t>(rdram, shared + 0xau) - 1));
+        }
+        return copy;
+    }
+
+    namespace
+    {
+        // `array` and all under it copied to `at`, which moves past them:
+        // each array, then its nodes or its text. With no `rdram` to write
+        // to, only measured.
+        uint32_t parkAt(uint8_t *from, uint8_t *rdram, uint32_t array, uint32_t type, uint32_t &at)
+        {
+            const auto take = [&at](uint32_t bytes)
+            {
+                const uint32_t block = at;
+                at += (bytes + 7u) & ~7u;
+                return block;
+            };
+            const uint32_t copy = take(0x10u);
+            const uint32_t data = load<uint32_t>(from, array);
+            const int count = load<int16_t>(from, array + 8u);
+            // A string's array holds its text and counts no nodes
+            // (DataArray::DataArray(const char *), 0x2b0760).
+            const bool nodes = type == kArray || type == kCommand || type == kProperty;
+            const uint32_t bytes = data == 0u ? 0u
+                                   : nodes ? 8u * static_cast<uint32_t>(count > 0 ? count : 0)
+                                   : count < 0 ? static_cast<uint32_t>(-count)
+                                   : static_cast<uint32_t>(std::strlen(reinterpret_cast<const char *>(getMemPtr(from, data)))) + 1u;
+            const uint32_t to = bytes ? take(bytes) : 0u;
+            if (rdram)
+            {
+                std::memcpy(getMemPtr(rdram, copy), getMemPtr(from, array), 0x10u);
+                store<int16_t>(rdram, copy + 0xau, 1);
+                store<uint32_t>(rdram, copy, to);
+                if (bytes)
+                    std::memcpy(getMemPtr(rdram, to), getMemPtr(from, data), bytes);
+            }
+            for (int i = 0; nodes && bytes && i < count; ++i)
+            {
+                const uint32_t node = 8u * static_cast<uint32_t>(i);
+                const uint32_t under = load<uint32_t>(from, data + node + 4u);
+                if ((under & 0x10u) == 0u)
+                    continue;
+                const uint32_t kept = parkAt(from, rdram, load<uint32_t>(from, data + node), under, at);
+                if (rdram)
+                    store<uint32_t>(rdram, to + node, kept);
+            }
+            return copy;
+        }
+    }
+
+    uint32_t park(uint8_t *rdram, PS2Runtime *runtime, uint32_t array, uint32_t type)
+    {
+        uint32_t bytes = 0u;
+        parkAt(rdram, nullptr, array, type, bytes);
+        uint32_t at = runtime->guestMalloc(bytes);
+        if (at == 0u)
+        {
+            std::cerr << "[script] no memory above the game's heap for " << bytes << " bytes" << std::endl;
+            std::abort();
+        }
+        return parkAt(rdram, rdram, array, type, at);
+    }
+
+    void release(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t array)
+    {
+        const int16_t held = static_cast<int16_t>(load<int16_t>(rdram, array + 0xau) - 1);
+        store<int16_t>(rdram, array + 0xau, held);
+        if (held == 0)
+            runtime->callGuestFunction(rdram, ctx, s_addresses->dataArrayDtor, {array, 3u});
     }
 
     void addCommand(const char *name, Command command)
@@ -275,13 +388,11 @@ namespace gh2::script
 
     void run(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &text)
     {
-        // The parsed array is kept: handlers defined in it stay referenced.
         const uint32_t root = parse(rdram, ctx, runtime, text);
         if (root == 0u)
             return;
-        const Call rootCall{rdram, ctx, runtime, root};
-        for (int i = 0; i < rootCall.size(); ++i)
-            rootCall.arg(i);
+        evaluate(rdram, ctx, runtime, root);
+        release(rdram, ctx, runtime, root);
     }
 
     uint32_t symbol(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &text)
