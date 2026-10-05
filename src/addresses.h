@@ -136,6 +136,7 @@ namespace gh2
         uint32_t dataArrayDtor;    // DataArray::~DataArray
         uint32_t dataArrayClone;   // DataArray::Clone(bool deep)
         uint32_t dataArraySort;    // DataArray::Sort
+        uint32_t loadMgrPoll;
         uint32_t dataNodeAssign;   // DataNode::operator=(const DataNode &)
         uint32_t venueProviderInitData; // VenueProvider::InitData(RndDir *)
         uint32_t campaignCtor;
@@ -165,6 +166,7 @@ namespace gh2
         uint32_t theGameConfig; // GameConfig*
         uint32_t theCampaign;   // Campaign*
         uint32_t theLocale;
+        uint32_t theLoadMgr;
         uint32_t nullStr; // char*, the empty Symbol's text
         uint32_t mcBuffer;    // the save's bytes between the two halves of a load or save
         uint32_t mcOverwrite; // GHMCSaveData's overwrite argument: replace a save already there
@@ -313,6 +315,7 @@ namespace gh2
         .dataArrayDtor = 0x2b07d0u,
         .dataArrayClone = 0x2b0558u,
         .dataArraySort = 0x2b08d8u,
+        .loadMgrPoll = 0x2cc218u,
         .dataNodeAssign = 0x2b8298u,
         .venueProviderInitData = 0x118a90u,
         .campaignCtor = 0x12cf00u,
@@ -341,6 +344,7 @@ namespace gh2
         .theGameConfig = 0x3da308u,
         .theCampaign = 0x3da31cu,
         .theLocale = 0x51f1b8u,
+        .theLoadMgr = 0x51f1d8u,
         .nullStr = 0x3de688u,
         .mcBuffer = 0x3da368u,
         .mcOverwrite = 0x3da394u,

@@ -11,6 +11,7 @@
 #include "script.h"
 
 #include "ps2_runtime.h"
+#include "runtime/ee_scheduler.h"
 
 #include <algorithm>
 #include <chrono>
@@ -480,6 +481,9 @@ namespace gh2::campaigns
             const Pending pending = *s_pending;
             s_pending.reset();
             const R5900Context saved = *ctx;
+            // The game's code here runs some three times faster than its
+            // cycles count for, time the game would then wait out.
+            const EeScheduler::UnpacedScope unpaced(runtime->eeScheduler());
             script::run(rdram, ctx, runtime, "{set $ghc_band {campaign profile_slot}}");
             if (!switchTo(script::Call{rdram, ctx, runtime, 0u}, pending.index))
                 script::run(rdram, ctx, runtime, "{ui goto_screen main_screen}");
@@ -487,6 +491,15 @@ namespace gh2::campaigns
                 script::run(rdram, ctx, runtime,
                             "{campaign set_profile_slot $ghc_band}" +
                                 (pending.next.empty() ? std::string() : "{ui goto_screen " + pending.next + "}"));
+            // The next screen's scenes load here and now, not at LoadMgr's
+            // 10 ms a frame (its period, +0x24): LoadMgr::Poll (0x2cc218)
+            // runs its loaders until none is left or that is spent, as
+            // PollUntilLoaded (0x2cc0f8) has it do.
+            const uint32_t loads = s_addresses->theLoadMgr;
+            const float period = load<float>(rdram, loads + 0x24u);
+            store<float>(rdram, loads + 0x24u, 1e30f);
+            runtime->callGuestFunction(rdram, ctx, s_addresses->loadMgrPoll, {loads});
+            store<float>(rdram, loads + 0x24u, period);
             *ctx = saved;
         }
     }

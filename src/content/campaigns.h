@@ -27,6 +27,9 @@
 //             as MetaPanel's constructor (0x134178) makes it, then that
 //             game's career out of the save (save/save.h)
 //
+// The screens either side fade as any do, and the next one's scenes load in
+// the frame of the switch.
+//
 //   {campaigns active}         the active campaign's game
 //   {campaigns count}          how many there are
 //   {campaigns has <game>}     TRUE if that game has a campaign
