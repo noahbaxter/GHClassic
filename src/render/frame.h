@@ -11,6 +11,10 @@
 
 namespace gh2
 {
+    // What a copy of the whole picture is sampled as, in place of a RndTex:
+    // no guest address.
+    constexpr uint32_t kScreenCopyTex = 1u;
+
     // The camera a draw was made with, as the engine held it at the time.
     struct Camera
     {

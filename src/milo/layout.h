@@ -16,6 +16,9 @@ namespace milo
         constexpr uint32_t kWidth = 0x40u;      // the frame's width in pixels
         constexpr uint32_t kHeight = 0x44u;     // and height
         constexpr uint32_t kAspect = 0xd4u;     // index
+        // PsRnd's own, read by VSync (0x19a970, 0x19a9a0).
+        constexpr uint32_t kNoDepthOfField = 0x508u; // nonzero: VSync only waits on sceGsSyncV; its meaning is not known
+        constexpr uint32_t kFocusZ = 0x510u;         // the GS Z depth of field starts at, 0 for none
     }
 
     // RndTransformable: local transform at +0x20, world at +0x60. A
