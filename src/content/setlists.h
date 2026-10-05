@@ -28,7 +28,9 @@ namespace gh2::setlists
         std::string venue;  // where its songs play when their own is locked
         std::string header; // headed by locale token song_header_<header>
         std::vector<std::string> songs;
-        bool encore = true; // its last song is locked as its encore
+        // A career tier: its last song is locked as its encore, where its
+        // game has them (content/encores.h).
+        bool encore = true;
     };
 
     // campaign.dta's (required_songs ...), easy first: the songs a venue

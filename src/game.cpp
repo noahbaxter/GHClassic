@@ -2,6 +2,7 @@
 
 #include "addresses.h"
 #include "disc/ark.h"
+#include "content/encores.h"
 #include "content/games.h"
 #include "content/locale.h"
 #include "content/outfits.h"
@@ -81,6 +82,7 @@ namespace
         gh2::installMenus(runtime);
         gh2::installHelpBar(runtime, gh2::kSlus21447);
         gh2::setlists::install(runtime, gh2::kSlus21447);
+        gh2::encores::install(runtime, gh2::kSlus21447);
         gh2::songs::install();
         gh2::locale::install(runtime, gh2::kSlus21447);
         gh2::games::install(runtime, gh2::kSlus21447);

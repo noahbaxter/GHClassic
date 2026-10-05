@@ -139,6 +139,18 @@ namespace gh2
         uint32_t campaignDtor;
         uint32_t localeInit;       // Locale::Init
         uint32_t localeTerminate;  // Locale::Terminate
+        uint32_t campaignStateIsEncoreSong;           // (Symbol song)
+        uint32_t campaignStateIsEncoreUnlockPossible; // (Symbol song)
+        uint32_t campaignStateCheckUnlockVenue;       // (Symbol song)
+        uint32_t campaignStateGetNumPassedSongs;      // (Symbol venue)
+        uint32_t campaignStateIsVenuePassed;          // (Symbol venue)
+        uint32_t campaignStateIsUnlocked;             // (Symbol item)
+        uint32_t campaignStateSetVenueUnlocked;       // (Symbol venue, bool)
+        uint32_t campaignDataIsStoreSong;             // (Symbol song)
+        uint32_t campaignDataGetRequiredSongs;        // (Difficulty, Symbol venue)
+        uint32_t campaignDataGetNextVenue;            // (Symbol venue, Difficulty)
+        uint32_t campaignItemsFind;                   // CampaignItemVec::Find(Symbol)
+        uint32_t campaignItemSetPassed;               // CampaignItem::SetPassed(bool)
         // Data
         uint32_t rndCamCurrent;  // RndCam::sCurrent
         uint32_t defaultMat;     // the RndMat a mesh without one draws with
@@ -150,6 +162,7 @@ namespace gh2
         uint32_t theGameConfig; // GameConfig*
         uint32_t theCampaign;   // Campaign*
         uint32_t theLocale;
+        uint32_t nullStr; // char*, the empty Symbol's text
         uint32_t mcBuffer;    // the save's bytes between the two halves of a load or save
         uint32_t mcOverwrite; // GHMCSaveData's overwrite argument: replace a save already there
         uint32_t mcBaseDir;   // char*, the save's directory on the card
@@ -300,6 +313,18 @@ namespace gh2
         .campaignDtor = 0x12d0c0u,
         .localeInit = 0x2cb798u,
         .localeTerminate = 0x2cba98u,
+        .campaignStateIsEncoreSong = 0x131d30u,
+        .campaignStateIsEncoreUnlockPossible = 0x132b18u,
+        .campaignStateCheckUnlockVenue = 0x1322c8u,
+        .campaignStateGetNumPassedSongs = 0x132450u,
+        .campaignStateIsVenuePassed = 0x132428u,
+        .campaignStateIsUnlocked = 0x131c70u,
+        .campaignStateSetVenueUnlocked = 0x132500u,
+        .campaignDataIsStoreSong = 0x131388u,
+        .campaignDataGetRequiredSongs = 0x1313d8u,
+        .campaignDataGetNextVenue = 0x1310c8u,
+        .campaignItemsFind = 0x140cf8u,
+        .campaignItemSetPassed = 0x140a90u,
         .rndCamCurrent = 0x3de348u,
         .defaultMat = 0x3da4f0u,
         .rndEnvironCurrent = 0x3de358u,
@@ -310,6 +335,7 @@ namespace gh2
         .theGameConfig = 0x3da308u,
         .theCampaign = 0x3da31cu,
         .theLocale = 0x51f1b8u,
+        .nullStr = 0x3de688u,
         .mcBuffer = 0x3da368u,
         .mcOverwrite = 0x3da394u,
         .mcBaseDir = 0x3da374u,

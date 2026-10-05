@@ -1,0 +1,43 @@
+; GH1 has no encores (content/encores.h). Quickplay's GH1 list has a tier's
+; fifth song from the start; in its career on medium the fifth is open with
+; the rest, the third song earns no encore offer, and the fourth passed
+; opens the next venue. Songs are passed by the game's own cheat.
+(needs gh1)
+#include common/first_boot.dta
+{gamecfg set mode quickplay}
+{setlist select gh1}
+{ui goto_screen qp_selsong_twin_screen}
+(wait_screen qp_selsong_twin_screen)
+(wait 2)
+(press down)
+(press down)
+(press down)
+(press down)
+(expect {game get_song} infected)
+(press down)
+(expect {game get_song} ironman)
+(shot quickplay)
+{setlist select gh2}
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+
+{set $pick gh1}
+#include common/career_start.dta
+(press green)
+(wait_screen sel_venue_screen 40)
+(press green)
+(wait_screen sel_song_screen)
+(wait 1)
+(expect {campaign is_encore_song infected} 0)
+(expect {campaign is_unlocked infected} 1)
+{campaign cheat_beat_song iloverockandroll 100000}
+{campaign cheat_beat_song iwannabesedated 100000}
+{game set_song_index 2}
+(expect {gamecfg get_song} thunderkiss65)
+(expect {campaign encore_unlock_potential} 0)
+{campaign cheat_beat_song thunderkiss65 100000}
+(expect {campaign is_unlocked small1} 0)
+{campaign cheat_beat_song infected 100000}
+(expect {campaign is_unlocked small1} 1)
+(expect {campaign is_unlocked ironman} 1)
+(quit)
