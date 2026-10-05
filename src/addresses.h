@@ -134,6 +134,8 @@ namespace gh2
         uint32_t systemConfig;     // SystemConfig()
         uint32_t dataArrayResize;  // DataArray::Resize(int)
         uint32_t dataArrayDtor;    // DataArray::~DataArray
+        uint32_t dataArrayClone;   // DataArray::Clone(bool deep)
+        uint32_t dataArraySort;    // DataArray::Sort
         uint32_t dataNodeAssign;   // DataNode::operator=(const DataNode &)
         uint32_t venueProviderInitData; // VenueProvider::InitData(RndDir *)
         uint32_t campaignCtor;
@@ -309,6 +311,8 @@ namespace gh2
         .systemConfig = 0x2a8680u,
         .dataArrayResize = 0x2afbd8u,
         .dataArrayDtor = 0x2b07d0u,
+        .dataArrayClone = 0x2b0558u,
+        .dataArraySort = 0x2b08d8u,
         .dataNodeAssign = 0x2b8298u,
         .venueProviderInitData = 0x118a90u,
         .campaignCtor = 0x12cf00u,

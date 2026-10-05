@@ -1,0 +1,67 @@
+; Every campaign switched to, then an 80s career song played to its results
+; and cash: the screens after a song load with the least heap free, so what
+; the switches leave in it shows there.
+(needs gh80s gh1 gh2x)
+#include common/first_boot.dta
+{gamecfg set mode career}
+{campaign set_profile_name "The Testers" 0}
+{ui goto_screen chooseprof_screen}
+(wait_screen chooseprof_screen)
+(press green)
+(wait_screen ghc_campaign_screen)
+(wait 1)
+{set $ghc_switch_next sel_difficulty_screen}
+{set $ghc_switch gh1}
+#include common/switch_and_back.dta
+{set $ghc_switch gh2}
+#include common/switch_and_back.dta
+{set $ghc_switch gh1}
+#include common/switch_and_back.dta
+{set $ghc_switch gh2x}
+#include common/switch_and_back.dta
+{set $pick gh80s}
+#include common/pick_campaign.dta
+(press green)
+(wait_screen sel_difficulty_screen)
+(expect {campaigns active} gh80s)
+(wait 1)
+(press down)
+(press green)
+(wait_screen sel_character_new_screen)
+(wait_until {char_single are_chars_loaded})
+(wait 2)
+(press green)
+(wait_screen sel_guitar_new_screen)
+(wait 3)
+(press green)
+(wait_screen tour_start_screen)
+(wait 2)
+(press green)
+(wait_screen career_screen 40)
+(wait 1)
+(press green)
+(wait_screen sel_venue_screen 40)
+(wait 1)
+(press green)
+(wait_screen sel_song_screen)
+(wait 2)
+{{game get_player_config 0} set autoplay TRUE}
+(press green)
+(wait_screen game_screen 60)
+(wait 5)
+{player0 win 5}
+(wait_screen endgame_screen 400)
+(wait 4)
+(shot results)
+(press green)
+(wait_screen cashaward_screen)
+(wait 2)
+(shot cash)
+(press green)
+(wait_screen complete_screen)
+(wait 1)
+(press green)
+(wait_screen sel_song_screen 40)
+(wait 2)
+(shot songs_after)
+(quit)

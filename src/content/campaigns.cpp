@@ -28,6 +28,10 @@ namespace gh2::campaigns
         {
             std::string game;
             std::optional<size_t> front;
+            // Its files' own, read once and kept: each of kConfig's arrays,
+            // 0 for one it lacks, and ui.dta's (init ...).
+            std::vector<uint32_t> config = {};
+            uint32_t init = 0u;
         };
 
         // The config's arrays that differ by game, each a path of keys from
@@ -42,7 +46,6 @@ namespace gh2::campaigns
         // Hmx::Object's vtable entry for SetTypeDef: a this adjustment
         // (s16), then the function.
         constexpr uint32_t kSetTypeDefSlot = 0x58u;
-        constexpr uint32_t kCommand = 0x11u; // a DataNode's type: {...}
         constexpr uint32_t kAllAccess = 0x80u; // Campaign's, the unlock-all cheat
         constexpr uint32_t kVenueProvider = 0xa0u; // GameConfig's VenueProvider
 
@@ -91,13 +94,8 @@ namespace gh2::campaigns
             {
                 store<int16_t>(call.rdram, array + 0xau, static_cast<int16_t>(load<int16_t>(call.rdram, array + 0xau) + by));
             }
-            // As a DataNode lets go of its array.
-            void release(uint32_t array) const
-            {
-                hold(array, -1);
-                if (load<int16_t>(call.rdram, array + 0xau) == 0)
-                    run(s_addresses->dataArrayDtor, {array, 3u});
-            }
+            void release(uint32_t array) const { script::release(call.rdram, call.ctx, call.runtime, array); }
+            uint32_t clone(uint32_t array) const { return script::clone(call.rdram, call.ctx, call.runtime, array); }
             uint32_t readFile(const std::string &path) const
             {
                 const uint32_t text = run(s_addresses->builtinNew, {static_cast<uint32_t>(path.size()) + 1u});
@@ -164,22 +162,56 @@ namespace gh2::campaigns
             }
         }
 
-        void syncConfig(const Guest &guest, uint32_t fresh)
+        uint32_t under(const Guest &guest, uint32_t array, const std::vector<const char *> &path)
+        {
+            for (const char *key : path)
+                array = array ? guest.find(array, key) : 0u;
+            return array;
+        }
+
+        // The campaign's files read, as its layer in front gives them, and
+        // what a switch takes of them kept, outside the game's heap
+        // (script::park). False if either cannot be read.
+        bool build(const Guest &guest, Campaign &campaign)
+        {
+            const uint32_t config = guest.readFile(kRootConfig);
+            const uint32_t ui = config ? guest.readFile(kUi) : 0u;
+            const uint32_t init = ui ? guest.find(ui, "init") : 0u;
+            if (init != 0u)
+            {
+                for (const auto &path : kConfig)
+                {
+                    const uint32_t array = under(guest, config, path);
+                    campaign.config.push_back(array ? script::park(guest.call.rdram, guest.call.runtime, array) : 0u);
+                }
+                campaign.init = script::park(guest.call.rdram, guest.call.runtime, init);
+            }
+            else
+                std::cerr << "[campaign] cannot read " << campaign.game << "'s " << (config ? kUi : kRootConfig) << std::endl;
+            for (const uint32_t read : {config, ui})
+                if (read != 0u)
+                    guest.release(read);
+            return init != 0u;
+        }
+
+        // The live tree takes a copy of each kept array, so what the game
+        // changes in place after (outfits.cpp pushes into characters) is
+        // the live tree's alone.
+        void syncConfig(const Guest &guest, const Campaign &campaign)
         {
             const uint32_t live = guest.run(s_addresses->systemConfig, {});
             const uint32_t scratch = guest.run(s_addresses->builtinNew, {8u});
-            for (const auto &path : kConfig)
+            for (size_t i = 0; i < kConfig.size(); ++i)
             {
-                uint32_t from = fresh, to = live;
-                for (const char *key : path)
+                const uint32_t to = under(guest, live, kConfig[i]);
+                if (campaign.config[i] == 0u || to == 0u)
                 {
-                    from = from ? guest.find(from, key) : 0u;
-                    to = to ? guest.find(to, key) : 0u;
+                    std::cerr << "[campaign] no " << kConfig[i].back() << " in the config" << std::endl;
+                    continue;
                 }
-                if (from == 0u || to == 0u)
-                    std::cerr << "[campaign] no " << path.back() << " in the config" << std::endl;
-                else
-                    sync(guest, to, from, scratch);
+                const uint32_t from = guest.clone(campaign.config[i]);
+                sync(guest, to, from, scratch);
+                guest.release(from);
             }
             guest.run(s_addresses->builtinDelete, {scratch});
         }
@@ -190,7 +222,7 @@ namespace gh2::campaigns
         {
             for (int i = 0; i < guest.size(init); ++i)
             {
-                if (guest.type(init, i) != kCommand)
+                if (guest.type(init, i) != script::kCommand)
                     continue;
                 const uint32_t command = guest.value(init, i);
                 if (guest.key(command) != "new" || guest.size(command) < 3 || guest.type(command, 2) != script::kSymbol ||
@@ -211,7 +243,7 @@ namespace gh2::campaigns
         {
             for (int i = 0; i < guest.size(init); ++i)
             {
-                if (guest.type(init, i) != kCommand)
+                if (guest.type(init, i) != script::kCommand)
                     continue;
                 const uint32_t command = guest.value(init, i);
                 // {foreach $p (pause_panel ... helpbar) {$p load}}: the panels
@@ -220,7 +252,7 @@ namespace gh2::campaigns
                 // help bar's, which is built at boot (ui/help_bar.cpp), is
                 // the same one, and stays.
                 if (guest.key(command) == "foreach" && guest.size(command) == 4 && guest.type(command, 2) == script::kArray &&
-                    guest.type(command, 3) == kCommand && guest.size(guest.value(command, 3)) == 2 &&
+                    guest.type(command, 3) == script::kCommand && guest.size(guest.value(command, 3)) == 2 &&
                     guest.type(guest.value(command, 3), 1) == script::kSymbol &&
                     std::strcmp(reinterpret_cast<const char *>(getMemPtr(
                                     guest.call.rdram, guest.value(guest.value(command, 3), 1))),
@@ -274,24 +306,15 @@ namespace gh2::campaigns
                         std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(now - last).count());
                 last = now;
             };
-            // Both files as the new campaign's archive gives them, before
+            // Its files read the first time it is switched to, before
             // anything changes.
             ark::front(s_campaigns[index].front);
-            const uint32_t config = guest.readFile(kRootConfig);
-            lap("config");
-            const uint32_t ui = guest.readFile(kUi);
-            lap("ui");
-            const uint32_t init = ui ? guest.find(ui, "init") : 0u;
-            if (config == 0u || init == 0u)
+            if (s_campaigns[index].init == 0u && !build(guest, s_campaigns[index]))
             {
-                std::cerr << "[campaign] cannot read " << s_campaigns[index].game << "'s " << (config ? kUi : kRootConfig)
-                          << std::endl;
-                for (const uint32_t read : {config, ui})
-                    if (read != 0u)
-                        guest.release(read);
                 ark::front(s_campaigns[before].front);
                 return false;
             }
+            lap("read");
             // The career as it stands goes into the save's sections first.
             ark::front(s_campaigns[before].front);
             save::leaveGame(call.rdram, call.ctx, call.runtime);
@@ -299,7 +322,7 @@ namespace gh2::campaigns
             ark::front(s_campaigns[index].front);
             s_active = index;
             outfits::campaignChanged();
-            syncConfig(guest, config);
+            syncConfig(guest, s_campaigns[index]);
             // GameConfig's list of the config's venues, which its constructor
             // (0x125c98) builds once: the career's map opens on the last
             // venue unlocked before the first in it that is not
@@ -307,16 +330,17 @@ namespace gh2::campaigns
             guest.run(s_addresses->venueProviderInitData,
                       {load<uint32_t>(call.rdram, s_addresses->theGameConfig) + kVenueProvider, 0u});
             lap("sync");
+            // The objects take a copy's arrays, as each would a file read
+            // again: a property with no value set is its type definition's
+            // own node (Hmx::Object::Property, 0x2c1488), which scripts
+            // change in place.
+            const uint32_t init = guest.clone(s_campaigns[index].init);
             retypeUi(guest, init, s_campaigns[before], s_campaigns[index]);
+            guest.release(init);
             lap("retype");
-            // What the live tree and the objects now hold stays; the rest of
-            // each read goes.
-            guest.release(config);
-            guest.release(ui);
-            lap("release");
             script::patchUiAgain(call.rdram, call.ctx, call.runtime);
             lap("patches");
-            locale::reload(call.rdram, call.ctx, call.runtime);
+            locale::enter(s_campaigns[index].game, call.rdram, call.ctx, call.runtime);
             lap("strings");
             // The Campaign where it stands, so every pointer to it holds. All
             // access goes back on after the load, which it would refuse.
