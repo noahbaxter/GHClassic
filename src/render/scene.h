@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <vector>
 
@@ -10,6 +11,22 @@
 // without ever reading the guest.
 namespace gh2
 {
+    // A vert's float as VU1 takes it. VU1 has no NaN or infinity: an exponent
+    // of 255 is one more power of two, so such a float is a very large
+    // number of its sign (main_hall.5.mesh in big has seven such normals),
+    // and a lit colour from it clamps to 0 or 1 where a NaN would blank the
+    // triangle. Kept that way here, 28 powers down so sums of it stay finite.
+    inline float vuFloat(float value)
+    {
+        uint32_t bits;
+        std::memcpy(&bits, &value, sizeof(bits));
+        if ((bits & 0x7f800000u) != 0x7f800000u)
+            return value;
+        bits = (bits & 0x807fffffu) | (227u << 23);
+        std::memcpy(&value, &bits, sizeof(bits));
+        return value;
+    }
+
     struct Vertex
     {
         float pos[3];

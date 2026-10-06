@@ -32,13 +32,13 @@ namespace gh2
                 Vertex &dst = out.verts[i];
                 for (uint32_t c = 0; c < 3; ++c)
                 {
-                    dst.pos[c] = load<float>(rdram, v + milo::mesh::kVertPos + c * 4u);
-                    dst.normal[c] = load<float>(rdram, v + milo::mesh::kVertNormal + c * 4u);
+                    dst.pos[c] = vuFloat(load<float>(rdram, v + milo::mesh::kVertPos + c * 4u));
+                    dst.normal[c] = vuFloat(load<float>(rdram, v + milo::mesh::kVertNormal + c * 4u));
                 }
                 for (uint32_t c = 0; c < 4; ++c)
-                    dst.color[c] = load<float>(rdram, v + milo::mesh::kVertColor + c * 4u);
+                    dst.color[c] = vuFloat(load<float>(rdram, v + milo::mesh::kVertColor + c * 4u));
                 for (uint32_t c = 0; c < 2; ++c)
-                    dst.uv[c] = load<float>(rdram, v + milo::mesh::kVertUv + c * 4u);
+                    dst.uv[c] = vuFloat(load<float>(rdram, v + milo::mesh::kVertUv + c * 4u));
             }
         }
 
