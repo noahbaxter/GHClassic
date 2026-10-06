@@ -1,0 +1,38 @@
+; The main menu, held at one moment in the retail game: tools/pcsx2.py run
+; (docs/retail-compare.md).
+(wait_until {! {ui in_transition}} 60)
+(wait 3)
+(clock 100)
+(freeze 105 0 0)
+; Past the first entry's focus on the tutorial, which depends on the controller.
+{main_panel set already_entered TRUE}
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+(wait_until {>= {taskmgr ui_seconds} 105})
+(wait 0.2)
+; A button's lettering is jittered by a seed (BandTextComp +0x1c, BandButton
+; +0x16c) that the focused one steps every focus_jitter_interval from the time
+; at its +0x198 (BandButton::DrawShowing 0x28be84). The screen loads in a
+; different time on each side, so by now they have stepped differently. With
+; the clock standing at 105 on both: one seed and one time for every button,
+; and jitter_text to draw from it. find gives the button's Hmx::Object, 0x1a0
+; into it, so the seed is 52 before that and the time 8.
+(poke {{main_panel loaded_dir} find main_career.btn} -52 7)
+(poke {{main_panel loaded_dir} find main_quickspin.btn} -52 7)
+(poke {{main_panel loaded_dir} find main_multiplayer.btn} -52 7)
+(poke {{main_panel loaded_dir} find main_tutorial.btn} -52 7)
+(poke {{main_panel loaded_dir} find main_options.btn} -52 7)
+(poke {{main_panel loaded_dir} find main_quickspin.btn} -8 105.0)
+{{{main_panel loaded_dir} find main_career.btn} jitter_text}
+{{{main_panel loaded_dir} find main_quickspin.btn} jitter_text}
+{{{main_panel loaded_dir} find main_multiplayer.btn} jitter_text}
+{{{main_panel loaded_dir} find main_tutorial.btn} jitter_text}
+{{{main_panel loaded_dir} find main_options.btn} jitter_text}
+(clock 105)
+(freeze 108 0 0)
+(wait_until {>= {taskmgr ui_seconds} 108})
+(wait 0.2)
+(dump frame)
+; Its memory, for (transplant) in our build.
+(ram frame)
+(quit)
