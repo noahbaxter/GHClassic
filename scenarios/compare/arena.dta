@@ -1,0 +1,38 @@
+; The arena under whatever shot and lights the song has reached, held at one
+; moment in the retail game: tools/pcsx2.py run (docs/retail-compare.md).
+(wait_until {! {ui in_transition}} 60)
+(wait 3)
+{main_panel set already_entered TRUE}
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+{gamecfg set mode quickplay}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{game set_venue arena}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 120)
+(wait 8)
+; The song stops wherever it has got to, and the clocks are put at one time.
+{game set_paused TRUE}
+(clock 100)
+(freeze 101 2.5 3.9)
+(wait_until {>= {taskmgr ui_seconds} 101})
+(wait 0.2)
+; With every clock standing, the shot and the lights the song has reached.
+(clock 101)
+(freeze 102 2.5 3.9)
+(wait_until {>= {taskmgr ui_seconds} 102})
+(wait 0.2)
+; Then the song's clocks jump on by the same amount, so whatever blends in
+; from what was there before, which differs, has finished.
+(clock 102)
+(freeze 104 22.5 43.9)
+(wait_until {>= {taskmgr ui_seconds} 104})
+(wait 0.5)
+(print {taskmgr seconds} {taskmgr beat} {taskmgr ui_seconds})
+(dump frame)
+; Its memory, for (transplant) in our build.
+(ram frame)
+(quit)

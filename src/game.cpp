@@ -24,6 +24,7 @@
 #include "dev/scenario.h"
 #include "script.h"
 #include "dev/seed.h"
+#include "dev/transplant.h"
 #include "synth/synth.h"
 #include "settings/video_options.h"
 #include "track_start.h"
@@ -55,6 +56,7 @@ namespace
         gh2::installFrameStep(runtime, gh2::kSlus21447);
         gh2::installMenus(runtime);
         gh2::scenario::install(runtime, gh2::kSlus21447);
+        gh2::transplant::install(runtime, gh2::kSlus21447);
         gh2::fast_boot::install(runtime, gh2::kSlus21447);
         gh2::seed::install(runtime, gh2::kSlus21447);
     }

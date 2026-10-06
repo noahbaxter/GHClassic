@@ -63,6 +63,11 @@ namespace gh2
         uint32_t systemConfig3; // SystemConfig(Symbol, Symbol, Symbol)
         uint32_t randomInt;     // RandomInt(lo, hi), hi exclusive
         uint32_t taskMgrAddTask; // TaskMgr::AddTask(Task *, Task::Units, float)
+        uint32_t taskMgrSetUISeconds;
+        uint32_t taskMgrSetSecondsBeat;
+        uint32_t systemPoll;  // SystemPoll(bool): pads, files, the loader
+        uint32_t synthPoll;   // Synth::Poll
+        uint32_t synthEEPoll; // SynthEE::Poll
         uint32_t streamEEPoll;
         uint32_t streamSampleFreq; // StreamEE::GetSampleFreq(int channel)
         uint32_t varTimerMs;
@@ -167,6 +172,11 @@ namespace gh2
         .systemConfig3 = 0x2a8700u,
         .randomInt = 0x2d9d10u,
         .taskMgrAddTask = 0x2c6b18u,
+        .taskMgrSetUISeconds = 0x2c6738u,
+        .taskMgrSetSecondsBeat = 0x2c6798u,
+        .systemPoll = 0x2a85d0u,
+        .synthPoll = 0x225cc8u,
+        .synthEEPoll = 0x22cc80u,
         .streamEEPoll = 0x2308a0u,
         .streamSampleFreq = 0x2314e8u,
         .varTimerMs = 0x2d4018u,

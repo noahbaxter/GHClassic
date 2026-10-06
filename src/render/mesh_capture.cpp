@@ -12,6 +12,7 @@
 #include "hook.h"
 #include "milo/layout.h"
 #include "ps2_runtime_macros.h"
+#include "dev/mesh_packet.h"
 
 #include <unordered_map>
 
@@ -20,6 +21,7 @@ namespace gh2
     namespace
     {
         std::unordered_map<uint32_t, std::shared_ptr<const MeshData>> s_meshes;
+        bool s_fromPackets = false;
 
         void readVerts(uint8_t *rdram, uint32_t mesh, MeshData &out)
         {
@@ -61,7 +63,7 @@ namespace gh2
         {
             const uint32_t mesh = GPR_U32(ctx, 4);
             const uint32_t flags = GPR_U32(ctx, 5);
-            if (load<uint32_t>(rdram, mesh + milo::mesh::kOwner) != mesh)
+            if (load<uint32_t>(rdram, mesh + milo::mesh::kOwner) != mesh || s_fromPackets)
                 return;
             std::shared_ptr<const MeshData> &slot = s_meshes[mesh];
             auto next = slot ? std::make_shared<MeshData>(*slot) : std::make_shared<MeshData>();
@@ -95,10 +97,18 @@ namespace gh2
         }
     }
 
-    std::shared_ptr<const MeshData> capturedMesh(uint32_t mesh)
+    std::shared_ptr<const MeshData> capturedMesh(uint8_t *rdram, uint32_t mesh)
     {
+        if (s_fromPackets)
+            return decodeMeshPacket(rdram, mesh);
         const auto found = s_meshes.find(mesh);
         return found != s_meshes.end() ? found->second : nullptr;
+    }
+
+    void readMeshesFromPackets()
+    {
+        s_meshes.clear();
+        s_fromPackets = true;
     }
 
     void installMeshCapture(PS2Runtime &runtime, const Addresses &addresses)

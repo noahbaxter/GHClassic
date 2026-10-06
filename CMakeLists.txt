@@ -165,9 +165,12 @@ set(GHC_GAME_SOURCES
     src/frame_step.cpp
     src/script.cpp
     src/track_start.cpp
+    src/dev/draw_dump.cpp
+    src/dev/mesh_packet.cpp
     src/dev/null_rnd.cpp
     src/dev/scenario.cpp
     src/dev/seed.cpp
+    src/dev/transplant.cpp
     src/disc/disc.cpp
     src/disc/sha1.cpp
     src/movie/movie.cpp

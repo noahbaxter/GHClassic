@@ -1,6 +1,7 @@
 #include "host/vulkan_frontend.h"
 
 #include "host/audio.h"
+#include "dev/draw_dump.h"
 #include "host/input.h"
 #include "host/scene_renderer.h"
 #include "movie/screen.h"
@@ -380,6 +381,7 @@ namespace gh2
         const PS2Runtime::HostOptions &options = runtime.hostOptions();
         s.hidden = options.hidden;
         s.shotDir = options.shotDir;
+        setDrawDumpDir(options.shotDir);
         s.shotEvery = options.shotEvery;
         s.title = title;
 
