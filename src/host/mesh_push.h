@@ -24,6 +24,7 @@ namespace gh2
     constexpr uint32_t kFlagHighlight = 1u << 9; // GS HIGHLIGHT texturing in place of modulate
     constexpr uint32_t kFlagSphere = 1u << 10;   // the tex gen block is the sphere one's
     constexpr uint32_t kFlagSpread = 1u << 11;   // sampled as the mean of four, matColor.xy apart in uv
+    constexpr uint32_t kFlagSetAlpha = 1u << 12; // alpha written as 1, as FBA does to an unblended pixel
 
     struct PushConstants
     {

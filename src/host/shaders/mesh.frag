@@ -22,6 +22,7 @@ layout(location = 0) out vec4 outColor;
 const uint kFlagAlphaCut = 16u;
 const uint kFlagHighlight = 512u;
 const uint kFlagSpread = 2048u;
+const uint kFlagSetAlpha = 4096u;
 
 void main()
 {
@@ -46,5 +47,7 @@ void main()
     // 0x80, so the smallest alpha that passes is 1/128.
     if ((pc.flags & kFlagAlphaCut) != 0u && color.a < 1.0 / 128.0)
         discard;
+    if ((pc.flags & kFlagSetAlpha) != 0u)
+        color.a = 1.0;
     outColor = color;
 }
