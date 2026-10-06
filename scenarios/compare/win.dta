@@ -1,0 +1,34 @@
+; The win sequence in Battle of the Bands, held at one moment in the retail
+; game: tools/pcsx2.py run (docs/retail-compare.md).
+(wait_until {! {ui in_transition}} 60)
+(wait 3)
+{main_panel set already_entered TRUE}
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+{gamecfg set mode quickplay}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 120)
+(wait_until {> {taskmgr seconds} 1} 60)
+; To 3 s before the last gem. The song stands after a jump until it is
+; paused and let go.
+{beatmatch jump 204000}
+{game set_paused TRUE}
+(wait 0.5)
+{game set_paused FALSE}
+; The sequence runs from 207 s to the results at 214.
+(wait_until {>= {taskmgr seconds} 211} 60)
+{game set_paused TRUE}
+(clock 100)
+(freeze 101 211.5 338.85)
+(wait_until {>= {taskmgr ui_seconds} 101})
+(wait 0.5)
+(print {taskmgr seconds} {taskmgr beat} {taskmgr ui_seconds})
+(dump frame)
+(shot frame)
+; Its memory, for (transplant) in our build.
+(ram frame)
+(quit)

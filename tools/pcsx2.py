@@ -20,6 +20,9 @@ src/dev/scenario.cpp runs them.
 from the mailbox (a base plus 1/64 s a poll, up to a hold), CamShot::Shake
 returns no shake and CharHair::Poll does nothing. (shot name) saves a state
 and keeps its screenshot.
+
+(hold bits) is one more: BreugPadRead's call of scePadRead goes through a stub
+that presses those buttons in what port 0 read, until the next (hold).
 """
 import argparse
 import os
@@ -50,15 +53,19 @@ SET_UI_SECONDS = 0x2C6738
 SET_SECONDS_BEAT = 0x2C6798
 CAM_SHOT_SHAKE = 0x262F38
 CHAR_HAIR_POLL = 0x176FB8
+PAD_READ_CALL = 0x2ABA00  # BreugPadRead's jal scePadRead
+SCE_PAD_READ = 0x2F2C48
 THE_TASK_MGR = 0x51EE40
 
-# The cave: code, then the mailbox, then the script text.
+# The cave: code, then the script text, then the mailbox. PCSX2 protects a page it has compiled code
+# from, and a write to it from here can kill PCSX2, so nothing written over PINE shares the code's page.
 CAVE = 0x000E0000
 STUB_UI = CAVE + 0x200
 STUB_BEAT = CAVE + 0x280
 STUB_SHAKE = CAVE + 0x300
 STUB_HAIR = CAVE + 0x340
-BOX = CAVE + 0x800
+STUB_PAD = CAVE + 0x380
+BOX = CAVE + 0x7100
 RUN, ROOT_ARRAY, VALUE, TYPE, DONE, POLLS = (BOX + 4 * n for n in range(6))
 # The UI clock: BASE + CLOCK_POLLS / RATE, no later than HOLD, while MODE.
 # RATE is 64, a step floats hold exactly, so this FPU and the host's agree.
@@ -66,9 +73,9 @@ MODE, BASE, HOLD, CLOCK_POLLS, RATE, STILL = (BOX + 0x20 + 4 * n for n in range(
 # Taken up, with CLOCK_POLLS zeroed, in the frame the mailbox next runs.
 ARM, NEW_BASE, NEW_HOLD, NEW_STILL = (BOX + 0x40 + 4 * n for n in range(4))
 FREEZE_BEAT, SECONDS, BEAT = (BOX + 0x50 + 4 * n for n in range(3))
-# While set the main loop waits in the stub, between one frame's draw and the next one's poll. On a page
-# of its own: PCSX2 protects a page it has compiled code from, and a write to the stub's from here while
-# the stub is what runs kills it.
+# What scePadRead's bytes 2 and 3 are ANDed with: a button is low while pressed.
+PAD_LOW, PAD_HIGH = (BOX + 0x60 + 4 * n for n in range(2))
+# While set the main loop waits in the stub, between one frame's draw and the next one's poll.
 PARK = CAVE + 0x7000
 TEXT = CAVE + 0x1000
 TEXT_MAX = 0x6000
@@ -87,6 +94,8 @@ def addiu(rt, rs, imm): return i_type(0x09, rs, rt, imm)
 def lui(rt, imm): return i_type(0x0F, 0, rt, imm)
 def lw(rt, off, base): return i_type(0x23, base, rt, off)
 def lh(rt, off, base): return i_type(0x21, base, rt, off)
+def lbu(rt, off, base): return i_type(0x24, base, rt, off)
+def sb(rt, off, base): return i_type(0x28, base, rt, off)
 def sw(rt, off, base): return i_type(0x2B, base, rt, off)
 def ld(rt, off, base): return i_type(0x37, base, rt, off)
 def sd(rt, off, base): return i_type(0x3F, base, rt, off)
@@ -100,6 +109,7 @@ def j(addr): return 0x08000000 | addr >> 2
 def sll(rd, rt, sa): return rt << 16 | rd << 11 | sa << 6
 def addu(rd, rs, rt): return rs << 21 | rt << 16 | rd << 11 | 0x21
 def slt(rd, rs, rt): return rs << 21 | rt << 16 | rd << 11 | 0x2A
+def and_(rd, rs, rt): return rs << 21 | rt << 16 | rd << 11 | 0x24
 def mtc1(rt, fs): return 0x44800000 | rt << 16 | fs << 11
 def cvt_s_w(fd, fs): return 0x46800020 | fs << 11 | fd << 6
 def div_s(fd, fs, ft): return 0x46000003 | ft << 16 | fs << 11 | fd << 6
@@ -272,15 +282,42 @@ def hair_stub():
     ]
 
 
+def pad_stub():
+    # scePadRead(port, slot, buf), buf being the caller's stack pointer
+    return [
+        addiu(SP, SP, -0x10),
+        sd(RA, 0x0, SP),
+        jal(SCE_PAD_READ),
+        sd(A0, 0x8, SP),
+        ld(A0, 0x8, SP),
+        bne(A0, ZERO, 9),               # -> out: not port 0
+        lui(V1, CAVE >> 16),
+        lbu(AT, 0x12, SP),
+        lw(A0, box(PAD_LOW), V1),
+        and_(AT, AT, A0),
+        sb(AT, 0x12, SP),
+        lbu(AT, 0x13, SP),
+        lw(A0, box(PAD_HIGH), V1),
+        and_(AT, AT, A0),
+        sb(AT, 0x13, SP),
+        # out
+        ld(RA, 0x0, SP),
+        JR_RA,
+        addiu(SP, SP, 0x10),
+    ]
+
+
 def patch_words():
     words = {}
     for base, code in ((CAVE, poll_stub()), (STUB_UI, ui_seconds_stub()), (STUB_BEAT, seconds_beat_stub()),
-                       (STUB_SHAKE, shake_stub()), (STUB_HAIR, hair_stub())):
+                       (STUB_SHAKE, shake_stub()), (STUB_HAIR, hair_stub()), (STUB_PAD, pad_stub())):
         for n, word in enumerate(code):
             words[base + 4 * n] = word
     words[RATE] = f32(64.0)
     words[HOLD] = f32(NEVER)
+    words[PAD_LOW] = words[PAD_HIGH] = 0xFF
     words[MAIN_LOOP_POLL] = jal(CAVE)
+    words[PAD_READ_CALL] = jal(STUB_PAD)
     for entry, stub in ((SET_UI_SECONDS, STUB_UI), (SET_SECONDS_BEAT, STUB_BEAT), (CAM_SHOT_SHAKE, STUB_SHAKE),
                         (CHAR_HAIR_POLL, STUB_HAIR)):
         words[entry] = j(stub)
@@ -699,6 +736,11 @@ class Runner:
                 target = pine.evaluate(script + "}", raw=True)
                 if target:
                     pine.write32(target + int(offset, 0), f32(float(value)) if "." in value else int(value, 0))
+            elif verb == "hold":
+                # Pad buttons held until the next (hold), as src/dev/scenario.cpp's: (hold 0) lets go.
+                bits = int(rest, 0)
+                pine.write32(PAD_LOW, ~bits & 0xFF)
+                pine.write32(PAD_HIGH, ~bits >> 8 & 0xFF)
             elif verb == "ram":
                 # The EE's memory, out of a save state: what (transplant) takes in our build. Taken with
                 # the main loop parked, or it is of the middle of a poll, with bones half worked out.
