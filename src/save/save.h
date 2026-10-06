@@ -4,15 +4,17 @@
 
 #include <array>
 #include <cstdint>
+#include <set>
 #include <string>
 #include <vector>
 
 class PS2Runtime;
+struct R5900Context;
 
 namespace gh2::save
 {
-    // Another game's songs, which GH2's high score table holds beside its
-    // own: each starts on that game's five names (its locale's
+    // A game's songs, which the high score table holds whichever game is
+    // played: each starts on that game's five names (its locale's
     // highscore_dummy_0..4), and their scores go in [<game> scores ...].
     // Before the game boots.
     void addScoreSongs(const std::string &game, const std::vector<std::string> &songs,
@@ -35,6 +37,9 @@ namespace gh2::save
 
     // Read and write `path` in place of the user data directory's save.bin.
     void usePath(const std::string &path);
+    // Saves succeed without writing the save file or a card: the run leaves
+    // the player's save as it found it.
+    void keepInMemory();
     // Load the saves on this PCSX2 card (.ps2) instead, making them save.bin:
     // GH2's whole, and every added game's high scores.
     void importCard(const std::string &path);
@@ -42,6 +47,28 @@ namespace gh2::save
     // formatting a new card if there is none. settings.ini's export_card does
     // the same to GHClassic.ps2 beside save.bin.
     void exportCard(const std::string &path);
+
+    // Any game's careers, as the save's sections hold them: the songs band
+    // `slot` (from 0) has passed in `game`'s on each difficulty, easy first,
+    // and the songs any band has unlocked there on any. A song is passed
+    // once it has stars, and unlocked only as progress: a fresh campaign's
+    // own open songs are in neither.
+    std::array<std::set<std::string>, 4> passedSongs(const std::string &game, int slot);
+    std::set<std::string> unlockedSongs(const std::string &game);
+    // Whether any band has unlocked that item, of any kind, in `game`'s
+    // career: an outfit or guitar bought.
+    bool unlockedItem(const std::string &game, const std::string &item);
+
+    // A campaign switch (content/campaigns.h), either side of the Campaign
+    // being rebuilt. leaveGame puts the career as it stands into the save's
+    // sections, in memory, where the next save writes it and the two above
+    // read it. enterGame takes the new Campaign as `game`'s fresh one and
+    // loads that game's career from its own sections.
+    // The game last entered when the save was written, which the next boot
+    // opens as; gh2 for a save that names none.
+    std::string lastGame();
+    void leaveGame(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
+    void enterGame(const std::string &game, uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
 
     void install(PS2Runtime &runtime, const Addresses &addresses);
 }

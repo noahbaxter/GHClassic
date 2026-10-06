@@ -1,0 +1,33 @@
+; The high score name is one name in every game: set in GH2 it is the 80s'
+; too, changed there it is GH2's, and a load brings it back.
+(needs gh80s)
+#include common/first_boot.dta
+{highscores set_default_name NOAH}
+{set $ghc_switch gh80s}
+{set $ghc_switch_next main_screen}
+{ui goto_screen ghc_switch_screen}
+(wait_screen main_screen)
+(expect {campaigns active} gh80s)
+(expect {highscores get_default_name} NOAH)
+{highscores set_default_name EDDIE}
+{set $ghc_switch gh2}
+{ui goto_screen ghc_switch_screen}
+(wait_screen main_screen)
+(expect {campaigns active} gh2)
+(expect {highscores get_default_name} EDDIE)
+{campaign mark_needs_save}
+{autosave_goto main_screen}
+(wait_screen autosave)
+(wait_screen main_screen)
+; Not saved: the load must drop it.
+{highscores set_default_name UNSAVED}
+{ui goto_screen bootup_load}
+(wait_screen guitar_help_screen)
+(expect {highscores get_default_name} EDDIE)
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+{set $ghc_switch gh80s}
+{ui goto_screen ghc_switch_screen}
+(wait_screen main_screen)
+(expect {highscores get_default_name} EDDIE)
+(quit)

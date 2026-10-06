@@ -1,0 +1,128 @@
+; A GH1 career from nothing: a band, Guitar Hero picked from the campaigns,
+; a new medium career as a GH1 guitarist, then its first song won
+; by the game's cheat, its results and cash. The tiers, songs, cash, store and names
+; are GH1's; the save holds it under gh1's own sections, and the band's GH2
+; career is untouched.
+(needs gh1)
+#include common/first_boot.dta
+(expect {campaigns has gh1} 1)
+{gamecfg set mode career}
+{campaign set_profile_name "The Testers" 0}
+{ui goto_screen chooseprof_screen}
+(wait_screen chooseprof_screen)
+(press green)
+(wait_screen ghc_campaign_screen)
+(wait 1)
+{set $pick gh1}
+#include common/pick_campaign.dta
+(press green)
+(wait_screen sel_difficulty_screen)
+(expect {campaigns active} gh1)
+(expect {campaign profile_slot} 0)
+(wait 1)
+(press down)
+(press green)
+(wait_screen sel_character_new_screen)
+(wait_until {char_single are_chars_loaded})
+(wait 2)
+(shot character)
+; GH1's eight, each its GH1 self; Izzy and the Ripper are the store's.
+(expect {size {find $syscfg characters}} 9)
+(expect {game get_character_outfit} punkgh1)
+(expect {campaign is_unlocked glam} 0)
+(expect {campaign is_unlocked metal} 1)
+(press green)
+(wait_screen sel_guitar_new_screen)
+(wait 3)
+(shot guitar)
+(press green)
+(wait_screen tour_start_screen)
+(wait 1)
+(press green)
+(wait_screen career_screen 40)
+(wait 1)
+(shot career)
+(expect {game get_difficulty_sym 0} medium)
+{set $cash {campaign cash}}
+(expect $cash 0)
+(press green)
+(wait_screen sel_venue_screen 40)
+(wait 1)
+(shot venue)
+(press green)
+(wait_screen sel_song_screen)
+(wait 2)
+(shot songs)
+(expect {song_provider get_symbol 0} iloverockandroll)
+(expect {song_provider get_symbol 4} infected)
+{{game get_player_config 0} set autoplay TRUE}
+(press green)
+(wait_screen game_screen 60)
+(expect {gamecfg get_song} iloverockandroll)
+(wait 5)
+(shot song)
+{player0 win 5}
+(wait_screen endgame_screen 400)
+(wait 4)
+(shot results)
+; Five stars pay each star level's award: 100, 200 and 350 in GH1.
+(expect {- {campaign cash} $cash} 650)
+(press green)
+(wait_screen cashaward_screen)
+(wait 2)
+(shot cash)
+(press green)
+(wait_screen complete_screen)
+(wait 1)
+(press green)
+(wait_screen sel_song_screen 40)
+(wait 2)
+(shot songs_after)
+{set $cash {campaign cash}}
+{set $score {campaign career_score}}
+(expect {> $score 0} 1)
+
+; The store: GH1's prices, on GH2's models of the same Gibsons.
+{ui goto_screen store_screen}
+(wait_screen store_screen)
+(wait 2)
+(shot store)
+(expect {elem {find $syscfg store character glam price} 1} 5000)
+(expect {elem {find $syscfg store character grim price} 1} 8000)
+(expect {elem {find $syscfg store guitar explorer price} 1} 600)
+(expect {elem {find $syscfg store song fireitup price} 1} 300)
+(press green)
+(wait 2)
+(shot store_guitars)
+(press red)
+(wait 2)
+{ui goto_screen career_screen}
+(wait_screen career_screen 40)
+
+; Not saved: the load must drop it.
+{campaign add_cash 111}
+{ui goto_screen bootup_load}
+(wait_screen main_screen 40)
+(expect {campaigns active} gh1)
+{gamecfg set mode career}
+{campaign set_profile_slot 0}
+(expect {campaign cash} $cash)
+(expect {campaign career_score} $score)
+
+; One song of thirty passed.
+{ui goto_screen ghc_campaign_screen}
+(wait_screen ghc_campaign_screen)
+(wait 2)
+(shot campaigns_after)
+(expect {campaigns progress gh1 0} 3)
+(expect {campaigns progress gh2 0} 0)
+
+; The band's GH2 career is a new one, with GH2's characters.
+{set $pick gh2}
+#include common/pick_campaign.dta
+(press green)
+(wait_screen sel_difficulty_screen)
+(expect {campaigns active} gh2)
+(expect {campaign new_campaign} 1)
+(expect {size {find $syscfg characters}} 12)
+(quit)

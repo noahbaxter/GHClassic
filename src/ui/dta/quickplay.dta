@@ -66,7 +66,7 @@
          {$this update_pos}
       )
       (exit
-         {song_preview }
+         {song_preview ''}
          {if [metamusic_on_exit] {meta_music start}}
          {set [metamusic_on_exit] TRUE}
          {song_provider set_quickplay FALSE}
@@ -107,7 +107,7 @@
    )
 }
 {retype sel_song_panel $ghc_sel_song_panel}
-{new GHPanel sel_song_twin_panel}
+{if {! {exists sel_song_twin_panel}} {new GHPanel sel_song_twin_panel}}
 {retype sel_song_twin_panel $ghc_sel_song_panel}
 ; The UI gets blue and orange both as kPad_Square (yellow as kPad_Circle,
 ; red as kPad_Tri), so the pad tells them apart.
@@ -142,7 +142,7 @@
       (BUTTON_DOWN_MSG {ghc_qp_button sel_song_panel qp_selsong_twin_screen $button})
    )
 }
-{new GHScreen qp_selsong_twin_screen}
+{if {! {exists qp_selsong_twin_screen}} {new GHScreen qp_selsong_twin_screen}}
 {retype qp_selsong_twin_screen
    (
       (panels meta sel_song_twin_panel helpbar)

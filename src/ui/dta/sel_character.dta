@@ -10,8 +10,8 @@
       ; From the ARK root: a path resolves against the file its array came
       ; from, and this one comes from no file.
       (file ui/sel_character.milo)
-      (char_focus rockabill)
-      (char_outfit rockabill1)
+      (char_focus punk)
+      (char_outfit punk1)
       (old_scroll_pos 0)
       (focus character.lst)
       (skin_select FALSE)
@@ -44,8 +44,7 @@
             {character.lst set_selected {character_provider get_index $character}}
             {$this set old_scroll_pos {character.lst selected_pos}}
             {char_highlight.tnm set_frame [old_scroll_pos]}
-            ; ui.dta's CHARACTERS
-            {foreach $c (punk alterna glam goth metal rockabill rock deathmetal classic funk1 grim)
+            {foreach $c CHARACTERS
                {do
                   ($mesh {sprint "char_" $c ".mesh"})
                   {if_else {campaign is_unlocked $c}
@@ -102,9 +101,24 @@
             {foreach_int $i 1 {size $entry}
                {do
                   ($outfit {elem {elem $entry $i} 0})
-                  {if {campaign is_unlocked $outfit} {push_back [outfits] $outfit}}
+                  {if {&& {campaign is_unlocked $outfit} {$this may_wear {elem $entry $i}}}
+                     {push_back [outfits] $outfit}
+                  }
                }
             }
+         }
+      )
+      ; Another game's outfit ((extra <game> <its name there>),
+      ; content/outfits.h) is no part of a career, which is its own game's
+      ; alone. In the other modes it is there once its own game's career
+      ; has it, or with all access.
+      (may_wear
+         ($entry)
+         {if_else {find_exists $entry extra}
+            {&& {!= {gamecfg get mode} career}
+               {|| {campaign all_access}
+                  {campaigns owns {elem {find $entry extra} 1} {elem {find $entry extra} 2}}}}
+            TRUE
          }
       )
       ; An outfit's (name "...") in config, else its locale token, as the
@@ -249,5 +263,47 @@
          }
          kDataUnhandled
       )
+   )
+}
+; The career's two character screens, as the game's own (career.dta) but
+; that the picker opens for a character with more than one outfit it would
+; list (find_outfits), where the game's counts config's: another game's
+; outfit is no part of a career, and a locked one is not listed.
+{func ghc_sel_character
+   ($screen)
+   {if_else {sel_character_panel get skin_select}
+      {do
+         ($sel_outfit {sel_character_panel get char_outfit})
+         {if {&& $sel_outfit {!= {game get_character_outfit} $sel_outfit}}
+            {game set_character $sel_outfit}
+         }
+         {ui goto_screen {$screen get done_screen}}
+      }
+      {do
+         {sel_character_panel find_outfits}
+         {if_else {> {size {sel_character_panel get outfits}} 1}
+            {sel_character_panel choose_skins}
+            {do
+               {game set_character {sel_character_panel get char_outfit} TRUE}
+               {ui goto_screen {$screen get done_screen}}
+            }
+         }
+      }
+   }
+}
+{retype sel_character_new_screen
+   (
+      (done_screen sel_guitar_new_screen)
+      (back_screen sel_difficulty_screen)
+      SEL_CHARACTER_COMMON
+      (SELECT_START_MSG {ghc_sel_character $this} kDataUnhandled)
+   )
+}
+{retype sel_character_edit_screen
+   (
+      (done_screen career_screen)
+      (back_screen career_screen)
+      SEL_CHARACTER_COMMON
+      (SELECT_START_MSG {ghc_sel_character $this} {campaign set_character_info} kDataUnhandled)
    )
 }

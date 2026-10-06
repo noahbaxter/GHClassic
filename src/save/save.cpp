@@ -1,4 +1,6 @@
-// GH2's save, kept in save.bin instead of on the memory card.
+// The save, kept in save.bin instead of on the memory card: the career of
+// the game being played (content/campaigns.h) under that game's sections,
+// every other game's left as they are.
 //
 // GHMCSaveData (retail 0x14b240) has Campaign::Save fill a 0x21c00-byte
 // buffer, then SaveData1 writes it to the card on a worker thread.
@@ -9,7 +11,8 @@
 //
 // The store keeps only what differs from a fresh campaign, the one the game
 // builds at boot. LoadData2's first call saves that campaign once as the base
-// every later load and save measures against.
+// every later load and save measures against, and a campaign switch takes the
+// rebuilt Campaign as the new game's (enterGame).
 //
 // The game's card holds nothing (save/card.cpp). --import-card's PCSX2 card
 // is read in place of save.bin by the first load, and becomes save.bin at once.
@@ -42,6 +45,8 @@
 #include <iterator>
 #include <map>
 #include <optional>
+#include <set>
+#include <sstream>
 #include <utility>
 
 namespace gh2::save
@@ -69,11 +74,13 @@ namespace gh2::save
         std::string s_path;
         std::string s_importCard;
         std::string s_exportCard;
+        bool s_inMemory = false; // a save goes no further than s_store
         Store s_store;
         Loaded s_loaded = Loaded::kNothing;
         std::string s_loadedFrom;
         std::optional<gh2::Save> s_fresh;
         gh2::SongGames s_songGames;
+        std::string s_game = "gh2"; // whose career the Campaign holds
         std::map<std::string, std::array<std::string, 5>> s_scoreNames; // by game
         std::vector<CardGame> s_cardGames;
         // An import's high scores from the other games' folders, by song.
@@ -83,6 +90,11 @@ namespace gh2::save
         std::string path()
         {
             return s_path.empty() ? settings::userDataPath("save.bin") : s_path;
+        }
+
+        gh2::Games games()
+        {
+            return {s_game, s_songGames};
         }
 
         // --export-card's, else settings.ini's export_card puts GHClassic.ps2
@@ -155,6 +167,8 @@ namespace gh2::save
                 return static_cast<uint32_t>(runtime->callGuestFunction(rdram, ctx, function, args));
             };
             const uint32_t buffer = call(s_addresses->builtinNew, {kBufferSize});
+            // Zeroed: a Save that writes nothing must leave nothing to parse.
+            std::memset(getMemPtr(rdram, buffer), 0, kBufferSize);
             std::memcpy(getMemPtr(rdram, buffer), bytes.data(), std::min<size_t>(bytes.size(), kBufferSize));
             const uint32_t stream = call(s_addresses->builtinNew, {kStreamSize});
             call(s_addresses->bufStreamCtor, {stream, buffer, kBufferSize, 1u});
@@ -194,7 +208,8 @@ namespace gh2::save
         }
 
         // The song list HighScoreDB is built from (Campaign's constructor,
-        // 0x12cf00) gains the other games' songs.
+        // 0x12cf00) gains the other games' songs: every one the campaign's
+        // own list lacks.
         struct HighScoreDbTag;
         void onHighScoreDb(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
@@ -202,8 +217,13 @@ namespace gh2::save
             const uint32_t songs = GPR_U32(ctx, 5);
             const uint32_t scratch = GPR_U32(ctx, 29) - 0x20u;
             SET_GPR_U32(ctx, 29, scratch - 0x10u);
+            std::set<std::string> listed;
+            for (uint32_t at = load<uint32_t>(rdram, songs); at < load<uint32_t>(rdram, songs + 4u); at += 4u)
+                listed.insert(reinterpret_cast<const char *>(getMemPtr(rdram, load<uint32_t>(rdram, at))));
             for (const auto &[song, game] : s_songGames)
             {
+                if (listed.count(song) != 0u)
+                    continue;
                 const uint32_t symbol = script::symbol(rdram, ctx, runtime, song);
                 pushBack(rdram, ctx, runtime, songs, &symbol, 4u, s_addresses->symbolsInsertOverflow, scratch);
             }
@@ -213,7 +233,7 @@ namespace gh2::save
         std::string gameOf(const std::string &song)
         {
             const auto it = s_songGames.find(song);
-            return it == s_songGames.end() ? "gh2" : it->second;
+            return it == s_songGames.end() ? s_game : it->second;
         }
 
         // A game's save folder as each game writes it: the marker file named
@@ -277,8 +297,9 @@ namespace gh2::save
             return gh2::write(*out);
         }
 
-        // GH2's folder with the icon SetupMCIcon (0x14b098) last built, and
-        // each added game's.
+        // Every game's folder, GH2's with the icon SetupMCIcon (0x14b098) last
+        // built. The game whose career `save` is takes it whole; each other
+        // takes its songs' high scores.
         void writeCard(uint8_t *rdram, const gh2::Save &save, const std::string &to)
         {
             std::optional<Ps2Card> card = Ps2Card::open(to);
@@ -301,17 +322,20 @@ namespace gh2::save
             const uint8_t *iconSys = getMemPtr(rdram, s_addresses->mcIconSys);
             const uint8_t *iconData = getMemPtr(rdram, icon);
             const std::string saveFile = guestString(rdram, s_addresses->mcSaveFile);
-            // GH2's own songs alone: GH2 would drop the rest on loading.
+            // Its own songs alone: the game would drop the rest on loading.
             gh2::Save own = save;
-            std::erase_if(own.scores, [](const gh2::SongScores &s) { return gameOf(s.song) != "gh2"; });
-            bool ok = card->replaceDir(guestString(rdram, s_addresses->mcBaseDir),
-                                       saveFolder(guestString(rdram, s_addresses->mcBaseDir), saveFile,
-                                                  gh2::write(own), kBufferSize, {iconSys, iconSys + kIconSysSize},
-                                                  guestString(rdram, s_addresses->mcIconFile),
-                                                  {iconData, iconData + load<uint32_t>(rdram, s_addresses->mcIconSize)}));
-            for (const CardGame &game : s_cardGames)
+            std::erase_if(own.scores, [](const gh2::SongScores &s) { return gameOf(s.song) != s_game; });
+            std::vector<CardGame> folders = {{"gh2", guestString(rdram, s_addresses->mcBaseDir), false, kBufferSize,
+                                              {iconSys, iconSys + kIconSysSize}, guestString(rdram, s_addresses->mcIconFile),
+                                              {iconData, iconData + load<uint32_t>(rdram, s_addresses->mcIconSize)}}};
+            folders.insert(folders.end(), s_cardGames.begin(), s_cardGames.end());
+            bool ok = true;
+            for (const CardGame &game : folders)
             {
-                const std::vector<uint8_t> stream = otherSave(game, save, card->read(game.dir, saveFile));
+                // GH1's own layout holds only what otherSave gives it.
+                const std::vector<uint8_t> stream = game.game == s_game && !game.gh1Layout
+                                                        ? gh2::write(own)
+                                                        : otherSave(game, save, card->read(game.dir, saveFile));
                 if (stream.size() > game.dataSize)
                 {
                     std::cerr << "[save] " << game.game << "'s save does not fit its card file; not exported" << std::endl;
@@ -339,6 +363,13 @@ namespace gh2::save
                 std::cerr << "[save] no fresh campaign to measure against; not saved" << std::endl;
                 return finish(ctx, kReadWriteFailed);
             }
+            if (s_inMemory)
+            {
+                keepOptions(save->options);
+                gh2::toStore(*save, *s_fresh, s_store, games());
+                std::cout << "[save] kept in memory, not written" << std::endl;
+                return finish(ctx, kNoError);
+            }
             // As retail's (0x14b514): a save already there is replaced only once
             // the player said so, which the menus ask for on this code.
             Store old;
@@ -346,7 +377,7 @@ namespace gh2::save
             if (there != ReadResult::kMissing && load<uint32_t>(rdram, s_addresses->mcOverwrite) == 0u)
                 return finish(ctx, kFileExists);
             keepOptions(save->options);
-            gh2::toStore(*save, *s_fresh, s_store, s_songGames);
+            gh2::toStore(*save, *s_fresh, s_store, games());
             // A damaged save is only ever replaced by choice, and kept aside.
             if (there == ReadResult::kCorrupt)
             {
@@ -368,7 +399,8 @@ namespace gh2::save
         // the same run is save.bin's.
         bool readCardSave(uint8_t *rdram)
         {
-            if (s_importCard.empty())
+            // The save read here is GH2's career.
+            if (s_importCard.empty() || s_game != "gh2")
                 return false;
             s_loadedFrom = std::exchange(s_importCard, {});
             const std::string dir = guestString(rdram, s_addresses->mcBaseDir);
@@ -497,11 +529,16 @@ namespace gh2::save
         // A card save becomes save.bin at once, the old one kept as save.bin.bak.
         void storeCardSave(const gh2::Save &save)
         {
+            if (s_inMemory)
+            {
+                gh2::toStore(save, *s_fresh, s_store, games());
+                return;
+            }
             std::error_code error;
             if (std::filesystem::exists(path(), error))
                 std::filesystem::copy_file(path(), path() + ".bak", std::filesystem::copy_options::overwrite_existing,
                                            error);
-            gh2::toStore(save, *s_fresh, s_store, s_songGames);
+            gh2::toStore(save, *s_fresh, s_store, games());
             if (writeFile(path(), s_store))
                 std::cout << "[save] " << s_loadedFrom << " is now " << path() << std::endl;
             else
@@ -531,7 +568,7 @@ namespace gh2::save
                 uint8_t *buffer = getMemPtr(rdram, load<uint32_t>(rdram, s_addresses->mcBuffer));
                 std::optional<gh2::Save> save;
                 if (s_fresh)
-                    save = gh2::fromStore(s_store, *s_fresh, s_songGames);
+                    save = gh2::fromStore(s_store, *s_fresh, games());
                 if (save && s_loaded == Loaded::kCard)
                 {
                     if (const std::optional<gh2::Save> card = gh2::parse(buffer, kBufferSize))
@@ -570,9 +607,113 @@ namespace gh2::save
         }
     }
 
+    namespace
+    {
+        const char *const kDifficulties[gh2::kDifficulties] = {"easy", "medium", "hard", "expert"};
+        // Each "song.<name>" in a section whose state has a word starting
+        // `start` (gh2_text.h): "unlocked", or "stars=", which a song has
+        // once it is finished.
+        void songsWith(const Section &section, const std::string &start, std::set<std::string> &out)
+        {
+            for (const auto &[key, value] : section.values)
+            {
+                if (key.rfind("song.", 0) != 0)
+                    continue;
+                std::istringstream words(value);
+                for (std::string word; words >> word;)
+                    if (word.rfind(start, 0) == 0)
+                        out.insert(key.substr(5, key.find('#') == std::string::npos ? std::string::npos : key.find('#') - 5));
+            }
+        }
+    }
+
+    std::array<std::set<std::string>, 4> passedSongs(const std::string &game, int slot)
+    {
+        std::array<std::set<std::string>, 4> passed;
+        for (int d = 0; d < gh2::kDifficulties; ++d)
+            if (const Section *section = s_store.find("band " + std::to_string(slot + 1) + " " + game + " " + kDifficulties[d]))
+                songsWith(*section, "stars=", passed[static_cast<size_t>(d)]);
+        return passed;
+    }
+
+    std::set<std::string> unlockedSongs(const std::string &game)
+    {
+        std::set<std::string> unlocked;
+        for (int slot = 0; slot < gh2::kProfiles; ++slot)
+            for (const char *difficulty : kDifficulties)
+                if (const Section *section = s_store.find("band " + std::to_string(slot + 1) + " " + game + " " + difficulty))
+                    songsWith(*section, "unlocked", unlocked);
+        return unlocked;
+    }
+
+    bool unlockedItem(const std::string &game, const std::string &item)
+    {
+        const std::string own = " " + game;
+        for (const Section &section : s_store.sections)
+        {
+            // [band N <game>] and [band N <game> <difficulty>].
+            const size_t at = section.name.find(own);
+            if (section.name.rfind("band ", 0) != 0 || at == std::string::npos ||
+                (at + own.size() != section.name.size() && section.name[at + own.size()] != ' '))
+                continue;
+            for (const auto &[key, value] : section.values)
+            {
+                // "<type>.<item>", "#2" on for one listed twice.
+                const size_t dot = key.find('.');
+                if (dot == std::string::npos || key.substr(dot + 1, key.find('#') - dot - 1) != item)
+                    continue;
+                std::istringstream words(value);
+                for (std::string word; words >> word;)
+                    if (word == "unlocked")
+                        return true;
+            }
+        }
+        return false;
+    }
+
+    void leaveGame(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        if (!s_fresh)
+            return;
+        // Nothing with all access on, which no save holds either.
+        if (const std::optional<gh2::Save> save = saveCampaign(rdram, ctx, runtime))
+        {
+            keepOptions(save->options);
+            gh2::toStore(*save, *s_fresh, s_store, games());
+        }
+    }
+
+    std::string lastGame()
+    {
+        const Section *section = s_store.find(kOwnSection);
+        const std::string *game = section ? section->get("campaign") : nullptr;
+        return game ? *game : "gh2";
+    }
+
+    void enterGame(const std::string &game, uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        s_game = game;
+        s_store.section(kOwnSection).set("campaign", game);
+        s_fresh = saveCampaign(rdram, ctx, runtime);
+        if (!s_fresh)
+        {
+            std::cerr << "[save] no fresh " << game << " campaign to measure against" << std::endl;
+            return;
+        }
+        nameDefaults(*s_fresh);
+        gh2::Save save = gh2::fromStore(s_store, *s_fresh, games());
+        applyOptions(save.options);
+        loadCampaign(rdram, ctx, runtime, save);
+    }
+
     void usePath(const std::string &path)
     {
         s_path = path;
+    }
+
+    void keepInMemory()
+    {
+        s_inMemory = true;
     }
 
     void importCard(const std::string &path)

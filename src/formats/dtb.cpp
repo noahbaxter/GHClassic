@@ -208,21 +208,27 @@ namespace gh2::dtb
         std::optional<std::vector<Node>> readFile(const std::string &script, Load &load)
         {
             const auto file = load.files(built(script));
-            if (!file)
+            const auto root = file ? raw(*file) : std::nullopt;
+            if (!root)
                 return std::nullopt;
-            // PS2's cipher, else 360's: the one giving version 1 and a whole
-            // root array.
-            for (const auto decrypt : {crypt::randStream, crypt::parkMiller})
-            {
-                const Bytes plain = decrypt(*file);
-                if (plain.empty() || plain[0] != 1u)
-                    continue;
-                Reader reader{plain, 1u};
-                if (auto root = reader.array(kArray))
-                    return apply(root->nodes, load, script);
-            }
-            return std::nullopt;
+            return apply(root->nodes, load, script);
         }
+    }
+
+    std::optional<Node> raw(const Bytes &file)
+    {
+        // PS2's cipher, else 360's: the one giving version 1 and a whole
+        // root array.
+        for (const auto decrypt : {crypt::randStream, crypt::parkMiller})
+        {
+            const Bytes plain = decrypt(file);
+            if (plain.empty() || plain[0] != 1u)
+                continue;
+            Reader reader{plain, 1u};
+            if (auto root = reader.array(kArray))
+                return root;
+        }
+        return std::nullopt;
     }
 
     std::optional<Node> read(const std::string &script, Macros &macros, const Files &files)
@@ -257,6 +263,65 @@ namespace gh2::dtb
         if (node.type == kFloat)
             return node.real;
         return std::nullopt;
+    }
+
+    namespace
+    {
+        void put(Bytes &out, const Node &node);
+
+        void putArray(Bytes &out, const Node &array)
+        {
+            const uint16_t size = static_cast<uint16_t>(array.nodes.size());
+            out.push_back(static_cast<uint8_t>(size & 0xffu));
+            out.push_back(static_cast<uint8_t>(size >> 8));
+            out.insert(out.end(), 4u, 0u); // line, id
+            for (const Node &n : array.nodes)
+                put(out, n);
+        }
+
+        void put(Bytes &out, const Node &node)
+        {
+            milo::putU32(out, node.type);
+            switch (node.type)
+            {
+            case kArray:
+            case kCommand:
+            case kProperty:
+                putArray(out, node);
+                break;
+            case kInt:
+                milo::putU32(out, static_cast<uint32_t>(node.integer));
+                break;
+            case kFloat:
+            {
+                uint32_t v = 0u;
+                std::memcpy(&v, &node.real, 4u);
+                milo::putU32(out, v);
+                break;
+            }
+            case kUnhandled:
+            case kElse:
+            case kEndif:
+                milo::putU32(out, 0u);
+                break;
+            default:
+                milo::putStr(out, node.text);
+                break;
+            }
+        }
+    }
+
+    Bytes write(const Node &root)
+    {
+        // The seed, then the stream: the cipher is its own inverse.
+        Bytes plain(4u, 0u);
+        plain[0] = 1u;
+        plain.push_back(1u);
+        putArray(plain, root);
+        Bytes out(plain.begin(), plain.begin() + 4);
+        const Bytes stream = crypt::randStream(plain);
+        out.insert(out.end(), stream.begin(), stream.end());
+        return out;
     }
 
     std::string text(const Node &node)

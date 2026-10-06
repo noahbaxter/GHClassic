@@ -1,0 +1,148 @@
+; What an 80s career earns, as the 80s shows it: on medium the third song
+; of the first tier unlocks its encore, the encore the next venue and a
+; sponsor, and the cash buys a finish in the store. A load brings it all
+; back. Then, playing GH2, quickplay's 80s list has the encore that career
+; opened.
+;
+; The first two songs are passed by the game's own cheat (cheat_beat_song);
+; the third and the encore are started and won by its other ({player0 win}).
+(needs gh80s)
+#include common/first_boot.dta
+; Before any 80s career, quickplay's 80s list passes over the encore: four
+; rows down from the first is the second tier's first song.
+{gamecfg set mode quickplay}
+{setlist select gh80s}
+{ui goto_screen qp_selsong_twin_screen}
+(wait_screen qp_selsong_twin_screen)
+(wait 2)
+(press down)
+(press down)
+(press down)
+(expect {game get_song} ballstothewall)
+(press down)
+(expect {game get_song} noonelikeyou)
+(shot quickplay_before)
+{setlist select gh2}
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+{set $pick gh80s}
+#include common/career_start.dta
+(press green)
+(wait_screen sel_venue_screen 40)
+(press green)
+(wait_screen sel_song_screen)
+(wait 1)
+{campaign cheat_beat_song bangyourhead 100000}
+{campaign cheat_beat_song wegotthebeat 100000}
+{set $index 2}
+#include common/career_song.dta
+(expect {gamecfg get_song} iran)
+(wait 3)
+{player0 win 5}
+(wait_screen endgame_encore_screen 400)
+(wait 4)
+(shot encore_unlocked)
+(press green)
+(wait_screen game_screen 60)
+(expect {gamecfg get_song} 18andlife)
+(wait 3)
+{player0 win 5}
+(wait_screen endgame_screen 400)
+(wait 4)
+(shot encore_results)
+(press green)
+(wait_screen status_screen)
+(wait 3)
+(shot sponsor)
+(press green)
+(wait_screen unlock_venue_screen)
+(wait 2)
+(shot venue_unlocked)
+(wait_screen complete_screen)
+(wait 1)
+(press green)
+(wait_screen career_screen 40)
+(wait 1)
+(expect {campaign is_unlocked small1} 1)
+(shot career)
+
+; The store: Finishes, the first one, bought.
+{set $cash {campaign cash}}
+(press down)
+(press down)
+(press down)
+(press green)
+(wait_screen store_screen)
+(wait 2)
+(press down)
+(press green)
+(wait 2)
+{set $item {store_panel get item_name}}
+{set $price {store_panel get_item_price}}
+(expect {campaign is_unlocked $item} 0)
+(shot store)
+(press green)
+(wait_screen store_bought_screen)
+(wait 2)
+(shot bought)
+(expect {campaign is_unlocked $item} 1)
+(expect {- $cash {campaign cash}} $price)
+(press green)
+(wait_screen store_screen)
+(press red)
+(wait 1)
+(press red)
+(wait_screen career_screen 40)
+{set $cash {campaign cash}}
+
+; Not saved: the load must drop it.
+{campaign add_cash 111}
+{ui goto_screen bootup_load}
+(wait_screen main_screen 40)
+(expect {campaigns active} gh80s)
+{gamecfg set mode career}
+{campaign set_profile_slot 0}
+(expect {campaign cash} $cash)
+(expect {campaign is_unlocked $item} 1)
+(expect {campaign is_unlocked small1} 1)
+; Four of thirty songs passed.
+(expect {campaigns progress gh80s 0} 13)
+
+; Playing GH2: the 80s list's first tier has its encore.
+{set $ghc_switch gh2}
+{set $ghc_switch_next main_screen}
+{ui goto_screen ghc_switch_screen}
+(wait_screen main_screen)
+(expect {campaigns active} gh2)
+{gamecfg set mode quickplay}
+{setlist select gh80s}
+{ui goto_screen qp_selsong_twin_screen}
+(wait_screen qp_selsong_twin_screen)
+(wait 2)
+(shot quickplay)
+; Four rows down is the encore now, and it can be picked. The second
+; tier's, in a venue the career has only opened, is the list's last row
+; and still shut: down stops on the row before it.
+(expect {song_provider get_symbol 4} 18andlife)
+(press down)
+(press down)
+(press down)
+(press down)
+(expect {game get_song} 18andlife)
+(shot encore_row)
+(press down)
+(press down)
+(press down)
+(press down)
+(expect {game get_song} radarlove)
+(press down)
+(expect {game get_song} radarlove)
+(press up)
+(press up)
+(press up)
+(press up)
+(expect {game get_song} 18andlife)
+(press green)
+(wait_screen qp_diff_screen)
+(expect {game get_song} 18andlife)
+(quit)

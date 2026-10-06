@@ -1,0 +1,9 @@
+; From the campaign picker to $ghc_switch's campaign, landing on
+; $ghc_switch_next, and back to the picker.
+{ui goto_screen ghc_switch_screen}
+(wait_screen $ghc_switch_next)
+(expect {campaigns active} $ghc_switch)
+(wait 1.5)
+{ui goto_screen ghc_campaign_screen}
+(wait_screen ghc_campaign_screen)
+(wait 1)

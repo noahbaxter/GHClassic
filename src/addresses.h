@@ -66,9 +66,11 @@ namespace gh2
         uint32_t uiManagerPoll;
         uint32_t debugModal; // DebugModal(bool &, char *)
         uint32_t abort;
+        uint32_t delayThread;
         uint32_t ctlClientPoll;
         uint32_t spuStartSend;
         uint32_t metaMusicPoll;
+        uint32_t metaMusicStop;
         uint32_t metaPanelPoll;
         uint32_t metaPanelPickLoopIndex; // (int size)
         uint32_t systemConfig3; // SystemConfig(Symbol, Symbol, Symbol)
@@ -114,6 +116,8 @@ namespace gh2
         uint32_t charsysPanelSetTypeDef;
         uint32_t charsysPanelPollCharLoading;
         uint32_t charsysPanelTrySetPriority; // (Symbol outfit, int priority)
+        uint32_t charsysPanelNextCharacter;  // (int index, int direction, Symbol &outfit)
+        uint32_t charsysPanelValidChar;      // (Symbol outfit)
         uint32_t playerConfigCharacterOfOutfit; // static (Symbol outfit, int &index)
         uint32_t dataVariable; // DataVariable(Symbol)
         uint32_t songProviderInitData;
@@ -126,6 +130,31 @@ namespace gh2
         uint32_t helpBarFinishLoad;
         uint32_t helpBarSetDisplay;
         uint32_t helpBarAddElement;
+        uint32_t dataReadFile;     // DataReadFile(const char *)
+        uint32_t systemConfig;     // SystemConfig()
+        uint32_t dataArrayResize;  // DataArray::Resize(int)
+        uint32_t dataArrayDtor;    // DataArray::~DataArray
+        uint32_t dataArrayClone;   // DataArray::Clone(bool deep)
+        uint32_t dataArraySort;    // DataArray::Sort
+        uint32_t loadMgrPoll;
+        uint32_t dataNodeAssign;   // DataNode::operator=(const DataNode &)
+        uint32_t venueProviderInitData; // VenueProvider::InitData(RndDir *)
+        uint32_t campaignCtor;
+        uint32_t campaignDtor;
+        uint32_t localeInit;       // Locale::Init
+        uint32_t localeTerminate;  // Locale::Terminate
+        uint32_t campaignStateIsEncoreSong;           // (Symbol song)
+        uint32_t campaignStateIsEncoreUnlockPossible; // (Symbol song)
+        uint32_t campaignStateCheckUnlockVenue;       // (Symbol song)
+        uint32_t campaignStateGetNumPassedSongs;      // (Symbol venue)
+        uint32_t campaignStateIsVenuePassed;          // (Symbol venue)
+        uint32_t campaignStateIsUnlocked;             // (Symbol item)
+        uint32_t campaignStateSetVenueUnlocked;       // (Symbol venue, bool)
+        uint32_t campaignDataIsStoreSong;             // (Symbol song)
+        uint32_t campaignDataGetRequiredSongs;        // (Difficulty, Symbol venue)
+        uint32_t campaignDataGetNextVenue;            // (Symbol venue, Difficulty)
+        uint32_t campaignItemsFind;                   // CampaignItemVec::Find(Symbol)
+        uint32_t campaignItemSetPassed;               // CampaignItem::SetPassed(bool)
         // Data
         uint32_t rndCamCurrent;  // RndCam::sCurrent
         uint32_t defaultMat;     // the RndMat a mesh without one draws with
@@ -137,6 +166,8 @@ namespace gh2
         uint32_t theGameConfig; // GameConfig*
         uint32_t theCampaign;   // Campaign*
         uint32_t theLocale;
+        uint32_t theLoadMgr;
+        uint32_t nullStr; // char*, the empty Symbol's text
         uint32_t mcBuffer;    // the save's bytes between the two halves of a load or save
         uint32_t mcOverwrite; // GHMCSaveData's overwrite argument: replace a save already there
         uint32_t mcBaseDir;   // char*, the save's directory on the card
@@ -214,9 +245,11 @@ namespace gh2
         .uiManagerPoll = 0x214510u,
         .debugModal = 0x105a88u,
         .abort = 0x307b80u,
+        .delayThread = 0x2f7dd8u,
         .ctlClientPoll = 0x22dc68u,
         .spuStartSend = 0x231a78u,
         .metaMusicPoll = 0x21f180u,
+        .metaMusicStop = 0x21f668u,
         .metaPanelPoll = 0x134850u,
         .metaPanelPickLoopIndex = 0x1349d8u,
         .systemConfig3 = 0x2a8700u,
@@ -262,6 +295,8 @@ namespace gh2
         .charsysPanelSetTypeDef = 0x141bf8u,
         .charsysPanelPollCharLoading = 0x142ea8u,
         .charsysPanelTrySetPriority = 0x142790u,
+        .charsysPanelNextCharacter = 0x142c70u,
+        .charsysPanelValidChar = 0x142bc0u,
         .playerConfigCharacterOfOutfit = 0x114030u,
         .dataVariable = 0x2b7b00u,
         .songProviderInitData = 0x117448u,
@@ -274,6 +309,31 @@ namespace gh2
         .helpBarFinishLoad = 0x149f40u,
         .helpBarSetDisplay = 0x14a2f0u,
         .helpBarAddElement = 0x14a1e0u,
+        .dataReadFile = 0x2b2928u,
+        .systemConfig = 0x2a8680u,
+        .dataArrayResize = 0x2afbd8u,
+        .dataArrayDtor = 0x2b07d0u,
+        .dataArrayClone = 0x2b0558u,
+        .dataArraySort = 0x2b08d8u,
+        .loadMgrPoll = 0x2cc218u,
+        .dataNodeAssign = 0x2b8298u,
+        .venueProviderInitData = 0x118a90u,
+        .campaignCtor = 0x12cf00u,
+        .campaignDtor = 0x12d0c0u,
+        .localeInit = 0x2cb798u,
+        .localeTerminate = 0x2cba98u,
+        .campaignStateIsEncoreSong = 0x131d30u,
+        .campaignStateIsEncoreUnlockPossible = 0x132b18u,
+        .campaignStateCheckUnlockVenue = 0x1322c8u,
+        .campaignStateGetNumPassedSongs = 0x132450u,
+        .campaignStateIsVenuePassed = 0x132428u,
+        .campaignStateIsUnlocked = 0x131c70u,
+        .campaignStateSetVenueUnlocked = 0x132500u,
+        .campaignDataIsStoreSong = 0x131388u,
+        .campaignDataGetRequiredSongs = 0x1313d8u,
+        .campaignDataGetNextVenue = 0x1310c8u,
+        .campaignItemsFind = 0x140cf8u,
+        .campaignItemSetPassed = 0x140a90u,
         .rndCamCurrent = 0x3de348u,
         .defaultMat = 0x3da4f0u,
         .rndEnvironCurrent = 0x3de358u,
@@ -284,6 +344,8 @@ namespace gh2
         .theGameConfig = 0x3da308u,
         .theCampaign = 0x3da31cu,
         .theLocale = 0x51f1b8u,
+        .theLoadMgr = 0x51f1d8u,
+        .nullStr = 0x3de688u,
         .mcBuffer = 0x3da368u,
         .mcOverwrite = 0x3da394u,
         .mcBaseDir = 0x3da374u,
