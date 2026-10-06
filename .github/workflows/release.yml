@@ -86,8 +86,9 @@ jobs:
     runs-on: ubuntu-latest
     container: ubuntu:22.04
     env:
-      CC: gcc-12
-      CXX: g++-12
+      CC: clang-21
+      CXX: clang++-21
+      LDFLAGS: -fuse-ld=lld-21
       DEBIAN_FRONTEND: noninteractive
     steps:
       # Before checkout, which needs git for the submodules and ssh for the key.

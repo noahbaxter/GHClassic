@@ -32,13 +32,15 @@ jobs:
           python-version: "3.11"
       - run: python tools/ghc.py ci
 
-  # The release baseline: Ubuntu 22.04, glibc 2.35, GCC 12.
+  # The release baseline: Ubuntu 22.04, glibc 2.35, clang 21 over GCC 12's
+  # libstdc++.
   linux:
     runs-on: ubuntu-latest
     container: ubuntu:22.04
     env:
-      CC: gcc-12
-      CXX: g++-12
+      CC: clang-21
+      CXX: clang++-21
+      LDFLAGS: -fuse-ld=lld-21
       DEBIAN_FRONTEND: noninteractive
     steps:
       # Before checkout, which needs git for the submodules.
