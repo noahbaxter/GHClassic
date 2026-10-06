@@ -5,6 +5,7 @@
 #include "ps2_runtime_macros.h"
 #include "render/mesh_capture.h"
 #include "render/texture_capture.h"
+#include "settings/settings.h"
 
 #include <cstring>
 #include <fstream>
@@ -59,6 +60,8 @@ namespace gh2::transplant
         forgetTextureAddresses();
         std::memcpy(getMemPtr(rdram, kFirst), image.data() + kFirst, kRamSize - kFirst);
         s_active = true;
+        // The frame is set beside retail's, which culls.
+        settings::set(settings::kFrustumCull, 1);
         std::cerr << "[transplant] memory is now " << path << std::endl;
         return true;
     }

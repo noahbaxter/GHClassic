@@ -52,6 +52,9 @@ namespace gh2::settings
             // a song), so drawn small they shimmer: the highway's far end.
             {"video", "mipmaps", Type::kBool, 0, 1, 1, 1, 0},
             {"video", "msaa", Type::kInt, 1, 16, 1, 4, 1},
+            // Off: a sphere that holds only part of its mesh hides what still
+            // shows (flashpot_4.mesh in battle's fail sequence).
+            {"video", "frustum_cull", Type::kBool, 0, 1, 1, 0, 1},
             // 5 ms: finer is below what a player can feel.
             {"latency", "video_ms", Type::kInt, -500, 500, 5, 0, 0},
             // 45 by default: the port's own delay on macOS, SDL's CoreAudio

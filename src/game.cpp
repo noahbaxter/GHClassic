@@ -12,6 +12,7 @@
 #include "dev/null_rnd.h"
 #include "host/pad.h"
 #include "render/mesh_capture.h"
+#include "render/native_cull.h"
 #include "render/native_environ.h"
 #include "render/native_mesh.h"
 #include "render/native_particles.h"
@@ -42,6 +43,7 @@ namespace
         gh2::installNativeRect(runtime, gh2::kSlus21447);
         gh2::installNativeParticles(runtime, gh2::kSlus21447);
         gh2::installNativePoints(runtime, gh2::kSlus21447);
+        gh2::installNativeCull(runtime, gh2::kSlus21447);
         gh2::installSynth(runtime, gh2::kSlus21447);
         gh2::installMetaMusic(runtime, gh2::kSlus21447);
         gh2::installTrackStart(runtime, gh2::kSlus21447);
