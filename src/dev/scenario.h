@@ -10,8 +10,17 @@
 //   (print {game get_character} ...)   each value, to stderr
 //   (expect {player0 score} 158678)    fails the run unless the value matches
 //   (expect {taskmgr seconds} 33.47 0.1)  or, numbers, is within the third
-//   (shot metal_1)                     the next frame, as shot_metal_1 (--shots)
-//   (quit)                             closes the app
+//   (clock 100)                        the UI clock runs from there, 1/64 s a poll
+//   (freeze 103 2.5 3.9)               holds TaskMgr's UI seconds (once a clock
+//                                      reaches them), seconds and beat there,
+//                                      with no camera shake and no hair
+//   (shot metal_1)                    the next frame, as shot_metal_1 (--shots)
+//   (poke {dir find a.btn} 364 7)      the word at that offset of the object, an int or a float
+//   (peek {dir find a.btn} 364)        prints that word, as an int and as a float
+//   (dump menu)                      the next frame's draws, as draws_menu.json (--shots)
+//   (transplant "../x/frame.ram" frame)  the retail game's memory in place of this one's
+//                                      (dev/transplant.h), then its frame as a shot and a dump
+//   (quit)                           closes the app
 //   #include common/first_boot.dta     that file's steps, from beside this one
 //
 // A wait_screen or wait_until that takes more than 30 s, or the seconds

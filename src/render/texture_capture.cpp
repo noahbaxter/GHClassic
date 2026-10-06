@@ -26,6 +26,7 @@ namespace gh2
     {
         const Addresses *s_addresses = nullptr;
         std::unordered_map<uint32_t, std::shared_ptr<const TextureData>> s_textures;
+        bool s_foreign = false; // after forgetTextureAddresses
 
         struct Bitmap
         {
@@ -361,10 +362,28 @@ namespace gh2
         }
     }
 
-    std::shared_ptr<const TextureData> capturedTexture(uint32_t tex)
+    std::shared_ptr<const TextureData> capturedTexture(uint8_t *rdram, uint32_t tex)
     {
         const auto found = s_textures.find(tex);
-        return found != s_textures.end() ? found->second : nullptr;
+        if (found != s_textures.end())
+            return found->second;
+        if (!s_foreign || tex == 0u)
+            return nullptr;
+        // Memory from another run: this texture never synced here, and its
+        // bitmap is still in it.
+        if (load<uint32_t>(rdram, tex + milo::tex::kType) & milo::tex::kTypeNoPixels)
+            s_textures[tex] = nullptr;
+        else
+            store(tex, decodeWithMips(rdram, tex + milo::tex::kBitmap));
+        return s_textures[tex];
+    }
+
+    void forgetTextureAddresses()
+    {
+        s_textures.clear();
+        s_textTextures.clear();
+        s_yellowFretIcons.clear();
+        s_foreign = true;
     }
 
     void installTextureCapture(PS2Runtime &runtime, const Addresses &addresses)

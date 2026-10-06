@@ -1,5 +1,6 @@
 #include "host/scene_renderer.h"
 
+#include "dev/draw_dump.h"
 #include "host/mesh_push.h"
 #include "milo/layout.h"
 #include "render/camera.h"
@@ -1410,6 +1411,8 @@ namespace gh2
             std::memcpy(push.uvRows, material.uvXfm, sizeof(push.uvRows));
             std::memcpy(push.uvOffset, material.uvXfm + 4, sizeof(push.uvOffset));
         }
+        writeDrawDump(frame, pushes.data(), data.mapped);
+
         // Bound state outlives a render pass, so the frame data is bound once.
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, s.layout, 1, 1, &data.set, 0, nullptr);
         uint32_t boundCamera = UINT32_MAX;

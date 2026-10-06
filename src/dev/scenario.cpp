@@ -1,5 +1,9 @@
 #include "dev/scenario.h"
 
+#include "dev/transplant.h"
+#include "frame_step.h"
+#include "dev/draw_dump.h"
+#include "ps2_runtime_macros.h"
 #include "guest.h"
 #include "hook.h"
 #include "host/pad.h"
@@ -43,6 +47,16 @@ namespace gh2::scenario
         Clock::time_point s_deadline; // and when either fails
         int s_timeout = kTimeout;     // that deadline's seconds, to report
         std::atomic<bool> s_done{false};
+        bool s_frozen = false;  // a freeze holds TaskMgr's clocks
+        float s_uiSeconds = 0.0f, s_seconds = 0.0f, s_beat = 0.0f; // at these
+        // A clock steps the UI clock 1/64 s a poll: a step floats hold exactly,
+        // so the PS2's rounding and the host's give the same times.
+        bool s_clock = false;
+        float s_clockBase = 0.0f;
+        int s_clockPolls = 0;
+        const Addresses *s_addresses = nullptr;
+        std::string s_transplantName; // a transplant's shot and dump
+        int s_transplantPolls = 0;    // polls since it
 
         // Steps wait in game time, which --speed runs faster than real. The
         // timeouts stay real: a game behind its clock is not hung.
@@ -130,7 +144,7 @@ namespace gh2::scenario
             const script::Call steps{rdram, ctx, runtime, s_steps};
             if (s_shooting)
             {
-                if (shotPending())
+                if (shotPending() || drawDumpPending())
                     return;
                 s_shooting = false;
             }
@@ -222,10 +236,71 @@ namespace gh2::scenario
                 else if (verb == "stall")
                     // A hitch: the game thread stops while audio plays on.
                     std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(array.number(1) * 1000.0f)));
+                else if (verb == "freeze")
+                {
+                    s_uiSeconds = array.number(1);
+                    s_seconds = array.number(2);
+                    s_beat = array.number(3);
+                    s_frozen = true;
+                    freezeFrameSteps();
+                    // GamePanel leaves these alone while paused: current and last, at TaskMgr +0x28.
+                    const uint32_t timers = gh2::load<uint32_t>(rdram, s_addresses->theTaskMgr + 0x28u);
+                    for (uint32_t at : {0xcu, 0x10u})
+                    {
+                        gh2::store<float>(rdram, timers + at, s_seconds);
+                        gh2::store<float>(rdram, timers + 0x14u + at, s_beat);
+                    }
+                }
+                else if (verb == "clock")
+                {
+                    s_clockBase = array.number(1);
+                    s_clockPolls = 0;
+                    s_clock = true;
+                }
                 else if (verb == "shot")
                 {
                     // Nothing more runs until that frame is written.
                     requestShot(array.symbol(1));
+                    s_shooting = true;
+                    return;
+                }
+                else if (verb == "poke")
+                {
+                    // A word of the object the first argument evaluates to: an int or a float's bits.
+                    const uint32_t object = array.arg(1).value;
+                    if (object != 0u)
+                        gh2::store<uint32_t>(rdram, object + static_cast<uint32_t>(static_cast<int32_t>(array.number(2))),
+                                             array.arg(3).value);
+                }
+                else if (verb == "transplant")
+                {
+                    // Copied out first: both are in the memory about to go.
+                    const std::string path = text(rdram, array.arg(1));
+                    s_transplantName = array.symbol(2);
+                    if (!transplant::load(rdram, path))
+                    {
+                        std::cerr << "[scenario] FAIL: transplant" << std::endl;
+                        quit();
+                    }
+                    // The first frame drawn from it: later ones lack what a
+                    // poll would have set up again.
+                    requestDrawDump(s_transplantName, building().serial + 1u);
+                    return;
+                }
+                else if (verb == "peek")
+                {
+                    const uint32_t object = array.arg(1).value;
+                    const uint32_t word =
+                        object != 0u ? gh2::load<uint32_t>(
+                                           rdram, object + static_cast<uint32_t>(static_cast<int32_t>(array.number(2))))
+                                     : 0u;
+                    float f;
+                    std::memcpy(&f, &word, sizeof(f));
+                    std::cerr << "[scenario] peek " << word << " " << f << std::endl;
+                }
+                else if (verb == "dump")
+                {
+                    requestDrawDump(array.symbol(1));
                     s_shooting = true;
                     return;
                 }
@@ -282,13 +357,47 @@ namespace gh2::scenario
             }
         }
 
-        struct PollTag;
+        struct UiSecondsTag;
+        void onSetUISeconds(uint8_t *, R5900Context *ctx, PS2Runtime *)
+        {
+            if (s_clock)
+            {
+                const float stepped = s_clockBase + static_cast<float>(s_clockPolls) / 64.0f;
+                ctx->f[12] = s_frozen ? std::min(stepped, s_uiSeconds) : stepped;
+            }
+            else if (s_frozen)
+                ctx->f[12] = s_uiSeconds;
+        }
+
+        struct SecondsBeatTag;
+        void onSetSecondsBeat(uint8_t *, R5900Context *ctx, PS2Runtime *)
+        {
+            if (!s_frozen)
+                return;
+            ctx->f[12] = s_seconds;
+            ctx->f[13] = s_beat;
+        }
+
         void onUiPoll(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
             if (s_done || s_text.empty())
                 return;
             s_lastPoll = Clock::now().time_since_epoch().count();
             s_runtime = runtime;
+            ++s_clockPolls;
+            if (transplant::active())
+            {
+                // The steps were in the memory replaced. What is left is the
+                // frame it draws: a shot and a dump of it, then out.
+                ++s_transplantPolls;
+                if (s_transplantPolls == 3)
+                    requestShot(s_transplantName);
+                else if (s_transplantPolls > 3 && !shotPending() && !drawDumpPending())
+                {
+                    quit();
+                }
+                return;
+            }
             const R5900Context saved = *ctx;
             if (s_steps == 0u)
             {
@@ -303,6 +412,17 @@ namespace gh2::scenario
             if (s_steps != 0u)
                 step(rdram, ctx, runtime);
             *ctx = saved;
+        }
+
+        // UIManager::Poll, which another run's memory must not go through.
+        PS2Runtime::RecompiledFunction s_poll = nullptr;
+        void uiPoll(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            onUiPoll(rdram, ctx, runtime);
+            if (transplant::active())
+                ctx->pc = GPR_U32(ctx, 31);
+            else
+                s_poll(rdram, ctx, runtime);
         }
     }
 
@@ -326,7 +446,11 @@ namespace gh2::scenario
             std::cerr << "[script] " << line << std::endl;
             return {};
         });
-        EntryHook<PollTag>::install(runtime, addresses.uiManagerPoll, onUiPoll);
+        s_addresses = &addresses;
+        s_poll = runtime.lookupFunction(addresses.uiManagerPoll);
+        runtime.replaceFunction(addresses.uiManagerPoll, &uiPoll);
+        EntryHook<UiSecondsTag>::install(runtime, addresses.taskMgrSetUISeconds, onSetUISeconds);
+        EntryHook<SecondsBeatTag>::install(runtime, addresses.taskMgrSetSecondsBeat, onSetSecondsBeat);
         if (!s_text.empty())
             std::thread(watchdog).detach();
     }

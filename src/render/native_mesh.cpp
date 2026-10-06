@@ -126,7 +126,7 @@ namespace gh2
             const uint32_t returnTo = GPR_U32(ctx, 31);
             const uint32_t mesh = GPR_U32(ctx, 4);
             const uint32_t owner = load<uint32_t>(rdram, mesh + milo::mesh::kOwner);
-            std::shared_ptr<const MeshData> geometry = capturedMesh(owner);
+            std::shared_ptr<const MeshData> geometry = capturedMesh(rdram, owner);
             // Retail draws nothing, and calls nothing, until the owner has a
             // packet (0x3d890c).
             const bool synced = load<uint32_t>(rdram, owner + milo::mesh::kPacket) != 0u;
@@ -163,7 +163,7 @@ namespace gh2
             const uint32_t multi = GPR_U32(ctx, 4);
             const uint32_t mesh = load<uint32_t>(rdram, multi + milo::multimesh::kMesh);
             const uint32_t owner = mesh != 0u ? load<uint32_t>(rdram, mesh + milo::mesh::kOwner) : 0u;
-            std::shared_ptr<const MeshData> geometry = owner != 0u ? capturedMesh(owner) : nullptr;
+            std::shared_ptr<const MeshData> geometry = owner != 0u ? capturedMesh(rdram, owner) : nullptr;
             const bool synced = owner != 0u && load<uint32_t>(rdram, owner + milo::mesh::kPacket) != 0u;
             const uint32_t sentinel = multi + milo::multimesh::kInstances;
             const uint32_t first = load<uint32_t>(rdram, sentinel);
