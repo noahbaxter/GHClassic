@@ -13,6 +13,9 @@ namespace gh2
         uint32_t psRndBeginDrawing;
         uint32_t psRndEndDrawing;
         uint32_t psRndDrawRect;
+        uint32_t psRndDoPointTests;
+        uint32_t rndTestPoint; // Rnd::TestPoint
+        uint32_t sphereOutsideFrustum; // operator>(const Sphere &, const Frustum &)
         uint32_t psMeshSync;
         uint32_t psMeshFixVerts;
         uint32_t psMeshDestroy;
@@ -23,9 +26,12 @@ namespace gh2
         uint32_t psEnvironSelect;
         uint32_t psTexSyncBitmap;
         uint32_t psTexDestroy;
+        uint32_t psTexCopyFromScreen;
         uint32_t rndTextDrawShowing;
         uint32_t worldXfm;       // RndTransformable::WorldXfm
         uint32_t setWorldXfm;    // RndTransformable::SetWorldXfm
+        uint32_t psMatUpdateSphereXfm;
+        uint32_t sphereXfm;      // the four quadwords PsMat::UpdateSphereXfm fills
         uint32_t playMovie;
         uint32_t muteAllTracks;  // MasterAudio::MuteAllTracks
         uint32_t muteTrack;      // MasterAudio::MuteTrack
@@ -58,6 +64,11 @@ namespace gh2
         uint32_t systemConfig3; // SystemConfig(Symbol, Symbol, Symbol)
         uint32_t randomInt;     // RandomInt(lo, hi), hi exclusive
         uint32_t taskMgrAddTask; // TaskMgr::AddTask(Task *, Task::Units, float)
+        uint32_t taskMgrSetUISeconds;
+        uint32_t taskMgrSetSecondsBeat;
+        uint32_t systemPoll;  // SystemPoll(bool): pads, files, the loader
+        uint32_t synthPoll;   // Synth::Poll
+        uint32_t synthEEPoll; // SynthEE::Poll
         uint32_t streamEEPoll;
         uint32_t streamSampleFreq; // StreamEE::GetSampleFreq(int channel)
         uint32_t varTimerMs;
@@ -112,6 +123,9 @@ namespace gh2
         .psRndBeginDrawing = 0x19af38u,
         .psRndEndDrawing = 0x19b018u,
         .psRndDrawRect = 0x19b050u,
+        .psRndDoPointTests = 0x19a7f0u,
+        .rndTestPoint = 0x1d55b8u,
+        .sphereOutsideFrustum = 0x2d9170u,
         .psMeshSync = 0x3d4f08u,
         .psMeshFixVerts = 0x19dbb8u,
         .psMeshDestroy = 0x19dd88u,
@@ -122,9 +136,12 @@ namespace gh2
         .psEnvironSelect = 0x1a2060u,
         .psTexSyncBitmap = 0x1a13a8u,
         .psTexDestroy = 0x1a0f18u,
+        .psTexCopyFromScreen = 0x1a0d68u,
         .rndTextDrawShowing = 0x1dc380u,
         .worldXfm = 0x3d8ea0u,
         .setWorldXfm = 0x1dd7b8u,
+        .psMatUpdateSphereXfm = 0x19cb78u,
+        .sphereXfm = 0x46d490u,
         .playMovie = 0x21bb60u,
         .muteAllTracks = 0x23a3e8u,
         .muteTrack = 0x23a2c0u,
@@ -157,6 +174,11 @@ namespace gh2
         .systemConfig3 = 0x2a8700u,
         .randomInt = 0x2d9d10u,
         .taskMgrAddTask = 0x2c6b18u,
+        .taskMgrSetUISeconds = 0x2c6738u,
+        .taskMgrSetSecondsBeat = 0x2c6798u,
+        .systemPoll = 0x2a85d0u,
+        .synthPoll = 0x225cc8u,
+        .synthEEPoll = 0x22cc80u,
         .streamEEPoll = 0x2308a0u,
         .streamSampleFreq = 0x2314e8u,
         .varTimerMs = 0x2d4018u,

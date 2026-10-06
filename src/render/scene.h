@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <vector>
 
@@ -10,6 +11,22 @@
 // without ever reading the guest.
 namespace gh2
 {
+    // A vert's float as VU1 takes it. VU1 has no NaN or infinity: an exponent
+    // of 255 is one more power of two, so such a float is a very large
+    // number of its sign (main_hall.5.mesh in big has seven such normals),
+    // and a lit colour from it clamps to 0 or 1 where a NaN would blank the
+    // triangle. Kept that way here, 28 powers down so sums of it stay finite.
+    inline float vuFloat(float value)
+    {
+        uint32_t bits;
+        std::memcpy(&bits, &value, sizeof(bits));
+        if ((bits & 0x7f800000u) != 0x7f800000u)
+            return value;
+        bits = (bits & 0x807fffffu) | (227u << 23);
+        std::memcpy(&value, &bits, sizeof(bits));
+        return value;
+    }
+
     struct Vertex
     {
         float pos[3];
@@ -48,9 +65,15 @@ namespace gh2
         float color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
         bool intensify = false;
         bool alphaCut = false;
+        bool alphaWrite = false;    // else every pixel it draws gets the frame buffer's alpha bit
+        bool destAlphaTest = false; // drawn only where that bit is clear
         bool texWrap = true;
         bool useEnviron = false;
         bool prelit = false;
+        bool highlight = false; // GS HIGHLIGHT texturing, PsMat +0x130 == 2
+        // Sampled as the mean of four texels, color[0] and [1] apart in u and
+        // v (addDepthOfField). The colour is then the vertex's alone.
+        bool spread = false;
         std::shared_ptr<const TextureData> texture; // null for none
         uint32_t renderTarget = 0; // the rendered RndTex sampled in place of texture, 0 for none
         uint32_t texGen = 0; // milo::mat::TexGen
@@ -59,6 +82,13 @@ namespace gh2
         // The environ tex gen's 3x3 (rows), which the reflection is taken
         // through: tex_xfm's rotation transposed, then y and z swapped.
         float envRows[3][3] = {{1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, -1.0f, 0.0f}};
+        // The projected tex gen's 3x3 (rows) and offset, which take a world
+        // position to its uv: tex_xfm inverted, then y and z swapped.
+        float projRows[4][3] = {};
+        // The sphere tex gen's 3x3 (rows) and offset, which take a normal to
+        // its uv. Set for a mesh's pass only (readSphereRows).
+        bool sphere = false;
+        float sphereRows[4][3] = {};
     };
 
     // What the current environ gives VU1's lighting programs, as
@@ -90,10 +120,11 @@ namespace gh2
         // A skinned vert is sum over b of weight[b] * (pos * bones[b]), its
         // four colour floats being the weights.
         bool skinned = false;
-        // Two or more bones: VU1's skin program leaves the skinned position
-        // and normal in the vert for lighting and tex gen, which then take
-        // them through an identity lightWorld. One bone is left as is.
-        bool blended = false;
+        // The bones of the skin program the mesh runs (UpdateFacePacket
+        // 0x3d484c). With two or more it leaves the skinned position and
+        // normal in the vert for lighting and tex gen, which then take them
+        // through an identity lightWorld. One bone is left as is.
+        uint32_t skinBones = 1;
         std::array<Matrix, 4> bones{};
         Environ environment; // not environ, a macro in mingw's stdlib.h
         // Takes normals to world space for lighting (qw676..678): the world

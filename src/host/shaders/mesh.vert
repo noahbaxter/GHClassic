@@ -15,7 +15,7 @@ layout(push_constant) uniform Push
     vec2 uvOffset;
     int boneBase;
     int lightBase;
-    uint flags; // colour mode in bits 0-2, prelit 8, alpha cut 16, intensify 32, blended 64
+    uint flags; // colour mode in bits 0-2, prelit 8, alpha cut 16, intensify 32, skin bones less one in 6-7, projected 256, highlight 512, sphere 1024
     int envBase;
 } pc;
 
@@ -34,7 +34,10 @@ const uint kColorMaterial = 3u;
 const uint kColorPoint = 4u;
 const uint kFlagPrelit = 8u;
 const uint kFlagIntensify = 32u;
-const uint kFlagBlended = 64u;
+const uint kSkinBonesShift = 6u;
+const uint kFlagProjected = 256u;
+const uint kFlagHighlight = 512u;
+const uint kFlagSphere = 1024u;
 
 mat4 bone(int b)
 {
@@ -42,21 +45,29 @@ mat4 bone(int b)
     return mat4(data[i], data[i + 1], data[i + 2], data[i + 3]);
 }
 
-// The normal as a skin program leaves it. With four bones (0x3c6) it is the
-// weighted sum of the normal through each bone's rotation, renormalised
-// (ERLENG). With two or three (0x373, 0x394) it goes through the one bone a
-// chain of weight compares picks, the heaviest; ties go to the later bone,
-// as the two-bone program's does. The batch's program is not kept, so the
-// bone count is read off the weights.
-vec3 skinNormal(vec4 w)
+// The normal as the mesh's skin program leaves it.
+vec3 skinNormal(vec4 w, uint bones)
 {
-    if (w.w != 0.0)
+    // 0x3c6, four bones: the weighted sum through each bone's rotation,
+    // renormalised (ERLENG 0x3ed).
+    if (bones == 4u)
         return normalize(w.x * mat3(bone(0)) * inNormal + w.y * mat3(bone(1)) * inNormal +
                          w.z * mat3(bone(2)) * inNormal + w.w * mat3(bone(3)) * inNormal);
-    int b = w.y >= w.x ? 1 : 0;
-    if (w.z != 0.0 && w.z >= max(w.x, w.y))
-        b = 2;
-    return mat3(bone(b)) * inNormal;
+    // 0x394, three bones: through the heaviest bone alone. The third wins
+    // only when strictly heavier (0x3a9..0x3be).
+    if (bones == 3u)
+    {
+        int b = w.y >= w.x ? 1 : 0;
+        if (w.z > (b == 1 ? w.y : w.x))
+            b = 2;
+        return mat3(bone(b)) * inNormal;
+    }
+    // 0x373, two bones: through the second unless the first is heavier,
+    // and then through the first's x and y rows and the second's z row
+    // (0x388 adds vf11 where the first's z row is vf7).
+    if (w.y >= w.x)
+        return mat3(bone(1)) * inNormal;
+    return mat3(bone(0))[0] * inNormal.x + mat3(bone(0))[1] * inNormal.y + mat3(bone(1))[2] * inNormal.z;
 }
 
 void main()
@@ -74,10 +85,11 @@ void main()
         pos = inColor.x * (bone(0) * pos) + inColor.y * (bone(1) * pos) + inColor.z * (bone(2) * pos) +
               inColor.w * (bone(3) * pos);
         vertexColor = vec4(1.0);
-        if ((pc.flags & kFlagBlended) != 0u)
+        uint bones = ((pc.flags >> kSkinBonesShift) & 3u) + 1u;
+        if (bones > 1u)
         {
             litPos = pos.xyz;
-            litNormal = skinNormal(inColor);
+            litNormal = skinNormal(inColor, bones);
         }
     }
     gl_Position = pc.mvp * pos;
@@ -112,21 +124,43 @@ void main()
     {
         // 0x436: base * ambient, plus within range the light * material *
         // (to . n) * (1/|to| - 1/range), where to runs from the vertex to the
-        // light in the mesh's space. The dot is not clamped at zero; the
-        // result is clamped to [0, 1].
+        // light in the mesh's space. A vert facing away gets none: the
+        // light's term is zeroed on the dot's sign flag as it is on the
+        // range's (FSAND 0x459, 0x45a). The result is clamped to [0, 1].
         vec4 local = data[pc.lightBase + 4];
         vec3 to = local.xyz - litPos;
         float d2 = dot(to, to);
+        float facing = dot(to, litNormal);
         color = base * data[pc.lightBase];
-        if (d2 <= data[pc.lightBase + 5].w && d2 > 0.0)
-            color += data[pc.lightBase + 1] * pc.matColor * (dot(to, litNormal) * (local.w + inversesqrt(d2)));
+        if (d2 <= data[pc.lightBase + 5].w && d2 > 0.0 && facing >= 0.0)
+            color += data[pc.lightBase + 1] * pc.matColor * (facing * (local.w + inversesqrt(d2)));
         color = clamp(color, vec4(0.0), vec4(1.0));
     }
     // The GS colour scale: 128 with a texture, raised to 255 by intensify.
     if ((pc.flags & kFlagIntensify) != 0u)
         color.rgb *= 255.0 / 128.0;
+    // A HIGHLIGHT material's alpha is 0.035 whatever its colour's: Select
+    // writes it over qw690's (0x3d8614), MakeRGBAQ over a rect's (0x199164).
+    if ((pc.flags & kFlagHighlight) != 0u)
+        color.a = 0.035;
     vColor = color;
-    if (pc.envBase >= 0)
+    if (pc.envBase >= 0 && (pc.flags & kFlagSphere) != 0u)
+    {
+        // 0x347, the sphere tex gen: the normal through the block's rows,
+        // plus its offset.
+        int e = pc.envBase;
+        mat3 wm = mat3(data[e].xyz, data[e + 1].xyz, data[e + 2].xyz);
+        vUv = (wm * litNormal).xy + data[e + 3].xy;
+    }
+    else if (pc.envBase >= 0 && (pc.flags & kFlagProjected) != 0u)
+    {
+        // 0x410, the projected tex gen: the vert through the block's rows
+        // and offset, which take it to the projector's space. No divide.
+        int e = pc.envBase;
+        mat3 wm = mat3(data[e].xyz, data[e + 1].xyz, data[e + 2].xyz);
+        vUv = (wm * litPos + data[e + 3].xyz).xy;
+    }
+    else if (pc.envBase >= 0)
     {
         // 0x139, the environ tex gen: the vert-to-eye vector reflected about
         // the normal, both taken through the block's rows.

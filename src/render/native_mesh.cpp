@@ -69,7 +69,7 @@ namespace gh2
 
         // One draw per material pass, from this mesh's material, not the
         // owner's.
-        void pushPasses(uint8_t *rdram, uint32_t mesh, DrawCall &draw)
+        void pushPasses(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t mesh, DrawCall &draw)
         {
             uint32_t mat = load<uint32_t>(rdram, mesh + milo::mesh::kMat);
             if (mat == 0u)
@@ -77,6 +77,8 @@ namespace gh2
             for (; mat != 0u; mat = nextPass(rdram, mat))
             {
                 draw.material = readMaterial(rdram, mat);
+                if (draw.material.texGen == milo::mat::kTexGenSphere)
+                    readSphereRows(rdram, ctx, runtime, *s_addresses, mat, draw.material);
                 building().draws.push_back(draw);
             }
         }
@@ -95,7 +97,7 @@ namespace gh2
         // bone exists, else the first bone's.
         bool readBones(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t bones, DrawCall &draw)
         {
-            bool several = false;
+            uint32_t count = 1;
             for (uint32_t b = 0; b < milo::mesh::kBoneCount; ++b)
             {
                 const uint32_t object =
@@ -107,15 +109,15 @@ namespace gh2
                     draw.bones[b] = draw.bones[0];
                     continue;
                 }
-                several |= b != 0u;
+                count = b + 1u;
                 const Matrix bind =
                     readTransform(rdram, bones + milo::mesh::kBoneBind + b * milo::mesh::kBoneBindStride);
                 draw.bones[b] = multiply(bind, worldXfm(rdram, ctx, runtime, object));
             }
             draw.skinned = true;
-            draw.blended = several;
+            draw.skinBones = count;
             draw.world = identity();
-            draw.lightWorld = several ? identity() : draw.bones[0];
+            draw.lightWorld = count > 1u ? identity() : draw.bones[0];
             return true;
         }
 
@@ -124,7 +126,7 @@ namespace gh2
             const uint32_t returnTo = GPR_U32(ctx, 31);
             const uint32_t mesh = GPR_U32(ctx, 4);
             const uint32_t owner = load<uint32_t>(rdram, mesh + milo::mesh::kOwner);
-            std::shared_ptr<const MeshData> geometry = capturedMesh(owner);
+            std::shared_ptr<const MeshData> geometry = capturedMesh(rdram, owner);
             // Retail draws nothing, and calls nothing, until the owner has a
             // packet (0x3d890c).
             const bool synced = load<uint32_t>(rdram, owner + milo::mesh::kPacket) != 0u;
@@ -145,7 +147,7 @@ namespace gh2
                 draw.mesh = std::move(geometry);
                 draw.environment =currentEnviron();
                 draw.camera = currentCamera(rdram);
-                pushPasses(rdram, mesh, draw);
+                pushPasses(rdram, ctx, runtime, mesh, draw);
             }
             ctx->pc = returnTo;
         }
@@ -161,7 +163,7 @@ namespace gh2
             const uint32_t multi = GPR_U32(ctx, 4);
             const uint32_t mesh = load<uint32_t>(rdram, multi + milo::multimesh::kMesh);
             const uint32_t owner = mesh != 0u ? load<uint32_t>(rdram, mesh + milo::mesh::kOwner) : 0u;
-            std::shared_ptr<const MeshData> geometry = owner != 0u ? capturedMesh(owner) : nullptr;
+            std::shared_ptr<const MeshData> geometry = owner != 0u ? capturedMesh(rdram, owner) : nullptr;
             const bool synced = owner != 0u && load<uint32_t>(rdram, owner + milo::mesh::kPacket) != 0u;
             const uint32_t sentinel = multi + milo::multimesh::kInstances;
             const uint32_t first = load<uint32_t>(rdram, sentinel);
@@ -181,7 +183,7 @@ namespace gh2
                     if (faceCamera)
                         std::copy(cameraWorld.begin(), cameraWorld.begin() + 12, draw.world.begin());
                     draw.lightWorld = draw.world;
-                    pushPasses(rdram, mesh, draw);
+                    pushPasses(rdram, ctx, runtime, mesh, draw);
                 }
             }
             ctx->pc = returnTo;

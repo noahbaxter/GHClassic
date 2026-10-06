@@ -1,0 +1,28 @@
+; The fail sequence in Battle of the Bands, held at one moment in the retail
+; game: tools/pcsx2.py run (docs/retail-compare.md).
+(wait_until {! {ui in_transition}} 60)
+(wait 3)
+{main_panel set already_entered TRUE}
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+{gamecfg set mode quickplay}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty expert}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 120)
+(wait_until {> {taskmgr seconds} 1} 60)
+; The sequence runs for about 6 s from here, then the lose screen.
+{player0 lose}
+(wait_until {>= {taskmgr seconds} 4} 60)
+{game set_paused TRUE}
+(clock 100)
+(freeze 101 4.5 7.9)
+(wait_until {>= {taskmgr ui_seconds} 101})
+(wait 0.5)
+(print {taskmgr seconds} {taskmgr beat} {taskmgr ui_seconds})
+(dump frame)
+(shot frame)
+; Its memory, for (transplant) in our build.
+(ram frame)
+(quit)

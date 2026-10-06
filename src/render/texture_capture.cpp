@@ -14,6 +14,7 @@
 #include "hook.h"
 #include "milo/layout.h"
 #include "ps2_runtime_macros.h"
+#include "render/frame.h"
 
 #include <algorithm>
 #include <unordered_map>
@@ -25,6 +26,7 @@ namespace gh2
     {
         const Addresses *s_addresses = nullptr;
         std::unordered_map<uint32_t, std::shared_ptr<const TextureData>> s_textures;
+        bool s_foreign = false; // after forgetTextureAddresses
 
         struct Bitmap
         {
@@ -329,6 +331,23 @@ namespace gh2
             std::erase(s_yellowFretIcons, tex);
         }
 
+        // PsTex::CopyFromScreen(x, y) (0x1a0d68) has the GS move the texture's
+        // width by height pixels of the buffer being drawn, from x and y,
+        // into its VRAM. Track::Draw (0x151290) saves the venue behind the
+        // highway's far end this way and fades the highway into it.
+        struct CopyTag;
+        void onCopyFromScreen(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
+        {
+            const uint32_t tex = GPR_U32(ctx, 4);
+            const int32_t width = load<int32_t>(rdram, tex + milo::tex::kWidth);
+            const int32_t height = load<int32_t>(rdram, tex + milo::tex::kHeight);
+            if (width <= 0 || height <= 0)
+                return;
+            Frame &frame = building();
+            frame.copies.push_back({frame.draws.size(), tex, GPR_S32(ctx, 5), GPR_S32(ctx, 6),
+                                    static_cast<uint32_t>(width), static_cast<uint32_t>(height)});
+        }
+
         struct TextDrawTag;
         void onTextDraw(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
@@ -343,10 +362,28 @@ namespace gh2
         }
     }
 
-    std::shared_ptr<const TextureData> capturedTexture(uint32_t tex)
+    std::shared_ptr<const TextureData> capturedTexture(uint8_t *rdram, uint32_t tex)
     {
         const auto found = s_textures.find(tex);
-        return found != s_textures.end() ? found->second : nullptr;
+        if (found != s_textures.end())
+            return found->second;
+        if (!s_foreign || tex == 0u)
+            return nullptr;
+        // Memory from another run: this texture never synced here, and its
+        // bitmap is still in it.
+        if (load<uint32_t>(rdram, tex + milo::tex::kType) & milo::tex::kTypeNoPixels)
+            s_textures[tex] = nullptr;
+        else
+            store(tex, decodeWithMips(rdram, tex + milo::tex::kBitmap));
+        return s_textures[tex];
+    }
+
+    void forgetTextureAddresses()
+    {
+        s_textures.clear();
+        s_textTextures.clear();
+        s_yellowFretIcons.clear();
+        s_foreign = true;
     }
 
     void installTextureCapture(PS2Runtime &runtime, const Addresses &addresses)
@@ -354,6 +391,7 @@ namespace gh2
         s_addresses = &addresses;
         EntryHook<SyncTag>::install(runtime, addresses.psTexSyncBitmap, onSync);
         EntryHook<DestroyTag>::install(runtime, addresses.psTexDestroy, onDestroy);
+        EntryHook<CopyTag>::install(runtime, addresses.psTexCopyFromScreen, onCopyFromScreen);
         EntryHook<TextDrawTag>::install(runtime, addresses.rndTextDrawShowing, onTextDraw);
     }
 }

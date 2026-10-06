@@ -1,5 +1,7 @@
 #include "host/scene_renderer.h"
 
+#include "dev/draw_dump.h"
+#include "host/mesh_push.h"
 #include "milo/layout.h"
 #include "render/camera.h"
 #include "settings/settings.h"
@@ -9,6 +11,8 @@
 #include "mesh_frag.h"
 #include "mesh_vert.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <iostream>
 #include <unordered_map>
@@ -18,37 +22,8 @@ namespace gh2
     namespace
     {
         constexpr VkFormat kColorFormat = VK_FORMAT_R8G8B8A8_UNORM;
-        constexpr VkFormat kDepthFormat = VK_FORMAT_D32_SFLOAT;
         // Frames a GPU resource must outlive its last use by.
         constexpr uint64_t kRetireAfter = 3;
-
-        // How a vertex gets its colour, by the VU1 lighting program the
-        // material and environ pick (PsMat::Select 0x3d8548).
-        enum ColorMode : uint32_t
-        {
-            kColorVertex,      // 0x614 (prelit, no environ): as is
-            kColorAmbient,     // 0x7c5 with the environ: base * ambient
-            kColorDirectional, // 0x6ec: base * ambient + lights * material
-            kColorMaterial,    // 0x7c5 without the environ or prelit: the material's
-            kColorPoint,       // 0x436: base * ambient + a point light * material, within its range
-        };
-        constexpr uint32_t kFlagPrelit = 1u << 3;    // base is the vertex colour, else the material's
-        constexpr uint32_t kFlagAlphaCut = 1u << 4;  // discard alpha below the GS's 1
-        constexpr uint32_t kFlagIntensify = 1u << 5; // textured rgb scale 255 over 128
-        constexpr uint32_t kFlagBlended = 1u << 6;   // lit and tex-genned from the skinned vert
-
-        struct PushConstants
-        {
-            float mvp[16];
-            float matColor[4];
-            float uvRows[4]; // Material::uvXfm
-            float uvOffset[2];
-            int32_t boneBase;  // the draw's first bone vec4 in the frame data, -1 when rigid
-            int32_t lightBase; // the draw's lighting block in the frame data
-            uint32_t flags;    // ColorMode in bits 0-2, then the kFlag bits
-            int32_t envBase;   // the draw's environ tex gen block in the frame data, -1 for none
-        };
-        static_assert(sizeof(PushConstants) <= 128, "past Vulkan's guaranteed push constant size");
 
         // Each frame writes its bones and lighting to its own slot's buffer,
         // so a slot is reused only after its frame has retired.
@@ -60,18 +35,25 @@ namespace gh2
         // A draw's environ tex gen block: see writeEnvTexGen.
         constexpr uint32_t kEnvTexGenVec4s = 4u;
 
+        // By blend, z mode, alpha write and dest alpha test.
         constexpr uint32_t kPipelineCount =
-            static_cast<uint32_t>(milo::mat::kBlendCount) * static_cast<uint32_t>(milo::mat::kZModeCount);
+            static_cast<uint32_t>(milo::mat::kBlendCount) * static_cast<uint32_t>(milo::mat::kZModeCount) * 4u;
 
         // The GS's ALPHA_1 for each blend, as PsMat::Update sets it.
-        VkPipelineColorBlendAttachmentState blendState(uint32_t blend)
+        //
+        // The alpha written is what a rendered texture's cards are cut by.
+        // FBA sets the alpha bit of every pixel a material without
+        // alpha_write draws (PsMat::Select 0x3d8498), so a blended pixel
+        // keeps the larger of its alpha and what is there, and one that is
+        // not blended is written as 1 (kFlagSetAlpha).
+        VkPipelineColorBlendAttachmentState blendState(uint32_t blend, bool alphaWrite)
         {
             VkPipelineColorBlendAttachmentState state{};
             state.blendEnable = VK_TRUE;
             state.colorBlendOp = VK_BLEND_OP_ADD;
             state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-            state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-            state.alphaBlendOp = VK_BLEND_OP_ADD;
+            state.dstAlphaBlendFactor = alphaWrite ? VK_BLEND_FACTOR_ZERO : VK_BLEND_FACTOR_ONE;
+            state.alphaBlendOp = alphaWrite ? VK_BLEND_OP_ADD : VK_BLEND_OP_MAX;
             state.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
                                    VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
             switch (blend)
@@ -81,6 +63,7 @@ namespace gh2
                 state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
                 state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
                 state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+                state.alphaBlendOp = VK_BLEND_OP_ADD;
                 break;
             case milo::mat::kBlendSrc:
                 state.blendEnable = VK_FALSE;
@@ -108,9 +91,26 @@ namespace gh2
 
         // The GS's ZTST and ZMSK for each z mode. Depth is reversed like the
         // GS's, nearer is larger.
-        VkPipelineDepthStencilStateCreateInfo depthState(uint32_t zMode)
+        //
+        // The stencil is the top bit of the frame buffer's alpha, the one a
+        // 16-bit buffer has. FBA sets it on every pixel a material draws
+        // unless the material has alpha_write, whose own alpha (0.99 on the
+        // highway's) then leaves it clear. DATE draws only where it is clear.
+        VkPipelineDepthStencilStateCreateInfo depthState(uint32_t zMode, bool alphaWrite, bool destAlphaTest)
         {
             VkPipelineDepthStencilStateCreateInfo state{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
+            state.stencilTestEnable = VK_TRUE;
+            state.front.failOp = VK_STENCIL_OP_KEEP;
+            state.front.depthFailOp = VK_STENCIL_OP_KEEP;
+            state.front.compareOp = destAlphaTest ? VK_COMPARE_OP_EQUAL : VK_COMPARE_OP_ALWAYS;
+            state.front.compareMask = 1u;
+            state.front.writeMask = 1u;
+            // A tested pixel's bit is clear, so setting it is one up.
+            state.front.reference = destAlphaTest ? 0u : 1u;
+            state.front.passOp = alphaWrite      ? VK_STENCIL_OP_ZERO
+                                 : destAlphaTest ? VK_STENCIL_OP_INCREMENT_AND_CLAMP
+                                                 : VK_STENCIL_OP_REPLACE;
+            state.back = state.front;
             state.depthTestEnable = VK_TRUE;
             switch (zMode)
             {
@@ -170,6 +170,10 @@ namespace gh2
             VkImage color = VK_NULL_HANDLE;
             VmaAllocation colorMemory = VK_NULL_HANDLE;
             VkImageView colorView = VK_NULL_HANDLE;
+            // The first level alone, which is drawn into; the rest are
+            // filled from it (fillTargetLevels).
+            VkImageView baseView = VK_NULL_HANDLE;
+            uint32_t levels = 1;
             VkImage depth = VK_NULL_HANDLE;
             VmaAllocation depthMemory = VK_NULL_HANDLE;
             VkImageView depthView = VK_NULL_HANDLE;
@@ -181,15 +185,11 @@ namespace gh2
             VkDescriptorSet sets[2]{}; // clamped, wrapped
             uint32_t width = 0;
             uint32_t height = 0;
+            bool copied = false; // filled by a screen copy: colour only
         };
 
         // Room for this many live textures before the pool refuses.
         constexpr uint32_t kMaxTextures = 4096;
-
-        struct Vec4
-        {
-            float v[4];
-        };
 
         struct FrameDataSlot
         {
@@ -282,6 +282,42 @@ namespace gh2
                     out[3].v[c] += (eye[k] - w[12 + k]) * m[k][c];
         }
 
+        // Program 0x410, the projected tex gen (0x2080..0x21b0), takes the
+        // vert through the lighting matrix W (qw676..679) and the material's
+        // rows and offset M (qw691..694), and keeps x and y:
+        //   uv = ((p.W).M).xy
+        // The block holds W.M as three rows, then W's position through M.
+        void writeProjTexGen(const DrawCall &draw, Vec4 *out)
+        {
+            const Matrix &w = draw.lightWorld;
+            const float(&m)[4][3] = draw.material.projRows;
+            for (uint32_t r = 0; r < 4; ++r)
+            {
+                out[r] = {{0.0f, 0.0f, 0.0f, 0.0f}};
+                for (uint32_t c = 0; c < 3; ++c)
+                    out[r].v[c] = w[r * 4 + 0] * m[0][c] + w[r * 4 + 1] * m[1][c] + w[r * 4 + 2] * m[2][c] +
+                                  (r == 3 ? m[3][c] : 0.0f);
+            }
+        }
+
+        // Program 0x347, the sphere tex gen (0x347..0x368), takes the normal
+        // through the lighting matrix's rotation W (qw676..678) and the rows
+        // G (qw691..693), keeps x and y and adds the offset (qw694):
+        //   uv = (n.W.G).xy + offset
+        // The block holds W.G as three rows, then the offset.
+        void writeSphereTexGen(const DrawCall &draw, Vec4 *out)
+        {
+            const Matrix &w = draw.lightWorld;
+            const float(&g)[4][3] = draw.material.sphereRows;
+            for (uint32_t r = 0; r < 3; ++r)
+            {
+                out[r] = {{0.0f, 0.0f, 0.0f, 0.0f}};
+                for (uint32_t c = 0; c < 3; ++c)
+                    out[r].v[c] = w[r * 4 + 0] * g[0][c] + w[r * 4 + 1] * g[1][c] + w[r * 4 + 2] * g[2][c];
+            }
+            out[3] = {{g[3][0], g[3][1], g[3][2], 0.0f}};
+        }
+
         bool check(VkResult result, const char *what)
         {
             if (result == VK_SUCCESS)
@@ -295,7 +331,14 @@ namespace gh2
     {
         VkDevice device = VK_NULL_HANDLE;
         VmaAllocator allocator = VK_NULL_HANDLE;
+        // Depth with a stencil: 32-bit float where the device has it, which
+        // Vulkan promises of one of these two.
+        VkFormat depthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
         VkRenderPass renderPass = VK_NULL_HANDLE;
+        // The main pass in parts, around a screen copy: up to the first, and
+        // from each on. Same attachments, so its framebuffer and pipelines.
+        VkRenderPass firstPass = VK_NULL_HANDLE;
+        VkRenderPass resumePass = VK_NULL_HANDLE;
         VkPipelineLayout layout = VK_NULL_HANDLE;
         VkShaderModule vertexShader = VK_NULL_HANDLE;
         VkShaderModule fragmentShader = VK_NULL_HANDLE;
@@ -344,26 +387,33 @@ namespace gh2
         // resolve into the finished image, attachment 2; else colour is it.
         // The finished image is read before a pass draws into it again and
         // after: blit and readback for the main pass, samplers for a target.
-        bool createPass(VkImageLayout finished, VkRenderPass &out)
+        //
+        // A pass stopped for a screen copy and taken up again is two: `keep`
+        // stores what the next needs, `resume` loads it in place of clearing.
+        bool createPass(VkImageLayout finished, bool keep, bool resume, VkRenderPass &out)
         {
             const bool resolve = samples != VK_SAMPLE_COUNT_1_BIT;
             VkAttachmentDescription attachments[3]{};
             attachments[0].format = kColorFormat;
             attachments[0].samples = samples;
-            attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-            attachments[0].storeOp = resolve ? VK_ATTACHMENT_STORE_OP_DONT_CARE : VK_ATTACHMENT_STORE_OP_STORE;
+            attachments[0].loadOp = resume ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR;
+            attachments[0].storeOp = resolve && !keep ? VK_ATTACHMENT_STORE_OP_DONT_CARE : VK_ATTACHMENT_STORE_OP_STORE;
             attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
             attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-            attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             attachments[0].finalLayout = resolve ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : finished;
+            attachments[0].initialLayout = resume ? attachments[0].finalLayout : VK_IMAGE_LAYOUT_UNDEFINED;
             attachments[1] = attachments[0];
-            attachments[1].format = kDepthFormat;
-            attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            attachments[1].format = depthFormat;
+            attachments[1].storeOp = keep ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            attachments[1].stencilLoadOp = attachments[1].loadOp;
+            attachments[1].stencilStoreOp = attachments[1].storeOp;
             attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            attachments[1].initialLayout = resume ? attachments[1].finalLayout : VK_IMAGE_LAYOUT_UNDEFINED;
             attachments[2] = attachments[0];
             attachments[2].samples = VK_SAMPLE_COUNT_1_BIT;
             attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
             attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            attachments[2].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             attachments[2].finalLayout = finished;
 
             VkAttachmentReference colorRef{0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
@@ -406,10 +456,12 @@ namespace gh2
             return check(vkCreateRenderPass(device, &info, nullptr, &out), "render pass");
         }
 
-        // A colour or depth attachment at `samples` that no one reads after
-        // its pass: depth, and colour that resolves into another image.
-        bool createAttachment(VkFormat format, VkImageUsageFlags usage, uint32_t w, uint32_t h, VkImage &image,
-                           VmaAllocation &memory, VkImageView &view)
+        // A colour or depth attachment at `samples` that no one samples:
+        // depth, and colour that resolves into another image. `transient`
+        // when nothing outlives its pass, which the main pass's must to be
+        // taken up again after a screen copy.
+        bool createAttachment(VkFormat format, VkImageUsageFlags usage, bool transient, uint32_t w, uint32_t h,
+                              VkImage &image, VmaAllocation &memory, VkImageView &view)
         {
             VkImageCreateInfo imageInfo{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
             imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -419,7 +471,7 @@ namespace gh2
             imageInfo.arrayLayers = 1;
             imageInfo.samples = samples;
             imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-            imageInfo.usage = usage | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
+            imageInfo.usage = usage | (transient ? VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT : 0u);
             VmaAllocationCreateInfo alloc{};
             alloc.usage = VMA_MEMORY_USAGE_AUTO;
             if (!check(vmaCreateImage(allocator, &imageInfo, &alloc, &image, &memory, nullptr), "attachment"))
@@ -428,8 +480,10 @@ namespace gh2
             viewInfo.image = image;
             viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
             viewInfo.format = format;
-            viewInfo.subresourceRange = {format == kDepthFormat ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
-                                         0, 1, 0, 1};
+            const VkImageAspectFlags aspect = format == depthFormat
+                                                  ? VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT
+                                                  : VK_IMAGE_ASPECT_COLOR_BIT;
+            viewInfo.subresourceRange = {aspect, 0, 1, 0, 1};
             return check(vkCreateImageView(device, &viewInfo, nullptr, &view), "attachment view");
         }
 
@@ -441,6 +495,8 @@ namespace gh2
                 vkDestroyFramebuffer(device, t.framebuffer, nullptr);
             if (t.colorView != VK_NULL_HANDLE)
                 vkDestroyImageView(device, t.colorView, nullptr);
+            if (t.baseView != VK_NULL_HANDLE)
+                vkDestroyImageView(device, t.baseView, nullptr);
             if (t.depthView != VK_NULL_HANDLE)
                 vkDestroyImageView(device, t.depthView, nullptr);
             if (t.msaaView != VK_NULL_HANDLE)
@@ -454,30 +510,137 @@ namespace gh2
             t = TargetImage{};
         }
 
+        // Fills a copied image from the main target, which the pass just
+        // ended left in TRANSFER_SRC_OPTIMAL, taking its first pixel from x
+        // and y. What falls outside the picture is black.
+        void copyFromTarget(VkCommandBuffer cmd, const TargetImage &to, int32_t x, int32_t y)
+        {
+            VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.image = to.color;
+            barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr,
+                                 0, nullptr, 1, &barrier);
+
+            const int32_t x0 = std::max(x, 0);
+            const int32_t y0 = std::max(y, 0);
+            const int32_t x1 = std::min(x + static_cast<int32_t>(to.width), static_cast<int32_t>(width));
+            const int32_t y1 = std::min(y + static_cast<int32_t>(to.height), static_cast<int32_t>(height));
+            const bool any = x1 > x0 && y1 > y0;
+            if (!any || static_cast<uint32_t>(x1 - x0) != to.width || static_cast<uint32_t>(y1 - y0) != to.height)
+            {
+                const VkClearColorValue black{};
+                vkCmdClearColorImage(cmd, to.color, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &black, 1,
+                                     &barrier.subresourceRange);
+            }
+            if (any)
+            {
+                VkImageCopy region{};
+                region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+                region.srcOffset = {x0, y0, 0};
+                region.dstSubresource = region.srcSubresource;
+                region.dstOffset = {x0 - x, y0 - y, 0};
+                region.extent = {static_cast<uint32_t>(x1 - x0), static_cast<uint32_t>(y1 - y0), 1};
+                vkCmdCopyImage(cmd, target, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, to.color,
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+            }
+
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0,
+                                 nullptr, 0, nullptr, 1, &barrier);
+        }
+
+        // Fills a drawn target's smaller levels, each from the one above. The
+        // pass just ended left the first in SHADER_READ_ONLY_OPTIMAL.
+        void fillTargetLevels(VkCommandBuffer cmd, const TargetImage &t)
+        {
+            VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+            barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.image = t.color;
+            auto move = [&](uint32_t level, VkImageLayout from, VkImageLayout to, VkAccessFlags was, VkAccessFlags is,
+                            VkPipelineStageFlags before, VkPipelineStageFlags after)
+            {
+                barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, level, 1, 0, 1};
+                barrier.oldLayout = from;
+                barrier.newLayout = to;
+                barrier.srcAccessMask = was;
+                barrier.dstAccessMask = is;
+                vkCmdPipelineBarrier(cmd, before, after, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+            };
+            for (uint32_t level = 1; level < t.levels; ++level)
+            {
+                move(level - 1u, level == 1u ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                     VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                     level == 1u ? VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT : VK_ACCESS_TRANSFER_WRITE_BIT,
+                     VK_ACCESS_TRANSFER_READ_BIT,
+                     level == 1u ? VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT : VK_PIPELINE_STAGE_TRANSFER_BIT,
+                     VK_PIPELINE_STAGE_TRANSFER_BIT);
+                move(level, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0,
+                     VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+                VkImageBlit blit{};
+                blit.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, level - 1u, 0, 1};
+                blit.srcOffsets[1] = {static_cast<int32_t>(std::max(t.width >> (level - 1u), 1u)),
+                                      static_cast<int32_t>(std::max(t.height >> (level - 1u), 1u)), 1};
+                blit.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, level, 0, 1};
+                blit.dstOffsets[1] = {static_cast<int32_t>(std::max(t.width >> level, 1u)),
+                                      static_cast<int32_t>(std::max(t.height >> level, 1u)), 1};
+                vkCmdBlitImage(cmd, t.color, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, t.color,
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
+                move(level - 1u, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                     VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                     VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+            }
+            if (t.levels > 1u)
+                move(t.levels - 1u, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                     VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                     VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+        }
+
         // The image for a target's generation, made or remade at its size.
-        TargetImage *targetImage(uint32_t tex, uint32_t generation, uint32_t w, uint32_t h)
+        // `copied` is one a screen copy fills: nothing draws into it.
+        TargetImage *targetImage(uint32_t tex, uint32_t generation, uint32_t w, uint32_t h, bool copied)
         {
             std::vector<TargetImage> &images = targets[tex];
             if (images.size() <= generation)
                 images.resize(generation + 1u);
             TargetImage &t = images[generation];
-            if (t.framebuffer != VK_NULL_HANDLE && t.width == w && t.height == h)
+            // Retail fills three smaller levels of a rendered texture once
+            // it is drawn (PsTex::FinishDrawTarget 0x1a0a38), which the
+            // crowd's cards are sampled from at a distance.
+            uint32_t levels = 1;
+            if (!copied && settings::get(settings::kMipmaps))
+                while (levels < 4u && (std::min(w, h) >> levels) != 0u)
+                    ++levels;
+            if (t.color != VK_NULL_HANDLE && t.width == w && t.height == h && t.copied == copied && t.levels == levels)
                 return &t;
-            if (t.framebuffer != VK_NULL_HANDLE)
+            if (t.color != VK_NULL_HANDLE)
             {
                 vkDeviceWaitIdle(device);
                 destroyTarget(t);
             }
+            t.copied = copied;
+            t.levels = levels;
 
             VkImageCreateInfo imageInfo{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
             imageInfo.imageType = VK_IMAGE_TYPE_2D;
             imageInfo.format = kColorFormat;
             imageInfo.extent = {w, h, 1};
-            imageInfo.mipLevels = 1;
+            imageInfo.mipLevels = levels;
             imageInfo.arrayLayers = 1;
             imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
             imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-            imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+            imageInfo.usage = (copied ? VK_IMAGE_USAGE_TRANSFER_DST_BIT : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) |
+                              VK_IMAGE_USAGE_SAMPLED_BIT;
+            if (levels > 1u)
+                imageInfo.usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
             VmaAllocationCreateInfo alloc{};
             alloc.usage = VMA_MEMORY_USAGE_AUTO;
             if (!check(vmaCreateImage(allocator, &imageInfo, &alloc, &t.color, &t.colorMemory, nullptr), "target"))
@@ -486,19 +649,28 @@ namespace gh2
             view.image = t.color;
             view.viewType = VK_IMAGE_VIEW_TYPE_2D;
             view.format = kColorFormat;
-            view.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+            // The GS's copy carries the frame buffer's alpha, whose top bit
+            // every material but the highway's own sets (FBA, PsMat::Select
+            // 0x3d8498) and the clear sets too. The picture's alpha here is
+            // the last fragment's, so a copy reads as opaque instead.
+            if (copied)
+                view.components.a = VK_COMPONENT_SWIZZLE_ONE;
+            view.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, levels, 0, 1};
             bool ok = check(vkCreateImageView(device, &view, nullptr, &t.colorView), "target view");
+            view.subresourceRange.levelCount = 1;
+            ok = ok && check(vkCreateImageView(device, &view, nullptr, &t.baseView), "target base view");
 
             const bool resolve = samples != VK_SAMPLE_COUNT_1_BIT;
-            if (resolve)
-                ok = ok && createAttachment(kColorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, w, h, t.msaa,
+            if (resolve && !copied)
+                ok = ok && createAttachment(kColorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, true, w, h, t.msaa,
                                             t.msaaMemory, t.msaaView);
-            ok = ok && createAttachment(kDepthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, w, h, t.depth,
-                                        t.depthMemory, t.depthView);
-            if (ok)
+            if (!copied)
+                ok = ok && createAttachment(depthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, true, w, h,
+                                            t.depth, t.depthMemory, t.depthView);
+            if (ok && !copied)
             {
-                const VkImageView plain[] = {t.colorView, t.depthView};
-                const VkImageView resolved[] = {t.msaaView, t.depthView, t.colorView};
+                const VkImageView plain[] = {t.baseView, t.depthView};
+                const VkImageView resolved[] = {t.msaaView, t.depthView, t.baseView};
                 VkFramebufferCreateInfo fb{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
                 fb.renderPass = targetPass;
                 fb.attachmentCount = resolve ? 3u : 2u;
@@ -822,9 +994,10 @@ namespace gh2
             return vertexShader != VK_NULL_HANDLE && fragmentShader != VK_NULL_HANDLE;
         }
 
-        VkPipeline pipeline(uint32_t blend, uint32_t zMode)
+        VkPipeline pipeline(uint32_t blend, uint32_t zMode, bool alphaWrite, bool destAlphaTest)
         {
-            VkPipeline &slot = pipelines[blend * milo::mat::kZModeCount + zMode];
+            VkPipeline &slot = pipelines[((blend * milo::mat::kZModeCount + zMode) * 2u + (alphaWrite ? 1u : 0u)) * 2u +
+                                         (destAlphaTest ? 1u : 0u)];
             if (slot != VK_NULL_HANDLE)
                 return slot;
 
@@ -868,9 +1041,9 @@ namespace gh2
             VkPipelineMultisampleStateCreateInfo multisample{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
             multisample.rasterizationSamples = samples;
 
-            const VkPipelineDepthStencilStateCreateInfo depth = depthState(zMode);
+            const VkPipelineDepthStencilStateCreateInfo depth = depthState(zMode, alphaWrite, destAlphaTest);
 
-            const VkPipelineColorBlendAttachmentState attachment = blendState(blend);
+            const VkPipelineColorBlendAttachmentState attachment = blendState(blend, alphaWrite);
             VkPipelineColorBlendStateCreateInfo colorBlend{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
             colorBlend.attachmentCount = 1;
             colorBlend.pAttachments = &attachment;
@@ -936,11 +1109,11 @@ namespace gh2
                 return false;
 
             const bool resolve = samples != VK_SAMPLE_COUNT_1_BIT;
-            if (resolve && !createAttachment(kColorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, w, h, msaa,
+            if (resolve && !createAttachment(kColorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, false, w, h, msaa,
                                              msaaMemory, msaaView))
                 return false;
-            if (!createAttachment(kDepthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, w, h, depth, depthMemory,
-                                  depthView))
+            if (!createAttachment(depthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, false, w, h, depth,
+                                  depthMemory, depthView))
                 return false;
 
             const VkImageView plain[] = {targetView, depthView};
@@ -1045,8 +1218,16 @@ namespace gh2
         m_state->device = device;
         m_state->allocator = allocator;
         m_state->samples = samples;
-        return m_state->createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_state->renderPass) &&
-               m_state->createPass(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_state->targetPass) &&
+        VmaAllocatorInfo allocatorInfo{};
+        vmaGetAllocatorInfo(allocator, &allocatorInfo);
+        VkFormatProperties depthProperties{};
+        vkGetPhysicalDeviceFormatProperties(allocatorInfo.physicalDevice, m_state->depthFormat, &depthProperties);
+        if ((depthProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) == 0u)
+            m_state->depthFormat = VK_FORMAT_D24_UNORM_S8_UINT;
+        return m_state->createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, false, false, m_state->renderPass) &&
+               m_state->createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, true, false, m_state->firstPass) &&
+               m_state->createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, true, true, m_state->resumePass) &&
+               m_state->createPass(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, false, false, m_state->targetPass) &&
                m_state->createDescriptorState() && m_state->createLayout();
     }
 
@@ -1087,8 +1268,9 @@ namespace gh2
             vkDestroyShaderModule(s.device, s.fragmentShader, nullptr);
         if (s.layout != VK_NULL_HANDLE)
             vkDestroyPipelineLayout(s.device, s.layout, nullptr);
-        if (s.renderPass != VK_NULL_HANDLE)
-            vkDestroyRenderPass(s.device, s.renderPass, nullptr);
+        for (VkRenderPass pass : {s.renderPass, s.firstPass, s.resumePass})
+            if (pass != VK_NULL_HANDLE)
+                vkDestroyRenderPass(s.device, pass, nullptr);
         if (s.targetPass != VK_NULL_HANDLE)
             vkDestroyRenderPass(s.device, s.targetPass, nullptr);
         m_state.reset();
@@ -1132,7 +1314,8 @@ namespace gh2
                 lightBases[i] = static_cast<int32_t>(used);
                 used += kLightingVec4s;
             }
-            if (draw.material.texGen == milo::mat::kTexGenEnviron)
+            if (draw.material.texGen == milo::mat::kTexGenEnviron ||
+                draw.material.texGen == milo::mat::kTexGenProjected || draw.material.sphere)
             {
                 envBases[i] = static_cast<int32_t>(used);
                 used += kEnvTexGenVec4s;
@@ -1146,7 +1329,11 @@ namespace gh2
                 std::memcpy(data.mapped + boneBases[i], frame.draws[i].bones.data(), sizeof(frame.draws[i].bones));
             if (lightBases[i] >= 0)
                 writeLighting(frame.draws[i], data.mapped + lightBases[i]);
-            if (envBases[i] >= 0)
+            if (envBases[i] >= 0 && frame.draws[i].material.sphere)
+                writeSphereTexGen(frame.draws[i], data.mapped + envBases[i]);
+            else if (envBases[i] >= 0 && frame.draws[i].material.texGen == milo::mat::kTexGenProjected)
+                writeProjTexGen(frame.draws[i], data.mapped + envBases[i]);
+            else if (envBases[i] >= 0)
                 writeEnvTexGen(frame.draws[i], frame.cameras[frame.draws[i].camera].eye, data.mapped + envBases[i]);
         }
         vmaFlushAllocation(s.allocator, data.memory, 0, VK_WHOLE_SIZE);
@@ -1162,16 +1349,50 @@ namespace gh2
             uint32_t height;
             std::vector<size_t> draws;
             TargetImage *image = nullptr;
+            // For a screen copy, which no draw goes into: where its texture's
+            // first pixel is in the picture, and the draw it is made before.
+            bool copied = false;
+            int32_t x = 0;
+            int32_t y = 0;
+            size_t before = 0;
         };
         std::vector<TargetRun> runs;
         std::vector<int32_t> drawRun(frame.draws.size(), -1);
         std::vector<int32_t> sampleRun(frame.draws.size(), -1);
+        std::vector<size_t> copyRuns; // in the order they are made
         {
             std::unordered_map<uint32_t, int32_t> current;
             std::unordered_map<uint32_t, bool> sampledSince;
             std::unordered_map<uint32_t, uint32_t> generations;
+            // A copy is the size its texture covers of the picture as drawn
+            // here, so the pixels it puts back are the ones it took.
+            const float sx = static_cast<float>(width) / static_cast<float>(frame.width);
+            const float sy = static_cast<float>(height) / static_cast<float>(frame.height);
+            size_t nextCopy = 0;
             for (size_t i = 0; i < frame.draws.size(); ++i)
             {
+                for (; nextCopy < frame.copies.size() && frame.copies[nextCopy].before <= i; ++nextCopy)
+                {
+                    const Frame::ScreenCopy &copy = frame.copies[nextCopy];
+                    const int32_t x0 = static_cast<int32_t>(std::lround(static_cast<float>(copy.x) * sx));
+                    const int32_t y0 = static_cast<int32_t>(std::lround(static_cast<float>(copy.y) * sy));
+                    const int32_t x1 =
+                        static_cast<int32_t>(std::lround(static_cast<float>(copy.x + static_cast<int32_t>(copy.width)) * sx));
+                    const int32_t y1 =
+                        static_cast<int32_t>(std::lround(static_cast<float>(copy.y + static_cast<int32_t>(copy.height)) * sy));
+                    if (x1 <= x0 || y1 <= y0)
+                        continue;
+                    TargetRun run{copy.tex, generations[copy.tex]++, static_cast<uint32_t>(x1 - x0),
+                                  static_cast<uint32_t>(y1 - y0), {}};
+                    run.copied = true;
+                    run.x = x0;
+                    run.y = y0;
+                    run.before = i;
+                    runs.push_back(run);
+                    copyRuns.push_back(runs.size() - 1u);
+                    current.insert_or_assign(copy.tex, static_cast<int32_t>(runs.size() - 1u));
+                    sampledSince[copy.tex] = false;
+                }
                 const DrawCall &draw = frame.draws[i];
                 if (draw.camera >= frame.cameras.size())
                     continue;
@@ -1214,12 +1435,57 @@ namespace gh2
                 images.resize(run.generation + 1u);
         }
         for (TargetRun &run : runs)
-            run.image = s.targetImage(run.tex, run.generation, run.width, run.height);
+            run.image = s.targetImage(run.tex, run.generation, run.width, run.height, run.copied);
 
         std::vector<Matrix> viewProjections;
         viewProjections.reserve(frame.cameras.size());
         for (const Camera &camera : frame.cameras)
             viewProjections.push_back(viewProjection(camera, frame.yRatio));
+
+        std::vector<PushConstants> pushes(frame.draws.size());
+        for (size_t i = 0; i < frame.draws.size(); ++i)
+        {
+            const DrawCall &draw = frame.draws[i];
+            if (draw.camera >= viewProjections.size())
+                continue;
+            const Material &material = draw.material;
+            PushConstants &push = pushes[i];
+            const Matrix mvp = draw.screen ? draw.world : multiply(draw.world, viewProjections[draw.camera]);
+            std::memcpy(push.mvp, mvp.data(), sizeof(push.mvp));
+            std::memcpy(push.matColor, material.color, sizeof(push.matColor));
+            push.flags = colorModes[i];
+            if (material.prelit)
+                push.flags |= kFlagPrelit;
+            // A src-alpha blend without alpha_cut tests alpha the same way but
+            // still writes Z where it fails (TEST 0x200d, PsMat::Update
+            // 0x19d10c), leaving colour and the alpha bit alone. With no Z to
+            // write that is alpha_cut's discard. With Z to write the fragment
+            // is kept: its alpha of 0 leaves the colour, but it sets or
+            // clears the bit where retail leaves it.
+            const bool noZWrite = material.zMode == milo::mat::kZDisable || material.zMode == milo::mat::kZTransparent;
+            if (material.alphaCut || (material.blend == milo::mat::kBlendSrcAlpha && noZWrite))
+                push.flags |= kFlagAlphaCut;
+            if (material.blend == milo::mat::kBlendSrc && !material.alphaWrite)
+                push.flags |= kFlagSetAlpha;
+            // Intensify raises a textured pass's rgb scale from 128 to 255.
+            if ((material.texture || material.renderTarget != 0u) && material.intensify)
+                push.flags |= kFlagIntensify;
+            push.flags |= (draw.skinBones - 1u) << kSkinBonesShift;
+            if (material.highlight)
+                push.flags |= kFlagHighlight;
+            push.boneBase = boneBases[i];
+            push.lightBase = lightBases[i];
+            push.envBase = envBases[i];
+            if (material.sphere)
+                push.flags |= kFlagSphere;
+            if (material.spread)
+                push.flags |= kFlagSpread;
+            if (material.texGen == milo::mat::kTexGenProjected)
+                push.flags |= kFlagProjected;
+            std::memcpy(push.uvRows, material.uvXfm, sizeof(push.uvRows));
+            std::memcpy(push.uvOffset, material.uvXfm + 4, sizeof(push.uvOffset));
+        }
+        writeDrawDump(frame, pushes.data(), data.mapped);
 
         // Bound state outlives a render pass, so the frame data is bound once.
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, s.layout, 1, 1, &data.set, 0, nullptr);
@@ -1259,7 +1525,8 @@ namespace gh2
                 boundCamera = draw.camera;
             }
             const Material &material = draw.material;
-            const VkPipeline pipeline = s.pipeline(material.blend, material.zMode);
+            const VkPipeline pipeline =
+                s.pipeline(material.blend, material.zMode, material.alphaWrite, material.destAlphaTest);
             if (pipeline == VK_NULL_HANDLE)
                 return;
             if (pipeline != boundPipeline)
@@ -1267,27 +1534,8 @@ namespace gh2
                 vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
                 boundPipeline = pipeline;
             }
-            PushConstants push{};
-            const Matrix mvp = draw.screen ? draw.world : multiply(draw.world, viewProjections[draw.camera]);
-            std::memcpy(push.mvp, mvp.data(), sizeof(push.mvp));
-            std::memcpy(push.matColor, material.color, sizeof(push.matColor));
-            push.flags = colorModes[i];
-            if (material.prelit)
-                push.flags |= kFlagPrelit;
-            if (material.alphaCut)
-                push.flags |= kFlagAlphaCut;
-            // Intensify raises a textured pass's rgb scale from 128 to 255.
-            if ((material.texture || material.renderTarget != 0u) && material.intensify)
-                push.flags |= kFlagIntensify;
-            if (draw.blended)
-                push.flags |= kFlagBlended;
-            push.boneBase = boneBases[i];
-            push.lightBase = lightBases[i];
-            push.envBase = envBases[i];
-            std::memcpy(push.uvRows, material.uvXfm, sizeof(push.uvRows));
-            std::memcpy(push.uvOffset, material.uvXfm + 4, sizeof(push.uvOffset));
             vkCmdPushConstants(cmd, s.layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                               sizeof(push), &push);
+                               sizeof(PushConstants), &pushes[i]);
             vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, s.layout, 0, 1,
                                     &sets[material.texWrap ? 1 : 0], 0, nullptr);
             const VkDeviceSize offset = 0;
@@ -1300,7 +1548,7 @@ namespace gh2
         // into it, in order of first use.
         for (const TargetRun &run : runs)
         {
-            if (!run.image)
+            if (!run.image || run.copied)
                 continue;
             // Transparent black, as the GS reads memory nothing drew.
             VkClearValue clears[2]{};
@@ -1316,23 +1564,44 @@ namespace gh2
             for (size_t i : run.draws)
                 drawOne(i, static_cast<float>(run.width), static_cast<float>(run.height));
             vkCmdEndRenderPass(cmd);
+            s.fillTargetLevels(cmd, *run.image);
         }
 
         VkClearValue clears[2]{};
         for (int i = 0; i < 4; ++i)
             clears[0].color.float32[i] = frame.clear[i];
-        clears[1].depthStencil = {0.0f, 0};
+        // The clear writes the clear colour's alpha, whose top bit 1.0 sets.
+        clears[1].depthStencil = {0.0f, frame.clear[3] >= 1.0f ? 1u : 0u};
         VkRenderPassBeginInfo begin{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
-        begin.renderPass = s.renderPass;
+        begin.renderPass = copyRuns.empty() ? s.renderPass : s.firstPass;
         begin.framebuffer = s.framebuffer;
         begin.renderArea = {{0, 0}, {width, height}};
         begin.clearValueCount = 2;
         begin.pClearValues = clears;
         vkCmdBeginRenderPass(cmd, &begin, VK_SUBPASS_CONTENTS_INLINE);
         boundCamera = UINT32_MAX;
+        size_t nextCopy = 0;
         for (size_t i = 0; i < frame.draws.size(); ++i)
-            if (drawRun[i] < 0)
-                drawOne(i, static_cast<float>(width), static_cast<float>(height));
+        {
+            if (drawRun[i] >= 0)
+                continue;
+            if (nextCopy < copyRuns.size() && runs[copyRuns[nextCopy]].before <= i)
+            {
+                // The pass ends with the picture so far in the target, is
+                // copied from, and goes on from what it kept.
+                vkCmdEndRenderPass(cmd);
+                for (; nextCopy < copyRuns.size() && runs[copyRuns[nextCopy]].before <= i; ++nextCopy)
+                {
+                    const TargetRun &run = runs[copyRuns[nextCopy]];
+                    if (run.image)
+                        s.copyFromTarget(cmd, *run.image, run.x, run.y);
+                }
+                begin.renderPass = s.resumePass;
+                vkCmdBeginRenderPass(cmd, &begin, VK_SUBPASS_CONTENTS_INLINE);
+                boundCamera = UINT32_MAX;
+            }
+            drawOne(i, static_cast<float>(width), static_cast<float>(height));
+        }
         vkCmdEndRenderPass(cmd);
         s.retire(serial);
         return true;

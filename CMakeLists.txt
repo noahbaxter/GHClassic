@@ -165,9 +165,12 @@ set(GHC_GAME_SOURCES
     src/frame_step.cpp
     src/script.cpp
     src/track_start.cpp
+    src/dev/draw_dump.cpp
+    src/dev/mesh_packet.cpp
     src/dev/null_rnd.cpp
     src/dev/scenario.cpp
     src/dev/seed.cpp
+    src/dev/transplant.cpp
     src/disc/disc.cpp
     src/disc/sha1.cpp
     src/movie/movie.cpp
@@ -202,10 +205,12 @@ set(GHC_GAME_SOURCES
     src/render/camera.cpp
     src/render/frame.cpp
     src/render/mesh_capture.cpp
+    src/render/native_cull.cpp
     src/render/native_environ.cpp
     src/render/native_mat.cpp
     src/render/native_mesh.cpp
     src/render/native_particles.cpp
+    src/render/native_points.cpp
     src/render/native_rect.cpp
     src/render/native_rnd.cpp
     src/render/texture_capture.cpp

@@ -1,0 +1,83 @@
+diff --git a/.github/workflows/scripts/macos/build-dependencies.sh b/.github/workflows/scripts/macos/build-dependencies.sh
+index 63b8c0463..b125c5d27 100755
+--- a/.github/workflows/scripts/macos/build-dependencies.sh
++++ b/.github/workflows/scripts/macos/build-dependencies.sh
+@@ -11,7 +11,7 @@ fi
+ # Users may want to use system ffmpeg for additional features
+ : ${BUILD_FFMPEG:=1}
+ 
+-export MACOSX_DEPLOYMENT_TARGET=11.0
++export MACOSX_DEPLOYMENT_TARGET=12.0
+ 
+ NPROCS="$(getconf _NPROCESSORS_ONLN)"
+ SCRIPTDIR=$(realpath $(dirname "${BASH_SOURCE[0]}"))
+@@ -234,8 +234,8 @@ patch -p1 < "$SCRIPTDIR/4cf93f0f16b1503580cdb7ffdedb056321446677.patch"
+ patch -p1 < "$SCRIPTDIR/mvk-texture-swizzle.patch"
+ sed -i '' 's/xcodebuild "$@"/xcodebuild $XCODEBUILD_EXTRA_ARGS "$@"/g' fetchDependencies
+ sed -i '' 's/XCODEBUILD :=/XCODEBUILD ?=/g' Makefile
+-XCODEBUILD_EXTRA_ARGS="VALID_ARCHS=x86_64" ./fetchDependencies --macos
+-XCODEBUILD="set -o pipefail && xcodebuild VALID_ARCHS=x86_64" make macos MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS=0 MVK_CONFIG_USE_METAL_PRIVATE_API=1
++XCODEBUILD_EXTRA_ARGS="VALID_ARCHS=x86_64 MACOSX_DEPLOYMENT_TARGET=12.0" ./fetchDependencies --macos
++XCODEBUILD="set -o pipefail && xcodebuild VALID_ARCHS=x86_64 MACOSX_DEPLOYMENT_TARGET=12.0" make macos MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS=0 MVK_CONFIG_USE_METAL_PRIVATE_API=1
+ cp Package/Latest/MoltenVK/dynamic/dylib/macOS/libMoltenVK.dylib "$INSTALLDIR/lib/"
+ cd ..
+ 
+diff --git a/pcsx2-qt/QtHost.cpp b/pcsx2-qt/QtHost.cpp
+index a177f3980..2fe5bead0 100644
+--- a/pcsx2-qt/QtHost.cpp
++++ b/pcsx2-qt/QtHost.cpp
+@@ -905,7 +905,9 @@ std::optional<WindowInfo> EmuThread::acquireRenderWindow(bool recreate_window)
+ 	const bool render_to_main = !m_is_exclusive_fullscreen && !window_fullscreen && m_is_rendering_to_main;
+ #endif
+ 
+-	return emit onAcquireRenderWindowRequested(recreate_window, window_fullscreen, render_to_main, m_is_surfaceless);
++	// Driven from a script: no window at all.
++	static const bool s_surfaceless = qEnvironmentVariableIsSet("PCSX2_SURFACELESS");
++	return emit onAcquireRenderWindowRequested(recreate_window, window_fullscreen, render_to_main, m_is_surfaceless || s_surfaceless);
+ }
+ 
+ void EmuThread::releaseRenderWindow()
+diff --git a/pcsx2/PINE.cpp b/pcsx2/PINE.cpp
+index dd4059a4a..0f90ae8f8 100644
+--- a/pcsx2/PINE.cpp
++++ b/pcsx2/PINE.cpp
+@@ -5,6 +5,8 @@
+ #include "Common.h"
+ #include "Host.h"
+ #include "Elfheader.h"
++#include "GS/GS.h"
++#include "MTGS.h"
+ #include "SaveState.h"
+ #include "PINE.h"
+ #include "VMManager.h"
+@@ -159,6 +161,7 @@ namespace PINEServer
+ 		MsgUUID = 0xD, /**< Returns the game UUID. */
+ 		MsgGameVersion = 0xE, /**< Returns the game verion. */
+ 		MsgStatus = 0xF, /**< Returns the emulator status. */
++		MsgGSDump = 0x10, /**< Queues a GS dump. */
+ 		MsgUnimplemented = 0xFF /**< Unimplemented IPC message. */
+ 	};
+ 
+@@ -746,6 +749,22 @@ PINEServer::IPCBuffer PINEServer::ParseCommand(std::span<u8> buf, std::vector<u8
+ 				ret_cnt += 4;
+ 				break;
+ 			}
++			case MsgGSDump:
++			{
++				// [frames/1] [path size/4] [path, ending in .png]: a GS dump of the next frames, beside that screenshot.
++				if (!VMManager::HasValidVM())
++					goto error;
++				if (!SafetyChecks(buf_cnt, 5, ret_cnt, 0, buf_size)) [[unlikely]]
++					goto error;
++				const u32 frames = FromSpan<u8>(buf, buf_cnt);
++				const u32 size = FromSpan<u32>(buf, buf_cnt + 1);
++				if (!SafetyChecks(buf_cnt, 5 + size, ret_cnt, 0, buf_size)) [[unlikely]]
++					goto error;
++				std::string path(reinterpret_cast<const char*>(&buf[buf_cnt + 5]), size);
++				MTGS::RunOnGSThread([path = std::move(path), frames]() { GSQueueSnapshot(path, frames); });
++				buf_cnt += 5 + size;
++				break;
++			}
+ 			default:
+ 			{
+ 			error:

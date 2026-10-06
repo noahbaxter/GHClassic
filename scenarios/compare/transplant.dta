@@ -1,0 +1,5 @@
+; Draws the retail frame tools/pcsx2.py saved beside this run: its memory in
+; place of ours, from the main menu (docs/retail-compare.md).
+(wait_until {! {ui in_transition}} 60)
+(wait 3)
+(transplant "../retail/dumps/frame.ram" frame)

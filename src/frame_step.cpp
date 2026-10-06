@@ -51,6 +51,7 @@ namespace gh2
         int s_steps = 1;
         bool s_between = false; // vblanks shorter than a step
         float s_since = 0.0f;   // the time since the last step, in steps
+        bool s_frozen = false;
 
         struct EndDrawingTag;
         void onEndDrawing(uint8_t *, R5900Context *, PS2Runtime *runtime)
@@ -250,6 +251,8 @@ namespace gh2
         void hairPoll(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
             const uint32_t hair = GPR_U32(ctx, 4);
+            if (s_frozen)
+                return returnNow(ctx);
             for (int i = 0; i < s_steps; ++i)
                 runtime->callGuestFunction(rdram, ctx, s_addresses->charHairPoll, {hair}, s_hairPoll);
             if (!s_between || !posing(rdram, hair))
@@ -276,6 +279,12 @@ namespace gh2
         PS2Runtime::RecompiledFunction s_shake = nullptr;
         void shake(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
+            if (s_frozen)
+            {
+                std::memset(getMemPtr(rdram, GPR_U32(ctx, 6)), 0, 16);
+                std::memset(getMemPtr(rdram, GPR_U32(ctx, 7)), 0, 16);
+                return returnNow(ctx);
+            }
             if (s_steps == 0)
             {
                 const uint32_t shot = GPR_U32(ctx, 4);
@@ -306,6 +315,11 @@ namespace gh2
             const int32_t target = std::clamp(at + dir * s_steps, 0, std::max(steps, 0));
             store<int32_t>(rdram, flare + 0x128u, target - dir);
         }
+    }
+
+    void freezeFrameSteps()
+    {
+        s_frozen = true;
     }
 
     void installFrameStep(PS2Runtime &runtime, const Addresses &addresses)

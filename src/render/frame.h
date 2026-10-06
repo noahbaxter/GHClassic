@@ -11,6 +11,10 @@
 
 namespace gh2
 {
+    // What a copy of the whole picture is sampled as, in place of a RndTex:
+    // no guest address.
+    constexpr uint32_t kScreenCopyTex = 1u;
+
     // The camera a draw was made with, as the engine held it at the time.
     struct Camera
     {
@@ -46,6 +50,28 @@ namespace gh2
         float displayAspect = 4.0f / 3.0f;
         std::vector<Camera> cameras;
         std::vector<DrawCall> draws;
+        // The points asked about while it was built (Rnd::TestPoint), each
+        // for an object through a camera: render/native_points.cpp.
+        struct PointTest
+        {
+            uint32_t object = 0; // guest address
+            float point[3] = {};
+            uint32_t camera = 0; // index into cameras
+        };
+        std::vector<PointTest> tests;
+        // Part of the picture copied into a texture (PsTex::CopyFromScreen),
+        // as it stood before draws[before]: the texture's size, from x and y
+        // in the frame's pixels.
+        struct ScreenCopy
+        {
+            size_t before = 0;
+            uint32_t tex = 0; // the RndTex, which later draws sample as a rendered texture
+            int32_t x = 0;
+            int32_t y = 0;
+            uint32_t width = 0;
+            uint32_t height = 0;
+        };
+        std::vector<ScreenCopy> copies;
     };
 
     // Finished frames, oldest first. The game thread publishes at EndDrawing;
@@ -113,6 +139,9 @@ namespace gh2
     // The frame the game thread is building between BeginDrawing and
     // EndDrawing. Game thread only.
     Frame &building();
+
+    // The frame built before it. Game thread only.
+    Frame &previous();
 
     // `camera`'s index in the building frame; consecutive draws through the
     // same camera share one.

@@ -16,6 +16,9 @@ namespace milo
         constexpr uint32_t kWidth = 0x40u;      // the frame's width in pixels
         constexpr uint32_t kHeight = 0x44u;     // and height
         constexpr uint32_t kAspect = 0xd4u;     // index
+        // PsRnd's own, read by VSync (0x19a970, 0x19a9a0).
+        constexpr uint32_t kNoDepthOfField = 0x508u; // nonzero: VSync only waits on sceGsSyncV; its meaning is not known
+        constexpr uint32_t kFocusZ = 0x510u;         // the GS Z depth of field starts at, 0 for none
     }
 
     // RndTransformable: local transform at +0x20, world at +0x60. A
@@ -52,7 +55,12 @@ namespace milo
         constexpr uint32_t kDiffuseTex = 0x98u; // RndTex* (ObjPtr at +0x90)
         constexpr uint32_t kPrelit = 0x9cu;     // bool: vertex colour is baked light
         constexpr uint32_t kAlphaCut = 0xa0u;   // bool: ATST greater, AREF 0
+        constexpr uint32_t kAlphaWrite = 0xa4u; // bool: FBA off, so the frame buffer's alpha is the fragment's (0x3d8498)
+        // PsMat's own, set from outside (Track::SetupFade 0x150ac8): DATE,
+        // draw only where the frame buffer's alpha bit is clear (0x19d114).
+        constexpr uint32_t kDestAlphaTest = 0x120u;
         constexpr uint32_t kNextPass = 0xb0u;   // RndMat* (ObjPtr at +0xa8)
+        constexpr uint32_t kPsTexGenRows = 0x170u; // PsMat: three quadwords PsMat::Update derives from tex_xfm
 
         enum Blend : uint32_t
         {
@@ -139,6 +147,7 @@ namespace milo
         constexpr uint32_t kWidth = 0x4cu;  // int
         constexpr uint32_t kHeight = 0x50u; // int
         constexpr uint32_t kTypeRendered = 0x2u; // drawn into through a camera's target
+        constexpr uint32_t kTypeFrameBuffer = 0x8u;
         // Only regular textures have pixels in RAM (SyncBitmap 0x1a13c0).
         constexpr uint32_t kTypeNoPixels = 0x2u | 0x4u | 0x8u; // rendered, movie, frame buffer
     }
@@ -167,7 +176,9 @@ namespace milo
         constexpr uint32_t kBones = 0x13cu;      // Bones*, null for a rigid mesh
         constexpr uint32_t kTransform = 0x40u;   // the RndTransformable base
         constexpr uint32_t kObjectBase = 0x160u; // the Hmx::Object virtual base, in a PsMesh
+        constexpr uint32_t kMutable = 0x140u;    // the sync bits that change again: such parts are kept
         constexpr uint32_t kPacket = 0x150u;     // PsMesh's face packet MemHandle*, null until synced
+        constexpr uint32_t kPacketQuads = 0x154u; // u16, the packet's length
         constexpr uint32_t kVertSize = 0x40u;
         constexpr uint32_t kFaceSize = 6u;
         // Vert: position +0x00, normal +0x10, colour (4 floats) +0x20,

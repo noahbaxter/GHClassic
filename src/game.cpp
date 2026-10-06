@@ -12,9 +12,11 @@
 #include "dev/null_rnd.h"
 #include "host/pad.h"
 #include "render/mesh_capture.h"
+#include "render/native_cull.h"
 #include "render/native_environ.h"
 #include "render/native_mesh.h"
 #include "render/native_particles.h"
+#include "render/native_points.h"
 #include "render/native_rect.h"
 #include "render/native_rnd.h"
 #include "render/texture_capture.h"
@@ -23,6 +25,7 @@
 #include "dev/scenario.h"
 #include "script.h"
 #include "dev/seed.h"
+#include "dev/transplant.h"
 #include "synth/synth.h"
 #include "settings/video_options.h"
 #include "track_start.h"
@@ -39,6 +42,8 @@ namespace
         gh2::installNativeEnviron(runtime, gh2::kSlus21447);
         gh2::installNativeRect(runtime, gh2::kSlus21447);
         gh2::installNativeParticles(runtime, gh2::kSlus21447);
+        gh2::installNativePoints(runtime, gh2::kSlus21447);
+        gh2::installNativeCull(runtime, gh2::kSlus21447);
         gh2::installSynth(runtime, gh2::kSlus21447);
         gh2::installMetaMusic(runtime, gh2::kSlus21447);
         gh2::installTrackStart(runtime, gh2::kSlus21447);
@@ -53,6 +58,7 @@ namespace
         gh2::installFrameStep(runtime, gh2::kSlus21447);
         gh2::installMenus(runtime);
         gh2::scenario::install(runtime, gh2::kSlus21447);
+        gh2::transplant::install(runtime, gh2::kSlus21447);
         gh2::fast_boot::install(runtime, gh2::kSlus21447);
         gh2::seed::install(runtime, gh2::kSlus21447);
     }

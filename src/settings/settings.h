@@ -13,6 +13,7 @@ namespace gh2::settings
         kFrameRateCap, // game frames per second, 0 for the display's rate
         kMipmaps,   // smaller copies for textures the game shipped without
         kMsaa,      // samples per pixel
+        kFrustumCull, // nothing drawn for what its sphere puts off the picture
         kVideoLagMs, // how late the picture reaches the player
         kAudioLagMs, // how late the sound does
         kBandVolume, // the game's own volumes, 0 to 11
