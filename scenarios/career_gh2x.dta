@@ -1,0 +1,128 @@
+; A 360 GH2 career from nothing, by the buttons a player presses: a band,
+; GH2 360 picked from the campaigns, a new medium career, then its first
+; song won by the game's cheat, its results and cash. The tiers, their six songs,
+; the cash and the store's prices are the 360's; the save holds it under
+; gh2x's own sections, and the band's GH2 career is untouched.
+(needs gh2x)
+#include common/first_boot.dta
+(expect {campaigns has gh2x} 1)
+{gamecfg set mode career}
+{campaign set_profile_name "The Testers" 0}
+{ui goto_screen chooseprof_screen}
+(wait_screen chooseprof_screen)
+(press green)
+(wait_screen ghc_campaign_screen)
+(wait 1)
+{set $pick gh2x}
+#include common/pick_campaign.dta
+(shot campaigns)
+(press green)
+(wait_screen sel_difficulty_screen)
+(expect {campaigns active} gh2x)
+(expect {campaign profile_slot} 0)
+(wait 1)
+(press down)
+(press green)
+(wait_screen sel_character_new_screen)
+(wait_until {char_single are_chars_loaded})
+(wait 1)
+(press green)
+(wait_screen sel_guitar_new_screen)
+(wait 3)
+(press green)
+(wait_screen tour_start_screen)
+(wait 1)
+(press green)
+(wait_screen career_screen 40)
+(wait 1)
+(shot career)
+(expect {game get_difficulty_sym 0} medium)
+{set $cash {campaign cash}}
+(expect $cash 50)
+(press green)
+(wait_screen sel_venue_screen 40)
+(wait 1)
+(shot venue)
+(press green)
+(wait_screen sel_song_screen)
+(wait 2)
+(shot songs)
+; The 360's first tier: six songs, Surrender first, its encore Shout at
+; the Devil.
+(expect {song_provider get_symbol 0} x_surrender)
+(expect {song_provider get_symbol 1} x_possum)
+(expect {song_provider get_symbol 5} x_shoutatthedevil)
+(expect {campaign is_unlocked x_surrender} 1)
+{{game get_player_config 0} set autoplay TRUE}
+(press green)
+(wait_screen game_screen 60)
+(expect {gamecfg get_song} x_surrender)
+(expect {game get_venue} battle)
+(wait 5)
+(shot song)
+{player0 win 5}
+(wait_screen endgame_screen 400)
+(wait 4)
+(shot results)
+; Five stars pay each star level's award: 150, 200 and 250 on the 360,
+; where PS2 pays 100, 150 and 200.
+(expect {- {campaign cash} $cash} 600)
+(press green)
+(wait_screen cashaward_screen)
+(wait 2)
+(shot cash)
+(press green)
+(wait_screen complete_screen)
+(wait 1)
+(press green)
+(wait_screen sel_song_screen 40)
+(wait 2)
+(shot songs_after)
+{set $cash {campaign cash}}
+{set $score {campaign career_score}}
+(expect {> $score 0} 1)
+(expect {campaign high_score x_surrender} $score)
+
+; The store: the 360's prices, and its two songs PS2 never sold.
+{ui goto_screen store_screen}
+(wait_screen store_screen)
+(wait 2)
+(shot store)
+(expect {elem {find $syscfg store character classic price} 1} 5000)
+(expect {elem {find $syscfg store song x_drinkup price} 1} 550)
+(expect {elem {find $syscfg store guitar log_reward price} 1} 8000)
+; A bass asks what the 360 asks, of PS2's model.
+(expect {elem {find $syscfg guitars bass_sg_mahogany require songs} 1} 1)
+(expect {elem {find $syscfg guitars bass_sg_mahogany skins bass_sg_mahog mat} 1} bass_sg_mahog.mat)
+{ui goto_screen career_screen}
+(wait_screen career_screen)
+
+; Not saved: the load must drop it.
+{campaign add_cash 111}
+{ui goto_screen bootup_load}
+(wait_screen main_screen 40)
+(expect {campaigns active} gh2x)
+{gamecfg set mode career}
+{campaign set_profile_slot 0}
+(expect {campaign cash} $cash)
+(expect {campaign career_score} $score)
+
+; One song of forty-eight passed.
+{ui goto_screen ghc_campaign_screen}
+(wait_screen ghc_campaign_screen)
+(wait 2)
+(shot campaigns_after)
+(expect {campaigns progress gh2x 0} 2)
+(expect {campaigns progress gh2 0} 0)
+
+; The band's GH2 career is a new one, at PS2's prices.
+{set $pick gh2}
+#include common/pick_campaign.dta
+(press green)
+(wait_screen sel_difficulty_screen)
+(expect {campaigns active} gh2)
+(expect {campaign new_campaign} 1)
+(expect {campaign cash} 0)
+(expect {elem {find $syscfg store character classic price} 1} 3000)
+(expect {elem {find $syscfg guitars bass_sg_mahogany require songs} 1} 10)
+(quit)

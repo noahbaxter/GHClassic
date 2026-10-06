@@ -14,6 +14,7 @@
 #include "gh1/songs.h"
 
 #include "disc/ark.h"
+#include "content/encores.h"
 #include "content/locale.h"
 #include "content/setlists.h"
 #include "content/songs.h"
@@ -29,17 +30,12 @@ namespace gh2::gh1
 {
     namespace
     {
-        // GH2's venues standing in for GH1's, by tier.
+        // GH2's venues standing in for GH1's, by tier: each the one that
+        // plays GH1's crowd for it (crowd_v1 to v6, world/<venue>/streams).
         const std::map<std::string, std::string> kVenues = {
-            {"basement", "small1"}, {"small_club", "small2"}, {"big_club", "big"},
+            {"basement", "battle"}, {"small_club", "small1"}, {"big_club", "big"},
             {"theatre", "theatre"}, {"fest", "fest"},         {"arena", "arena"},
         };
-
-        std::string venue(const std::string &gh1)
-        {
-            const auto it = kVenues.find(gh1);
-            return it != kVenues.end() ? it->second : "small1";
-        }
 
         // A GH1 EVENTS text as GH2's track and text, or no track to drop it.
         std::pair<std::string, std::string> cue(const std::string &gh1)
@@ -211,6 +207,12 @@ namespace gh2::gh1
         }
     }
 
+    std::string venue(const std::string &gh1)
+    {
+        const auto it = kVenues.find(gh1);
+        return it != kVenues.end() ? it->second : "small1";
+    }
+
     void addSetlist(size_t disc, size_t gh2Disc)
     {
         const dtb::Files files = [disc](const std::string &path) { return ark::readFile(disc, path); };
@@ -271,7 +273,9 @@ namespace gh2::gh1
         for (size_t i = 0; i < scoreNames.size(); ++i)
             if (const dtb::Node *name = value(*strings, "highscore_dummy_" + std::to_string(i)))
                 scoreNames[i] = name->text;
-        setlists::add("gh1", std::move(tiers), "ui/sel_song_quickplay.milo", scoreNames);
+        setlists::add("gh1", std::move(tiers), "ui/sel_song_quickplay.milo", scoreNames, setlists::required(*campaign));
+        // Its campaign.dta asks a venue only for a count of songs.
+        encores::none("gh1");
         std::cerr << "[gh1] " << count << " songs converted" << std::endl;
     }
 }

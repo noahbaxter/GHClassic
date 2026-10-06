@@ -1,0 +1,7 @@
+; On the campaign picker, $pick as the row green takes: which row that is
+; follows the discs mounted.
+{foreach_int $pick_row 0 {size {ghc_campaign_panel get games}}
+   {if {== {elem {ghc_campaign_panel get games} $pick_row} $pick}
+      {ghc_campaign_panel set picked $pick_row}
+   }
+}

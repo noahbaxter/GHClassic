@@ -19,6 +19,7 @@
 #include "content/games.h"
 #include "content/outfits.h"
 #include "formats/dtb.h"
+#include "gh1/career.h"
 #include "gh1/clips.h"
 #include "gh1/face.h"
 #include "gh1/guitarist.h"
@@ -89,7 +90,7 @@ namespace gh2
             return;
         }
         const dtb::Node *types = &scripts->archetypes;
-        size_t count = 0u;
+        std::vector<Guitarist> done;
         for (const Guitarist &guitarist : kGuitarists)
         {
             const std::string base = guitarist.base, name = guitarist.name(), folder = guitarist.folder;
@@ -155,11 +156,13 @@ namespace gh2
             ark::rename("char/" + name + "/og/gen/" + name, *gh2Disc, "char/" + base + "/og/gen/" + base);
             ark::rename(surfaces + name + "_keep", *gh1Disc, surfaces + highway);
             outfits::photosFrom(name, *gh2Disc, base);
-            outfits::add(guitarist.character, name, base, guitarist.label);
-            ++count;
+            // GH1's store sells the character, by GH2's name here (gh1/career.cpp).
+            outfits::add("gh1", guitarist.character, guitarist.character, name, base, guitarist.label);
+            done.push_back(guitarist);
         }
+        gh1::addCareer(*gh1Disc, done);
         const auto ms =
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
-        std::cerr << "[gh1] " << count << " outfits built in " << ms << " ms" << std::endl;
+        std::cerr << "[gh1] " << done.size() << " outfits built in " << ms << " ms" << std::endl;
     }
 }

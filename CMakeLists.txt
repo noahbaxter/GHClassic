@@ -210,13 +210,16 @@ set(GHC_GAME_SOURCES
     src/sustain_release.cpp
     src/track_start.cpp
     src/whammy_hold.cpp
+    src/content/campaigns.cpp
     src/content/card.cpp
+    src/content/encores.cpp
     src/content/games.cpp
     src/content/locale.cpp
     src/content/mogg.cpp
     src/content/outfits.cpp
     src/content/setlists.cpp
     src/content/songs.cpp
+    src/dev/cheats.cpp
     src/dev/draw_dump.cpp
     src/dev/mesh_packet.cpp
     src/dev/null_rnd.cpp
@@ -230,6 +233,7 @@ set(GHC_GAME_SOURCES
     src/disc/volume.cpp
     src/formats/dtb.cpp
     src/formats/midi.cpp
+    src/gh1/career.cpp
     src/gh1/clips.cpp
     src/gh1/face.cpp
     src/gh1/install.cpp
@@ -323,9 +327,11 @@ file(READ src/ui/dta/locale.dta GHC_LOCALE_DTA)
 file(READ src/ui/dta/crowd.dta GHC_CROWD_DTA)
 file(READ src/ui/dta/sel_character.dta GHC_SEL_CHARACTER_DTA)
 file(READ src/ui/dta/quickplay.dta GHC_QUICKPLAY_DTA)
+file(READ src/ui/dta/campaigns.dta GHC_CAMPAIGNS_DTA)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     src/ui/dta/lag_panel.dta src/ui/dta/highscore_panel.dta src/ui/dta/main_menu.dta src/ui/dta/fast_boot.dta
-    src/ui/dta/locale.dta src/ui/dta/crowd.dta src/ui/dta/sel_character.dta src/ui/dta/quickplay.dta)
+    src/ui/dta/locale.dta src/ui/dta/crowd.dta src/ui/dta/sel_character.dta src/ui/dta/quickplay.dta
+    src/ui/dta/campaigns.dta)
 configure_file(src/ui/dta/dta.h.in "${GHC_DTA_DIR}/dta.h" @ONLY)
 target_include_directories(GHClassic PRIVATE "${GHC_DTA_DIR}")
 

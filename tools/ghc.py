@@ -539,7 +539,8 @@ def cmd_scenarios(argv):
     def one(name):
         out = ROOT / "runs" / name
         started = time.time()
-        state = arm(out, ROOT / "scenarios" / f"{name}.dta", args.speed, 600, disc, env=env, games=args.discs)
+        # The longest plays a career's whole first tier, five songs.
+        state = arm(out, ROOT / "scenarios" / f"{name}.dta", args.speed, 900, disc, env=env, games=args.discs)
         log = (out / "run.log").read_text(errors="replace")
         # Anywhere in a line: the watchdog's STALL lands mid-line in the game thread's output.
         failures = [m.group(1) for m in re.finditer(r"\[scenario\] ((?:FAIL|STALL).*)", log)]

@@ -1,0 +1,12 @@
+; From a career song's results, past its cash, back to the song list.
+(wait_screen endgame_screen 400)
+(wait 2)
+(press green)
+(wait_screen cashaward_screen)
+(wait 1)
+(press green)
+(wait_screen complete_screen)
+(wait 1)
+(press green)
+(wait_screen sel_song_screen 40)
+(wait 1)

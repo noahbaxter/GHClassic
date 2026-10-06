@@ -181,36 +181,44 @@ namespace gh2::save::gh2
             return keys;
         }
 
-        std::string gameOf(const SongGames &games, const std::string &song)
+        std::string gameOf(const Games &games, const std::string &song)
         {
-            const auto it = games.find(song);
-            return it == games.end() ? "gh2" : it->second;
+            const auto it = games.songs.find(song);
+            return it == games.songs.end() ? games.own : it->second;
         }
 
-        // "<game> scores <difficulty>", for GH2 or a game whose songs it holds.
-        std::optional<std::pair<std::string, int32_t>> scoreSection(const SongGames &games, const std::string &name)
+        // "<game> scores <difficulty>", for the career's game or one whose
+        // songs it holds.
+        std::optional<std::pair<std::string, int32_t>> scoreSection(const Games &games, const std::string &name)
         {
             const size_t at = name.find(" scores ");
             if (at == std::string::npos)
                 return std::nullopt;
             const std::string game = name.substr(0, at);
             const auto d = difficulty(name.substr(at + 8));
-            bool known = game == "gh2";
-            for (const auto &[song, g] : games)
+            bool known = game == games.own;
+            for (const auto &[song, g] : games.songs)
                 known = known || g == game;
             if (!known || !d)
                 return std::nullopt;
             return std::pair{game, *d};
         }
 
-        bool owned(const SongGames &games, const std::string &name)
+        // A band's own section, or one of its sections for any game.
+        bool ofBand(const std::string &name, int profile)
         {
-            if (name == "gh2" || name.rfind("gh2 ", 0) == 0 || scoreSection(games, name))
+            const std::string b = band(profile);
+            return name == b || name.rfind(b + " ", 0) == 0;
+        }
+
+        bool owned(const Games &games, const std::string &name)
+        {
+            if (name == games.own || name == games.own + " coop" || scoreSection(games, name))
                 return true;
             for (int p = 0; p < kProfiles; ++p)
             {
-                const std::string b = band(p);
-                if (name == b || name.rfind(b + " gh2", 0) == 0)
+                const std::string b = band(p), mine = b + " " + games.own;
+                if (name == b || name == mine || name.rfind(mine + " ", 0) == 0)
                     return true;
             }
             return false;
@@ -220,9 +228,9 @@ namespace gh2::save::gh2
         struct Keys
         {
             std::vector<std::string> profile, campaign, coop;
-            const SongGames &games;
+            const Games &games;
 
-            Keys(const Save &fresh, const SongGames &songGames)
+            Keys(const Save &fresh, const Games &songGames)
                 : profile(itemKeys(fresh.profileItems)), campaign(itemKeys(fresh.campaignItems)), coop(coopKeys(fresh)),
                   games(songGames)
             {
@@ -233,9 +241,11 @@ namespace gh2::save::gh2
         bool apply(Save &save, const Keys &keys, const std::string &section, const std::string &key,
                    const std::string &value)
         {
-            if (section == "gh2")
+            const std::string &own = keys.games.own;
+            if (section == own)
             {
                 const auto v = number(value);
+                // Each game kept its own once; [classic]'s is read after.
                 if (key == "default_name")
                     save.defaultName = value;
                 else if (key == "career_beaten" && v)
@@ -244,7 +254,7 @@ namespace gh2::save::gh2
                     return false;
                 return true;
             }
-            if (section == "gh2 coop")
+            if (section == own + " coop")
             {
                 for (size_t i = 0; i < keys.coop.size(); ++i)
                     if (keys.coop[i] == key)
@@ -284,7 +294,8 @@ namespace gh2::save::gh2
                     profile.name = value;
                     return true;
                 }
-                if (section == b + " gh2")
+                const std::string mine = b + " " + own;
+                if (section == mine)
                 {
                     const auto v = number(value);
                     if (key == "tutorials" && v)
@@ -297,9 +308,9 @@ namespace gh2::save::gh2
                         return readItem(save.profileItems, keys.profile, p, key, value);
                     return true;
                 }
-                if (section.rfind(b + " gh2 ", 0) == 0)
+                if (section.rfind(mine + " ", 0) == 0)
                 {
-                    const auto d = difficulty(section.substr(b.size() + 5));
+                    const auto d = difficulty(section.substr(mine.size() + 1));
                     if (!d)
                         return false;
                     for (int part = 0; part < 4; ++part)
@@ -315,8 +326,15 @@ namespace gh2::save::gh2
         }
     }
 
-    void toStore(const Save &save, const Save &fresh, Store &store, const SongGames &games)
+    void toStore(const Save &save, const Save &fresh, Store &store, const Games &games)
     {
+        store.removeIf([&](const std::string &name)
+                       {
+                           for (int p = 0; p < kProfiles; ++p)
+                               if (save.profiles[p].empty && ofBand(name, p))
+                                   return true;
+                           return false;
+                       });
         // What this build cannot address stays for one that can: an outfit
         // another build adds keeps its progress through a session without it.
         const Keys keys(fresh, games);
@@ -331,9 +349,13 @@ namespace gh2::save::gh2
         store.removeIf(ours);
         Store out;
 
-        Section &game = out.section("gh2");
         if (save.defaultName != fresh.defaultName)
-            game.set("default_name", save.defaultName);
+            store.section(kOwnSection).set("default_name", save.defaultName);
+        else if (store.find(kOwnSection))
+            std::erase_if(store.section(kOwnSection).values,
+                          [](const auto &entry) { return entry.first == "default_name"; });
+
+        Section &game = out.section(games.own);
         if (save.careerBeaten != fresh.careerBeaten)
             game.set("career_beaten", std::to_string(save.careerBeaten));
 
@@ -344,7 +366,7 @@ namespace gh2::save::gh2
             if (!profile.empty)
                 out.section(band(p)).set("name", profile.name);
 
-            Section &own = out.section(band(p) + " gh2");
+            Section &own = out.section(band(p) + " " + games.own);
             if (profile.tutorials != base.tutorials)
                 own.set("tutorials", std::to_string(profile.tutorials));
             if (profile.difficulty != base.difficulty && profile.difficulty >= 0 && profile.difficulty < kDifficulties)
@@ -355,7 +377,7 @@ namespace gh2::save::gh2
 
             for (int d = 0; d < kDifficulties; ++d)
             {
-                Section &diff = out.section(band(p) + " gh2 " + kDifficultyNames[d]);
+                Section &diff = out.section(band(p) + " " + games.own + " " + kDifficultyNames[d]);
                 for (int part = 0; part < 4; ++part)
                     if (profile.look[d][part] != base.look[d][part])
                         diff.set(kLook[part], profile.look[d][part]);
@@ -363,7 +385,7 @@ namespace gh2::save::gh2
             }
         }
 
-        Section &coop = out.section("gh2 coop");
+        Section &coop = out.section(games.own + " coop");
         for (size_t i = 0; i < save.coop.size() && i < keys.coop.size(); ++i)
             if (save.coop[i] != fresh.coop[i])
                 coop.set(keys.coop[i], formatState(save.coop[i], kSongType));
@@ -397,7 +419,7 @@ namespace gh2::save::gh2
                 store.sections.push_back(std::move(s));
     }
 
-    Save fromStore(const Store &store, const Save &fresh, const SongGames &games)
+    Save fromStore(const Store &store, const Save &fresh, const Games &games)
     {
         Save save = fresh;
         const Keys keys(fresh, games);
@@ -406,8 +428,11 @@ namespace gh2::save::gh2
             if (owned(games, section.name))
                 for (const auto &[key, value] : section.values)
                     unknown += !apply(save, keys, section.name, key, value);
+        if (const Section *shared = store.find(kOwnSection))
+            if (const std::string *name = shared->get("default_name"))
+                save.defaultName = *name;
         if (unknown)
-            std::cout << "[save] " << unknown << " GH2 entries this build does not know, kept for one that does"
+            std::cout << "[save] " << unknown << " " << games.own << " entries this build does not know, kept for one that does"
                       << std::endl;
         return save;
     }
