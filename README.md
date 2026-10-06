@@ -2,7 +2,7 @@
 
 ![Guitar Hero II running in GH Classic](assets/gameplay.gif)
 
-GH Classic is an AI-assisted recompilation of the PS2 version of Guitar Hero II that runs natively on macOS, Windows and Linux. While you can play through the entire campaign, know that it's still experimental so expect (and please report any) bugs and glitches.
+GH Classic is a recompilation of the PS2 version of Guitar Hero II that runs natively on macOS, Windows and Linux. Much of the code was written using AI ([more on that below](#how-was-ai-used)). While you can play through the entire campaign, know that it's still experimental so expect (and please report any) bugs and glitches.
 
 To run this you need:
 - **Your own disc image** of Guitar Hero II (USA), SLUS-21447, as `.chd`, `.iso` or `.bin`
@@ -61,18 +61,18 @@ sudo dnf install gcc-c++ libX11-devel libXext-devel libXrandr-devel libXcursor-d
 
 ## How Was AI Used?
 
-I've noticed a lot of talk recently where folk feel misled by the use of AI in similar recompilation projects, so I wanted to be super clear and upfront about how I use these tools.
+AI was used to write code and nothing else. This README and any other text a user may see is 100% written by me (or the original developers).
 
-No texture, image, video, audio file or any other game asset was generated or altered by AI. What you see and hear is what's on the disc, just presented at a higher resolution and framerate. In some cases assets are converted between formats by code so GH1 content can run in the GH2 engine.
+No texture, image, video, audio file or any other game asset was generated, upscaled, or otherwise altered by AI. What you see and hear is what's on the disc, just rendered at a higher resolution and framerate. In some cases assets are converted between formats by code so that content from GH1 can load into the GH2 engine.
 
-As for code, the game was recompiled with my [fork](https://github.com/noahbaxter/PS2Recomp/tree/ghrecomp) of the [PS2Recomp](https://github.com/ran-j/PS2Recomp) project and then runs the original game code mostly unchanged, so expect things to feel the same. Everything around that core (renderer, audio, input, saves, etc.) intercepts game calls to the original PS2 hardware and allows GHC to run on pc platforms and easily add new features, while still reading everything from the original disc images. That layer was rewritten from scratch with Claude Code, which means planning a feature, letting Claude take a pass, reading what it writes, complaining that it isn't what I meant, editing and revisions, additional prompts, testing, a UX pass, cleanup, and then a commit.
+The game is recompiled with my [fork](https://github.com/noahbaxter/PS2Recomp/tree/ghrecomp) of the [PS2Recomp](https://github.com/ran-j/PS2Recomp) project and runs original game code (mostly) unchanged. Everything built around that core recomp (renderer, audio, input, saves, etc.) was written with Claude Code. All generated code gets reviewed and reworked until I am happy with the shape and structure of it and understand how it works. I've been a professional software developer since 2018 and while this is my first time playing around with emulation/graphics, I am not "vibe coding" something I have no understanding of.
 
 ## Credits
 
-All I've done here is build a thin layer over excellent work done by the community. Please give most of the credit to these fine folk.
+This project is built on top of a lot of excellent work by others. Please give most of the credit to these fine folk.
 
 - [PS2Recomp](https://github.com/ran-j/PS2Recomp) ([fork](https://github.com/noahbaxter/PS2Recomp/tree/ghrecomp))
-- Project Deluge: the debug builds of GH1, GH2 and Rocks the 80s that the function names come from, matched onto the retail executable
+- Project Deluge: debug builds of GH1, GH2 and Rocks the 80s that the function names come from, matched onto the retail executable
 - [MiloHax](https://github.com/hmxmilohax): those builds collected ([milo-executable-library](https://github.com/hmxmilohax/milo-executable-library)), menu script references ([milo-script-library](https://github.com/hmxmilohax/milo-script-library)), and [gh2-calibration-fix](https://github.com/hmxmilohax/gh2-calibration-fix)
 - [PCSX2](https://github.com/PCSX2/pcsx2) and [psx-spx](https://psx-spx.consoledev.net/): SPU2 reference code/reverb coefficients
 - [ps2tek](https://github.com/PSI-Rockin/ps2tek): PS2 hardware reference
