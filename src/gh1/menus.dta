@@ -181,3 +181,27 @@
       {foreach $o (cp_band2.btn cp_band3.btn cp_band4.btn cp_band5.btn cp_band6.btn cp_band7.btn)
          {{$this find $o} set_showing FALSE}
          {$this disable {$this find $o}}}))
+
+; Two players.
+
+; GH1's hero screen for two lights each player's pick on the wall: a View
+; for each character and player (gh1/screens.cpp).
+(multi_sel_character_screen
+   (needs multi_sel_character)
+   (scroll_char_sel
+      {do
+         ($dir {multi_sel_character_panel loaded_dir})
+         ($all {find $syscfg characters})
+         {foreach_int $i 1 {size $all}
+            {do
+               ($c {elem {elem $all $i} 0})
+               {foreach_int $p 0 2
+                  {{$dir find {sprint "sc_char_" $c "_focus_p" {'+' $p 1} ".view"}} set_showing
+                     {== $c {{game get_player_config $p} get_character}}}}}}}))
+
+; GH1's results for two show the winner's photo (GH1's multiplayer.dta).
+(multi_compete_panel
+   (needs multi_compete)
+   (enter
+      {winner_photo0.mesh set_showing {> {player0 score} {player1 score}}}
+      {winner_photo1.mesh set_showing {< {player0 score} {player1 score}}}))
