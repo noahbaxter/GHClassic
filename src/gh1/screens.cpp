@@ -145,6 +145,14 @@ namespace gh2::gh1
                          {"cp_band1.btn", "delete_band.btn"},
                          {"dp_title.lbl", "manage_band.lbl"}},
              .rows = {{"rename_band.btn", 75.0f}, {"delete_band.btn", 40.0f}}},
+            // As its hero screen for one: each player's lit portrait a View
+            // for the script to light (menus.dta), and GH2's placers either
+            // side of the wall.
+            {.gh1 = "multi_sel_character",
+             .renamed = kHeroes,
+             .placed = {{"char_multi0.placer", -43.0f, -650.0f, -48.0f}, {"char_multi1.placer", 32.0f, -650.0f, -48.0f}}},
+            {"multi_sel_guitar"},
+            {"multi_compete"},
         };
         return kScreens;
     }
