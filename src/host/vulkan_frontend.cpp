@@ -36,8 +36,10 @@ namespace gh2
         bool s_shotWriting = false; // taken from the request, not yet on disk
 
         constexpr uint32_t kFramesInFlight = 2;
-        constexpr int kWindowWidth = 960;
+        // The window opens at the picture's shape: 16:9 with widescreen, else 4:3.
         constexpr int kWindowHeight = 720;
+        constexpr int kWindowWidthWide = 1280;
+        constexpr int kWindowWidth = 960;
 
         bool check(VkResult result, const char *what)
         {
@@ -401,7 +403,8 @@ namespace gh2
         SDL_WindowFlags flags = SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
         if (s.hidden)
             flags |= SDL_WINDOW_HIDDEN;
-        s.window = SDL_CreateWindow(title, kWindowWidth, kWindowHeight, flags);
+        const int width = settings::get(settings::kWidescreen) ? kWindowWidthWide : kWindowWidth;
+        s.window = SDL_CreateWindow(title, width, kWindowHeight, flags);
         if (!s.window)
         {
             std::cerr << "[sdl] window: " << SDL_GetError() << std::endl;
