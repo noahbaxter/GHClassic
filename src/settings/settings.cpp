@@ -75,6 +75,7 @@ namespace gh2::settings
             // 100: the hit window (slop, beatmatcher.dta), so the note after
             // can be hit from when the release stops muting.
             {"game", "sustain_release_ms", Type::kInt, 0, 500, 5, 100, 0},
+            {"game", "whammy_hold", Type::kBool, 0, 1, 1, 1, 0},
             // With both in PUT_DISC_HERE. A .chd is smaller; an .iso reads
             // faster, which only shows with the game run far above 1x.
             {"disc", "prefer", Type::kChoice, 0, 1, 1, kChd, kChd, "chd iso"},

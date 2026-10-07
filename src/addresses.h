@@ -41,6 +41,9 @@ namespace gh2
         uint32_t muteTrack;      // MasterAudio::MuteTrack
         uint32_t unmuteTrack;    // MasterAudio::UnmuteTrack
         uint32_t masterAudioReleaseGem;
+        uint32_t checkForPitchBend; // TrackWatcherImpl::CheckForPitchBend
+        uint32_t sendWhammy;        // TrackWatcherImpl::SendWhammy
+        uint32_t playerSetWhammyBar; // Player::SetWhammyBar
         uint32_t optionsSyncVideo; // Options::SyncVideoOptions
         uint32_t optionsSetSyncOffset;
         uint32_t beatMatchCtor;
@@ -159,6 +162,9 @@ namespace gh2
         .muteTrack = 0x23a2c0u,
         .unmuteTrack = 0x23a370u,
         .masterAudioReleaseGem = 0x239ec8u,
+        .checkForPitchBend = 0x248e38u,
+        .sendWhammy = 0x249b98u,
+        .playerSetWhammyBar = 0x111d88u,
         .optionsSyncVideo = 0x10db80u,
         .optionsSetSyncOffset = 0x10ded8u,
         .beatMatchCtor = 0x120f48u,
