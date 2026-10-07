@@ -36,6 +36,7 @@
 //   {campaigns switch <game> [<screen>]}  to that game's at the next UI poll,
 //                              once no script is running, then to that screen;
 //                              TRUE unless it is the one active or there is none
+//   {campaigns first_character}   the first player's default outfit there
 //   {campaigns second_character}  the second player's default outfit there
 //   {campaigns owns <game> <item>}  TRUE if that game's item is there to use
 //                              outside its own career: one its store does not
