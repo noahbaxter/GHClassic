@@ -1,5 +1,8 @@
 ; GH1's campaign shows GH1's own menus, driven by GH2's scripts: its main
-; menu down its buttons and round, and back to GH2's main menu.
+; menu down its buttons and round, options with GH2's extra rows, its
+; tutorials, the quickplay setlist, the band list and a career's
+; difficulties, and back to GH2's main menu. The screens after a song are
+; career_gh1's.
 (needs gh1)
 #include common/first_boot.dta
 (wait 1)
@@ -20,6 +23,40 @@
 (press down)
 (wait 1)
 (shot main_round)
+{ui goto_screen options_screen}
+(wait_screen options_screen)
+(wait 1)
+(press down)
+(wait 1)
+(shot options)
+(press green)
+(wait_screen video_settings_screen)
+{ui goto_screen training_screen}
+(wait_screen training_screen)
+(press green)
+(wait 2.5)
+(shot tutorials)
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 2)
+(shot quickplay_songs)
+(expect {song_provider get_symbol 0} iloverockandroll)
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+{gamecfg set mode career}
+{campaign set_profile_name "The Testers" 0}
+{ui goto_screen chooseprof_screen}
+(wait_screen chooseprof_screen)
+(wait 1.5)
+(shot bands)
+{campaign set_profile_slot 0}
+{ui goto_screen sel_difficulty_screen}
+(wait_screen sel_difficulty_screen)
+(wait 1.5)
+(shot difficulty)
+{ui goto_screen main_screen}
+(wait_screen main_screen)
 {set $ghc_switch gh2}
 {set $ghc_switch_next main_screen}
 {ui goto_screen ghc_switch_screen}
