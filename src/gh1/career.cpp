@@ -17,6 +17,7 @@
 //               characters, videos, songs and tips
 //   menus       GH1's screens and their text (gh1/menus.h), under GH2's
 //               scripts fitted to them
+//   music       GH1's menu loops
 
 #include "gh1/career.h"
 
@@ -295,6 +296,21 @@ namespace gh2::gh1
         ark::addFile(layer, "config/gen/store.dtb", dtb::write(store));
         ark::addFile(layer, "config/gen/guitars.dtb", dtb::write(*guitars));
         ark::addFile(layer, "config/gen/tips.dtb", dtb::write(*tips));
+        // Menu music: GH1's loops, which its disc has under their own names
+        // (sfx/streams), streamed as GH1 plays them: they are twice the size
+        // of the loops GH2 holds in memory.
+        auto synth = raw("config/gen/synth.dtb");
+        const auto theirSynth = dtb::read("config/synth.dta", none, theirs);
+        const dtb::Node *theirMusic = theirSynth ? dtb::find(*theirSynth, "metamusic") : nullptr;
+        const dtb::Node *loops = theirMusic ? dtb::find(*theirMusic, "music") : nullptr;
+        if (dtb::Node *music = synth ? child(*synth, "metamusic") : nullptr; music && loops)
+        {
+            if (dtb::Node *n = child(*music, "music"))
+                *n = *loops;
+            if (dtb::Node *n = child(*music, "play_from_memory"); n && n->nodes.size() > 1u)
+                n->nodes[1] = {dtb::kInt, 0, 0.0f, {}, {}};
+            ark::addFile(layer, "config/gen/synth.dtb", dtb::write(*synth));
+        }
         ark::addFile(layer, "ui/gen/ui.dtb", dtb::write(*ui));
         ark::addFile(layer, "ui/eng/gen/locale.dtb", dtb::write(*locale));
         // GH2's screens' scripts (ui/init.dta includes each), fitted to GH1's
