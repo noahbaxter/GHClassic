@@ -136,6 +136,13 @@ namespace gh2
                 for (int c = 0; c < 4; ++c)
                     color[c] = std::clamp(color[c], 0.0f, 1.0f);
             }
+            if (mode == kColorAmbient || mode == kColorDirectional)
+            {
+                const float scale = (pc.flags & kFlagIntensify) ? 255.0f : 128.0f;
+                for (int c = 0; c < 3; ++c)
+                    if (const float units = color[c] * scale; units < 0.0f)
+                        color[c] = (std::trunc(units) - 256.0f * std::floor(std::trunc(units) / 256.0f)) / scale;
+            }
             if (pc.flags & kFlagIntensify)
                 for (int c = 0; c < 3; ++c)
                     color[c] *= 255.0f / 128.0f;

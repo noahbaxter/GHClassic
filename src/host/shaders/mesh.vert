@@ -136,6 +136,14 @@ void main()
             color += data[pc.lightBase + 1] * pc.matColor * (facing * (local.w + inversesqrt(d2)));
         color = clamp(color, vec4(0.0), vec4(1.0));
     }
+    // The two environ programs clamp at 1 alone, and FTOI0's negative
+    // integer reaches the GS as its low byte: -11 is 245, nearly twice white.
+    if (mode == kColorAmbient || mode == kColorDirectional)
+    {
+        float scale = (pc.flags & kFlagIntensify) != 0u ? 255.0 : 128.0;
+        vec3 units = color.rgb * scale;
+        color.rgb = mix(color.rgb, mod(trunc(units), 256.0) / scale, lessThan(units, vec3(0.0)));
+    }
     // The GS colour scale: 128 with a texture, raised to 255 by intensify.
     if ((pc.flags & kFlagIntensify) != 0u)
         color.rgb *= 255.0 / 128.0;
