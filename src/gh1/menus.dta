@@ -75,6 +75,41 @@
             )
             {if {$dir exists $label} {{$dir find $label} set_text {game get_character}}}}}))
 
+; GH1's screen for beating the game names the difficulty, and opens on the
+; first of its two pages (GH1's endgame.dta, win_game). Easy's is a letter
+; with none of these.
+(win_game_panel
+   (enter
+      {if {{$this loaded_dir} exists wg_diff.lbl}
+         {wg_diff.lbl set_localized_text {sprintf {localize win_diff} {localize {game get_difficulty_sym 0}}}}
+         {win_screen1.view set_showing TRUE}
+         {win_screen2.view set_showing FALSE}}))
+
+; Beating GH1 on expert wins the Battleaxe, on the second page of its win
+; screen (GH1's endgame.dta, display_battleaxe): green turns to it once,
+; and leaves as ever after (endgame.dta). The guitar is the band's from the
+; start here, its career's store not selling it.
+(win_game_screen
+   (= BUTTON_DOWN_MSG
+      {if {&& {$this can_continue} {== $button kPad_X}}
+         {if_else
+            {&& {== kDifficultyExpert {game get_difficulty 0}}
+               {{win_game_panel loaded_dir} exists win_screen2.view}
+               {! {{win_game_panel find win_screen2.view} showing}}}
+            {do
+               {synth play_sequence button_select}
+               {{win_game_panel find win_screen1.view} set_showing FALSE}
+               {{win_game_panel find win_screen2.view} set_showing TRUE}
+               {helpbar set_display ()}
+               {set [continue_time] {'+' {taskmgr ui_seconds} 3}}}
+            {do
+               {fade_panel start_fade 1 (color 0 0 0) (fade_synth FALSE) (fade_out TRUE)}
+               {synth play_sequence button_select}
+               {script_task (delay 1) (units kTaskUISeconds)
+                  (script
+                     {ui goto_screen
+                        {if_else {post_show_screen get pfo_newly_unlocked} unlock_pfo_screen endgame_screen}})}}}}))
+
 ; The store.
 
 ; The street and the room behind GH1's shop are a backdrop: by GH2's z_mode
