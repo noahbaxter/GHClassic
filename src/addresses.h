@@ -16,6 +16,10 @@ namespace gh2
         uint32_t psRndDoPointTests;
         uint32_t rndTestPoint; // Rnd::TestPoint
         uint32_t sphereOutsideFrustum; // operator>(const Sphere &, const Frustum &)
+        uint32_t gamePanelSetGameOver; // GamePanel::SetGameOver(bool won)
+        uint32_t gamePanelReset;
+        uint32_t gamePanelExit;
+        uint32_t winCampaignSong; // GameConfig::WinCampaignSong
         uint32_t psMeshSync;
         uint32_t psMeshFixVerts;
         uint32_t psMeshDestroy;
@@ -100,6 +104,7 @@ namespace gh2
         uint32_t theTaskMgr;
         uint32_t theOptions; // Options*
         uint32_t theCampaign; // Campaign*
+        uint32_t theGameConfig; // GameConfig*
         uint32_t mcBuffer;    // the save's bytes between the two halves of a load or save
         uint32_t mcOverwrite; // GHMCSaveData's overwrite argument: replace a save already there
         uint32_t mcBaseDir;   // char*, the save's directory on the card
@@ -126,6 +131,10 @@ namespace gh2
         .psRndDoPointTests = 0x19a7f0u,
         .rndTestPoint = 0x1d55b8u,
         .sphereOutsideFrustum = 0x2d9170u,
+        .gamePanelSetGameOver = 0x108178u,
+        .gamePanelReset = 0x105fd8u,
+        .gamePanelExit = 0x106d50u,
+        .winCampaignSong = 0x126f10u,
         .psMeshSync = 0x3d4f08u,
         .psMeshFixVerts = 0x19dbb8u,
         .psMeshDestroy = 0x19dd88u,
@@ -209,6 +218,7 @@ namespace gh2
         .theTaskMgr = 0x51ee40u,
         .theOptions = 0x3da2e8u,
         .theCampaign = 0x3da31cu,
+        .theGameConfig = 0x3da308u,
         .mcBuffer = 0x3da368u,
         .mcOverwrite = 0x3da394u,
         .mcBaseDir = 0x3da374u,

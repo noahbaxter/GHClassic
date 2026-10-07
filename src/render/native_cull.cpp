@@ -12,11 +12,13 @@
 // so all six planes count.
 //
 // Only with the frustum_cull setting, which is off: the cull saves the PS2
-// drawing and can only take from the picture.
+// drawing and can only take from the picture. The career's ending has it
+// regardless: nothing else stops drawing the guitarist the saucer takes.
 
 #include "render/native_cull.h"
 
 #include "guest.h"
+#include "hook.h"
 #include "settings/settings.h"
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
@@ -32,14 +34,36 @@ namespace gh2
         constexpr uint32_t kPlaneStride = 0x10u;
         constexpr uint32_t kStickySign = 0x80u;
 
+        const Addresses *s_addresses = nullptr;
+        bool s_ending = false; // from the career's last song won to the game panel's reset or exit
+
+        struct GameOverTag;
+        struct ResetTag;
+        struct ExitTag;
+
+        void onGameOver(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const R5900Context saved = *ctx;
+            const bool won = GPR_U32(ctx, 5) != 0u;
+            s_ending = won && runtime->callGuestFunction(rdram, ctx, s_addresses->winCampaignSong,
+                                                         {load<uint32_t>(rdram, s_addresses->theGameConfig)}) != 0u;
+            *ctx = saved;
+        }
+
+        void onGameLeft(uint8_t *, R5900Context *, PS2Runtime *)
+        {
+            s_ending = false;
+        }
+
         void sphereOutside(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
             const uint32_t returnTo = GPR_U32(ctx, 31);
             const uint32_t sphere = GPR_U32(ctx, 4);
             const uint32_t frustum = GPR_U32(ctx, 5);
             const float radius = load<float>(rdram, sphere + kRadius);
+            const bool cull = s_ending || settings::get(settings::kFrustumCull);
             bool outside = false;
-            for (uint32_t p = 0; settings::get(settings::kFrustumCull) && p < kPlanes; ++p)
+            for (uint32_t p = 0; cull && p < kPlanes; ++p)
             {
                 const uint32_t plane = frustum + p * kPlaneStride;
                 float distance = load<float>(rdram, plane) * load<float>(rdram, sphere);
@@ -55,6 +79,10 @@ namespace gh2
 
     void installNativeCull(PS2Runtime &runtime, const Addresses &addresses)
     {
+        s_addresses = &addresses;
         runtime.replaceFunction(addresses.sphereOutsideFrustum, sphereOutside);
+        EntryHook<GameOverTag>::install(runtime, addresses.gamePanelSetGameOver, onGameOver);
+        EntryHook<ResetTag>::install(runtime, addresses.gamePanelReset, onGameLeft);
+        EntryHook<ExitTag>::install(runtime, addresses.gamePanelExit, onGameLeft);
     }
 }
