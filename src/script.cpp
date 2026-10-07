@@ -92,6 +92,17 @@ namespace gh2::script
                 slot += 4u;
             }
             s_pending.clear();
+            if (!s_registered)
+            {
+                // Fader has a creator the game registers nowhere, so no
+                // script could {new Fader}: NewObject (0x2c0e48) calls 0.
+                const Call call{rdram, ctx, runtime, 0u};
+                const uint32_t block = guestString(call, "Fader", 4u);
+                runtime->callGuestFunction(rdram, ctx, s_addresses->symbolCtor, {block, block + 4u});
+                runtime->callGuestFunction(rdram, ctx, s_addresses->registerFactory,
+                                           {load<uint32_t>(rdram, block), s_addresses->faderNewObject});
+                runtime->callGuestFunction(rdram, ctx, s_addresses->builtinDelete, {block});
+            }
             s_registered = true;
             *ctx = saved;
         }

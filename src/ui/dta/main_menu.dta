@@ -4,6 +4,16 @@
 ; and linked below it (strum up follows the link backwards). The buttons
 ; draw through their parent group, so it joins that; sync_objects adds it to
 ; the panel's focus list.
+;
+; The lick the splash and the menu each play runs up to 6 s and nothing of
+; the game's stops it: without a disc load after the menu it plays over the
+; next screen. Its ten sounds get a fader of their own before either plays,
+; which leaving the menu fades out (dB, ms).
+{set $lick_fade {new Fader lick.fade}}
+{func lick_attach
+   {$lick_fade set_val 0}
+   {foreach_int $i 0 10 {{synth find {sprint "meta_lick" $i}} add_fader $lick_fade}}
+}
 {retype main_panel
    (
       ; From the ARK root: a path resolves against the file its array came
@@ -26,6 +36,7 @@
          {set $main_entered TRUE}
          {$this reset_player_settings}
          {if {! [already_entered]}
+            {lick_attach}
             {synth play_sequence meta_lick}
             {if {&& {== {game get_controller 0} guitar} {== {campaign tutorials_done} 0}}
                {$this set_focus main_tutorial.btn}
@@ -36,6 +47,7 @@
          {main_msg.view set_showing FALSE}
          {set [msg_last_frame] 0}
       )
+      (exit {$lick_fade fade kDbSilence 1500})
       (add_quit
          {if {! {exists quit.btn}}
             {do
@@ -150,5 +162,47 @@
       )
       (access_all {main_panel reset_player_settings})
       (enter {$this turn_off_ambient})
+   )
+}
+; The splash, as the game's own (splash.dta) but for lick_attach.
+{retype splash_panel
+   (
+      (file ui/splash.milo)
+      (player_num 0)
+      (finish_load {splash.view set_frame 0} {splash_legal.view set_showing TRUE})
+      (enter
+         {splash.view animate (period 3.333) (range 0 100)}
+         {set $enter_time {taskmgr ui_seconds}}
+         {game_screen set attract_mode FALSE}
+         {set $entering_attract_mode FALSE}
+         {set $disable_attract_mode FALSE}
+         {lick_attach}
+         {synth play_sequence meta_lick}
+      )
+      (poll
+         {if {&& {! $entering_attract_mode} {! {ui in_transition}}}
+            {do
+               ($now {'-' {taskmgr ui_seconds} $enter_time})
+               {if {> $now 60}
+                  {if {! $disable_attract_mode} {$this enter_attract_mode}}
+               }
+            }
+         }
+      )
+      (enter_attract_mode
+         {gamecfg set mode attract}
+         {set $entering_attract_mode TRUE}
+         {game set_song {campaign pick_attract_song}}
+         {{game get_player_config 0} set_difficulty kDifficultyExpert}
+         {game set_quickplay}
+         {game_screen set attract_mode TRUE}
+         {ui goto_screen loading_screen}
+      )
+      (BUTTON_DOWN_MSG
+         {if {meta is_any_button $button $player_num}
+            {synth play_sequence button_select}
+            {ui goto_screen main_screen}
+         }
+      )
    )
 }

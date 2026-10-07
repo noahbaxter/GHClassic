@@ -50,6 +50,8 @@ namespace gh2
         uint32_t splashShow;       // Splash::Show
         uint32_t seedRand;
         uint32_t dataRegisterFunc;
+        uint32_t registerFactory; // Hmx::Object::RegisterFactory(Symbol, creator)
+        uint32_t faderNewObject;  // Fader::NewObject
         uint32_t dataReadString;
         uint32_t dataNodeEvaluate; // DataNode::Evaluate
         uint32_t symbolCtor;       // Symbol::Symbol(const char *)
@@ -165,6 +167,8 @@ namespace gh2
         .splashShow = 0x2139f0u,
         .seedRand = 0x2d9cc8u,
         .dataRegisterFunc = 0x2b2c80u,
+        .registerFactory = 0x2c0ed0u,
+        .faderNewObject = 0x37f160u,
         .dataReadString = 0x2b28d0u,
         .dataNodeEvaluate = 0x2b7d38u,
         .symbolCtor = 0x2d3a48u,
