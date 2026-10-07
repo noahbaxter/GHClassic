@@ -21,6 +21,7 @@
 #include "content/setlists.h"
 #include "disc/ark.h"
 #include "formats/dtb.h"
+#include "gh1/guitarist.h"
 #include "gh1/look.h"
 #include "gh1/scene.h"
 #include "gh1/screens.h"
@@ -153,10 +154,15 @@ namespace gh2::gh1
             return {};
         }
         // GH1's names for a band's status, which the game finds by number
-        // (status_%d).
+        // (status_%d), and the lines its newspapers take a name into.
         for (const auto &[token, string] : look->strings)
             if (token.rfind("status_", 0) == 0)
                 text[token] = string;
+        // Each character's photo for those newspapers, by GH2's name for
+        // the character, for the script to load (menus.dta).
+        for (const Guitarist &g : kGuitarists)
+            if (auto photo = ark::readFile(disc, std::string(kFolder) + "image/gen/status_" + g.folder + "0.png_ps2"))
+                ark::addFile(layer, std::string("ui/image/gen/gh1_status_") + g.character + ".png_ps2", std::move(*photo));
         std::map<std::string, std::string> down;
         if (const auto scripts = dtb::read(std::string(kFolder) + "ui.dta", macros, theirs))
             links(*scripts, down);

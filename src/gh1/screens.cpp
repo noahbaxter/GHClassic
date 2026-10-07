@@ -71,6 +71,16 @@ namespace gh2::gh1
                         {"song_logos.pic", kAway, 0.0f, 0.0f},
                         {"st_sold.mesh", kAway, 0.0f, 0.0f}}},
             {"store_back"},
+            // GH1 marks a new status with a newspaper, where GH2 has a
+            // sponsor's letter for the status reached (endgame.dta's
+            // status_panel).
+            {"status_1", "sponsorship1"},
+            {"status_2", "sponsorship2"},
+            {"status_3", "sponsorship3"},
+            {"status_4", "sponsorship4"},
+            {"status_5", "sponsorship5"},
+            {"status_6", "sponsorship6"},
+            {"status_7", "sponsorship7"},
         };
         return kScreens;
     }

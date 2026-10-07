@@ -45,6 +45,36 @@
       {ca_blurb7.lbl set_showing FALSE}
       {ca_num7.lbl set_showing FALSE}))
 
+; GH1's newspaper for a new status has the character's photo, lines that
+; take the band's name, and lines that are the character's (GH1's
+; endgame.dta, its status panel's text).
+(status_panel
+   (needs sponsorship1 sponsorship2 sponsorship3 sponsorship4 sponsorship5 sponsorship6 sponsorship7)
+   (enter
+      {status_char1.tex set_bitmap {sprint "ui/image/gh1_status_" {game get_character} ".png"}}
+      {do
+         ($dir {$this loaded_dir})
+         ($band {campaign profile_name {campaign profile_slot}})
+         {foreach $line
+            (
+               (status_rocker_headline1.lbl status_rocker_week)
+               (status_young_bandname.lbl status_young_gun_interview)
+               (status_shredder_headline2.lbl status_shredder_changing)
+               (status_pro_headline1.lbl status_pro_goes)
+               (status_pro_headline2.lbl status_pro_piece)
+               (status_guitarhero_venue1.lbl status_guitarhero_crash)
+               (status_guitargod_headline5.lbl status_god_depart)
+               (status_guitargod_headline7.lbl status_god_drummer)
+            )
+            {if {$dir exists {elem $line 0}}
+               {{$dir find {elem $line 0}} set_localized_text {sprintf {localize {elem $line 1}} $band}}}}
+         {foreach $label
+            (
+               status_guitarhero_headline1.lbl status_guitarhero_headline5.lbl status_guitarlegend_charname.lbl
+               status_guitargod_headline3.lbl status_guitargod_status2.lbl status_guitargod_headline2.lbl
+            )
+            {if {$dir exists $label} {{$dir find $label} set_text {game get_character}}}}}))
+
 ; The store.
 
 ; The street and the room behind GH1's shop are a backdrop: by GH2's z_mode
