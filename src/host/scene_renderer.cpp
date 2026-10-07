@@ -1456,6 +1456,8 @@ namespace gh2
             push.flags = colorModes[i];
             if (material.prelit)
                 push.flags |= kFlagPrelit;
+            if (material.vertDyn)
+                push.flags |= kFlagVertDyn;
             // A src-alpha blend without alpha_cut tests alpha the same way but
             // still writes Z where it fails (TEST 0x200d, PsMat::Update
             // 0x19d10c), leaving colour and the alpha bit alone. With no Z to

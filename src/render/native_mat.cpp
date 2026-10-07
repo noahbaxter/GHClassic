@@ -15,14 +15,56 @@
 #include "render/native_mat.h"
 
 #include "guest.h"
+#include "hook.h"
 #include "milo/layout.h"
 #include "ps2_runtime.h"
 #include "render/texture_capture.h"
+
+#include <unordered_set>
 
 namespace gh2
 {
     namespace
     {
+        // GH1's RndMat lights by four flags (SetLighting, GH1 0x1be288):
+        // useEnv, vertAmb, vertDyn and normalize. A material before rev 25
+        // has them in its file, and RndMat::Load (0x1bfc00) keeps useEnv and
+        // vertAmb (as prelit) and reads vertDyn into a byte it drops
+        // (0x1c0030). GH1's PsMat::Select hands VU1 vertAmb and vertDyn both
+        // (GH1 0x2ebfc0), and a vertDyn material's lights are scaled by the
+        // vertex colour where the material's scales them otherwise. Only
+        // GH1's files are that old: every Mat on GH2's and the 80s' discs is
+        // rev 27.
+        const Addresses *s_addresses = nullptr;
+        PS2Runtime::RecompiledFunction s_read = nullptr;
+        std::unordered_set<uint32_t> s_vertDyn; // the RndMats loaded with it
+
+        struct LoadTag;
+        void onLoad(uint8_t *, R5900Context *ctx, PS2Runtime *)
+        {
+            s_vertDyn.erase(GPR_U32(ctx, 4));
+        }
+
+        // BinStream::Read(void *, int) (0x2c8c50), as Load calls it for
+        // that byte: the RndMat is in $s1. Objects load from a ChunkStream
+        // alone (DirLoader::OpenFile, 0x2beffc), whose ReadImpl (0x2ca1e0)
+        // is a memcpy, so the read cannot wait.
+        void read(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t returnTo = GPR_U32(ctx, 31);
+            if (returnTo != s_addresses->rndMatLoadVertDyn)
+            {
+                s_read(rdram, ctx, runtime);
+                return;
+            }
+            const uint32_t mat = GPR_U32(ctx, 17), into = GPR_U32(ctx, 5);
+            runtime->callGuestFunction(rdram, ctx, s_addresses->binStreamRead,
+                                       {GPR_U32(ctx, 4), into, GPR_U32(ctx, 6)}, s_read);
+            if (load<uint8_t>(rdram, into) != 0u)
+                s_vertDyn.insert(mat);
+            ctx->pc = returnTo;
+        }
+
         // The uv transform PsMat::Update builds from tex_xfm for the xfm tex
         // gens (0x19d510), rows at +0x170/+0x180 and offset at +0x1a0. The
         // off-diagonals flip sign, and xfm turns about the texture's centre
@@ -106,6 +148,7 @@ namespace gh2
     Material readMaterial(uint8_t *rdram, uint32_t mat)
     {
         Material m;
+        m.vertDyn = s_vertDyn.count(mat) != 0u;
         m.blend = load<uint32_t>(rdram, mat + milo::mat::kBlend);
         m.zMode = load<uint32_t>(rdram, mat + milo::mat::kZMode);
         for (uint32_t i = 0; i < 4; ++i)
@@ -141,6 +184,14 @@ namespace gh2
         if (m.zMode >= milo::mat::kZModeCount)
             m.zMode = milo::mat::kZNormal;
         return m;
+    }
+
+    void installNativeMat(PS2Runtime &runtime, const Addresses &addresses)
+    {
+        s_addresses = &addresses;
+        EntryHook<LoadTag>::install(runtime, addresses.rndMatLoad, onLoad);
+        s_read = runtime.lookupFunction(addresses.binStreamRead);
+        runtime.replaceFunction(addresses.binStreamRead, &read);
     }
 
     // Select calls UpdateSphereXfm on every select of a sphere material

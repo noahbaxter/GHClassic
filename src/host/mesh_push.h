@@ -25,6 +25,7 @@ namespace gh2
     constexpr uint32_t kFlagSphere = 1u << 10;   // the tex gen block is the sphere one's
     constexpr uint32_t kFlagSpread = 1u << 11;   // sampled as the mean of four, matColor.xy apart in uv
     constexpr uint32_t kFlagSetAlpha = 1u << 12; // alpha written as 1, as FBA does to an unblended pixel
+    constexpr uint32_t kFlagVertDyn = 1u << 13;  // a light's colour is scaled by the vertex colour, not the material's
 
     struct PushConstants
     {

@@ -87,6 +87,9 @@ namespace gh2
         uint32_t scePadRead;
         uint32_t scePadInfoAct;
         uint32_t charHairPoll;
+        uint32_t rndMatLoad;
+        uint32_t rndMatLoadVertDyn; // where it returns to from reading a rev under 25's vertDyn
+        uint32_t binStreamRead;     // (void *, int)
         uint32_t rndMorphCtor;
         uint32_t rndMorphDtor;
         uint32_t rndMorphSetFrame; // (frame, blend)
@@ -277,6 +280,9 @@ namespace gh2
         .scePadRead = 0x2f2c48u,
         .scePadInfoAct = 0x2f2e58u,
         .charHairPoll = 0x176fb8u,
+        .rndMatLoad = 0x1bfc00u,
+        .rndMatLoadVertDyn = 0x1c0038u,
+        .binStreamRead = 0x2c8c50u,
         .rndMorphCtor = 0x200b98u,
         .rndMorphDtor = 0x374f90u,
         .rndMorphSetFrame = 0x201048u,

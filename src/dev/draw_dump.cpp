@@ -116,6 +116,7 @@ namespace gh2
 
             const uint32_t mode = pc.flags & 7u;
             const float *base = (pc.flags & kFlagPrelit) ? vertexColor : pc.matColor;
+            const float *lightScale = (pc.flags & kFlagVertDyn) ? vertexColor : pc.matColor;
             float color[4] = {vertexColor[0], vertexColor[1], vertexColor[2], vertexColor[3]};
             const Vec4 *light = data + pc.lightBase;
             if (mode == kColorAmbient)
@@ -135,8 +136,8 @@ namespace gh2
                     d[i] = std::max(dot(litNormal, {light[4 + i].v[0], light[4 + i].v[1], light[4 + i].v[2]}), 0.0f);
                 for (int c = 0; c < 4; ++c)
                 {
-                    const float lit = d[0] * (light[1].v[c] * pc.matColor[c]) + d[1] * (light[2].v[c] * pc.matColor[c]) +
-                                      d[2] * (light[3].v[c] * pc.matColor[c]);
+                    const float lit = d[0] * (light[1].v[c] * lightScale[c]) + d[1] * (light[2].v[c] * lightScale[c]) +
+                                      d[2] * (light[3].v[c] * lightScale[c]);
                     color[c] = std::min(lit + base[c] * light[0].v[c], 1.0f);
                 }
             }
@@ -150,7 +151,7 @@ namespace gh2
                     color[c] = base[c] * light[0].v[c];
                 if (d2 <= light[5].v[3] && d2 > 0.0f && facing >= 0.0f)
                     for (int c = 0; c < 4; ++c)
-                        color[c] += light[1].v[c] * pc.matColor[c] * (facing * (local.v[3] + 1.0f / std::sqrt(d2)));
+                        color[c] += light[1].v[c] * lightScale[c] * (facing * (local.v[3] + 1.0f / std::sqrt(d2)));
                 for (int c = 0; c < 4; ++c)
                     color[c] = std::clamp(color[c], 0.0f, 1.0f);
             }
