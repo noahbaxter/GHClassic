@@ -168,3 +168,16 @@
       {foreach $o (ds_rename.btn ds_newprof.btn ds_delprof.btn)
          {{$this find $o} set_showing FALSE}
          {$this disable {$this find $o}}}))
+
+; GH1's poster for deleting a band lists eight: the first two are GH2's rows
+; for one band, named so, and the rest go.
+(manage_band_panel
+   (needs manage_band)
+   (enter
+      {rename_band.btn set text_token "RENAME BAND"}
+      {delete_band.btn set text_token "DELETE BAND"}
+      {dp_title.mesh set_showing FALSE}
+      {manage_band.lbl set_showing TRUE}
+      {foreach $o (cp_band2.btn cp_band3.btn cp_band4.btn cp_band5.btn cp_band6.btn cp_band7.btn)
+         {{$this find $o} set_showing FALSE}
+         {$this disable {$this find $o}}}))

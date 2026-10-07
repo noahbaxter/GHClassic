@@ -136,6 +136,15 @@ namespace gh2::gh1
                          {"ds_title2.lbl", "title2.lbl"}},
              .rows = {{"autosave.btn", 30.0f}, {"save_bands.btn", 5.0f}, {"load_bands.btn", -20.0f}},
              .placed = {{"autosave.chk", -94.0f, -10.5f, 2.0f}}},
+            // GH2's screen for one band, to rename or delete it, on GH1's
+            // poster for deleting one: its title the band's name, its first
+            // two rows those (menus.dta hides the rest).
+            {.gh1 = "delprof",
+             .gh2 = "manage_band",
+             .renamed = {{"cp_band0.btn", "rename_band.btn"},
+                         {"cp_band1.btn", "delete_band.btn"},
+                         {"dp_title.lbl", "manage_band.lbl"}},
+             .rows = {{"rename_band.btn", 75.0f}, {"delete_band.btn", 40.0f}}},
         };
         return kScreens;
     }
