@@ -25,6 +25,7 @@ namespace gh2::settings
         kLeftyP2,
         kExportCard, // each save also written to GHClassic.ps2, a PCSX2 card
         kTrackOnAtStart, // the player's track heard before its first hit
+        kSustainReleaseMs, // a sustain let go this close to its end stays heard
         kDiscPrefer, // kChd or kIso: the image taken when the disc folder has both
         kKeyCount,
     };

@@ -40,6 +40,7 @@ namespace gh2
         uint32_t muteAllTracks;  // MasterAudio::MuteAllTracks
         uint32_t muteTrack;      // MasterAudio::MuteTrack
         uint32_t unmuteTrack;    // MasterAudio::UnmuteTrack
+        uint32_t masterAudioReleaseGem;
         uint32_t optionsSyncVideo; // Options::SyncVideoOptions
         uint32_t optionsSetSyncOffset;
         uint32_t beatMatchCtor;
@@ -157,6 +158,7 @@ namespace gh2
         .muteAllTracks = 0x23a3e8u,
         .muteTrack = 0x23a2c0u,
         .unmuteTrack = 0x23a370u,
+        .masterAudioReleaseGem = 0x239ec8u,
         .optionsSyncVideo = 0x10db80u,
         .optionsSetSyncOffset = 0x10ded8u,
         .beatMatchCtor = 0x120f48u,
