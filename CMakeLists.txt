@@ -232,6 +232,7 @@ set(GHC_GAME_SOURCES
     src/disc/sha1.cpp
     src/disc/volume.cpp
     src/formats/dtb.cpp
+    src/formats/dtb_text.cpp
     src/formats/midi.cpp
     src/gh1/career.cpp
     src/gh1/clips.cpp
