@@ -333,6 +333,9 @@ namespace gh2::synth
     void Module::writeRam(uint32_t address, const uint8_t *data, uint32_t len)
     {
         std::lock_guard<std::mutex> lock(m_mutex);
+        // A voice whose stop is still queued (CtlClientPoll) would play the
+        // new bytes: retail's upload goes through that queue, behind it.
+        m_spu.silence(address, len);
         m_spu.write(address, data, len);
     }
 

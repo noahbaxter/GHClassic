@@ -125,6 +125,17 @@ namespace gh2::synth
             m_ram[(address + i) % kRamBytes] = bytes[i];
     }
 
+    void Spu::silence(uint32_t address, uint32_t len)
+    {
+        for (Voice &v : m_voices)
+            if (v.phase != Phase::kOff && (v.nax - address) % kRamBytes < len)
+            {
+                v.phase = Phase::kOff;
+                v.level = 0;
+                v.ended = true;
+            }
+    }
+
     void Spu::setVolume(uint32_t voice, uint16_t left, uint16_t right)
     {
         m_voices[voice].volL = fixedVolume(left);

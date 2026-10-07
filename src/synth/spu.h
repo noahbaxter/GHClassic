@@ -31,6 +31,8 @@ namespace gh2::synth
 
         void reset();
         void write(uint32_t address, const uint8_t *bytes, uint32_t len);
+        // Voices playing from these bytes go silent at once.
+        void silence(uint32_t address, uint32_t len);
 
         // VOLL/VOLR as written: 15 bits of volume/2, bit 14 its sign.
         void setVolume(uint32_t voice, uint16_t left, uint16_t right);
