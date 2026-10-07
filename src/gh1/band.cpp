@@ -3,6 +3,7 @@
 #include "content/band.h"
 #include "disc/ark.h"
 #include "gh1/clip_set.h"
+#include "gh1/face.h"
 #include "gh1/rig.h"
 #include "milo/milo.h"
 
@@ -224,6 +225,12 @@ namespace gh2::gh1
                 ark::rename(dir + "og/gen/" + as, gh2Disc, gh2Dir + "og/gen/" + name);
                 ark::rename(dir, gh2Disc, gh2Dir);
             }
+            // A singer's face_data is its archetype's (band_chars.dta's
+            // SINGER_FACES); the morph is the outfit's (gh1/rig.h).
+            if (const auto faces = macros.find("SINGER_FACES"); *member.face && faces != macros.end())
+                for (const dtb::Node &node : faces->second)
+                    if (node.type == dtb::kArray && node.nodes.size() > 1u && node.nodes[0].text == "face_data")
+                        addFace(ours, node);
             band::add("gh1", name, ours, home);
         }
     }

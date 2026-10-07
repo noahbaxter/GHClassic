@@ -19,6 +19,7 @@
 #include "content/setlists.h"
 #include "content/songs.h"
 #include "formats/dtb.h"
+#include "gh1/face.h"
 #include "gh1/guitarist.h"
 #include "formats/midi.h"
 
@@ -197,6 +198,52 @@ namespace gh2::gh1
             return midi::write(out);
         }
 
+        // When the singer's mouth is open, in seconds: the gems track's
+        // note 108 (charsys.dta's singer_events), by the tempo track.
+        std::vector<std::pair<float, float>> sung(const midi::Bytes &gh1)
+        {
+            const auto in = midi::parse(gh1);
+            std::vector<std::pair<float, float>> out;
+            if (!in || in->tracks.empty())
+                return out;
+            const auto seconds = [&](uint32_t tick)
+            {
+                double at = 0.0, perTick = 0.5 / in->division; // 120 beats a minute until set
+                uint32_t from = 0u;
+                for (const midi::Event &e : in->tracks[0].events)
+                {
+                    if (e.tick >= tick)
+                        break;
+                    if (e.status != 0xffu || e.meta != 0x51u || e.data.size() < 3u)
+                        continue;
+                    at += (e.tick - from) * perTick;
+                    from = e.tick;
+                    perTick = ((e.data[0] << 16) | (e.data[1] << 8) | e.data[2]) / 1.0e6 / in->division;
+                }
+                return static_cast<float>(at + (tick - from) * perTick);
+            };
+            for (const midi::Track &track : in->tracks)
+            {
+                if (track.name != "T1 GEMS")
+                    continue;
+                std::optional<uint32_t> on;
+                for (const midi::Event &e : track.events)
+                {
+                    if (e.status == 0xffu || e.data.size() < 2u || e.data[0] != 108u)
+                        continue;
+                    const bool down = (e.status & 0xf0u) == 0x90u && e.data[1] != 0u;
+                    if (down && !on)
+                        on = e.tick;
+                    else if (!down && on && ((e.status & 0xf0u) == 0x80u || (e.status & 0xf0u) == 0x90u))
+                    {
+                        out.emplace_back(seconds(*on), seconds(e.tick));
+                        on.reset();
+                    }
+                }
+            }
+            return out;
+        }
+
         dtb::Node symbol(const std::string &text) { return {dtb::kSymbol, 0, 0.0f, text}; }
         dtb::Node array(std::vector<dtb::Node> nodes) { return {dtb::kArray, 0, 0.0f, {}, std::move(nodes)}; }
 
@@ -334,6 +381,7 @@ namespace gh2::gh1
                 }
                 songs::add(*text);
                 ark::addFile(mid, *converted);
+                addSinging(name, sung(*file));
                 // GH2's singer lip-syncs to <song>.voc; GH1's sang to chart
                 // events, so GH2's neutral track stands in.
                 ark::rename("songs/" + name + "/" + name + ".voc", gh2Disc, "songs/_blinktrack/_blinktrack.voc");
