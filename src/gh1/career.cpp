@@ -15,12 +15,14 @@
 //               the root config and the UI's lists of them
 //   text        GH2's locale with GH1's names and blurbs for the venues,
 //               characters, videos, songs and tips
+//   menus       GH1's screens and their text (gh1/menus.h)
 
 #include "gh1/career.h"
 
 #include "content/campaigns.h"
 #include "disc/ark.h"
 #include "formats/dtb.h"
+#include "gh1/menus.h"
 #include "gh1/songs.h"
 
 #include <algorithm>
@@ -275,6 +277,8 @@ namespace gh2::gh1
             else if (key.rfind("loading_tip", 0) == 0 || key.rfind("video", 0) == 0 || songs.count(stem) != 0u)
                 text[key] = entry.nodes[1].text;
         }
+        const size_t layer = ark::addLayer(std::nullopt);
+        addMenus(layer, disc, text);
         for (dtb::Node &entry : locale->nodes)
             if (const auto it = text.find(keyOf(entry)); entry.type == dtb::kArray && entry.nodes.size() > 1u && it != text.end())
             {
@@ -284,7 +288,6 @@ namespace gh2::gh1
         for (const auto &[key, value] : text)
             locale->nodes.push_back(array({symbol(key), {dtb::kString, 0, 0.0f, value, {}}}));
 
-        const size_t layer = ark::addLayer(std::nullopt);
         ark::addFile(layer, "config/gen/gh2.dtb", dtb::write(*root));
         ark::addFile(layer, "config/gen/campaign.dtb", dtb::write(*campaign));
         ark::addFile(layer, "config/gen/store.dtb", dtb::write(store));
