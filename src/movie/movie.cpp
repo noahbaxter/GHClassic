@@ -10,6 +10,8 @@
 #include "host/input.h"
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
+#include "runtime/ee_scheduler.h"
+#include "runtime/host_clock.h"
 #include "runtime/ps2_disc_image.h"
 
 #include <algorithm>
@@ -319,7 +321,11 @@ namespace gh2
             if (disc && disc->find(path, extent) && !extent.isDir)
             {
                 std::cerr << "[movie] playing " << path << std::endl;
+                // The game stands still for the movie and has none of that
+                // time to make up after it.
+                const auto began = ps2x::host_clock::now();
                 Player(*disc, extent, minSkipSeconds, *runtime).run();
+                runtime->eeScheduler().dropHostTime(ps2x::host_clock::now() - began);
                 result = 1;
             }
             else
