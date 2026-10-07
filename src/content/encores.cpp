@@ -23,6 +23,7 @@ namespace gh2::encores
         PS2Runtime::RecompiledFunction s_isEncoreSong = nullptr;
         PS2Runtime::RecompiledFunction s_isEncoreUnlockPossible = nullptr;
         PS2Runtime::RecompiledFunction s_checkUnlockVenue = nullptr;
+        PS2Runtime::RecompiledFunction s_getBlurb = nullptr;
 
         bool played()
         {
@@ -92,6 +93,35 @@ namespace gh2::encores
             SET_GPR_U32(ctx, 2, unlocked);
             ctx->pc = returnTo;
         }
+
+        // SongProvider::GetBlurb(int) (0x117df8) asks for the encore once a
+        // venue's last song is open (0x117f4c), which here it always is: the
+        // game's own line in its place, song_current_venue_<game>, with the
+        // songs the venue asks for.
+        void getBlurb(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            if (played())
+                return s_getBlurb(rdram, ctx, runtime);
+            const uint32_t returnTo = GPR_U32(ctx, 31);
+            const auto call = [&](uint32_t function, std::initializer_list<uint32_t> args)
+            {
+                return static_cast<uint32_t>(runtime->callGuestFunction(rdram, ctx, function, args));
+            };
+            const auto text = [&](const std::string &token)
+            {
+                return call(s_addresses->localeLocalize,
+                            {s_addresses->theLocale, script::symbol(rdram, ctx, runtime, token), 1u});
+            };
+            uint32_t blurb = static_cast<uint32_t>(runtime->callGuestFunction(
+                rdram, ctx, s_addresses->songProviderGetBlurb, {GPR_U32(ctx, 4), GPR_U32(ctx, 5)}, s_getBlurb));
+            if (blurb == text("song_current_venue_encore"))
+                blurb = call(s_addresses->makeStringInt,
+                             {text("song_current_venue_" + campaigns::active()),
+                              call(s_addresses->campaignGetRequiredSongs,
+                                   {load<uint32_t>(rdram, s_addresses->theCampaign)})});
+            SET_GPR_U32(ctx, 2, blurb);
+            ctx->pc = returnTo;
+        }
     }
 
     void none(const std::string &game)
@@ -113,5 +143,7 @@ namespace gh2::encores
         runtime.replaceFunction(addresses.campaignStateIsEncoreUnlockPossible, &isEncoreUnlockPossible);
         s_checkUnlockVenue = runtime.lookupFunction(addresses.campaignStateCheckUnlockVenue);
         runtime.replaceFunction(addresses.campaignStateCheckUnlockVenue, &checkUnlockVenue);
+        s_getBlurb = runtime.lookupFunction(addresses.songProviderGetBlurb);
+        runtime.replaceFunction(addresses.songProviderGetBlurb, &getBlurb);
     }
 }

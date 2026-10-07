@@ -155,6 +155,14 @@ namespace gh2
         uint32_t campaignDataGetNextVenue;            // (Symbol venue, Difficulty)
         uint32_t campaignItemsFind;                   // CampaignItemVec::Find(Symbol)
         uint32_t campaignItemSetPassed;               // CampaignItem::SetPassed(bool)
+        uint32_t campaignGetRequiredSongs;            // Campaign's, for the venue and difficulty being played
+        uint32_t campaignGetStatusProgress;           // (Difficulty)
+        uint32_t campaignGetCampaign;                 // (Difficulty): that difficulty's CampaignState
+        uint32_t campaignStateGetSongsBeat;
+        uint32_t campaignStateGetNumSongs;
+        uint32_t campaignStateGetStatusSym;
+        uint32_t songProviderGetBlurb;                // (int row)
+        uint32_t makeStringInt;                       // MakeString(const char *, int)
         // Data
         uint32_t rndCamCurrent;  // RndCam::sCurrent
         uint32_t defaultMat;     // the RndMat a mesh without one draws with
@@ -334,6 +342,14 @@ namespace gh2
         .campaignDataGetNextVenue = 0x1310c8u,
         .campaignItemsFind = 0x140cf8u,
         .campaignItemSetPassed = 0x140a90u,
+        .campaignGetRequiredSongs = 0x12e2d8u,
+        .campaignGetStatusProgress = 0x12f828u,
+        .campaignGetCampaign = 0x12e5e0u,
+        .campaignStateGetSongsBeat = 0x132f00u,
+        .campaignStateGetNumSongs = 0x133020u,
+        .campaignStateGetStatusSym = 0x132760u,
+        .songProviderGetBlurb = 0x117df8u,
+        .makeStringInt = 0x3147a8u,
         .rndCamCurrent = 0x3de348u,
         .defaultMat = 0x3da4f0u,
         .rndEnvironCurrent = 0x3de358u,
