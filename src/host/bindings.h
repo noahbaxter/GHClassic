@@ -16,6 +16,8 @@
 // An action takes any number of sources, comma separated, and is held when
 // any of them is. Whammy takes the largest amount.
 
+#include "host/input.h"
+
 #include <array>
 #include <cstdint>
 #include <map>
@@ -39,6 +41,27 @@ namespace gh2::input
         kTilt,
         kWhammy,
         kActionCount,
+    };
+
+    // Each action's name, in input.ini and in scripts, and the libpad button
+    // it presses on the guitar. Whammy is the left stick and presses none.
+    struct ActionInfo
+    {
+        const char *name;
+        uint16_t button;
+    };
+    inline constexpr ActionInfo kActions[kActionCount] = {
+        {"green", pad::kR2},
+        {"red", pad::kCircle},
+        {"yellow", pad::kTriangle},
+        {"blue", pad::kCross},
+        {"orange", pad::kSquare},
+        {"strum_up", pad::kUp},
+        {"strum_down", pad::kDown},
+        {"start", pad::kStart},
+        {"star_power", pad::kSelect},
+        {"tilt", pad::kL2},
+        {"whammy", 0},
     };
 
     struct Source

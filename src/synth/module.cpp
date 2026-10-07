@@ -333,6 +333,9 @@ namespace gh2::synth
     void Module::writeRam(uint32_t address, const uint8_t *data, uint32_t len)
     {
         std::lock_guard<std::mutex> lock(m_mutex);
+        // A voice whose stop is still queued (CtlClientPoll) would play the
+        // new bytes: retail's upload goes through that queue, behind it.
+        m_spu.silence(address, len);
         m_spu.write(address, data, len);
     }
 
@@ -361,9 +364,11 @@ namespace gh2::synth
         case 0x3: // sceSdEffectAttr {core, mode, s16 depthL, s16 depthR, delay, feedback}
             m_spu.reverb(u32(d, 0)).setMode(u32(d, 4));
             m_spu.reverb(u32(d, 0)).setDepth(s16(d, 8), s16(d, 10));
+            m_spu.reverb(u32(d, 0)).setEcho(s32(d, 12), s32(d, 16));
             break;
         case 0x4: // the same, for depth, delay and feedback only
             m_spu.reverb(u32(d, 0)).setDepth(s16(d, 8), s16(d, 10));
+            m_spu.reverb(u32(d, 0)).setEcho(s32(d, 12), s32(d, 16));
             break;
         case 0x5: // effect chain: new voices on core 1
             m_voicesOnCore1 = u32(d, 0) != 0u;
@@ -540,6 +545,9 @@ namespace gh2::synth
                 slipJump(*s, ch, s32(d, 8));
             else if (cmd == 0x19c)
             {
+                // Not slipping, the reference is this voice too.
+                if (!ch.slip)
+                    ch.reference = -1;
                 freeVoice(ch.main);
                 ch.main = -1;
             }
@@ -729,6 +737,9 @@ namespace gh2::synth
             return;
         freeVoice(ch.main);
         ch.main = -1;
+        // Not slipping, the reference is the heard voice: it follows the new one.
+        if (!ch.slip)
+            ch.reference = -1;
         const uint32_t from = ch.readAt / kAdpcmBlockBytes * kAdpcmBlockBytes;
         if (from < ch.base || from >= ch.base + ch.blocks * kBlockBytes)
             return;
@@ -745,6 +756,8 @@ namespace gh2::synth
             return;
         m_spu.setLoop(static_cast<uint32_t>(ch.main), ch.base);
         keyOn(ch.main);
+        if (!ch.slip)
+            ch.reference = ch.main;
     }
 
     // 0x32a8: 16-byte lines played, from the NAX the last refill read.

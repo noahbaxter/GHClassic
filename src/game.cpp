@@ -28,7 +28,9 @@
 #include "dev/transplant.h"
 #include "synth/synth.h"
 #include "settings/video_options.h"
+#include "sustain_release.h"
 #include "track_start.h"
+#include "whammy_hold.h"
 
 namespace
 {
@@ -47,6 +49,8 @@ namespace
         gh2::installSynth(runtime, gh2::kSlus21447);
         gh2::installMetaMusic(runtime, gh2::kSlus21447);
         gh2::installTrackStart(runtime, gh2::kSlus21447);
+        gh2::installSustainRelease(runtime, gh2::kSlus21447);
+        gh2::installWhammyHold(runtime, gh2::kSlus21447);
         gh2::installMovies(runtime, gh2::kSlus21447);
         gh2::installVideoOptions(runtime, gh2::kSlus21447);
         gh2::card::install(runtime, gh2::kSlus21447);

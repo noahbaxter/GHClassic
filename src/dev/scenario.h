@@ -10,6 +10,8 @@
 //   (print {game get_character} ...)   each value, to stderr
 //   (expect {player0 score} 158678)    fails the run unless the value matches
 //   (expect {taskmgr seconds} 33.47 0.1)  or, numbers, is within the third
+//   (press green)                      a fret's colour, up, down, left or right,
+//                                      pressed and let go as a player would
 //   (clock 100)                        the UI clock runs from there, 1/64 s a poll
 //   (freeze 103 2.5 3.9)               holds TaskMgr's UI seconds (once a clock
 //                                      reaches them), seconds and beat there,
@@ -25,7 +27,8 @@
 //
 // A wait_screen or wait_until that takes more than 30 s, or the seconds
 // given after its screen or condition, fails the run and quits, as does the
-// UI going 8 s without a poll, after naming what each thread waits on.
+// UI going 8 s without a poll, after naming what each thread waits on and,
+// for one still running, the code and scripts on its stack.
 // {ghc_log ...} prints values and their types from any script.
 
 #include "addresses.h"

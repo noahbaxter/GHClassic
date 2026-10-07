@@ -7,9 +7,12 @@
 #include "movie/screen.h"
 
 #include "host/audio.h"
+#include "host/bindings.h"
 #include "host/input.h"
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
+#include "runtime/ee_scheduler.h"
+#include "runtime/host_clock.h"
 #include "runtime/ps2_disc_image.h"
 
 #include <algorithm>
@@ -275,7 +278,8 @@ namespace gh2
                 if (m_done)
                     return true;
                 const uint16_t pressed = hostPad().pressed;
-                const bool skip = Clock::now() >= m_skipAfter && (pressed & pad::kR2) && !(pressed & pad::kStart);
+                const bool skip = Clock::now() >= m_skipAfter && (pressed & input::kActions[input::kGreen].button) &&
+                                  !(pressed & input::kActions[input::kStart].button);
                 m_done = skip || m_runtime.isStopRequested();
                 return m_done;
             }
@@ -319,7 +323,11 @@ namespace gh2
             if (disc && disc->find(path, extent) && !extent.isDir)
             {
                 std::cerr << "[movie] playing " << path << std::endl;
+                // The game stands still for the movie and has none of that
+                // time to make up after it.
+                const auto began = ps2x::host_clock::now();
                 Player(*disc, extent, minSkipSeconds, *runtime).run();
+                runtime->eeScheduler().dropHostTime(ps2x::host_clock::now() - began);
                 result = 1;
             }
             else

@@ -53,9 +53,12 @@ class FileFrames:
 
 def _chdr():
     """libchdr as a ctypes library, built from lib/libchdr the first time."""
-    # is_file drops symlinks left dangling by a build that never finished.
-    libs = [p for pattern in ("libchdr*.dylib", "libchdr*.so*", "*chdr*.dll")
-            for p in CHDR_BUILD.glob(pattern) if p.is_file()]
+    def built():
+        # is_file drops symlinks left dangling by a build that never finished.
+        return [p for pattern in ("libchdr*.dylib", "libchdr*.so*", "*chdr*.dll")
+                for p in CHDR_BUILD.glob(pattern) if p.is_file()]
+
+    libs = built()
     if not libs:
         print("building libchdr", file=sys.stderr)
         subprocess.run(["cmake", "-S", str(CHDR_SRC), "-B", str(CHDR_BUILD),
@@ -63,7 +66,9 @@ def _chdr():
                         "-DCHDR_WANT_TESTS=OFF"], check=True, capture_output=True)
         subprocess.run(["cmake", "--build", str(CHDR_BUILD), "--target", "chdr"],
                        check=True, capture_output=True)
-        return _chdr()
+        libs = built()
+        if not libs:
+            sys.exit(f"libchdr built no library in {CHDR_BUILD}")
     lib = ctypes.CDLL(str(sorted(libs)[0]))
     lib.chd_open.argtypes = [ctypes.c_char_p, ctypes.c_int, ctypes.c_void_p,
                              ctypes.POINTER(ctypes.c_void_p)]

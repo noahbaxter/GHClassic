@@ -15,11 +15,6 @@ namespace gh2::input
 {
     namespace
     {
-        const char *const kActionKeys[kActionCount] = {
-            "green", "red", "yellow", "blue", "orange", "strum_up", "strum_down",
-            "start", "star_power", "tilt", "whammy",
-        };
-
         struct HatName
         {
             const char *name;
@@ -68,13 +63,13 @@ namespace gh2::input
         // The file key for an action: "green", "strum_up", ...
         const char *actionKey(Action action)
         {
-            return action < kActionCount ? kActionKeys[action] : "";
+            return action < kActionCount ? kActions[action].name : "";
         }
 
         std::optional<Action> actionFromKey(const std::string &key)
         {
             for (int a = 0; a < kActionCount; ++a)
-                if (key == kActionKeys[a])
+                if (key == kActions[a].name)
                     return static_cast<Action>(a);
             return std::nullopt;
         }
@@ -304,7 +299,7 @@ namespace gh2::input
             out << "\n[" << section << "]\n";
             for (int a = 0; a < kActionCount; ++a)
             {
-                out << "; " << kActionKeys[a] << " =";
+                out << "; " << kActions[a].name << " =";
                 for (size_t i = 0; i < profile[a].size(); ++i)
                     out << (i == 0 ? " " : ", ") << formatSource(profile[a][i]);
                 out << "\n";
