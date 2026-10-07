@@ -11,6 +11,15 @@
    (needs career)
    (enter {cm_status.lbl set_localized_text {localize {campaign get_cur_status_sym}}}))
 
+; GH1 has no sponsors: a new career goes straight to its hub.
+(sel_guitar_new_screen
+   (= goto_career
+      {game set_guitar {sel_guitar_panel get_selected_guitar 0} {sel_guitar_panel get_selected_skin 0}}
+      {do
+         ($new_campaign {campaign new_campaign})
+         {campaign set_character_info}
+         {if_else $new_campaign {autosave_goto career_screen} {ui goto_screen career_screen}}}))
+
 ; GH1's map has six venues, each button here GH2's for the venue standing in
 ; (gh1/songs.h).
 (sel_venue_screen
