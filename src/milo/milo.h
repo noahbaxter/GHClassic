@@ -37,6 +37,9 @@ namespace gh2::milo
 
     std::optional<Dir> parse(const Bytes &raw);
 
+    // A scene file's objects, packed or not (GH1's .gh files are not).
+    std::optional<Dir> read(const Bytes &file);
+
     // One more object, its string table hints grown to fit its names.
     void add(Dir &dir, const std::string &className, const std::string &name, Bytes body);
 

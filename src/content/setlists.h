@@ -14,6 +14,7 @@
 
 #include "addresses.h"
 #include "formats/dtb.h"
+#include "milo/milo.h"
 
 #include <array>
 #include <string>
@@ -44,6 +45,10 @@ namespace gh2::setlists
     // `required`, its career's, an encore opens as that career opens it.
     void add(const std::string &name, std::vector<Tier> tiers, const std::string &look,
              const std::array<std::string, 5> &scoreNames, Required required = {});
+
+    // That game's song list scene, served at <game>/ui/sel_song_quickplay.milo
+    // and turning with the menus as the game's own does.
+    void addLook(const std::string &game, milo::Dir scene);
 
     // A game's career songs: its tiers' own, without the store's.
     std::vector<std::string> careerSongs(const std::string &name);

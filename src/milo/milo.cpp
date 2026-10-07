@@ -276,6 +276,12 @@ namespace gh2::milo
         return std::nullopt;
     }
 
+    std::optional<Dir> read(const Bytes &file)
+    {
+        const auto raw = inflate(file);
+        return parse(raw ? *raw : file);
+    }
+
     Bytes write(const Dir &dir)
     {
         Bytes raw;

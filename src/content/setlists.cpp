@@ -7,6 +7,7 @@
 #include "disc/ark.h"
 #include "formats/dtb.h"
 #include "guest.h"
+#include "milo/milo.h"
 #include "save/save.h"
 #include "script.h"
 
@@ -31,6 +32,7 @@ namespace gh2::setlists
         };
 
         constexpr const char *kOwnLook = "ui/sel_song_quickplay.milo";
+        constexpr const char *kOwnScene = "ui/gen/sel_song_quickplay.milo_ps2"; // that, as the disc keeps it
         constexpr int kBands = 8; // the save's band slots
 
         const Addresses *s_addresses = nullptr;
@@ -268,6 +270,16 @@ namespace gh2::setlists
         s_setlists[name] = {std::move(tiers), look, std::move(required)};
     }
 
+    // A scene names the menus' camera beside it (../metacam.milo), which
+    // under <game>/ is another camera than the one the screens turn
+    // (GHScreen::AnimateTransition, 0x145e18). From the ARK root it is the
+    // same one.
+    void addLook(const std::string &game, milo::Dir scene)
+    {
+        milo::replacePrefix(scene, "../metacam.milo", "../../../ui/metacam.milo");
+        ark::addFile(game + "/" + kOwnScene, milo::write(scene));
+    }
+
     Required required(const dtb::Node &campaign)
     {
         Required out;
@@ -341,6 +353,9 @@ namespace gh2::setlists
         // Its archive whole under <game>/, so its song list scene finds what
         // it refers to on its own disc.
         ark::rename(game + "/", disc, "");
+        const auto file = ark::readFile(disc, kOwnScene);
+        if (const auto scene = file ? milo::read(*file) : std::nullopt)
+            addLook(game, *scene);
         std::array<std::string, 5> scoreNames;
         for (size_t i = 0; i < scoreNames.size(); ++i)
             scoreNames[i] = text("highscore_dummy_" + std::to_string(i));
