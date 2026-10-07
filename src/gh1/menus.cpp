@@ -154,9 +154,10 @@ namespace gh2::gh1
             return {};
         }
         // GH1's names for a band's status, which the game finds by number
-        // (status_%d), and the lines its newspapers take a name into.
+        // (status_%d), the lines its newspapers take a name into, and the
+        // line its win screen takes the difficulty into.
         for (const auto &[token, string] : look->strings)
-            if (token.rfind("status_", 0) == 0)
+            if (token.rfind("status_", 0) == 0 || token == "win_diff")
                 text[token] = string;
         // Each character's photo for those newspapers, by GH2's name for
         // the character, for the script to load (menus.dta).

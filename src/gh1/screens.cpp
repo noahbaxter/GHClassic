@@ -114,6 +114,13 @@ namespace gh2::gh1
                          {"lose_restart.btn", "lose_restart_normal.btn"},
                          {"lose_selsong.btn", "lose_selsong_normal.btn"},
                          {"lose_quit.btn", "lose_quit_normal.btn"}}},
+            // GH1 has one screen for beating medium, hard and expert,
+            // where GH2 has a letter for each (endgame.dta's
+            // win_game_panel).
+            {"win_game", "win_medium"},
+            {"win_game", "win_hard"},
+            {"win_game", "win_expert"},
+            {"win_easy"},
         };
         return kScreens;
     }
