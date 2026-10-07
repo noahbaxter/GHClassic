@@ -273,7 +273,9 @@ namespace gh2::gh1
         for (size_t i = 0; i < scoreNames.size(); ++i)
             if (const dtb::Node *name = value(*strings, "highscore_dummy_" + std::to_string(i)))
                 scoreNames[i] = name->text;
-        setlists::add("gh1", std::move(tiers), "ui/sel_song_quickplay.milo", scoreNames, setlists::required(*campaign));
+        // In its own setlist scene, as GH2's (gh1/menus.h).
+        setlists::add("gh1", std::move(tiers), "gh1/ui/sel_song_quickplay.milo", scoreNames,
+                      setlists::required(*campaign));
         // Its campaign.dta asks a venue only for a count of songs.
         encores::none("gh1");
         std::cerr << "[gh1] " << count << " songs converted" << std::endl;

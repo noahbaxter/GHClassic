@@ -23,6 +23,7 @@ namespace gh2
     void installMenus(PS2Runtime &)
     {
         script::addCommand("quit_app", quitApp);
+        script::patchUi(kPickerDta);
         script::patchUi(kMainMenuDta);
         script::patchUi(kHighscorePanelDta);
         script::patchUi(kSelCharacterDta);
@@ -33,6 +34,8 @@ namespace gh2
         locale::add("campaign_gh2", "GUITAR HERO II");
         locale::add("campaign_gh2x", "GUITAR HERO II XBOX 360");
         locale::add("campaign_gh80s", "ROCKS THE 80S");
+        locale::add("ghc_theme", "THEME");
+        locale::add("ghc_setlist", "SETLIST");
         locale::add("setlist_gh1", "GH1");
         locale::add("setlist_gh2", "GH2");
         locale::add("setlist_gh2x", "360");

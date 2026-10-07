@@ -15,12 +15,17 @@
 //               the root config and the UI's lists of them
 //   text        GH2's locale with GH1's names and blurbs for the venues,
 //               characters, videos, songs and tips
+//   menus       GH1's screens and their text (gh1/menus.h), under GH2's
+//               scripts fitted to them
+//   music       GH1's menu loops
 
 #include "gh1/career.h"
 
 #include "content/campaigns.h"
 #include "disc/ark.h"
 #include "formats/dtb.h"
+#include "gh1/menu_scripts.h"
+#include "gh1/menus.h"
 #include "gh1/songs.h"
 
 #include <algorithm>
@@ -235,10 +240,19 @@ namespace gh2::gh1
             general->nodes.insert(general->nodes.end(), theirTips->nodes.begin(), theirTips->nodes.end());
         }
 
-        // Characters, in the root config and the UI's lists.
+        // Characters, in the root config and the UI's lists, in the order
+        // GH1's hero screen steps through them (its career.dta's
+        // navigator): its first two are the players' defaults (main.dta).
+        static const char *const kOrder[] = {"metal", "classic", "alterna", "hair_metal",
+                                             "punk",  "nu_metal", "hiphop",  "grim"};
+        std::vector<Guitarist> ordered;
+        for (const char *folder : kOrder)
+            for (const Guitarist &g : guitarists)
+                if (std::string(g.folder) == folder)
+                    ordered.push_back(g);
         dtb::Node config = array({symbol("characters")}), all = array({}), outfits = array({});
         std::string first, second;
-        for (const Guitarist &g : guitarists)
+        for (const Guitarist &g : ordered)
         {
             config.nodes.push_back(array({symbol(g.character), array({symbol(g.name())})}));
             all.nodes.push_back(symbol(g.character));
@@ -270,11 +284,22 @@ namespace gh2::gh1
                 continue;
             const std::string key = keyOf(entry);
             const std::string stem = key.substr(0, key.rfind("_shop_desc") == std::string::npos ? key.size() : key.rfind("_shop_desc"));
+            // The tips, the videos, the store's songs, its headings and each
+            // category's blurb keep their names.
+            static const std::set<std::string> kStore = {"category_cost", "guitar_shop_desc", "skin_shop_desc",
+                                                         "song_shop_desc", "character_shop_desc"};
+            const auto starts = [&](const char *with) { return key.rfind(with, 0) == 0; };
             if (const auto as = renamed(key, names))
                 text[*as] = entry.nodes[1].text;
-            else if (key.rfind("loading_tip", 0) == 0 || key.rfind("video", 0) == 0 || songs.count(stem) != 0u)
+            else if (starts("loading_tip") || starts("video") || starts("store_") || songs.count(stem) != 0u ||
+                     kStore.count(key) != 0u)
                 text[key] = entry.nodes[1].text;
+            // What the store says of a guitar, by GH2's name for that body.
+            else if (stem != key && dtb::find(*theirGuitars, stem) != nullptr && bodies.count(body(stem)) != 0u)
+                text[body(stem) + "_shop_desc"] = entry.nodes[1].text;
         }
+        const size_t layer = ark::addLayer(std::nullopt);
+        const std::set<std::string> scenes = addMenus(layer, disc, text);
         for (dtb::Node &entry : locale->nodes)
             if (const auto it = text.find(keyOf(entry)); entry.type == dtb::kArray && entry.nodes.size() > 1u && it != text.end())
             {
@@ -284,21 +309,53 @@ namespace gh2::gh1
         for (const auto &[key, value] : text)
             locale->nodes.push_back(array({symbol(key), {dtb::kString, 0, 0.0f, value, {}}}));
 
-        const size_t layer = ark::addLayer(std::nullopt);
         ark::addFile(layer, "config/gen/gh2.dtb", dtb::write(*root));
         ark::addFile(layer, "config/gen/campaign.dtb", dtb::write(*campaign));
         ark::addFile(layer, "config/gen/store.dtb", dtb::write(store));
         ark::addFile(layer, "config/gen/guitars.dtb", dtb::write(*guitars));
         ark::addFile(layer, "config/gen/tips.dtb", dtb::write(*tips));
+        // GH1's credits, which the credits screen reads as it opens
+        // (CreditsPanel::Load, 0x143bd8).
+        if (const auto credits = dtb::read("config/credits.dta", none, theirs))
+            ark::addFile(layer, "config/gen/credits.dtb", dtb::write(*credits));
+        // Menu music: GH1's loops, which its disc has under their own names
+        // (sfx/streams), streamed as GH1 plays them: they are twice the size
+        // of the loops GH2 holds in memory.
+        auto synth = raw("config/gen/synth.dtb");
+        const auto theirSynth = dtb::read("config/synth.dta", none, theirs);
+        const dtb::Node *theirMusic = theirSynth ? dtb::find(*theirSynth, "metamusic") : nullptr;
+        const dtb::Node *loops = theirMusic ? dtb::find(*theirMusic, "music") : nullptr;
+        if (dtb::Node *music = synth ? child(*synth, "metamusic") : nullptr; music && loops)
+        {
+            if (dtb::Node *n = child(*music, "music"))
+                *n = *loops;
+            if (dtb::Node *n = child(*music, "play_from_memory"); n && n->nodes.size() > 1u)
+                n->nodes[1] = {dtb::kInt, 0, 0.0f, {}, {}};
+            ark::addFile(layer, "config/gen/synth.dtb", dtb::write(*synth));
+        }
         ark::addFile(layer, "ui/gen/ui.dtb", dtb::write(*ui));
         ark::addFile(layer, "ui/eng/gen/locale.dtb", dtb::write(*locale));
-        // The outfits GH2's screens name: the main menu's two defaults and
-        // the difficulty screen's guitarist.
-        for (const char *script : {"ui/gen/main.dtb", "ui/gen/career.dtb"})
-            if (auto file = raw(script))
+        // GH2's screens' scripts (ui/init.dta includes each), fitted to GH1's
+        // screens, and with the outfits they name: the main menu's two
+        // defaults and the difficulty screen's guitarist.
+        if (const auto init = raw("ui/gen/init.dtb"))
+            for (const dtb::Node &include : init->nodes)
             {
-                replaceSymbol(*file, "punk1", first);
-                replaceSymbol(*file, "rockabill1", second.empty() ? first : second);
+                if (include.type != dtb::kInclude)
+                    continue;
+                const std::string name = include.text.substr(0, include.text.rfind('.'));
+                const std::string script = "ui/gen/" + name + ".dtb";
+                auto file = raw(script);
+                if (!file)
+                    continue;
+                const bool fitted = fitScript(*file, scenes);
+                if (name == "main" || name == "career")
+                {
+                    replaceSymbol(*file, "punk1", first);
+                    replaceSymbol(*file, "rockabill1", second.empty() ? first : second);
+                }
+                else if (!fitted)
+                    continue;
                 ark::addFile(layer, script, dtb::write(*file));
             }
         // The store shows a character it sells by the character's name, as

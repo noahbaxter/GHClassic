@@ -1,0 +1,140 @@
+; GH1's campaign shows GH1's own screens past the ones menus_gh1 walks: the
+; store and an item of each kind, a status newspaper, pause and song failed
+; in a song, the settings and band screens, its two-player hero screen, its
+; win screen's two pages on expert, and its credits. Each is driven by the
+; buttons GH2's script gives it.
+(needs gh1)
+#include common/first_boot.dta
+{set $pick gh1}
+#include common/career_start.dta
+
+; The store: GH1's poster for the category, then a guitar, a song and a
+; character in its window.
+{ui goto_screen store_screen}
+(wait_screen store_screen 40)
+(wait 3)
+(shot store)
+(expect {{store_panel loaded_dir} exists st_poster_guitar.mat} 1)
+(expect {store_panel get category} guitar)
+(press green)
+(wait 4)
+(shot store_guitar)
+(press red)
+(wait 2)
+(press down)
+(press down)
+(press green)
+(wait 4)
+(shot store_song)
+(press red)
+(wait 2)
+(press down)
+(press green)
+(wait 6)
+(shot store_character)
+(expect {store_panel get category} character)
+
+; A status newspaper, with the band's name in its headline.
+{ui goto_screen status_screen}
+(wait_screen status_screen 40)
+(wait 4)
+(shot status)
+(expect {{status_panel loaded_dir} exists status_char1.tex} 1)
+
+; In a song: pause's five rows round, the lost controller's screen, then
+; song failed and its Quit to the main menu.
+{ui goto_screen career_screen}
+(wait_screen career_screen 40)
+(press green)
+(wait_screen sel_venue_screen 40)
+(wait 1.5)
+(press green)
+(wait_screen sel_song_screen)
+(wait 2)
+(press green)
+(wait_screen game_screen 60)
+(wait 2)
+{ui goto_screen pause_screen}
+(wait_screen pause_screen 20)
+(wait 2)
+(shot pause)
+(expect {{pause_panel loaded_dir} exists video_options.btn} 1)
+(press down)
+(press down)
+(press down)
+(press down)
+(press down)
+(wait 1)
+(press green)
+(wait_screen game_screen 20)
+(wait 1)
+{ui goto_screen pause_controller_screen}
+(wait_screen pause_controller_screen 20)
+(wait 2)
+(shot pause_controller)
+{pause_controller_screen resume}
+(wait_screen game_screen 20)
+(wait_screen lose_screen 90)
+(wait 3)
+(shot lose)
+(expect {{lose_panel find normal_buttons.view} showing} 1)
+(press down)
+(press down)
+(press green)
+
+; Settings: the audio screen's sliders and tick box, the memory card
+; screen's three rows, and a band's two.
+(wait_screen main_screen 60)
+{ui goto_screen audio_settings_screen}
+(wait_screen audio_settings_screen 20)
+(wait 2)
+(shot audio_settings)
+(expect {{audio_settings_panel find gs_left_p1.btn} showing} 0)
+{ui goto_screen mem_card_screen}
+(wait_screen mem_card_screen 20)
+(wait 2)
+(shot data_settings)
+(expect {{mem_card_panel find ds_rename.btn} showing} 0)
+{ui goto_screen options_chooseprof_screen}
+(wait_screen options_chooseprof_screen 20)
+(wait 1)
+(press green)
+(wait_screen manage_band_screen 20)
+(wait 2)
+(shot manage_band)
+(expect {{manage_band_panel find cp_band2.btn} showing} 0)
+
+; The credits are GH1's.
+{ui goto_screen main_screen}
+(wait_screen main_screen 20)
+{ui goto_screen credits_screen}
+(wait_screen credits_screen 20)
+(wait 10)
+(shot credits)
+
+; Two players: each on GH1's own default, lit on the wall.
+{ui goto_screen main_screen}
+(wait_screen main_screen 20)
+(expect {game get_character_outfit} metalgh1)
+{ui goto_screen multi_sel_character_screen}
+(wait_screen multi_sel_character_screen 30)
+(wait 8)
+(shot multi_sel_character)
+(expect {{multi_sel_character_panel find sc_char_metal_focus_p1.view} showing} 1)
+(expect {{multi_sel_character_panel find sc_char_classic_focus_p2.view} showing} 1)
+
+; Beating expert: the win screen, then the Battleaxe's page. Last: the win
+; screen holds a venue.
+{ui goto_screen main_screen}
+(wait_screen main_screen 20)
+{{game get_player_config 0} set_difficulty kDifficultyExpert}
+{ui goto_screen win_game_screen}
+(wait_screen win_game_screen 20)
+(wait 8)
+(shot win)
+(expect {{win_game_panel find win_screen1.view} showing} 1)
+(press green)
+(wait 5)
+(shot win_battleaxe)
+(expect {{win_game_panel find win_screen2.view} showing} 1)
+(quit)

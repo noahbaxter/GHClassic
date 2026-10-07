@@ -1,0 +1,207 @@
+; GH2's screens in GH1's campaign (gh1/menu_scripts.cpp): for each of these
+; objects of GH2's UI scripts, what a handler gains after its own commands,
+; or with = what stands in place of it. One that (needs ...) scenes, by
+; GH2's names for them, is left alone unless GH1's are there (gh1/menus.cpp).
+
+; A career.
+
+; GH1's hub names the band's status (RndLabelEx cm_status.lbl, GH1's
+; career.dta).
+(career_panel
+   (needs career)
+   (enter {cm_status.lbl set_localized_text {localize {campaign get_cur_status_sym}}}))
+
+; GH1 has no sponsors: a new career goes straight to its hub.
+(sel_guitar_new_screen
+   (= goto_career
+      {game set_guitar {sel_guitar_panel get_selected_guitar 0} {sel_guitar_panel get_selected_skin 0}}
+      {do
+         ($new_campaign {campaign new_campaign})
+         {campaign set_character_info}
+         {if_else $new_campaign {autosave_goto career_screen} {ui goto_screen career_screen}}}))
+
+; GH1's map has six venues, each button here GH2's for the venue standing in
+; (gh1/songs.h).
+(sel_venue_screen
+   (needs sel_venue)
+   (= FOCUS_MSG
+      {if {! {ui in_transition}}
+         {switch $new_focus
+            (sv_battle.btn {$this set_venue_map_frame 1} {game set_venue battle})
+            (sv_small1.btn {$this set_venue_map_frame 2} {game set_venue small1})
+            (sv_big.btn {$this set_venue_map_frame 3} {game set_venue big})
+            (sv_theatre.btn {$this set_venue_map_frame 4} {game set_venue theatre})
+            (sv_fest.btn {$this set_venue_map_frame 5} {game set_venue fest})
+            (sv_arena.btn {$this set_venue_map_frame 6} {game set_venue arena})}}))
+
+; GH1's letter is to the band by name, and lists seven deductions where the
+; game counts five (CashAwardScreen's set_deduction).
+(cashaward_panel
+   (needs cashaward)
+   (enter
+      {ca_bandname.lbl set_localized_text {campaign profile_name {campaign profile_slot}}}
+      {ca_blurb6.lbl set_showing FALSE}
+      {ca_num6.lbl set_showing FALSE}
+      {ca_blurb7.lbl set_showing FALSE}
+      {ca_num7.lbl set_showing FALSE}))
+
+; GH1's newspaper for a new status has the character's photo, lines that
+; take the band's name, and lines that are the character's (GH1's
+; endgame.dta, its status panel's text).
+(status_panel
+   (needs sponsorship1 sponsorship2 sponsorship3 sponsorship4 sponsorship5 sponsorship6 sponsorship7)
+   (enter
+      {status_char1.tex set_bitmap {sprint "ui/image/gh1_status_" {game get_character} ".png"}}
+      {do
+         ($dir {$this loaded_dir})
+         ($band {campaign profile_name {campaign profile_slot}})
+         {foreach $line
+            (
+               (status_rocker_headline1.lbl status_rocker_week)
+               (status_young_bandname.lbl status_young_gun_interview)
+               (status_shredder_headline2.lbl status_shredder_changing)
+               (status_pro_headline1.lbl status_pro_goes)
+               (status_pro_headline2.lbl status_pro_piece)
+               (status_guitarhero_venue1.lbl status_guitarhero_crash)
+               (status_guitargod_headline5.lbl status_god_depart)
+               (status_guitargod_headline7.lbl status_god_drummer)
+            )
+            {if {$dir exists {elem $line 0}}
+               {{$dir find {elem $line 0}} set_localized_text {sprintf {localize {elem $line 1}} $band}}}}
+         {foreach $label
+            (
+               status_guitarhero_headline1.lbl status_guitarhero_headline5.lbl status_guitarlegend_charname.lbl
+               status_guitargod_headline3.lbl status_guitargod_status2.lbl status_guitargod_headline2.lbl
+            )
+            {if {$dir exists $label} {{$dir find $label} set_text {game get_character}}}}}))
+
+; GH1's screen for beating the game names the difficulty, and opens on the
+; first of its two pages (GH1's endgame.dta, win_game). Easy's is a letter
+; with none of these.
+(win_game_panel
+   (enter
+      {if {{$this loaded_dir} exists wg_diff.lbl}
+         {wg_diff.lbl set_localized_text {sprintf {localize win_diff} {localize {game get_difficulty_sym 0}}}}
+         {win_screen1.view set_showing TRUE}
+         {win_screen2.view set_showing FALSE}}))
+
+; Beating GH1 on expert wins the Battleaxe, on the second page of its win
+; screen (GH1's endgame.dta, display_battleaxe): green turns to it once,
+; and leaves as ever after (endgame.dta). The guitar is the band's from the
+; start here, its career's store not selling it.
+(win_game_screen
+   (= BUTTON_DOWN_MSG
+      {if {&& {$this can_continue} {== $button kPad_X}}
+         {if_else
+            {&& {== kDifficultyExpert {game get_difficulty 0}}
+               {{win_game_panel loaded_dir} exists win_screen2.view}
+               {! {{win_game_panel find win_screen2.view} showing}}}
+            {do
+               {synth play_sequence button_select}
+               {{win_game_panel find win_screen1.view} set_showing FALSE}
+               {{win_game_panel find win_screen2.view} set_showing TRUE}
+               {helpbar set_display ()}
+               {set [continue_time] {'+' {taskmgr ui_seconds} 3}}}
+            {do
+               {fade_panel start_fade 1 (color 0 0 0) (fade_synth FALSE) (fade_out TRUE)}
+               {synth play_sequence button_select}
+               {script_task (delay 1) (units kTaskUISeconds)
+                  (script
+                     {ui goto_screen
+                        {if_else {post_show_screen get pfo_newly_unlocked} unlock_pfo_screen endgame_screen}})}}}}))
+
+; The store.
+
+; The street and the room behind GH1's shop are a backdrop: by GH2's z_mode
+; 2 they are tested against what is drawn and leave no depth themselves,
+; for the shop's posts and GH2's character to draw over.
+(store_back_panel
+   (needs store_back)
+   (enter
+      {brick03.mat set z_mode 2}
+      {us_insidewalls.mat set z_mode 2}
+      {us_items.mat set z_mode 2}
+      {us_wall_posters.mat set z_mode 2}))
+
+; GH1's SOLD is a label, and its store's poster a mesh with a material for
+; each category (gh1/menus.cpp). GH2's character stands in GH1's shop
+; window: its group is moved here, where the move reaches the placer under
+; it (one written into the scene does not).
+(store_panel
+   (needs store)
+   (enter {char_placer.grp set_local_pos -28.4 -590 -37})
+   (update_store_item_sold {st_sold.lbl set_showing {campaign is_unlocked [item_name]}})
+   (update_store_category_desc
+      {st_poster.pic set_mat {$this find {sprint "st_poster_" [category] ".mat"}}}))
+
+; In a song.
+
+; GH1's row for its settings is GH2's for its audio settings, named so: a
+; word as short as the rows around it, which the row's box fits.
+(pause_panel
+   (needs pause)
+   (enter {audio_options.btn set text_token "AUDIO"}))
+
+; GH1's song failed screen has one list of buttons, in a career too.
+(lose_panel
+   (needs lose)
+   (enter
+      {normal_buttons.view set_showing TRUE}
+      {$this set_focus lose_restart_normal.btn}))
+
+; Settings.
+
+; GH1's game settings have rows for playing left handed, which are GH2's
+; video settings'.
+(audio_settings_panel
+   (needs game_settings)
+   (enter
+      {foreach $o (gs_left_p1.btn gs_left_p2.btn)
+         {{$this find $o} set_showing FALSE}
+         {$this disable {$this find $o}}}))
+
+; GH1's data settings have rows for a band's name, a new band and deleting
+; one, which are GH2's band screen's.
+(mem_card_panel
+   (needs mem_card)
+   (enter
+      {foreach $o (ds_rename.btn ds_newprof.btn ds_delprof.btn)
+         {{$this find $o} set_showing FALSE}
+         {$this disable {$this find $o}}}))
+
+; GH1's poster for deleting a band lists eight: the first two are GH2's rows
+; for one band, named so, and the rest go.
+(manage_band_panel
+   (needs manage_band)
+   (enter
+      {rename_band.btn set text_token "RENAME BAND"}
+      {delete_band.btn set text_token "DELETE BAND"}
+      {dp_title.mesh set_showing FALSE}
+      {manage_band.lbl set_showing TRUE}
+      {foreach $o (cp_band2.btn cp_band3.btn cp_band4.btn cp_band5.btn cp_band6.btn cp_band7.btn)
+         {{$this find $o} set_showing FALSE}
+         {$this disable {$this find $o}}}))
+
+; Two players.
+
+; GH1's hero screen for two lights each player's pick on the wall: a View
+; for each character and player (gh1/screens.cpp).
+(multi_sel_character_screen
+   (needs multi_sel_character)
+   (scroll_char_sel
+      {do
+         ($dir {multi_sel_character_panel loaded_dir})
+         ($all {find $syscfg characters})
+         {foreach_int $i 1 {size $all}
+            {do
+               ($c {elem {elem $all $i} 0})
+               {foreach_int $p 0 2
+                  {{$dir find {sprint "sc_char_" $c "_focus_p" {'+' $p 1} ".view"}} set_showing
+                     {== $c {{game get_player_config $p} get_character}}}}}}}))
+
+; GH1's results for two show the winner's photo (GH1's multiplayer.dta).
+(multi_compete_panel
+   (needs multi_compete)
+   (enter
+      {winner_photo0.mesh set_showing {> {player0 score} {player1 score}}}
+      {winner_photo1.mesh set_showing {< {player0 score} {player1 score}}}))

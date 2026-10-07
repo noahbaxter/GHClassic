@@ -276,6 +276,20 @@ namespace gh2::milo
         return std::nullopt;
     }
 
+    std::optional<Dir> read(const Bytes &file)
+    {
+        const auto raw = inflate(file);
+        return parse(raw ? *raw : file);
+    }
+
+    std::optional<size_t> find(const Dir &dir, const std::string &name)
+    {
+        for (size_t i = 0; i < dir.entries.size(); ++i)
+            if (dir.entries[i].second == name)
+                return i;
+        return std::nullopt;
+    }
+
     Bytes write(const Dir &dir)
     {
         Bytes raw;

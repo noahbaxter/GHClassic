@@ -1,6 +1,7 @@
 ; From the main menu to a new medium career's career screen in the campaign
 ; $pick, by the buttons a player presses: the band in slot 0, that campaign,
-; then the difficulty, character, guitar and sponsor.
+; then the difficulty, character, guitar and sponsor. GH1's campaign has no
+; sponsor: its guitar screen leads straight to the career screen.
 {gamecfg set mode career}
 {campaign set_profile_name "The Testers" 0}
 {ui goto_screen chooseprof_screen}
@@ -22,8 +23,11 @@
 (wait_screen sel_guitar_new_screen)
 (wait 3)
 (press green)
-(wait_screen tour_start_screen)
+(wait_until
+   {&& {! {ui in_transition}}
+      {|| {== {ui current_screen} tour_start_screen} {== {ui current_screen} career_screen}}} 40)
 (wait 1)
-(press green)
+; As the sponsor's own green does (career.dta).
+{if {== {ui current_screen} tour_start_screen} {autosave_goto career_screen}}
 (wait_screen career_screen 40)
 (wait 1)
