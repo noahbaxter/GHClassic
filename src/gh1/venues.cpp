@@ -809,13 +809,11 @@ namespace gh2::gh1
         // environs and lights the dirs above it name, with the materials
         // those dirs' meshes take from it (big_chars' crowd_plane.mesh has
         // ray_blocker.mat) and their textures. GH1's environs and lights
-        // come with the room, and its lighting scene's beside them. GH1's
-        // drum kit is part of the room and GH2's of its drummer, who plays
-        // here, so GH1's `kit` stays out. `unreached` gets the meshes GH1
-        // never draws, which no script is to show (fest's shows
-        // solo_beam01.mesh, GH2's dir would draw it).
+        // come with the room, and its lighting scene's beside them.
+        // `unreached` gets the meshes GH1 never draws, which no script is
+        // to show (fest's shows solo_beam01.mesh, GH2's dir would draw it).
         std::optional<milo::Dir> geom(const milo::Dir &gh2, const std::vector<const milo::Dir *> &above,
-                                      const milo::Dir &room, const milo::Dir &lighting, const std::string &kit,
+                                      const milo::Dir &room, const milo::Dir &lighting,
                                       const std::set<std::string> &scripted, Drivers &drivers,
                                       std::set<std::string> &unreached)
         {
@@ -856,7 +854,7 @@ namespace gh2::gh1
                 "LightAnim", "EnvAnim", "MeshAnim", "Flare", "ParticleSys", "ParticleSysAnim",
             };
             for (const auto &[scene, top] : {std::pair{&room, kRoom}, std::pair{&lighting, kLighting}})
-                for (Object &o : objects(*scene, kClasses, top, taken, {kit}, scripted, drivers))
+                for (Object &o : objects(*scene, kClasses, top, taken, {}, scripted, drivers))
                     if (taken.insert(o.name).second)
                     {
                         if (o.unreached)
@@ -1206,7 +1204,8 @@ namespace gh2::gh1
 
     void addVenues(size_t layer, size_t disc)
     {
-        // GH1's venues, each with the View that is its drum kit.
+        // GH1's venues, each with the View that is its drum kit: part of the
+        // room, where GH2's is its drummer's.
         static const std::pair<const char *, const char *> kVenues[] = {
             {"basement", "drum_kit.view"}, {"small_club", "drumkit.view"}, {"big_club", "drum_kit.view"},
             {"theatre", "drum_kit.view"},  {"fest", "drum_kit.view"},      {"arena", "drum kit 00.view"},
@@ -1238,8 +1237,8 @@ namespace gh2::gh1
             }
             Drivers drivers;
             std::set<std::string> unreached;
-            const auto madeGeom = geom(*gh2Geom, {&*gh2Chars, &*gh2Lights}, *room, *lighting, kit,
-                                       scripted(disc, name), drivers, unreached);
+            const auto madeGeom =
+                geom(*gh2Geom, {&*gh2Chars, &*gh2Lights}, *room, *lighting, scripted(disc, name), drivers, unreached);
             const Spots at = spots({&*lighting, &*room});
             Stage stage;
             auto madeChars = chars(*gh2Chars, at, stage.walks);
@@ -1267,7 +1266,7 @@ namespace gh2::gh1
             for (const auto &e : madeGeom->entries)
                 if (!unreached.count(e.second))
                     present.insert(e.second);
-            addScripts(layer, disc, name, ours, drivers, present);
+            addScripts(layer, disc, name, ours, drivers, present, kit);
             // GH1's crowd streams, which the type names (gh1/scripts.cpp).
             // What is not made here is the stand-in's: its sound bank and
             // encore streams.

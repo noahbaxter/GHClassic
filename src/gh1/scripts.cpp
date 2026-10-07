@@ -537,7 +537,7 @@ namespace gh2::gh1
     }
 
     void addScripts(size_t layer, size_t disc, const std::string &gh1, const std::string &gh2, const Drivers &drivers,
-                    const std::set<std::string> &objects)
+                    const std::set<std::string> &objects, const std::string &kit)
     {
         const std::string path = "world/" + gh2 + "/gen/" + gh2 + ".dtb";
         const auto file = ark::readFile(0u, path);
@@ -613,6 +613,8 @@ namespace gh2::gh1
             if (objects.count(view))
                 scene.nodes.push_back(command({symbol(view), symbol("set"), symbol("draw_order"), real(order)}));
         scene.nodes.push_back(command({{dtb::kVar, 0, 0.0f, "this", {}}, symbol("sync_objects")}));
+        if (objects.count(kit))
+            scene.nodes.push_back(command({symbol(kit), symbol("set_showing"), command({symbol("band"), symbol("room_kit")})}));
         for (const char *top : {"venue.view", "lighting.view"})
             if (const auto it = drivers.find(top); it != drivers.end())
                 for (const std::string &driver : it->second)

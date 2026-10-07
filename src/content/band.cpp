@@ -8,6 +8,7 @@
 
 #include <cstring>
 #include <map>
+#include <set>
 #include <unordered_map>
 #include <utility>
 
@@ -15,7 +16,12 @@ namespace gh2::band
 {
     namespace
     {
-        std::map<std::pair<std::string, std::string>, std::string> s_own; // by game and member
+        struct Own
+        {
+            std::string away, home;
+        };
+        std::map<std::pair<std::string, std::string>, Own> s_own; // by game and member
+        std::set<std::string> s_roomKits;                         // the games with a home drummer
         std::unordered_map<std::string, uint32_t> s_symbols;
 
         std::string game()
@@ -41,16 +47,18 @@ namespace gh2::band
             const char *character = reinterpret_cast<const char *>(getMemPtr(rdram, GPR_U32(ctx, 6)));
             if (s_own.empty() || std::strncmp(object, "guitarist", 9u) == 0)
                 return;
-            const auto own = s_own.find({game(), character});
+            const std::string from = game();
+            const auto own = s_own.find({from, character});
             if (own == s_own.end())
                 return;
-            auto symbol = s_symbols.find(own->second);
+            const std::string &name = campaigns::active() == from ? own->second.home : own->second.away;
+            auto symbol = s_symbols.find(name);
             if (symbol == s_symbols.end())
             {
                 const R5900Context saved = *ctx;
-                const uint32_t made = script::symbol(rdram, ctx, runtime, own->second);
+                const uint32_t made = script::symbol(rdram, ctx, runtime, name);
                 *ctx = saved;
-                symbol = s_symbols.emplace(own->second, made).first;
+                symbol = s_symbols.emplace(name, made).first;
             }
             SET_GPR_U32(ctx, 6, symbol->second);
         }
@@ -60,6 +68,11 @@ namespace gh2::band
 
         script::Node bandCommand(const script::Call &call)
         {
+            if (call.symbol(1) == "room_kit")
+            {
+                const std::string from = game();
+                return {s_roomKits.count(from) != 0u && campaigns::active() == from ? 1u : 0u, script::kInt};
+            }
             if (call.symbol(1) == "from" && call.size() > 2)
                 for (int i = 0; i < 3; ++i)
                     if (call.symbol(2) == kFrom[i])
@@ -69,9 +82,11 @@ namespace gh2::band
         }
     }
 
-    void add(const std::string &game, const std::string &member, const std::string &own)
+    void add(const std::string &game, const std::string &member, const std::string &own, const std::string &home)
     {
-        s_own[{game, member}] = own;
+        s_own[{game, member}] = {own, home.empty() ? own : home};
+        if (!home.empty())
+            s_roomKits.insert(game);
     }
 
     void install(PS2Runtime &runtime, const Addresses &addresses)

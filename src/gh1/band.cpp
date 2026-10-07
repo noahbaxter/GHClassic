@@ -188,7 +188,7 @@ namespace gh2::gh1
         for (const Member &member : kMembers)
         {
             const std::string name = member.name, ours = name + "gh1";
-            const std::string theirs = "charsys/" + name + "/gen/", gh2Dir = "char/" + name + "/", dir = "char/" + ours + "/";
+            const std::string theirs = "charsys/" + name + "/gen/", gh2Dir = "char/" + name + "/";
             const auto gh1 = load(theirs + name + ".rnd_ps2");
             const auto face = *member.face ? load(theirs + member.face + ".rnd_ps2") : std::optional(milo::Dir{});
             const auto gh2 = load(gh2Dir + "og/gen/" + name + ".milo_ps2");
@@ -200,13 +200,31 @@ namespace gh2::gh1
             }
             milo::Dir outfit = graft(*gh2, *gh1, *face, ours);
             hideUnviewed(outfit, *gh1);
-            ark::addFile(dir + "og/gen/" + ours + ".milo_ps2", milo::write(outfit));
-            // The outfit names its clips beside itself (../../anims/<set>_main.milo).
-            ark::addFile(dir + "anims/gen/" + member.set + "_main.milo_ps2", *clips);
-            // The rest is GH2's: the horse head's outfit, the singers' visemes.
-            ark::rename(dir + "og/gen/" + ours, gh2Disc, gh2Dir + "og/gen/" + name);
-            ark::rename(dir, gh2Disc, gh2Dir);
-            band::add("gh1", name, ours);
+            // GH2's drummer loads the venue's kit (drums.outfit). GH1's kit
+            // is its room's (gh1/venues.cpp), so there its drummer has none.
+            milo::Dir seated = outfit;
+            seated.entries.clear();
+            seated.bodies.clear();
+            for (size_t i = 0; i < outfit.entries.size(); ++i)
+                if (outfit.entries[i].first != "OutfitLoader")
+                {
+                    seated.entries.push_back(outfit.entries[i]);
+                    seated.bodies.push_back(outfit.bodies[i]);
+                }
+            const std::string home = seated.entries.size() != outfit.entries.size() ? ours + "_room" : std::string();
+            for (const std::string &as : {ours, home})
+            {
+                if (as.empty())
+                    continue;
+                const std::string dir = "char/" + as + "/";
+                ark::addFile(dir + "og/gen/" + as + ".milo_ps2", milo::write(as == ours ? outfit : seated));
+                // The outfit names its clips beside itself (../../anims/<set>_main.milo).
+                ark::addFile(dir + "anims/gen/" + member.set + "_main.milo_ps2", *clips);
+                // The rest is GH2's: the horse head's outfit, the singers' visemes.
+                ark::rename(dir + "og/gen/" + as, gh2Disc, gh2Dir + "og/gen/" + name);
+                ark::rename(dir, gh2Disc, gh2Dir);
+            }
+            band::add("gh1", name, ours, home);
         }
     }
 }

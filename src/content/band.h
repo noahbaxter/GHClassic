@@ -12,6 +12,7 @@
 //
 //   {band from}          whose band plays: venue, gh2 or gh1
 //   {band from <which>}  that one's from the next song on
+//   {band room_kit}      TRUE if the drummer plays the room's own kit
 
 #include "addresses.h"
 
@@ -23,8 +24,10 @@ namespace gh2::band
 {
     // `game` has its own of GH2's `member` (metal_singer): the character
     // `own`, whose name holds what GH2's does and whose files the caller
-    // serves.
-    void add(const std::string &game, const std::string &member, const std::string &own);
+    // serves. `home` is the one for that game's own venues where it is
+    // another: a drummer without GH2's kit, where the room has the game's.
+    void add(const std::string &game, const std::string &member, const std::string &own,
+             const std::string &home = "");
 
     void install(PS2Runtime &runtime, const Addresses &addresses);
 }
