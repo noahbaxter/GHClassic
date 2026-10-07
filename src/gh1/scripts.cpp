@@ -455,6 +455,70 @@ namespace gh2::gh1
 (hit_p0_fret5 {$this hit_gem 4})
 )";
 
+        // The array in `in` that starts with that symbol.
+        Node *child(Node &in, const char *key)
+        {
+            for (Node &n : in.nodes)
+                if (n.type == dtb::kArray && !n.nodes.empty() && is(n.nodes[0], key))
+                    return &n;
+            return nullptr;
+        }
+
+        // GH1's own settings for the venue (arena/venues.dta) over the
+        // stand-in's in its world's type: each crowd stream and how loud it
+        // is, a gain there and decibels here, how many bars a shot lasts by
+        // how the song goes, and where the intro is shot from.
+        void configure(Node &type, const Node &theirs)
+        {
+            const auto decibels = [](const Node &gain)
+            {
+                const auto v = dtb::number(gain);
+                return real(v && *v > 0.0f ? 20.0f * std::log10(*v) : -96.0f);
+            };
+            const auto stream = [&](Node &ours, const Node *from)
+            {
+                if (from && from->nodes.size() > 2u && ours.nodes.size() > 2u)
+                {
+                    ours.nodes[1] = decibels(from->nodes[1]);
+                    ours.nodes[2] = from->nodes[2];
+                }
+            };
+            const Node *sound = dtb::find(theirs, "sound");
+            const Node *crowd = sound ? dtb::find(*sound, "crowd") : nullptr;
+            Node *ourSound = child(type, "sound");
+            Node *ourCrowd = ourSound ? child(*ourSound, "crowd") : nullptr;
+            if (crowd && ourCrowd)
+            {
+                if (Node *intro = child(*ourCrowd, "intro"))
+                    stream(*intro, dtb::find(*crowd, "intro"));
+                const Node *levels = dtb::find(*crowd, "levels");
+                Node *ourLevels = child(*ourCrowd, "levels");
+                for (size_t i = 1u; levels && ourLevels && i < levels->nodes.size() && i < ourLevels->nodes.size(); ++i)
+                    stream(ourLevels->nodes[i], &levels->nodes[i]);
+            }
+            const Node *bars = dtb::find(theirs, "camera_durations");
+            Node *ourBars = child(type, "camera_durations");
+            if (bars && ourBars && ourBars->nodes.size() > 1u)
+            {
+                Node &list = ourBars->nodes[1];
+                for (size_t i = 0u; i < list.nodes.size() && i + 1u < bars->nodes.size(); ++i)
+                    if (list.nodes[i].nodes.size() > 2u && bars->nodes[i + 1u].nodes.size() > 2u)
+                    {
+                        list.nodes[i].nodes[1] = bars->nodes[i + 1u].nodes[1];
+                        list.nodes[i].nodes[2] = bars->nodes[i + 1u].nodes[2];
+                    }
+            }
+            if (const Node *flags = dtb::find(theirs, "intro_camera_flags"); flags && flags->nodes.size() > 1u)
+                for (const Node &flag : flags->nodes[1].nodes)
+                {
+                    const bool distance = is(flag, "kCamNear") || is(flag, "kCamFar");
+                    if (!distance && !is(flag, "kCamLeft") && !is(flag, "kCamRight"))
+                        continue;
+                    if (Node *ours = child(type, distance ? "intro_camera_distance" : "intro_camera_facing"); ours && ours->nodes.size() > 1u)
+                        ours->nodes[1] = symbol(is(flag, "kCamNear") ? "near" : is(flag, "kCamFar") ? "far" : is(flag, "kCamLeft") ? "left" : "right");
+                }
+        }
+
         // GH1's name for a handler as the one of GH2's that runs it.
         std::string renamed(const std::string &handler)
         {
@@ -567,6 +631,11 @@ namespace gh2::gh1
             if (m.nodes.size() == 1u || (m.nodes.size() == 2u && m.nodes[1].type == dtb::kArray))
                 m.nodes.push_back({dtb::kInt, 0, 0.0f, {}, {}});
 
+        const dtb::Files files = [disc](const std::string &f) { return ark::readFile(disc, f); };
+        dtb::Macros macros;
+        const auto venues = dtb::read("arena/venues.dta", macros, files);
+        const Node *settings = venues ? dtb::find(*venues, gh1) : nullptr;
+
         bool placed = false;
         for (Node &cls : root->nodes)
             if (cls.type == dtb::kArray && !cls.nodes.empty() && is(cls.nodes[0], "WorldDir"))
@@ -575,6 +644,8 @@ namespace gh2::gh1
                         for (Node &type : types.nodes)
                             if (type.type == dtb::kArray && !type.nodes.empty() && is(type.nodes[0], gh2.c_str()))
                             {
+                                if (settings)
+                                    configure(type, *settings);
                                 // Ahead of the stand-in's own and its base's:
                                 // the first of a name is the one found.
                                 type.nodes.insert(type.nodes.begin() + 1, made.begin(), made.end());

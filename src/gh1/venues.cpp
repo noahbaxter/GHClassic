@@ -1028,6 +1028,16 @@ namespace gh2::gh1
                 if (!unreached.count(e.second))
                     present.insert(e.second);
             addScripts(layer, disc, name, ours, drivers, present);
+            // GH1's crowd streams, which the type names (gh1/scripts.cpp).
+            // What is not made here is the stand-in's: its sound bank and
+            // encore streams.
+            const std::string streams = std::string("venues/") + name + "/streams/";
+            for (int version = 1; version < 10; ++version)
+                for (const char *level : {"0intro", "1danger", "2poor", "3norm", "4good"})
+                {
+                    const std::string file = "crowd_v" + std::to_string(version) + "_" + level + ".vgs";
+                    ark::lend(layer, world + "streams/" + file, disc, streams + file);
+                }
         }
     }
 }
