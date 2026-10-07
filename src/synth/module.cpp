@@ -545,6 +545,9 @@ namespace gh2::synth
                 slipJump(*s, ch, s32(d, 8));
             else if (cmd == 0x19c)
             {
+                // Not slipping, the reference is this voice too.
+                if (!ch.slip)
+                    ch.reference = -1;
                 freeVoice(ch.main);
                 ch.main = -1;
             }
@@ -734,6 +737,9 @@ namespace gh2::synth
             return;
         freeVoice(ch.main);
         ch.main = -1;
+        // Not slipping, the reference is the heard voice: it follows the new one.
+        if (!ch.slip)
+            ch.reference = -1;
         const uint32_t from = ch.readAt / kAdpcmBlockBytes * kAdpcmBlockBytes;
         if (from < ch.base || from >= ch.base + ch.blocks * kBlockBytes)
             return;
@@ -750,6 +756,8 @@ namespace gh2::synth
             return;
         m_spu.setLoop(static_cast<uint32_t>(ch.main), ch.base);
         keyOn(ch.main);
+        if (!ch.slip)
+            ch.reference = ch.main;
     }
 
     // 0x32a8: 16-byte lines played, from the NAX the last refill read.
