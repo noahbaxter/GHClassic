@@ -44,3 +44,27 @@
       {ca_num6.lbl set_showing FALSE}
       {ca_blurb7.lbl set_showing FALSE}
       {ca_num7.lbl set_showing FALSE}))
+
+; The store.
+
+; The street and the room behind GH1's shop are a backdrop: by GH2's z_mode
+; 2 they are tested against what is drawn and leave no depth themselves,
+; for the shop's posts and GH2's character to draw over.
+(store_back_panel
+   (needs store_back)
+   (enter
+      {brick03.mat set z_mode 2}
+      {us_insidewalls.mat set z_mode 2}
+      {us_items.mat set z_mode 2}
+      {us_wall_posters.mat set z_mode 2}))
+
+; GH1's SOLD is a label, and its store's poster a mesh with a material for
+; each category (gh1/menus.cpp). GH2's character stands in GH1's shop
+; window: its group is moved here, where the move reaches the placer under
+; it (one written into the scene does not).
+(store_panel
+   (needs store)
+   (enter {char_placer.grp set_local_pos -28.4 -590 -37})
+   (update_store_item_sold {st_sold.lbl set_showing {campaign is_unlocked [item_name]}})
+   (update_store_category_desc
+      {st_poster.pic set_mat {$this find {sprint "st_poster_" [category] ".mat"}}}))

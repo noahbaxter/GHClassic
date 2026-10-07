@@ -284,10 +284,19 @@ namespace gh2::gh1
                 continue;
             const std::string key = keyOf(entry);
             const std::string stem = key.substr(0, key.rfind("_shop_desc") == std::string::npos ? key.size() : key.rfind("_shop_desc"));
+            // The tips, the videos, the store's songs, its headings and each
+            // category's blurb keep their names.
+            static const std::set<std::string> kStore = {"category_cost", "guitar_shop_desc", "skin_shop_desc",
+                                                         "song_shop_desc", "character_shop_desc"};
+            const auto starts = [&](const char *with) { return key.rfind(with, 0) == 0; };
             if (const auto as = renamed(key, names))
                 text[*as] = entry.nodes[1].text;
-            else if (key.rfind("loading_tip", 0) == 0 || key.rfind("video", 0) == 0 || songs.count(stem) != 0u)
+            else if (starts("loading_tip") || starts("video") || starts("store_") || songs.count(stem) != 0u ||
+                     kStore.count(key) != 0u)
                 text[key] = entry.nodes[1].text;
+            // What the store says of a guitar, by GH2's name for that body.
+            else if (stem != key && dtb::find(*theirGuitars, stem) != nullptr && bodies.count(body(stem)) != 0u)
+                text[body(stem) + "_shop_desc"] = entry.nodes[1].text;
         }
         const size_t layer = ark::addLayer(std::nullopt);
         const std::set<std::string> scenes = addMenus(layer, disc, text);

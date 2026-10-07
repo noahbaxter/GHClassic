@@ -61,6 +61,36 @@ namespace gh2::gh1
                 objects(n, out);
         }
 
+        // GH1's store shows a poster for the category picked: the picture's
+        // material again for each, over that category's image, for the
+        // script to put on it (menus.dta).
+        void addPosters(milo::Dir &store, size_t disc)
+        {
+            const auto body = [&](const std::string &name)
+            {
+                const auto i = milo::find(store, name);
+                return i ? store.bodies[*i] : milo::Bytes();
+            };
+            const auto mats = named(body("st_poster.pic"), ".mat");
+            const milo::Bytes mat = mats.empty() ? milo::Bytes() : body(mats[0]);
+            const auto texs = named(mat, ".tex");
+            const milo::Bytes tex = texs.empty() ? milo::Bytes() : body(texs[0]);
+            for (const char *category : {"guitar", "skin", "song", "character", "video"})
+            {
+                const auto bitmap =
+                    ark::readFile(disc, std::string(kFolder) + "image/gen/shop_" + category + "_poster.png_ps2");
+                milo::Bytes image = bitmap ? texWith(tex, *bitmap, true) : milo::Bytes();
+                if (image.empty())
+                    continue;
+                const std::string name = std::string("st_poster_") + category;
+                milo::Dir over;
+                over.bodies = {mat};
+                milo::replacePrefix(over, texs[0], name + ".tex");
+                milo::add(store, "Tex", name + ".tex", std::move(image));
+                milo::add(store, "Mat", name + ".mat", std::move(over.bodies[0]));
+            }
+        }
+
         // That screen's scene in that layer, in place of GH2's. False if it
         // cannot be built.
         bool addScreen(size_t layer, size_t disc, const Screen &screen, const Look &look,
@@ -101,6 +131,8 @@ namespace gh2::gh1
                 std::cerr << "[gh1] cannot build " << name << "'s menu" << std::endl;
                 return false;
             }
+            if (name == "store")
+                addPosters(*made, disc);
             ark::addFile(layer, "ui/gen/" + name + ".milo_ps2", milo::write(*made));
             // Quickplay shows GH1's setlist in GH1's scene from any game's
             // menus, as it does the other games' (content/setlists.h).

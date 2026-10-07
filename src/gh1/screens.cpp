@@ -62,6 +62,15 @@ namespace gh2::gh1
             // GH2's guitar is its display's, shown by a proxy, here in GH1's
             // case.
             {.gh1 = "sel_guitar", .without = {"guitar.grp"}, .placed = {{"guitar.pxy", 15.0f, -685.0f, -10.0f, 0.8f}}},
+            // GH2's guitar and character stand in GH1's shop window (the
+            // character's group is moved by the script, menus.dta), and its
+            // song logos, which GH1 has none of, out of sight.
+            {.gh1 = "store",
+             .with = {"char_placer.grp"},
+             .placed = {{"guitar.grp", -9.4f, -743.0f, -1.4f, 0.0f, 0.3f},
+                        {"song_logos.pic", kAway, 0.0f, 0.0f},
+                        {"st_sold.mesh", kAway, 0.0f, 0.0f}}},
+            {"store_back"},
         };
         return kScreens;
     }
