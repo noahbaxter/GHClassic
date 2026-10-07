@@ -53,6 +53,34 @@
                   }
                }
             }
+            {$this light_portraits}
+         }
+      )
+      ; GH1's hero screen (gh1/menus.cpp) is a wall of portraits: each
+      ; character's lit one shows while it is the pick, and one the store
+      ; still sells shows its locked picture in place of its own.
+      ; The characters are config's and the sold ones its store's, as they
+      ; stand now: CHARACTERS here is the game's this was read under.
+      (light_portraits
+         {if {exists sc_buttons_focus.view}
+            {do
+               ($dir {$this loaded_dir})
+               ($all {find $syscfg characters})
+               ($sold {find $syscfg store character})
+               {foreach_int $i 1 {size $all}
+                  {do
+                     ($c {elem {elem $all $i} 0})
+                     {{$dir find {sprint "sc_char_" $c "_focus.view"}} set_showing {== $c [char_focus]}}
+                  }
+               }
+               {foreach_int $i 1 {size $sold}
+                  {do
+                     ($c {elem {elem $sold $i} 0})
+                     {{$dir find {sprint "sc_char_" $c ".pic"}} set_showing {campaign is_unlocked $c}}
+                     {{$dir find {sprint "sc_char_" $c "_lock.pic"}} set_showing {! {campaign is_unlocked $c}}}
+                  }
+               }
+            }
          }
       )
       (poll {scl_loading.lbl set_showing {! {char_single are_chars_loaded}}})
@@ -216,6 +244,7 @@
                   {char_single char_event 0 animate}
                   {$this set old_scroll_pos $new_scroll_pos}
                   {char_highlight.tnm set_frame $new_scroll_pos}
+                  {$this light_portraits}
                }
             }
          }

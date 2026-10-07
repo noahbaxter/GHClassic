@@ -240,10 +240,19 @@ namespace gh2::gh1
             general->nodes.insert(general->nodes.end(), theirTips->nodes.begin(), theirTips->nodes.end());
         }
 
-        // Characters, in the root config and the UI's lists.
+        // Characters, in the root config and the UI's lists, in the order
+        // GH1's hero screen steps through them (its career.dta's
+        // navigator): its first two are the players' defaults (main.dta).
+        static const char *const kOrder[] = {"metal", "classic", "alterna", "hair_metal",
+                                             "punk",  "nu_metal", "hiphop",  "grim"};
+        std::vector<Guitarist> ordered;
+        for (const char *folder : kOrder)
+            for (const Guitarist &g : guitarists)
+                if (std::string(g.folder) == folder)
+                    ordered.push_back(g);
         dtb::Node config = array({symbol("characters")}), all = array({}), outfits = array({});
         std::string first, second;
-        for (const Guitarist &g : guitarists)
+        for (const Guitarist &g : ordered)
         {
             config.nodes.push_back(array({symbol(g.character), array({symbol(g.name())})}));
             all.nodes.push_back(symbol(g.character));
