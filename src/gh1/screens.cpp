@@ -81,6 +81,27 @@ namespace gh2::gh1
             {"status_5", "sponsorship5"},
             {"status_6", "sponsorship6"},
             {"status_7", "sponsorship7"},
+            // GH2's pause has a row for each of its settings screens where
+            // GH1's has one for its only: five rows in the room of four.
+            {.gh1 = "pause",
+             .renamed = {{"pause_resume.btn", "resume.btn"},
+                         {"pause_restart.btn", "restart.btn"},
+                         {"pause_options.btn", "audio_options.btn"},
+                         {"pause_quit.btn", "quit.btn"}},
+             .rows = {{"resume.btn", 0.0f},
+                      {"restart.btn", -14.0f},
+                      {"audio_options.btn", -28.0f},
+                      {"video_options.btn", -42.0f, "audio_options.btn", "VIDEO"},
+                      {"quit.btn", -56.0f}}},
+            {.gh1 = "pause_controller", .renamed = {{"pause_controller_resume.btn", "resume.btn"}}},
+            // GH1 has one list of buttons where GH2 has one for a career
+            // and one for the rest: its own is GH2's for the rest, shown in
+            // a career too (menus.dta).
+            {.gh1 = "lose",
+             .renamed = {{"lose_buttons.view", "normal_buttons.view"},
+                         {"lose_restart.btn", "lose_restart_normal.btn"},
+                         {"lose_selsong.btn", "lose_selsong_normal.btn"},
+                         {"lose_quit.btn", "lose_quit_normal.btn"}}},
         };
         return kScreens;
     }

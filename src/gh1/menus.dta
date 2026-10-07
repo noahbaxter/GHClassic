@@ -98,3 +98,18 @@
    (update_store_item_sold {st_sold.lbl set_showing {campaign is_unlocked [item_name]}})
    (update_store_category_desc
       {st_poster.pic set_mat {$this find {sprint "st_poster_" [category] ".mat"}}}))
+
+; In a song.
+
+; GH1's row for its settings is GH2's for its audio settings, named so: a
+; word as short as the rows around it, which the row's box fits.
+(pause_panel
+   (needs pause)
+   (enter {audio_options.btn set text_token "AUDIO"}))
+
+; GH1's song failed screen has one list of buttons, in a career too.
+(lose_panel
+   (needs lose)
+   (enter
+      {normal_buttons.view set_showing TRUE}
+      {$this set_focus lose_restart_normal.btn}))
