@@ -15,13 +15,15 @@
 //               the root config and the UI's lists of them
 //   text        GH2's locale with GH1's names and blurbs for the venues,
 //               characters, videos, songs and tips
-//   menus       GH1's screens and their text (gh1/menus.h)
+//   menus       GH1's screens and their text (gh1/menus.h), under GH2's
+//               scripts fitted to them
 
 #include "gh1/career.h"
 
 #include "content/campaigns.h"
 #include "disc/ark.h"
 #include "formats/dtb.h"
+#include "gh1/menu_scripts.h"
 #include "gh1/menus.h"
 #include "gh1/songs.h"
 
@@ -278,7 +280,7 @@ namespace gh2::gh1
                 text[key] = entry.nodes[1].text;
         }
         const size_t layer = ark::addLayer(std::nullopt);
-        addMenus(layer, disc, text);
+        const std::set<std::string> scenes = addMenus(layer, disc, text);
         for (dtb::Node &entry : locale->nodes)
             if (const auto it = text.find(keyOf(entry)); entry.type == dtb::kArray && entry.nodes.size() > 1u && it != text.end())
             {
@@ -295,13 +297,27 @@ namespace gh2::gh1
         ark::addFile(layer, "config/gen/tips.dtb", dtb::write(*tips));
         ark::addFile(layer, "ui/gen/ui.dtb", dtb::write(*ui));
         ark::addFile(layer, "ui/eng/gen/locale.dtb", dtb::write(*locale));
-        // The outfits GH2's screens name: the main menu's two defaults and
-        // the difficulty screen's guitarist.
-        for (const char *script : {"ui/gen/main.dtb", "ui/gen/career.dtb"})
-            if (auto file = raw(script))
+        // GH2's screens' scripts (ui/init.dta includes each), fitted to GH1's
+        // screens, and with the outfits they name: the main menu's two
+        // defaults and the difficulty screen's guitarist.
+        if (const auto init = raw("ui/gen/init.dtb"))
+            for (const dtb::Node &include : init->nodes)
             {
-                replaceSymbol(*file, "punk1", first);
-                replaceSymbol(*file, "rockabill1", second.empty() ? first : second);
+                if (include.type != dtb::kInclude)
+                    continue;
+                const std::string name = include.text.substr(0, include.text.rfind('.'));
+                const std::string script = "ui/gen/" + name + ".dtb";
+                auto file = raw(script);
+                if (!file)
+                    continue;
+                const bool fitted = fitScript(*file, scenes);
+                if (name == "main" || name == "career")
+                {
+                    replaceSymbol(*file, "punk1", first);
+                    replaceSymbol(*file, "rockabill1", second.empty() ? first : second);
+                }
+                else if (!fitted)
+                    continue;
                 ark::addFile(layer, script, dtb::write(*file));
             }
         // The store shows a character it sells by the character's name, as

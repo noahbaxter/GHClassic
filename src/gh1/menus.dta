@@ -1,0 +1,4 @@
+; GH2's screens in GH1's campaign (gh1/menu_scripts.cpp): for each of these
+; objects of GH2's UI scripts, what a handler gains after its own commands,
+; or with = what stands in place of it. One that (needs ...) scenes, by
+; GH2's names for them, is left alone unless GH1's are there (gh1/menus.cpp).
