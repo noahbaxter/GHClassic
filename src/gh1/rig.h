@@ -56,6 +56,11 @@ namespace gh2
         // the face's morphs named <outfit>_face.mrf for gh1/face.
         milo::Dir graft(const milo::Dir &gh2, const milo::Dir &gh1, const milo::Dir &face, const std::string &outfit);
 
+        // Leaves out of drawing the meshes of `gh1` that none of its views
+        // list: Bip01.mesh, the ponytails hair is skinned to. Retail's frame
+        // has none of a band member's.
+        void hideUnviewed(milo::Dir &outfit, const milo::Dir &gh1);
+
         // A scene from the mounted discs.
         std::optional<milo::Dir> load(const std::string &path);
 

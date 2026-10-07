@@ -253,6 +253,19 @@ namespace gh2::gh1
             for (const char *key : {"anim_tempo", "preview", "bpm"})
                 if (const dtb::Node *n = dtb::find(gh1, key))
                     out.nodes.push_back(*n);
+            // A band is GH1's archetypes (band_chars.dta), each in the folder
+            // GH2 names the same character by: charsys/metal_bass.
+            if (const dtb::Node *band = dtb::find(gh1, "band"))
+            {
+                dtb::Node members = array({symbol("band")});
+                for (size_t i = 1u; i < band->nodes.size(); ++i)
+                {
+                    const dtb::Node *model = dtb::find(band->nodes[i], "outfit");
+                    if (const dtb::Node *folder = model ? value(*model, "directory") : nullptr)
+                        members.nodes.push_back(symbol(folder->text.substr(folder->text.rfind('/') + 1u)));
+                }
+                out.nodes.push_back(std::move(members));
+            }
             out.nodes.push_back(array({
                 symbol("quickplay"),
                 array({symbol("character_outfit"), symbol(outfit)}),

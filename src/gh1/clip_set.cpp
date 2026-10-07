@@ -260,7 +260,10 @@ namespace gh2
                     const dtb::Node *list = dtb::find(cset, "animations");
                     if (!dir || dir->nodes.size() < 2u || dir->nodes[1].text != directory || !list)
                         continue;
-                    Gh1AnimSet out{directory, {}};
+                    const std::string &full = cset.nodes[0].text; // main::bass.cset
+                    const size_t scope = full.find("::");
+                    const size_t from = scope == std::string::npos ? 0u : scope + 2u;
+                    Gh1AnimSet out{full.substr(from, full.rfind('.') - from), directory, {}};
                     for (size_t i = 1; i < list->nodes.size(); ++i)
                     {
                         const dtb::Node &a = list->nodes[i];
@@ -321,7 +324,10 @@ namespace gh2
                     continue;
                 const auto t = transitions.find(r->transitionsFrom);
                 set.bodies[i] = writeClip(r->clip, set.bodies[i], parts,
-                                          t != transitions.end() ? t->second : transitions.at(name));
+                                          !r->transitions.empty() ? r->transitions
+                                          : t != transitions.end() ? t->second : transitions.at(name));
+                if (r->blend != 0u)
+                    set.bodies[i][kClipFlags + 4u] = static_cast<uint8_t>((set.bodies[i][kClipFlags + 4u] & 0xf0u) | r->blend);
                 for (const Samples &s : r->clip.sets)
                     channels.insert(s.channels.begin(), s.channels.end());
             }

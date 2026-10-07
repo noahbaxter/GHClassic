@@ -19,6 +19,7 @@
 #include "content/games.h"
 #include "content/outfits.h"
 #include "formats/dtb.h"
+#include "gh1/band.h"
 #include "gh1/career.h"
 #include "gh1/clips.h"
 #include "gh1/face.h"
@@ -89,6 +90,7 @@ namespace gh2
             std::cerr << "[gh1] cannot read GH1's charsys" << std::endl;
             return;
         }
+        gh1::addBand(*gh2Disc, scripts->macros);
         const dtb::Node *types = &scripts->archetypes;
         std::vector<Guitarist> done;
         for (const Guitarist &guitarist : kGuitarists)

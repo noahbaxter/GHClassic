@@ -91,14 +91,14 @@ namespace gh2
 
         // A GH1 Mesh 25 under `parent`: its Trans 8, whose parent field GH2
         // never reads (RndTransformable::Load, 0x3d72d0, takes rev 8's link
-        // from the parent's child list), rewritten as Trans 9 naming it. One
-        // with children of its own keeps them and stays unparented. `local`
-        // keeps its GH1 world under the bone as posed here.
+        // from the parent's child list), rewritten as Trans 9 naming it,
+        // without its own child list: each child names it the same way.
+        // `local` keeps its GH1 world under the parent as posed here.
         Bytes reparent(const Bytes &body, const std::string &parent, const Xfm &local)
         {
-            if (u32(body, 104u) != 0u)
-                return body;
-            const size_t constraint = 108u;
+            size_t constraint = 108u;
+            for (uint32_t i = 0, n = u32(body, 104u); i < n; ++i)
+                str(body, constraint);
             size_t o = constraint + 4u;
             str(body, o);
             o += 1u;
@@ -299,6 +299,10 @@ namespace gh2
                 if (gh2.entries[i].first == "Group" && gh2.entries[i].second.find("shadow") != std::string::npos)
                     for (const std::string &n : groupNames(gh2.bodies[i]))
                         shadow.insert(n);
+                // A band member's is in no group of its own: shadow.mesh,
+                // which a singer's CharPosConstraint keeps under the pelvis.
+                if (gh2.entries[i].first == "Mesh" && gh2.entries[i].second.rfind("shadow", 0) == 0)
+                    shadow.insert(gh2.entries[i].second);
             }
 
             // GH1's skin: its Tex, Mat and Mesh objects but the bones.
@@ -422,18 +426,30 @@ namespace gh2
             };
             for (const auto &g : gh2Bones)
                 worldOf(g.first);
+            // GH1's root (bone_base) hangs off the character, as GH2's pelvis
+            // does: the bassist's guitar spot is its child.
+            const auto pelvis = gh2Bones.find("bone_pelvis.mesh");
+            const std::string character = pelvis != gh2Bones.end() ? pelvis->second.parent : std::string();
             for (const std::string &b : needed)
             {
                 worldOf(b);
-                added.push_back({"Trans", b, trans9(posed[b].first, posed[b].second,
-                                                    owner.count(b) ? owner[b] : std::string())});
+                added.push_back({"Trans", b, trans9(posed[b].first, posed[b].second, owner.count(b) ? owner[b] : character)});
             }
 
             // Rigid pieces hang off bones by the bones' child lists: hair,
             // earrings, belts, the face.
+            // So do pieces off other pieces: the keyboardist's ponytails,
+            // which his hair is skinned to.
+            std::map<std::string, std::pair<std::string, Xfm>> pieces; // a child's parent and its world
+            for (size_t i = 0; i < gh1.entries.size(); ++i)
+                if (gh1.entries[i].first == "Mesh" && !bones.count(gh1.entries[i].second))
+                    for (const std::string &child : gh1Bone(gh1.bodies[i]).children)
+                        pieces[child] = {gh1.entries[i].second, xfm(gh1.bodies[i], 56u)};
             for (Object &o : added)
                 if (o.cls == "Mesh" && owner.count(o.name))
                     o.body = reparent(o.body, owner[o.name], xfm(o.body, 56u) * inverse(worldOf(owner[o.name])));
+                else if (const auto on = pieces.find(o.name); o.cls == "Mesh" && on != pieces.end())
+                    o.body = reparent(o.body, on->second.first, xfm(o.body, 56u) * inverse(on->second.second));
 
             // GH2's eyes are its own, sized for its heads and turned by its
             // CharLookAts along their axes, which GH1's don't share. GH2's
@@ -543,6 +559,22 @@ namespace gh2
                 milo::add(out, o.cls, o.name, std::move(o.body));
             }
             return out;
+        }
+
+        void hideUnviewed(milo::Dir &outfit, const milo::Dir &gh1)
+        {
+            std::set<std::string> meshes, viewed;
+            for (const auto &[c, n] : gh1.entries)
+                if (c == "Mesh" && !startsWith(n, "bone_"))
+                    meshes.insert(n);
+            for (size_t i = 0; i < gh1.entries.size(); ++i)
+                if (gh1.entries[i].first == "View")
+                    for (const std::string &n : viewMeshes(gh1.bodies[i], meshes))
+                        viewed.insert(n);
+            for (size_t i = 0; i < outfit.entries.size(); ++i)
+                if (outfit.entries[i].first == "Mesh" && meshes.count(outfit.entries[i].second) &&
+                    !viewed.count(outfit.entries[i].second))
+                    hideGh1(outfit.bodies[i]);
         }
 
         std::optional<milo::Dir> load(const std::string &path)

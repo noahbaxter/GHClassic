@@ -13,6 +13,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace gh2
@@ -58,6 +59,31 @@ namespace gh2
                     o += width(c);
                 }
                 return std::nullopt;
+            }
+
+            // A channel holding `value` in every sample, where its type and
+            // then its name put it.
+            void hold(const std::string &channel, const Bytes &value)
+            {
+                const auto key = [](const std::string &c)
+                {
+                    const std::string kind = c.substr(c.rfind('.') + 1);
+                    return std::pair(kind == "pos" ? 0 : kind == "scale" ? 1 : kind == "quat" ? 2 : 3, c);
+                };
+                size_t at = 0u, offset = 0u;
+                for (; at < channels.size() && key(channels[at]) < key(channel); ++at)
+                    offset += width(channels[at]);
+                const size_t s = stride();
+                Bytes out;
+                for (uint32_t i = 0; i < count; ++i)
+                {
+                    const auto sample = data.begin() + static_cast<std::ptrdiff_t>(s * i);
+                    out.insert(out.end(), sample, sample + static_cast<std::ptrdiff_t>(offset));
+                    out.insert(out.end(), value.begin(), value.end());
+                    out.insert(out.end(), sample + static_cast<std::ptrdiff_t>(offset), sample + static_cast<std::ptrdiff_t>(s));
+                }
+                channels.insert(channels.begin() + static_cast<std::ptrdiff_t>(at), channel);
+                data = std::move(out);
             }
 
             // A rotation channel after the rest, as rotations come last.
@@ -136,6 +162,7 @@ namespace gh2
         // from the macros GH1's anim scripts define.
         struct Gh1AnimSet
         {
+            std::string name; // x
             std::string directory;
             std::vector<Gh1Anim> anims;
         };
@@ -150,12 +177,17 @@ namespace gh2
             const Gh1Clip *get(const std::string &directory, const std::string &name);
         };
 
-        // A GH2 clip's samples replaced, under the transitions of the clip
-        // named (its own when it has none of that name).
+        // A GH2 clip's samples replaced, under `transitions` as writeClip
+        // takes them or, with none, those of the clip named (its own when it
+        // has none of that name). `blend`, unless 0, is how the clip comes
+        // in when a play does not say (its play flags' low four bits,
+        // CharClipDriver's constructor, 0x1986d4).
         struct Replacement
         {
             Gh1Clip clip;
             std::string transitionsFrom;
+            Bytes transitions;
+            uint32_t blend = 0u;
         };
 
         std::optional<Replacement> asIs(Gh1Clips &clips, const std::string &directory, const Gh1Anim &anim);
