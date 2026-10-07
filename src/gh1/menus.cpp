@@ -164,6 +164,20 @@ namespace gh2::gh1
         for (const Guitarist &g : kGuitarists)
             if (auto photo = ark::readFile(disc, std::string(kFolder) + "image/gen/status_" + g.folder + "0.png_ps2"))
                 ark::addFile(layer, std::string("ui/image/gen/gh1_status_") + g.character + ".png_ps2", std::move(*photo));
+        // GH1's credits are in its serif face, their headings in its
+        // impactor in orange (resources.rnd's credit_title.txt and
+        // credits_center.mat): GH2's list for credits with those of its own
+        // fonts' scenes in place of clarendon and rockletters. The orange
+        // is not carried: the list colours its text by its type
+        // (ui_objects.dta's UIList credits).
+        if (auto list = loadScene(0u, "ui/gen/list_credits.milo_ps2"))
+        {
+            milo::replacePrefix(*list, "../clarendon.milo", "../serif.milo");
+            milo::replacePrefix(*list, "../rockletters.milo", "../impactor.milo");
+            milo::replacePrefix(*list, "clarendon.font", "serif.font");
+            milo::replacePrefix(*list, "rockletters.font", "impactor.font");
+            ark::addFile(layer, "ui/gen/list_credits.milo_ps2", milo::write(*list));
+        }
         std::map<std::string, std::string> down;
         if (const auto scripts = dtb::read(std::string(kFolder) + "ui.dta", macros, theirs))
             links(*scripts, down);

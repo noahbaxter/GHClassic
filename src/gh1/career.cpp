@@ -314,6 +314,10 @@ namespace gh2::gh1
         ark::addFile(layer, "config/gen/store.dtb", dtb::write(store));
         ark::addFile(layer, "config/gen/guitars.dtb", dtb::write(*guitars));
         ark::addFile(layer, "config/gen/tips.dtb", dtb::write(*tips));
+        // GH1's credits, which the credits screen reads as it opens
+        // (CreditsPanel::Load, 0x143bd8).
+        if (const auto credits = dtb::read("config/credits.dta", none, theirs))
+            ark::addFile(layer, "config/gen/credits.dtb", dtb::write(*credits));
         // Menu music: GH1's loops, which its disc has under their own names
         // (sfx/streams), streamed as GH1 plays them: they are twice the size
         // of the loops GH2 holds in memory.
