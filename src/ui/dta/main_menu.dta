@@ -172,22 +172,60 @@
       )
    )
 }
+; The games whose menus these can turn into: those with a campaign
+; ({campaigns}, content/campaigns.h). The 360's songs have no menus of
+; their own, so its campaign is not one of these.
+{func ghc_themes
+   {do
+      ($themes)
+      {set $themes ()}
+      {resize $themes 0}
+      {foreach $game (gh1 gh2 gh80s)
+         {if {campaigns has $game} {push_back $themes $game}}
+      }
+      $themes
+   }
+}
 ; The main screen, as the game's own but for fade_panel, which Quit fades
-; through.
+; through, and for yellow: held, it lists those games (picker.dta), and the
+; one picked becomes the campaign and so the menus and music, back on this
+; screen.
 {retype main_screen
    (
-      (panels meta main_panel helpbar fade_panel)
+      (panels meta main_panel helpbar ghc_pick_panel fade_panel)
       (focus main_panel)
-      (helpbar
-         (default
-            (
-               (fret1 help_continue)
-               (strum help_updown)
-            )
-         )
-      )
       (access_all {main_panel reset_player_settings})
-      (enter {$this turn_off_ambient})
+      ; The help bar puts up a screen's (helpbar ...) after its enter, so
+      ; this one has none and sets its own.
+      (enter
+         {$this turn_off_ambient}
+         {do
+            ($array)
+            {set $array ()}
+            {resize $array 0}
+            {push_back $array (fret1 help_continue)}
+            {if {> {size {ghc_themes}} 1} {push_back $array (fret3 ghc_theme)}}
+            {push_back $array (strum help_updown)}
+            {helpbar set_display $array}
+         }
+      )
+      (BUTTON_DOWN_MSG
+         {cond
+            ({ghc_pick_button $button} TRUE)
+            ({&& {== $button kPad_Circle} {> {size {ghc_themes}} 1} {! {ui in_transition}}}
+               {ghc_pick_panel open_with {ghc_themes} {campaigns active}}
+               TRUE
+            )
+            (TRUE kDataUnhandled)
+         }
+      )
+      (ghc_picked
+         ($game)
+         {synth play_sequence button_select}
+         {set $ghc_switch $game}
+         {set $ghc_switch_next main_screen}
+         {ui goto_screen ghc_switch_screen}
+      )
    )
 }
 ; The splash, as the game's own (splash.dta) but for lick_attach.
