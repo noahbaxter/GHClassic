@@ -240,6 +240,11 @@ set(GHC_GAME_SOURCES
     src/gh1/look.cpp
     src/gh1/rig.cpp
     src/gh1/scene.cpp
+    src/gh1/screen.cpp
+    src/gh1/screen_gh2.cpp
+    src/gh1/screen_objects.cpp
+    src/gh1/screen_pictures.cpp
+    src/gh1/screen_widgets.cpp
     src/gh1/songs.cpp
     src/gh2x/install.cpp
     src/gh80s/install.cpp
