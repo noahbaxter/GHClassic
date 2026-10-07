@@ -10,6 +10,7 @@
 #include "ps2_runtime_macros.h"
 #include "render/camera.h"
 #include "render/frame.h"
+#include "settings/settings.h"
 
 #include <memory>
 
@@ -72,7 +73,8 @@ namespace gh2
         void addDepthOfField(uint8_t *rdram, uint32_t rnd, Frame &frame)
         {
             const uint32_t focus = load<uint32_t>(rdram, rnd + milo::rnd::kFocusZ);
-            if (focus == 0u || load<uint32_t>(rdram, rnd + milo::rnd::kNoDepthOfField) != 0u)
+            if (focus == 0u || load<uint32_t>(rdram, rnd + milo::rnd::kNoDepthOfField) != 0u ||
+                !settings::get(settings::kDepthOfField))
                 return;
             const float width = static_cast<float>(frame.width);
             const float height = static_cast<float>(frame.height);

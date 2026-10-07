@@ -29,6 +29,7 @@ namespace gh2::settings
         kWhammyHold, // a whammy bar held down bends every sustain
         kDiscPrefer, // kChd or kIso: the image taken when the disc folder has both
         kCheckUpdates, // a newer release offered when the game starts
+        kDepthOfField, // the PS2's blur behind what a camera shot looks at
         kKeyCount,
     };
 
