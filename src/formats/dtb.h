@@ -73,6 +73,12 @@ namespace gh2::dtb
     // A node read back as script text, for the game's DataReadString.
     std::string text(const Node &node);
 
+    // Script text as the array of its nodes: arrays, commands, properties,
+    // numbers, variables, strings (\q a quote, \n a line), symbols, TRUE,
+    // FALSE and kDataUnhandled, with ; comments. No directives or other
+    // macros. None if its brackets do not match.
+    std::optional<Node> parse(const std::string &text);
+
     // An array's nodes as a built file the game loads, under PS2's cipher.
     milo::Bytes write(const Node &root);
 }
