@@ -121,6 +121,21 @@ namespace gh2::gh1
             {"win_game", "win_hard"},
             {"win_game", "win_expert"},
             {"win_easy"},
+            // GH1's game settings are GH2's audio settings, its tick box
+            // GH2's where GH1's own stands. GH1's rows for playing left
+            // handed are GH2's video settings' (menus.dta hides them).
+            {.gh1 = "game_settings", .placed = {{"stereo.chk", -35.2f, -15.0f, -53.7f}}},
+            // GH1's data settings are GH2's memory card screen: autosave,
+            // save and load. The rest of GH1's rows are GH2's band screen's.
+            {.gh1 = "data_settings",
+             .gh2 = "mem_card",
+             .renamed = {{"ds_autosave.btn", "autosave.btn"},
+                         {"ds_saveprof.btn", "save_bands.btn"},
+                         {"ds_loadprof.btn", "load_bands.btn"},
+                         {"ds_title.lbl", "title.lbl"},
+                         {"ds_title2.lbl", "title2.lbl"}},
+             .rows = {{"autosave.btn", 30.0f}, {"save_bands.btn", 5.0f}, {"load_bands.btn", -20.0f}},
+             .placed = {{"autosave.chk", -94.0f, -10.5f, 2.0f}}},
         };
         return kScreens;
     }

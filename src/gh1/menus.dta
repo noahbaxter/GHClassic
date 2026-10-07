@@ -148,3 +148,23 @@
    (enter
       {normal_buttons.view set_showing TRUE}
       {$this set_focus lose_restart_normal.btn}))
+
+; Settings.
+
+; GH1's game settings have rows for playing left handed, which are GH2's
+; video settings'.
+(audio_settings_panel
+   (needs game_settings)
+   (enter
+      {foreach $o (gs_left_p1.btn gs_left_p2.btn)
+         {{$this find $o} set_showing FALSE}
+         {$this disable {$this find $o}}}))
+
+; GH1's data settings have rows for a band's name, a new band and deleting
+; one, which are GH2's band screen's.
+(mem_card_panel
+   (needs mem_card)
+   (enter
+      {foreach $o (ds_rename.btn ds_newprof.btn ds_delprof.btn)
+         {{$this find $o} set_showing FALSE}
+         {$this disable {$this find $o}}}))
