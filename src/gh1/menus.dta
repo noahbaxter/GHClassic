@@ -2,3 +2,36 @@
 ; objects of GH2's UI scripts, what a handler gains after its own commands,
 ; or with = what stands in place of it. One that (needs ...) scenes, by
 ; GH2's names for them, is left alone unless GH1's are there (gh1/menus.cpp).
+
+; A career.
+
+; GH1's hub names the band's status (RndLabelEx cm_status.lbl, GH1's
+; career.dta).
+(career_panel
+   (needs career)
+   (enter {cm_status.lbl set_localized_text {localize {campaign get_cur_status_sym}}}))
+
+; GH1's map has six venues, each button here GH2's for the venue standing in
+; (gh1/songs.h).
+(sel_venue_screen
+   (needs sel_venue)
+   (= FOCUS_MSG
+      {if {! {ui in_transition}}
+         {switch $new_focus
+            (sv_battle.btn {$this set_venue_map_frame 1} {game set_venue battle})
+            (sv_small1.btn {$this set_venue_map_frame 2} {game set_venue small1})
+            (sv_big.btn {$this set_venue_map_frame 3} {game set_venue big})
+            (sv_theatre.btn {$this set_venue_map_frame 4} {game set_venue theatre})
+            (sv_fest.btn {$this set_venue_map_frame 5} {game set_venue fest})
+            (sv_arena.btn {$this set_venue_map_frame 6} {game set_venue arena})}}))
+
+; GH1's letter is to the band by name, and lists seven deductions where the
+; game counts five (CashAwardScreen's set_deduction).
+(cashaward_panel
+   (needs cashaward)
+   (enter
+      {ca_bandname.lbl set_localized_text {campaign profile_name {campaign profile_slot}}}
+      {ca_blurb6.lbl set_showing FALSE}
+      {ca_num6.lbl set_showing FALSE}
+      {ca_blurb7.lbl set_showing FALSE}
+      {ca_num7.lbl set_showing FALSE}))

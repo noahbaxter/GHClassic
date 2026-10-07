@@ -10,6 +10,16 @@ namespace gh2::gh1
             {"nameprof"},
             {"sel_diff_career"},
             {"sel_difficulty"},
+            {"career"},
+            // GH2's venue buttons are named for its venues, here those
+            // standing in for GH1's (gh1/songs.h), and its map takes its
+            // frame by a group of its anims.
+            {.gh1 = "sel_venue",
+             .renamed = {{"sv_basement.btn", "sv_battle.btn"},
+                         {"sv_small_club.btn", "sv_small1.btn"},
+                         {"sv_big_club.btn", "sv_big.btn"}},
+             .without = {"sv_small2.btn", "sv_stone.btn"},
+             .frames = {{"venue_anims.grp", "sv_map.view"}}},
             // GH1 has one setlist for career and quickplay.
             {"sel_song"},
             {"sel_song", "sel_song_quickplay"},
@@ -28,6 +38,7 @@ namespace gh2::gh1
             {"bonus_material"},
             {"loading"},
             {"endgame"},
+            {"cashaward"},
             {"complete"},
         };
         return kScreens;

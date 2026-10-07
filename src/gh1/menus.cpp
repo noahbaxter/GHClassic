@@ -120,6 +120,11 @@ namespace gh2::gh1
             std::cerr << "[gh1] cannot read GH1's menus" << std::endl;
             return {};
         }
+        // GH1's names for a band's status, which the game finds by number
+        // (status_%d).
+        for (const auto &[token, string] : look->strings)
+            if (token.rfind("status_", 0) == 0)
+                text[token] = string;
         std::map<std::string, std::string> down;
         if (const auto scripts = dtb::read(std::string(kFolder) + "ui.dta", macros, theirs))
             links(*scripts, down);
