@@ -65,6 +65,8 @@ namespace gh2::band
 
         // settings::Band's words.
         constexpr const char *kFrom[] = {"venue", "gh2", "gh1"};
+        // settings::BandShadows' words.
+        constexpr const char *kShadows[] = {"off", "classic", "gh2"};
 
         script::Node bandCommand(const script::Call &call)
         {
@@ -72,6 +74,14 @@ namespace gh2::band
             {
                 const std::string from = game();
                 return {s_roomKits.count(from) != 0u && campaigns::active() == from ? 1u : 0u, script::kInt};
+            }
+            if (call.symbol(1) == "shadows")
+            {
+                for (int i = 0; i < 3 && call.size() > 2; ++i)
+                    if (call.symbol(2) == kShadows[i])
+                        settings::set(settings::kBandShadows, i);
+                return {script::symbol(call.rdram, call.ctx, call.runtime, kShadows[settings::get(settings::kBandShadows)]),
+                        script::kSymbol};
             }
             if (call.symbol(1) == "from" && call.size() > 2)
                 for (int i = 0; i < 3; ++i)

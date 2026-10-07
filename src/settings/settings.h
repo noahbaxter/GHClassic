@@ -31,7 +31,15 @@ namespace gh2::settings
         kCheckUpdates, // a newer release offered when the game starts
         kBand,       // whose backing band plays: the venue's game's, or one game's everywhere
         kDepthOfField, // the PS2's blur behind what a camera shot looks at
+        kBandShadows,  // the band's shadows in GH1's venues: none, the room's as GH1 drew them, or GH2's own
         kKeyCount,
+    };
+
+    enum BandShadows
+    {
+        kShadowsOff,
+        kShadowsClassic,
+        kShadowsGh2,
     };
 
     enum DiscFormat

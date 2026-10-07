@@ -627,6 +627,31 @@ namespace gh2::gh1
         if (objects.count("stagechar.env"))
             for (Node &made : lit({"singer", "bassist", "drummer", "keyboardist"}, "stagechar.env"))
                 scene.nodes.push_back(std::move(made));
+        // GH1 shows no shadow of the band's or a guitarist's own: where a
+        // room has them it draws them, and a guitarist's is drawn with no
+        // alpha, which its alpha test keeps to the Z buffer. A setting
+        // picks the room's, GH2's own under everyone, or neither. They are
+        // only ever hidden here: a band member's shadow.mesh, wherever the
+        // room draws the band's, and a guitarist's Group of them, as GH2
+        // hides it with two players (char_objects.dta).
+        const auto chosen = [](const char *which)
+        { return command({symbol("=="), command({symbol("band"), symbol("shadows")}), symbol(which)}); };
+        const Node no = {dtb::kInt, 0, 0.0f, {}, {}};
+        for (const char *who : {"singer", "bassist", "drummer", "keyboardist"})
+        {
+            Node hide = command({symbol("if"), command({symbol(who), symbol("exists"), symbol("shadow.mesh")}),
+                                 command({command({symbol(who), symbol("find"), symbol("shadow.mesh")}), symbol("set_showing"), no})});
+            if (!objects.count("band_shadow.mesh"))
+                hide = command({symbol("if"), command({symbol("!"), chosen("gh2")}), std::move(hide)});
+            scene.nodes.push_back(command({symbol("if"), command({symbol("exists"), symbol(who)}), std::move(hide)}));
+        }
+        for (const std::string who : {"guitarist0", "guitarist1"})
+            scene.nodes.push_back(dtb::parse("{if {&& {exists " + who + "} {! {== {band shadows} gh2}}} {do ($group {" + who +
+                                             " get shadow}) {if {!= $group \"\"} {$group set_showing FALSE}}}}")
+                                      ->nodes[0]);
+        for (const std::string &object : objects)
+            if (object.rfind("band_shadow", 0) == 0)
+                scene.nodes.push_back(command({symbol("if"), chosen("off"), command({symbol(object), symbol("set_showing"), no})}));
         if (objects.count("crowd.env"))
             for (Node &made : lit({"crowd_male01", "crowd_male02", "crowd_male03", "crowd_male04", "crowd_female01",
                                    "crowd_female02", "crowd_female03", "crowd_female04"},
