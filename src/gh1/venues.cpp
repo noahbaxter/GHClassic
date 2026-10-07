@@ -585,6 +585,10 @@ namespace gh2::gh1
                 std::string exit;                           // the Environ it leaves in use, if it sets one
             };
             std::map<std::string, Listing> listings;
+            // An Environ's own children, a Group "<environ>.draws" first in
+            // its run: unshown, GH1's Environ draws none of them and is not
+            // put in use.
+            std::map<std::string, std::vector<std::string>> owned;
             const std::function<const Listing &(const std::string &, int)> listed =
                 [&](const std::string &view, int depth) -> const Listing &
             {
@@ -592,21 +596,29 @@ namespace gh2::gh1
                     return it->second;
                 listings[view];
                 Listing l;
-                const std::function<void(const std::string &, int)> add = [&](const std::string &n, int within)
+                const std::function<void(const std::string &, int, std::vector<std::string> *)> add =
+                    [&](const std::string &n, int within, std::vector<std::string> *into)
                 {
                     if (n == apart)
                         return;
-                    if (environs.count(n))
+                    if (environs.count(n) && !into)
                     {
                         l.runs.push_back({n});
                         l.exit = n;
+                        if (!draws[n].empty() && !owned.count(n))
+                        {
+                            std::vector<std::string> &mine = owned[n];
+                            for (const std::string &child : draws[n])
+                                add(child, within + 1, &mine);
+                            l.runs.back().push_back(drawsOf(n));
+                        }
+                        return;
                     }
-                    else
-                        (l.runs.empty() ? l.own : l.runs.back()).push_back(n);
-                    if ((meshes.count(n) || environs.count(n)) && within < 8)
+                    (into ? *into : l.runs.empty() ? l.own : l.runs.back()).push_back(n);
+                    if (meshes.count(n) && within < 8)
                         for (const std::string &child : draws[n])
-                            add(child, within + 1);
-                    else if (draws.count(n) && !meshes.count(n) && depth < 16)
+                            add(child, within + 1, into);
+                    else if (!into && draws.count(n) && !meshes.count(n) && !environs.count(n) && depth < 16)
                         if (const std::string left = listed(n, depth + 1).exit; !left.empty() && left != l.exit)
                         {
                             l.runs.push_back({left});
@@ -614,7 +626,7 @@ namespace gh2::gh1
                         }
                 };
                 for (const std::string &child : draws[view])
-                    add(child, 0);
+                    add(child, 0, nullptr);
                 return listings[view] = std::move(l);
             };
             // What the tree draws: a Mesh or View reached, and what each lists.
@@ -768,6 +780,8 @@ namespace gh2::gh1
                 }
                 out.push_back({c == "View" ? "Group" : c, n, std::move(body), c == "Mesh" && !drawn.count(n)});
             }
+            for (const auto &[of, list] : owned)
+                out.push_back({"Group", drawsOf(of), group(drawsOf(of), {}, list)});
             return out;
         }
 

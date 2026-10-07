@@ -14,6 +14,10 @@ namespace gh2::gh1
     // name: the objects that whatever drives it there drives here.
     using Drivers = std::map<std::string, std::vector<std::string>>;
 
+    // The Group of an Environ's own children (gh1/venues.cpp), which a
+    // script shows and hides in its place.
+    inline std::string drawsOf(const std::string &of) { return of + ".draws"; }
+
     // The anims that GH1 venue's script drives itself.
     std::set<std::string> scripted(size_t disc, const std::string &gh1);
 

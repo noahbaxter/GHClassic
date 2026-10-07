@@ -17,8 +17,7 @@
 // (gh1/venues.cpp), and arena/venue.dta's choice of lights with them.
 //
 // What has nothing of GH2's to be is left out: a command on an object not
-// brought in, the camera's name (post_switch_cam), sounds, and GH1's
-// game_lost, which GH2's own handler answers.
+// brought in, sounds, and GH1's game_lost, which GH2's own handler answers.
 
 #include "gh1/scripts.h"
 
@@ -228,9 +227,26 @@ namespace gh2::gh1
                 out.nodes.insert(out.nodes.begin(), head);
                 return {out};
             }
+            // {with_namespace {<member> geom_space} {top.view set_showing x}}
+            // hides a band member from a shot that stands in it: top.view is
+            // the View all of the member draws under (charsys/<member>).
+            if (head.type == dtb::kSymbol && head.text == "with_namespace" && node.nodes.size() == 3u &&
+                node.nodes[1].type == dtb::kCommand && node.nodes[1].nodes.size() == 2u &&
+                node.nodes[1].nodes[1].text == "geom_space" && node.nodes[2].type == dtb::kCommand &&
+                node.nodes[2].nodes.size() == 3u && node.nodes[2].nodes[0].text == "top.view" &&
+                node.nodes[2].nodes[1].text == "set_showing")
+            {
+                const Node who = node.nodes[1].nodes[0];
+                const std::vector<Node> showing = translate(node.nodes[2].nodes[2], venue);
+                if (showing.size() != 1u)
+                    return {};
+                return {command({symbol("if"), command({symbol("exists"), who}),
+                                 command({who, symbol("set_showing"), showing[0]})})};
+            }
             if (head.type != dtb::kSymbol)
                 return {};
-            const std::string &h = head.text;
+            // arena::<object> is the venue's, as every object here is.
+            const std::string h = head.text.rfind("arena::", 0) == 0 ? head.text.substr(7u) : head.text;
             const std::string what = node.nodes.size() > 1u && node.nodes[1].type == dtb::kSymbol ? node.nodes[1].text : "";
             if (h == "arena" || h == "game")
             {
@@ -266,6 +282,9 @@ namespace gh2::gh1
                     return {command({symbol("script_task"), array({symbol("units"), symbol("kTaskBeats")}),
                                      array({symbol("delay"), real(*ticks / kTicks)}), array(std::move(body))})};
                 }
+                // The shot's name, as GH1's script tells shots apart.
+                if (h == "arena" && what == "cam_msg")
+                    return {command({command({{dtb::kVar, 0, 0.0f, "this", {}}, symbol("current_shot")}), symbol("name")})};
                 if (h == "game" && what == "multiplayer")
                     return {node};
                 if (h == "arena" && venue.functions.count(what))
@@ -335,13 +354,16 @@ namespace gh2::gh1
             std::vector<Node> out;
             std::vector<Node> objects;
             if (what == "set_frame" && venue.drivers.count(h))
-                objects = targets(head, venue);
+                objects = targets(symbol(h), venue);
             else if (venue.objects.count(h))
-                objects.push_back(head);
+                objects.push_back(symbol(what == "set_showing" && venue.objects.count(drawsOf(h)) ? drawsOf(h) : h));
+            const std::vector<Node> with = translated(node.nodes, 2u, venue);
+            if (with.size() + 2u != node.nodes.size())
+                return {};
             for (const Node &object : objects)
             {
-                Node made = command({object});
-                made.nodes.insert(made.nodes.end(), node.nodes.begin() + 1, node.nodes.end());
+                Node made = command({object, node.nodes[1]});
+                made.nodes.insert(made.nodes.end(), with.begin(), with.end());
                 out.push_back(std::move(made));
             }
             return out;
@@ -468,12 +490,19 @@ namespace gh2::gh1
         for (const Node &h : theirs.handlers)
         {
             const std::string &name = h.nodes[0].text;
-            if (functions.count(name) || name == "terminate" || name == "post_switch_cam" || name == "game_lost")
+            if (functions.count(name) || name == "terminate" || name == "game_lost")
                 continue;
             Node &to = handler(renamed(name));
             if (name == "hit_gem" && to.nodes.size() == 1u)
                 to.nodes.push_back(array({{dtb::kVar, 0, 0.0f, "slot", {}}}));
             std::vector<Node> does = translated(h.nodes, 1u, venue);
+            // GH2 sends it as a shot starts (world/camshot.dta), and once
+            // with none.
+            if (name == "post_switch_cam" && !does.empty())
+            {
+                does.insert(does.begin(), {symbol("if"), command({{dtb::kVar, 0, 0.0f, "this", {}}, symbol("current_shot")})});
+                does = {command(std::move(does))};
+            }
             to.nodes.insert(to.nodes.end(), does.begin(), does.end());
         }
         // The scene's frame is the song's tick from its start, as far as a
