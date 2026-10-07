@@ -364,9 +364,11 @@ namespace gh2::synth
         case 0x3: // sceSdEffectAttr {core, mode, s16 depthL, s16 depthR, delay, feedback}
             m_spu.reverb(u32(d, 0)).setMode(u32(d, 4));
             m_spu.reverb(u32(d, 0)).setDepth(s16(d, 8), s16(d, 10));
+            m_spu.reverb(u32(d, 0)).setEcho(s32(d, 12), s32(d, 16));
             break;
         case 0x4: // the same, for depth, delay and feedback only
             m_spu.reverb(u32(d, 0)).setDepth(s16(d, 8), s16(d, 10));
+            m_spu.reverb(u32(d, 0)).setEcho(s32(d, 12), s32(d, 16));
             break;
         case 0x5: // effect chain: new voices on core 1
             m_voicesOnCore1 = u32(d, 0) != 0u;

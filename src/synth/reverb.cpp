@@ -81,6 +81,7 @@ namespace gh2::synth
         if (mode >= 10u)
             mode = 0u;
         m_mode = mode;
+        std::copy(std::begin(kPresets[mode].r), std::end(kPresets[mode].r), m_r.begin());
         m_buffer.assign(std::max<uint32_t>(kPresets[mode].bytes / 2u, 8u), 0);
         m_pos = 0;
         m_down = {};
@@ -91,6 +92,24 @@ namespace gh2::synth
     {
         m_depthL = left;
         m_depthR = right;
+    }
+
+    // sceSdSetEffectAttr, as ps2sdk's libsd has it (effect.c): for ECHO and
+    // DELAY the feedback becomes vWALL and the delay moves the taps it reads
+    // from. The presets hold these for a delay of 0x7f, and ECHO's for a
+    // feedback of 0x80.
+    void Reverb::setEcho(int32_t delay, int32_t feedback)
+    {
+        if (m_mode != 7u && m_mode != 8u)
+            return;
+        const uint16_t taps = static_cast<uint16_t>((delay + 1) << 5);
+        m_r[7] = static_cast<uint16_t>(feedback * 258);
+        m_r[10] = static_cast<uint16_t>((taps << 1) - m_r[0]);
+        m_r[11] = static_cast<uint16_t>(taps - m_r[1]);
+        m_r[16] = static_cast<uint16_t>(m_r[17] + taps);
+        m_r[12] = static_cast<uint16_t>(m_r[13] + taps);
+        m_r[27] = static_cast<uint16_t>(m_r[29] + taps);
+        m_r[26] = static_cast<uint16_t>(m_r[28] + taps);
     }
 
     bool Reverb::active() const
@@ -112,7 +131,7 @@ namespace gh2::synth
     // what it writes back saturated.
     int32_t Reverb::step(bool right, int32_t in)
     {
-        const uint16_t *r = kPresets[m_mode].r;
+        const uint16_t *r = m_r.data();
         auto v = [r](int i) { return static_cast<int32_t>(static_cast<int16_t>(r[i])); };
         auto m = [r](int i) { return static_cast<int32_t>(r[i]) * 4; };
         const int32_t vIIR = v(2), vWALL = v(7), vAPF1 = v(8), vAPF2 = v(9);

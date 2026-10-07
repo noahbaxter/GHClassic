@@ -18,6 +18,9 @@ namespace gh2::synth
         // DELAY, PIPE. The depth is the core's EVOL per side.
         void setMode(uint32_t mode);
         void setDepth(int16_t left, int16_t right);
+        // sceSdEffectAttr's delay and feedback (0 to 127), which only ECHO
+        // and DELAY take.
+        void setEcho(int32_t delay, int32_t feedback);
 
         bool active() const;
 
@@ -30,6 +33,7 @@ namespace gh2::synth
         int16_t &at(int32_t offset);
 
         uint32_t m_mode = 0;
+        std::array<uint16_t, 32> m_r{}; // the mode's registers, as setEcho leaves them
         int32_t m_depthL = 0;
         int32_t m_depthR = 0;
         std::vector<int16_t> m_buffer;
