@@ -358,30 +358,32 @@ namespace gh2::campaigns
             return true;
         }
 
-        // The first {$variable set_character <outfit> ...} under `node`: the
-        // second player's default, which main.dta's main_panel sets.
-        const dtb::Node *setCharacter(const dtb::Node &node)
+        // The first {game set_character <outfit> ...} under `node`, or for
+        // the second player {$variable set_character <outfit> ...}: the
+        // players' defaults, which main.dta's main_panel sets.
+        const dtb::Node *setCharacter(const dtb::Node &node, bool second)
         {
-            if (node.nodes.size() > 2u && node.nodes[0].type == dtb::kVar && node.nodes[1].text == "set_character")
+            if (node.nodes.size() > 2u && node.nodes[1].text == "set_character" && node.nodes[2].type == dtb::kSymbol &&
+                (second ? node.nodes[0].type == dtb::kVar : node.nodes[0].text == "game"))
                 return &node.nodes[2];
             for (const dtb::Node &child : node.nodes)
-                if (const dtb::Node *found = setCharacter(child))
+                if (const dtb::Node *found = setCharacter(child, second))
                     return found;
             return nullptr;
         }
 
-        // The active game's own, read off its disc: rockabill1 in GH2, goth2
-        // in the 80s.
-        std::string secondCharacter()
+        // The active game's own, read off its disc: punk1 and rockabill1 in
+        // GH2, goth2 the second in the 80s.
+        std::string defaultCharacter(bool second)
         {
-            static std::map<size_t, std::string> s_found;
-            if (const auto it = s_found.find(s_active); it != s_found.end())
+            static std::map<std::pair<size_t, bool>, std::string> s_found;
+            if (const auto it = s_found.find({s_active, second}); it != s_found.end())
                 return it->second;
             const auto front = s_campaigns[s_active].front;
             dtb::Macros macros;
             const auto main = dtb::read("ui/main.dta", macros, [front](const std::string &path) { return ark::readFront(front, path); });
-            const dtb::Node *outfit = main ? setCharacter(*main) : nullptr;
-            return s_found[s_active] = outfit ? outfit->text : "punk1";
+            const dtb::Node *outfit = main ? setCharacter(*main, second) : nullptr;
+            return s_found[{s_active, second}] = outfit ? outfit->text : "punk1";
         }
 
         // How far band `slot` is through `game`'s career, 0 to 100: its
@@ -438,8 +440,9 @@ namespace gh2::campaigns
                 return {script::symbol(call.rdram, call.ctx, call.runtime, active()), script::kSymbol};
             if (op == "has")
                 return {indexOf(call.symbol(2)) ? 1u : 0u, script::kInt};
-            if (op == "second_character")
-                return {script::symbol(call.rdram, call.ctx, call.runtime, secondCharacter()), script::kSymbol};
+            if (op == "first_character" || op == "second_character")
+                return {script::symbol(call.rdram, call.ctx, call.runtime, defaultCharacter(op == "second_character")),
+                        script::kSymbol};
             if (op == "progress")
             {
                 // The career being played as it stands, not as last saved.

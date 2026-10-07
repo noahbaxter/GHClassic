@@ -1,0 +1,73 @@
+; GH1's campaign shows GH1's own menus, driven by GH2's scripts: its main
+; menu down its buttons and round, options with GH2's extra rows, the
+; quickplay setlist, then a career's screens to its setlist, and back to
+; GH2's main menu, each with its own game's menu music. The screens after a
+; song are career_gh1's.
+(needs gh1)
+#include common/first_boot.dta
+(wait 1)
+(shot gh2_main)
+{set $ghc_switch gh1}
+{set $ghc_switch_next main_screen}
+{ui goto_screen ghc_switch_screen}
+(wait 3)
+(wait_screen main_screen)
+(expect {campaigns active} gh1)
+; GH1's menu loops, streamed.
+(expect {elem {find $syscfg synth metamusic music} 1} meta_loop1a)
+(expect {elem {find $syscfg synth metamusic play_from_memory} 1} 0)
+(wait 2)
+(shot main)
+(press down)
+(press down)
+(press down)
+(press down)
+(press down)
+(press down)
+(wait 1)
+(shot main_round)
+{ui goto_screen options_screen}
+(wait_screen options_screen)
+(wait 1)
+(press down)
+(wait 1)
+(shot options)
+(press green)
+(wait_screen video_settings_screen)
+{ui goto_screen training_screen}
+(wait_screen training_screen)
+(press green)
+(wait 2.5)
+(shot tutorials)
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 2)
+(shot quickplay_songs)
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+{set $pick gh1}
+#include common/career_start.dta
+(shot career)
+; GH1's hub names the band's status, by GH1's name for it.
+(expect {localize {campaign get_cur_status_sym}} "NOVICE")
+(press green)
+(wait_screen sel_venue_screen 40)
+(wait 1.5)
+(shot venue)
+(expect {game get_venue} battle)
+(press green)
+(wait_screen sel_song_screen)
+(wait 2)
+(shot songs)
+(expect {song_provider get_symbol 0} iloverockandroll)
+{set $ghc_switch gh2}
+{set $ghc_switch_next main_screen}
+{ui goto_screen ghc_switch_screen}
+(wait 3)
+(wait_screen main_screen)
+(expect {campaigns active} gh2)
+(expect {elem {find $syscfg synth metamusic music} 1} metaloop1_warpigs)
+(wait 2)
+(shot gh2_again)
+(quit)

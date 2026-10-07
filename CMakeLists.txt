@@ -232,12 +232,23 @@ set(GHC_GAME_SOURCES
     src/disc/sha1.cpp
     src/disc/volume.cpp
     src/formats/dtb.cpp
+    src/formats/dtb_text.cpp
     src/formats/midi.cpp
     src/gh1/career.cpp
     src/gh1/clips.cpp
     src/gh1/face.cpp
     src/gh1/install.cpp
+    src/gh1/look.cpp
+    src/gh1/menu_scripts.cpp
+    src/gh1/menus.cpp
     src/gh1/rig.cpp
+    src/gh1/scene.cpp
+    src/gh1/screen.cpp
+    src/gh1/screen_gh2.cpp
+    src/gh1/screen_objects.cpp
+    src/gh1/screen_pictures.cpp
+    src/gh1/screen_widgets.cpp
+    src/gh1/screens.cpp
     src/gh1/songs.cpp
     src/gh2x/install.cpp
     src/gh80s/install.cpp
@@ -328,10 +339,12 @@ file(READ src/ui/dta/crowd.dta GHC_CROWD_DTA)
 file(READ src/ui/dta/sel_character.dta GHC_SEL_CHARACTER_DTA)
 file(READ src/ui/dta/quickplay.dta GHC_QUICKPLAY_DTA)
 file(READ src/ui/dta/campaigns.dta GHC_CAMPAIGNS_DTA)
+file(READ src/gh1/menus.dta GHC_GH1_MENUS_DTA)
+file(READ src/ui/dta/picker.dta GHC_PICKER_DTA)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     src/ui/dta/lag_panel.dta src/ui/dta/highscore_panel.dta src/ui/dta/main_menu.dta src/ui/dta/fast_boot.dta
     src/ui/dta/locale.dta src/ui/dta/crowd.dta src/ui/dta/sel_character.dta src/ui/dta/quickplay.dta
-    src/ui/dta/campaigns.dta)
+    src/ui/dta/campaigns.dta src/gh1/menus.dta src/ui/dta/picker.dta)
 configure_file(src/ui/dta/dta.h.in "${GHC_DTA_DIR}/dta.h" @ONLY)
 target_include_directories(GHClassic PRIVATE "${GHC_DTA_DIR}")
 

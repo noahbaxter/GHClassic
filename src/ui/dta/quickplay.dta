@@ -1,40 +1,33 @@
 ; Quickplay's song list, as the game's own (quickplay.dta, career.dta) but
-; showing one of the setlists ({setlist}): yellow GH1, blue GH2, orange 80s,
-; and blue again 360 GH2 (gh2x) and back. Each shows in its own game's
-; scene, which the panel takes at load, so a switch goes to the twin screen,
-; whose own panel loads the new one. Both leave for the main menu, never for
-; each other. The help bar has room for the setlist frets or the strum, not
-; both.
-{func ghc_qp_blue
-   {if_else {&& {== {setlist shown} gh2} {mounted gh2x}} gh2x gh2}
+; showing one of the setlists ({setlist}), picked from a list while yellow
+; is held (picker.dta). Each shows in its own game's scene, which the panel
+; takes at load, so a switch goes to the twin screen, whose own panel loads
+; the new one. Both leave for the main menu, never for each other.
+;
+; The setlists there are to show: GH2's, and each other game's whose disc is
+; mounted ({mounted}, content/games.h).
+{func ghc_setlists
+   {do
+      ($lists)
+      {set $lists ()}
+      {resize $lists 0}
+      {foreach $game (gh1 gh2 gh2x gh80s)
+         {if {|| {== $game gh2} {mounted $game}} {push_back $lists $game}}
+      }
+      $lists
+   }
 }
-; A setlist fret shows only where it goes somewhere: a game whose disc is
-; mounted ({mounted}, content/games.h), and blue's label names where it goes. With none, the game's own
-; bar. Set from the screen's enter, after the help bar's own has put up the
-; screen's default.
+; The yellow fret shows only where there is another setlist. Set from the
+; screen's enter, after the help bar's own has put up the screen's default.
 {func ghc_qp_helpbar
    {do
-      ($array $frets)
+      ($array)
       {set $array ()}
       {resize $array 0}
-      {set $frets FALSE}
       {push_back $array (fret1 help_continue)}
       {push_back $array (fret2 help_back)}
-      {if {mounted gh1}
-         {push_back $array (fret3 setlist_gh1)}
-         {set $frets TRUE}
-      }
-      {if {|| {!= {setlist shown} gh2} {mounted gh2x}}
-         {push_back $array {if_else {== {ghc_qp_blue} gh2x} (fret4 setlist_gh2x) (fret4 setlist_gh2)}}
-         {set $frets TRUE}
-      }
-      {if {mounted gh80s}
-         {push_back $array (fret5 setlist_gh80s)}
-         {set $frets TRUE}
-      }
-      {if {! $frets}
-         {push_back $array (strum help_updown)}
-      }
+      {if {> {size {ghc_setlists}} 1} {push_back $array (fret3 ghc_setlist)}}
+      {push_back $array (strum help_updown)}
       {helpbar set_display $array}
    }
 }
@@ -109,47 +102,51 @@
 {retype sel_song_panel $ghc_sel_song_panel}
 {if {! {exists sel_song_twin_panel}} {new GHPanel sel_song_twin_panel}}
 {retype sel_song_twin_panel $ghc_sel_song_panel}
-; The UI gets blue and orange both as kPad_Square (yellow as kPad_Circle,
-; red as kPad_Tri), so the pad tells them apart.
-{func ghc_qp_button ($panel $twin $button)
+; The UI gets yellow as kPad_Circle and red as kPad_Tri.
+{func ghc_qp_button ($button)
    {cond
+      ({ghc_pick_button $button} TRUE)
       ({== $button kPad_Tri}
          {synth play_sequence button_back.cue}
          {ui goto_screen main_screen FALSE TRUE}
          TRUE
       )
-      ({&& {|| {== $button kPad_Circle} {== $button kPad_Square}}
-            {setlist select
-               {cond ({== $button kPad_Circle} gh1) ({pad_held blue} {ghc_qp_blue}) (TRUE gh80s)}
-            }
-         }
-         {synth play_sequence button_select}
-         {$panel set metamusic_on_exit FALSE}
-         {game set_song_index 0}
-         {ui goto_screen $twin}
+      ({&& {== $button kPad_Circle} {> {size {ghc_setlists}} 1} {! {ui in_transition}}}
+         {ghc_pick_panel open_with {ghc_setlists} {setlist shown}}
          TRUE
       )
       (TRUE kDataUnhandled)
    }
 }
+; The setlist picked, shown by that screen.
+{func ghc_qp_picked ($panel $twin $game)
+   {if {setlist select $game}
+      {synth play_sequence button_select}
+      {$panel set metamusic_on_exit FALSE}
+      {game set_song_index 0}
+      {ui goto_screen $twin}
+   }
+}
 {retype qp_selsong_screen
    (
-      (panels meta sel_song_panel helpbar)
+      (panels meta sel_song_panel helpbar ghc_pick_panel)
       (focus sel_song_panel)
       (sel_song_career FALSE)
       (enter {ghc_qp_helpbar})
       (SELECT_START_MSG {ui goto_screen qp_diff_screen} kDataUnhandled)
-      (BUTTON_DOWN_MSG {ghc_qp_button sel_song_panel qp_selsong_twin_screen $button})
+      (BUTTON_DOWN_MSG {ghc_qp_button $button})
+      (ghc_picked ($game) {ghc_qp_picked sel_song_panel qp_selsong_twin_screen $game})
    )
 }
 {if {! {exists qp_selsong_twin_screen}} {new GHScreen qp_selsong_twin_screen}}
 {retype qp_selsong_twin_screen
    (
-      (panels meta sel_song_twin_panel helpbar)
+      (panels meta sel_song_twin_panel helpbar ghc_pick_panel)
       (focus sel_song_twin_panel)
       (sel_song_career FALSE)
       (enter {ghc_qp_helpbar})
       (SELECT_START_MSG {ui goto_screen qp_diff_screen} kDataUnhandled)
-      (BUTTON_DOWN_MSG {ghc_qp_button sel_song_twin_panel qp_selsong_screen $button})
+      (BUTTON_DOWN_MSG {ghc_qp_button $button})
+      (ghc_picked ($game) {ghc_qp_picked sel_song_twin_panel qp_selsong_screen $game})
    )
 }

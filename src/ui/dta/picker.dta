@@ -1,0 +1,175 @@
+; A list to pick from while yellow is held: it opens in the middle of the
+; screen, the strum steps through it, and letting go picks. It is the help
+; bar's own box and text (helpbar.milo, loaded here a second time): the box
+; as wide as its text and as tall as its rows, drawn three times over to be
+; dark enough to read on, and once more behind the row picked.
+;
+; A screen with this among its panels sends its presses here first
+; ({ghc_pick_button}), opens it on yellow ({ghc_pick_panel open_with}), and
+; is told the pick, where it is not the one the list opened on:
+; (ghc_picked ($option)).
+{if {! {exists ghc_pick_panel}} {new GHPanel ghc_pick_panel}}
+{retype ghc_pick_panel
+   (
+      ; From the ARK root: a path resolves against the file its array came
+      ; from, and this one comes from no file.
+      (file ui/helpbar.milo)
+      (rows (pt0.txt pt1.txt pt2.txt pt3.txt))
+      (box (help_box_left.mesh help_box_mid.mesh help_box_right.mesh))
+      ; The box again, each with the height it draws at over the box's own.
+      (copies
+         (
+            (pb1_left.mesh pb1_mid.mesh pb1_right.mesh 0)
+            (pb2_left.mesh pb2_mid.mesh pb2_right.mesh 0)
+            (pf_left.mesh pf_mid.mesh pf_right.mesh 1)
+         )
+      )
+      (fill (pf_left.mesh pf_mid.mesh pf_right.mesh))
+      (options ())
+      (picked 0)
+      (first 0)
+      (open FALSE)
+      ; A row's height, its text's size against the help bar's, and the
+      ; room either side of the widest (x right, z up, the screen's middle
+      ; 0). The width is the open list's.
+      (height 40)
+      (size 1.8)
+      (margin 18)
+      (width 0)
+      (enter
+         {$this build}
+         {$this shut}
+      )
+      ; The rows, each the help bar's text copied, and the box's copies;
+      ; the rest of the help bar's own stays out of sight.
+      (build
+         {if {! {exists pt0.txt}}
+            {foreach $o
+               (help_bar_strum.mesh help_bar_starting.mesh help_bar_strumbar.mesh help_bar.mesh help_bar.txt)
+               {{$this find $o} set_showing FALSE}
+            }
+            {foreach $row [rows]
+               {new Text $row}
+               {{$this find $row} copy help_bar.txt 0}
+               {{$this find $row} set_local_scale [size] [size] [size]}
+               {{$this find $row} set draw_order 2}
+               {helpbar.view insert (objects 0) {$this find $row}}
+            }
+            ; Sharing the box's mesh (a copy of its own does not draw).
+            {foreach $copy [copies]
+               {foreach_int $i 0 3
+                  {new Mesh {elem $copy $i}}
+                  {{$this find {elem $copy $i}} copy {$this find {elem [box] $i}} 1}
+                  {{$this find {elem $copy $i}} set draw_order {elem $copy 3}}
+                  {helpbar.view insert (objects 0) {$this find {elem $copy $i}}}
+               }
+            }
+            ; The fill is the box's shape in plain white, a quarter there.
+            {new Mat pf.mat}
+            {pf.mat copy help_box_mid.mat 0}
+            {pf.mat set diffuse_tex ''}
+            {pf.mat set alpha 0.25}
+            {foreach $o [fill] {{$this find $o} set_mat pf.mat}}
+            ; The boxes, then the fill, then the text.
+            {helpbar.view sort_draws}
+            {{$this loaded_dir} sync_objects}
+         }
+      )
+      ; A box of those three, that tall, its middle at that height. Its
+      ; ends are 40 high and its middle 16 by 40, as the help bar stretches
+      ; them (HelpBarElement, 0x1511d8).
+      (stretch
+         ($box $z $tall)
+         {do
+            ($x {/ [width] -2.0})
+            ($by {/ $tall 40.0})
+            {{$this find {elem $box 0}} set_local_pos $x 0 $z}
+            {{$this find {elem $box 0}} set_local_scale -0.5 1 {'*' -2.5 $by}}
+            {{$this find {elem $box 1}} set_local_pos $x 0 $z}
+            {{$this find {elem $box 1}} set_local_scale {/ [width] 16.0} 1 $by}
+            {{$this find {elem $box 2}} set_local_pos {'+' $x [width]} 0 $z}
+            {{$this find {elem $box 2}} set_local_scale 0.5 1 {'*' 2.5 $by}}
+            {foreach_int $i 0 3 {{$this find {elem $box $i}} set_showing TRUE}}
+         }
+      )
+      ; That row's height on screen, the list's middle at 0.
+      (row_z ($i) {'*' [height] {'-' {/ {'-' {size [options]} 1} 2.0} $i}})
+      ; Open on those options, the list's top first, with that one picked.
+      (open_with
+         ($options $current)
+         {set [options] $options}
+         {set [picked] 0}
+         {set [width] 0}
+         {foreach_int $i 0 {size $options}
+            {do
+               ($text {localize {sprint "setlist_" {elem $options $i}}})
+               ($wide {'*' [size] {help_bar.txt get_string_width $text}})
+               {{$this find {elem [rows] $i}} set_text $text}
+               {if {> $wide [width]} {set [width] $wide}}
+               {if {== {elem $options $i} $current} {set [picked] $i}}
+            }
+         }
+         {set [first] [picked]}
+         {foreach_int $i 0 {size [rows]}
+            {do
+               ($row {$this find {elem [rows] $i}})
+               {$row set_showing {< $i {size $options}}}
+               {if {< $i {size $options}}
+                  {$row set_local_pos {/ [width] -2.0} 0 {$this row_z $i}}
+               }
+            }
+         }
+         {set [width] {'+' [width] {'*' 2 [margin]}}}
+         {$this stretch [box] 0 {'+' {'*' [height] {size $options}} 12}}
+         {foreach $copy [copies]
+            {if {== {elem $copy 3} 0}
+               {$this stretch $copy 0 {'+' {'*' [height] {size $options}} 12}}
+            }
+         }
+         {set [open] TRUE}
+         {$this paint}
+      )
+      ; The fill has no round ends to draw.
+      (paint
+         {$this stretch [fill] {$this row_z [picked]} [height]}
+         {pf_left.mesh set_showing FALSE}
+         {pf_right.mesh set_showing FALSE}
+      )
+      ; Up or down the list, round its ends.
+      (step
+         ($by)
+         {set [picked] {mod {'+' {'+' [picked] $by} {size [options]}} {size [options]}}}
+         {synth play_sequence button_focus}
+         {$this paint}
+      )
+      (shut
+         {foreach $o [rows] {{$this find $o} set_showing FALSE}}
+         {foreach $o [box] {{$this find $o} set_showing FALSE}}
+         {foreach $copy [copies]
+            {foreach_int $i 0 3 {{$this find {elem $copy $i}} set_showing FALSE}}
+         }
+         {set [open] FALSE}
+      )
+      ; Yellow let go: the pick, to the screen.
+      (poll
+         {if {&& [open] {! {pad_held yellow}}}
+            {$this shut}
+            {if {!= [picked] [first]}
+               {{ui current_screen} ghc_picked {elem [options] [picked]}}
+            }
+         }
+      )
+   )
+}
+; A screen's press while the list may be open: with it open the strum steps
+; it and nothing else gets the press.
+{func ghc_pick_button ($button)
+   {if_else {ghc_pick_panel get open}
+      {do
+         {if {== $button kPad_DUp} {ghc_pick_panel step -1}}
+         {if {== $button kPad_DDown} {ghc_pick_panel step 1}}
+         TRUE
+      }
+      FALSE
+   }
+}

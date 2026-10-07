@@ -28,16 +28,14 @@
 (shot character)
 ; GH1's eight, each its GH1 self; Izzy and the Ripper are the store's.
 (expect {size {find $syscfg characters}} 9)
-(expect {game get_character_outfit} punkgh1)
+(expect {game get_character_outfit} metalgh1)
 (expect {campaign is_unlocked glam} 0)
 (expect {campaign is_unlocked metal} 1)
 (press green)
 (wait_screen sel_guitar_new_screen)
 (wait 3)
 (shot guitar)
-(press green)
-(wait_screen tour_start_screen)
-(wait 1)
+; No sponsor, as GH1 has none.
 (press green)
 (wait_screen career_screen 40)
 (wait 1)

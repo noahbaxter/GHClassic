@@ -1,6 +1,7 @@
 ; Quickplay's setlists follow the discs: each game's list can be shown
-; exactly when its disc is mounted, and blue goes to 360 only when it is.
-; Holds with any set of discs (ghc.py scenarios --discs).
+; exactly when its disc is mounted. Yellow held lists them, the strum steps
+; down the list without moving the songs, and letting go shows the one
+; picked. Holds with any set of discs (ghc.py scenarios --discs).
 #include common/first_boot.dta
 {gamecfg set mode quickplay}
 {ui goto_screen qp_selsong_screen}
@@ -8,10 +9,31 @@
 (wait 2)
 (shot list)
 (expect {setlist shown} gh2)
-(expect {== {ghc_qp_blue} gh2x} {mounted gh2x})
+(expect {size {ghc_setlists}} {'+' {'+' 1 {mounted gh1}} {'+' {mounted gh2x} {mounted gh80s}}})
 (expect {setlist select gh1} {mounted gh1})
 {setlist select gh2}
 (expect {setlist select gh80s} {mounted gh80s})
 {setlist select gh2}
 (expect {setlist select gh2x} {mounted gh2x})
+{setlist select gh2}
+; Yellow and the strum are libpad's 0x1000 and 0x40.
+{set $at 0}
+{foreach_int $i 0 {size {ghc_setlists}} {if {== {elem {ghc_setlists} $i} gh2} {set $at $i}}}
+{set $want {elem {ghc_setlists} {mod {'+' $at 1} {size {ghc_setlists}}}}}
+(hold 4096)
+(wait 1)
+(expect {ghc_pick_panel get open} {> {size {ghc_setlists}} 1})
+(hold 4160)
+(wait 0.3)
+(hold 4096)
+(wait 1)
+(shot picking)
+; With no list to open, the strum moves the songs as ever.
+(expect {game get_song_index} {if_else {> {size {ghc_setlists}} 1} 0 1})
+(expect {setlist shown} gh2)
+(hold 0)
+(wait 3)
+(expect {ghc_pick_panel get open} 0)
+(expect {setlist shown} $want)
+(shot picked)
 (quit)
