@@ -238,6 +238,7 @@ set(GHC_GAME_SOURCES
     src/gh1/face.cpp
     src/gh1/install.cpp
     src/gh1/rig.cpp
+    src/gh1/scene.cpp
     src/gh1/songs.cpp
     src/gh2x/install.cpp
     src/gh80s/install.cpp
