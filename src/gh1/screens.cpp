@@ -2,6 +2,17 @@
 
 namespace gh2::gh1
 {
+    namespace
+    {
+        // Where an object of GH2's goes to be out of sight.
+        constexpr float kAway = -5000.0f;
+
+        // GH1's portraits and their lit Views, named for its folders, by
+        // GH2's characters (gh1/guitarist.h), for scripts to find by them.
+        const std::vector<std::pair<const char *, const char *>> kHeroes = {
+            {"sc_char_hair_metal", "sc_char_glam"}, {"sc_char_nu_metal", "sc_char_goth"}, {"sc_char_hiphop", "sc_char_funk1"}};
+    }
+
     const std::vector<Screen> &screens()
     {
         static const std::vector<Screen> kScreens = {
@@ -40,6 +51,17 @@ namespace gh2::gh1
             {"endgame"},
             {"cashaward"},
             {"complete"},
+            // GH1 picks a hero from a wall of portraits, each lit by its own
+            // View, for the script to light (ui/dta/sel_character.dta).
+            // GH2's list still does the picking, out of sight, and its
+            // placer stands the hero where GH1's own scene for one does
+            // (char_single.gh).
+            {.gh1 = "sel_character",
+             .renamed = kHeroes,
+             .placed = {{"char_single.placer", -10.0f, -640.0f, -48.0f}, {"character.lst", kAway, 0.0f, 0.0f}}},
+            // GH2's guitar is its display's, shown by a proxy, here in GH1's
+            // case.
+            {.gh1 = "sel_guitar", .without = {"guitar.grp"}, .placed = {{"guitar.pxy", 15.0f, -685.0f, -10.0f, 0.8f}}},
         };
         return kScreens;
     }
