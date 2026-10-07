@@ -48,9 +48,14 @@ namespace gh2::gh1
             {"tutorials"},
             {"bonus_material"},
             {"loading"},
+            {"meta_loading"},
             {"endgame"},
             {"cashaward"},
             {"complete"},
+            {"highscore"},
+            {"splash"},
+            {"guitar_help"},
+            {"dialog"},
             // GH1 picks a hero from a wall of portraits, each lit by its own
             // View, for the script to light (ui/dta/sel_character.dta).
             // GH2's list still does the picking, out of sight, and its
@@ -71,6 +76,7 @@ namespace gh2::gh1
                         {"song_logos.pic", kAway, 0.0f, 0.0f},
                         {"st_sold.mesh", kAway, 0.0f, 0.0f}}},
             {"store_back"},
+            {"store_bought"},
             // GH1 marks a new status with a newspaper, where GH2 has a
             // sponsor's letter for the status reached (endgame.dta's
             // status_panel).
@@ -94,6 +100,12 @@ namespace gh2::gh1
                       {"video_options.btn", -42.0f, "audio_options.btn", "VIDEO"},
                       {"quit.btn", -56.0f}}},
             {.gh1 = "pause_controller", .renamed = {{"pause_controller_resume.btn", "resume.btn"}}},
+            {"pause_settings", "pause_audio_settings"},
+            {.gh1 = "tut_pause",
+             .renamed = {{"tut_pause_resume.btn", "resume.btn"},
+                         {"tut_pause_restart.btn", "restart.btn"},
+                         {"tut_pause_quit.btn", "quit.btn"}}},
+            {"tut_pause_controller"},
             // GH1 has one list of buttons where GH2 has one for a career
             // and one for the rest: its own is GH2's for the rest, shown in
             // a career too (menus.dta).
