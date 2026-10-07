@@ -35,9 +35,7 @@
 (wait_screen sel_guitar_new_screen)
 (wait 3)
 (shot guitar)
-(press green)
-(wait_screen tour_start_screen)
-(wait 1)
+; No sponsor, as GH1 has none.
 (press green)
 (wait_screen career_screen 40)
 (wait 1)

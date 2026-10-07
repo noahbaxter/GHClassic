@@ -1,8 +1,7 @@
 ; GH1's campaign shows GH1's own menus, driven by GH2's scripts: its main
-; menu down its buttons and round, options with GH2's extra rows, its
-; tutorials, the quickplay setlist, the band list and a career's
-; difficulties, and back to GH2's main menu. The screens after a song are
-; career_gh1's.
+; menu down its buttons and round, options with GH2's extra rows, the
+; quickplay setlist, then a career's screens to its setlist, and back to
+; GH2's main menu. The screens after a song are career_gh1's.
 (needs gh1)
 #include common/first_boot.dta
 (wait 1)
@@ -41,22 +40,23 @@
 (wait_screen qp_selsong_screen)
 (wait 2)
 (shot quickplay_songs)
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+{set $pick gh1}
+#include common/career_start.dta
+(shot career)
+; GH1's hub names the band's status, by GH1's name for it.
+(expect {localize {campaign get_cur_status_sym}} "NOVICE")
+(press green)
+(wait_screen sel_venue_screen 40)
+(wait 1.5)
+(shot venue)
+(expect {game get_venue} battle)
+(press green)
+(wait_screen sel_song_screen)
+(wait 2)
+(shot songs)
 (expect {song_provider get_symbol 0} iloverockandroll)
-{ui goto_screen main_screen}
-(wait_screen main_screen)
-{gamecfg set mode career}
-{campaign set_profile_name "The Testers" 0}
-{ui goto_screen chooseprof_screen}
-(wait_screen chooseprof_screen)
-(wait 1.5)
-(shot bands)
-{campaign set_profile_slot 0}
-{ui goto_screen sel_difficulty_screen}
-(wait_screen sel_difficulty_screen)
-(wait 1.5)
-(shot difficulty)
-{ui goto_screen main_screen}
-(wait_screen main_screen)
 {set $ghc_switch gh2}
 {set $ghc_switch_next main_screen}
 {ui goto_screen ghc_switch_screen}
