@@ -4,6 +4,7 @@
 #include "disc/ark.h"
 #include "content/encores.h"
 #include "content/games.h"
+#include "content/heaps.h"
 #include "content/locale.h"
 #include "content/outfits.h"
 #include "content/campaigns.h"
@@ -51,6 +52,7 @@ namespace
     void applySlus21447(PS2Runtime &runtime)
     {
         gh2::ark::install(runtime, gh2::kSlus21447);
+        gh2::installHeaps();
         gh2::installEighties();
         gh2::installGh1();
         gh2::installGh2x();

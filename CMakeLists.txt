@@ -202,6 +202,7 @@ set(GHC_GAME_SOURCES
     src/content/card.cpp
     src/content/encores.cpp
     src/content/games.cpp
+    src/content/heaps.cpp
     src/content/locale.cpp
     src/content/mogg.cpp
     src/content/outfits.cpp
