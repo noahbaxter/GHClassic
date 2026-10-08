@@ -213,6 +213,7 @@ set(GHC_GAME_SOURCES
     src/content/campaigns.cpp
     src/content/card.cpp
     src/content/crowd_cards.cpp
+    src/content/focus.cpp
     src/content/encores.cpp
     src/content/games.cpp
     src/content/locale.cpp

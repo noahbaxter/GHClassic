@@ -480,10 +480,16 @@ namespace gh2::gh1
                 putF32(out, at.z);
                 putF32(out, spot.x);
                 putF32(out, spot.y);
-                // Blur before and behind what it looks at, as GH2's shots.
+                // Blur behind twice as far as what it looks at (VenueCam::Poll,
+                // GH1 0x16ea0c), which GH1 measures before the screen spot
+                // moves the camera. A key GH2 holds is measured after
+                // (CamShotFrame::Interp, 0x26696c), farther by this, which
+                // goes where the PS2 reads no blur amount (content/focus.h).
+                const float half = std::tan((fovIn + (shot.number("fov_out", 0u, 45.0f) - fovIn) * u) * 0.0174533f * 0.5f);
+                const float moved = std::sqrt(1.0f + spot.x * half * spot.x * half + spot.y * half * 0.75f * spot.y * half * 0.75f);
                 putF32(out, 0.5f);
                 putF32(out, 2.0f);
-                putF32(out, 0.9f);
+                putF32(out, i == steps ? moved : 1.0f);
                 putU32(out, static_cast<uint32_t>(targets.size()));
                 for (const Target &looked : targets)
                     put(out, looked);
