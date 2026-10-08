@@ -144,9 +144,8 @@ namespace gh2
             const uint32_t owner = load<uint32_t>(rdram, mesh + milo::mesh::kOwner);
             std::shared_ptr<const MeshData> geometry = capturedMesh(rdram, owner);
             // Retail draws nothing, and calls nothing, until the owner has a
-            // packet (0x3d890c).
-            const bool synced = load<uint32_t>(rdram, owner + milo::mesh::kPacket) != 0u;
-            if (synced && geometry && !geometry->indices.empty())
+            // packet (0x3d890c), which a sync with faces and verts gives it.
+            if (geometry && !geometry->indices.empty() && !geometry->verts.empty())
             {
                 DrawCall draw;
                 const uint32_t bones = load<uint32_t>(rdram, mesh + milo::mesh::kBones);
@@ -191,10 +190,9 @@ namespace gh2
             const uint32_t mesh = load<uint32_t>(rdram, multi + milo::multimesh::kMesh);
             const uint32_t owner = mesh != 0u ? load<uint32_t>(rdram, mesh + milo::mesh::kOwner) : 0u;
             std::shared_ptr<const MeshData> geometry = owner != 0u ? capturedMesh(rdram, owner) : nullptr;
-            const bool synced = owner != 0u && load<uint32_t>(rdram, owner + milo::mesh::kPacket) != 0u;
             const uint32_t sentinel = multi + milo::multimesh::kInstances;
             const uint32_t first = load<uint32_t>(rdram, sentinel);
-            if (synced && geometry && !geometry->indices.empty() && first != sentinel)
+            if (geometry && !geometry->indices.empty() && !geometry->verts.empty() && first != sentinel)
             {
                 // Retail asks for the camera's world on every draw (0x1a31d0).
                 const Matrix cameraWorld =

@@ -21,8 +21,14 @@ namespace gh2
         uint32_t gamePanelExit;
         uint32_t winCampaignSong; // GameConfig::WinCampaignSong
         uint32_t psMeshSync;
-        uint32_t psMeshFixVerts;
+        uint32_t psMeshUpdateFacePacket;
+        uint32_t psMeshCopy;
         uint32_t psMeshDestroy;
+        uint32_t psRndSyncFree; // PsRnd::SyncFree(MemHandle *)
+        uint32_t thePsRnd;
+        uint32_t meshStrips; // the list of strips RndMesh::Load read, a mesh's face groups in order
+        uint32_t memFree;
+        uint32_t memOrPoolFree;
         uint32_t psMeshDrawShowing;
         uint32_t psMultiMeshDrawShowing;
         uint32_t psParticleSysDrawShowing;
@@ -226,8 +232,14 @@ namespace gh2
         .gamePanelExit = 0x106d50u,
         .winCampaignSong = 0x126f10u,
         .psMeshSync = 0x3d4f08u,
-        .psMeshFixVerts = 0x19dbb8u,
+        .psMeshUpdateFacePacket = 0x3d47f0u,
+        .psMeshCopy = 0x19dc38u,
         .psMeshDestroy = 0x19dd88u,
+        .psRndSyncFree = 0x19b758u,
+        .thePsRnd = 0x46cb20u,
+        .meshStrips = 0x471dd8u,
+        .memFree = 0x2ceb48u,
+        .memOrPoolFree = 0x2cf210u,
         .psMeshDrawShowing = 0x3d88d8u,
         .psMultiMeshDrawShowing = 0x1a2f00u,
         .psParticleSysDrawShowing = 0x1a2c28u,

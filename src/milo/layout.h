@@ -189,7 +189,8 @@ namespace milo
         constexpr uint32_t kTransform = 0x40u;   // the RndTransformable base
         constexpr uint32_t kObjectBase = 0x160u; // the Hmx::Object virtual base, in a PsMesh
         constexpr uint32_t kMutable = 0x140u;    // the sync bits that change again: such parts are kept
-        constexpr uint32_t kPacket = 0x150u;     // PsMesh's face packet MemHandle*, null until synced
+        constexpr uint32_t kGroups = 0x128u;     // the face groups' list, its own sentinel
+        constexpr uint32_t kPacket = 0x150u;     // PsMesh's face packet MemHandle*: retail's, never built here
         constexpr uint32_t kPacketQuads = 0x154u; // u16, the packet's length
         constexpr uint32_t kVertSize = 0x40u;
         constexpr uint32_t kFaceSize = 6u;
