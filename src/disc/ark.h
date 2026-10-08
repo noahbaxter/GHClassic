@@ -33,6 +33,16 @@ namespace gh2::ark
     };
     void addMade(const std::string &path, std::function<std::optional<Made>()> make);
 
+    // A file served in place of that disc's own copy of `path`, wherever its
+    // copy would be (as a rename's source, under a layer over it, or in the
+    // disc's turn) and nowhere else, made when the game first asks for it.
+    // None leaves the disc's own. Once install has run.
+    void addMade(size_t disc, const std::string &path, std::function<std::optional<Made>()> make);
+
+    // That disc's archive paths starting `prefix`, in order, once install
+    // has run.
+    std::vector<std::string> paths(size_t disc, const std::string &prefix);
+
     // Every file under `root`, at its path relative to it. False, with the
     // reason printed, if it cannot be read.
     bool addFolder(const std::string &root);
