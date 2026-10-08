@@ -9,6 +9,7 @@
 #include "content/encores.h"
 #include "content/quickplay.h"
 #include "content/games.h"
+#include "content/heaps.h"
 #include "content/hidden_guitars.h"
 #include "content/tour_or_higher.h"
 #include "content/locale.h"
@@ -60,6 +61,7 @@ namespace
     void applySlus21447(PS2Runtime &runtime)
     {
         gh2::ark::install(runtime, gh2::kSlus21447);
+        gh2::installHeaps();
         gh2::installEighties();
         gh2::installGh1();
         gh2::installGh2x();

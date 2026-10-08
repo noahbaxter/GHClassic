@@ -219,6 +219,7 @@ set(GHC_GAME_SOURCES
     src/content/encores.cpp
     src/content/quickplay.cpp
     src/content/games.cpp
+    src/content/heaps.cpp
     src/content/locale.cpp
     src/content/mogg.cpp
     src/content/hidden_guitars.cpp
