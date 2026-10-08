@@ -10,6 +10,7 @@
 #include "ps2_runtime_macros.h"
 #include "render/camera.h"
 #include "render/frame.h"
+#include "render/texture_store.h"
 #include "settings/settings.h"
 
 #include <memory>
@@ -131,6 +132,7 @@ namespace gh2
         {
             addDepthOfField(rdram, GPR_U32(ctx, 4), building());
             frames().publish(building());
+            textures::endFrame();
         }
     }
 
