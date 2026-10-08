@@ -14,6 +14,7 @@ namespace gh2::settings
         kMipmaps,   // smaller copies for textures the game shipped without
         kMsaa,      // samples per pixel
         kFrustumCull, // nothing drawn for what its sphere puts off the picture
+        kTextures,  // kPs2 or kX360: whose textures the track, HUD and menus draw
         kVideoLagMs, // how late the picture reaches the player
         kAudioLagMs, // how late the sound does
         kBandVolume, // the game's own volumes, 0 to 11
@@ -35,6 +36,13 @@ namespace gh2::settings
     {
         kChd,
         kIso,
+    };
+
+    // Which GH2's assets are drawn.
+    enum AssetSet
+    {
+        kPs2,
+        kX360, // the 360 disc's, while it is mounted
     };
 
     int get(Key key);

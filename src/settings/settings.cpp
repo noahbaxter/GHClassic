@@ -55,6 +55,9 @@ namespace gh2::settings
             // Off: a sphere that holds only part of its mesh hides what still
             // shows (flashpot_4.mesh in battle's fail sequence).
             {"video", "frustum_cull", Type::kBool, 0, 1, 1, 0, 1},
+            // x360: the 360 disc's sharper pictures on the track, HUD and
+            // menus, taken as each scene loads (gh2x/textures.h).
+            {"video", "textures", Type::kChoice, 0, 1, 1, kPs2, kPs2, "ps2 x360"},
             // 5 ms: finer is below what a player can feel.
             {"latency", "video_ms", Type::kInt, -500, 500, 5, 0, 0},
             // 45 by default: the port's own delay on macOS, SDL's CoreAudio
