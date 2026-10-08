@@ -240,8 +240,10 @@ set(GHC_GAME_SOURCES
     src/disc/disc.cpp
     src/disc/sha1.cpp
     src/disc/volume.cpp
+    src/formats/bitmap.cpp
     src/formats/dtb.cpp
     src/formats/dtb_text.cpp
+    src/formats/dxt.cpp
     src/formats/midi.cpp
     src/gh1/band.cpp
     src/gh1/cameras.cpp
@@ -271,6 +273,7 @@ set(GHC_GAME_SOURCES
     src/gh2x/install.cpp
     src/gh80s/install.cpp
     src/milo/milo.cpp
+    src/milo/objects.cpp
     src/movie/movie.cpp
     src/movie/pss.cpp
     src/movie/screen.cpp
