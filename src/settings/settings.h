@@ -39,6 +39,7 @@ namespace gh2::settings
         kGems,         // outside a career, whose gems: the in-song look's, or one game's
         kMenuMusic,    // outside a career, whose menu loops: the theme's, one game's, or every game's
         kMenuMusicOrder, // the loops one after another in order, one over and over, or shuffled
+        kTextures,  // kPs2 or kX360: whose textures the track, HUD and menus draw
         kKeyCount,
     };
 
@@ -91,6 +92,13 @@ namespace gh2::settings
         kBandVenue,
         kBandGh2,
         kBandGh1,
+    };
+
+    // Which GH2's assets are drawn.
+    enum AssetSet
+    {
+        kPs2,
+        kX360, // the 360 disc's, while it is mounted
     };
 
     int get(Key key);

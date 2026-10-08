@@ -95,6 +95,9 @@ namespace gh2::settings
             {"menu_music", Type::kChoice, 0, 4, 1, kMusicTheme, "theme gh1 gh2 gh80s all"},
             // Retail plays one loop over and over.
             {"menu_music_order", Type::kChoice, 0, 2, 1, kOrderLoop, "playlist loop shuffle"},
+            // x360: the 360 disc's sharper pictures on the track, HUD and
+            // menus, taken as each scene loads (gh2x/textures.h).
+            {"textures", Type::kChoice, 0, 1, 1, kPs2, "ps2 x360"},
         };
 
         // By its name, or one it went by before.
