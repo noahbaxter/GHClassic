@@ -288,6 +288,7 @@ set(GHC_GAME_SOURCES
     src/render/native_rect.cpp
     src/render/native_rnd.cpp
     src/render/texture_capture.cpp
+    src/render/texture_store.cpp
 )
 
 add_executable(GHClassic
