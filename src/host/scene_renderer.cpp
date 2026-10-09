@@ -1475,6 +1475,8 @@ namespace gh2
             push.flags |= (draw.skinBones - 1u) << kSkinBonesShift;
             if (material.highlight)
                 push.flags |= kFlagHighlight;
+            if (material.decal)
+                push.flags |= kFlagDecal;
             push.boneBase = boneBases[i];
             push.lightBase = lightBases[i];
             push.envBase = envBases[i];

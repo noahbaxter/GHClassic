@@ -73,6 +73,7 @@ namespace gh2
         bool prelit = false;
         bool vertDyn = false; // lights scaled by the vertex colour: GH1's, which GH2's loader drops
         bool highlight = false; // GS HIGHLIGHT texturing, PsMat +0x130 == 2
+        bool decal = false;     // GS DECAL texturing: the texel as it is. GH1's alone
         // Sampled as the mean of four texels, color[0] and [1] apart in u and
         // v (addDepthOfField). The colour is then the vertex's alone.
         bool spread = false;

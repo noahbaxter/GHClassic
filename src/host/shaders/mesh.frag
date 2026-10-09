@@ -23,6 +23,7 @@ const uint kFlagAlphaCut = 16u;
 const uint kFlagHighlight = 512u;
 const uint kFlagSpread = 2048u;
 const uint kFlagSetAlpha = 4096u;
+const uint kFlagDecal = 16384u;
 
 void main()
 {
@@ -34,7 +35,8 @@ void main()
         texel = 0.25 * (texture(tex, vUv + vec2(-h.x, -h.y)) + texture(tex, vUv + vec2(h.x, -h.y)) +
                         texture(tex, vUv + vec2(-h.x, h.y)) + texture(tex, vUv + vec2(h.x, h.y)));
     }
-    vec4 color = texel * vColor;
+    // TFX DECAL: the texel alone.
+    vec4 color = (pc.flags & kFlagDecal) != 0u ? texel : texel * vColor;
     if ((pc.flags & kFlagHighlight) != 0u)
     {
         // TFX HIGHLIGHT: Ct * Cf + Af, alpha At + Af. Af is the vertex

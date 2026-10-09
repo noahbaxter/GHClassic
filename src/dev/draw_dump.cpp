@@ -262,14 +262,14 @@ namespace gh2
                              "\"rect\": [%.9g, %.9g, %.9g, %.9g], "
                              "\"blend\": %u, \"zMode\": %u, \"mode\": %u, \"alphaCut\": %s, \"alphaWrite\": %s, "
                              "\"destAlphaTest\": %s, \"intensify\": %s, \"texWrap\": %s, \"skinned\": %s, "
-                             "\"renderTarget\": %u, \"highlight\": %s, ",
+                             "\"renderTarget\": %u, \"highlight\": %s, \"decal\": %s, ",
                              first ? "" : ",\n", i, draw.screen ? "true" : "false", camera.target, camera.targetWidth,
                              camera.targetHeight, camera.rect[0],
                              camera.rect[1], camera.rect[2], camera.rect[3], m.blend, m.zMode, pc.flags & 7u,
                              (pc.flags & kFlagAlphaCut) ? "true" : "false", m.alphaWrite ? "true" : "false",
                              m.destAlphaTest ? "true" : "false", (pc.flags & kFlagIntensify) ? "true" : "false",
                              m.texWrap ? "true" : "false", draw.skinned ? "true" : "false", m.renderTarget,
-                             (pc.flags & kFlagHighlight) ? "true" : "false");
+                             (pc.flags & kFlagHighlight) ? "true" : "false", (pc.flags & kFlagDecal) ? "true" : "false");
                 std::fprintf(file, "\"name\": \"%s\", ", quoted(draw.name).c_str());
                 first = false;
                 if (m.renderTarget != 0u)

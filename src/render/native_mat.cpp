@@ -20,6 +20,7 @@
 #include "ps2_runtime.h"
 #include "render/texture_capture.h"
 
+#include <unordered_map>
 #include <unordered_set>
 
 namespace gh2
@@ -35,14 +36,52 @@ namespace gh2
         // vertex colour where the material's scales them otherwise. Only
         // GH1's files are that old: every Mat on GH2's and the 80s' discs is
         // rev 27.
+        //
+        // A GH1 material's stages after the first are passes of their own
+        // here (RndMat::LoadStages, 0x1bf350), which Load then makes white
+        // and unlit (MakeWhite, 0x1bf328). GH1 lights every pass by the
+        // material's own flags and colour (PsMat::UpdatePass, GH1 0x19d550),
+        // so a pass is read as its material for those.
         const Addresses *s_addresses = nullptr;
         PS2Runtime::RecompiledFunction s_read = nullptr;
-        std::unordered_set<uint32_t> s_vertDyn; // the RndMats loaded with it
+        std::unordered_set<uint32_t> s_vertDyn;           // the RndMats loaded with it
+        std::unordered_map<uint32_t, uint32_t> s_passOf; // a rev under 25's pass, and its material
+        std::unordered_set<uint32_t> s_modulated;        // the materials whose passes modulate: multiPass 2
+        PS2Runtime::RecompiledFunction s_readEndian = nullptr;
 
         struct LoadTag;
         void onLoad(uint8_t *, R5900Context *ctx, PS2Runtime *)
         {
             s_vertDyn.erase(GPR_U32(ctx, 4));
+            s_passOf.erase(GPR_U32(ctx, 4));
+            s_modulated.erase(GPR_U32(ctx, 4));
+        }
+
+        struct DtorTag;
+        void onDtor(uint8_t *, R5900Context *ctx, PS2Runtime *)
+        {
+            s_vertDyn.erase(GPR_U32(ctx, 4));
+            s_passOf.erase(GPR_U32(ctx, 4));
+            s_modulated.erase(GPR_U32(ctx, 4));
+        }
+
+        // BinStream::ReadEndian(void *, int) (0x2c8e20), as Load calls it
+        // for a rev under 25's multiPass, which it keeps only as whether to
+        // make the passes white (0x1c02a4).
+        void readEndian(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t returnTo = GPR_U32(ctx, 31);
+            if (returnTo != s_addresses->rndMatLoadMultiPass)
+            {
+                s_readEndian(rdram, ctx, runtime);
+                return;
+            }
+            const uint32_t mat = GPR_U32(ctx, 17), into = GPR_U32(ctx, 5);
+            runtime->callGuestFunction(rdram, ctx, s_addresses->binStreamReadEndian,
+                                       {GPR_U32(ctx, 4), into, GPR_U32(ctx, 6)}, s_readEndian);
+            if (load<uint32_t>(rdram, into) == 2u)
+                s_modulated.insert(mat);
+            ctx->pc = returnTo;
         }
 
         // BinStream::Read(void *, int) (0x2c8c50), as Load calls it for
@@ -62,6 +101,8 @@ namespace gh2
                                        {GPR_U32(ctx, 4), into, GPR_U32(ctx, 6)}, s_read);
             if (load<uint8_t>(rdram, into) != 0u)
                 s_vertDyn.insert(mat);
+            for (uint32_t pass = nextPass(rdram, mat), n = 0; pass != 0u && n < 8u; pass = nextPass(rdram, pass), ++n)
+                s_passOf[pass] = mat;
             ctx->pc = returnTo;
         }
 
@@ -148,18 +189,20 @@ namespace gh2
     Material readMaterial(uint8_t *rdram, uint32_t mat)
     {
         Material m;
-        m.vertDyn = s_vertDyn.count(mat) != 0u;
+        const auto pass = s_passOf.find(mat);
+        const uint32_t lit = pass != s_passOf.end() ? pass->second : mat;
+        m.vertDyn = s_vertDyn.count(lit) != 0u;
         m.blend = load<uint32_t>(rdram, mat + milo::mat::kBlend);
         m.zMode = load<uint32_t>(rdram, mat + milo::mat::kZMode);
         for (uint32_t i = 0; i < 4; ++i)
-            m.color[i] = load<float>(rdram, mat + milo::mat::kColor + i * 4u);
+            m.color[i] = load<float>(rdram, lit + milo::mat::kColor + i * 4u);
         m.intensify = load<uint32_t>(rdram, mat + milo::mat::kIntensify) != 0u;
         m.alphaCut = load<uint32_t>(rdram, mat + milo::mat::kAlphaCut) != 0u;
         m.alphaWrite = load<uint32_t>(rdram, mat + milo::mat::kAlphaWrite) != 0u;
         m.destAlphaTest = load<uint32_t>(rdram, mat + milo::mat::kDestAlphaTest) != 0u;
         m.texWrap = load<uint32_t>(rdram, mat + milo::mat::kTexWrap) != 0u;
-        m.useEnviron = load<uint32_t>(rdram, mat + milo::mat::kUseEnviron) != 0u;
-        m.prelit = load<uint32_t>(rdram, mat + milo::mat::kPrelit) != 0u;
+        m.useEnviron = load<uint32_t>(rdram, lit + milo::mat::kUseEnviron) != 0u;
+        m.prelit = load<uint32_t>(rdram, lit + milo::mat::kPrelit) != 0u;
         // Update drops the texture for a dest-blended material.
         if (m.blend != milo::mat::kBlendDest)
         {
@@ -171,6 +214,18 @@ namespace gh2
             // Update: the add blend alone (0x19d064), textured and not prelit (0x19d2b0).
             m.highlight = tex != 0u && (type & milo::tex::kTypeFrameBuffer) == 0u &&
                           m.blend == milo::mat::kBlendAdd && !m.prelit;
+            // GH1 textures a pass after the first as DECAL (UpdatePass, GH1
+            // 0x19d6c8: PsTex's blend 1 of its table at 0x2edd80), but for a
+            // multiPass 2 material, whose passes modulate.
+            m.decal = tex != 0u && pass != s_passOf.end() && s_modulated.count(lit) == 0u;
+            if (m.decal)
+            {
+                m.highlight = false;
+                // A DECAL pass is unlit: its lit word is zeroed (UpdatePass,
+                // GH1 0x19d774), so it draws the vertex colour as stored.
+                m.useEnviron = false;
+                m.prelit = true;
+            }
         }
         m.texGen = load<uint32_t>(rdram, mat + milo::mat::kTexGen);
         if (m.texGen == milo::mat::kTexGenXfm || m.texGen == milo::mat::kTexGenXfmOrigin)
@@ -190,8 +245,11 @@ namespace gh2
     {
         s_addresses = &addresses;
         EntryHook<LoadTag>::install(runtime, addresses.rndMatLoad, onLoad);
+        EntryHook<DtorTag>::install(runtime, addresses.rndMatDtor, onDtor);
         s_read = runtime.lookupFunction(addresses.binStreamRead);
         runtime.replaceFunction(addresses.binStreamRead, &read);
+        s_readEndian = runtime.lookupFunction(addresses.binStreamReadEndian);
+        runtime.replaceFunction(addresses.binStreamReadEndian, &readEndian);
     }
 
     // Select calls UpdateSphereXfm on every select of a sphere material

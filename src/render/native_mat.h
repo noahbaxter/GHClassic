@@ -21,6 +21,6 @@ namespace gh2
     // The pass after `mat`, or 0.
     uint32_t nextPass(uint8_t *rdram, uint32_t mat);
 
-    // Keeps a GH1 material's vertDyn, for readMaterial.
+    // Keeps what RndMat::Load drops of a GH1 material, for readMaterial.
     void installNativeMat(PS2Runtime &runtime, const Addresses &addresses);
 }
