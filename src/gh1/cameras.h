@@ -3,11 +3,23 @@
 #include "milo/milo.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace gh2::gh1
 {
+    // A crowd region: the crowd members drawn whole in it, each the crowd
+    // archetype it is of and which of that one's places, and the sphere
+    // about them (gh1/venues.cpp).
+    struct Region
+    {
+        std::vector<std::pair<uint32_t, uint32_t>> members;
+        float centre[3] = {0.0f, 0.0f, 0.0f};
+        float radius = 0.0f;
+    };
+
     // Where GH1's band stands in a venue, for its camera shots.
     struct Stage
     {
@@ -15,6 +27,9 @@ namespace gh2::gh1
         milo::Bytes spot;
         // The walk waypoints on each of GH1's walk spots, by name.
         std::vector<std::vector<std::string>> walks;
+        std::vector<Region> regions;
+        // The crowd's stamp, which a shot naming members of it has to have.
+        uint32_t crowdStamp = 0xffffffffu;
     };
 
     // GH1's camera shots for its venue `gh1` in that layer, as the CamShots

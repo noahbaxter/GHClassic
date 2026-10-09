@@ -28,6 +28,7 @@
 #include "milo/milo.h"
 
 #include <algorithm>
+#include <cmath>
 #include <functional>
 #include <iostream>
 #include <map>
@@ -982,6 +983,138 @@ namespace gh2::gh1
             return out;
         }
 
+        // That object's body in the first of those scenes that has it.
+        const Bytes *object(const std::vector<const milo::Dir *> &scenes, const char *cls, const std::string &name)
+        {
+            for (const milo::Dir *scene : scenes)
+                for (size_t i = 0; scene && i < scene->entries.size(); ++i)
+                    if (scene->entries[i].first == cls && scene->entries[i].second == name)
+                        return &scene->bodies[i];
+            return nullptr;
+        }
+
+        std::string numbered(const char *prefix, int nn, const char *suffix)
+        {
+            return std::string(prefix) + (nn < 10 ? "0" : "") + std::to_string(nn) + suffix;
+        }
+
+        // Each Crowd<nn>.mm's places: a count, then that many transforms.
+        std::vector<Bytes> crowdPlaces(const std::vector<const milo::Dir *> &scenes)
+        {
+            std::vector<Bytes> places;
+            for (int nn = 1; nn < 100; ++nn)
+            {
+                const Bytes *found = object(scenes, "MultiMesh", numbered("Crowd", nn, ".mm"));
+                if (!found || u32(*found, 0u) != 0u || u32(*found, 4u) != 1u)
+                    break;
+                size_t o = 9u;
+                names(*found, o);
+                o += 16u;
+                str(*found, o);
+                const size_t end = o + 4u + static_cast<size_t>(u32(*found, o)) * 48u;
+                if (end > found->size())
+                    break;
+                places.emplace_back(found->begin() + static_cast<std::ptrdiff_t>(o), found->begin() + static_cast<std::ptrdiff_t>(end));
+            }
+            return places;
+        }
+
+        // The crowd members GH1 draws whole in each of a venue's regions,
+        // each the Crowd<nn>.mm it is of and which of its places.
+        //
+        // A region is crowd_limits<nn>.mesh, a Mesh 25 (its Trans 8, Draw 1,
+        // material, owner, nine bytes, then its verts, 48 bytes each, and
+        // faces): the places that are over one of its faces and less than a
+        // card's height above it, in the mesh's own space, as many as the
+        // crowd has members to draw whole (Crowd::InitRegion, GH1 0x170da8;
+        // PointInXY, GH1 0x1e3600). A shot names its region, and the flat
+        // cards there give way to those members (Crowd::SwitchRegion, GH1
+        // 0x1727b0). Its sphere is about the middle of the box those places
+        // are in and as wide as the box is from corner to corner (GH1
+        // 0x171378).
+        std::vector<Region> crowdRegions(const std::vector<const milo::Dir *> &scenes, const std::vector<Bytes> &places,
+                                         float height, size_t whole)
+        {
+            std::vector<Region> out;
+            for (int nn = 0; nn < 100; ++nn)
+            {
+                const Bytes *mesh = object(scenes, "Mesh", numbered("crowd_limits", nn, ".mesh"));
+                if (!mesh)
+                    break;
+                out.emplace_back();
+                if (u32(*mesh, 0u) != 25u || u32(*mesh, 4u) != 8u)
+                    continue;
+                // Its world transform, three rows and where it is, inverted.
+                float m[12];
+                for (size_t i = 0; i < 12u; ++i)
+                    m[i] = f32(*mesh, 56u + i * 4u);
+                const float det = m[0] * (m[4] * m[8] - m[5] * m[7]) - m[1] * (m[3] * m[8] - m[5] * m[6]) +
+                                  m[2] * (m[3] * m[7] - m[4] * m[6]);
+                if (det == 0.0f)
+                    continue;
+                const float inv[9] = {
+                    (m[4] * m[8] - m[5] * m[7]) / det, (m[2] * m[7] - m[1] * m[8]) / det, (m[1] * m[5] - m[2] * m[4]) / det,
+                    (m[5] * m[6] - m[3] * m[8]) / det, (m[0] * m[8] - m[2] * m[6]) / det, (m[2] * m[3] - m[0] * m[5]) / det,
+                    (m[3] * m[7] - m[4] * m[6]) / det, (m[1] * m[6] - m[0] * m[7]) / det, (m[0] * m[4] - m[1] * m[3]) / det,
+                };
+                size_t o = transEnd(*mesh, 4u) + 5u;
+                names(*mesh, o);
+                o += 16u;
+                str(*mesh, o);
+                str(*mesh, o);
+                o += 9u;
+                const size_t verts = o + 4u, count = u32(*mesh, o);
+                const size_t faces = verts + count * 48u + 4u, faceCount = u32(*mesh, verts + count * 48u);
+                if (faces + faceCount * 6u > mesh->size())
+                    continue;
+                const auto over = [&](float x, float y)
+                {
+                    for (size_t f = 0; f < faceCount; ++f)
+                    {
+                        float px[3], py[3];
+                        for (size_t c = 0; c < 3u; ++c)
+                        {
+                            const size_t v = (*mesh)[faces + f * 6u + c * 2u] | ((*mesh)[faces + f * 6u + c * 2u + 1u] << 8);
+                            if (v >= count)
+                                return false;
+                            px[c] = f32(*mesh, verts + v * 48u);
+                            py[c] = f32(*mesh, verts + v * 48u + 4u);
+                        }
+                        const auto side = [&](size_t a, size_t b) { return (x - px[a]) * (py[b] - py[a]) - (y - py[a]) * (px[b] - px[a]); };
+                        const float s0 = side(0, 1), s1 = side(1, 2), s2 = side(2, 0);
+                        if ((s0 >= 0.0f && s1 >= 0.0f && s2 >= 0.0f) || (s0 <= 0.0f && s1 <= 0.0f && s2 <= 0.0f))
+                            return true;
+                    }
+                    return false;
+                };
+                Region &region = out.back();
+                float low[3] = {0.0f, 0.0f, 0.0f}, high[3] = {0.0f, 0.0f, 0.0f};
+                for (size_t c = 0; c < places.size(); ++c)
+                    for (uint32_t k = 0; k < u32(places[c], 0u) && region.members.size() < whole; ++k)
+                    {
+                        const size_t at = 4u + static_cast<size_t>(k) * 48u + 36u;
+                        const float p[3] = {f32(places[c], at), f32(places[c], at + 4u), f32(places[c], at + 8u)};
+                        const float d[3] = {p[0] - m[9], p[1] - m[10], p[2] - m[11]};
+                        const float x = d[0] * inv[0] + d[1] * inv[3] + d[2] * inv[6];
+                        const float y = d[0] * inv[1] + d[1] * inv[4] + d[2] * inv[7];
+                        const float z = d[0] * inv[2] + d[1] * inv[5] + d[2] * inv[8];
+                        if (!(z > 0.0f && z < height && over(x, y)))
+                            continue;
+                        for (size_t i = 0; i < 3u; ++i)
+                        {
+                            low[i] = region.members.empty() ? p[i] : std::min(low[i], p[i]);
+                            high[i] = region.members.empty() ? p[i] : std::max(high[i], p[i]);
+                        }
+                        region.members.emplace_back(static_cast<uint32_t>(c), k);
+                    }
+                for (size_t i = 0; i < 3u; ++i)
+                    region.centre[i] = (low[i] + high[i]) * 0.5f;
+                region.radius = std::sqrt((high[0] - low[0]) * (high[0] - low[0]) + (high[1] - low[1]) * (high[1] - low[1]) +
+                                          (high[2] - low[2]) * (high[2] - low[2]));
+            }
+            return out;
+        }
+
         // GH1's flat crowd in GH2's.
         //
         // GH1 keeps a card's place for each member of the crowd it draws
@@ -999,28 +1132,13 @@ namespace gh2::gh1
         // (gh1/cameras.cpp), has GH1's places and height, with the stand-in's
         // crowd members for GH1's, male before female as GH1 lists them, and
         // any other WorldCrowd has none.
-        void crowd(milo::Dir &chars, const std::vector<const milo::Dir *> &scenes, float height)
+        //
+        // Returns `crowd`'s stamp, the first word of what follows its places:
+        // a shot's members are kept only if it has the same
+        // (CamShot::Load, 0x265508).
+        uint32_t crowd(milo::Dir &chars, const std::vector<Bytes> &places, float height)
         {
-            std::vector<Bytes> places; // each a count, then that many transforms
-            for (int nn = 1; nn < 100; ++nn)
-            {
-                const std::string name = std::string("Crowd") + (nn < 10 ? "0" : "") + std::to_string(nn) + ".mm";
-                const Bytes *found = nullptr;
-                for (const milo::Dir *scene : scenes)
-                    for (size_t i = 0; scene && i < scene->entries.size(); ++i)
-                        if (scene->entries[i].first == "MultiMesh" && scene->entries[i].second == name)
-                            found = &scene->bodies[i];
-                if (!found || u32(*found, 0u) != 0u || u32(*found, 4u) != 1u)
-                    break;
-                size_t o = 9u;
-                names(*found, o);
-                o += 16u;
-                str(*found, o);
-                const size_t end = o + 4u + static_cast<size_t>(u32(*found, o)) * 48u;
-                if (end > found->size())
-                    break;
-                places.emplace_back(found->begin() + static_cast<std::ptrdiff_t>(o), found->begin() + static_cast<std::ptrdiff_t>(end));
-            }
+            uint32_t stamp = 0xffffffffu;
             std::vector<std::string> all;
             for (const auto &[cls, name] : chars.entries)
                 if (cls == "Character" && name.rfind("crowd_", 0) == 0)
@@ -1077,9 +1195,12 @@ namespace gh2::gh1
                         out.insert(out.end(), places[c].begin(), places[c].end());
                     else
                         putU32(out, 0u);
+                if (shown)
+                    stamp = u32(b, o);
                 out.insert(out.end(), b.begin() + static_cast<std::ptrdiff_t>(o), b.end());
                 chars.bodies[i] = std::move(out);
             }
+            return stamp;
         }
     }
 
@@ -1128,7 +1249,15 @@ namespace gh2::gh1
                 continue;
             }
             const auto crowdScene = load(disc, theirs + "crowd.rnd_ps2");
-            crowd(*madeChars, {&*lighting, &*room, crowdScene ? &*crowdScene : nullptr}, flatHeight);
+            const std::vector<const milo::Dir *> crowdScenes = {&*lighting, &*room, crowdScene ? &*crowdScene : nullptr};
+            const std::vector<Bytes> places = crowdPlaces(crowdScenes);
+            stage.crowdStamp = crowd(*madeChars, places, flatHeight);
+            // The members GH1 draws whole: arena/crowd.dta's instances, ten,
+            // two more outside the festival, and five more again in the
+            // basement and the small club.
+            const std::string venueName = name;
+            const size_t whole = venueName == "fest" ? 10u : venueName == "basement" || venueName == "small_club" ? 17u : 12u;
+            stage.regions = crowdRegions(crowdScenes, places, flatHeight, whole);
             ark::addFile(layer, geomPath, milo::write(*madeGeom));
             ark::addFile(layer, lightsPath, milo::write(lights(*gh2Lights)));
             ark::addFile(layer, charsPath, milo::write(*madeChars));

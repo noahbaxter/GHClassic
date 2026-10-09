@@ -65,6 +65,8 @@ namespace gh2::gh1
         Vec operator+(const Vec &a, const Vec &b) { return {a.x + b.x, a.y + b.y, a.z + b.z}; }
         Vec operator-(const Vec &a, const Vec &b) { return {a.x - b.x, a.y - b.y, a.z - b.z}; }
         Vec operator*(const Vec &a, float s) { return {a.x * s, a.y * s, a.z * s}; }
+        float dot(const Vec &a, const Vec &b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+        Vec cross(const Vec &a, const Vec &b) { return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x}; }
 
         // A camera path: GH1's TransAnim 4 (RndTransAnim::Load, GH1
         // 0x1e9808), its position keys and rotation keys by frame.
@@ -362,6 +364,56 @@ namespace gh2::gh1
             return ease != 0.0f ? 0.5f + std::atan(ease * (2.0f * t - 1.0f)) / (2.0f * std::atan(ease)) : t;
         }
 
+        // Where a shot's target or parent is before anyone moves: nowhere,
+        // the stage spot, or a player's head, 60 over it (GH1 0x16e0c0).
+        Vec place(const Target &t, const Stage &stage)
+        {
+            if (t.entity.empty())
+                return {};
+            const Vec spot = {f32(stage.spot, 36u), f32(stage.spot, 40u), f32(stage.spot, 44u)};
+            return t.entity == kSpot ? spot : spot + Vec{0.0f, 0.0f, 60.0f};
+        }
+
+        // The crowd region a camera faces (Crowd::SwitchRegion, GH1
+        // 0x17287c): the one whose sphere is widest on screen, 15 at most,
+        // for how far its centre is from the middle of the screen, 0.2 at
+        // least, and the last if none is. The camera turns from `eye` to
+        // `look`, level with `up`, then moves across its view to hold that
+        // at `spot` (VenueCam::Poll, GH1 0x16ea3c); `half` is the tangent
+        // of half its field of view.
+        int faced(const std::vector<Region> &regions, Vec eye, const Vec &look, const Vec &up, const Vec &spot, float half)
+        {
+            const Vec to = look - eye;
+            const float far = std::sqrt(dot(to, to));
+            const Vec ahead = to * (far > 0.0f ? 1.0f / far : 0.0f);
+            Vec right = cross(ahead, up);
+            const float length = std::sqrt(dot(right, right));
+            if (regions.empty() || length == 0.0f)
+                return -1;
+            right = right * (1.0f / length);
+            const Vec above = cross(right, ahead);
+            eye = eye - right * (spot.x * far * half) - above * (spot.y * far * half * 0.75f);
+            size_t best = regions.size() - 1u;
+            float most = 0.0f;
+            for (size_t i = 0; i < regions.size(); ++i)
+            {
+                const Vec centre = Vec{regions[i].centre[0], regions[i].centre[1], regions[i].centre[2]} - eye;
+                const float depth = dot(centre, ahead);
+                if (depth == 0.0f)
+                    continue;
+                const float x = dot(centre, right) / (half * depth) * 0.5f;
+                const float y = dot(centre, above) / (half * 0.75f * depth) * 0.5f;
+                const float size = std::fabs(regions[i].radius / (half * depth));
+                const float score = std::min(size, 15.0f) / std::max(std::sqrt(x * x + y * y), 0.2f);
+                if (score > most)
+                {
+                    most = score;
+                    best = i;
+                }
+            }
+            return static_cast<int>(best);
+        }
+
         // A GH1 shot as a CamShot 20 (CamShot::Load, 0x264528) of that
         // category, for one player or two: all of it, or only where it ends.
         std::optional<Bytes> camShot(const Shot &shot, const std::string &category, bool ended, bool two,
@@ -449,6 +501,7 @@ namespace gh2::gh1
             // the head only carries it.
             const bool turned = !under.empty() && !parent.part.empty();
             const bool shaky = shot.number("shaky", 0u, 0.0f) != 0.0f;
+            int region = static_cast<int>(shot.number("crowd_region", 0u, -1.0f));
 
             putU32(out, static_cast<uint32_t>(steps + 1));
             for (int i = 0; i <= steps; ++i)
@@ -500,6 +553,11 @@ namespace gh2::gh1
                 putF32(out, shaky ? 0.2f : 0.0f);
                 putF32(out, shaky ? 0.25f : 0.0f);
                 putF32(out, shaky ? 0.25f : 0.0f);
+                // A shot that names no crowd region has the one its first
+                // key faces.
+                if (i == 0 && region < 0)
+                    region = faced(stage.regions, place(parent, stage) + at, place(targets[0], stage),
+                                   {rows[6], rows[7], rows[8]}, spot, half);
             }
 
             out.push_back(0u); // looping
@@ -514,8 +572,16 @@ namespace gh2::gh1
             putF32(out, 0.0f);  // no fade
             putStr(out, category);
             putF32(out, as->weight);
-            putU32(out, 0u); // no crowd members picked
-            putU32(out, 0xffffffffu);
+            // The crowd members drawn whole, those of the shot's crowd
+            // region (CamShot::Set3DCrowd, 0x2629b0).
+            const bool whole = !hideCrowd && region >= 0 && static_cast<size_t>(region) < stage.regions.size();
+            putU32(out, whole ? static_cast<uint32_t>(stage.regions[region].members.size()) : 0u);
+            for (size_t i = 0; whole && i < stage.regions[region].members.size(); ++i)
+            {
+                putU32(out, stage.regions[region].members[i].first);
+                putU32(out, stage.regions[region].members[i].second);
+            }
+            putU32(out, stage.crowdStamp);
             putU32(out, 0u); // nothing hidden
             putStr(out, hideCrowd ? "" : "crowd");
             putStr(out, {});
