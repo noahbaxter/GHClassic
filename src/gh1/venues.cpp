@@ -330,10 +330,18 @@ namespace gh2::gh1
             return name.substr(0, name.rfind('.'));
         }
 
-        // A View 7 of those anims, none of them drawn: its Anim 0, a Trans 8
-        // at the origin under itself, and a Draw 1 showing, as a Group must
-        // be to set a frame (RndGroup::SetFrame, 0x1ba8a0).
-        Bytes animGroup(const std::string &name, const std::vector<std::string> &anims)
+        // The View a section draws after the band, by the one it draws
+        // before.
+        std::string transparentOf(const std::string &view)
+        {
+            return base(view) + "_transparent.view";
+        }
+
+        // A View 7 of those anims and draws: its Anim 0, a Trans 8 at the
+        // origin under itself, and a Draw 1 showing, as a Group must be to
+        // set a frame (RndGroup::SetFrame, 0x1ba8a0).
+        Bytes group(const std::string &name, const std::vector<std::string> &anims,
+                    const std::vector<std::string> &draws)
         {
             Bytes out;
             putU32(out, 7u);
@@ -351,8 +359,19 @@ namespace gh2::gh1
             putStr(out, name);
             putU32(out, 1u);
             out.push_back(1u);
-            putU32(out, 0u);
+            putNames(out, draws);
             out.insert(out.end(), 16u, 0u);
+            return out;
+        }
+
+        // An Environ 1 less the children its Draw 1 lists.
+        Bytes withoutDraws(const Bytes &b)
+        {
+            size_t o = 9u;
+            names(b, o);
+            Bytes out(b.begin(), b.begin() + 9);
+            putU32(out, 0u);
+            out.insert(out.end(), b.begin() + static_cast<std::ptrdiff_t>(std::min(o, b.size())), b.end());
             return out;
         }
 
@@ -415,19 +434,37 @@ namespace gh2::gh1
             std::map<std::string, Parts> parts;
             std::map<std::string, size_t> trans;                   // by name, where its Trans 8 is
             std::map<std::string, std::vector<std::string>> draws; // by Mesh or View, its Draw 1's children
-            std::set<std::string> meshes;
+            std::map<std::string, std::vector<std::string>> hangs; // by name, its Trans 8's children
+            std::map<std::string, std::string> owners;             // by View, its children's owner
+            std::set<std::string> meshes, environs;
+            std::set<std::string> moved; // what a TransAnim moves
             for (size_t i = 0; i < scene.entries.size(); ++i)
             {
                 const auto &[c, n] = scene.entries[i];
                 const Bytes &b = scene.bodies[i];
                 if (!classes.count(c) || without.count(n))
                     continue;
+                if (c == "Environ" && u32(b, 0u) == 1u && u32(b, 4u) == 1u)
+                {
+                    size_t o = 9u;
+                    draws[n] = names(b, o);
+                    environs.insert(n);
+                }
                 Parts p;
                 if (c == "View" || c == "ParticleSys" || kAnims.count(c))
                 {
                     p.anim = anim(b, p.rest);
                     if (!p.anim)
                         continue;
+                    // A TransAnim 4 (RndTransAnim::Load, GH1 0x1dd538): after
+                    // its Anim 0 a Draw 1, then the Trans it moves.
+                    if (c == "TransAnim" && u32(b, p.rest) == 1u)
+                    {
+                        size_t o = p.rest + 5u;
+                        names(b, o);
+                        o += 16u;
+                        moved.insert(str(b, o));
+                    }
                 }
                 else if (c != "Mesh" && c != "Light" && c != "Flare")
                     continue;
@@ -436,16 +473,45 @@ namespace gh2::gh1
                     if (u32(b, p.rest) != 8u)
                         continue;
                     trans[n] = p.rest;
+                    size_t children = p.rest + kChildren;
+                    hangs[n] = names(b, children);
                     if (c == "Mesh" || c == "View")
                     {
                         size_t o = transEnd(b, p.rest) + 5u;
                         draws[n] = names(b, o);
+                        // Past a View's sphere, the View whose children it has
+                        // (RndView::Load, GH1 0x2eb3f0).
+                        o += 16u;
+                        if (c == "View" && u32(b, 0u) > 3u)
+                            owners[n] = str(b, o);
                     }
                     if (c == "Mesh")
                         meshes.insert(n);
                 }
                 parts[n] = std::move(p);
             }
+
+            // A View with another's children draws those and then its own
+            // (RndView::DrawShowing, GH1 0x1ef8f0).
+            for (const auto own = draws; const auto &[view, owner] : owners)
+                if (const auto it = own.find(owner); owner != view && it != own.end())
+                    draws[view].insert(draws[view].begin(), it->second.begin(), it->second.end());
+
+            // GH1 works a world out only from a section's View down, each
+            // Trans its children's (VenueSection::Poll, GH1 0x178ce8;
+            // RndTransformable::UpdateWorldXfm, GH1 0x1da570): what that
+            // never reaches keeps the world it loads with, here its local
+            // with no parent. One a TransAnim moves is left as it is.
+            std::set<std::string> hung;
+            const std::function<void(const std::string &)> hang = [&](const std::string &n)
+            {
+                if (!trans.count(n) || !hung.insert(n).second)
+                    return;
+                for (const std::string &child : hangs[n])
+                    hang(child);
+            };
+            hang(top);
+            const auto held = [&](const std::string &n) { return !hung.count(n) && !moved.count(n); };
 
             // What stands for each anim: a View's anims if it has any here,
             // a MatAnim's later stages after it.
@@ -499,20 +565,57 @@ namespace gh2::gh1
             for (const auto &e : scene.entries)
                 stand(e.second, 0);
 
-            // A View's list: its children, each Mesh's own after it.
-            const auto listed = [&](const std::string &view)
+            // A View's list: its children, each Mesh's and Environ's own
+            // after it. GH1 draws a drawable and then its children
+            // (RndDrawable::Draw, GH1 0x2ec850), and an Environ drawn is the
+            // one in use from then on, past its View's end
+            // (RndEnviron::DrawShowing, GH1 0x2b69e0). A Group puts back the
+            // one before it (RndGroup::DrawShowing, 0x1bab10), so what a View
+            // draws from an Environ on, or after a View that left another in
+            // use, is a Group of that Environ's, "<view>.env<n>".
+            //
+            // A section's "<name>_transparent.view" is taken out of the View
+            // that lists it (VenueSection::IsLoaded, GH1 0x178db8) and drawn
+            // after the band (ArenaPanel::Draw, GH1 0x10d488).
+            const std::string apart = transparentOf(top);
+            struct Listing
             {
-                std::vector<std::string> out;
-                const std::function<void(const std::string &, int)> add = [&](const std::string &n, int depth)
+                std::vector<std::string> own;
+                std::vector<std::vector<std::string>> runs; // each its Environ first
+                std::string exit;                           // the Environ it leaves in use, if it sets one
+            };
+            std::map<std::string, Listing> listings;
+            const std::function<const Listing &(const std::string &, int)> listed =
+                [&](const std::string &view, int depth) -> const Listing &
+            {
+                if (const auto it = listings.find(view); it != listings.end())
+                    return it->second;
+                listings[view];
+                Listing l;
+                const std::function<void(const std::string &, int)> add = [&](const std::string &n, int within)
                 {
-                    out.push_back(n);
-                    if (meshes.count(n) && depth < 8)
+                    if (n == apart)
+                        return;
+                    if (environs.count(n))
+                    {
+                        l.runs.push_back({n});
+                        l.exit = n;
+                    }
+                    else
+                        (l.runs.empty() ? l.own : l.runs.back()).push_back(n);
+                    if ((meshes.count(n) || environs.count(n)) && within < 8)
                         for (const std::string &child : draws[n])
-                            add(child, depth + 1);
+                            add(child, within + 1);
+                    else if (draws.count(n) && !meshes.count(n) && depth < 16)
+                        if (const std::string left = listed(n, depth + 1).exit; !left.empty() && left != l.exit)
+                        {
+                            l.runs.push_back({left});
+                            l.exit = left;
+                        }
                 };
                 for (const std::string &child : draws[view])
                     add(child, 0);
-                return out;
+                return listings[view] = std::move(l);
             };
             // What the tree draws: a Mesh or View reached, and what each lists.
             std::set<std::string> drawn;
@@ -525,6 +628,7 @@ namespace gh2::gh1
                         reach(child);
             };
             reach(top);
+            reach(apart);
 
             std::vector<Object> out;
             for (size_t i = 0; i < scene.entries.size(); ++i)
@@ -536,8 +640,10 @@ namespace gh2::gh1
                 const auto part = parts.find(n);
                 if (part == parts.end())
                 {
-                    if (c == "Tex" || c == "Mat" || c == "Environ")
+                    if (c == "Tex" || c == "Mat")
                         out.push_back({c, n, b});
+                    else if (c == "Environ")
+                        out.push_back({c, n, environs.count(n) ? withoutDraws(b) : b});
                     continue;
                 }
                 const Parts &p = part->second;
@@ -555,7 +661,7 @@ namespace gh2::gh1
                         putU32(body, 0u);
                         if (!anims.empty())
                         {
-                            out.push_back({"Group", animsOf(n), animGroup(animsOf(n), anims)});
+                            out.push_back({"Group", animsOf(n), group(animsOf(n), anims, {})});
                             out.push_back({"AnimFilter", filterOf(n), filter(animsOf(n), *p.anim)});
                         }
                     }
@@ -609,10 +715,18 @@ namespace gh2::gh1
                     continue;
                 }
                 size_t o = at->second + kChildren;
-                body.insert(body.end(), b.begin() + static_cast<std::ptrdiff_t>(at->second),
-                            b.begin() + static_cast<std::ptrdiff_t>(o));
+                // Its rev, local and world: the world for both of one held.
+                const size_t local = at->second + 4u, world = at->second + 52u;
+                const auto span = [&](size_t from, size_t to)
+                {
+                    body.insert(body.end(), b.begin() + static_cast<std::ptrdiff_t>(from),
+                                b.begin() + static_cast<std::ptrdiff_t>(to));
+                };
+                span(at->second, local);
+                span(held(n) ? world : local, held(n) ? o : world);
+                span(world, o);
                 std::vector<std::string> children = names(b, o);
-                std::erase_if(children, [&](const std::string &child) { return trans.count(child) == 0u; });
+                std::erase_if(children, [&](const std::string &child) { return trans.count(child) == 0u || held(child); });
                 putNames(body, children);
                 // The constraint, its target, preserve scale, then the
                 // parent: the object's own name for none, as here when the
@@ -639,7 +753,14 @@ namespace gh2::gh1
                     body.insert(body.end(), b.begin() + static_cast<std::ptrdiff_t>(draw + 5u), b.end());
                 else
                 {
-                    putNames(body, listed(n));
+                    const Listing &l = listed(n, 0);
+                    std::vector<std::string> list = l.own;
+                    for (size_t k = 0; k < l.runs.size(); ++k)
+                    {
+                        list.push_back(n + ".env" + std::to_string(k + 1u));
+                        out.push_back({"Group", list.back(), group(list.back(), {}, l.runs[k])});
+                    }
+                    putNames(body, list);
                     o = draw + 5u;
                     names(b, o);
                     body.insert(body.end(), b.begin() + static_cast<std::ptrdiff_t>(o),

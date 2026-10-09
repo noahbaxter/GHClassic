@@ -479,6 +479,18 @@ namespace gh2::gh1
         // The scene's frame is the song's tick from its start, as far as a
         // song goes; the functions the glue calls are there for it to call.
         Node &scene = handler("gh1_scene");
+        // GH1 draws each section's View, the crowd, the band, then each
+        // section's transparent View (ArenaPanel::Draw, GH1 0x10d488). GH2's
+        // crowd draws at 0 and its band from 6. A dir sorts its draws when
+        // it syncs alone (RndDir::SyncObjects, 0x1b2f78).
+        static const std::pair<const char *, float> kOrder[] = {
+            {"venue.view", -2.0f}, {"lighting.view", -1.0f},
+            {"venue_transparent.view", 10.0f}, {"lighting_transparent.view", 11.0f},
+        };
+        for (const auto &[view, order] : kOrder)
+            if (objects.count(view))
+                scene.nodes.push_back(command({symbol(view), symbol("set"), symbol("draw_order"), real(order)}));
+        scene.nodes.push_back(command({{dtb::kVar, 0, 0.0f, "this", {}}, symbol("sync_objects")}));
         for (const char *top : {"venue.view", "lighting.view"})
             if (const auto it = drivers.find(top); it != drivers.end())
                 for (const std::string &driver : it->second)
