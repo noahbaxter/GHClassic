@@ -17,7 +17,9 @@
 #include "guest.h"
 #include "milo/layout.h"
 #include "ps2_runtime.h"
+#include "render/look.h"
 #include "render/texture_capture.h"
+#include "settings/settings.h"
 
 namespace gh2
 {
@@ -101,6 +103,19 @@ namespace gh2
                 m.projRows[i][2] = row[1];
             }
         }
+
+        // A converted 360 Mat's own shading, by its name and the payload its
+        // diffuse texture stands in for. RndMat derives from Hmx::Object
+        // plainly, so the Object's fields are the Mat's own.
+        std::shared_ptr<const Shading> readShading(uint8_t *rdram, uint32_t mat)
+        {
+            const uint32_t name = load<uint32_t>(rdram, mat + milo::object::kName);
+            if (name == 0u)
+                return nullptr;
+            const uint32_t tex = load<uint32_t>(rdram, mat + milo::mat::kDiffuseTex);
+            const uint32_t diffuse = tex != 0u ? standInPayload(tex).value_or(0u) : 0u;
+            return look::find(reinterpret_cast<const char *>(getMemPtr(rdram, name)), diffuse);
+        }
     }
 
     Material readMaterial(uint8_t *rdram, uint32_t mat)
@@ -136,6 +151,8 @@ namespace gh2
             readEnvRows(rdram, mat, m);
         else if (m.texGen == milo::mat::kTexGenProjected)
             readProjRows(rdram, mat, m);
+        if (settings::get(settings::kShading) == settings::kX360)
+            m.shading = readShading(rdram, mat);
         if (m.blend >= milo::mat::kBlendCount)
             m.blend = milo::mat::kBlendSrcAlpha; // Update's default case
         if (m.zMode >= milo::mat::kZModeCount)

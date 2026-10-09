@@ -103,6 +103,53 @@ namespace gh2::textures
             return out->rgba.empty() ? nullptr : out;
         }
 
+        // The bytes a 360 bitmap at `data` takes, header and levels, or 0
+        // when it is none.
+        size_t bitmapBytes(const uint8_t *data, size_t size)
+        {
+            const auto header = bitmap::read(data, size);
+            const auto encoded = header ? format(header->encoding) : std::nullopt;
+            if (!encoded || header->width == 0u || header->height == 0u)
+                return 0u;
+            size_t bytes = bitmap::kHeaderBytes;
+            const uint32_t width = header->width, height = header->height;
+            for (uint32_t level = 0; level <= header->mips; ++level)
+                bytes += dxt::levelBytes(*encoded, std::max(width >> level, 1u), std::max(height >> level, 1u));
+            return bytes <= size ? bytes : 0u;
+        }
+
+        // A CubeTex: its six faces' source names, then the six faces as 360
+        // bitmaps, square and alike, in D3D's order (+x -x +y -y +z -z:
+        // right, left, top, bottom, front, back). The faces are found as the
+        // first run of six such bitmaps that ends the body.
+        std::shared_ptr<TextureData> decodeCube(const milo::Bytes &body)
+        {
+            for (size_t at = 0; at + bitmap::kHeaderBytes <= body.size(); ++at)
+            {
+                const size_t face = bitmapBytes(body.data() + at, body.size() - at);
+                if (face == 0u || at + 6u * face != body.size())
+                    continue;
+                auto out = std::make_shared<TextureData>();
+                out->cube = true;
+                for (size_t f = 0; f < 6u; ++f)
+                {
+                    const auto one = decode(body.data() + at + f * face, face);
+                    if (!one || one->width != one->height ||
+                        (f != 0u && (one->width != out->width || one->mips.size() != out->mips.size())))
+                        return nullptr;
+                    out->width = one->width;
+                    out->height = one->height;
+                    out->rgba.insert(out->rgba.end(), one->rgba.begin(), one->rgba.end());
+                    out->mips.resize(one->mips.size());
+                    for (size_t level = 0; level < one->mips.size(); ++level)
+                        out->mips[level].insert(out->mips[level].end(), one->mips[level].begin(),
+                                                one->mips[level].end());
+                }
+                return out;
+            }
+            return nullptr;
+        }
+
         std::shared_ptr<TextureData> read(const Source &source)
         {
             if (source.tex.empty())
@@ -123,7 +170,12 @@ namespace gh2::textures
             const std::pair<std::string, std::string> entry("Tex", source.tex);
             const auto found = std::find(dir.entries.begin(), dir.entries.end(), entry);
             if (found == dir.entries.end())
-                return nullptr;
+            {
+                const std::pair<std::string, std::string> cube("CubeTex", source.tex);
+                const auto at = std::find(dir.entries.begin(), dir.entries.end(), cube);
+                return at != dir.entries.end() ? decodeCube(dir.bodies[static_cast<size_t>(at - dir.entries.begin())])
+                                               : nullptr;
+            }
             const milo::Bytes &body = dir.bodies[static_cast<size_t>(found - dir.entries.begin())];
             const auto tex = milo::readTex(body, dir.version);
             return tex ? decode(body.data() + tex->bitmap, body.size() - tex->bitmap) : nullptr;

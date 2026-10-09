@@ -25,6 +25,14 @@ namespace gh2
     constexpr uint32_t kFlagSphere = 1u << 10;   // the tex gen block is the sphere one's
     constexpr uint32_t kFlagSpread = 1u << 11;   // sampled as the mean of four, matColor.xy apart in uv
     constexpr uint32_t kFlagSetAlpha = 1u << 12; // alpha written as 1, as FBA does to an unblended pixel
+    // x360.vert and x360.frag's, which take kFlagPrelit, kFlagAlphaCut and
+    // kFlagSetAlpha as above, and lightBase as their block.
+    constexpr uint32_t kFlagNormalMap = 1u << 16;
+    constexpr uint32_t kFlagSpecularMap = 1u << 17;
+    constexpr uint32_t kFlagGlowMap = 1u << 18;
+    constexpr uint32_t kFlagRamp = 1u << 19;      // the diffuse ramp in place of n . l
+    constexpr uint32_t kFlagCube = 1u << 20;      // a cube map in place of the lights' specular
+    constexpr uint32_t kFlagNormalize = 1u << 21; // normal, tangent and bitangent made unit length first
 
     struct PushConstants
     {

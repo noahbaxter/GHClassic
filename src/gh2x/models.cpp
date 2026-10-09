@@ -18,6 +18,7 @@
 #include "disc/ark.h"
 #include "formats/dtb.h"
 #include "gh2x/scene.h"
+#include "render/look.h"
 #include "render/texture_store.h"
 #include "settings/settings.h"
 
@@ -33,6 +34,7 @@ namespace gh2
     {
         constexpr const char *kFolders[] = {"world/", "char/"};
         constexpr const char *kGuitars = "char/og/guitars/gen/";
+        constexpr const char *kLuminanceMap = "world/battle/ng/textures/gen/arena_luminancetest04.png_xbox";
         constexpr uint32_t kStandInSide = 64u;
         // The smallest a stand-in has room for its payload's name in.
         constexpr uint32_t kStandInLeast = 16u;
@@ -99,7 +101,11 @@ namespace gh2
             return path.substr(slash, path.rfind('.') - slash);
         }
 
-        std::optional<milo::Dir> convert(const Discs &discs, const std::string &twin, const std::string &path)
+        // Each Mat's 360 shading, by name.
+        using Looks = std::map<std::string, look::Look>;
+
+        std::optional<milo::Dir> convert(const Discs &discs, const std::string &twin, const std::string &path,
+                                         Looks &looks)
         {
             const auto theirs = ark::readFile(discs.xbox, twin);
             const auto other = theirs ? milo::read(*theirs) : std::nullopt;
@@ -126,6 +132,23 @@ namespace gh2
                     }
                     return textures::standIn(textures::add({discs.xbox, twin, tex}), std::max(width, kStandInLeast),
                                              std::max(height, kStandInLeast));
+                },
+                [&](const std::string &mat, const gh2x::Mat &shading)
+                {
+                    // Normal, glow, specular, diffuse ramp and cube, as
+                    // matToPs2 lists them.
+                    const auto map = [&](size_t i)
+                    { return shading.maps[i].empty() ? 0u : textures::add({discs.xbox, twin, shading.maps[i]}); };
+                    look::Look &look = looks[mat];
+                    look.diffuse = shading.diffuse.empty() ? 0u : textures::add({discs.xbox, twin, shading.diffuse});
+                    look.normal = map(0u);
+                    look.glow = map(1u);
+                    look.specular = map(2u);
+                    look.ramp = map(3u);
+                    look.cube = map(4u);
+                    look.emissive = shading.emissive;
+                    std::copy_n(shading.specular, 4, look.specularColor);
+                    look.normalize = shading.normalize;
                 }};
             return gh2x::convertScene(source);
         }
@@ -135,7 +158,8 @@ namespace gh2
         // The Mats the game disc's skins ask a converted guitar for that it
         // lacks: the 360 skin's, from this file or the 360's own for it,
         // with each picture it names.
-        void addSkins(const Discs &discs, const std::string &path, const std::string &twin, milo::Dir &dir)
+        void addSkins(const Discs &discs, const std::string &path, const std::string &twin, milo::Dir &dir,
+                      Looks &looks)
         {
             const auto found = discs.skins.find(stem(path));
             if (!path.starts_with(kGuitars) || found == discs.skins.end())
@@ -145,12 +169,16 @@ namespace gh2
                 if (has(dir, skin.mat))
                     continue;
                 std::optional<milo::Dir> own;
+                Looks ownLooks;
                 if (skin.xboxOutfit != stem(twin))
                 {
                     const std::string file = "char/ng/guitars/gen/" + skin.xboxOutfit + ".milo_xbox";
-                    own = convert(discs, file, gh2x::ps2Path(file));
+                    own = convert(discs, file, gh2x::ps2Path(file), ownLooks);
                 }
                 const milo::Dir &from = own ? *own : dir;
+                const Looks &fromLooks = own ? ownLooks : looks;
+                if (const auto shading = fromLooks.find(skin.xboxMat); shading != fromLooks.end())
+                    looks[skin.mat] = shading->second;
                 const auto mat = milo::find(from, skin.xboxMat);
                 if (!mat || from.entries[*mat].first != "Mat")
                 {
@@ -174,13 +202,16 @@ namespace gh2
         {
             if (settings::get(settings::kModels) != settings::kX360)
                 return std::nullopt;
-            auto converted = convert(discs, twin, path);
+            Looks looks;
+            auto converted = convert(discs, twin, path, looks);
             if (!converted)
             {
                 std::cerr << "[gh2x] " << twin << " cannot be converted; the PS2's own stays" << std::endl;
                 return std::nullopt;
             }
-            addSkins(discs, path, twin, *converted);
+            addSkins(discs, path, twin, *converted, looks);
+            for (const auto &[mat, shading] : looks)
+                look::add(mat, shading);
             const auto file = std::make_shared<const std::vector<uint8_t>>(milo::write(*converted));
             return ark::Made{static_cast<uint32_t>(file->size()), [file](uint64_t offset, uint8_t *dst, size_t want)
                              {
@@ -197,6 +228,9 @@ namespace gh2
         const auto xbox = games::disc("gh2x");
         if (!xbox)
             return;
+        // The luminance map every venue's PostProc names (all eight copies
+        // are the same file), for the x360 shading's post stage.
+        look::setLuminance(textures::add({*xbox, kLuminanceMap, ""}));
         // Only the two discs' file tables and guitar lists are read here.
         auto discs = std::make_shared<Discs>();
         discs->xbox = *xbox;

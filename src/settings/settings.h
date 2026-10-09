@@ -16,6 +16,7 @@ namespace gh2::settings
         kFrustumCull, // nothing drawn for what its sphere puts off the picture
         kTextures,  // kPs2 or kX360: whose textures the track, HUD and menus draw
         kModels,    // kPs2 or kX360: whose venues, characters and guitars load
+        kShading,   // kPs2 or kX360: whose shading and post the renderer draws with
         kVideoLagMs, // how late the picture reaches the player
         kAudioLagMs, // how late the sound does
         kBandVolume, // the game's own volumes, 0 to 11

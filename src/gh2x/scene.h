@@ -6,6 +6,7 @@
 // PS2 can take, and the pictures stay on the host behind stand-ins
 // (render/texture_store.h).
 
+#include "gh2x/classes.h"
 #include "milo/milo.h"
 
 #include <functional>
@@ -25,6 +26,9 @@ namespace gh2::gh2x
         // A stand-in bitmap for the 360 scene's Tex of that name, whose
         // picture is that size. Empty leaves the Tex with no picture.
         std::function<milo::Bytes(const std::string &tex, uint32_t width, uint32_t height)> standIn;
+        // Told of each Mat kept, with the 360's shading of it that its PS2
+        // body has no use for. May be empty.
+        std::function<void(const std::string &mat, const Mat &shading)> look;
     };
 
     // None when the scene's own object cannot be converted. Any other

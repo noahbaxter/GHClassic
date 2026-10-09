@@ -837,17 +837,22 @@ namespace gh2::gh2x
         put(w.u32(27u), o);
         // Blend, colour, prelit, use environ, z mode, alpha cut, alpha
         // write, tex gen, tex wrap, tex transform; diffuse, next pass.
-        w.raw(r.raw(84u)).str(r.str()).str(r.str());
-        // Intensify, cull; emissive multiplier, specular colour and power.
-        w.u8(r.flag()).u8(r.flag()).raw(r.raw(20u));
         Mat mat;
+        w.raw(r.raw(84u)).str(mat.diffuse = r.str()).str(r.str());
+        // Intensify, cull; emissive multiplier, specular colour and power.
+        w.u8(r.flag()).u8(r.flag());
+        w.f32(mat.emissive = r.f32());
+        for (float &value : mat.specular)
+            w.f32(value = r.f32());
         for (int i = 0; i < 5; ++i)
         {
             mat.maps.push_back(r.str());
             w.str("");
         }
-        w.u8(r.flag()).u8(r.flag()); // per pixel lit, a flag
-        r.u32();                     // stencil mode
+        mat.perPixel = r.flag();
+        mat.normalize = r.flag();
+        w.u8(mat.perPixel).u8(mat.normalize);
+        r.u32(); // stencil mode
         if (!r.done())
             return std::nullopt;
         mat.body = std::move(w.out);

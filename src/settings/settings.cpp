@@ -61,6 +61,10 @@ namespace gh2::settings
             // x360: the 360 disc's venues, characters and guitars, converted
             // as each scene loads (gh2x/models.h).
             {"video", "models", Type::kChoice, 0, 1, 1, kPs2, kPs2, "ps2 x360"},
+            // x360: lit meshes shaded per pixel as the 360's standard.fx does,
+            // with its maps and its light range of 0 to 4, then its bloom and
+            // luminance ramp (host/shaders/x360.frag). Read at startup.
+            {"video", "shading", Type::kChoice, 0, 1, 1, kPs2, kPs2, "ps2 x360"},
             // 5 ms: finer is below what a player can feel.
             {"latency", "video_ms", Type::kInt, -500, 500, 5, 0, 0},
             // 45 by default: the port's own delay on macOS, SDL's CoreAudio

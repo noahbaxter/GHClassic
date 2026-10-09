@@ -72,6 +72,9 @@ namespace gh2
             uint32_t height = 0;
         };
         std::vector<ScreenCopy> copies;
+        // The 360's luminance map for its post stage, null for none
+        // (render/look.h).
+        std::shared_ptr<const TextureData> luminance;
     };
 
     // Finished frames, oldest first. The game thread publishes at EndDrawing;
