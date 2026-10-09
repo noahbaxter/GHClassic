@@ -157,4 +157,16 @@ namespace gh2::gh1
             std::cerr << "[gh1] " << done << " of " << kSwap.size() << " in-game sounds made GH1's" << std::endl;
         ark::addFile(layer, "sfx/gen/ingame_bank.milo_ps2", milo::write(*dir));
     }
+
+    std::optional<std::vector<uint8_t>> silenced(const std::vector<uint8_t> &bank)
+    {
+        auto dir = milo::read(bank);
+        if (!dir)
+            return std::nullopt;
+        for (size_t i = 0; i < dir->entries.size(); ++i)
+            if (dir->entries[i].first == "SynthSample")
+                if (auto body = withData(dir->bodies[i], kSilence, 22050u))
+                    dir->bodies[i] = std::move(*body);
+        return milo::write(*dir);
+    }
 }
