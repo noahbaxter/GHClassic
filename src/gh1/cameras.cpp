@@ -439,7 +439,7 @@ namespace gh2::gh1
             if (const dtb::Node *spots = dtb::find(shot.params, "bad_walk_spots"); spots && spots->nodes.size() > 1u)
                 for (const dtb::Node &spot : spots->nodes[1].nodes)
                     if (const auto walk = static_cast<size_t>(spot.integer); spot.type == dtb::kInt && walk < stage.walks.size())
-                        bad.insert(bad.end(), stage.walks[walk].begin(), stage.walks[walk].end());
+                        bad.push_back(stage.walks[walk]);
             const bool hideCrowd = shot.number("hide_crowd", 0u, 0.0f) != 0.0f;
             putSize(out, bad.empty() ? 18u : 20u);
             putSymbol(out, "distance");

@@ -24,7 +24,9 @@ namespace gh2::gh1
     // That GH1 venue's script into `layer`, as the type of the GH2 venue
     // standing in for it with GH1's handlers, over the `objects` its dir
     // holds. `kit` is the room's drum kit, shown for GH1's drummer alone
-    // (content/band.h).
+    // (content/band.h), `spots` the waypoint on each walk spot its
+    // guitarist stands on.
     void addScripts(size_t layer, size_t disc, const std::string &gh1, const std::string &gh2, const Drivers &drivers,
-                    const std::set<std::string> &objects, const std::string &kit);
+                    const std::set<std::string> &objects, const std::string &kit,
+                    const std::vector<std::string> &spots);
 }

@@ -913,12 +913,41 @@ namespace gh2::gh1
             return *o + 25u;
         }
 
-        // GH2's chars dir with its waypoints on GH1's spots, each by its
-        // flags (macros.dta): the band's starts on GH1's, the guitarist's on
-        // walk spot 01, and the waypoints it walks to on the rest, a solo's
-        // first. GH1 has no second guitarist: the two start on 02 and 01.
-        // `onWalk` gets the names of those put on each walk spot.
-        std::optional<milo::Dir> chars(const milo::Dir &gh2, const Spots &at, std::vector<std::vector<std::string>> &onWalk)
+        std::string numbered(const char *prefix, int nn, const char *suffix)
+        {
+            return std::string(prefix) + (nn < 10 ? "0" : "") + std::to_string(nn) + suffix;
+        }
+
+        // A Waypoint 3 as `from` is, on that spot, with those flags and
+        // links to those (Waypoint::Load, 0x192068).
+        Bytes waypoint(const Bytes &from, size_t trans, const Bytes &spot, uint32_t flags,
+                       const std::vector<std::string> &links)
+        {
+            size_t o = transEnd(from, trans);
+            Bytes out(from.begin(), from.begin() + static_cast<std::ptrdiff_t>(o));
+            for (const size_t t : {trans + 4u, trans + 52u})
+                std::copy(spot.begin(), spot.end(), out.begin() + static_cast<std::ptrdiff_t>(t));
+            putU32(out, flags);
+            putU32(out, static_cast<uint32_t>(links.size()));
+            for (const std::string &link : links)
+                putStr(out, link);
+            const uint32_t had = u32(from, o + 4u);
+            o += 8u;
+            for (uint32_t i = 0; i < had; ++i)
+                str(from, o);
+            out.insert(out.end(), from.begin() + static_cast<std::ptrdiff_t>(o), from.end());
+            return out;
+        }
+
+        // GH2's chars dir with GH1's waypoints for its own (flags in
+        // macros.dta). The band's starts are on GH1's stage spots and the
+        // guitarist's on walk spot 01; GH1 has no second guitarist, and the
+        // two start on 02 and 01. Each walk spot has a waypoint, `onWalk`
+        // its name: the last is where a walk turns and never where one ends
+        // (StartWalk, GH1 0x284818), the rest link to it and are walked to
+        // where the venue has `walks`, `solo` before a solo.
+        std::optional<milo::Dir> chars(const milo::Dir &gh2, const Spots &at, bool walks, int solo,
+                                       std::vector<std::string> &onWalk)
         {
             if (at.stage.size() < 3u || at.walk.empty())
                 return std::nullopt;
@@ -930,27 +959,32 @@ namespace gh2::gh1
                 kStartKeyboardist = 8u,
                 kStartBassist = 16u,
                 kStartDrummer = 32u,
+                kWalkSpot = 64u,
                 kSoloWalkSpot = 128u,
                 kStartGuitarist0Mp = 512u,
+                kStarts = kStartGuitarist0 | kStartGuitarist1Mp | kStartSinger | kStartKeyboardist | kStartBassist |
+                          kStartDrummer | kStartGuitarist0Mp,
             };
             milo::Dir out = gh2;
-            onWalk.assign(at.walk.size(), {});
-            std::vector<std::pair<size_t, size_t>> walks; // entry, its Trans
-            for (size_t i = 0; i < out.entries.size(); ++i)
+            out.entries.clear();
+            out.bodies.clear();
+            std::optional<std::pair<Bytes, size_t>> start; // the guitarist's, and its Trans
+            for (size_t i = 0; i < gh2.entries.size(); ++i)
             {
-                if (out.entries[i].first != "Waypoint")
+                if (gh2.entries[i].first != "Waypoint")
+                {
+                    out.entries.push_back(gh2.entries[i]);
+                    out.bodies.push_back(gh2.bodies[i]);
                     continue;
-                Bytes &b = out.bodies[i];
+                }
+                const Bytes &b = gh2.bodies[i];
                 const auto trans = waypointTrans(b);
                 if (!trans)
                     return std::nullopt;
                 const uint32_t flags = u32(b, transEnd(b, *trans));
                 const Bytes *spot = nullptr;
                 if (flags & kStartGuitarist0)
-                {
                     spot = &at.walk[0];
-                    onWalk[0].push_back(out.entries[i].second);
-                }
                 else if (flags & (kStartSinger | kStartKeyboardist))
                     spot = &at.stage[0];
                 else if (flags & kStartBassist)
@@ -961,23 +995,32 @@ namespace gh2::gh1
                     spot = &at.walk[at.walk.size() > 1u ? 1u : 0u];
                 else if (flags & kStartGuitarist1Mp)
                     spot = &at.walk[0];
-                else if (flags & kSoloWalkSpot)
-                    walks.insert(walks.begin(), {i, *trans});
-                else
-                    walks.emplace_back(i, *trans);
-                if (spot)
-                    for (const size_t o : {*trans + 4u, *trans + 52u})
-                        std::copy(spot->begin(), spot->end(), b.begin() + static_cast<std::ptrdiff_t>(o));
+                if (!spot)
+                    continue;
+                out.entries.push_back(gh2.entries[i]);
+                out.bodies.push_back(waypoint(b, *trans, *spot, flags & kStarts, {}));
+                if (flags & kStartGuitarist0)
+                    start = {out.bodies.back(), *trans};
             }
-            for (size_t w = 0; w < walks.size(); ++w)
+            if (!start)
+                return std::nullopt;
+            const size_t spots = at.walk.size() > 1u ? at.walk.size() - 1u : 1u;
+            onWalk.clear();
+            for (size_t i = 0; i < at.walk.size(); ++i)
+                onWalk.push_back(numbered("walk_spot_", static_cast<int>(i) + 1, ".way"));
+            for (size_t i = 0; i < at.walk.size(); ++i)
             {
-                const size_t on = at.walk.size() > 1u ? 1u + w % (at.walk.size() - 1u) : 0u;
-                const Bytes &spot = at.walk[on];
-                onWalk[on].push_back(out.entries[walks[w].first].second);
-                for (const size_t o : {walks[w].second + 4u, walks[w].second + 52u})
-                    std::copy(spot.begin(), spot.end(),
-                              out.bodies[walks[w].first].begin() + static_cast<std::ptrdiff_t>(o));
+                const bool turn = i >= spots;
+                const uint32_t flags =
+                    turn || !walks ? 0u : kWalkSpot | (static_cast<int>(i) == solo ? kSoloWalkSpot : 0u);
+                std::vector<std::string> links;
+                if (turn)
+                    links.assign(onWalk.begin(), onWalk.begin() + static_cast<std::ptrdiff_t>(spots));
+                else if (spots < at.walk.size())
+                    links.push_back(onWalk[spots]);
+                milo::add(out, "Waypoint", onWalk[i], waypoint(start->first, start->second, at.walk[i], flags, links));
             }
+            onWalk.resize(spots);
             return out;
         }
 
@@ -989,11 +1032,6 @@ namespace gh2::gh1
                     if (scene->entries[i].first == cls && scene->entries[i].second == name)
                         return &scene->bodies[i];
             return nullptr;
-        }
-
-        std::string numbered(const char *prefix, int nn, const char *suffix)
-        {
-            return std::string(prefix) + (nn < 10 ? "0" : "") + std::to_string(nn) + suffix;
         }
 
         // Each Crowd<nn>.mm's places: a count, then that many transforms.
@@ -1218,6 +1256,17 @@ namespace gh2::gh1
             if (const dtb::Node *arena = dtb::find(*config, "arena"))
                 if (const dtb::Node *found = dtb::find(*arena, "crowd_flat_height"); found && found->nodes.size() > 1u)
                     flatHeight = dtb::number(found->nodes[1]).value_or(flatHeight);
+        // Whether the guitarist walks in each venue, and the walk spot a
+        // solo is played on (allow_walks and solo_walk_point, by its number
+        // less one, in arena/venues.dta).
+        const auto settings =
+            dtb::read("arena/venues.dta", none, [disc](const std::string &path) { return ark::readFile(disc, path); });
+        const auto setting = [&](const char *of, const char *key, float fallback)
+        {
+            const dtb::Node *theirs = settings ? dtb::find(*settings, of) : nullptr;
+            const dtb::Node *found = theirs ? dtb::find(*theirs, key) : nullptr;
+            return found && found->nodes.size() > 1u ? dtb::number(found->nodes[1]).value_or(fallback) : fallback;
+        };
         for (const auto &[name, kit] : kVenues)
         {
             const std::string ours = venue(name);
@@ -1241,7 +1290,8 @@ namespace gh2::gh1
                 geom(*gh2Geom, {&*gh2Chars, &*gh2Lights}, *room, *lighting, scripted(disc, name), drivers, unreached);
             const Spots at = spots({&*lighting, &*room});
             Stage stage;
-            auto madeChars = chars(*gh2Chars, at, stage.walks);
+            auto madeChars = chars(*gh2Chars, at, setting(name, "allow_walks", 0.0f) != 0.0f,
+                                   static_cast<int>(setting(name, "solo_walk_point", -1.0f)), stage.walks);
             if (!madeGeom || !madeChars)
             {
                 std::cerr << "[gh1] cannot build " << name << "'s venue" << std::endl;
@@ -1266,7 +1316,7 @@ namespace gh2::gh1
             for (const auto &e : madeGeom->entries)
                 if (!unreached.count(e.second))
                     present.insert(e.second);
-            addScripts(layer, disc, name, ours, drivers, present, kit);
+            addScripts(layer, disc, name, ours, drivers, present, kit, stage.walks);
             // GH1's crowd streams, which the type names (gh1/scripts.cpp).
             // What is not made here is the stand-in's: its sound bank and
             // encore streams.

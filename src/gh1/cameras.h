@@ -25,8 +25,8 @@ namespace gh2::gh1
     {
         // stage_spot_01.mesh's world, which GH1's fixed shots look at.
         milo::Bytes spot;
-        // The walk waypoints on each of GH1's walk spots, by name.
-        std::vector<std::vector<std::string>> walks;
+        // The waypoint on each walk spot GH1's guitarist stands on, by name.
+        std::vector<std::string> walks;
         std::vector<Region> regions;
         // The crowd's stamp, which a shot naming members of it has to have.
         uint32_t crowdStamp = 0xffffffffu;

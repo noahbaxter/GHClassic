@@ -273,6 +273,10 @@ namespace gh2::gh1
             // arena::<object> is the venue's, as every object here is.
             const std::string h = head.text.rfind("arena::", 0) == 0 ? head.text.substr(7u) : head.text;
             const std::string what = node.nodes.size() > 1u && node.nodes[1].type == dtb::kSymbol ? node.nodes[1].text : "";
+            // {char_sys get_spot <guitarist>}: the walk spot it is nearest, by
+            // its number less one (CharMan::GetSpot, GH1 0x18ef80).
+            if (h == "char_sys" && what == "get_spot" && node.nodes.size() == 3u)
+                return {command({{dtb::kVar, 0, 0.0f, "this", {}}, symbol("gh1_spot"), node.nodes[2]})};
             if (h == "arena" || h == "game")
             {
                 if (what == "switch_anim" || what == "switch_anim_rt")
@@ -402,8 +406,17 @@ namespace gh2::gh1
         // lights, on the downbeat after either changes (GH2 has no event
         // for one: the next beat that is a multiple of four), the intro has
         // the bad ones and the first shot after it the music's start, which
-        // GH2 has no event for.
+        // GH2 has no event for. A beat is GH2's own with GH1's cut from a
+        // shot the guitarist may not walk in once he walks
+        // (CameraShot::Okay, GH1 0x110040), which GH2's check leaves out
+        // (CheckShot, 0x11f628).
         constexpr const char *kGlue = R"(
+(beat
+ {set [camera_beat] $beat}
+ {if {world current_shot}
+  {if {|| {! {{world current_shot} check_shot}}
+       {&& {guitarist0 actually_walking} {! {{world current_shot} get walk_ok}}}}
+   {$this pick_new_shot}}})
 (gh1_section verse)
 (gh1_started FALSE)
 (gh1_lights_due FALSE)
@@ -537,7 +550,7 @@ namespace gh2::gh1
     }
 
     void addScripts(size_t layer, size_t disc, const std::string &gh1, const std::string &gh2, const Drivers &drivers,
-                    const std::set<std::string> &objects, const std::string &kit)
+                    const std::set<std::string> &objects, const std::string &kit, const std::vector<std::string> &spots)
     {
         const std::string path = "world/" + gh2 + "/gen/" + gh2 + ".dtb";
         const auto file = ark::readFile(0u, path);
@@ -559,6 +572,13 @@ namespace gh2::gh1
         // under their names, a handler that only calls the function of its
         // own name left out for it.
         std::vector<Node> made = dtb::parse(kGlue)->nodes;
+        // The walk spot whose waypoint is the nearest to that character of
+        // those it walks to (kWalkSpot or kSoloWalkSpot, 0x191078), -1 with
+        // none.
+        std::string nearest = "(gh1_spot ($who) {do ($at {waypoint_nearest $who 192}) {if_else {== $at \"\"} -1 {- {switch {$at name}";
+        for (size_t i = 0; i < spots.size(); ++i)
+            nearest += " (" + spots[i] + " " + std::to_string(i + 1u) + ")";
+        made.push_back(dtb::parse(nearest + "} 1}}})")->nodes[0]);
         const auto handler = [&](const std::string &name) -> Node &
         {
             for (Node &m : made)
