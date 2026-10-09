@@ -1,6 +1,7 @@
 #include "formats/midi.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace gh2::midi
 {
@@ -181,5 +182,38 @@ namespace gh2::midi
     Event text(uint32_t tick, const std::string &text)
     {
         return {tick, 0xffu, 0x01u, Bytes(text.begin(), text.end())};
+    }
+
+    TempoMap::TempoMap(const File &file) : m_spans{{0u, 0.0, 0.5 / file.division}}
+    {
+        if (file.tracks.empty())
+            return;
+        for (const Event &e : file.tracks[0].events)
+        {
+            if (e.status != 0xffu || e.meta != 0x51u || e.data.size() < 3u)
+                continue;
+            const uint32_t perBeat = (e.data[0] << 16) | (e.data[1] << 8) | e.data[2];
+            if (perBeat == 0u)
+                continue;
+            const Span &last = m_spans.back();
+            m_spans.push_back({e.tick, last.at + (e.tick - last.tick) * last.perTick, perBeat / 1.0e6 / file.division});
+        }
+    }
+
+    double TempoMap::seconds(uint32_t tick) const
+    {
+        size_t i = 0u;
+        while (i + 1u < m_spans.size() && m_spans[i + 1u].tick < tick)
+            ++i;
+        return m_spans[i].at + (tick - m_spans[i].tick) * m_spans[i].perTick;
+    }
+
+    uint32_t TempoMap::tick(double seconds) const
+    {
+        size_t i = 0u;
+        while (i + 1u < m_spans.size() && m_spans[i + 1u].at < seconds)
+            ++i;
+        const Span &in = m_spans[i];
+        return in.tick + static_cast<uint32_t>(std::lround(std::max(seconds - in.at, 0.0) / in.perTick));
     }
 }

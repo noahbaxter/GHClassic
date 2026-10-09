@@ -40,4 +40,28 @@ namespace gh2::midi
 
     // A text event (meta 0x01).
     Event text(uint32_t tick, const std::string &text);
+
+    // A file's tempos (meta 0x51 on its first track), as a tick's time
+    // in seconds and back: 120 beats a minute until set. A tempo of 0 is
+    // none.
+    class TempoMap
+    {
+    public:
+        explicit TempoMap(const File &file);
+
+        double seconds(uint32_t tick) const;
+
+        // The tick nearest a time.
+        uint32_t tick(double seconds) const;
+
+    private:
+        // Where a tempo starts, its time there and its seconds a tick.
+        struct Span
+        {
+            uint32_t tick = 0u;
+            double at = 0.0, perTick = 0.0;
+        };
+
+        std::vector<Span> m_spans;
+    };
 }

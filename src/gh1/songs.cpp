@@ -86,43 +86,6 @@ namespace gh2::gh1
             return it != kWhat.end() ? std::pair{track->second, it->second} : std::pair<std::string, std::string>{};
         }
 
-        // A tick's time in seconds by the tempo track, 120 beats a minute
-        // until set.
-        double secondsAt(const midi::File &in, uint32_t tick)
-        {
-            double at = 0.0, perTick = 0.5 / in.division;
-            uint32_t from = 0u;
-            for (const midi::Event &e : in.tracks[0].events)
-            {
-                if (e.tick >= tick)
-                    break;
-                if (e.status != 0xffu || e.meta != 0x51u || e.data.size() < 3u)
-                    continue;
-                at += (e.tick - from) * perTick;
-                from = e.tick;
-                perTick = ((e.data[0] << 16) | (e.data[1] << 8) | e.data[2]) / 1.0e6 / in.division;
-            }
-            return at + (tick - from) * perTick;
-        }
-
-        // The tick at a time, the inverse of secondsAt.
-        uint32_t tickAt(const midi::File &in, double seconds)
-        {
-            double at = 0.0, perTick = 0.5 / in.division;
-            uint32_t from = 0u;
-            for (const midi::Event &e : in.tracks[0].events)
-            {
-                if (e.status != 0xffu || e.meta != 0x51u || e.data.size() < 3u)
-                    continue;
-                if (at + (e.tick - from) * perTick >= seconds)
-                    break;
-                at += (e.tick - from) * perTick;
-                from = e.tick;
-                perTick = ((e.data[0] << 16) | (e.data[1] << 8) | e.data[2]) / 1.0e6 / in.division;
-            }
-            return from + static_cast<uint32_t>(std::lround(std::max(seconds - at, 0.0) / perTick));
-        }
-
         // The tick a measure, counted from 0, starts on, by the tempo
         // track's time signatures, 4/4 until set. One of no beats, or of
         // beats too short for a tick, is none.
@@ -203,6 +166,7 @@ namespace gh2::gh1
             // speaker_pulse). Each fires its lead earlier, 90 and 50 ms
             // (midi_triggers.dta's third field, SongDB::AddTrigger GH1
             // 0x10bf08).
+            const midi::TempoMap tempos(*in);
             if (triggers)
                 for (midi::Event e : triggers->events)
                     if (e.status != 0xffu && (e.status & 0xe0u) == 0x80u && !e.data.empty() &&
@@ -210,7 +174,7 @@ namespace gh2::gh1
                     {
                         const bool kick = e.data[0] == 60u;
                         const char *track = kick ? "BAND DRUMS" : "BAND BASS";
-                        e.tick = tickAt(*in, std::max(secondsAt(*in, e.tick) - (kick ? 0.09 : 0.05), 0.0));
+                        e.tick = tempos.tick(std::max(tempos.seconds(e.tick) - (kick ? 0.09 : 0.05), 0.0));
                         e.data[0] = 36u;
                         made[track].events.push_back(std::move(e));
                     }
@@ -235,22 +199,8 @@ namespace gh2::gh1
             std::vector<std::pair<float, float>> out;
             if (!in || in->tracks.empty())
                 return out;
-            const auto seconds = [&](uint32_t tick)
-            {
-                double at = 0.0, perTick = 0.5 / in->division; // 120 beats a minute until set
-                uint32_t from = 0u;
-                for (const midi::Event &e : in->tracks[0].events)
-                {
-                    if (e.tick >= tick)
-                        break;
-                    if (e.status != 0xffu || e.meta != 0x51u || e.data.size() < 3u)
-                        continue;
-                    at += (e.tick - from) * perTick;
-                    from = e.tick;
-                    perTick = ((e.data[0] << 16) | (e.data[1] << 8) | e.data[2]) / 1.0e6 / in->division;
-                }
-                return static_cast<float>(at + (tick - from) * perTick);
-            };
+            const midi::TempoMap tempos(*in);
+            const auto seconds = [&](uint32_t tick) { return static_cast<float>(tempos.seconds(tick)); };
             for (const midi::Track &track : in->tracks)
             {
                 if (track.name != "T1 GEMS")
