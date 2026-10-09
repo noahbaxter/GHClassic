@@ -32,6 +32,7 @@
 #include "save/ps2_card.h"
 #include "save/store.h"
 #include "script.h"
+#include "settings/ini.h"
 #include "settings/settings.h"
 
 #include "ps2_runtime.h"
@@ -90,6 +91,34 @@ namespace gh2::save
         std::string path()
         {
             return s_path.empty() ? settings::userDataPath("save.bin") : s_path;
+        }
+
+        // state.ini, beside save.bin, or beside --save's file so a run keeps
+        // its own: [game] last, the game last entered. Written at every
+        // switch, where the save holds it only once the game saves again,
+        // and read before the boot loads the save.
+        std::string statePath()
+        {
+            return s_path.empty() ? settings::userDataPath("state.ini")
+                                  : (std::filesystem::path(s_path).parent_path() / "state.ini").string();
+        }
+
+        std::string readLastGame()
+        {
+            std::ifstream in(statePath());
+            std::string line, section;
+            while (std::getline(in, line))
+            {
+                line = ini::trim(line);
+                if (ini::skipped(line))
+                    continue;
+                if (const auto name = ini::sectionName(line))
+                    section = *name;
+                else if (const size_t eq = line.find('='); section == "game" && eq != std::string::npos &&
+                                                           ini::trim(line.substr(0, eq)) == "last")
+                    return ini::trim(line.substr(eq + 1));
+            }
+            return "";
         }
 
         gh2::Games games()
@@ -685,7 +714,12 @@ namespace gh2::save
 
     std::string lastGame()
     {
-        const Section *section = s_store.find(kOwnSection);
+        if (std::string game = readLastGame(); !game.empty())
+            return game;
+        // Before the boot's load, the save as it is on disk.
+        Store disk;
+        const Store &store = s_store.find(kOwnSection) || readFile(path(), disk) != ReadResult::kOk ? s_store : disk;
+        const Section *section = store.find(kOwnSection);
         const std::string *game = section ? section->get("campaign") : nullptr;
         return game ? *game : "gh2";
     }
@@ -694,6 +728,9 @@ namespace gh2::save
     {
         s_game = game;
         s_store.section(kOwnSection).set("campaign", game);
+        if (!s_inMemory)
+            if (ini::writeReplacing(statePath(), [&](std::ofstream &out) { out << "[game]\nlast = " << game << "\n"; }))
+                std::cerr << "[save] could not write " << statePath() << std::endl;
         s_fresh = saveCampaign(rdram, ctx, runtime);
         if (!s_fresh)
         {
