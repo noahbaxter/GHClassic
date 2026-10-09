@@ -27,6 +27,18 @@ const uint kFlagHighlight = 512u;
 const uint kFlagSpread = 2048u;
 const uint kFlagSetAlpha = 4096u;
 const uint kFlagDecal = 16384u;
+const uint kFlagAdd16 = 32768u;
+
+// Added to a 16-bit frame under DIMX's 0 to 3 (PsMat::Update, 0x19d0a4), a
+// colour keeps its whole eights and of the rest what the dither carries
+// over: none of 4 or less, a quarter of the pixels at 5, half at 6, three
+// quarters at 7.
+vec3 added16(vec3 rgb)
+{
+    vec3 c = min(rgb, vec3(1.0)) * 255.0;
+    vec3 whole = floor(c / 8.0) * 8.0;
+    return (whole + max(c - whole - 4.0, vec3(0.0)) * 2.0) / 255.0;
+}
 
 void main()
 {
@@ -46,14 +58,10 @@ void main()
         // alpha as VU1's FTOI0 leaves it, added to rgb in 255ths.
         float af = floor(vColor.a * 128.0);
         color = vec4(color.rgb + af / 255.0, texel.a + af / 128.0);
-        // Added to a 16-bit frame under DIMX's 0 to 3 (PsMat::Update,
-        // 0x19d0a4), a colour keeps its whole eights and of the rest what
-        // the dither carries over: none of 4 or less, a quarter of the
-        // pixels at 5, half at 6, three quarters at 7.
-        vec3 c = min(color.rgb, vec3(1.0)) * 255.0;
-        vec3 whole = floor(c / 8.0) * 8.0;
-        color.rgb = (whole + max(c - whole - 4.0, vec3(0.0)) * 2.0) / 255.0;
+        color.rgb = added16(color.rgb);
     }
+    if ((pc.flags & kFlagAdd16) != 0u)
+        color.rgb = added16(color.rgb);
     color = min(color, vec4(1.0));
     // The GS's fog, per pixel by the interpolated F, before the blend: F of
     // 255 leaves the colour, 0 is the fog's alone.

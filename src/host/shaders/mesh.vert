@@ -15,7 +15,11 @@ layout(push_constant) uniform Push
     vec2 uvOffset;
     int boneBase;
     int lightBase;
-    uint flags; // colour mode in bits 0-2, prelit 8, alpha cut 16, intensify 32, skin bones less one in 6-7, projected 256, highlight 512, sphere 1024
+    // Colour mode in bits 0-2, prelit 8, alpha cut 16, intensify 32, skin
+    // bones less one in 6-7, projected 256, highlight 512, sphere 1024,
+    // spread 2048, set alpha 4096, vertDyn 8192, decal 16384, add16 32768
+    // (mesh_push.h).
+    uint flags;
     int envBase;
     int fogBase; // (start, end), then the colour, in the frame data; -1 for no fog
 } pc;

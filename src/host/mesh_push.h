@@ -27,6 +27,7 @@ namespace gh2
     constexpr uint32_t kFlagSetAlpha = 1u << 12; // alpha written as 1, as FBA does to an unblended pixel
     constexpr uint32_t kFlagVertDyn = 1u << 13;  // a light's colour is scaled by the vertex colour, not the material's
     constexpr uint32_t kFlagDecal = 1u << 14;    // GS DECAL texturing in place of modulate
+    constexpr uint32_t kFlagAdd16 = 1u << 15;    // an add as a 16-bit frame keeps it under dither
 
     struct PushConstants
     {

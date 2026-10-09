@@ -1550,6 +1550,8 @@ namespace gh2
                 push.flags |= kFlagHighlight;
             if (material.decal)
                 push.flags |= kFlagDecal;
+            if (material.add16)
+                push.flags |= kFlagAdd16;
             push.boneBase = boneBases[i];
             push.lightBase = lightBases[i];
             push.envBase = envBases[i];

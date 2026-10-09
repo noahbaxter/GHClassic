@@ -74,6 +74,7 @@ namespace gh2
         bool vertDyn = false; // lights scaled by the vertex colour: GH1's, which GH2's loader drops
         bool highlight = false; // GS HIGHLIGHT texturing, PsMat +0x130 == 2
         bool decal = false;     // GS DECAL texturing: the texel as it is. GH1's alone
+        bool add16 = false;     // an add of which a 16-bit frame keeps what its dither carries
         // Whether the pass takes fog, as PsMat::UpdatePass sets it (GH1
         // 0x19d56c): by its blend (a source, source alpha or multiply one
         // does, an additive or subtractive one never), and a GH1 material's

@@ -121,6 +121,9 @@ namespace gh2
                 draw.material.prelit = true;
                 if (draw.material.texGen != milo::mat::kTexGenXfm && draw.material.texGen != milo::mat::kTexGenXfmOrigin)
                     draw.material.texGen = milo::mat::kTexGenNone;
+                // Track::Draw adds 5 of 255 over the highway's far end, which
+                // retail's 16-bit frame mostly rounds away.
+                draw.material.add16 = draw.material.blend == milo::mat::kBlendAdd;
                 building().draws.push_back(draw);
             }
             ctx->pc = returnTo;
