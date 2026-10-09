@@ -53,7 +53,10 @@ namespace gh2
             return;
         // The 80s is GH2's code over its own files at GH2's paths, so with
         // its archive in front it is the whole game (content/campaigns.h).
-        campaigns::add("gh80s", ark::addLayer(*disc));
+        // But for its intro movie, which is on the disc beside the archive.
+        const size_t layer = ark::addLayer(*disc);
+        ark::lendFromDisc(layer, "videos/intro.pss", *disc, "VIDEOS/INTRO.PSS");
+        campaigns::add("gh80s", layer);
         setlists::addDisc("gh80s", *disc, false);
         // GH2's save code at GH2's addresses, its own folder: a 0x29c00-byte
         // save (GHMCSaveData 0x14b278), title 0x404918 broken after 13

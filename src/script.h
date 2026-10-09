@@ -82,6 +82,10 @@ namespace gh2::script
     // Run once the game's UI objects exist: at the first screen change after
     // the commands are registered.
     void runWhenUiReady(std::string text);
+    // Those scripts run now if the commands are registered and they have not
+    // yet, for a hook on that screen change that runs before this one's.
+    // Whether they have.
+    bool readyUi(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
 
     // The same, for a script that changes the game's screens: run again by
     // patchUiAgain once they have taken another game's scripts

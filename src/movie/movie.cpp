@@ -6,6 +6,7 @@
 #include "movie/pss.h"
 #include "movie/screen.h"
 
+#include "disc/ark.h"
 #include "host/audio.h"
 #include "host/bindings.h"
 #include "host/input.h"
@@ -14,6 +15,8 @@
 #include "runtime/ee_scheduler.h"
 #include "runtime/host_clock.h"
 #include "runtime/ps2_disc_image.h"
+
+#include <SDL3/SDL.h>
 
 #include <algorithm>
 #include <atomic>
@@ -94,8 +97,8 @@ namespace gh2
         class Player
         {
         public:
-            Player(DiscImage &disc, const DiscImage::Extent &extent, float minSkipSeconds, PS2Runtime &runtime)
-                : m_disc(disc), m_extent(extent), m_runtime(runtime),
+            Player(ark::Made file, float minSkipSeconds, PS2Runtime &runtime)
+                : m_file(std::move(file)), m_runtime(runtime),
                   m_skipAfter(Clock::now() + std::chrono::duration_cast<Clock::duration>(
                                                  std::chrono::duration<float>(minSkipSeconds)))
             {
@@ -114,17 +117,24 @@ namespace gh2
                 setMovieAudioSource(nullptr);
                 movie::endPictures();
                 mpeg2_close(m_decoder);
+                if (m_resample)
+                    SDL_DestroyAudioStream(m_resample);
             }
 
             void run()
             {
                 std::vector<uint8_t> pack(movie::kPackBytes);
-                for (uint64_t offset = 0; offset < m_extent.size && !m_done; offset += movie::kPackBytes)
+                for (uint64_t offset = 0; offset < m_file.size && !m_done; offset += movie::kPackBytes)
                 {
-                    const size_t size = m_disc.readExtent(m_extent, offset, pack.data(), pack.size());
+                    const size_t size = m_file.read(offset, pack.data(), pack.size());
                     if (!movie::demuxPack(pack.data(), size, [this](const movie::Packet &packet) { take(packet); }))
                         break;
                     showDue();
+                }
+                if (m_resample)
+                {
+                    SDL_FlushAudioStream(m_resample);
+                    drain();
                 }
                 // A sequence end code puts out the last picture if the stream
                 // did not.
@@ -157,11 +167,44 @@ namespace gh2
                 if (m_clockBase < 0 && packet.pts >= 0)
                     m_clockBase = packet.pts;
                 if (!m_audio.feed(packet.data, packet.size,
-                                  [this](const int16_t *frames, size_t count) { push(frames, count); }))
+                                  [this](const int16_t *frames, size_t count) { deliver(frames, count); }))
                 {
-                    std::cerr << "[movie] soundtrack is not PCM16 stereo 48 kHz; playing without it" << std::endl;
+                    std::cerr << "[movie] soundtrack is not PCM16 stereo 48 or 44.1 kHz; playing without it" << std::endl;
                     m_audioBad = true;
                 }
+            }
+
+            // Frames at the soundtrack's rate into the ring, at the device's:
+            // GH1's intro is 44.1 kHz, through SDL's resampler.
+            void deliver(const int16_t *frames, size_t count)
+            {
+                if (m_audio.rate() == kAudioRate)
+                {
+                    push(frames, count);
+                    return;
+                }
+                if (!m_resample)
+                {
+                    const SDL_AudioSpec from{SDL_AUDIO_S16, 2, static_cast<int>(m_audio.rate())};
+                    const SDL_AudioSpec to{SDL_AUDIO_S16, 2, static_cast<int>(kAudioRate)};
+                    m_resample = SDL_CreateAudioStream(&from, &to);
+                    if (!m_resample)
+                    {
+                        std::cerr << "[movie] no resampler (" << SDL_GetError() << "); playing without soundtrack" << std::endl;
+                        m_audioBad = true;
+                        return;
+                    }
+                }
+                SDL_PutAudioStreamData(m_resample, frames, static_cast<int>(count * 2u * sizeof(int16_t)));
+                drain();
+            }
+
+            // What the resampler has ready, into the ring.
+            void drain()
+            {
+                int16_t out[1024 * 2];
+                for (int got; (got = SDL_GetAudioStreamData(m_resample, out, sizeof(out))) > 0;)
+                    push(out, static_cast<size_t>(got) / (2u * sizeof(int16_t)));
             }
 
             void push(const int16_t *frames, size_t count)
@@ -259,7 +302,7 @@ namespace gh2
             int64_t clock() const
             {
                 const uint64_t played = s_played.load(std::memory_order_acquire);
-                return m_clockBase + int64_t(played * 90000u / movie::PssAudio::kRate);
+                return m_clockBase + int64_t(played * 90000u / kAudioRate);
             }
 
             // Until the soundtrack reaches `pts`, or the player skips.
@@ -284,12 +327,12 @@ namespace gh2
                 return m_done;
             }
 
-            DiscImage &m_disc;
-            DiscImage::Extent m_extent;
+            ark::Made m_file;
             PS2Runtime &m_runtime;
             Clock::time_point m_skipAfter;
             mpeg2dec_t *m_decoder = nullptr;
             movie::PssAudio m_audio;
+            SDL_AudioStream *m_resample = nullptr;
             bool m_audioBad = false;
             // Half a second of pictures decoded ahead, so the soundtrack in
             // between keeps arriving while they wait to be shown.
@@ -312,21 +355,26 @@ namespace gh2
         // plays the PSS through libmpeg, the IPU and a libsdr channel until
         // sceMpegIsEnd or a skip and returns 1 (0x21bebc), or 0 when the file
         // will not open. Its one caller, MetaPanel::OnPlayMovie (0x134c08),
-        // passes "videos/<name>" and 0.
+        // passes "videos/<name>" and 0. Another game's own, the campaign in
+        // front's (content/campaigns.h), comes before the game disc's.
         void playMovie(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
             const std::string path = reinterpret_cast<const char *>(getMemPtr(rdram, GPR_U32(ctx, 4)));
             const float minSkipSeconds = ctx->f[12];
             uint32_t result = 0;
+            std::optional<ark::Made> file = ark::openFront(path);
             DiscImage *disc = ps2ConfiguredDisc();
             DiscImage::Extent extent;
-            if (disc && disc->find(path, extent) && !extent.isDir)
+            if (!file && disc && disc->find(path, extent) && !extent.isDir)
+                file = ark::Made{static_cast<uint32_t>(extent.size), [disc, extent](uint64_t offset, uint8_t *dst, size_t size)
+                                 { return disc->readExtent(extent, offset, dst, size); }};
+            if (file)
             {
                 std::cerr << "[movie] playing " << path << std::endl;
                 // The game stands still for the movie and has none of that
                 // time to make up after it.
                 const auto began = ps2x::host_clock::now();
-                Player(*disc, extent, minSkipSeconds, *runtime).run();
+                Player(std::move(*file), minSkipSeconds, *runtime).run();
                 runtime->eeScheduler().dropHostTime(ps2x::host_clock::now() - began);
                 result = 1;
             }

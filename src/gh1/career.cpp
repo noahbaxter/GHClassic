@@ -301,6 +301,9 @@ namespace gh2::gh1
                 text[body(stem) + "_shop_desc"] = entry.nodes[1].text;
         }
         const size_t layer = ark::addLayer(std::nullopt);
+        // GH1's intro movie, in its archive, where GH2 plays its own
+        // (splash.dta's CUT_SCENE_VIDEO in each).
+        ark::lend(layer, "videos/intro.pss", disc, "videos/ghintro.pss");
         const std::set<std::string> scenes = addMenus(layer, disc, text);
         for (dtb::Node &entry : locale->nodes)
             if (const auto it = text.find(keyOf(entry)); entry.type == dtb::kArray && entry.nodes.size() > 1u && it != text.end())

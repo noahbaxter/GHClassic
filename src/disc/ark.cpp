@@ -52,6 +52,7 @@ namespace gh2::ark
         {
             std::string serial; // Volume::serial's
             std::unordered_map<std::string, Entry> files; // dir/name -> entry
+            Volume *volume = nullptr;
         };
 
         // Paths under `as` are `source`'s on one disc, and nowhere else.
@@ -77,6 +78,8 @@ namespace gh2::ark
         };
         std::vector<Layer> s_layers;
         std::optional<size_t> s_front; // the layer searched before the game disc
+        std::optional<size_t> s_boot;  // bootFrom's
+        std::unordered_set<std::string> s_bootFiles;
 
         uint32_t word(const std::vector<uint8_t> &data, size_t &at)
         {
@@ -172,7 +175,7 @@ namespace gh2::ark
             const std::string serial = volume.serial();
             std::cerr << "[ark] " << label << " (" << serial << "): " << files.size() << " files in " << partCount
                       << " part" << (partCount == 1u ? "" : "s") << std::endl;
-            s_discs.push_back({serial, std::move(files)});
+            s_discs.push_back({serial, std::move(files), &volume});
             return true;
         }
 
@@ -227,8 +230,9 @@ namespace gh2::ark
             return nullptr;
         }
 
-        // Loose files first, made ones as they are asked for, then renames,
-        // then the layer in front if one is, then each disc in turn.
+        // Loose files first, made ones as they are asked for, then the boot's
+        // own, then renames, then the layer in front if one is, then each
+        // disc in turn.
         const Entry *find(const std::string &name)
         {
             const auto loose = s_loose.find(name);
@@ -244,6 +248,9 @@ namespace gh2::ark
                     return &(s_loose[name] = addPart({std::move(file->read), size, size}));
                 }
             }
+            if (s_boot && s_bootFiles.count(name) != 0u)
+                if (const Entry *entry = findIn(s_layers[*s_boot], name))
+                    return entry;
             for (const Rename &rename : s_renames)
             {
                 if (name.compare(0u, rename.as.size(), rename.as) != 0)
@@ -369,6 +376,20 @@ namespace gh2::ark
         return true;
     }
 
+    bool lendFromDisc(size_t layer, const std::string &path, size_t disc, const std::string &source)
+    {
+        const auto file = disc < s_discs.size() ? s_discs[disc].volume->find(source) : std::nullopt;
+        if (!file)
+            return false;
+        Volume *from = s_discs[disc].volume;
+        const uint64_t base = file->offset;
+        const uint32_t size = static_cast<uint32_t>(file->size);
+        s_layers[layer].files[key(path.c_str())] =
+            addPart({[from, base](uint64_t offset, uint8_t *dst, size_t want) { return from->read(base + offset, dst, want); },
+                     file->size, size});
+        return true;
+    }
+
     void addMade(const std::string &path, std::function<std::optional<Made>()> make)
     {
         s_made[key(path.c_str())] = std::move(make);
@@ -415,6 +436,21 @@ namespace gh2::ark
         return read(find(key(path.c_str())));
     }
 
+    std::optional<Made> openFront(const std::string &path)
+    {
+        const Entry *entry = s_front ? findIn(s_layers[*s_front], key(path.c_str())) : nullptr;
+        if (!entry)
+            return std::nullopt;
+        const Entry at = *entry;
+        return Made{at.size, [at](uint64_t offset, uint8_t *dst, size_t want)
+                    {
+                        if (offset >= at.size)
+                            return size_t{0};
+                        return s_parts[at.part].read(at.offset + offset, dst,
+                                                     std::min<uint64_t>(want, at.size - offset));
+                    }};
+    }
+
     std::optional<std::vector<uint8_t>> readFile(size_t disc, const std::string &path)
     {
         if (disc >= s_discs.size())
@@ -435,6 +471,14 @@ namespace gh2::ark
     }
 
     void front(std::optional<size_t> layer) { s_front = layer; }
+
+    void bootFrom(std::optional<size_t> layer, const std::vector<std::string> &paths)
+    {
+        s_boot = layer;
+        s_bootFiles.clear();
+        for (const std::string &path : paths)
+            s_bootFiles.insert(key(path.c_str()));
+    }
 
     std::optional<std::vector<uint8_t>> readFront(std::optional<size_t> layer, const std::string &path)
     {
