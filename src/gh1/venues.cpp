@@ -576,8 +576,15 @@ namespace gh2::gh1
             //
             // A section's "<name>_transparent.view" is taken out of the View
             // that lists it (VenueSection::IsLoaded, GH1 0x178db8) and drawn
-            // after the band (ArenaPanel::Draw, GH1 0x10d488).
+            // after the band (ArenaPanel::Draw, GH1 0x10d488). The Environs
+            // of the band, the guitarists and the crowd are taken out too
+            // (Arena::SetupEnvs, GH1 0x168370).
             const std::string apart = transparentOf(top);
+            const auto ofCharacters = [](const std::string &n)
+            {
+                return n == "stagechar.env" || n == "crowd.env" ||
+                       (n.size() == 11u && n.rfind("singer", 0) == 0 && n.substr(7u) == ".env");
+            };
             struct Listing
             {
                 std::vector<std::string> own;
@@ -599,7 +606,7 @@ namespace gh2::gh1
                 const std::function<void(const std::string &, int, std::vector<std::string> *)> add =
                     [&](const std::string &n, int within, std::vector<std::string> *into)
                 {
-                    if (n == apart)
+                    if (n == apart || ofCharacters(n))
                         return;
                     if (environs.count(n) && !into)
                     {

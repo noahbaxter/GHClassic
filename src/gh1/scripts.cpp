@@ -140,6 +140,22 @@ namespace gh2::gh1
             return out;
         }
 
+        // Those of GH2's characters that are there drawn under that Environ
+        // of the venue's (RndDir's environ, 0x1b3de0). GH1 draws each
+        // guitarist under singer<n>.env, or the one its script last set,
+        // and the rest of the band under stagechar.env (MyCharSys::Draw,
+        // GH1 0x2826d0).
+        std::vector<Node> lit(std::initializer_list<const char *> characters, const std::string &by)
+        {
+            std::vector<Node> out;
+            for (const char *who : characters)
+                out.push_back(command(
+                    {symbol("if"), command({symbol("exists"), symbol(who)}),
+                     command({symbol(who), symbol("set"), symbol("environ"),
+                              command({{dtb::kVar, 0, 0.0f, "this", {}}, symbol("find"), symbol(by)})})}));
+            return out;
+        }
+
         // {arena switch_anim <anim> (loop a b) (scale s) (blend t)}, or
         // switch_anim_rt in milliseconds, as {<anim> animate ...}: a range
         // from one frame to another, played once or looped, at the anim's
@@ -227,6 +243,13 @@ namespace gh2::gh1
                 out.nodes.insert(out.nodes.begin(), head);
                 return {out};
             }
+            // {<cam> add_trans <object>} hangs the object off GH1's one
+            // camera, which GH2's default.cam is here: the theatre's rim
+            // light, so behind the band from wherever a shot looks.
+            if (node.nodes.size() == 3u && node.nodes[1].type == dtb::kSymbol && node.nodes[1].text == "add_trans" &&
+                venue.objects.count(node.nodes[2].text))
+                return {command({symbol(node.nodes[2].text), symbol("set"), symbol("trans_parent"),
+                                 command({{dtb::kVar, 0, 0.0f, "this", {}}, symbol("find"), symbol("default.cam")})})};
             // {with_namespace {<member> geom_space} {top.view set_showing x}}
             // hides a band member from a shot that stands in it: top.view is
             // the View all of the member draws under (charsys/<member>).
@@ -285,6 +308,10 @@ namespace gh2::gh1
                 // The shot's name, as GH1's script tells shots apart.
                 if (h == "arena" && what == "cam_msg")
                     return {command({command({{dtb::kVar, 0, 0.0f, "this", {}}, symbol("current_shot")}), symbol("name")})};
+                // The Environ both guitarists are drawn under from now on.
+                if (h == "arena" && what == "set_singer_env" && node.nodes.size() > 2u &&
+                    venue.objects.count(node.nodes[2].text))
+                    return lit({"guitarist0", "guitarist1"}, node.nodes[2].text);
                 if (h == "game" && what == "multiplayer")
                     return {node};
                 if (h == "arena" && venue.functions.count(what))
@@ -525,6 +552,13 @@ namespace gh2::gh1
                 for (const std::string &driver : it->second)
                     scene.nodes.push_back(command({symbol(driver), symbol("animate"),
                                                    array({symbol("range"), real(0.0f), real(1.0e7f)})}));
+        for (const auto &[who, by] : {std::pair{"guitarist0", "singer0.env"}, std::pair{"guitarist1", "singer1.env"}})
+            if (objects.count(by))
+                for (Node &made : lit({who}, by))
+                    scene.nodes.push_back(std::move(made));
+        if (objects.count("stagechar.env"))
+            for (Node &made : lit({"singer", "bassist", "drummer", "keyboardist"}, "stagechar.env"))
+                scene.nodes.push_back(std::move(made));
         for (const char *name : {"gh1_music_start", "hit_gem", "set_lights_bad", "set_lights_okay_verse", "set_lights_okay_chorus",
                                  "set_lights_okay_solo", "set_lights_great_verse", "set_lights_great_chorus",
                                  "set_lights_great_solo"})
