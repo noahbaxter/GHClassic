@@ -49,7 +49,12 @@ namespace gh2::gh1
             {"bonus_material"},
             {"loading"},
             {"meta_loading"},
-            {"endgame"},
+            // GH1's results take any button to go on; GH2's buttons for
+            // going on and for its breakdown by section (endgame.dta's
+            // me_morestats.btn) show in GH2's look, beside GH1's paper.
+            {.gh1 = "endgame",
+             .with = {"me_continue.btn", "me_morestats.btn"},
+             .placed = {{"me_continue.btn", 305.0f, 0.0f, -100.0f}, {"me_morestats.btn", 305.0f, 0.0f, -120.0f}}},
             {"cashaward"},
             {"complete"},
             {"highscore"},
