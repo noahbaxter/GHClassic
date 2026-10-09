@@ -393,21 +393,10 @@ namespace gh2::gh1
             return static_cast<int>(best);
         }
 
-        // A GH1 shot as a CamShot 20 (CamShot::Load, 0x264528) of that
-        // category, for one player or two: all of it, or only where it ends.
-        std::optional<Bytes> camShot(const Shot &shot, const std::string &category, bool ended, bool two,
-                                     const std::map<std::string, Path> &paths, const dtb::Node &camPaths,
-                                     const Stage &stage)
+        // Hmx::Object's header (0x2c2018): the type and its properties, what
+        // GH2 picks the shot by.
+        void putProperties(Bytes &out, const Shot &shot, const Kind &as, const Stage &stage)
         {
-            const Kind *as = kind(category);
-            const auto on = paths.find(shot.path);
-            if (!as || on == paths.end())
-                return std::nullopt;
-            const Path &path = on->second;
-
-            Bytes out;
-            putU32(out, 20u);
-            // Hmx::Object's header (0x2c2018): the type and its properties.
             putU32(out, 0u);
             putStr(out, "band");
             out.push_back(1u);
@@ -419,18 +408,17 @@ namespace gh2::gh1
                 for (const dtb::Node &spot : spots->nodes[1].nodes)
                     if (const auto walk = static_cast<size_t>(spot.integer); spot.type == dtb::kInt && walk < stage.walks.size())
                         bad.push_back(stage.walks[walk]);
-            const bool hideCrowd = shot.number("hide_crowd", 0u, 0.0f) != 0.0f;
             putSize(out, bad.empty() ? 18u : 20u);
             putSymbol(out, "distance");
-            putSymbol(out, as->distance);
+            putSymbol(out, as.distance);
             putSymbol(out, "facing");
-            putSymbol(out, as->facing);
+            putSymbol(out, as.facing);
             putSymbol(out, "special");
-            putInt(out, as->special);
+            putInt(out, as.special);
             putSymbol(out, "solo");
-            putSymbol(out, as->solo);
+            putSymbol(out, as.solo);
             putSymbol(out, "hide_crowd");
-            putInt(out, hideCrowd);
+            putInt(out, shot.number("hide_crowd", 0u, 0.0f) != 0.0f);
             putSymbol(out, "force_char_lod");
             putInt(out, static_cast<int32_t>(shot.number("force_char_lod", 0u, -1.0f)));
             putSymbol(out, "walk_ok");
@@ -451,6 +439,112 @@ namespace gh2::gh1
                     putStr(out, waypoint);
                 }
             }
+        }
+
+        // What a shot looks at and hangs under. A parent that is part of the
+        // guitar turns the shot with it; the head only carries it.
+        struct Framing
+        {
+            std::vector<Target> targets;
+            Target parent;
+            bool turned = false;
+        };
+
+        Framing framing(const Shot &shot, const dtb::Node &camPaths, bool two)
+        {
+            Framing out;
+            const std::string lookAt = named(camPaths, shot.path, "target"), under = named(camPaths, shot.path, "parent");
+            if (!lookAt.empty())
+                out.targets.push_back(target(lookAt));
+            else
+                for (int i = 0; i < (two ? 2 : 1); ++i)
+                    out.targets.push_back({kGuitarists[i], kHead});
+            out.parent = under.empty() ? Target{kGuitarists[0], kHead} : target(under);
+            out.turned = !under.empty() && !out.parent.part.empty();
+            return out;
+        }
+
+        // A shot at a frame of its path, `u` of the way from its "in"
+        // offset, screen spot and field of view to its "out": where it is,
+        // how it is turned, where on screen it holds what it looks at, and
+        // the tangent of half its field of view.
+        struct Key
+        {
+            Vec at, spot;
+            float rows[9];
+            float half;
+        };
+
+        Key key(const Shot &shot, const Path &path, float frame, float u, bool turned)
+        {
+            Key out;
+            const Vec in = shot.vec("offset_in"), offset = in + (shot.vec("offset_out") - in) * u;
+            out.at = position(path, frame) + offset;
+            if (turned)
+                out.at.z *= kSpotDepth;
+            const Vec spotIn = shot.vec("singer_in");
+            out.spot = spotIn + (shot.vec("singer_out") - spotIn) * u;
+            const float fovIn = shot.number("fov_in", 0u, 45.0f);
+            const float degrees = fovIn + (shot.number("fov_out", 0u, 45.0f) - fovIn) * u;
+            out.half = std::tan(degrees * kRadiansPerDegree * 0.5f);
+            rotation(path, frame, out.rows);
+            return out;
+        }
+
+        // A CamShotFrame: how long it holds, then how long it takes to the
+        // next key and that move's ease, the field of view, where it is and
+        // where on screen it holds what it looks at, its blur, what it looks
+        // at and hangs under, and its shake.
+        void putKey(Bytes &out, const Key &k, float time, bool last, const Framing &framing, bool shaky)
+        {
+            putF32(out, 0.0f);
+            putF32(out, time);
+            putF32(out, 0.0f);
+            putF32(out, fov(k.half));
+            for (const float v : k.rows)
+                putF32(out, v);
+            putF32(out, k.at.x);
+            putF32(out, k.at.y);
+            putF32(out, k.at.z);
+            putF32(out, k.spot.x);
+            putF32(out, k.spot.y);
+            // Blur behind twice as far as what it looks at (VenueCam::Poll,
+            // GH1 0x16ea0c), which GH1 measures before the screen spot moves
+            // the camera. A key GH2 holds is measured after
+            // (CamShotFrame::Interp, 0x26696c), farther by this, which goes
+            // where the PS2 reads no blur amount (content/focus.h).
+            const Vec &s = k.spot;
+            const float moved = std::sqrt(1.0f + s.x * k.half * s.x * k.half + s.y * k.half * 0.75f * s.y * k.half * 0.75f);
+            putF32(out, 0.5f);
+            putF32(out, 2.0f);
+            putF32(out, last ? moved : 1.0f);
+            putU32(out, static_cast<uint32_t>(framing.targets.size()));
+            for (const Target &looked : framing.targets)
+                put(out, looked);
+            put(out, framing.parent);
+            out.push_back(framing.turned ? 1u : 0u);
+            // The noise's size and speed, and the most it turns.
+            putF32(out, shaky ? 0.2f : 0.0f);
+            putF32(out, shaky ? 0.2f : 0.0f);
+            putF32(out, shaky ? 0.25f : 0.0f);
+            putF32(out, shaky ? 0.25f : 0.0f);
+        }
+
+        // A GH1 shot as a CamShot 20 (CamShot::Load, 0x264528) of that
+        // category, for one player or two: all of it, or only where it ends.
+        std::optional<Bytes> camShot(const Shot &shot, const std::string &category, bool ended, bool two,
+                                     const std::map<std::string, Path> &paths, const dtb::Node &camPaths,
+                                     const Stage &stage)
+        {
+            const Kind *as = kind(category);
+            const auto on = paths.find(shot.path);
+            if (!as || on == paths.end())
+                return std::nullopt;
+            const Path &path = on->second;
+
+            Bytes out;
+            putU32(out, 20u);
+            putProperties(out, shot, *as, stage);
             // RndAnimatable 4 (0x1ab228): its frame, and 30 frames a second.
             putU32(out, 4u);
             putF32(out, 0.0f);
@@ -458,86 +552,33 @@ namespace gh2::gh1
 
             // The path's frames this shot covers, start to end percent of
             // its length, and how long it takes in GH2's frames. The "in"
-            // offset, screen spot and field of view are those at the lower
-            // of the two frames, the "out" at the higher (GH1 0x16f9ec).
+            // values are those at the lower of the two frames, the "out" at
+            // the higher (GH1 0x16f9ec).
             const float length = path.keys.back().second;
             const float from = shot.number("start", 0u, 0.0f) * length / 100.0f;
             const float to = shot.number("end", 0u, 100.0f) * length / 100.0f;
+            const float low = std::min(from, to), high = std::max(from, to);
             const float frames = shot.number("duration", 0u, 1920.0f) * 0.03f;
             const float ease = shot.number("ease", 0u, 0.0f);
             const bool still = ended || from == to || frames <= 0.0f;
             const int steps = still ? 0 : std::clamp(static_cast<int>(std::ceil(frames / 15.0f)), 4, 24);
 
-            const std::string lookAt = named(camPaths, shot.path, "target"), under = named(camPaths, shot.path, "parent");
-            std::vector<Target> targets;
-            if (!lookAt.empty())
-                targets.push_back(target(lookAt));
-            else
-                for (int i = 0; i < (two ? 2 : 1); ++i)
-                    targets.push_back({kGuitarists[i], kHead});
-            const Target parent = under.empty() ? Target{kGuitarists[0], kHead} : target(under);
-            // A parent that is part of the guitar turns the shot with it;
-            // the head only carries it.
-            const bool turned = !under.empty() && !parent.part.empty();
+            const Framing framed = framing(shot, camPaths, two);
+            const bool hideCrowd = shot.number("hide_crowd", 0u, 0.0f) != 0.0f;
             const bool shaky = shot.number("shaky", 0u, 0.0f) != 0.0f;
             int region = static_cast<int>(shot.number("crowd_region", 0u, -1.0f));
-
             putU32(out, static_cast<uint32_t>(steps + 1));
             for (int i = 0; i <= steps; ++i)
             {
                 const float t = still ? 1.0f : static_cast<float>(i) / static_cast<float>(steps);
                 const float frame = from + (to - from) * eased(ease, t);
-                const float low = std::min(from, to), high = std::max(from, to);
-                const float u = high > low ? (frame - low) / (high - low) : 1.0f;
-                const Vec in = shot.vec("offset_in"), offset = in + (shot.vec("offset_out") - in) * u;
-                Vec at = position(path, frame) + offset;
-                if (turned)
-                    at.z *= kSpotDepth;
-                const Vec spotIn = shot.vec("singer_in"), spot = spotIn + (shot.vec("singer_out") - spotIn) * u;
-                const float fovIn = shot.number("fov_in", 0u, 45.0f);
-                const float degrees = fovIn + (shot.number("fov_out", 0u, 45.0f) - fovIn) * u;
-                const float half = std::tan(degrees * kRadiansPerDegree * 0.5f);
-                float rows[9];
-                rotation(path, frame, rows);
-
-                // How long it holds, then how long it takes to the next key
-                // and that move's ease, the field of view, where it is and
-                // where on screen it holds what it looks at.
-                putF32(out, 0.0f);
-                putF32(out, i < steps ? frames / static_cast<float>(steps) : 0.0f);
-                putF32(out, 0.0f);
-                putF32(out, fov(half));
-                for (const float v : rows)
-                    putF32(out, v);
-                putF32(out, at.x);
-                putF32(out, at.y);
-                putF32(out, at.z);
-                putF32(out, spot.x);
-                putF32(out, spot.y);
-                // Blur behind twice as far as what it looks at (VenueCam::Poll,
-                // GH1 0x16ea0c), which GH1 measures before the screen spot
-                // moves the camera. A key GH2 holds is measured after
-                // (CamShotFrame::Interp, 0x26696c), farther by this, which
-                // goes where the PS2 reads no blur amount (content/focus.h).
-                const float moved = std::sqrt(1.0f + spot.x * half * spot.x * half + spot.y * half * 0.75f * spot.y * half * 0.75f);
-                putF32(out, 0.5f);
-                putF32(out, 2.0f);
-                putF32(out, i == steps ? moved : 1.0f);
-                putU32(out, static_cast<uint32_t>(targets.size()));
-                for (const Target &looked : targets)
-                    put(out, looked);
-                put(out, parent);
-                out.push_back(turned ? 1u : 0u);
-                // Shake: the noise's size and speed, and the most it turns.
-                putF32(out, shaky ? 0.2f : 0.0f);
-                putF32(out, shaky ? 0.2f : 0.0f);
-                putF32(out, shaky ? 0.25f : 0.0f);
-                putF32(out, shaky ? 0.25f : 0.0f);
+                const Key k = key(shot, path, frame, high > low ? (frame - low) / (high - low) : 1.0f, framed.turned);
+                putKey(out, k, i < steps ? frames / static_cast<float>(steps) : 0.0f, i == steps, framed, shaky);
                 // A shot that names no crowd region has the one its first
                 // key faces.
                 if (i == 0 && region < 0)
-                    region = faced(stage.regions, place(parent, stage) + at, place(targets[0], stage),
-                                   {rows[6], rows[7], rows[8]}, spot, half);
+                    region = faced(stage.regions, place(framed.parent, stage) + k.at, place(framed.targets[0], stage),
+                                   {k.rows[6], k.rows[7], k.rows[8]}, k.spot, k.half);
             }
 
             out.push_back(0u); // looping
@@ -567,6 +608,32 @@ namespace gh2::gh1
             putStr(out, {});
             return out;
         }
+
+        // The camera paths of campaths.rnd, by name less ".tnm".
+        std::map<std::string, Path> paths(const milo::Dir &scene)
+        {
+            std::map<std::string, Path> out;
+            for (size_t i = 0; i < scene.entries.size(); ++i)
+                if (const auto &[cls, name] = scene.entries[i]; cls == "TransAnim" && name.size() > 4u)
+                    if (auto made = path(scene.bodies[i]))
+                        out[name.substr(0, name.size() - 4u)] = std::move(*made);
+            return out;
+        }
+
+        // A world with all but its shots.
+        milo::Dir withoutShots(const milo::Dir &world)
+        {
+            milo::Dir out = world;
+            out.entries.clear();
+            out.bodies.clear();
+            for (size_t i = 0; i < world.entries.size(); ++i)
+                if (world.entries[i].first != "CamShot")
+                {
+                    out.entries.push_back(world.entries[i]);
+                    out.bodies.push_back(world.bodies[i]);
+                }
+            return out;
+        }
     }
 
     void addCameras(size_t layer, size_t disc, const std::string &gh1, const std::string &gh2, const Stage &stage)
@@ -581,11 +648,7 @@ namespace gh2::gh1
             std::cerr << "[gh1] cannot read " << gh1 << "'s cameras" << std::endl;
             return;
         }
-        std::map<std::string, Path> paths;
-        for (size_t i = 0; i < scene->entries.size(); ++i)
-            if (const auto &[cls, name] = scene->entries[i]; cls == "TransAnim" && name.size() > 4u)
-                if (auto made = path(scene->bodies[i]))
-                    paths[name.substr(0, name.size() - 4u)] = std::move(*made);
+        const std::map<std::string, Path> byName = paths(*scene);
         const std::vector<Shot> all = shots(*script);
 
         // A shot of those groups: the first that stays still if any does and
@@ -609,16 +672,7 @@ namespace gh2::gh1
                 continue;
             }
             const bool two = players[0] != '\0';
-            milo::Dir out = *world;
-            out.entries.clear();
-            out.bodies.clear();
-            for (size_t i = 0; i < world->entries.size(); ++i)
-                if (world->entries[i].first != "CamShot")
-                {
-                    out.entries.push_back(world->entries[i]);
-                    out.bodies.push_back(world->bodies[i]);
-                }
-
+            milo::Dir out = withoutShots(*world);
             milo::add(out, "Trans", kSpot, trans(stage.spot));
 
             std::set<std::string> taken;
@@ -627,7 +681,7 @@ namespace gh2::gh1
             {
                 while (!taken.insert(name).second)
                     name += "_";
-                if (auto body = camShot(shot, category, ended, two, paths, *camPaths, stage))
+                if (auto body = camShot(shot, category, ended, two, byName, *camPaths, stage))
                 {
                     milo::add(out, "CamShot", name, std::move(*body));
                     ++made;

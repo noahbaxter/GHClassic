@@ -217,31 +217,209 @@ namespace gh2::gh1
             return out;
         }
 
-        std::vector<Node> translate(const Node &node, const Venue &venue)
+        // {game anim_task <anim> <time> <from> <to>} (TaskMgr::OnAnimTask,
+        // GH1 0x242b48): the arena's tasks run in ticks, the game panel's in
+        // milliseconds (UIPanel::Poll, GH1 0x207140).
+        std::vector<Node> animTask(const Node &cmd, bool game, const Venue &venue)
+        {
+            std::vector<Node> out;
+            const auto time = dtb::number(cmd.nodes[3]);
+            const float unit = game ? 1000.0f : kTicks;
+            for (const Node &target : targets(cmd.nodes[2], venue))
+            {
+                Node made = command({target, symbol("animate"), array({symbol("range"), cmd.nodes[4], cmd.nodes[5]})});
+                if (game)
+                    made.nodes.push_back(array({symbol("units"), integer(0)}));
+                made.nodes.push_back(array({symbol("period"), real((time ? *time : unit) / unit)}));
+                out.push_back(std::move(made));
+            }
+            return out;
+        }
+
+        // {animate_to arena <anim> <to> <ticks>}: from the frame it is at
+        // (system_script.dta).
+        std::vector<Node> animateTo(const Node &cmd, const Venue &venue)
+        {
+            std::vector<Node> out;
+            const auto ticks = dtb::number(cmd.nodes[4]);
+            for (const Node &target : targets(cmd.nodes[2], venue))
+                out.push_back(command({target, symbol("animate"),
+                                       array({symbol("range"), command({target, symbol("frame")}), cmd.nodes[3]}),
+                                       array({symbol("period"), real((ticks ? *ticks : kTicks) / kTicks)})}));
+            return out;
+        }
+
+        // {arena delay_task <ticks> ...}
+        std::vector<Node> delayTask(const Node &cmd, const Venue &venue)
+        {
+            const auto ticks = dtb::number(cmd.nodes[2]);
+            std::vector<Node> body = translated(cmd.nodes, 3u, venue);
+            if (!ticks || body.empty())
+                return {};
+            body.insert(body.begin(), symbol("script"));
+            return {command({symbol("script_task"), array({symbol("units"), symbol("kTaskBeats")}),
+                             array({symbol("delay"), real(*ticks / kTicks)}), array(std::move(body))})};
+        }
+
+        // {with_namespace {<member> geom_space} {top.view set_showing x}}
+        // hides a band member from a shot that stands in it: top.view is the
+        // View all of the member draws under (charsys/<member>).
+        bool isMemberShowing(const Node &cmd)
+        {
+            return is(cmd.nodes[0], "with_namespace") && cmd.nodes.size() == 3u && cmd.nodes[1].type == dtb::kCommand &&
+                   cmd.nodes[1].nodes.size() == 2u && cmd.nodes[1].nodes[1].text == "geom_space" &&
+                   cmd.nodes[2].type == dtb::kCommand && cmd.nodes[2].nodes.size() == 3u &&
+                   cmd.nodes[2].nodes[0].text == "top.view" && cmd.nodes[2].nodes[1].text == "set_showing";
+        }
+
+        std::vector<Node> memberShowing(const Node &cmd, const Venue &venue)
+        {
+            const Node who = cmd.nodes[1].nodes[0];
+            const std::vector<Node> showing = translate(cmd.nodes[2].nodes[2], venue);
+            if (showing.size() != 1u)
+                return {};
+            return {command({symbol("if"), command({symbol("exists"), who}), command({who, symbol("set_showing"), showing[0]})})};
+        }
+
+        // One of the venue's functions, a handler of its type here, given
+        // the command's nodes from `from` on.
+        std::vector<Node> call(const std::string &function, const Node &cmd, size_t from, const Venue &venue)
+        {
+            Node out = command({self(), symbol(function)});
+            std::vector<Node> args = translated(cmd.nodes, from, venue);
+            out.nodes.insert(out.nodes.end(), args.begin(), args.end());
+            return {out};
+        }
+
+        // A command kept as it is: its nodes up to `fixed` made one each,
+        // then `body`. None if one of those makes other than one.
+        std::vector<Node> kept(const Node &cmd, size_t fixed, std::vector<Node> body, const Venue &venue)
+        {
+            if (cmd.nodes.size() < fixed)
+                return {};
+            Node out = command({cmd.nodes[0]});
+            for (size_t i = 1u; i < fixed; ++i)
+            {
+                std::vector<Node> made = translate(cmd.nodes[i], venue);
+                if (made.size() != 1u)
+                    return {};
+                out.nodes.push_back(std::move(made[0]));
+            }
+            out.nodes.insert(out.nodes.end(), std::make_move_iterator(body.begin()), std::make_move_iterator(body.end()));
+            return {out};
+        }
+
+        // {arena <what> ...} or {game <what> ...}.
+        std::vector<Node> arenaCommand(const Node &cmd, bool game, const std::string &what, const Venue &venue)
+        {
+            if (what == "switch_anim" || what == "switch_anim_rt")
+                return animate(cmd, what == "switch_anim_rt", venue);
+            if (what == "anim_task" && cmd.nodes.size() > 5u)
+                return animTask(cmd, game, venue);
+            if (what == "delay_task" && cmd.nodes.size() > 3u)
+                return delayTask(cmd, venue);
+            if (game)
+                return what == "multiplayer" ? std::vector<Node>{cmd} : std::vector<Node>{};
+            // The shot's name, as GH1's script tells shots apart.
+            if (what == "cam_msg")
+                return {command({command({self(), symbol("current_shot")}), symbol("name")})};
+            // The Environ both guitarists are drawn under from now on.
+            if (what == "set_singer_env" && cmd.nodes.size() > 2u && venue.objects.count(cmd.nodes[2].text))
+                return lit({"guitarist0", "guitarist1"}, cmd.nodes[2].text);
+            if (venue.functions.count(what))
+                return call(what, cmd, 2u, venue);
+            return {};
+        }
+
+        // A method of an object: one GH2's objects answer, of an object that
+        // is here, or a frame for each that stands for an anim.
+        std::vector<Node> method(const Node &cmd, const std::string &object, const std::string &what, const Venue &venue)
+        {
+            static const std::set<std::string> kMethods = {"set_showing", "set_frame", "set_steps"};
+            if (!kMethods.count(what))
+                return {};
+            std::vector<Node> objects;
+            if (what == "set_frame" && venue.drivers.count(object))
+                for (const Node &driver : targets(symbol(object), venue))
+                    objects.push_back(inRoom(driver.text));
+            else if (venue.objects.count(object))
+                objects.push_back(
+                    inRoom(what == "set_showing" && venue.objects.count(drawsOf(object)) ? drawsOf(object) : object));
+            const std::vector<Node> with = translated(cmd.nodes, 2u, venue);
+            if (with.size() + 2u != cmd.nodes.size())
+                return {};
+            std::vector<Node> out;
+            for (const Node &o : objects)
+            {
+                Node made = command({o, cmd.nodes[1]});
+                made.nodes.insert(made.nodes.end(), with.begin(), with.end());
+                out.push_back(std::move(made));
+            }
+            return out;
+        }
+
+        std::vector<Node> translateCommand(const Node &cmd, const Venue &venue)
         {
             static const std::set<std::string> kControl = {"if", "if_else", "unless", "foreach", "do", "switch"};
-            static const std::set<std::string> kMethods = {"set_showing", "set_frame", "set_steps"};
             static const std::set<std::string> kKept = {
                 "set", "random_int", "random_float", "exists", "==", "!=", ">", "<", ">=", "<=", "!", "&&", "||",
                 "+", "-", "*", "/",
             };
+            if (cmd.nodes.empty())
+                return {};
+            const Node &head = cmd.nodes[0];
+            if (head.type == dtb::kVar)
+            {
+                // A method of whatever the variable names.
+                Node out = cmd;
+                out.nodes = translated(cmd.nodes, 1u, venue);
+                out.nodes.insert(out.nodes.begin(), head);
+                return {out};
+            }
+            // {<cam> add_trans <object>} hangs the object off GH1's one
+            // camera, which GH2's default.cam is here: the theatre's rim
+            // light, so behind the band from wherever a shot looks.
+            if (cmd.nodes.size() == 3u && is(cmd.nodes[1], "add_trans") && venue.objects.count(cmd.nodes[2].text))
+                return {command({symbol(cmd.nodes[2].text), symbol("set"), symbol("trans_parent"),
+                                 command({self(), symbol("find"), symbol("default.cam")})})};
+            if (isMemberShowing(cmd))
+                return memberShowing(cmd, venue);
+            if (head.type != dtb::kSymbol)
+                return {};
+            // arena::<object> is the venue's, as every object here is.
+            const std::string h = head.text.rfind("arena::", 0) == 0 ? head.text.substr(7u) : head.text;
+            const std::string what = cmd.nodes.size() > 1u && cmd.nodes[1].type == dtb::kSymbol ? cmd.nodes[1].text : "";
+            // {char_sys get_spot <guitarist>}: the walk spot it is nearest, by
+            // its number less one (CharMan::GetSpot, GH1 0x18ef80).
+            if (h == "char_sys" && what == "get_spot" && cmd.nodes.size() == 3u)
+                return {command({self(), symbol("gh1_spot"), cmd.nodes[2]})};
+            if (h == "arena" || h == "game")
+                return arenaCommand(cmd, h == "game", what, venue);
+            if (h == "animate_to" && cmd.nodes.size() > 4u)
+                return animateTo(cmd, venue);
+            if (venue.functions.count(h))
+                return call(h, cmd, 1u, venue);
+            if (kControl.count(h))
+            {
+                // What it tests, or runs over, then what it does.
+                const size_t fixed = h == "foreach" ? 3u : h == "do" ? 1u : 2u;
+                std::vector<Node> body = translated(cmd.nodes, fixed, venue);
+                return body.empty() ? std::vector<Node>{} : kept(cmd, fixed, std::move(body), venue);
+            }
+            if (kKept.count(h))
+                return kept(cmd, cmd.nodes.size(), {}, venue);
+            return method(cmd, h, what, venue);
+        }
+
+        std::vector<Node> translate(const Node &node, const Venue &venue)
+        {
             switch (node.type)
             {
             case dtb::kVar:
-                if (node.text == "arena.excitement")
-                    return {property("excitement_level")};
-                return {node};
+                return {node.text == "arena.excitement" ? property("excitement_level") : node};
             case dtb::kSymbol:
-            {
                 // An anim, wherever it is named, is what stands for it.
-                const auto it = venue.drivers.find(node.text);
-                if (it == venue.drivers.end())
-                    return {node};
-                std::vector<Node> out;
-                for (const std::string &driver : it->second)
-                    out.push_back(symbol(driver));
-                return out;
-            }
+                return venue.drivers.count(node.text) ? targets(node, venue) : std::vector<Node>{node};
             case dtb::kArray:
             {
                 Node out = node;
@@ -249,177 +427,10 @@ namespace gh2::gh1
                 return {out};
             }
             case dtb::kCommand:
-                break;
+                return translateCommand(node, venue);
             default:
                 return {node};
             }
-            if (node.nodes.empty())
-                return {};
-            const Node &head = node.nodes[0];
-            if (head.type == dtb::kVar)
-            {
-                // A method of whatever the variable names.
-                Node out = node;
-                out.nodes = translated(node.nodes, 1u, venue);
-                out.nodes.insert(out.nodes.begin(), head);
-                return {out};
-            }
-            // {<cam> add_trans <object>} hangs the object off GH1's one
-            // camera, which GH2's default.cam is here: the theatre's rim
-            // light, so behind the band from wherever a shot looks.
-            if (node.nodes.size() == 3u && node.nodes[1].type == dtb::kSymbol && node.nodes[1].text == "add_trans" &&
-                venue.objects.count(node.nodes[2].text))
-                return {command({symbol(node.nodes[2].text), symbol("set"), symbol("trans_parent"),
-                                 command({self(), symbol("find"), symbol("default.cam")})})};
-            // {with_namespace {<member> geom_space} {top.view set_showing x}}
-            // hides a band member from a shot that stands in it: top.view is
-            // the View all of the member draws under (charsys/<member>).
-            if (head.type == dtb::kSymbol && head.text == "with_namespace" && node.nodes.size() == 3u &&
-                node.nodes[1].type == dtb::kCommand && node.nodes[1].nodes.size() == 2u &&
-                node.nodes[1].nodes[1].text == "geom_space" && node.nodes[2].type == dtb::kCommand &&
-                node.nodes[2].nodes.size() == 3u && node.nodes[2].nodes[0].text == "top.view" &&
-                node.nodes[2].nodes[1].text == "set_showing")
-            {
-                const Node who = node.nodes[1].nodes[0];
-                const std::vector<Node> showing = translate(node.nodes[2].nodes[2], venue);
-                if (showing.size() != 1u)
-                    return {};
-                return {command({symbol("if"), command({symbol("exists"), who}),
-                                 command({who, symbol("set_showing"), showing[0]})})};
-            }
-            if (head.type != dtb::kSymbol)
-                return {};
-            // arena::<object> is the venue's, as every object here is.
-            const std::string h = head.text.rfind("arena::", 0) == 0 ? head.text.substr(7u) : head.text;
-            const std::string what = node.nodes.size() > 1u && node.nodes[1].type == dtb::kSymbol ? node.nodes[1].text : "";
-            // {char_sys get_spot <guitarist>}: the walk spot it is nearest, by
-            // its number less one (CharMan::GetSpot, GH1 0x18ef80).
-            if (h == "char_sys" && what == "get_spot" && node.nodes.size() == 3u)
-                return {command({self(), symbol("gh1_spot"), node.nodes[2]})};
-            if (h == "arena" || h == "game")
-            {
-                if (what == "switch_anim" || what == "switch_anim_rt")
-                    return animate(node, what == "switch_anim_rt", venue);
-                if (what == "anim_task" && node.nodes.size() > 5u)
-                {
-                    // {game anim_task <anim> <time> <from> <to>}
-                    // (TaskMgr::OnAnimTask, GH1 0x242b48): the arena's
-                    // tasks run in ticks, the game panel's in milliseconds
-                    // (UIPanel::Poll, GH1 0x207140).
-                    std::vector<Node> out;
-                    const auto time = dtb::number(node.nodes[3]);
-                    for (const Node &target : targets(node.nodes[2], venue))
-                    {
-                        Node made = command({target, symbol("animate"), array({symbol("range"), node.nodes[4], node.nodes[5]})});
-                        if (h == "game")
-                            made.nodes.push_back(array({symbol("units"), integer(0)}));
-                        made.nodes.push_back(array({symbol("period"), real(h == "game" ? (time ? *time : 1000.0f) / 1000.0f
-                                                                                        : (time ? *time : kTicks) / kTicks)}));
-                        out.push_back(std::move(made));
-                    }
-                    return out;
-                }
-                if (what == "delay_task" && node.nodes.size() > 3u)
-                {
-                    // {arena delay_task <ticks> ...}
-                    const auto ticks = dtb::number(node.nodes[2]);
-                    std::vector<Node> body = translated(node.nodes, 3u, venue);
-                    if (!ticks || body.empty())
-                        return {};
-                    body.insert(body.begin(), symbol("script"));
-                    return {command({symbol("script_task"), array({symbol("units"), symbol("kTaskBeats")}),
-                                     array({symbol("delay"), real(*ticks / kTicks)}), array(std::move(body))})};
-                }
-                // The shot's name, as GH1's script tells shots apart.
-                if (h == "arena" && what == "cam_msg")
-                    return {command({command({self(), symbol("current_shot")}), symbol("name")})};
-                // The Environ both guitarists are drawn under from now on.
-                if (h == "arena" && what == "set_singer_env" && node.nodes.size() > 2u &&
-                    venue.objects.count(node.nodes[2].text))
-                    return lit({"guitarist0", "guitarist1"}, node.nodes[2].text);
-                if (h == "game" && what == "multiplayer")
-                    return {node};
-                if (h == "arena" && venue.functions.count(what))
-                {
-                    Node out = command({self(), symbol(what)});
-                    std::vector<Node> args = translated(node.nodes, 2u, venue);
-                    out.nodes.insert(out.nodes.end(), args.begin(), args.end());
-                    return {out};
-                }
-                return {};
-            }
-            if (h == "animate_to" && node.nodes.size() > 4u)
-            {
-                // {animate_to arena <anim> <to> <ticks>}: from the frame it
-                // is at (system_script.dta).
-                std::vector<Node> out;
-                const auto ticks = dtb::number(node.nodes[4]);
-                for (const Node &target : targets(node.nodes[2], venue))
-                    out.push_back(command({target, symbol("animate"),
-                                           array({symbol("range"), command({target, symbol("frame")}), node.nodes[3]}),
-                                           array({symbol("period"), real((ticks ? *ticks : kTicks) / kTicks)})}));
-                return out;
-            }
-            if (venue.functions.count(h))
-            {
-                Node out = command({self(), symbol(h)});
-                std::vector<Node> args = translated(node.nodes, 1u, venue);
-                out.nodes.insert(out.nodes.end(), args.begin(), args.end());
-                return {out};
-            }
-            if (kControl.count(h))
-            {
-                // What it tests, or runs over, then what it does.
-                const size_t fixed = h == "foreach" ? 3u : h == "do" ? 1u : 2u;
-                if (node.nodes.size() < fixed)
-                    return {};
-                Node out = command({head});
-                for (size_t i = 1u; i < fixed; ++i)
-                {
-                    std::vector<Node> made = translate(node.nodes[i], venue);
-                    if (made.size() != 1u)
-                        return {};
-                    out.nodes.push_back(std::move(made[0]));
-                }
-                std::vector<Node> body = translated(node.nodes, fixed, venue);
-                if (body.empty())
-                    return {};
-                out.nodes.insert(out.nodes.end(), body.begin(), body.end());
-                return {out};
-            }
-            if (kKept.count(h))
-            {
-                Node out = command({head});
-                for (size_t i = 1u; i < node.nodes.size(); ++i)
-                {
-                    std::vector<Node> made = translate(node.nodes[i], venue);
-                    if (made.size() != 1u)
-                        return {};
-                    out.nodes.push_back(std::move(made[0]));
-                }
-                return {out};
-            }
-            // A method of an object: one GH2's objects answer, of an object
-            // that is here, or a frame for each that stands for an anim.
-            if (!kMethods.count(what))
-                return {};
-            std::vector<Node> out;
-            std::vector<Node> objects;
-            if (what == "set_frame" && venue.drivers.count(h))
-                for (const Node &driver : targets(symbol(h), venue))
-                    objects.push_back(inRoom(driver.text));
-            else if (venue.objects.count(h))
-                objects.push_back(inRoom(what == "set_showing" && venue.objects.count(drawsOf(h)) ? drawsOf(h) : h));
-            const std::vector<Node> with = translated(node.nodes, 2u, venue);
-            if (with.size() + 2u != node.nodes.size())
-                return {};
-            for (const Node &object : objects)
-            {
-                Node made = command({object, node.nodes[1]});
-                made.nodes.insert(made.nodes.end(), with.begin(), with.end());
-                out.push_back(std::move(made));
-            }
-            return out;
         }
 
         // The walk spot whose waypoint is the nearest to that character of
@@ -437,6 +448,42 @@ namespace gh2::gh1
                           command({symbol("do"), array({at, command({symbol("waypoint_nearest"), who, integer(192)})}),
                                    command({symbol("if_else"), command({symbol("=="), at, none}), integer(-1),
                                             command({symbol("-"), std::move(spot), integer(1)})})})});
+        }
+
+        // GH1 shows no shadow of the band's or a guitarist's own: where a room
+        // has them it draws them, and a guitarist's is drawn with no alpha,
+        // which its alpha test keeps to the Z buffer. A setting picks the
+        // room's, GH2's own under everyone, or neither. They are only ever
+        // hidden here: a band member's shadow.mesh, wherever the room draws
+        // the band's, and a guitarist's Group of them, as GH2 hides it with
+        // two players (char_objects.dta).
+        std::vector<Node> shadows(const std::set<std::string> &objects)
+        {
+            std::vector<Node> out;
+            const auto chosen = [](const char *which)
+            { return command({symbol("=="), command({symbol("band"), symbol("shadows")}), symbol(which)}); };
+            for (const char *who : {"singer", "bassist", "drummer", "keyboardist"})
+            {
+                Node hide = command({symbol("if"), command({symbol(who), symbol("exists"), symbol("shadow.mesh")}),
+                                     command({command({symbol(who), symbol("find"), symbol("shadow.mesh")}), symbol("set_showing"),
+                                              integer(0)})});
+                if (!objects.count("band_shadow.mesh"))
+                    hide = command({symbol("if"), command({symbol("!"), chosen("gh2")}), std::move(hide)});
+                out.push_back(command({symbol("if"), command({symbol("exists"), symbol(who)}), std::move(hide)}));
+            }
+            // {if {&& {exists <who>} {! {== {band shadows} gh2}}} {do ($group
+            // {<who> get shadow}) {if {!= $group ""} {$group set_showing FALSE}}}}
+            const Node group = variable("group"), none = {dtb::kString, 0, 0.0f, {}, {}};
+            for (const char *who : {"guitarist0", "guitarist1"})
+                out.push_back(command(
+                    {symbol("if"), command({symbol("&&"), command({symbol("exists"), symbol(who)}), command({symbol("!"), chosen("gh2")})}),
+                     command({symbol("do"), array({group, command({symbol(who), symbol("get"), symbol("shadow")})}),
+                              command({symbol("if"), command({symbol("!="), group, none}),
+                                       command({group, symbol("set_showing"), integer(0)})})})}));
+            for (const std::string &object : objects)
+                if (object.rfind("band_shadow", 0) == 0)
+                    out.push_back(command({symbol("if"), chosen("off"), command({symbol(object), symbol("set_showing"), integer(0)})}));
+            return out;
         }
 
         // What gh1_scene does as the intro starts. GH1 draws each section's
@@ -475,36 +522,8 @@ namespace gh2::gh1
             if (objects.count("stagechar.env"))
                 for (Node &made : lit({"singer", "bassist", "drummer", "keyboardist"}, "stagechar.env"))
                     out.push_back(std::move(made));
-            // GH1 shows no shadow of the band's or a guitarist's own: where a
-            // room has them it draws them, and a guitarist's is drawn with no
-            // alpha, which its alpha test keeps to the Z buffer. A setting
-            // picks the room's, GH2's own under everyone, or neither. They are
-            // only ever hidden here: a band member's shadow.mesh, wherever the
-            // room draws the band's, and a guitarist's Group of them, as GH2
-            // hides it with two players (char_objects.dta).
-            const auto chosen = [](const char *which)
-            { return command({symbol("=="), command({symbol("band"), symbol("shadows")}), symbol(which)}); };
-            for (const char *who : {"singer", "bassist", "drummer", "keyboardist"})
-            {
-                Node hide = command({symbol("if"), command({symbol(who), symbol("exists"), symbol("shadow.mesh")}),
-                                     command({command({symbol(who), symbol("find"), symbol("shadow.mesh")}), symbol("set_showing"),
-                                              integer(0)})});
-                if (!objects.count("band_shadow.mesh"))
-                    hide = command({symbol("if"), command({symbol("!"), chosen("gh2")}), std::move(hide)});
-                out.push_back(command({symbol("if"), command({symbol("exists"), symbol(who)}), std::move(hide)}));
-            }
-            // {if {&& {exists <who>} {! {== {band shadows} gh2}}} {do ($group
-            // {<who> get shadow}) {if {!= $group ""} {$group set_showing FALSE}}}}
-            const Node group = variable("group"), none = {dtb::kString, 0, 0.0f, {}, {}};
-            for (const char *who : {"guitarist0", "guitarist1"})
-                out.push_back(command(
-                    {symbol("if"), command({symbol("&&"), command({symbol("exists"), symbol(who)}), command({symbol("!"), chosen("gh2")})}),
-                     command({symbol("do"), array({group, command({symbol(who), symbol("get"), symbol("shadow")})}),
-                              command({symbol("if"), command({symbol("!="), group, none}),
-                                       command({group, symbol("set_showing"), integer(0)})})})}));
-            for (const std::string &object : objects)
-                if (object.rfind("band_shadow", 0) == 0)
-                    out.push_back(command({symbol("if"), chosen("off"), command({symbol(object), symbol("set_showing"), integer(0)})}));
+            for (Node &made : shadows(objects))
+                out.push_back(std::move(made));
             if (objects.count("crowd.env"))
                 for (Node &made : lit({"crowd_male01", "crowd_male02", "crowd_male03", "crowd_male04", "crowd_female01",
                                        "crowd_female02", "crowd_female03", "crowd_female04"},
@@ -582,6 +601,92 @@ namespace gh2::gh1
         {
             return handler == "finish_loading" ? "intro_start" : handler == "music_start" ? "gh1_music_start" : handler;
         }
+
+        // The venue type's handlers, each once: the glue's (gh1/scripts.dta),
+        // then GH1's functions and handlers under their names, a handler that
+        // only calls the function of its own name left out for it.
+        std::optional<std::vector<Node>> handlers(const Script &theirs, const Venue &venue, const std::string &kit,
+                                                  const std::vector<std::string> &spots)
+        {
+            static const std::optional<Node> glue = dtb::parse(kGh1ScriptsDta);
+            if (!glue)
+                return std::nullopt;
+            std::vector<Node> made = glue->nodes;
+            made.push_back(nearest(spots));
+            const auto handler = [&](const std::string &name) -> Node &
+            {
+                for (Node &m : made)
+                    if (!m.nodes.empty() && m.nodes[0].text == name)
+                        return m;
+                made.push_back(array({symbol(name)}));
+                return made.back();
+            };
+            std::set<std::string> functions;
+            for (const Node &f : theirs.functions)
+            {
+                if (f.nodes.size() < 2u)
+                    continue;
+                functions.insert(f.nodes[0].text);
+                Node &to = handler(f.nodes[0].text);
+                const size_t body = f.nodes[1].type == dtb::kArray ? 2u : 1u;
+                if (body == 2u && !f.nodes[1].nodes.empty())
+                    to.nodes.push_back(f.nodes[1]);
+                std::vector<Node> does = translated(f.nodes, body, venue);
+                to.nodes.insert(to.nodes.end(), does.begin(), does.end());
+            }
+            for (const Node &h : theirs.handlers)
+            {
+                const std::string &name = h.nodes[0].text;
+                if (functions.count(name) || name == "terminate" || name == "game_lost")
+                    continue;
+                Node &to = handler(renamed(name));
+                if (name == "hit_gem" && to.nodes.size() == 1u)
+                    to.nodes.push_back(array({variable("slot")}));
+                std::vector<Node> does = translated(h.nodes, 1u, venue);
+                // GH2 sends it as a shot starts (world/camshot.dta), and once
+                // with none.
+                if (name == "post_switch_cam" && !does.empty())
+                {
+                    does.insert(does.begin(), {symbol("if"), command({self(), symbol("current_shot")})});
+                    does = {command(std::move(does))};
+                }
+                to.nodes.insert(to.nodes.end(), does.begin(), does.end());
+            }
+            // The scene's frame is the song's tick from its start, as far as a
+            // song goes; the functions the glue calls are there for it to call.
+            Node &gh1Scene = handler("gh1_scene");
+            for (Node &does : scene(venue.drivers, venue.objects, kit))
+                gh1Scene.nodes.push_back(std::move(does));
+            for (const char *name : {"gh1_music_start", "hit_gem", "set_lights_bad", "set_lights_okay_verse",
+                                     "set_lights_okay_chorus", "set_lights_okay_solo", "set_lights_great_verse",
+                                     "set_lights_great_chorus", "set_lights_great_solo"})
+                handler(name);
+            for (Node &m : made)
+                if (m.nodes.size() == 1u || (m.nodes.size() == 2u && m.nodes[1].type == dtb::kArray))
+                    m.nodes.push_back(integer(0));
+            return made;
+        }
+
+        // Those handlers and the venue's settings in the stand-in's type in
+        // its world's script, ahead of the type's own and its base's: the
+        // first of a name is the one found. False with no such type.
+        bool place(Node &root, const std::string &gh2, const std::vector<Node> &made, const Node *settings)
+        {
+            bool placed = false;
+            for (Node &cls : root.nodes)
+                if (cls.type == dtb::kArray && !cls.nodes.empty() && is(cls.nodes[0], "WorldDir"))
+                    for (Node &types : cls.nodes)
+                        if (types.type == dtb::kArray && !types.nodes.empty() && is(types.nodes[0], "types"))
+                            for (Node &type : types.nodes)
+                                if (type.type == dtb::kArray && !type.nodes.empty() && is(type.nodes[0], gh2.c_str()))
+                                {
+                                    if (settings)
+                                        configure(type, *settings);
+                                    type.nodes.insert(type.nodes.begin() + 1, made.begin(), made.end());
+                                    placed = true;
+                                }
+            return placed;
+        }
     }
 
     std::set<std::string> scripted(size_t disc, const std::string &gh1)
@@ -611,88 +716,14 @@ namespace gh2::gh1
         for (const Node &h : theirs.handlers)
             venue.functions.insert(h.nodes[0].text);
 
-        // Each handler once: the glue's (gh1/scripts.dta), then GH1's
-        // functions and handlers under their names, a handler that only
-        // calls the function of its own name left out for it.
-        static const std::optional<Node> glue = dtb::parse(kGh1ScriptsDta);
-        if (!glue)
+        const auto made = handlers(theirs, venue, kit, spots);
+        if (!made)
         {
             std::cerr << "[gh1] cannot read gh1/scripts.dta" << std::endl;
             return;
         }
-        std::vector<Node> made = glue->nodes;
-        made.push_back(nearest(spots));
-        const auto handler = [&](const std::string &name) -> Node &
-        {
-            for (Node &m : made)
-                if (!m.nodes.empty() && m.nodes[0].text == name)
-                    return m;
-            made.push_back(array({symbol(name)}));
-            return made.back();
-        };
-        std::set<std::string> functions;
-        for (const Node &f : theirs.functions)
-        {
-            if (f.nodes.size() < 2u)
-                continue;
-            functions.insert(f.nodes[0].text);
-            Node &to = handler(f.nodes[0].text);
-            const size_t body = f.nodes[1].type == dtb::kArray ? 2u : 1u;
-            if (body == 2u && !f.nodes[1].nodes.empty())
-                to.nodes.push_back(f.nodes[1]);
-            std::vector<Node> does = translated(f.nodes, body, venue);
-            to.nodes.insert(to.nodes.end(), does.begin(), does.end());
-        }
-        for (const Node &h : theirs.handlers)
-        {
-            const std::string &name = h.nodes[0].text;
-            if (functions.count(name) || name == "terminate" || name == "game_lost")
-                continue;
-            Node &to = handler(renamed(name));
-            if (name == "hit_gem" && to.nodes.size() == 1u)
-                to.nodes.push_back(array({variable("slot")}));
-            std::vector<Node> does = translated(h.nodes, 1u, venue);
-            // GH2 sends it as a shot starts (world/camshot.dta), and once
-            // with none.
-            if (name == "post_switch_cam" && !does.empty())
-            {
-                does.insert(does.begin(), {symbol("if"), command({self(), symbol("current_shot")})});
-                does = {command(std::move(does))};
-            }
-            to.nodes.insert(to.nodes.end(), does.begin(), does.end());
-        }
-        // The scene's frame is the song's tick from its start, as far as a
-        // song goes; the functions the glue calls are there for it to call.
-        Node &gh1Scene = handler("gh1_scene");
-        for (Node &does : scene(drivers, objects, kit))
-            gh1Scene.nodes.push_back(std::move(does));
-        for (const char *name : {"gh1_music_start", "hit_gem", "set_lights_bad", "set_lights_okay_verse", "set_lights_okay_chorus",
-                                 "set_lights_okay_solo", "set_lights_great_verse", "set_lights_great_chorus",
-                                 "set_lights_great_solo"})
-            handler(name);
-        for (Node &m : made)
-            if (m.nodes.size() == 1u || (m.nodes.size() == 2u && m.nodes[1].type == dtb::kArray))
-                m.nodes.push_back(integer(0));
-
         const auto venues = readScript(disc, "arena/venues.dta");
-        const Node *settings = venues ? dtb::find(*venues, gh1) : nullptr;
-
-        bool placed = false;
-        for (Node &cls : root->nodes)
-            if (cls.type == dtb::kArray && !cls.nodes.empty() && is(cls.nodes[0], "WorldDir"))
-                for (Node &types : cls.nodes)
-                    if (types.type == dtb::kArray && !types.nodes.empty() && is(types.nodes[0], "types"))
-                        for (Node &type : types.nodes)
-                            if (type.type == dtb::kArray && !type.nodes.empty() && is(type.nodes[0], gh2.c_str()))
-                            {
-                                if (settings)
-                                    configure(type, *settings);
-                                // Ahead of the stand-in's own and its base's:
-                                // the first of a name is the one found.
-                                type.nodes.insert(type.nodes.begin() + 1, made.begin(), made.end());
-                                placed = true;
-                            }
-        if (!placed)
+        if (!place(*root, gh2, *made, venues ? dtb::find(*venues, gh1) : nullptr))
         {
             std::cerr << "[gh1] no type for " << gh2 << "'s world" << std::endl;
             return;
