@@ -71,6 +71,9 @@ namespace gh2
         uint32_t metaMusicPoll;
         uint32_t metaPanelPoll;
         uint32_t metaPanelPickLoopIndex; // (int size)
+        uint32_t ghScreenEntering;
+        uint32_t ghScreenExiting;
+        uint32_t rndAnimatableAnimate; // RndAnimatable::Animate(float, float, Task::Units, float, float)
         uint32_t systemConfig3; // SystemConfig(Symbol, Symbol, Symbol)
         uint32_t randomInt;     // RandomInt(lo, hi), hi exclusive
         uint32_t taskMgrAddTask; // TaskMgr::AddTask(Task *, Task::Units, float)
@@ -125,6 +128,9 @@ namespace gh2
         uint32_t swizzle4[2];
         uint32_t streamEndMs; // the float Stream::SetJump takes for a file's end
         uint32_t scriptTaskVtable;
+        // RndAnimatable*: the menu camera's slides, one of which
+        // GHScreen::AnimateTransition animates (0x145e58 to 0x145e84).
+        uint32_t menuSlides[3];
     };
 
     // Guitar Hero II (USA), SLUS-21447.
@@ -192,6 +198,9 @@ namespace gh2
         .metaMusicPoll = 0x21f180u,
         .metaPanelPoll = 0x134850u,
         .metaPanelPickLoopIndex = 0x1349d8u,
+        .ghScreenEntering = 0x146018u,
+        .ghScreenExiting = 0x146088u,
+        .rndAnimatableAnimate = 0x1abbb8u,
         .systemConfig3 = 0x2a8700u,
         .randomInt = 0x2d9d10u,
         .taskMgrAddTask = 0x2c6b18u,
@@ -243,5 +252,6 @@ namespace gh2
         .swizzle4 = {0x3de248u, 0x3de2c8u},
         .streamEndMs = 0x43311cu,
         .scriptTaskVtable = 0x3f3510u, // as ScriptTask's ctor (0x2c5040) stores it
+        .menuSlides = {0x466b7cu, 0x466b80u, 0x466b84u},
     };
 }

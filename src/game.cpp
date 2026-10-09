@@ -8,6 +8,7 @@
 #include "ui/locale.h"
 #include "ui/menus.h"
 #include "ui/meta_music.h"
+#include "ui/transitions.h"
 #include "movie/movie.h"
 #include "dev/null_rnd.h"
 #include "host/pad.h"
@@ -48,6 +49,7 @@ namespace
         gh2::installNativeCull(runtime, gh2::kSlus21447);
         gh2::installSynth(runtime, gh2::kSlus21447);
         gh2::installMetaMusic(runtime, gh2::kSlus21447);
+        gh2::installTransitions(runtime, gh2::kSlus21447);
         gh2::installTrackStart(runtime, gh2::kSlus21447);
         gh2::installSustainRelease(runtime, gh2::kSlus21447);
         gh2::installWhammyHold(runtime, gh2::kSlus21447);

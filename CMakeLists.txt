@@ -208,6 +208,7 @@ set(GHC_GAME_SOURCES
     src/ui/locale.cpp
     src/ui/menus.cpp
     src/ui/meta_music.cpp
+    src/ui/transitions.cpp
     src/host/audio.cpp
     src/host/bind.cpp
     src/host/bindings.cpp
