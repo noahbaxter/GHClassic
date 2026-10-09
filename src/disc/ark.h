@@ -65,6 +65,11 @@ namespace gh2::ark
     // the disc, not the archive. False if the disc has none.
     bool lendFromDisc(size_t layer, const std::string &path, size_t disc, const std::string &source);
     void front(std::optional<size_t> layer);
+    // Until cleared (no layer), these files are that layer's, where it has
+    // them, ahead of every disc and the layer in front: a boot's own scenes,
+    // the logos and the card check's, shown as the game the boot will open
+    // as before its campaign is switched to (content/campaigns.cpp).
+    void bootFrom(std::optional<size_t> layer, const std::vector<std::string> &paths);
 
     // A file's bytes as that layer in front gives them: its own, its
     // disc's, else the game disc's. With no layer, the game disc's.

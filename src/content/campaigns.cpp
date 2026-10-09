@@ -514,8 +514,8 @@ namespace gh2::campaigns
         // The boot's first themed screen, once the card check has loaded the
         // save (LoadData1, save.cpp): the intro movie's (splash.dta's
         // cut_scene_screen, which every card check goes on to, and
-        // fast_boot.dta's too), else the main menu's. Where the save says
-        // another game was the last played, by way of the screen the switch
+        // fast_boot.dta's too), else the main menu's. Where another game was
+        // the last entered (save::lastGame), by way of the screen the switch
         // happens on (campaigns.dta), so the movie, the splash and the menus
         // are all that one's.
         struct GotoScreenTag;
@@ -549,6 +549,9 @@ namespace gh2::campaigns
             if (opening < 0)
                 return;
             s_opened = true;
+            // The switch finds the boot's scenes again as the game disc has
+            // them, and so loads its own over them (retypeUi).
+            ark::bootFrom(std::nullopt, {});
             if (switching)
             {
                 SET_GPR_U32(ctx, 5, screens[2]);
@@ -606,6 +609,14 @@ namespace gh2::campaigns
     void install(PS2Runtime &runtime, const Addresses &addresses)
     {
         s_addresses = &addresses;
+        // The boot's logos (App::App's Splash::Show, 0x2139f0) and the card
+        // check's poster, the dialog panel loaded with the UI, come before the
+        // save that the switch to the last game waits for: they are that
+        // game's from the start.
+        if (const auto last = indexOf(save::lastGame()); last && *last != s_active)
+            ark::bootFrom(s_campaigns[*last].front,
+                          {"ui/gen/harmonix_splash.milo_ps2", "ui/gen/activision_splash.milo_ps2",
+                           "ui/gen/pub_splash.milo_ps2", "ui/gen/dialog.milo_ps2"});
         script::addCommand("campaigns", campaignsCommand);
         EntryHook<PollTag>::install(runtime, addresses.uiManagerPoll, onUiPoll);
         EntryHook<GotoScreenTag>::install(runtime, addresses.uiGotoScreen, onGotoScreen);

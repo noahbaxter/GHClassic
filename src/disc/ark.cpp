@@ -78,6 +78,8 @@ namespace gh2::ark
         };
         std::vector<Layer> s_layers;
         std::optional<size_t> s_front; // the layer searched before the game disc
+        std::optional<size_t> s_boot;  // bootFrom's
+        std::unordered_set<std::string> s_bootFiles;
 
         uint32_t word(const std::vector<uint8_t> &data, size_t &at)
         {
@@ -228,8 +230,9 @@ namespace gh2::ark
             return nullptr;
         }
 
-        // Loose files first, made ones as they are asked for, then renames,
-        // then the layer in front if one is, then each disc in turn.
+        // Loose files first, made ones as they are asked for, then the boot's
+        // own, then renames, then the layer in front if one is, then each
+        // disc in turn.
         const Entry *find(const std::string &name)
         {
             const auto loose = s_loose.find(name);
@@ -245,6 +248,9 @@ namespace gh2::ark
                     return &(s_loose[name] = addPart({std::move(file->read), size, size}));
                 }
             }
+            if (s_boot && s_bootFiles.count(name) != 0u)
+                if (const Entry *entry = findIn(s_layers[*s_boot], name))
+                    return entry;
             for (const Rename &rename : s_renames)
             {
                 if (name.compare(0u, rename.as.size(), rename.as) != 0)
@@ -465,6 +471,14 @@ namespace gh2::ark
     }
 
     void front(std::optional<size_t> layer) { s_front = layer; }
+
+    void bootFrom(std::optional<size_t> layer, const std::vector<std::string> &paths)
+    {
+        s_boot = layer;
+        s_bootFiles.clear();
+        for (const std::string &path : paths)
+            s_bootFiles.insert(key(path.c_str()));
+    }
 
     std::optional<std::vector<uint8_t>> readFront(std::optional<size_t> layer, const std::string &path)
     {
