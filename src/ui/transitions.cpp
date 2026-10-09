@@ -1,6 +1,7 @@
 // transitions: with snappy_menus, screens change near at once. Retail slides
-// one out and the next in over half a second each, taking no input until
-// both end.
+// one out and the next in over half a second each, and holds a screen while
+// any blocking trigger's animation plays (the store's, 1.2 s more), taking
+// no input until all of it ends.
 
 #include "ui/transitions.h"
 
@@ -25,12 +26,17 @@ namespace gh2
         constexpr uint32_t kSlideEnd = 0x50u;
         constexpr uint32_t kSlideStart = 0x60u;
         constexpr float kNoSlide = 1e30f;
+        // UITrigger: block_transition, and the UI second its animation ends
+        // (Trigger, 0x21b3b8: its frames over 30 a second from the trigger).
+        constexpr uint32_t kBlocks = 0x150u;
+        constexpr uint32_t kBlockEnd = 0x154u;
 
         const Addresses *s_addresses = nullptr;
 
         struct SlideAnimTag;
         struct EnteringTag;
         struct ExitingTag;
+        struct TriggerTag;
 
         // RndAnimatable::Animate(from, to, units, period, blend), retail
         // 0x1abbb8: the period in $f14. GHScreen::AnimateTransition (0x145e18)
@@ -65,6 +71,16 @@ namespace gh2
         {
             shortenSlide(rdram, GPR_U32(ctx, 4));
         }
+
+        // UITrigger::IsBlocking, retail 0x21b2a0: what PanelDir::Entering
+        // and Exiting (0x210720, 0x2107a0) ask of each component. The
+        // animation plays on; only the hold goes.
+        void onIsBlocking(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
+        {
+            const uint32_t trigger = GPR_U32(ctx, 4);
+            if (settings::get(settings::kSnappyMenus) && load<uint32_t>(rdram, trigger + kBlocks) != 0u)
+                store<float>(rdram, trigger + kBlockEnd, 0.0f);
+        }
     }
 
     void installTransitions(PS2Runtime &runtime, const Addresses &addresses)
@@ -73,5 +89,6 @@ namespace gh2
         EntryHook<SlideAnimTag>::install(runtime, addresses.rndAnimatableAnimate, onAnimate);
         EntryHook<EnteringTag>::install(runtime, addresses.ghScreenEntering, onEntering);
         EntryHook<ExitingTag>::install(runtime, addresses.ghScreenExiting, onExiting);
+        EntryHook<TriggerTag>::install(runtime, addresses.uiTriggerIsBlocking, onIsBlocking);
     }
 }

@@ -74,6 +74,7 @@ namespace gh2
         uint32_t ghScreenEntering;
         uint32_t ghScreenExiting;
         uint32_t rndAnimatableAnimate; // RndAnimatable::Animate(float, float, Task::Units, float, float)
+        uint32_t uiTriggerIsBlocking;
         uint32_t systemConfig3; // SystemConfig(Symbol, Symbol, Symbol)
         uint32_t randomInt;     // RandomInt(lo, hi), hi exclusive
         uint32_t taskMgrAddTask; // TaskMgr::AddTask(Task *, Task::Units, float)
@@ -201,6 +202,7 @@ namespace gh2
         .ghScreenEntering = 0x146018u,
         .ghScreenExiting = 0x146088u,
         .rndAnimatableAnimate = 0x1abbb8u,
+        .uiTriggerIsBlocking = 0x21b2a0u,
         .systemConfig3 = 0x2a8700u,
         .randomInt = 0x2d9d10u,
         .taskMgrAddTask = 0x2c6b18u,

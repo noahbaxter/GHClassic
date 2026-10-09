@@ -29,7 +29,7 @@ namespace gh2::settings
         kWhammyHold, // a whammy bar held down bends every sustain
         kDiscPrefer, // kChd or kIso: the image taken when the disc folder has both
         kCheckUpdates, // a newer release offered when the game starts
-        kSnappyMenus,  // screens change near at once
+        kSnappyMenus,  // screens change near at once, and an animation never holds one
         kKeyCount,
     };
 
