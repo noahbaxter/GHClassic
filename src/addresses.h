@@ -125,6 +125,7 @@ namespace gh2
         uint32_t songProviderIsActive;
         uint32_t songProviderGetSongData; // (Symbol)
         uint32_t campaignDataGetVenueForSong;
+        uint32_t addLoadChar; // (list<Character *> &, const char *object, const char *character)
         uint32_t worldCrowdSetFullness; // (float flat, float whole)
         uint32_t psRndSetDepthOfField;  // (RndCam *, float distance, float nearest, float farthest, float amount)
         uint32_t songsInsertOverflow;     // vector<DataArray *>::_M_insert_overflow
@@ -314,6 +315,7 @@ namespace gh2
         .songProviderIsActive = 0x117a50u,
         .songProviderGetSongData = 0x118318u,
         .campaignDataGetVenueForSong = 0x1312a0u,
+        .addLoadChar = 0x128778u,
         .worldCrowdSetFullness = 0x26bdf0u,
         .psRndSetDepthOfField = 0x19a798u,
         .songsInsertOverflow = 0x3177e0u,

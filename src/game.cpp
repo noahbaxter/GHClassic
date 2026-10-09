@@ -2,6 +2,7 @@
 
 #include "addresses.h"
 #include "disc/ark.h"
+#include "content/band.h"
 #include "content/crowd_cards.h"
 #include "content/focus.h"
 #include "content/encores.h"
@@ -59,6 +60,7 @@ namespace
         gh2::installGh2x();
         gh2::installGh1Face(runtime, gh2::kSlus21447);
         gh2::outfits::install(runtime, gh2::kSlus21447);
+        gh2::band::install(runtime, gh2::kSlus21447);
         gh2::crowd_cards::install(runtime, gh2::kSlus21447);
         gh2::focus::install(runtime, gh2::kSlus21447);
         gh2::installNullRnd(runtime, gh2::kSlus21447);

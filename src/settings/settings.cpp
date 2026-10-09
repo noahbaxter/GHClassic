@@ -81,6 +81,7 @@ namespace gh2::settings
             // faster, which only shows with the game run far above 1x.
             {"disc", "prefer", Type::kChoice, 0, 1, 1, kChd, kChd, "chd iso"},
             {"game", "check_updates", Type::kBool, 0, 1, 1, 1, 1},
+            {"game", "band", Type::kChoice, 0, 2, 1, kBandVenue, kBandVenue, "venue gh2 gh1"},
             {"video", "depth_of_field", Type::kBool, 0, 1, 1, 1, 1},
         };
 
