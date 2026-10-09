@@ -8,17 +8,21 @@
 //
 // The geom dir here is GH2's own object, cameras, environs and lights, which
 // the dirs above name, around GH1's room: its Tex 8, Mat 21, Mesh 25, Light
-// 3 and Environ 1 objects, which GH2's loaders still read, and its Views as
-// Groups. The chars dir is GH2's with its waypoints on GH1's spots, and the
-// lighting dir GH2's with its spotlights and fixtures unshown. The camera
-// shots are GH1's (gh1/cameras.cpp); the presets that light the band, and
-// the crowd, are GH2's still.
+// 3, Environ 1, Flare 3, ParticleSys 22 and anim objects (TransAnim 4,
+// MatAnim 5, LightAnim 1, EnvAnim 3, MeshAnim 0, ParticleSysAnim 2), which GH2's loaders
+// still read, and its Views as Groups, with GH1's lighting scene beside it.
+// The chars dir is GH2's with its waypoints on GH1's spots, and the lighting
+// dir GH2's with its spotlights and fixtures unshown. The camera shots are
+// GH1's (gh1/cameras.cpp) and the script that drives the anims GH1's
+// (gh1/scripts.cpp); the presets that light the band, and the crowd, are
+// GH2's still.
 
 #include "gh1/venues.h"
 
 #include "disc/ark.h"
 #include "gh1/cameras.h"
 #include "gh1/rig.h"
+#include "gh1/scripts.h"
 #include "gh1/songs.h"
 #include "milo/milo.h"
 
@@ -168,27 +172,113 @@ namespace gh2::gh1
                 putStr(out, n);
         }
 
-        // Where the children of a View 7's Anim 0 start: past its revision
-        // and filters (RndAnimatable::Load, 0x1ab228: a kind and two floats,
-        // a flag more for kind 1 and a float more for kind 4). Its Trans 8
-        // follows them.
-        std::optional<size_t> viewAnims(const Bytes &view)
+        float f32(const Bytes &b, size_t o)
         {
-            if (u32(view, 0u) != 7u || u32(view, 4u) != 0u)
+            float v = 0.0f;
+            if (o + 4u <= b.size())
+                std::memcpy(&v, b.data() + o, 4u);
+            return v;
+        }
+
+        void putF32(Bytes &out, float v)
+        {
+            uint32_t u = 0u;
+            std::memcpy(&u, &v, 4u);
+            putU32(out, u);
+        }
+
+        // An Anim 0 (RndAnimatable::Load, 0x1ab228): its filters, each a
+        // kind and two floats (0 a scale and an offset; 1 a range, with a
+        // flag more for whether it loops; 4 a float more), then the anims it
+        // drives.
+        struct Anim
+        {
+            float scale = 1.0f, offset = 0.0f, min = 0.0f, max = 0.0f;
+            bool loop = false;
+            std::vector<std::string> children;
+
+            // Whether GH2 makes a filter of it (0x1ab494).
+            bool filtered() const { return scale != 1.0f || offset != 0.0f || min != max; }
+        };
+
+        // The Anim 0 at `o`, which is left past it.
+        std::optional<Anim> anim(const Bytes &b, size_t &o)
+        {
+            if (u32(b, o) != 0u)
                 return std::nullopt;
-            size_t o = 12u;
-            for (uint32_t i = 0, n = u32(view, 8u); i < n; ++i)
+            Anim out;
+            const uint32_t filters = u32(b, o + 4u);
+            o += 8u;
+            for (uint32_t i = 0; i < filters; ++i)
             {
-                const uint32_t kind = u32(view, o);
+                const uint32_t kind = u32(b, o);
                 if (kind > 4u)
                     return std::nullopt;
+                if (kind == 0u)
+                {
+                    out.scale = f32(b, o + 4u);
+                    out.offset = f32(b, o + 8u);
+                }
+                else if (kind == 1u)
+                {
+                    out.min = f32(b, o + 4u);
+                    out.max = f32(b, o + 8u);
+                    out.loop = o + 12u < b.size() && b[o + 12u] != 0u;
+                }
                 o += 12u + (kind == 1u ? 1u : kind == 4u ? 4u : 0u);
             }
-            return o;
+            out.children = names(b, o);
+            return out;
+        }
+
+        // An Anim 4 (0x1ab2d8) in place of an Anim 0: its frame, and GH1's
+        // rate, 480 frames a beat (Arena::Poll, GH1 0x16a020, sets a scene's
+        // frame to the song's tick).
+        void putTicks(Bytes &out)
+        {
+            putU32(out, 4u);
+            putF32(out, 0.0f);
+            putU32(out, 1u);
+        }
+
+        // GH2's name for the filter of an anim that has one.
+        std::string filterOf(const std::string &name)
+        {
+            return name + ".filt";
+        }
+
+        // An AnimFilter 1 (RndAnimFilter::Load, 0x1acf48) of that anim:
+        // Hmx::Object's header, an Anim 4 at 480 frames a beat, the anim,
+        // its scale, offset and range, whether it loops, and no period.
+        Bytes filter(const std::string &name, const Anim &of)
+        {
+            Bytes out;
+            putU32(out, 1u);
+            putU32(out, 0u);
+            putStr(out, {});
+            out.push_back(0u);
+            putU32(out, 4u);
+            putF32(out, 0.0f);
+            putU32(out, 1u);
+            putStr(out, name);
+            putF32(out, of.scale);
+            putF32(out, of.offset);
+            // No range is every frame. A looping one keeps its last frame:
+            // small_club's neon1.envanim held at 480 of 0 to 480 is lit in
+            // retail and wraps to its dark frame 0 here.
+            putF32(out, of.min != of.max ? of.min : -1.0e9f);
+            putF32(out, of.min != of.max ? (of.loop ? std::nextafter(of.max, 1.0e9f) : of.max) : 1.0e9f);
+            putU32(out, of.loop ? 1u : 0u);
+            putF32(out, 0.0f);
+            return out;
         }
 
         // Into a Trans 8, its children: past its rev, local and world.
         constexpr size_t kChildren = 100u;
+
+        // The Views GH1 draws its room and its lighting scene from.
+        constexpr const char *kRoom = "venue.view";
+        constexpr const char *kLighting = "lighting.view";
 
         // A GH1 scene as GH2 draws it.
         //
@@ -210,14 +300,120 @@ namespace gh2::gh1
         {
             std::string cls, name;
             Bytes body;
+            // A Mesh no View of GH1's tree reaches: GH1 never draws it.
+            bool unreached = false;
         };
 
-        // The objects of `scene` in those classes, less the names in
-        // `without`, drawn from `top` but for the names in `hidden`.
-        std::vector<Object> objects(const milo::Dir &scene, const std::set<std::string> &classes, const std::string &top,
-                                    const std::set<std::string> &without, const std::set<std::string> &hidden)
+        // GH1 sets a scene's frame from its top View down: each anim takes
+        // its View's frame through its own filters and hands it to its
+        // children (RndAnimatable::SetFrame, GH1 0x1b3d00). GH2's
+        // RndAnimatable::Load (0x1ab228) takes an Anim 0's filters out into
+        // an AnimFilter that nothing drives, and a Group sets the frame of
+        // every anim in it, those it draws too. So an anim's filters are an
+        // AnimFilter made here, and a View's anims a Group of their own
+        // beside the one it draws, "<view>.anims", unshown: what stands for
+        // an anim, to whatever drives it, is its filter or else itself.
+        //
+        // RndMatAnim::LoadStages (0x1c2c28) hands a stage after the first to
+        // an anim nothing drives, of the pass RndMat::LoadStages (0x1bf350)
+        // made of that stage, or loads it over the first. Each is an anim
+        // of its own here, "<anim>_<n>.mnm" of "<mat>_<n>.mat", driven with
+        // the first.
+        std::string animsOf(const std::string &view)
         {
-            std::map<std::string, size_t> trans;                   // by Mesh, View or Light, where its Trans 8 is
+            return view + ".anims";
+        }
+
+        // A name less its extension.
+        std::string base(const std::string &name)
+        {
+            return name.substr(0, name.rfind('.'));
+        }
+
+        // A View 7 of those anims, none of them drawn: its Anim 0, a Trans 8
+        // at the origin under itself, and a Draw 1 showing, as a Group must
+        // be to set a frame (RndGroup::SetFrame, 0x1ba8a0).
+        Bytes animGroup(const std::string &name, const std::vector<std::string> &anims)
+        {
+            Bytes out;
+            putU32(out, 7u);
+            putU32(out, 0u);
+            putU32(out, 0u);
+            putNames(out, anims);
+            putU32(out, 8u);
+            for (int i = 0; i < 2; ++i)
+                for (int f = 0; f < 12; ++f)
+                    putF32(out, f == 0 || f == 4 || f == 8 ? 1.0f : 0.0f);
+            putU32(out, 0u);
+            putU32(out, 0u);
+            putStr(out, {});
+            out.push_back(0u);
+            putStr(out, name);
+            putU32(out, 1u);
+            out.push_back(1u);
+            putU32(out, 0u);
+            out.insert(out.end(), 16u, 0u);
+            return out;
+        }
+
+        // A MatAnim 5's stages (RndMatAnim::Load, GH1 0x1cb570): where each
+        // starts and the last ends, and whether each has keys. A stage is
+        // its translation, scale and rotation keys, each a vector and a
+        // frame, then its texture keys, each a name and a frame.
+        struct Stages
+        {
+            size_t count = 0u; // where their count is
+            std::vector<size_t> at;
+            std::vector<bool> keyed;
+        };
+
+        Stages stages(const Bytes &b, size_t o)
+        {
+            Stages out;
+            str(b, o);
+            out.count = o;
+            const uint32_t n = u32(b, o);
+            o += 4u;
+            for (uint32_t i = 0; i < n && o < b.size(); ++i)
+            {
+                out.at.push_back(o);
+                bool keyed = false;
+                for (int list = 0; list < 3; ++list)
+                {
+                    keyed |= u32(b, o) != 0u;
+                    o += 4u + static_cast<size_t>(u32(b, o)) * 16u;
+                }
+                const uint32_t textures = u32(b, o);
+                keyed |= textures != 0u;
+                o += 4u;
+                for (uint32_t t = 0; t < textures && o < b.size(); ++t)
+                {
+                    str(b, o);
+                    o += 4u;
+                }
+                out.keyed.push_back(keyed);
+            }
+            out.at.push_back(o);
+            return out;
+        }
+
+        // The objects of `scene` in those classes, less the names in
+        // `without`, drawn from `top` but for the names in `hidden`. An anim
+        // in `scripted` is left out of every View's, for the script that
+        // drives it. `drivers` gets what stands for each anim.
+        std::vector<Object> objects(const milo::Dir &scene, const std::set<std::string> &classes, const std::string &top,
+                                    const std::set<std::string> &without, const std::set<std::string> &hidden,
+                                    const std::set<std::string> &scripted, Drivers &drivers)
+        {
+            static const std::set<std::string> kAnims = {"TransAnim", "MatAnim",  "LightAnim",
+                                                         "EnvAnim",   "MeshAnim", "ParticleSysAnim"};
+            struct Parts
+            {
+                std::optional<Anim> anim;
+                size_t rest = 4u; // past its Anim 0
+            };
+            std::map<std::string, Parts> parts;
+            std::map<std::string, size_t> trans;                   // by name, where its Trans 8 is
             std::map<std::string, std::vector<std::string>> draws; // by Mesh or View, its Draw 1's children
             std::set<std::string> meshes;
             for (size_t i = 0; i < scene.entries.size(); ++i)
@@ -226,19 +422,82 @@ namespace gh2::gh1
                 const Bytes &b = scene.bodies[i];
                 if (!classes.count(c) || without.count(n))
                     continue;
-                auto at = c == "Mesh" || c == "Light" ? std::optional<size_t>(4u) : c == "View" ? viewAnims(b) : std::nullopt;
-                if (at && c == "View")
-                    names(b, *at);
-                if (!at || u32(b, *at) != 8u)
+                Parts p;
+                if (c == "View" || c == "ParticleSys" || kAnims.count(c))
+                {
+                    p.anim = anim(b, p.rest);
+                    if (!p.anim)
+                        continue;
+                }
+                else if (c != "Mesh" && c != "Light" && c != "Flare")
                     continue;
-                trans[n] = *at;
-                if (c == "Light")
-                    continue;
-                size_t o = transEnd(b, *at) + 5u;
-                draws[n] = names(b, o);
-                if (c == "Mesh")
-                    meshes.insert(n);
+                if (!kAnims.count(c))
+                {
+                    if (u32(b, p.rest) != 8u)
+                        continue;
+                    trans[n] = p.rest;
+                    if (c == "Mesh" || c == "View")
+                    {
+                        size_t o = transEnd(b, p.rest) + 5u;
+                        draws[n] = names(b, o);
+                    }
+                    if (c == "Mesh")
+                        meshes.insert(n);
+                }
+                parts[n] = std::move(p);
             }
+
+            // What stands for each anim: a View's anims if it has any here,
+            // a MatAnim's later stages after it.
+            const auto driven = [&](const Anim &of)
+            {
+                std::vector<std::string> out;
+                for (const std::string &child : of.children)
+                    if (parts.count(child) && parts[child].anim && !scripted.count(child))
+                        out.push_back(child);
+                return out;
+            };
+            std::map<std::string, size_t> entry;
+            for (size_t i = 0; i < scene.entries.size(); ++i)
+                entry[scene.entries[i].second] = i;
+            const std::function<void(const std::string &, int)> stand = [&](const std::string &n, int depth)
+            {
+                const auto it = parts.find(n);
+                if (it == parts.end() || !it->second.anim || drivers.count(n))
+                    return;
+                const Anim &a = *it->second.anim;
+                const size_t i = entry[n];
+                const std::string &c = scene.entries[i].first;
+                std::vector<std::string> as;
+                if (c == "View")
+                {
+                    bool any = false;
+                    for (const std::string &child : driven(a))
+                    {
+                        if (depth < 16)
+                            stand(child, depth + 1);
+                        any |= drivers.count(child) && !drivers[child].empty();
+                    }
+                    if (any)
+                        as.push_back(filterOf(n));
+                }
+                else
+                {
+                    // A ParticleSys is drawn by whatever Group it is in, so
+                    // its filter stands for it filtered or not.
+                    as.push_back(a.filtered() || c == "ParticleSys" ? filterOf(n) : n);
+                    const Stages s = c == "MatAnim" ? stages(scene.bodies[i], it->second.rest) : Stages();
+                    for (size_t k = 1u; k < s.keyed.size(); ++k)
+                        if (s.keyed[k])
+                        {
+                            const std::string stage = base(n) + "_" + std::to_string(k) + ".mnm";
+                            as.push_back(a.filtered() ? filterOf(stage) : stage);
+                        }
+                }
+                drivers[n] = std::move(as);
+            };
+            for (const auto &e : scene.entries)
+                stand(e.second, 0);
 
             // A View's list: its children, each Mesh's own after it.
             const auto listed = [&](const std::string &view)
@@ -255,10 +514,13 @@ namespace gh2::gh1
                     add(child, 0);
                 return out;
             };
+            // What the tree draws: a Mesh or View reached, and what each lists.
             std::set<std::string> drawn;
             const std::function<void(const std::string &)> reach = [&](const std::string &n)
             {
-                if (draws.count(n) && !hidden.count(n) && drawn.insert(n).second)
+                if (hidden.count(n) || !drawn.insert(n).second)
+                    return;
+                if (draws.count(n))
                     for (const std::string &child : draws[n])
                         reach(child);
             };
@@ -271,32 +533,84 @@ namespace gh2::gh1
                 const Bytes &b = scene.bodies[i];
                 if (!classes.count(c) || without.count(n))
                     continue;
-                const auto at = trans.find(n);
-                if (at == trans.end())
+                const auto part = parts.find(n);
+                if (part == parts.end())
                 {
                     if (c == "Tex" || c == "Mat" || c == "Environ")
                         out.push_back({c, n, b});
                     continue;
                 }
-                size_t o = at->second + kChildren;
-                Bytes body;
-                if (c == "View")
+                const Parts &p = part->second;
+                Bytes body(b.begin(), b.begin() + 4);
+                if (p.anim)
                 {
-                    // Its Anim 0's children join the group too, which draws
-                    // every drawable in it (RndGroup::Update, 0x1ba308): one
-                    // this View animates and another draws stays out.
-                    size_t anims = *viewAnims(b);
-                    body.assign(b.begin(), b.begin() + static_cast<std::ptrdiff_t>(anims));
-                    std::vector<std::string> animated = names(b, anims);
-                    const std::vector<std::string> list = listed(n);
-                    std::erase_if(animated, [&](const std::string &child)
-                                  { return draws.count(child) != 0u && std::find(list.begin(), list.end(), child) == list.end(); });
-                    putNames(body, animated);
-                    body.insert(body.end(), b.begin() + static_cast<std::ptrdiff_t>(at->second),
-                                b.begin() + static_cast<std::ptrdiff_t>(o));
+                    std::vector<std::string> anims;
+                    for (const std::string &child : driven(*p.anim))
+                        anims.insert(anims.end(), drivers[child].begin(), drivers[child].end());
+                    if (c == "View")
+                    {
+                        // A View draws; its anims are their own Group's.
+                        putU32(body, 0u);
+                        putU32(body, 0u);
+                        putU32(body, 0u);
+                        if (!anims.empty())
+                        {
+                            out.push_back({"Group", animsOf(n), animGroup(animsOf(n), anims)});
+                            out.push_back({"AnimFilter", filterOf(n), filter(animsOf(n), *p.anim)});
+                        }
+                    }
+                    else
+                    {
+                        putTicks(body);
+                        if (p.anim->filtered() || c == "ParticleSys")
+                            out.push_back({"AnimFilter", filterOf(n), filter(n, *p.anim)});
+                    }
                 }
-                else
-                    body.assign(b.begin(), b.begin() + static_cast<std::ptrdiff_t>(o));
+                if (c == "MatAnim")
+                {
+                    // Its first stage alone, or none with no material, and
+                    // each later one that has keys as an anim of its own.
+                    const Stages s = stages(b, p.rest);
+                    size_t o = p.rest;
+                    const std::string mat = str(b, o);
+                    putStr(body, mat);
+                    const bool first = !mat.empty() && !s.keyed.empty();
+                    putU32(body, first ? 1u : 0u);
+                    if (first)
+                        body.insert(body.end(), b.begin() + static_cast<std::ptrdiff_t>(s.at[0]),
+                                    b.begin() + static_cast<std::ptrdiff_t>(s.at[1]));
+                    body.insert(body.end(), b.begin() + static_cast<std::ptrdiff_t>(s.at.back()), b.end());
+                    out.push_back({c, n, std::move(body)});
+                    for (size_t k = 1u; k < s.keyed.size(); ++k)
+                    {
+                        if (!s.keyed[k])
+                            continue;
+                        const std::string stage = base(n) + "_" + std::to_string(k) + ".mnm";
+                        Bytes made(b.begin(), b.begin() + 4);
+                        putTicks(made);
+                        putStr(made, base(mat) + "_" + std::to_string(k) + ".mat");
+                        putU32(made, 1u);
+                        made.insert(made.end(), b.begin() + static_cast<std::ptrdiff_t>(s.at[k]),
+                                    b.begin() + static_cast<std::ptrdiff_t>(s.at[k + 1u]));
+                        putStr(made, {});
+                        putU32(made, 0u);
+                        putU32(made, 0u);
+                        out.push_back({c, stage, std::move(made)});
+                        if (p.anim->filtered())
+                            out.push_back({"AnimFilter", filterOf(stage), filter(stage, *p.anim)});
+                    }
+                    continue;
+                }
+                const auto at = trans.find(n);
+                if (at == trans.end())
+                {
+                    body.insert(body.end(), b.begin() + static_cast<std::ptrdiff_t>(p.rest), b.end());
+                    out.push_back({c, n, std::move(body)});
+                    continue;
+                }
+                size_t o = at->second + kChildren;
+                body.insert(body.end(), b.begin() + static_cast<std::ptrdiff_t>(at->second),
+                            b.begin() + static_cast<std::ptrdiff_t>(o));
                 std::vector<std::string> children = names(b, o);
                 std::erase_if(children, [&](const std::string &child) { return trans.count(child) == 0u; });
                 putNames(body, children);
@@ -321,7 +635,7 @@ namespace gh2::gh1
                 body.insert(body.end(), b.begin() + static_cast<std::ptrdiff_t>(draw),
                             b.begin() + static_cast<std::ptrdiff_t>(draw + 4u));
                 body.push_back(drawn.count(n) ? b[draw + 4u] : 0u);
-                if (c == "Mesh")
+                if (c != "View")
                     body.insert(body.end(), b.begin() + static_cast<std::ptrdiff_t>(draw + 5u), b.end());
                 else
                 {
@@ -331,18 +645,35 @@ namespace gh2::gh1
                     body.insert(body.end(), b.begin() + static_cast<std::ptrdiff_t>(o),
                                 b.begin() + static_cast<std::ptrdiff_t>(std::min(o + 16u, b.size())));
                 }
-                out.push_back({c == "View" ? "Group" : c, n, std::move(body)});
+                out.push_back({c == "View" ? "Group" : c, n, std::move(body), c == "Mesh" && !drawn.count(n)});
             }
             return out;
         }
 
+        // Whether a body of `dir` holds `name` as a string.
+        bool names(const milo::Dir &dir, const std::string &name)
+        {
+            Bytes key;
+            putStr(key, name);
+            for (const Bytes &b : dir.bodies)
+                if (std::search(b.begin(), b.end(), key.begin(), key.end()) != b.end())
+                    return true;
+            return false;
+        }
+
         // GH2's geom dir around GH1's room: its own object, and the cameras,
-        // environs and lights the dirs above it name. GH1's environs and
-        // lights come with the room, and its lighting scene's beside them.
-        // GH1's drum kit is part of the room and GH2's of its drummer, who
-        // plays here, so GH1's `kit` stays out.
-        std::optional<milo::Dir> geom(const milo::Dir &gh2, const milo::Dir &room, const milo::Dir &lighting,
-                                      const std::string &kit)
+        // environs and lights the dirs above it name, with the materials
+        // those dirs' meshes take from it (big_chars' crowd_plane.mesh has
+        // ray_blocker.mat) and their textures. GH1's environs and lights
+        // come with the room, and its lighting scene's beside them. GH1's
+        // drum kit is part of the room and GH2's of its drummer, who plays
+        // here, so GH1's `kit` stays out. `unreached` gets the meshes GH1
+        // never draws, which no script is to show (fest's shows
+        // solo_beam01.mesh, GH2's dir would draw it).
+        std::optional<milo::Dir> geom(const milo::Dir &gh2, const std::vector<const milo::Dir *> &above,
+                                      const milo::Dir &room, const milo::Dir &lighting, const std::string &kit,
+                                      const std::set<std::string> &scripted, Drivers &drivers,
+                                      std::set<std::string> &unreached)
         {
             const auto root = withoutObjects(gh2.root);
             if (!root)
@@ -358,16 +689,36 @@ namespace gh2::gh1
                     out.entries.push_back(gh2.entries[i]);
                     out.bodies.push_back(gh2.bodies[i]);
                 }
-            std::set<std::string> taken;
+            milo::Dir mats;
+            for (size_t i = 0; i < gh2.entries.size(); ++i)
+                if (gh2.entries[i].first == "Mat" &&
+                    std::any_of(above.begin(), above.end(), [&](const milo::Dir *d) { return names(*d, gh2.entries[i].second); }))
+                {
+                    mats.entries.push_back(gh2.entries[i]);
+                    mats.bodies.push_back(gh2.bodies[i]);
+                }
+            for (size_t i = 0; i < gh2.entries.size(); ++i)
+                if (gh2.entries[i].first == "Tex" && names(mats, gh2.entries[i].second))
+                    milo::add(out, "Tex", gh2.entries[i].second, gh2.bodies[i]);
+            for (size_t i = 0; i < mats.entries.size(); ++i)
+                milo::add(out, "Mat", mats.entries[i].second, std::move(mats.bodies[i]));
+            // GH1's camera deletes the room's target_parent.mesh for its own
+            // (VenueCam's constructor, GH1 0x16f18c).
+            std::set<std::string> taken = {"target_parent.mesh"};
             for (const auto &e : out.entries)
                 taken.insert(e.second);
-            for (Object &o : objects(room, {"Tex", "Mat", "Mesh", "View", "Light", "Environ"}, "venue.view", taken, {kit}))
-            {
-                taken.insert(o.name);
-                milo::add(out, o.cls, o.name, std::move(o.body));
-            }
-            for (Object &o : objects(lighting, {"Light", "Environ"}, "", taken, {}))
-                milo::add(out, o.cls, o.name, std::move(o.body));
+            static const std::set<std::string> kClasses = {
+                "Tex", "Mat", "Mesh", "View", "Light", "Environ", "TransAnim", "MatAnim",
+                "LightAnim", "EnvAnim", "MeshAnim", "Flare", "ParticleSys", "ParticleSysAnim",
+            };
+            for (const auto &[scene, top] : {std::pair{&room, kRoom}, std::pair{&lighting, kLighting}})
+                for (Object &o : objects(*scene, kClasses, top, taken, {kit}, scripted, drivers))
+                    if (taken.insert(o.name).second)
+                    {
+                        if (o.unreached)
+                            unreached.insert(o.name);
+                        milo::add(out, o.cls, o.name, std::move(o.body));
+                    }
             return out;
         }
 
@@ -513,7 +864,10 @@ namespace gh2::gh1
                 std::cerr << "[gh1] cannot read " << name << "'s venue" << std::endl;
                 continue;
             }
-            const auto madeGeom = geom(*gh2Geom, *room, *lighting, kit);
+            Drivers drivers;
+            std::set<std::string> unreached;
+            const auto madeGeom = geom(*gh2Geom, {&*gh2Chars, &*gh2Lights}, *room, *lighting, kit,
+                                       scripted(disc, name), drivers, unreached);
             const Spots at = spots({&*lighting, &*room});
             Stage stage;
             const auto madeChars = chars(*gh2Chars, at, stage.walks);
@@ -527,6 +881,11 @@ namespace gh2::gh1
             ark::addFile(layer, charsPath, milo::write(*madeChars));
             stage.spot = at.stage[0];
             addCameras(layer, disc, name, ours, stage);
+            std::set<std::string> present;
+            for (const auto &e : madeGeom->entries)
+                if (!unreached.count(e.second))
+                    present.insert(e.second);
+            addScripts(layer, disc, name, ours, drivers, present);
         }
     }
 }

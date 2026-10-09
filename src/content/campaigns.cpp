@@ -38,9 +38,11 @@ namespace gh2::campaigns
         // The config's arrays that differ by game, each a path of keys from
         // the root. The rest is the game disc's for every campaign: songs
         // holds every game's, and the objects, cheats and sound setup are
-        // read once at boot.
+        // read once at boot, but for the venues' types: each a world's
+        // script, found by its name when the world loads.
         const std::vector<std::vector<const char *>> kConfig = {
             {"campaign"}, {"store"}, {"guitars"}, {"tips"}, {"venues"}, {"characters"}, {"synth", "metamusic"},
+            {"objects", "WorldDir", "types"},
         };
         constexpr const char *kRootConfig = "config/gh2.dta";
         constexpr const char *kUi = "ui/ui.dta";

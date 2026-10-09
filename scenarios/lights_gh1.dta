@@ -1,0 +1,92 @@
+; GH1's venue anims and lighting (gh1/venues.cpp, gh1/scripts.cpp): in the
+; GH1 campaign a venue's dir holds GH1's anims, flares and lighting scene, and
+; its world's type GH1's script, which sets them going from the game's
+; events. GH2's own venues have none of it.
+(needs gh1)
+#include common/first_boot.dta
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty medium}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{game set_venue small1}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 2)
+(expect {world exists lighting.view} 0)
+(expect {world exists venue.view.filt} 0)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+
+{set $ghc_switch gh1}
+{set $ghc_switch_next main_screen}
+{ui goto_screen ghc_switch_screen}
+(wait_screen main_screen)
+{game set_song iloverockandroll}
+{{game get_player_config 0} set_difficulty medium}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{game set_venue small1}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 14)
+; The small club: its lighting scene, its anims' filters and Groups, its
+; flares, and a MatAnim's second stage as an anim of its own.
+(expect {world exists lighting.view} 1)
+(expect {world exists venue.view.anims} 1)
+(expect {world exists venue.view.filt} 1)
+(expect {world exists speaker1.tnm.filt} 1)
+(expect {world exists orange_lights.envanim} 1)
+(expect {world exists Flare1} 1)
+(expect {world exists record_1.mnm} 1)
+(expect {world exists target_parent.mesh} 0)
+; The scene's frame runs with the song, through each View's filter: the
+; records turn at a two hundredth of it, looped over 100 frames.
+(expect {> {{world find venue.view.filt} frame} 480} 1)
+(expect {> {{world find vinyl_spinners.view.anims} frame} 0} 1)
+(expect {<= {{world find vinyl_spinners.view.anims} frame} 100} 1)
+; A flare is boxed in by its flareNN.mesh but for a chorus's flash and the
+; fade after it.
+{world do_force_shot flr_far_lft01}
+(wait 1.5)
+(shot small_club)
+; GH1's lights for how the song goes: each set's anims loop over its frames.
+{world set_lights_bad}
+(wait 1)
+(expect {>= {{world find orange_lights.envanim} frame} 20000} 1)
+(expect {<= {{world find orange_lights.envanim} frame} 25000} 1)
+(expect {>= {{world find color_plane.envanim} frame} 60000} 1)
+(shot small_club_bad)
+{world set_lights_great_verse}
+(wait 1)
+(expect {<= {{world find orange_lights.envanim} frame} 3840} 1)
+(shot small_club_great)
+; A bass hit kicks the speakers out and back, a fifth of its frame through
+; each cone's filter.
+{world bass_hit}
+(wait 0.05)
+(expect {> {{world find speaker1.tnm} frame} 0} 1)
+(expect {< {{world find speaker1.tnm} frame} 27} 1)
+{world kick_drum}
+(wait 0.05)
+(expect {> {{world find kickdrum01.tnm} frame} 0} 1)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+
+; The festival: its screens and beams by GH1's lights.
+{game set_song iloverockandroll}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{game set_venue fest}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 10)
+(expect {world exists lighting.view} 1)
+(expect {world exists blast.matanim} 1)
+{world do_force_shot flr_far_lft02}
+{world set_lights_bad}
+(wait 1.5)
+(shot fest_bad)
+{world set_lights_great_chorus}
+(wait 1.5)
+(shot fest_great)
+(quit)

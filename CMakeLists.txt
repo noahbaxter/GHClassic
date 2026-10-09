@@ -251,6 +251,7 @@ set(GHC_GAME_SOURCES
     src/gh1/screen_pictures.cpp
     src/gh1/screen_widgets.cpp
     src/gh1/screens.cpp
+    src/gh1/scripts.cpp
     src/gh1/songs.cpp
     src/gh1/venues.cpp
     src/gh2x/install.cpp
