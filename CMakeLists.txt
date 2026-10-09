@@ -345,6 +345,11 @@ if(MINGW)
     target_compile_options(GHClassic PRIVATE -Wa,-mbig-obj)
     target_link_options(GHClassic PRIVATE -static -mwindows)
 endif()
+# The C++ runtime linked in, so the release (built on Ubuntu 22.04) asks a
+# distro for glibc no newer than 2.35 and nothing of its libstdc++.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_options(GHClassic PRIVATE -static-libstdc++ -static-libgcc)
+endif()
 
 # Same batching and precompiled headers upstream uses for its runner. Without
 # them a cold build of the generated code takes several times longer.

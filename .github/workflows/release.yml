@@ -105,6 +105,12 @@ jobs:
       - run: git config --global --add safe.directory '*'
       - run: .github/linux-deps.sh
       - run: python3.11 tools/ghc.py release "$ELF"
+      # What a distro must have to start it: no libstdc++ of its own, and glibc
+      # no newer than this baseline's.
+      - run: |
+          objdump -p build/game/GHClassic | grep NEEDED
+          objdump -T build/game/GHClassic | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1
+          ! objdump -T build/game/GHClassic | grep -q GLIBCXX_
       - uses: actions/upload-artifact@v7
         if: startsWith(github.ref, 'refs/tags/')
         with:
