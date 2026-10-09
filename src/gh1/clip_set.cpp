@@ -282,6 +282,55 @@ namespace gh2
             return std::nullopt;
         }
 
+        std::optional<std::vector<std::vector<Jump>>> graph(const Bytes &acg, size_t clips)
+        {
+            if (u32(acg, 0u) != 1u || u32(acg, 4u) != clips)
+                return std::nullopt;
+            std::vector<std::vector<Jump>> out(clips);
+            size_t o = 8u;
+            for (std::vector<Jump> &jumps : out)
+            {
+                const uint32_t n = u32(acg, o);
+                o += 4u;
+                if (o + 12u * n > acg.size())
+                    return std::nullopt;
+                for (uint32_t i = 0; i < n; ++i, o += 12u)
+                {
+                    Jump jump{u32(acg, o), 0.0f, 0.0f};
+                    std::memcpy(&jump.from, acg.data() + o + 4u, 4u);
+                    std::memcpy(&jump.to, acg.data() + o + 8u, 4u);
+                    if (jump.clip >= clips)
+                        return std::nullopt;
+                    jumps.push_back(jump);
+                }
+            }
+            return out;
+        }
+
+        Bytes transitions(const std::vector<Jump> &jumps, const std::map<std::string, size_t> &plays)
+        {
+            std::map<std::string, std::vector<Jump>> to;
+            for (const Jump &jump : jumps)
+                for (const auto &[clip, anim] : plays)
+                    if (anim == jump.clip)
+                        to[clip].push_back(jump);
+            Bytes out;
+            putU32(out, static_cast<uint32_t>(to.size()));
+            for (const auto &[clip, pairs] : to)
+            {
+                putStr(out, clip);
+                putU32(out, static_cast<uint32_t>(pairs.size()));
+                for (const Jump &jump : pairs)
+                    for (const float beat : {jump.from, jump.to})
+                    {
+                        uint32_t bits;
+                        std::memcpy(&bits, &beat, 4u);
+                        putU32(out, bits);
+                    }
+            }
+            return out;
+        }
+
         const Gh1Clip *Gh1Clips::get(const std::string &directory, const std::string &name)
         {
             const std::string path = directory + "/gen/" + name + ".acp";

@@ -7,7 +7,6 @@
 #include "gh1/rig.h"
 #include "milo/milo.h"
 
-#include <cstring>
 #include <iostream>
 #include <map>
 #include <optional>
@@ -18,8 +17,6 @@ namespace gh2::gh1
 {
     namespace
     {
-        using milo::putStr;
-        using milo::putU32;
         using milo::u32;
 
         // GH2 has the same five under the same names: charsys/<name> is its
@@ -36,39 +33,6 @@ namespace gh2::gh1
             {"metal_drummer", "drummer", ""},
             {"metal_keyboard", "keyboard", ""},
         };
-
-        // GH1's graph (AnimSet::LoadGraph, GH1 0x17f440): rev, clip count,
-        // then per clip its jumps: the clip gone to, from and to beats.
-        struct Jump
-        {
-            uint32_t clip;
-            float from, to;
-        };
-
-        std::optional<std::vector<std::vector<Jump>>> graph(const Bytes &acg, size_t clips)
-        {
-            if (u32(acg, 0u) != 1u || u32(acg, 4u) != clips)
-                return std::nullopt;
-            std::vector<std::vector<Jump>> out(clips);
-            size_t o = 8u;
-            for (std::vector<Jump> &jumps : out)
-            {
-                const uint32_t n = u32(acg, o);
-                o += 4u;
-                if (o + 12u * n > acg.size())
-                    return std::nullopt;
-                for (uint32_t i = 0; i < n; ++i, o += 12u)
-                {
-                    Jump jump{u32(acg, o), 0.0f, 0.0f};
-                    std::memcpy(&jump.from, acg.data() + o + 4u, 4u);
-                    std::memcpy(&jump.to, acg.data() + o + 8u, 4u);
-                    if (jump.clip >= clips)
-                        return std::nullopt;
-                    jumps.push_back(jump);
-                }
-            }
-            return out;
-        }
 
         // The GH1 anim a GH2 clip plays: the one of its name, where GH2
         // numbers its several and GH1's female singer's carry her name, else
@@ -110,34 +74,6 @@ namespace gh2::gh1
                     any = i;
             }
             return any;
-        }
-
-        // A clip's jumps as a GH2 clip's transitions: a count, then per clip
-        // gone to its name and (from, to) beat pairs. `plays` is each GH2
-        // clip's GH1 anim; a jump goes to every clip playing the one it
-        // names.
-        Bytes transitions(const std::vector<Jump> &jumps, const std::map<std::string, size_t> &plays)
-        {
-            std::map<std::string, std::vector<Jump>> to;
-            for (const Jump &jump : jumps)
-                for (const auto &[clip, anim] : plays)
-                    if (anim == jump.clip)
-                        to[clip].push_back(jump);
-            Bytes out;
-            putU32(out, static_cast<uint32_t>(to.size()));
-            for (const auto &[clip, pairs] : to)
-            {
-                putStr(out, clip);
-                putU32(out, static_cast<uint32_t>(pairs.size()));
-                for (const Jump &jump : pairs)
-                    for (const float beat : {jump.from, jump.to})
-                    {
-                        uint32_t bits;
-                        std::memcpy(&bits, &beat, 4u);
-                        putU32(out, bits);
-                    }
-            }
-            return out;
         }
 
         std::optional<Bytes> clipSet(const Member &member, const milo::Dir &gh1, const dtb::Macros &macros)

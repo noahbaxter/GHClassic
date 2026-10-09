@@ -176,6 +176,23 @@ namespace gh2
 
         std::optional<Gh1AnimSet> gh1AnimSet(const dtb::Macros &macros, const std::string &directory);
 
+        // GH1's graph (AnimSet::LoadGraph, GH1 0x17f440): rev, clip count,
+        // then per clip its jumps: the clip gone to, from and to beats.
+        struct Jump
+        {
+            uint32_t clip;
+            float from, to;
+        };
+
+        // A set's graph, <directory>/<name>.acg, a list of jumps per clip.
+        std::optional<std::vector<std::vector<Jump>>> graph(const Bytes &acg, size_t clips);
+
+        // A clip's jumps as a GH2 clip's transitions: a count, then per clip
+        // gone to its name and (from, to) beat pairs. `plays` is each GH2
+        // clip's GH1 anim; a jump goes to every clip playing the one it
+        // names.
+        Bytes transitions(const std::vector<Jump> &jumps, const std::map<std::string, size_t> &plays);
+
         // GH1 clips as read, by path.
         struct Gh1Clips
         {
