@@ -357,7 +357,9 @@ def cmd_scenarios(argv):
     parser.add_argument("--speed", type=float, default=2)
     parser.add_argument("names", nargs="*", help="files in scenarios/ without .dta; none means all")
     args = parser.parse_args(argv)
-    names = args.names or sorted(p.stem for p in (ROOT / "scenarios").glob("*.dta"))
+    # Not dotfiles: pathlib's glob matches them, and a tar made on macOS
+    # brings a ._ copy of every file.
+    names = args.names or sorted(p.stem for p in (ROOT / "scenarios").glob("*.dta") if not p.name.startswith("."))
     env = tool_env()
     disc = find_disc(env)
 
@@ -376,10 +378,12 @@ def cmd_scenarios(argv):
 
     (ROOT / "runs").mkdir(exist_ok=True)
     lines = []
+    started = time.time()
     with ThreadPoolExecutor(args.jobs) as pool:
         for future in as_completed([pool.submit(one, name) for name in names]):
             lines.append(future.result())
             print(lines[-1], flush=True)
+    print(f"{len(lines)} scenarios in {round(time.time() - started)}s, {args.jobs} at a time")
     (ROOT / "runs" / "scenarios.txt").write_text("\n".join(lines) + "\n")
     return 1 if any(line.startswith("FAIL") for line in lines) else 0
 
