@@ -123,6 +123,29 @@ namespace gh2::gh1
             return from + static_cast<uint32_t>(std::lround(std::max(seconds - at, 0.0) / perTick));
         }
 
+        // The tick a measure, counted from 0, starts on, by the tempo
+        // track's time signatures, 4/4 until set. One of no beats, or of
+        // beats too short for a tick, is none.
+        uint32_t measureTick(const midi::File &in, uint32_t measure)
+        {
+            uint32_t at = 0u, from = 0u, length = in.division * 4u;
+            for (const midi::Event &e : in.tracks[0].events)
+            {
+                if (e.status != 0xffu || e.meta != 0x58u || e.data.size() < 2u)
+                    continue;
+                const uint32_t next = e.data[1] < 32u ? in.division * 4u * e.data[0] >> e.data[1] : 0u;
+                if (next == 0u)
+                    continue;
+                const uint32_t whole = (e.tick - from) / length;
+                if (at + whole >= measure)
+                    break;
+                at += whole;
+                from += whole * length;
+                length = next;
+            }
+            return from + (measure - at) * length;
+        }
+
         std::optional<midi::Bytes> chart(const midi::Bytes &gh1)
         {
             const auto in = midi::parse(gh1);
@@ -167,6 +190,12 @@ namespace gh2::gh1
                 if (const auto s = textOf(e))
                     if (const auto [track, text] = cue(*s); !track.empty())
                         made[track].events.push_back(midi::text(e.tick, text));
+            // GH2 starts the crowd's level loops, and the world's
+            // music_start, from a [music_start] text (CrowdAudio::Handle,
+            // 0x1245a8); GH1's songs have none, its BeatMatch sends it at the
+            // third measure (UpdateSongPos, GH1 0x10e75c). Without it the
+            // crowd's intro, feedback and all, loops the whole song.
+            made["EVENTS"].events.push_back(midi::text(measureTick(*in, 2u), "[music_start]"));
 
             // GH1's kick and bass hits are TRIGGERS notes 60 and 61
             // (config/midi_triggers.dta), GH2's note 36 of the drummer's and
