@@ -10,6 +10,11 @@
 
 namespace gh2::gh1
 {
+    // The Views GH1 draws a venue's room and its lighting scene from
+    // (venues/<v>/<v>.rnd and lighting.rnd).
+    inline constexpr const char *kRoomView = "venue.view";
+    inline constexpr const char *kLightingView = "lighting.view";
+
     // A crowd region: the crowd members drawn whole in it, each the crowd
     // archetype it is of and which of that one's places, and the sphere
     // about them (gh1/venues.cpp).

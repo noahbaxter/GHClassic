@@ -244,6 +244,7 @@ set(GHC_GAME_SOURCES
     src/gh1/career.cpp
     src/gh1/clip_set.cpp
     src/gh1/clips.cpp
+    src/gh1/crowd.cpp
     src/gh1/face.cpp
     src/gh1/install.cpp
     src/gh1/look.cpp
@@ -259,6 +260,7 @@ set(GHC_GAME_SOURCES
     src/gh1/screens.cpp
     src/gh1/scripts.cpp
     src/gh1/songs.cpp
+    src/gh1/venue_scene.cpp
     src/gh1/venues.cpp
     src/gh2x/install.cpp
     src/gh80s/install.cpp

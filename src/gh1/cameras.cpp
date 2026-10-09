@@ -14,16 +14,17 @@
 // code still). So a GH1 shot is a CamShot of its group's category whose keys
 // are its path sampled, and a still one a single key.
 //
-// GH1's shake track (shaky_cam1.tnm) is GH2's noise here. Its real_time
-// clock, eyes, guard band, force_cam_facing and crowd region have nothing of
-// GH2's to be and are left out, as are the groups GH2 never asks for
-// (TUTORIAL, SINGER, FINAL_WIN_GRIM).
+// GH1's shake track (shaky_cam1.tnm) is GH2's noise here, and its crowd
+// region the crowd members a CamShot draws whole. Its real_time clock, eyes,
+// guard band and force_cam_facing have nothing of GH2's to be and are left
+// out, as are the groups GH2 never asks for (TUTORIAL, SINGER,
+// FINAL_WIN_GRIM).
 
 #include "gh1/cameras.h"
 
 #include "disc/ark.h"
 #include "formats/dtb.h"
-#include "gh1/rig.h"
+#include "gh1/scene.h"
 
 #include <algorithm>
 #include <cmath>
@@ -41,21 +42,6 @@ namespace gh2::gh1
         using milo::putU32;
         using milo::str;
         using milo::u32;
-
-        float f32(const Bytes &b, size_t o)
-        {
-            float v = 0.0f;
-            if (o + 4u <= b.size())
-                std::memcpy(&v, b.data() + o, 4u);
-            return v;
-        }
-
-        void putF32(Bytes &out, float v)
-        {
-            uint32_t u = 0u;
-            std::memcpy(&u, &v, 4u);
-            putU32(out, u);
-        }
 
         struct Vec
         {
@@ -82,15 +68,6 @@ namespace gh2::gh1
             bool spline = false;
         };
 
-        // Past a count and that many names.
-        void skipNames(const Bytes &b, size_t &o)
-        {
-            const uint32_t n = u32(b, o);
-            o += 4u;
-            for (uint32_t i = 0; i < n && o < b.size(); ++i)
-                str(b, o);
-        }
-
         std::optional<Path> path(const Bytes &b)
         {
             // Anim 0 with no filters and its children, Draw 1 (showing, its
@@ -100,9 +77,9 @@ namespace gh2::gh1
             if (u32(b, 0u) != 4u || u32(b, 8u) != 0u)
                 return std::nullopt;
             size_t o = 12u;
-            skipNames(b, o);
+            names(b, o);
             o += 5u;
-            skipNames(b, o);
+            names(b, o);
             o += 16u;
             str(b, o);
             Path out;
@@ -271,7 +248,7 @@ namespace gh2::gh1
         Target target(const std::string &gh1)
         {
             const size_t colons = gh1.find("::");
-            if (colons == std::string::npos || gh1 == "arena::venue.view")
+            if (colons == std::string::npos || gh1 == std::string("arena::") + kRoomView)
                 return {};
             const std::string space = gh1.substr(0, colons), object = gh1.substr(colons + 2u);
             return space == "arena" ? Target{object, {}} : Target{space, object};
@@ -350,11 +327,13 @@ namespace gh2::gh1
             return it != kKinds.end() ? &it->second : nullptr;
         }
 
+        constexpr float kRadiansPerDegree = 0.0174533f;
+
         // GH1's field of view is across the screen and GH2's up it, both of
-        // a 4:3 picture.
-        float fov(float degrees)
+        // a 4:3 picture: GH2's from the tangent of half of GH1's.
+        float fov(float half)
         {
-            return 2.0f * std::atan(0.75f * std::tan(degrees * 0.0174533f * 0.5f));
+            return 2.0f * std::atan(0.75f * half);
         }
 
         // How far along a move of that ease GH1 is at `t` of its time: even,
@@ -516,6 +495,8 @@ namespace gh2::gh1
                     at.z *= kSpotDepth;
                 const Vec spotIn = shot.vec("singer_in"), spot = spotIn + (shot.vec("singer_out") - spotIn) * u;
                 const float fovIn = shot.number("fov_in", 0u, 45.0f);
+                const float degrees = fovIn + (shot.number("fov_out", 0u, 45.0f) - fovIn) * u;
+                const float half = std::tan(degrees * kRadiansPerDegree * 0.5f);
                 float rows[9];
                 rotation(path, frame, rows);
 
@@ -525,7 +506,7 @@ namespace gh2::gh1
                 putF32(out, 0.0f);
                 putF32(out, i < steps ? frames / static_cast<float>(steps) : 0.0f);
                 putF32(out, 0.0f);
-                putF32(out, fov(fovIn + (shot.number("fov_out", 0u, 45.0f) - fovIn) * u));
+                putF32(out, fov(half));
                 for (const float v : rows)
                     putF32(out, v);
                 putF32(out, at.x);
@@ -538,7 +519,6 @@ namespace gh2::gh1
                 // moves the camera. A key GH2 holds is measured after
                 // (CamShotFrame::Interp, 0x26696c), farther by this, which
                 // goes where the PS2 reads no blur amount (content/focus.h).
-                const float half = std::tan((fovIn + (shot.number("fov_out", 0u, 45.0f) - fovIn) * u) * 0.0174533f * 0.5f);
                 const float moved = std::sqrt(1.0f + spot.x * half * spot.x * half + spot.y * half * 0.75f * spot.y * half * 0.75f);
                 putF32(out, 0.5f);
                 putF32(out, 2.0f);
@@ -595,7 +575,7 @@ namespace gh2::gh1
         dtb::Macros macros;
         const auto script = dtb::read("venues/" + gh1 + "/camera.dta", macros, files);
         const auto camPaths = dtb::read("arena/cam_paths.dta", macros, files);
-        const auto scene = load(disc, "venues/" + gh1 + "/gen/campaths.rnd_ps2");
+        const auto scene = loadScene(disc, "venues/" + gh1 + "/gen/campaths.rnd_ps2");
         if (!script || !camPaths || !scene)
         {
             std::cerr << "[gh1] cannot read " << gh1 << "'s cameras" << std::endl;
@@ -622,7 +602,7 @@ namespace gh2::gh1
         for (const char *players : {"", "_coop", "_mp"})
         {
             const std::string file = "world/" + gh2 + "/gen/" + gh2 + players + ".milo_ps2";
-            const auto world = load(0u, file);
+            const auto world = loadScene(0u, file);
             if (!world)
             {
                 std::cerr << "[gh1] cannot read " << file << std::endl;

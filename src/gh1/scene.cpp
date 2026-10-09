@@ -3,6 +3,7 @@
 #include "disc/ark.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 
 namespace gh2::gh1
@@ -78,6 +79,17 @@ namespace gh2::gh1
         return out;
     }
 
+    size_t transEnd(const Bytes &b, size_t o)
+    {
+        if (const auto t = trans(b, o))
+            return t->end;
+        o += 104u;
+        str(b, o);
+        o += 1u;
+        str(b, o);
+        return o;
+    }
+
     std::optional<Draw> draw(const Bytes &b, size_t &o)
     {
         if (u32(b, o) != 1u)
@@ -143,9 +155,11 @@ namespace gh2::gh1
         putStr(out, name);
         putF32(out, of.scale);
         putF32(out, of.offset);
-        // No range is every frame.
+        // No range is every frame. A looping one keeps its last frame:
+        // small_club's neon1.envanim held at 480 of 0 to 480 is lit in
+        // retail and wraps to its dark frame 0 here.
         putF32(out, of.min != of.max ? of.min : -1.0e9f);
-        putF32(out, of.min != of.max ? of.max : 1.0e9f);
+        putF32(out, of.min != of.max ? (of.loop ? std::nextafter(of.max, 1.0e9f) : of.max) : 1.0e9f);
         putU32(out, of.loop ? 1u : 0u);
         putF32(out, 0.0f);
         return out;
@@ -276,6 +290,114 @@ namespace gh2::gh1
         Bytes key;
         putStr(key, name);
         return std::search(b.begin(), b.end(), key.begin(), key.end()) != b.end();
+    }
+
+    bool holds(const milo::Dir &dir, const std::string &name)
+    {
+        return std::any_of(dir.bodies.begin(), dir.bodies.end(), [&](const Bytes &b) { return holds(b, name); });
+    }
+
+    const Bytes *object(const std::vector<const milo::Dir *> &scenes, const char *cls, const std::string &name)
+    {
+        for (const milo::Dir *scene : scenes)
+            for (size_t i = 0; scene && i < scene->entries.size(); ++i)
+                if (scene->entries[i].first == cls && scene->entries[i].second == name)
+                    return &scene->bodies[i];
+        return nullptr;
+    }
+
+    std::string numbered(const char *prefix, int nn, const char *suffix)
+    {
+        return std::string(prefix) + (nn < 10 ? "0" : "") + std::to_string(nn) + suffix;
+    }
+
+    std::optional<size_t> arrayEnd(const Bytes &b, size_t o)
+    {
+        if (o + 6u > b.size())
+            return std::nullopt;
+        const uint32_t size = b[o] | (b[o + 1u] << 8);
+        o += 6u;
+        for (uint32_t i = 0; i < size; ++i)
+        {
+            const uint32_t type = u32(b, o);
+            o += 4u;
+            if (type == 0x10u || type == 0x11u || type == 0x13u)
+            {
+                const auto end = arrayEnd(b, o);
+                if (!end)
+                    return std::nullopt;
+                o = *end;
+            }
+            else if (type == 0u || type == 1u)
+                o += 4u;
+            else if (type == 4u || type == 5u || type == 0x12u)
+                str(b, o);
+            else
+                return std::nullopt;
+            if (o > b.size())
+                return std::nullopt;
+        }
+        return o;
+    }
+
+    std::optional<size_t> headerEnd(const Bytes &b, size_t o)
+    {
+        o += 4u;
+        str(b, o);
+        if (o >= b.size())
+            return std::nullopt;
+        return b[o] != 0u ? arrayEnd(b, o + 1u) : std::optional<size_t>(o + 1u);
+    }
+
+    std::optional<Bytes> withoutObjects(const Bytes &root)
+    {
+        size_t o = 12u;
+        str(root, o);
+        const size_t flag = o;
+        if (flag >= root.size())
+            return std::nullopt;
+        if (root[flag] == 0u)
+            return root;
+        const auto end = arrayEnd(root, flag + 1u);
+        if (!end)
+            return std::nullopt;
+        Bytes kept;
+        uint32_t count = 0u;
+        o = flag + 7u;
+        while (o < *end)
+        {
+            const size_t key = o;
+            o += 4u;
+            str(root, o);
+            const uint32_t type = u32(root, o);
+            o += 4u;
+            if (type == 0x10u)
+            {
+                const auto array = arrayEnd(root, o);
+                if (!array)
+                    return std::nullopt;
+                o = *array;
+            }
+            else if (type == 0u || type == 1u)
+                o += 4u;
+            else
+                str(root, o);
+            if (u32(root, key) != 5u || type == 0x10u || type == 4u)
+                continue;
+            put(kept, root, key, o);
+            count += 2u;
+        }
+        Bytes out(root.begin(), root.begin() + static_cast<std::ptrdiff_t>(flag));
+        out.push_back(count != 0u ? 1u : 0u);
+        if (count != 0u)
+        {
+            out.push_back(static_cast<uint8_t>(count));
+            out.push_back(static_cast<uint8_t>(count >> 8));
+            out.insert(out.end(), 4u, 0u);
+            out.insert(out.end(), kept.begin(), kept.end());
+        }
+        put(out, root, *end, root.size());
+        return out;
     }
 
     std::optional<milo::Dir> loadScene(size_t disc, const std::string &path)

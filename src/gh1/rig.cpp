@@ -3,6 +3,7 @@
 #include "gh1/rig.h"
 
 #include "disc/ark.h"
+#include "gh1/scene.h"
 
 #include <algorithm>
 #include <cstring>
@@ -130,17 +131,11 @@ namespace gh2
                 mesh[o] = 0u;
         }
 
-        // Where a GH1 Mesh 25's Draw starts: rev, then its Trans 8, or the
-        // Trans 9 reparent writes.
-        size_t gh1Draw(const Bytes &mesh)
-        {
-            return gh1::transEnd(mesh, 4u);
-        }
-
-        // A GH1 Mesh 25 left out of drawing: Draw's rev, then its showing flag.
+        // A GH1 Mesh 25 left out of drawing: past its rev and its Trans 8 (or
+        // the Trans 9 reparent writes), Draw's rev, then its showing flag.
         void hideGh1(Bytes &mesh)
         {
-            const size_t o = gh1Draw(mesh) + 4u;
+            const size_t o = gh1::transEnd(mesh, 4u) + 4u;
             if (o < mesh.size())
                 mesh[o] = 0u;
         }
@@ -151,7 +146,7 @@ namespace gh2
         // 0x1ba4f0, its comparator 0x1e5ec8).
         void setDrawOrder(Bytes &mesh, float order)
         {
-            const size_t o = gh1Draw(mesh);
+            const size_t o = gh1::transEnd(mesh, 4u);
             if (u32(mesh, o) != 1u || u32(mesh, o + 5u) != 0u || o + 25u > mesh.size())
                 return;
             Bytes draw;
@@ -269,24 +264,6 @@ namespace gh2
                 for (int k = 0; k < 3; ++k)
                     r.v[j] -= a.v[k] * r.m[k * 3 + j];
             return r;
-        }
-
-        size_t transEnd(const Bytes &b, size_t o)
-        {
-            const bool children = u32(b, o) == 8u;
-            o += 100u;
-            if (children)
-            {
-                const uint32_t n = u32(b, o);
-                o += 4u;
-                for (uint32_t i = 0; i < n; ++i)
-                    str(b, o);
-            }
-            o += 4u;
-            str(b, o);
-            o += 1u;
-            str(b, o);
-            return o;
         }
 
         milo::Dir graft(const milo::Dir &gh2, const milo::Dir &gh1, const milo::Dir &face, const std::string &outfit)
@@ -586,13 +563,6 @@ namespace gh2
             if (!raw)
                 return std::nullopt;
             return milo::parse(*raw);
-        }
-
-        std::optional<milo::Dir> load(size_t disc, const std::string &path)
-        {
-            const auto file = ark::readFile(disc, path);
-            const auto raw = file ? milo::inflate(*file) : std::nullopt;
-            return raw ? milo::parse(*raw) : std::nullopt;
         }
     }
 }
