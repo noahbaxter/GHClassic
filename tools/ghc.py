@@ -239,9 +239,22 @@ def cmd_play(argv):
             sys.exit("no build; run tools/ghc.py build")
         build(disc)
     elif rebuild:
-        # Quiet unless it fails: a no-op when nothing changed.
+        # Quiet unless it fails: a no-op when nothing changed. A relink with
+        # LTO takes a minute or two, so one still going after a few seconds
+        # says so rather than seem to hang. Ninja prints a step only once it
+        # is done when not on a terminal, so its output cannot tell sooner.
+        env = tool_env()
         log = BUILD / "play-build.log"
-        run(["cmake", "--build", GAME, "--target", "GHClassic"], tool_env(), log=log)
+        with open(log, "w") as out:
+            proc = subprocess.Popen([shutil.which("cmake", path=env["PATH"]) or "cmake", "--build", GAME, "--target",
+                                     "GHClassic"], env=env, stdout=out, stderr=subprocess.STDOUT)
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                print("building GHClassic, a minute or two", file=sys.stderr)
+        if proc.wait():
+            sys.stderr.writelines(log.read_text(errors="replace").splitlines(True)[-20:])
+            sys.exit(f"failed ({proc.returncode}): cmake --build {GAME}")
         log.unlink()
     disc = disc or find_disc(tool_env())
     return subprocess.run([str(game_binary()), disc, *argv]).returncode
