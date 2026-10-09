@@ -273,8 +273,8 @@ namespace gh2::gh1
             return out;
         }
 
-        dtb::Node symbol(const std::string &text) { return {dtb::kSymbol, 0, 0.0f, text}; }
-        dtb::Node array(std::vector<dtb::Node> nodes) { return {dtb::kArray, 0, 0.0f, {}, std::move(nodes)}; }
+        using dtb::array;
+        using dtb::symbol;
 
         // `key`'s value in an entry's (key value) array, or none.
         const dtb::Node *value(const dtb::Node &node, const std::string &key)

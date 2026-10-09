@@ -1,0 +1,69 @@
+; The handlers a GH1 venue's world type has ahead of GH1's own functions
+; and handlers (gh1/scripts.cpp): arena/venue.dta's. Where the song is and
+; how it goes pick the lights, on the downbeat after either changes (GH2 has
+; no event for one: the next beat that is a multiple of four), the intro has
+; the bad ones and the first shot after it the music's start, which GH2 has
+; no event for.
+
+; GH2's own beat (world_objects_worldbase.dta), which cuts from a shot its
+; check fails (CheckShot, 0x11f628), and GH1's cut that check leaves out:
+; from a shot the guitarist may not walk in, once he walks
+; (CameraShot::Okay, GH1 0x110040). The first of a name is the one found,
+; so this stands in for GH2's.
+(beat
+   {set [camera_beat] $beat}
+   {if {world current_shot}
+      {if {|| {! {{world current_shot} check_shot}}
+              {&& {guitarist0 actually_walking} {! {{world current_shot} get walk_ok}}}}
+         {$this pick_new_shot}}})
+(gh1_section verse)
+(gh1_started FALSE)
+(gh1_lights_due FALSE)
+(gh1_lights_soon
+   {if {! [gh1_lights_due]}
+      {set [gh1_lights_due] TRUE}
+      {script_task (units kTaskBeats)
+         (delay {- {* 4 {+ 1 {int {/ {taskmgr beat} 4}}}} {taskmgr beat}})
+         (script {world set gh1_lights_due FALSE} {world gh1_lights})}})
+(excitement_bad {$this gh1_lights_soon})
+(excitement_okay {$this gh1_lights_soon})
+(excitement_great {$this gh1_lights_soon})
+(gh1_lights
+   {if_else {game multiplayer}
+      {$this gh1_lights_great}
+      {switch [excitement_level]
+         (kExcitementBoot {$this set_lights_bad})
+         (kExcitementBad {$this set_lights_bad})
+         (kExcitementOkay
+            {switch [gh1_section]
+               (verse {$this set_lights_okay_verse})
+               (chorus {$this set_lights_okay_chorus})
+               (solo {$this set_lights_okay_solo})})
+         (kExcitementGreat {$this gh1_lights_great})
+         (kExcitementPeak {$this gh1_lights_great})}})
+(gh1_lights_great
+   {switch [gh1_section]
+      (verse {$this set_lights_great_verse})
+      (chorus {$this set_lights_great_chorus})
+      (solo {$this set_lights_great_solo})})
+(verse {set [gh1_section] verse} {$this gh1_lights_soon})
+(chorus {set [gh1_section] chorus} {$this gh1_lights_soon})
+(solo {set [gh1_section] solo} {$this gh1_lights_soon})
+(intro_start
+   {set [gh1_started] FALSE}
+   {set [gh1_lights_due] FALSE}
+   {set [gh1_section] verse}
+   {$this gh1_scene}
+   {$this set_lights_bad})
+(post_switch_cam
+   {if {&& {! [gh1_started]} {world current_shot}}
+      {if {!= {{world current_shot} get category} INTRO}
+         {set [gh1_started] TRUE}
+         {$this set_lights_okay_verse}
+         {$this gh1_music_start}}})
+(game_won {$this set_lights_great_verse})
+(hit_p0_fret1 {$this hit_gem 0})
+(hit_p0_fret2 {$this hit_gem 1})
+(hit_p0_fret3 {$this hit_gem 2})
+(hit_p0_fret4 {$this hit_gem 3})
+(hit_p0_fret5 {$this hit_gem 4})

@@ -22,22 +22,29 @@
 #include "gh1/scripts.h"
 
 #include "disc/ark.h"
+#include "dta.h"
 #include "formats/dtb.h"
+#include "gh1/cameras.h"
 
 #include <cmath>
 #include <iostream>
+#include <map>
 #include <optional>
+#include <utility>
 
 namespace gh2::gh1
 {
     namespace
     {
+        using dtb::array;
+        using dtb::command;
         using dtb::Node;
+        using dtb::symbol;
 
-        Node symbol(const std::string &text) { return {dtb::kSymbol, 0, 0.0f, text, {}}; }
         Node real(float v) { return {dtb::kFloat, 0, v, {}, {}}; }
-        Node array(std::vector<Node> nodes) { return {dtb::kArray, 0, 0.0f, {}, std::move(nodes)}; }
-        Node command(std::vector<Node> nodes) { return {dtb::kCommand, 0, 0.0f, {}, std::move(nodes)}; }
+        Node integer(int32_t v) { return {dtb::kInt, v, 0.0f, {}, {}}; }
+        Node variable(const std::string &name) { return {dtb::kVar, 0, 0.0f, name, {}}; }
+        Node self() { return variable("this"); }
         Node property(const std::string &name) { return {dtb::kProperty, 0, 0.0f, {}, {symbol(name)}}; }
 
         bool is(const Node &node, const char *text)
@@ -48,13 +55,19 @@ namespace gh2::gh1
         // GH1's ticks to a beat.
         constexpr float kTicks = 480.0f;
 
+        // A script of that disc's.
+        std::optional<Node> readScript(size_t disc, const std::string &script)
+        {
+            const dtb::Files files = [disc](const std::string &file) { return ark::readFile(disc, file); };
+            dtb::Macros macros;
+            return dtb::read(script, macros, files);
+        }
+
         // A venue's script: its functions and its handlers, each a name,
         // its arguments if it takes any, and its body.
         std::optional<Node> read(size_t disc, const std::string &gh1)
         {
-            const dtb::Files files = [disc](const std::string &file) { return ark::readFile(disc, file); };
-            dtb::Macros macros;
-            return dtb::read("venues/" + gh1 + "/" + gh1 + ".dta", macros, files);
+            return readScript(disc, "venues/" + gh1 + "/" + gh1 + ".dta");
         }
 
         struct Script
@@ -146,7 +159,7 @@ namespace gh2::gh1
         // spotlight01.lit and spotlight01.tnm.
         Node inRoom(const std::string &name)
         {
-            return command({command({symbol("venue.view"), symbol("dir")}), symbol("find"), symbol(name)});
+            return command({command({symbol(kRoomView), symbol("dir")}), symbol("find"), symbol(name)});
         }
 
         // Those of GH2's characters that are there drawn under that Environ
@@ -194,7 +207,7 @@ namespace gh2::gh1
                 // A loop of no length holds its frame (GH1 0x17cf18).
                 made.nodes.push_back(array({symbol(loop && !still ? "loop" : "range"), ends[0], ends[1]}));
                 if (realTime)
-                    made.nodes.push_back(array({symbol("units"), {dtb::kInt, 0, 0.0f, {}, {}}}));
+                    made.nodes.push_back(array({symbol("units"), integer(0)}));
                 if (from && to && !still && scale != 0.0f && (scale != 1.0f || realTime))
                     made.nodes.push_back(array({symbol("period"), real(std::fabs(*to - *from) / (unit * std::fabs(scale)))}));
                 if (blend != 0.0f)
@@ -257,7 +270,7 @@ namespace gh2::gh1
             if (node.nodes.size() == 3u && node.nodes[1].type == dtb::kSymbol && node.nodes[1].text == "add_trans" &&
                 venue.objects.count(node.nodes[2].text))
                 return {command({symbol(node.nodes[2].text), symbol("set"), symbol("trans_parent"),
-                                 command({{dtb::kVar, 0, 0.0f, "this", {}}, symbol("find"), symbol("default.cam")})})};
+                                 command({self(), symbol("find"), symbol("default.cam")})})};
             // {with_namespace {<member> geom_space} {top.view set_showing x}}
             // hides a band member from a shot that stands in it: top.view is
             // the View all of the member draws under (charsys/<member>).
@@ -282,7 +295,7 @@ namespace gh2::gh1
             // {char_sys get_spot <guitarist>}: the walk spot it is nearest, by
             // its number less one (CharMan::GetSpot, GH1 0x18ef80).
             if (h == "char_sys" && what == "get_spot" && node.nodes.size() == 3u)
-                return {command({{dtb::kVar, 0, 0.0f, "this", {}}, symbol("gh1_spot"), node.nodes[2]})};
+                return {command({self(), symbol("gh1_spot"), node.nodes[2]})};
             if (h == "arena" || h == "game")
             {
                 if (what == "switch_anim" || what == "switch_anim_rt")
@@ -299,7 +312,7 @@ namespace gh2::gh1
                     {
                         Node made = command({target, symbol("animate"), array({symbol("range"), node.nodes[4], node.nodes[5]})});
                         if (h == "game")
-                            made.nodes.push_back(array({symbol("units"), {dtb::kInt, 0, 0.0f, {}, {}}}));
+                            made.nodes.push_back(array({symbol("units"), integer(0)}));
                         made.nodes.push_back(array({symbol("period"), real(h == "game" ? (time ? *time : 1000.0f) / 1000.0f
                                                                                         : (time ? *time : kTicks) / kTicks)}));
                         out.push_back(std::move(made));
@@ -319,7 +332,7 @@ namespace gh2::gh1
                 }
                 // The shot's name, as GH1's script tells shots apart.
                 if (h == "arena" && what == "cam_msg")
-                    return {command({command({{dtb::kVar, 0, 0.0f, "this", {}}, symbol("current_shot")}), symbol("name")})};
+                    return {command({command({self(), symbol("current_shot")}), symbol("name")})};
                 // The Environ both guitarists are drawn under from now on.
                 if (h == "arena" && what == "set_singer_env" && node.nodes.size() > 2u &&
                     venue.objects.count(node.nodes[2].text))
@@ -328,7 +341,7 @@ namespace gh2::gh1
                     return {node};
                 if (h == "arena" && venue.functions.count(what))
                 {
-                    Node out = command({{dtb::kVar, 0, 0.0f, "this", {}}, symbol(what)});
+                    Node out = command({self(), symbol(what)});
                     std::vector<Node> args = translated(node.nodes, 2u, venue);
                     out.nodes.insert(out.nodes.end(), args.begin(), args.end());
                     return {out};
@@ -349,7 +362,7 @@ namespace gh2::gh1
             }
             if (venue.functions.count(h))
             {
-                Node out = command({{dtb::kVar, 0, 0.0f, "this", {}}, symbol(h)});
+                Node out = command({self(), symbol(h)});
                 std::vector<Node> args = translated(node.nodes, 1u, venue);
                 out.nodes.insert(out.nodes.end(), args.begin(), args.end());
                 return {out};
@@ -409,73 +422,96 @@ namespace gh2::gh1
             return out;
         }
 
-        // arena/venue.dta's: where the song is and how it goes pick the
-        // lights, on the downbeat after either changes (GH2 has no event
-        // for one: the next beat that is a multiple of four), the intro has
-        // the bad ones and the first shot after it the music's start, which
-        // GH2 has no event for. A beat is GH2's own with GH1's cut from a
-        // shot the guitarist may not walk in once he walks
-        // (CameraShot::Okay, GH1 0x110040), which GH2's check leaves out
-        // (CheckShot, 0x11f628).
-        constexpr const char *kGlue = R"(
-(beat
- {set [camera_beat] $beat}
- {if {world current_shot}
-  {if {|| {! {{world current_shot} check_shot}}
-       {&& {guitarist0 actually_walking} {! {{world current_shot} get walk_ok}}}}
-   {$this pick_new_shot}}})
-(gh1_section verse)
-(gh1_started FALSE)
-(gh1_lights_due FALSE)
-(gh1_lights_soon
- {if {! [gh1_lights_due]}
-  {set [gh1_lights_due] TRUE}
-  {script_task (units kTaskBeats)
-   (delay {- {* 4 {+ 1 {int {/ {taskmgr beat} 4}}}} {taskmgr beat}})
-   (script {world set gh1_lights_due FALSE} {world gh1_lights})}})
-(excitement_bad {$this gh1_lights_soon})
-(excitement_okay {$this gh1_lights_soon})
-(excitement_great {$this gh1_lights_soon})
-(gh1_lights
- {if_else {game multiplayer}
-  {$this gh1_lights_great}
-  {switch [excitement_level]
-   (kExcitementBoot {$this set_lights_bad})
-   (kExcitementBad {$this set_lights_bad})
-   (kExcitementOkay
-    {switch [gh1_section]
-     (verse {$this set_lights_okay_verse})
-     (chorus {$this set_lights_okay_chorus})
-     (solo {$this set_lights_okay_solo})})
-   (kExcitementGreat {$this gh1_lights_great})
-   (kExcitementPeak {$this gh1_lights_great})}})
-(gh1_lights_great
- {switch [gh1_section]
-  (verse {$this set_lights_great_verse})
-  (chorus {$this set_lights_great_chorus})
-  (solo {$this set_lights_great_solo})})
-(verse {set [gh1_section] verse} {$this gh1_lights_soon})
-(chorus {set [gh1_section] chorus} {$this gh1_lights_soon})
-(solo {set [gh1_section] solo} {$this gh1_lights_soon})
-(intro_start
- {set [gh1_started] FALSE}
- {set [gh1_lights_due] FALSE}
- {set [gh1_section] verse}
- {$this gh1_scene}
- {$this set_lights_bad})
-(post_switch_cam
- {if {&& {! [gh1_started]} {world current_shot}}
-  {if {!= {{world current_shot} get category} INTRO}
-   {set [gh1_started] TRUE}
-   {$this set_lights_okay_verse}
-   {$this gh1_music_start}}})
-(game_won {$this set_lights_great_verse})
-(hit_p0_fret1 {$this hit_gem 0})
-(hit_p0_fret2 {$this hit_gem 1})
-(hit_p0_fret3 {$this hit_gem 2})
-(hit_p0_fret4 {$this hit_gem 3})
-(hit_p0_fret5 {$this hit_gem 4})
-)";
+        // The walk spot whose waypoint is the nearest to that character of
+        // those it walks to (kWalkSpot or kSoloWalkSpot, 0x191078), -1 with
+        // none: (gh1_spot ($who) {do ($at {waypoint_nearest $who 192})
+        // {if_else {== $at ""} -1 {- {switch {$at name} (<waypoint> <n>)...}
+        // 1}}}), each spot's waypoint by its number.
+        Node nearest(const std::vector<std::string> &spots)
+        {
+            const Node who = variable("who"), at = variable("at"), none = {dtb::kString, 0, 0.0f, {}, {}};
+            Node spot = command({symbol("switch"), command({at, symbol("name")})});
+            for (size_t i = 0; i < spots.size(); ++i)
+                spot.nodes.push_back(array({symbol(spots[i]), integer(static_cast<int32_t>(i + 1u))}));
+            return array({symbol("gh1_spot"), array({who}),
+                          command({symbol("do"), array({at, command({symbol("waypoint_nearest"), who, integer(192)})}),
+                                   command({symbol("if_else"), command({symbol("=="), at, none}), integer(-1),
+                                            command({symbol("-"), std::move(spot), integer(1)})})})});
+        }
+
+        // What gh1_scene does as the intro starts. GH1 draws each section's
+        // View, the crowd, the band, then each section's transparent View
+        // (ArenaPanel::Draw, GH1 0x10d488), the guitarist's pool of light
+        // before those (Arena::DrawTransparent, GH1 0x169818). GH2's crowd
+        // draws at 0 and its band from 6. A dir sorts its draws when it
+        // syncs alone (RndDir::SyncObjects, 0x1b2f78).
+        std::vector<Node> scene(const Drivers &drivers, const std::set<std::string> &objects, const std::string &kit)
+        {
+            std::vector<Node> out;
+            static const std::pair<const char *, float> kOrder[] = {
+                {kRoomView, -2.0f}, {kLightingView, -1.0f}, {"floorspot_char.mesh", 9.0f},
+                {"venue_transparent.view", 10.0f}, {"lighting_transparent.view", 11.0f},
+            };
+            for (const auto &[view, order] : kOrder)
+                if (objects.count(view))
+                    out.push_back(command({symbol(view), symbol("set"), symbol("draw_order"), real(order)}));
+            out.push_back(command({self(), symbol("sync_objects")}));
+            // The pool follows the first guitarist (content/floor_spot.h).
+            if (objects.count("floorspot_char.mesh"))
+                out.push_back(command({symbol("if"), command({symbol("exists"), symbol("guitarist0")}),
+                                       command({symbol("floor_spot"), symbol("floorspot_char.mesh"),
+                                                inRoom("spotlight01.lit"), symbol("guitarist0")})}));
+            if (objects.count(kit))
+                out.push_back(command({symbol(kit), symbol("set_showing"), command({symbol("band"), symbol("room_kit")})}));
+            for (const char *top : {kRoomView, kLightingView})
+                if (const auto it = drivers.find(top); it != drivers.end())
+                    for (const std::string &driver : it->second)
+                        out.push_back(command({symbol(driver), symbol("animate"),
+                                               array({symbol("range"), real(0.0f), real(1.0e7f)})}));
+            for (const auto &[who, by] : {std::pair{"guitarist0", "singer0.env"}, std::pair{"guitarist1", "singer1.env"}})
+                if (objects.count(by))
+                    for (Node &made : lit({who}, by))
+                        out.push_back(std::move(made));
+            if (objects.count("stagechar.env"))
+                for (Node &made : lit({"singer", "bassist", "drummer", "keyboardist"}, "stagechar.env"))
+                    out.push_back(std::move(made));
+            // GH1 shows no shadow of the band's or a guitarist's own: where a
+            // room has them it draws them, and a guitarist's is drawn with no
+            // alpha, which its alpha test keeps to the Z buffer. A setting
+            // picks the room's, GH2's own under everyone, or neither. They are
+            // only ever hidden here: a band member's shadow.mesh, wherever the
+            // room draws the band's, and a guitarist's Group of them, as GH2
+            // hides it with two players (char_objects.dta).
+            const auto chosen = [](const char *which)
+            { return command({symbol("=="), command({symbol("band"), symbol("shadows")}), symbol(which)}); };
+            for (const char *who : {"singer", "bassist", "drummer", "keyboardist"})
+            {
+                Node hide = command({symbol("if"), command({symbol(who), symbol("exists"), symbol("shadow.mesh")}),
+                                     command({command({symbol(who), symbol("find"), symbol("shadow.mesh")}), symbol("set_showing"),
+                                              integer(0)})});
+                if (!objects.count("band_shadow.mesh"))
+                    hide = command({symbol("if"), command({symbol("!"), chosen("gh2")}), std::move(hide)});
+                out.push_back(command({symbol("if"), command({symbol("exists"), symbol(who)}), std::move(hide)}));
+            }
+            // {if {&& {exists <who>} {! {== {band shadows} gh2}}} {do ($group
+            // {<who> get shadow}) {if {!= $group ""} {$group set_showing FALSE}}}}
+            const Node group = variable("group"), none = {dtb::kString, 0, 0.0f, {}, {}};
+            for (const char *who : {"guitarist0", "guitarist1"})
+                out.push_back(command(
+                    {symbol("if"), command({symbol("&&"), command({symbol("exists"), symbol(who)}), command({symbol("!"), chosen("gh2")})}),
+                     command({symbol("do"), array({group, command({symbol(who), symbol("get"), symbol("shadow")})}),
+                              command({symbol("if"), command({symbol("!="), group, none}),
+                                       command({group, symbol("set_showing"), integer(0)})})})}));
+            for (const std::string &object : objects)
+                if (object.rfind("band_shadow", 0) == 0)
+                    out.push_back(command({symbol("if"), chosen("off"), command({symbol(object), symbol("set_showing"), integer(0)})}));
+            if (objects.count("crowd.env"))
+                for (Node &made : lit({"crowd_male01", "crowd_male02", "crowd_male03", "crowd_male04", "crowd_female01",
+                                       "crowd_female02", "crowd_female03", "crowd_female04"},
+                                      "crowd.env"))
+                    out.push_back(std::move(made));
+            return out;
+        }
 
         // The array in `in` that starts with that symbol.
         Node *child(Node &in, const char *key)
@@ -551,7 +587,7 @@ namespace gh2::gh1
     std::set<std::string> scripted(size_t disc, const std::string &gh1)
     {
         std::set<std::string> out;
-        if (const auto script = read(disc, gh1))
+        if (const auto &script = read(disc, gh1))
             collect(*script, out);
         return out;
     }
@@ -562,7 +598,7 @@ namespace gh2::gh1
         const std::string path = "world/" + gh2 + "/gen/" + gh2 + ".dtb";
         const auto file = ark::readFile(0u, path);
         auto root = file ? dtb::raw(*file) : std::nullopt;
-        const auto script = read(disc, gh1);
+        const auto &script = read(disc, gh1);
         if (!root || !script)
         {
             std::cerr << "[gh1] cannot read " << gh1 << "'s script" << std::endl;
@@ -575,17 +611,17 @@ namespace gh2::gh1
         for (const Node &h : theirs.handlers)
             venue.functions.insert(h.nodes[0].text);
 
-        // Each handler once: the glue's, then GH1's functions and handlers
-        // under their names, a handler that only calls the function of its
-        // own name left out for it.
-        std::vector<Node> made = dtb::parse(kGlue)->nodes;
-        // The walk spot whose waypoint is the nearest to that character of
-        // those it walks to (kWalkSpot or kSoloWalkSpot, 0x191078), -1 with
-        // none.
-        std::string nearest = "(gh1_spot ($who) {do ($at {waypoint_nearest $who 192}) {if_else {== $at \"\"} -1 {- {switch {$at name}";
-        for (size_t i = 0; i < spots.size(); ++i)
-            nearest += " (" + spots[i] + " " + std::to_string(i + 1u) + ")";
-        made.push_back(dtb::parse(nearest + "} 1}}})")->nodes[0]);
+        // Each handler once: the glue's (gh1/scripts.dta), then GH1's
+        // functions and handlers under their names, a handler that only
+        // calls the function of its own name left out for it.
+        static const std::optional<Node> glue = dtb::parse(kGh1ScriptsDta);
+        if (!glue)
+        {
+            std::cerr << "[gh1] cannot read gh1/scripts.dta" << std::endl;
+            return;
+        }
+        std::vector<Node> made = glue->nodes;
+        made.push_back(nearest(spots));
         const auto handler = [&](const std::string &name) -> Node &
         {
             for (Node &m : made)
@@ -614,94 +650,31 @@ namespace gh2::gh1
                 continue;
             Node &to = handler(renamed(name));
             if (name == "hit_gem" && to.nodes.size() == 1u)
-                to.nodes.push_back(array({{dtb::kVar, 0, 0.0f, "slot", {}}}));
+                to.nodes.push_back(array({variable("slot")}));
             std::vector<Node> does = translated(h.nodes, 1u, venue);
             // GH2 sends it as a shot starts (world/camshot.dta), and once
             // with none.
             if (name == "post_switch_cam" && !does.empty())
             {
-                does.insert(does.begin(), {symbol("if"), command({{dtb::kVar, 0, 0.0f, "this", {}}, symbol("current_shot")})});
+                does.insert(does.begin(), {symbol("if"), command({self(), symbol("current_shot")})});
                 does = {command(std::move(does))};
             }
             to.nodes.insert(to.nodes.end(), does.begin(), does.end());
         }
         // The scene's frame is the song's tick from its start, as far as a
         // song goes; the functions the glue calls are there for it to call.
-        Node &scene = handler("gh1_scene");
-        // GH1 draws each section's View, the crowd, the band, then each
-        // section's transparent View (ArenaPanel::Draw, GH1 0x10d488), the
-        // guitarist's pool of light before those (Arena::DrawTransparent,
-        // GH1 0x169818). GH2's crowd draws at 0 and its band from 6. A dir
-        // sorts its draws when it syncs alone (RndDir::SyncObjects,
-        // 0x1b2f78).
-        static const std::pair<const char *, float> kOrder[] = {
-            {"venue.view", -2.0f}, {"lighting.view", -1.0f}, {"floorspot_char.mesh", 9.0f},
-            {"venue_transparent.view", 10.0f}, {"lighting_transparent.view", 11.0f},
-        };
-        for (const auto &[view, order] : kOrder)
-            if (objects.count(view))
-                scene.nodes.push_back(command({symbol(view), symbol("set"), symbol("draw_order"), real(order)}));
-        scene.nodes.push_back(command({{dtb::kVar, 0, 0.0f, "this", {}}, symbol("sync_objects")}));
-        // The pool follows the first guitarist (content/floor_spot.h).
-        if (objects.count("floorspot_char.mesh"))
-            scene.nodes.push_back(command({symbol("if"), command({symbol("exists"), symbol("guitarist0")}),
-                                           command({symbol("floor_spot"), symbol("floorspot_char.mesh"),
-                                                    inRoom("spotlight01.lit"), symbol("guitarist0")})}));
-        if (objects.count(kit))
-            scene.nodes.push_back(command({symbol(kit), symbol("set_showing"), command({symbol("band"), symbol("room_kit")})}));
-        for (const char *top : {"venue.view", "lighting.view"})
-            if (const auto it = drivers.find(top); it != drivers.end())
-                for (const std::string &driver : it->second)
-                    scene.nodes.push_back(command({symbol(driver), symbol("animate"),
-                                                   array({symbol("range"), real(0.0f), real(1.0e7f)})}));
-        for (const auto &[who, by] : {std::pair{"guitarist0", "singer0.env"}, std::pair{"guitarist1", "singer1.env"}})
-            if (objects.count(by))
-                for (Node &made : lit({who}, by))
-                    scene.nodes.push_back(std::move(made));
-        if (objects.count("stagechar.env"))
-            for (Node &made : lit({"singer", "bassist", "drummer", "keyboardist"}, "stagechar.env"))
-                scene.nodes.push_back(std::move(made));
-        // GH1 shows no shadow of the band's or a guitarist's own: where a
-        // room has them it draws them, and a guitarist's is drawn with no
-        // alpha, which its alpha test keeps to the Z buffer. A setting
-        // picks the room's, GH2's own under everyone, or neither. They are
-        // only ever hidden here: a band member's shadow.mesh, wherever the
-        // room draws the band's, and a guitarist's Group of them, as GH2
-        // hides it with two players (char_objects.dta).
-        const auto chosen = [](const char *which)
-        { return command({symbol("=="), command({symbol("band"), symbol("shadows")}), symbol(which)}); };
-        const Node no = {dtb::kInt, 0, 0.0f, {}, {}};
-        for (const char *who : {"singer", "bassist", "drummer", "keyboardist"})
-        {
-            Node hide = command({symbol("if"), command({symbol(who), symbol("exists"), symbol("shadow.mesh")}),
-                                 command({command({symbol(who), symbol("find"), symbol("shadow.mesh")}), symbol("set_showing"), no})});
-            if (!objects.count("band_shadow.mesh"))
-                hide = command({symbol("if"), command({symbol("!"), chosen("gh2")}), std::move(hide)});
-            scene.nodes.push_back(command({symbol("if"), command({symbol("exists"), symbol(who)}), std::move(hide)}));
-        }
-        for (const std::string who : {"guitarist0", "guitarist1"})
-            scene.nodes.push_back(dtb::parse("{if {&& {exists " + who + "} {! {== {band shadows} gh2}}} {do ($group {" + who +
-                                             " get shadow}) {if {!= $group \"\"} {$group set_showing FALSE}}}}")
-                                      ->nodes[0]);
-        for (const std::string &object : objects)
-            if (object.rfind("band_shadow", 0) == 0)
-                scene.nodes.push_back(command({symbol("if"), chosen("off"), command({symbol(object), symbol("set_showing"), no})}));
-        if (objects.count("crowd.env"))
-            for (Node &made : lit({"crowd_male01", "crowd_male02", "crowd_male03", "crowd_male04", "crowd_female01",
-                                   "crowd_female02", "crowd_female03", "crowd_female04"},
-                                  "crowd.env"))
-                scene.nodes.push_back(std::move(made));
+        Node &gh1Scene = handler("gh1_scene");
+        for (Node &does : scene(drivers, objects, kit))
+            gh1Scene.nodes.push_back(std::move(does));
         for (const char *name : {"gh1_music_start", "hit_gem", "set_lights_bad", "set_lights_okay_verse", "set_lights_okay_chorus",
                                  "set_lights_okay_solo", "set_lights_great_verse", "set_lights_great_chorus",
                                  "set_lights_great_solo"})
             handler(name);
         for (Node &m : made)
             if (m.nodes.size() == 1u || (m.nodes.size() == 2u && m.nodes[1].type == dtb::kArray))
-                m.nodes.push_back({dtb::kInt, 0, 0.0f, {}, {}});
+                m.nodes.push_back(integer(0));
 
-        const dtb::Files files = [disc](const std::string &f) { return ark::readFile(disc, f); };
-        dtb::Macros macros;
-        const auto venues = dtb::read("arena/venues.dta", macros, files);
+        const auto venues = readScript(disc, "arena/venues.dta");
         const Node *settings = venues ? dtb::find(*venues, gh1) : nullptr;
 
         bool placed = false;

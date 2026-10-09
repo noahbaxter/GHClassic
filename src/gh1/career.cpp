@@ -39,8 +39,8 @@ namespace gh2::gh1
 {
     namespace
     {
-        dtb::Node symbol(const std::string &text) { return {dtb::kSymbol, 0, 0.0f, text, {}}; }
-        dtb::Node array(std::vector<dtb::Node> nodes) { return {dtb::kArray, 0, 0.0f, {}, std::move(nodes)}; }
+        using dtb::array;
+        using dtb::symbol;
 
         std::string keyOf(const dtb::Node &node)
         {
