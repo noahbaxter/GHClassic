@@ -116,6 +116,9 @@ namespace gh2::gh1
 
     void addSounds(size_t layer, size_t disc)
     {
+        // GH1's credits music, at the path GH2's has.
+        ark::lend(layer, "sfx/streams/credits.vgs", disc, "sfx/streams/credits.vgs");
+
         const auto bnk = ark::readFile(disc, "sfx/gen/ingame.bnk"), nse = ark::readFile(disc, "sfx/gen/ingame.nse");
         const auto bank = ark::readFile(0u, "sfx/gen/ingame_bank.milo_ps2");
         auto dir = bank ? milo::read(*bank) : std::nullopt;

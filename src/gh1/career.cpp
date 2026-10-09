@@ -19,7 +19,7 @@
 //   menus       GH1's screens and their text (gh1/menus.h), under GH2's
 //               scripts fitted to them
 //   music       GH1's menu loops
-//   sound       GH1's star power and stingers (gh1/sound.h)
+//   sound       GH1's star power, stingers and credits music (gh1/sound.h)
 
 #include "gh1/career.h"
 
