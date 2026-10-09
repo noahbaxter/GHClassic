@@ -267,7 +267,7 @@ def content(env, games=None):
     """GHClassic's --content for each content game's disc in game/, any of
     its releases (or only those of `games`), and --mods for mods/ when it
     exists."""
-    images = sorted(str(p) for p in (ROOT / "game").glob("*"))
+    images = sorted(str(p) for p in discs_dir().glob("*"))
     args = []
     for game in content_games():
         if games is not None and game not in games:
@@ -276,8 +276,10 @@ def content(env, games=None):
                                 env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
         if not result.returncode:
             args += ["--content", result.stdout.strip()]
-    if (ROOT / "mods").is_dir():
-        args += ["--mods", str(ROOT / "mods")]
+    # The same as game/: this tree's own, else the main checkout's.
+    mods = ROOT / "mods" if (ROOT / "mods").is_dir() else main_checkout() / "mods"
+    if mods.is_dir():
+        args += ["--mods", str(mods)]
     return args
 
 
