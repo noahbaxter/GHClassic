@@ -22,6 +22,7 @@
 #include "gh1/guitarist.h"
 #include "formats/midi.h"
 
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <map>
@@ -84,6 +85,43 @@ namespace gh2::gh1
             return it != kWhat.end() ? std::pair{track->second, it->second} : std::pair<std::string, std::string>{};
         }
 
+        // A tick's time in seconds by the tempo track, 120 beats a minute
+        // until set.
+        double secondsAt(const midi::File &in, uint32_t tick)
+        {
+            double at = 0.0, perTick = 0.5 / in.division;
+            uint32_t from = 0u;
+            for (const midi::Event &e : in.tracks[0].events)
+            {
+                if (e.tick >= tick)
+                    break;
+                if (e.status != 0xffu || e.meta != 0x51u || e.data.size() < 3u)
+                    continue;
+                at += (e.tick - from) * perTick;
+                from = e.tick;
+                perTick = ((e.data[0] << 16) | (e.data[1] << 8) | e.data[2]) / 1.0e6 / in.division;
+            }
+            return at + (tick - from) * perTick;
+        }
+
+        // The tick at a time, the inverse of secondsAt.
+        uint32_t tickAt(const midi::File &in, double seconds)
+        {
+            double at = 0.0, perTick = 0.5 / in.division;
+            uint32_t from = 0u;
+            for (const midi::Event &e : in.tracks[0].events)
+            {
+                if (e.status != 0xffu || e.meta != 0x51u || e.data.size() < 3u)
+                    continue;
+                if (at + (e.tick - from) * perTick >= seconds)
+                    break;
+                at += (e.tick - from) * perTick;
+                from = e.tick;
+                perTick = ((e.data[0] << 16) | (e.data[1] << 8) | e.data[2]) / 1.0e6 / in.division;
+            }
+            return from + static_cast<uint32_t>(std::lround(std::max(seconds - at, 0.0) / perTick));
+        }
+
         std::optional<midi::Bytes> chart(const midi::Bytes &gh1)
         {
             const auto in = midi::parse(gh1);
@@ -128,6 +166,24 @@ namespace gh2::gh1
                 if (const auto s = textOf(e))
                     if (const auto [track, text] = cue(*s); !track.empty())
                         made[track].events.push_back(midi::text(e.tick, text));
+
+            // GH1's kick and bass hits are TRIGGERS notes 60 and 61
+            // (config/midi_triggers.dta), GH2's note 36 of the drummer's and
+            // the bassist's tracks (midi_parsers.dta's drummer_kick_drum and
+            // speaker_pulse). Each fires its lead earlier, 90 and 50 ms
+            // (midi_triggers.dta's third field, SongDB::AddTrigger GH1
+            // 0x10bf08).
+            if (triggers)
+                for (midi::Event e : triggers->events)
+                    if (e.status != 0xffu && (e.status & 0xe0u) == 0x80u && !e.data.empty() &&
+                        (e.data[0] == 60u || e.data[0] == 61u))
+                    {
+                        const bool kick = e.data[0] == 60u;
+                        const char *track = kick ? "BAND DRUMS" : "BAND BASS";
+                        e.tick = tickAt(*in, std::max(secondsAt(*in, e.tick) - (kick ? 0.09 : 0.05), 0.0));
+                        e.data[0] = 36u;
+                        made[track].events.push_back(std::move(e));
+                    }
 
             midi::File out{in->format, in->division, {in->tracks[0]}};
             for (const char *name : order)
