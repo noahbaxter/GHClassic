@@ -159,7 +159,8 @@ namespace gh2
 
         // GH1's Draw 1 (showing, an empty draw list, sphere) as Draw 3, which
         // RndDrawable::Load (0x3d5090) gives a draw order. A character's lod
-        // group sorts by it, then by material address (SortDraws, 0x214fa0).
+        // group sorts by it, then by material address (RndGroup::SortDraws,
+        // 0x1ba4f0, its comparator 0x1e5ec8).
         void setDrawOrder(Bytes &mesh, float order)
         {
             const size_t o = gh1Draw(mesh);
@@ -454,12 +455,19 @@ namespace gh2
             // before its eyes, the eyes before glasses over them.
             if (lod1.empty())
                 lod1 = lod0;
-            std::map<std::string, float> topOrder;
+            // A lod view's own order too, or the group's sort falls back to
+            // material addresses: Johnny's shirt drew before the belly under
+            // its cut-out hem, whose depth then hid the belly.
+            std::map<std::string, float> drawOrder;
+            for (const auto *lod : {&lod0, &lod1})
+                for (size_t i = 0; i < lod->size(); ++i)
+                    drawOrder.emplace((*lod)[i], static_cast<float>(i + 1u));
+            size_t topAt = std::max(lod0.size(), lod1.size()) + 1u;
             for (std::string n : top)
             {
                 if (n == "L-eye.mesh" || n == "R-eye.mesh")
                     n = "gh1_" + n;
-                topOrder.emplace(n, static_cast<float>(topOrder.size() + 1u));
+                drawOrder.insert_or_assign(n, static_cast<float>(topAt++));
                 for (auto *lod : {&lod0, &lod1})
                     if (std::find(lod->begin(), lod->end(), n) == lod->end())
                         lod->push_back(n);
@@ -524,7 +532,7 @@ namespace gh2
                     (std::find(lod0.begin(), lod0.end(), o.name) != lod0.end() ||
                      std::find(lod1.begin(), lod1.end(), o.name) != lod1.end()))
                     hideGh1(o.body);
-                if (const auto t = topOrder.find(o.name); o.cls == "Mesh" && t != topOrder.end())
+                if (const auto t = drawOrder.find(o.name); o.cls == "Mesh" && t != drawOrder.end())
                     setDrawOrder(o.body, t->second);
                 milo::add(out, o.cls, o.name, std::move(o.body));
             }
