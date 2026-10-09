@@ -28,6 +28,7 @@ namespace gh2::settings
         kSustainReleaseMs, // a sustain let go this close to its end stays heard
         kWhammyHold, // a whammy bar held down bends every sustain
         kDiscPrefer, // kChd or kIso: the image taken when the disc folder has both
+        kCheckUpdates, // a newer release offered when the game starts
         kKeyCount,
     };
 

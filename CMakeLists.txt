@@ -148,6 +148,10 @@ add_executable(save_test EXCLUDE_FROM_ALL
 target_include_directories(save_test PRIVATE src)
 target_link_libraries(save_test PRIVATE miniz)
 
+# Which release the game offers as an update.
+add_executable(releases_test EXCLUDE_FROM_ALL tests/releases_test.cpp src/host/releases.cpp)
+target_include_directories(releases_test PRIVATE src)
+
 # Without a disc's generated code, everything above still builds: what CI
 # checks (tools/ghc.py ci).
 file(GLOB GHC_GENERATED_SOURCES CONFIGURE_DEPENDS
@@ -203,6 +207,8 @@ set(GHC_GAME_SOURCES
     src/host/input.cpp
     src/host/pad.cpp
     src/host/profiles.cpp
+    src/host/releases.cpp
+    src/host/update.cpp
     src/host/vulkan_frontend.cpp
     src/host/vma.cpp
     src/host/scene_renderer.cpp

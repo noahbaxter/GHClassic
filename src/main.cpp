@@ -26,6 +26,7 @@
 #include "disc/disc.h"
 #include "ui/fast_boot.h"
 #include "host/bind.h"
+#include "host/update.h"
 #include "host/vulkan_frontend.h"
 #include "save/save.h"
 #include "dev/scenario.h"
@@ -186,6 +187,10 @@ int main(int argc, char *argv[])
         if (std::freopen(log.c_str(), "w", stderr))
             dup2(fileno(stderr), fileno(stdout));
     }
+
+    // A player who takes a newer release is sent to it and not into this one.
+    if (!hostOptions.hidden && gh2::settings::get(gh2::settings::kCheckUpdates) && gh2::update::offer())
+        return 0;
 
     // The disc, and this build's executable on it, before any window opens.
     std::string why;

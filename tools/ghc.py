@@ -383,8 +383,9 @@ def cmd_ci(argv):
     run(["cmake", "-S", ROOT, "-B", ci, "-DCMAKE_BUILD_TYPE=Release", f"-DGHC_GENERATED_DIR={ci / 'none'}"],
         env, quiet=True)
     run(["cmake", "--build", ci, "-j", jobs, "--target", "ps2_runtime", "chdr-static", "SDL3-static", "volk",
-         "vk-bootstrap", "glslang-standalone", "mpeg2", "save_test"], env)
+         "vk-bootstrap", "glslang-standalone", "mpeg2", "save_test", "releases_test"], env)
     run([ci / f"save_test{EXE}"], env)
+    run([ci / f"releases_test{EXE}"], env)
 
 
 def cmd_bind(argv):

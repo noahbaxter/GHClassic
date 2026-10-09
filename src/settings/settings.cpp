@@ -80,6 +80,7 @@ namespace gh2::settings
             // With both in PUT_DISC_HERE. A .chd is smaller; an .iso reads
             // faster, which only shows with the game run far above 1x.
             {"disc", "prefer", Type::kChoice, 0, 1, 1, kChd, kChd, "chd iso"},
+            {"game", "check_updates", Type::kBool, 0, 1, 1, 1, 1},
         };
 
         int snap(const Entry &entry, int value)
