@@ -352,7 +352,25 @@ namespace gh2
                         const std::string gh1 = strum(name);
                         for (const Gh1Anim &a : hand->anims)
                             if (a.name == gh1)
-                                return asIs(clips, hand->directory, a);
+                            {
+                                // GH2 starts a hand clip at most max_gap (0.24) before its
+                                // gem, fades it in over that span and has its beat 0 there
+                                // (MidiParser::AddEvent, 0x23e0d4; CharDriverMidi::
+                                // OnMidiParser, 0x173d20; CharClipDriver::Evaluate,
+                                // 0x198b00), where its own clips strike. GH1 starts its
+                                // clips their lead (AnimClip +0x20, 0.24 beats) before the
+                                // event and strikes a lead in (UpdateStrum,
+                                // UpdateLeftExpression), so beat 0 moves back by the lead:
+                                // the clip plays from its first frame, at its own speed,
+                                // onto the gem.
+                                auto r = asIs(clips, hand->directory, a);
+                                if (r)
+                                {
+                                    r->clip.start -= r->clip.lead;
+                                    r->clip.end -= r->clip.lead;
+                                }
+                                return r;
+                            }
                         return std::nullopt;
                     }) || !declareBones(*hands, handChannels, gh1))
                     return std::nullopt;

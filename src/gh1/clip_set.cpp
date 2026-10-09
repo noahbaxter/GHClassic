@@ -66,6 +66,7 @@ namespace gh2
             std::memcpy(&clip.start, acp.data() + o + 4u, 4u);
             std::memcpy(&clip.end, acp.data() + o + 8u, 4u);
             std::memcpy(&clip.rate, acp.data() + o + 12u, 4u);
+            std::memcpy(&clip.lead, acp.data() + o + 24u, 4u); // AnimClip +0x20
             clip.rev = u32(acp, o + 28u);
             auto sets = readSamples(acp, o + 32u, clip.rev, 2);
             if (!sets)

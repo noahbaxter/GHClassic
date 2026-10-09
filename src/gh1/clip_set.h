@@ -104,13 +104,20 @@ namespace gh2
         };
 
         // GH1's AnimClipSamples (Load, GH1 0x17cdb8) after its class and
-        // name: AnimClip rev 17+ (rev, start, end, rate, flags and two words
-        // GH2 has its own of), then the samples' rev and two sets.
+        // name: AnimClip rev 17+ (AnimClip::Load, GH1 0x189da0: rev, start,
+        // end, rate, flags and two words GH2 has its own of, the second the
+        // lead), then the samples' rev and two sets.
         struct Gh1Clip
         {
             float start = 0.0f, end = 0.0f, rate = 0.0f;
             uint32_t rev = 0u;
             std::vector<Samples> sets;
+            // How many beats ahead of its event GH1 starts a hand clip:
+            // AnimClip +0x20 in memory, 24 bytes on from the rev in the file.
+            // GuitarHands::UpdateStrum (GH1 0x286bc8) takes it from the
+            // event's beat, against TheGameTime's beat (+0x10, its tick
+            // over 480: GameTime::Set, GH1 0x106a70).
+            float lead = 0.0f;
         };
 
         std::optional<Gh1Clip> readGh1Clip(const Bytes &acp);
