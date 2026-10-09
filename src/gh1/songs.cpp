@@ -229,6 +229,11 @@ namespace gh2::gh1
             return;
         }
 
+        // The basement's results headlines, by stars (gh1/menus.dta).
+        for (int stars = 3; stars <= 5; ++stars)
+            if (const dtb::Node *line = value(*strings, "headline_basement_star" + std::to_string(stars)))
+                locale::add("headline_basement_star" + std::to_string(stars), line->text);
+
         // The career's tiers, then the store's songs as GH1 heads them.
         std::vector<std::pair<std::string, const dtb::Node *>> groups;
         for (size_t i = 1u; i < order->nodes.size(); ++i)

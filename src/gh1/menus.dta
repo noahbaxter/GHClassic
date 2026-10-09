@@ -47,9 +47,12 @@
 
 ; GH1's newspaper for a new status has the character's photo, lines that
 ; take the band's name, and lines that are the character's (GH1's
-; endgame.dta, its status panel's text).
+; endgame.dta, its status panel's text). It is the status reached, where
+; GH2's letter is the next one's (GH2's endgame.dta, status_panel): none
+; shows before the first status, but for a script that opens it.
 (status_panel
    (needs sponsorship1 sponsorship2 sponsorship3 sponsorship4 sponsorship5 sponsorship6 sponsorship7)
+   (= file {sprint "sponsorship" {max 1 {campaign status}} ".milo"})
    (enter
       {status_char1.tex set_bitmap {sprint "ui/image/gh1_status_" {game get_character} ".png"}}
       {do
@@ -74,6 +77,24 @@
                status_guitargod_headline3.lbl status_guitargod_status2.lbl status_guitargod_headline2.lbl
             )
             {if {$dir exists $label} {{$dir find $label} set_text {game get_character}}}}}))
+
+; GH1's basement stands in GH2's battle of the bands, whose headline is the
+; battle's: GH1's has its own for each star count (GH1's endgame.dta,
+; gen_basement_headline).
+(endgame_panel
+   (needs endgame)
+   (= gen_battle_headline {localize {sprintf "headline_basement_star%i" {player0 num_stars}}}))
+
+; GH1 has no scene for reaching a new venue: its newspaper goes on to the
+; cash award or the end (GH1's endgame.dta, status), where GH2's plays its
+; drive to the next city. It opens on a guitar lick, beat_venue, where GH2's
+; plays the cash register: GH2's bank keeps GH1's sample for it.
+(status_screen
+   (= enter {play_sfx beat_venue})
+   (= BUTTON_DOWN_MSG
+      {if {== $button kPad_X}
+         {synth play_sequence button_select}
+         {goto_endgame_complete}}))
 
 ; GH1's screen for beating the game names the difficulty, and opens on the
 ; first of its two pages (GH1's endgame.dta, win_game). Easy's is a letter
