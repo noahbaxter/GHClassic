@@ -144,6 +144,10 @@ namespace gh2
         // Takes normals to world space for lighting (qw676..678): the world
         // transform, or for a skinned mesh the palette's fifth matrix.
         Matrix lightWorld{};
+        // A crowd member's, drawn whole, or a card a flat one is drawn on:
+        // what reaches past the GS's window is left out (scene_renderer.cpp,
+        // inWindow).
+        bool crowd = false;
         // The mesh's name, only while a draw dump is asked for.
         std::string name;
     };

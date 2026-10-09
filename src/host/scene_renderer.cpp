@@ -361,6 +361,8 @@ namespace gh2
         uint32_t height = 0;
 
         std::unordered_map<const MeshData *, GpuMesh> meshes;
+        // Each crowd mesh as last drawn without its triangles past the window.
+        std::unordered_map<const MeshData *, std::shared_ptr<const MeshData>> trimmed;
 
         VkDescriptorSetLayout setLayout = VK_NULL_HANDLE;
         VkDescriptorPool pool = VK_NULL_HANDLE;
@@ -1173,6 +1175,58 @@ namespace gh2
             return &found->second;
         }
 
+        // A crowd draw without what reaches behind the camera or past the
+        // GS's 4096-pixel window, which XYOFFSET centres on the frame, or
+        // null for none of it. GH1 sends none of those and clips nothing at
+        // the near plane: a retail GS dump of small_club's SOLO_FAR02, crowd
+        // full, holds no vertex past the window and none on the near plane's
+        // depth. Ours clipped a member at the lens to a slice of it, so a
+        // member goes without those triangles. A card, the rigid kind, goes
+        // whole or not at all: retail shows none in GH1's basement on
+        // flr_far_rt03, where one at the lens drew here as a few texels of
+        // its sheet blown up.
+        std::shared_ptr<const MeshData> inWindow(const DrawCall &draw, const float *mvp, const Frame &frame)
+        {
+            const MeshData &in = *draw.mesh;
+            // Half the window over half the frame: where clip space meets it.
+            const float xMax = 4096.0f / static_cast<float>(frame.width);
+            const float yMax = 4096.0f / static_cast<float>(frame.height);
+            std::vector<bool> out(in.verts.size());
+            bool any = false;
+            for (size_t v = 0; v < in.verts.size(); ++v)
+            {
+                const Vertex &vert = in.verts[v];
+                float at[4] = {vert.pos[0], vert.pos[1], vert.pos[2], 1.0f};
+                if (draw.skinned)
+                {
+                    // The skin, as mesh.vert has it: the weights are the colour.
+                    std::fill(at, at + 4, 0.0f);
+                    for (size_t b = 0; b < 4u; ++b)
+                        for (size_t c = 0; c < 4u; ++c)
+                            at[c] += vert.color[b] * (draw.bones[b][c] * vert.pos[0] + draw.bones[b][4 + c] * vert.pos[1] +
+                                                      draw.bones[b][8 + c] * vert.pos[2] + draw.bones[b][12 + c]);
+                }
+                float clip[4];
+                for (size_t c = 0; c < 4u; ++c)
+                    clip[c] = mvp[c] * at[0] + mvp[4 + c] * at[1] + mvp[8 + c] * at[2] + mvp[12 + c] * at[3];
+                out[v] = clip[3] <= 0.0f || std::fabs(clip[0]) > clip[3] * xMax || std::fabs(clip[1]) > clip[3] * yMax;
+                any = any || out[v];
+            }
+            if (!any)
+                return draw.mesh;
+            if (!draw.skinned)
+                return nullptr;
+            std::vector<uint16_t> kept;
+            for (size_t t = 0; t + 2u < in.indices.size(); t += 3u)
+                if (!out[in.indices[t]] && !out[in.indices[t + 1u]] && !out[in.indices[t + 2u]])
+                    kept.insert(kept.end(), in.indices.begin() + static_cast<std::ptrdiff_t>(t),
+                                in.indices.begin() + static_cast<std::ptrdiff_t>(t + 3u));
+            std::shared_ptr<const MeshData> &last = trimmed[draw.mesh.get()];
+            if (!last || last->indices != kept)
+                last = std::make_shared<const MeshData>(MeshData{in.verts, std::move(kept)});
+            return last;
+        }
+
         void destroyMesh(GpuMesh &mesh)
         {
             vmaDestroyBuffer(allocator, mesh.vertices, mesh.vertexMemory);
@@ -1529,7 +1583,11 @@ namespace gh2
                 return;
             if (frame.cameras[draw.camera].rect[2] <= 0.0f || frame.cameras[draw.camera].rect[3] <= 0.0f)
                 return;
-            GpuMesh *mesh = s.gpuMesh(draw.mesh, serial);
+            const std::shared_ptr<const MeshData> shown =
+                draw.crowd ? s.inWindow(draw, pushes[i].mvp, frame) : draw.mesh;
+            if (!shown)
+                return;
+            GpuMesh *mesh = s.gpuMesh(shown, serial);
             if (!mesh)
                 return;
             if (draw.camera != boundCamera)

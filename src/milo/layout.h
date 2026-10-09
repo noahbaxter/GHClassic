@@ -222,4 +222,11 @@ namespace milo
         constexpr uint32_t kInstances = 0x50u; // the instance list's sentinel node; its first word is the first node
         constexpr uint32_t kInstanceXfm = 0x10u; // a node's Transform
     }
+
+    // WorldCrowd: its flat members' cards, each a mesh BuildBillboard
+    // (0x26bba0) makes under this one material (0x26bda8).
+    namespace crowd
+    {
+        constexpr uint32_t kCardMat = 0xb4u; // RndMat*, made by the constructor (0x268fe0)
+    }
 }

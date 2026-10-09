@@ -9,8 +9,6 @@ namespace gh2::crowd_cards
 {
     namespace
     {
-        constexpr uint32_t kCardMat = 0xb4u; // WorldCrowd's RndMat *
-
         // WorldCrowd::SetFullness(float flat, float whole) (0x26bdf0), which
         // a crowd's script calls as its song starts and at each change of
         // excitement. Each crowd makes its own material, so another game's
@@ -20,7 +18,7 @@ namespace gh2::crowd_cards
         {
             if (campaigns::active() != "gh1")
                 return;
-            const uint32_t mat = load<uint32_t>(rdram, GPR_U32(ctx, 4) + kCardMat);
+            const uint32_t mat = load<uint32_t>(rdram, GPR_U32(ctx, 4) + milo::crowd::kCardMat);
             if (mat != 0u)
                 store<uint32_t>(rdram, mat + milo::mat::kBlend, milo::mat::kBlendSrcAlpha);
         }

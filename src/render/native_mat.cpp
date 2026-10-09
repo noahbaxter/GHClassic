@@ -48,24 +48,29 @@ namespace gh2
         std::unordered_map<uint32_t, uint32_t> s_passOf; // a rev under 25's pass, and its material
         std::unordered_set<uint32_t> s_modulated;        // the materials whose passes modulate: multiPass 2
         std::unordered_set<uint32_t> s_gh1;              // the RndMats of a rev under 25, GH1's
+        std::unordered_set<uint32_t> s_crowdCards;       // the WorldCrowds' card materials
         PS2Runtime::RecompiledFunction s_readEndian = nullptr;
 
+        // A RndMat loaded again, or gone, keeps nothing from before.
         struct LoadTag;
-        void onLoad(uint8_t *, R5900Context *ctx, PS2Runtime *)
+        struct DtorTag;
+        void forget(uint8_t *, R5900Context *ctx, PS2Runtime *)
         {
             s_vertDyn.erase(GPR_U32(ctx, 4));
             s_passOf.erase(GPR_U32(ctx, 4));
             s_modulated.erase(GPR_U32(ctx, 4));
             s_gh1.erase(GPR_U32(ctx, 4));
+            s_crowdCards.erase(GPR_U32(ctx, 4));
         }
 
-        struct DtorTag;
-        void onDtor(uint8_t *, R5900Context *ctx, PS2Runtime *)
+        // WorldCrowd::BuildBillboard (0x26bba0), which makes each card and
+        // puts it under the crowd's material.
+        struct BillboardTag;
+        void onBuildBillboard(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
-            s_vertDyn.erase(GPR_U32(ctx, 4));
-            s_passOf.erase(GPR_U32(ctx, 4));
-            s_modulated.erase(GPR_U32(ctx, 4));
-            s_gh1.erase(GPR_U32(ctx, 4));
+            const uint32_t mat = load<uint32_t>(rdram, GPR_U32(ctx, 4) + milo::crowd::kCardMat);
+            if (mat != 0u)
+                s_crowdCards.insert(mat);
         }
 
         // BinStream::ReadEndian(void *, int) (0x2c8e20), as Load calls it
@@ -254,8 +259,9 @@ namespace gh2
     void installNativeMat(PS2Runtime &runtime, const Addresses &addresses)
     {
         s_addresses = &addresses;
-        EntryHook<LoadTag>::install(runtime, addresses.rndMatLoad, onLoad);
-        EntryHook<DtorTag>::install(runtime, addresses.rndMatDtor, onDtor);
+        EntryHook<LoadTag>::install(runtime, addresses.rndMatLoad, forget);
+        EntryHook<DtorTag>::install(runtime, addresses.rndMatDtor, forget);
+        EntryHook<BillboardTag>::install(runtime, addresses.worldCrowdBuildBillboard, onBuildBillboard);
         s_read = runtime.lookupFunction(addresses.binStreamRead);
         runtime.replaceFunction(addresses.binStreamRead, &read);
         s_readEndian = runtime.lookupFunction(addresses.binStreamReadEndian);
@@ -285,5 +291,10 @@ namespace gh2
     uint32_t nextPass(uint8_t *rdram, uint32_t mat)
     {
         return load<uint32_t>(rdram, mat + milo::mat::kNextPass);
+    }
+
+    bool crowdCard(uint32_t mat)
+    {
+        return s_crowdCards.count(mat) != 0u;
     }
 }

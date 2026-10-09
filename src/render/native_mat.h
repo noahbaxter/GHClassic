@@ -21,6 +21,11 @@ namespace gh2
     // The pass after `mat`, or 0.
     uint32_t nextPass(uint8_t *rdram, uint32_t mat);
 
-    // Keeps what RndMat::Load drops of a GH1 material, for readMaterial.
+    // Whether `mat` is a WorldCrowd's, that its flat members' cards are
+    // drawn under. Game thread only.
+    bool crowdCard(uint32_t mat);
+
+    // Keeps what RndMat::Load drops of a GH1 material, for readMaterial,
+    // and which materials are crowd cards'.
     void installNativeMat(PS2Runtime &runtime, const Addresses &addresses);
 }

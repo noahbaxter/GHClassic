@@ -275,7 +275,8 @@ namespace gh2
                              m.destAlphaTest ? "true" : "false", (pc.flags & kFlagIntensify) ? "true" : "false",
                              m.texWrap ? "true" : "false", draw.skinned ? "true" : "false", m.renderTarget,
                              (pc.flags & kFlagHighlight) ? "true" : "false", (pc.flags & kFlagDecal) ? "true" : "false");
-                std::fprintf(file, "\"name\": \"%s\", ", quoted(draw.name).c_str());
+                std::fprintf(file, "\"name\": \"%s\", \"crowd\": %s, ", quoted(draw.name).c_str(),
+                             draw.crowd ? "true" : "false");
                 first = false;
                 if (m.renderTarget != 0u)
                 {

@@ -134,6 +134,7 @@ namespace gh2
         uint32_t campaignDataGetVenueForSong;
         uint32_t addLoadChar; // (list<Character *> &, const char *object, const char *character)
         uint32_t worldCrowdSetFullness; // (float flat, float whole)
+        uint32_t worldCrowdBuildBillboard; // (Character *, float)
         uint32_t psRndSetDepthOfField;  // (RndCam *, float distance, float nearest, float farthest, float amount)
         uint32_t worldDirDrawShowing;
         uint32_t worldDirDtor;
@@ -333,6 +334,7 @@ namespace gh2
         .campaignDataGetVenueForSong = 0x1312a0u,
         .addLoadChar = 0x128778u,
         .worldCrowdSetFullness = 0x26bdf0u,
+        .worldCrowdBuildBillboard = 0x26bba0u,
         .psRndSetDepthOfField = 0x19a798u,
         .worldDirDrawShowing = 0x26f6b8u,
         .worldDirDtor = 0x26ddb8u,
