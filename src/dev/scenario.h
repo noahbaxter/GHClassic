@@ -16,9 +16,12 @@
 //   (freeze 103 2.5 3.9)               holds TaskMgr's UI seconds (once a clock
 //                                      reaches them), seconds and beat there,
 //                                      with no camera shake and no hair
+//   (still)                            no camera shake and no hair, the clocks
+//                                      left running
 //   (shot metal_1)                    the next frame, as shot_metal_1 (--shots)
 //   (poke {dir find a.btn} 364 7)      the word at that offset of the object, an int or a float
 //   (peek {dir find a.btn} 364)        prints that word, as an int and as a float
+//   (cam balcony {world find a.cam})   prints that Cam's world transform and y fov under that name
 //   (dump menu)                      the next frame's draws, as draws_menu.json (--shots)
 //   (transplant "../x/frame.ram" frame)  the retail game's memory in place of this one's
 //                                      (dev/transplant.h), then its frame as a shot and a dump

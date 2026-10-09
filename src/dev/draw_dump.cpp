@@ -26,6 +26,24 @@ namespace gh2
             return a.x * b.x + a.y * b.y + a.z * b.z;
         }
 
+        // A name as the inside of a JSON string: GH2's battle has "ampsmall\t.mesh".
+        std::string quoted(const std::string &name)
+        {
+            std::string out;
+            for (const char c : name)
+                if (c == '"' || c == '\\')
+                    out += {'\\', c};
+                else if (static_cast<unsigned char>(c) < 0x20u)
+                {
+                    char code[8];
+                    std::snprintf(code, sizeof code, "\\u%04x", static_cast<unsigned>(c));
+                    out += code;
+                }
+                else
+                    out += c;
+            return out;
+        }
+
         // mat3(c0, c1, c2) * x, the columns three vec4s of the frame data.
         V3 through(const Vec4 *c, V3 x)
         {
@@ -251,6 +269,7 @@ namespace gh2
                              m.destAlphaTest ? "true" : "false", (pc.flags & kFlagIntensify) ? "true" : "false",
                              m.texWrap ? "true" : "false", draw.skinned ? "true" : "false", m.renderTarget,
                              (pc.flags & kFlagHighlight) ? "true" : "false");
+                std::fprintf(file, "\"name\": \"%s\", ", quoted(draw.name).c_str());
                 first = false;
                 if (m.renderTarget != 0u)
                 {

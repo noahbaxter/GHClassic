@@ -8,6 +8,7 @@
 
 #include "render/native_mesh.h"
 
+#include "dev/draw_dump.h"
 #include "guest.h"
 #include "milo/layout.h"
 #include "ps2_runtime.h"
@@ -25,6 +26,14 @@ namespace gh2
     namespace
     {
         const Addresses *s_addresses = nullptr;
+
+        // The name of the Hmx::Object an object's first word points to.
+        std::string objectName(uint8_t *rdram, uint32_t address)
+        {
+            const uint32_t object = address != 0u ? load<uint32_t>(rdram, address) : 0u;
+            const uint32_t name = object != 0u ? load<uint32_t>(rdram, object + milo::object::kName) : 0u;
+            return name != 0u ? reinterpret_cast<const char *>(getMemPtr(rdram, name)) : "";
+        }
     }
 
     Matrix readTransform(uint8_t *rdram, uint32_t address)
@@ -147,6 +156,8 @@ namespace gh2
                 draw.mesh = std::move(geometry);
                 draw.environment =currentEnviron();
                 draw.camera = currentCamera(rdram);
+                if (drawDumpPending())
+                    draw.name = objectName(rdram, mesh);
                 pushPasses(rdram, ctx, runtime, mesh, draw);
             }
             ctx->pc = returnTo;

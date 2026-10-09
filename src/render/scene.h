@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <string>
 #include <vector>
 
 // Native copies of what the engine draws. Built on the game thread from guest
@@ -130,5 +131,7 @@ namespace gh2
         // Takes normals to world space for lighting (qw676..678): the world
         // transform, or for a skinned mesh the palette's fifth matrix.
         Matrix lightWorld{};
+        // The mesh's name, only while a draw dump is asked for.
+        std::string name;
     };
 }
