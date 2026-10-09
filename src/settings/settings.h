@@ -40,6 +40,7 @@ namespace gh2::settings
         kMenuMusic,    // outside a career, whose menu loops: the theme's, one game's, or every game's
         kMenuMusicOrder, // the loops one after another in order, one over and over, or shuffled
         kTextures,  // kPs2 or kX360: whose textures the track, HUD and menus draw
+        kModels,    // kPs2 or kX360: whose venues, characters and guitars load
         kKeyCount,
     };
 

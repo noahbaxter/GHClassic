@@ -98,6 +98,9 @@ namespace gh2::settings
             // x360: the 360 disc's sharper pictures on the track, HUD and
             // menus, taken as each scene loads (gh2x/textures.h).
             {"textures", Type::kChoice, 0, 1, 1, kPs2, "ps2 x360"},
+            // x360: the 360 disc's venues, characters and guitars, converted
+            // as each scene loads (gh2x/models.h).
+            {"models", Type::kChoice, 0, 1, 1, kPs2, "ps2 x360"},
         };
 
         // By its name, or one it went by before.

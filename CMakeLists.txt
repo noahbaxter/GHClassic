@@ -270,7 +270,10 @@ set(GHC_GAME_SOURCES
     src/gh1/songs.cpp
     src/gh1/venue_scene.cpp
     src/gh1/venues.cpp
+    src/gh2x/classes.cpp
     src/gh2x/install.cpp
+    src/gh2x/models.cpp
+    src/gh2x/scene.cpp
     src/gh2x/textures.cpp
     src/gh80s/install.cpp
     src/milo/milo.cpp

@@ -25,6 +25,7 @@
 #include "gh1/install.h"
 #include "gh80s/install.h"
 #include "gh2x/install.h"
+#include "gh2x/models.h"
 #include "gh2x/textures.h"
 #include "ui/help_bar.h"
 #include "settings/latency.h"
@@ -103,6 +104,7 @@ namespace
         gh2::installMenus(runtime);
         gh2::installHelpBar(runtime, gh2::kSlus21447);
         gh2::installGh2xTextures(); // after the help bar, which recolours its scene's own pixels
+        gh2::installGh2xModels();
         gh2::setlists::install(runtime, gh2::kSlus21447);
         gh2::encores::install(runtime, gh2::kSlus21447);
         gh2::status_line::install(runtime, gh2::kSlus21447);
