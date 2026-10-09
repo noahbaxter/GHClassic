@@ -511,35 +511,47 @@ namespace gh2::campaigns
 
     namespace
     {
-        // The main menu's first showing, after the boot's load: where the
-        // save says another game was the last played, by way of the screen
-        // the switch happens on (campaigns.dta), so the game opens as that
-        // one.
+        // The boot's first themed screen, once the card check has loaded the
+        // save (LoadData1, save.cpp): the intro movie's (splash.dta's
+        // cut_scene_screen, which every card check goes on to, and
+        // fast_boot.dta's too), else the main menu's. Where the save says
+        // another game was the last played, by way of the screen the switch
+        // happens on (campaigns.dta), so the movie, the splash and the menus
+        // are all that one's.
         struct GotoScreenTag;
         void onGotoScreen(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
             static bool s_opened = false;
-            static uint32_t screens[2] = {0u, 0u}; // main_screen, ghc_switch_screen
+            static uint32_t screens[3] = {0u, 0u, 0u}; // cut_scene_screen, main_screen, ghc_switch_screen
+            static const char *const kOpening[] = {"cut_scene_screen", "main_screen"};
             const uint32_t screen = GPR_U32(ctx, 5);
-            s_toSwitch = screen != 0u && screen == screens[1];
+            s_toSwitch = screen != 0u && screen == screens[2];
             if (s_opened || screen == 0u)
                 return;
             const R5900Context saved = *ctx;
-            const uint32_t names = script::parse(rdram, ctx, runtime, "main_screen ghc_switch_screen");
-            for (uint32_t i = 0u; names != 0u && i < 2u; ++i)
+            // The UI scripts, which make the switch's screen, run at the first
+            // screen change after the commands register (script.h), in a hook
+            // that runs after this one: the intro movie's, on a boot.
+            script::readyUi(rdram, ctx, runtime);
+            const uint32_t names = script::parse(rdram, ctx, runtime, "cut_scene_screen main_screen ghc_switch_screen");
+            for (uint32_t i = 0u; names != 0u && i < 3u; ++i)
                 screens[i] = static_cast<uint32_t>(runtime->callGuestFunction(
                     rdram, ctx, s_addresses->dataNodeGetObj, {load<uint32_t>(rdram, names) + 8u * i, names}));
-            const bool toMain = screens[0] != 0u && screens[0] == screen;
-            const std::string last = toMain ? save::lastGame() : "";
-            if (toMain && screens[1] != 0u && indexOf(last) && last != active())
-                script::run(rdram, ctx, runtime, "{set $ghc_switch " + last + "} {set $ghc_switch_next main_screen}");
+            const int opening = screens[0] != 0u && screens[0] == screen   ? 0
+                                : screens[1] != 0u && screens[1] == screen ? 1
+                                                                           : -1;
+            const std::string last = opening >= 0 ? save::lastGame() : "";
+            const bool switching = opening >= 0 && screens[2] != 0u && indexOf(last) && last != active();
+            if (switching)
+                script::run(rdram, ctx, runtime,
+                            "{set $ghc_switch " + last + "} {set $ghc_switch_next " + kOpening[opening] + "}");
             *ctx = saved;
-            if (!toMain)
+            if (opening < 0)
                 return;
             s_opened = true;
-            if (screens[1] != 0u && indexOf(last) && last != active())
+            if (switching)
             {
-                SET_GPR_U32(ctx, 5, screens[1]);
+                SET_GPR_U32(ctx, 5, screens[2]);
                 s_toSwitch = true;
             }
         }

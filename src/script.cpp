@@ -186,15 +186,7 @@ namespace gh2::script
         struct GotoScreenTag;
         void onGotoScreen(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
-            // bootup_load comes up before GHUtl::Init, so wait for the
-            // commands the scripts call.
-            if (!s_registered || s_uiRan)
-                return;
-            s_uiRan = true;
-            const R5900Context saved = *ctx;
-            for (UiScript &script : s_uiScripts)
-                runUi(rdram, ctx, runtime, script);
-            *ctx = saved;
+            readyUi(rdram, ctx, runtime);
         }
 
         // {retype <object> (<type def>)}: the object's handlers and
@@ -267,6 +259,22 @@ namespace gh2::script
     void runWhenUiReady(std::string text)
     {
         s_uiScripts.push_back({std::move(text), false});
+    }
+
+    bool readyUi(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        // bootup_load comes up before GHUtl::Init, so wait for the
+        // commands the scripts call.
+        if (!s_registered)
+            return false;
+        if (s_uiRan)
+            return true;
+        s_uiRan = true;
+        const R5900Context saved = *ctx;
+        for (UiScript &script : s_uiScripts)
+            runUi(rdram, ctx, runtime, script);
+        *ctx = saved;
+        return true;
     }
 
     void patchUi(std::string text)
