@@ -32,6 +32,7 @@ namespace milo
     // transform is three 16-byte rows then the position.
     namespace transformable
     {
+        constexpr uint32_t kLocal = 0x20u;
         constexpr uint32_t kWorld = 0x60u;
     }
 

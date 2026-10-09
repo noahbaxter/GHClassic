@@ -5,6 +5,7 @@
 #include "content/band.h"
 #include "content/crowd_cards.h"
 #include "content/focus.h"
+#include "content/floor_spot.h"
 #include "content/encores.h"
 #include "content/games.h"
 #include "content/locale.h"
@@ -64,6 +65,7 @@ namespace
         gh2::band::install(runtime, gh2::kSlus21447);
         gh2::crowd_cards::install(runtime, gh2::kSlus21447);
         gh2::focus::install(runtime, gh2::kSlus21447);
+        gh2::floor_spot::install(runtime, gh2::kSlus21447);
         gh2::installNullRnd(runtime, gh2::kSlus21447);
         gh2::installNativeRnd(runtime, gh2::kSlus21447);
         gh2::installMeshCapture(runtime, gh2::kSlus21447);

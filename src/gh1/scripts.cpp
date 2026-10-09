@@ -629,17 +629,24 @@ namespace gh2::gh1
         // song goes; the functions the glue calls are there for it to call.
         Node &scene = handler("gh1_scene");
         // GH1 draws each section's View, the crowd, the band, then each
-        // section's transparent View (ArenaPanel::Draw, GH1 0x10d488). GH2's
-        // crowd draws at 0 and its band from 6. A dir sorts its draws when
-        // it syncs alone (RndDir::SyncObjects, 0x1b2f78).
+        // section's transparent View (ArenaPanel::Draw, GH1 0x10d488), the
+        // guitarist's pool of light before those (Arena::DrawTransparent,
+        // GH1 0x169818). GH2's crowd draws at 0 and its band from 6. A dir
+        // sorts its draws when it syncs alone (RndDir::SyncObjects,
+        // 0x1b2f78).
         static const std::pair<const char *, float> kOrder[] = {
-            {"venue.view", -2.0f}, {"lighting.view", -1.0f},
+            {"venue.view", -2.0f}, {"lighting.view", -1.0f}, {"floorspot_char.mesh", 9.0f},
             {"venue_transparent.view", 10.0f}, {"lighting_transparent.view", 11.0f},
         };
         for (const auto &[view, order] : kOrder)
             if (objects.count(view))
                 scene.nodes.push_back(command({symbol(view), symbol("set"), symbol("draw_order"), real(order)}));
         scene.nodes.push_back(command({{dtb::kVar, 0, 0.0f, "this", {}}, symbol("sync_objects")}));
+        // The pool follows the first guitarist (content/floor_spot.h).
+        if (objects.count("floorspot_char.mesh"))
+            scene.nodes.push_back(command({symbol("if"), command({symbol("exists"), symbol("guitarist0")}),
+                                           command({symbol("floor_spot"), symbol("floorspot_char.mesh"),
+                                                    inRoom("spotlight01.lit"), symbol("guitarist0")})}));
         if (objects.count(kit))
             scene.nodes.push_back(command({symbol(kit), symbol("set_showing"), command({symbol("band"), symbol("room_kit")})}));
         for (const char *top : {"venue.view", "lighting.view"})

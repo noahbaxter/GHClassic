@@ -1267,6 +1267,10 @@ namespace gh2::gh1
             const dtb::Node *found = theirs ? dtb::find(*theirs, key) : nullptr;
             return found && found->nodes.size() > 1u ? dtb::number(found->nodes[1]).value_or(fallback) : fallback;
         };
+        // The pool a follow spot throws on the floor, from the scene every
+        // venue shares, in the venue's own floorspot_glow.mat
+        // (VenueSpotLight's constructor, GH1 0x179190).
+        const auto fx = load(disc, "../../system/run/arena/gen/fx.rnd_ps2");
         for (const auto &[name, kit] : kVenues)
         {
             const std::string ours = venue(name);
@@ -1286,7 +1290,7 @@ namespace gh2::gh1
             }
             Drivers drivers;
             std::set<std::string> unreached;
-            const auto madeGeom =
+            auto madeGeom =
                 geom(*gh2Geom, {&*gh2Chars, &*gh2Lights}, *room, *lighting, scripted(disc, name), drivers, unreached);
             const Spots at = spots({&*lighting, &*room});
             Stage stage;
@@ -1297,6 +1301,9 @@ namespace gh2::gh1
                 std::cerr << "[gh1] cannot build " << name << "'s venue" << std::endl;
                 continue;
             }
+            if (const Bytes *pool = object({fx ? &*fx : nullptr}, "Mesh", "floorspot_char.mesh");
+                pool && milo::find(*madeGeom, "floorspot_glow.mat") && milo::find(*madeGeom, "spotlight01.lit"))
+                milo::add(*madeGeom, "Mesh", "floorspot_char.mesh", *pool);
             const auto crowdScene = load(disc, theirs + "crowd.rnd_ps2");
             const std::vector<const milo::Dir *> crowdScenes = {&*lighting, &*room, crowdScene ? &*crowdScene : nullptr};
             const std::vector<Bytes> places = crowdPlaces(crowdScenes);
