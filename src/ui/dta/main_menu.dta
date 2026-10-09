@@ -31,8 +31,16 @@
       (quit_height 0.72)
       (quit_dx 47)
       (quit_dz -14)
+      ; The build's version ($ghc_version, menus.cpp): a copy of the help
+      ; bar's text, drawn with the menu but placed from the help bar's group,
+      ; which gives it the help bar's size and faces it to the menu's light
+      ; (placed from the poster it comes out dim and narrow). Its right end
+      ; at the top right corner, above the poster's tape.
+      (version_x 290)
+      (version_z 245)
       (enter
          {$this add_quit}
+         {$this add_version}
          {set $main_entered TRUE}
          {$this reset_player_settings}
          {if {! [already_entered]}
@@ -68,6 +76,23 @@
                {main_options.btn set nav_down quit.btn}
                ; Last, so it draws over the poster as the others do.
                {$group insert (objects {$group size objects}) quit.btn}
+               {{$this loaded_dir} sync_objects}
+            }
+         }
+      )
+      (add_version
+         {if {! {exists version.txt}}
+            {do
+               ($group {main_options.btn get trans_parent})
+               ($help {{helpbar loaded_dir} find help_bar.txt})
+               {new Text version.txt}
+               {version.txt copy $help 0}
+               {version.txt set trans_parent {$help get trans_parent}}
+               {version.txt set_local_pos [version_x] 0 [version_z]}
+               {version.txt set_align 20} ; kTopRight
+               {version.txt set_wrap_width 10000} ; one line, however long
+               {version.txt set_text $ghc_version}
+               {$group insert (objects {$group size objects}) version.txt}
                {{$this loaded_dir} sync_objects}
             }
          }

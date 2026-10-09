@@ -263,8 +263,9 @@ configure_file(src/ui/dta/dta.h.in "${GHC_DTA_DIR}/dta.h" @ONLY)
 target_include_directories(GHClassic PRIVATE "${GHC_DTA_DIR}")
 
 # What the build is (src/build_info.h), from tools/ghc.py: the tag it was made
-# from, and whether that is the experimental track's.
+# from, whether that is the experimental track's, and when it was configured.
 set(GHC_VERSION "dev" CACHE STRING "The release this build is")
+string(TIMESTAMP GHC_BUILT "%Y-%m-%d %H:%M")
 option(GHC_EXPERIMENTAL "The experimental track: its own name, saves and settings" OFF)
 set(GHC_EXPERIMENTAL_VALUE 0)
 set(GHC_BUNDLE_NAME "GH Classic")
@@ -275,7 +276,7 @@ if(GHC_EXPERIMENTAL)
     set(GHC_BUNDLE_ID com.noahbaxter.ghclassic.experimental)
 endif()
 set_source_files_properties(src/build_info.cpp PROPERTIES
-    COMPILE_DEFINITIONS "GHC_VERSION=\"${GHC_VERSION}\";GHC_EXPERIMENTAL=${GHC_EXPERIMENTAL_VALUE}")
+    COMPILE_DEFINITIONS "GHC_VERSION=\"${GHC_VERSION}\";GHC_BUILT=\"${GHC_BUILT}\";GHC_EXPERIMENTAL=${GHC_EXPERIMENTAL_VALUE}")
 
 # The window icons, where SDL_GetBasePath finds them. On macOS the game is an
 # app bundle, so other apps (Finder, audio mixers) see its icon too, and the
