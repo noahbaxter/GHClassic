@@ -23,7 +23,18 @@ namespace gh2::update
         {
             const char *args[] = {"curl", "--silent", "--fail", "--location", "--connect-timeout", "2",
                                   "--max-time", "4", "--header", "Accept: application/vnd.github+json", url, nullptr};
-            SDL_Process *process = SDL_CreateProcess(args, true);
+            // In the background, which on Windows is what keeps curl, a
+            // console program, from opening a console window over the game's.
+            // Its exit code then reads 0 whatever happened; --fail leaves its
+            // output empty on an error all the same.
+            const SDL_PropertiesID props = SDL_CreateProperties();
+            SDL_SetPointerProperty(props, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, args);
+            SDL_SetNumberProperty(props, SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER, SDL_PROCESS_STDIO_APP);
+#ifdef _WIN32
+            SDL_SetBooleanProperty(props, SDL_PROP_PROCESS_CREATE_BACKGROUND_BOOLEAN, true);
+#endif
+            SDL_Process *process = SDL_CreateProcessWithProperties(props);
+            SDL_DestroyProperties(props);
             if (!process)
                 return {};
             size_t size = 0;
