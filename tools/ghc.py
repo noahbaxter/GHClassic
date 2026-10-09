@@ -113,6 +113,11 @@ def tool_env():
     """The environment every build step runs in: the venv's CMake and Ninja
     first on PATH, Ninja as CMake's generator, and on Windows llvm-mingw as
     the compiler. disc.py's own libchdr build inherits it too."""
+    # A new worktree has lib/'s submodules empty, and every step needs them.
+    if (ROOT / ".git").exists() and not all((ROOT / "lib" / m / "CMakeLists.txt").exists()
+                                            for m in ("PS2Recomp", "libchdr")):
+        print("fetching lib/'s submodules", file=sys.stderr)
+        subprocess.run(["git", "submodule", "update", "--init", "--recursive"], cwd=ROOT, check=True)
     env = dict(os.environ)
     path = [str(VENV_BIN)]
     if WINDOWS:
@@ -142,10 +147,24 @@ def run(cmd, env, log=None, quiet=False):
         sys.exit(f"failed ({result.returncode}): {' '.join(cmd)}")
 
 
+def main_checkout():
+    """The repo's own checkout, which the worktrees in .worktrees/ sit inside."""
+    common = subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], cwd=ROOT,
+                            stdout=subprocess.PIPE, text=True).stdout.strip()
+    return Path(common).parent if common else ROOT
+
+
+def discs_dir():
+    """game/, the disc images: this tree's own, else the main checkout's, so
+    every worktree plays from the one set."""
+    own = ROOT / "game"
+    return own if own.is_dir() else main_checkout() / "game"
+
+
 def find_disc(env):
     """The GH2 image in game/, a .chd before any other. Builds libchdr on
     first use, so callers that go parallel call this first."""
-    images = sorted((str(p) for p in (ROOT / "game").glob("*")), key=lambda p: (not p.lower().endswith(".chd"), p))
+    images = sorted((str(p) for p in discs_dir().glob("*")), key=lambda p: (not p.lower().endswith(".chd"), p))
     result = subprocess.run([sys.executable, ROOT / "tools" / "disc.py", "find", SERIAL, *images],
                             env=env, stdout=subprocess.PIPE, text=True)
     if result.returncode:

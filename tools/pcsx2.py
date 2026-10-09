@@ -40,8 +40,11 @@ HOME = ROOT / "build" / "pcsx2" / "PCSX2"  # -datapath takes its parent
 PCSX2 = Path(os.environ.get(
     "PCSX2", Path.home() / "Code/third_party/pcsx2/build/pcsx2-qt/PCSX2.app/Contents/MacOS/PCSX2"))
 BIOS = Path(os.environ.get("PS2_BIOS", "/Volumes/terramox/Games/Emulation/bios/ps2/ps2-0230a-20080220.bin"))
-DISC = Path(os.environ.get("GH2_DISC", ROOT.parent.parent / "ghrecomp" / "game" / "Guitar Hero II (USA).iso"))
-ELF = ROOT.parent.parent / "ghrecomp" / "build" / "recomp" / "retail.elf"
+# The main checkout's, which a worktree in .worktrees/ sits inside.
+MAIN = Path(subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], cwd=ROOT,
+                           stdout=subprocess.PIPE, text=True).stdout.strip() or ROOT / ".git").parent
+DISC = Path(os.environ.get("GH2_DISC", MAIN / "game" / "Guitar Hero II (USA).iso"))
+ELF = MAIN / "build" / "recomp" / "retail.elf"
 SERIAL = "SLUS-21447"
 
 # Retail addresses (src/addresses.h).
