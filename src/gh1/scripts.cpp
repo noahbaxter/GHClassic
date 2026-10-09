@@ -140,21 +140,27 @@ namespace gh2::gh1
             return out;
         }
 
+        // That object in the room's dir. A name alone finds the first in the
+        // world's dirs, and the stand-in's have some of GH1's names: its
+        // chars dir a crowd.env, the theatre's lighting dir a
+        // spotlight01.lit and spotlight01.tnm.
+        Node inRoom(const std::string &name)
+        {
+            return command({command({symbol("venue.view"), symbol("dir")}), symbol("find"), symbol(name)});
+        }
+
         // Those of GH2's characters that are there drawn under that Environ
         // of the venue's (RndDir's environ, 0x1b3de0). GH1 draws each
         // guitarist under singer<n>.env, or the one its script last set,
         // the rest of the band under stagechar.env (MyCharSys::Draw, GH1
         // 0x2826d0) and the crowd under crowd.env (Arena::SetupEnvs, GH1
-        // 0x168370). The Environ is the one in the room's dir: the
-        // stand-in's chars dir has a crowd.env of its own.
+        // 0x168370).
         std::vector<Node> lit(std::initializer_list<const char *> characters, const std::string &by)
         {
             std::vector<Node> out;
             for (const char *who : characters)
-                out.push_back(command(
-                    {symbol("if"), command({symbol("exists"), symbol(who)}),
-                     command({symbol(who), symbol("set"), symbol("environ"),
-                              command({command({symbol("venue.view"), symbol("dir")}), symbol("find"), symbol(by)})})}));
+                out.push_back(command({symbol("if"), command({symbol("exists"), symbol(who)}),
+                                       command({symbol(who), symbol("set"), symbol("environ"), inRoom(by)})}));
             return out;
         }
 
@@ -387,9 +393,10 @@ namespace gh2::gh1
             std::vector<Node> out;
             std::vector<Node> objects;
             if (what == "set_frame" && venue.drivers.count(h))
-                objects = targets(symbol(h), venue);
+                for (const Node &driver : targets(symbol(h), venue))
+                    objects.push_back(inRoom(driver.text));
             else if (venue.objects.count(h))
-                objects.push_back(symbol(what == "set_showing" && venue.objects.count(drawsOf(h)) ? drawsOf(h) : h));
+                objects.push_back(inRoom(what == "set_showing" && venue.objects.count(drawsOf(h)) ? drawsOf(h) : h));
             const std::vector<Node> with = translated(node.nodes, 2u, venue);
             if (with.size() + 2u != node.nodes.size())
                 return {};
