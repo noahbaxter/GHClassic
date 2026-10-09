@@ -52,6 +52,7 @@ namespace gh2::ark
         {
             std::string serial; // Volume::serial's
             std::unordered_map<std::string, Entry> files; // dir/name -> entry
+            Volume *volume = nullptr;
         };
 
         // Paths under `as` are `source`'s on one disc, and nowhere else.
@@ -172,7 +173,7 @@ namespace gh2::ark
             const std::string serial = volume.serial();
             std::cerr << "[ark] " << label << " (" << serial << "): " << files.size() << " files in " << partCount
                       << " part" << (partCount == 1u ? "" : "s") << std::endl;
-            s_discs.push_back({serial, std::move(files)});
+            s_discs.push_back({serial, std::move(files), &volume});
             return true;
         }
 
@@ -369,6 +370,20 @@ namespace gh2::ark
         return true;
     }
 
+    bool lendFromDisc(size_t layer, const std::string &path, size_t disc, const std::string &source)
+    {
+        const auto file = disc < s_discs.size() ? s_discs[disc].volume->find(source) : std::nullopt;
+        if (!file)
+            return false;
+        Volume *from = s_discs[disc].volume;
+        const uint64_t base = file->offset;
+        const uint32_t size = static_cast<uint32_t>(file->size);
+        s_layers[layer].files[key(path.c_str())] =
+            addPart({[from, base](uint64_t offset, uint8_t *dst, size_t want) { return from->read(base + offset, dst, want); },
+                     file->size, size});
+        return true;
+    }
+
     void addMade(const std::string &path, std::function<std::optional<Made>()> make)
     {
         s_made[key(path.c_str())] = std::move(make);
@@ -413,6 +428,21 @@ namespace gh2::ark
     std::optional<std::vector<uint8_t>> readFile(const std::string &path)
     {
         return read(find(key(path.c_str())));
+    }
+
+    std::optional<Made> openFront(const std::string &path)
+    {
+        const Entry *entry = s_front ? findIn(s_layers[*s_front], key(path.c_str())) : nullptr;
+        if (!entry)
+            return std::nullopt;
+        const Entry at = *entry;
+        return Made{at.size, [at](uint64_t offset, uint8_t *dst, size_t want)
+                    {
+                        if (offset >= at.size)
+                            return size_t{0};
+                        return s_parts[at.part].read(at.offset + offset, dst,
+                                                     std::min<uint64_t>(want, at.size - offset));
+                    }};
     }
 
     std::optional<std::vector<uint8_t>> readFile(size_t disc, const std::string &path)

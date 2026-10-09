@@ -60,11 +60,19 @@ namespace gh2::ark
     // That layer's file at `path` is that disc's at `source`, read where it
     // is. False if the disc has none.
     bool lend(size_t layer, const std::string &path, size_t disc, const std::string &source);
+    // The same for a file of that disc's own outside its archive, `source`
+    // a path on the disc ("VIDEOS/INTRO.PSS"): the game reads movies from
+    // the disc, not the archive. False if the disc has none.
+    bool lendFromDisc(size_t layer, const std::string &path, size_t disc, const std::string &source);
     void front(std::optional<size_t> layer);
 
     // A file's bytes as that layer in front gives them: its own, its
     // disc's, else the game disc's. With no layer, the game disc's.
     std::optional<std::vector<uint8_t>> readFront(std::optional<size_t> layer, const std::string &path);
+
+    // The layer in front's own file at `path`, or its disc's, read in place
+    // as it is asked for. None with no layer in front, or none there.
+    std::optional<Made> openFront(const std::string &path);
 
     // Where a file's bytes live, its part and offset there, as it is found
     // now: one disc's copy differs from another's.
