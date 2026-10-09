@@ -408,6 +408,12 @@ namespace gh2
         }
     }
 
+    std::optional<uint32_t> standInPayload(uint32_t tex)
+    {
+        const auto found = s_standIns.find(tex);
+        return found != s_standIns.end() ? std::optional(found->second) : std::nullopt;
+    }
+
     std::shared_ptr<const TextureData> capturedTexture(uint8_t *rdram, uint32_t tex)
     {
         if (const auto found = s_textures.find(tex); found != s_textures.end())

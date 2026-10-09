@@ -10,6 +10,7 @@
 #include "ps2_runtime_macros.h"
 #include "render/camera.h"
 #include "render/frame.h"
+#include "render/look.h"
 #include "render/texture_store.h"
 #include "settings/settings.h"
 
@@ -131,8 +132,10 @@ namespace gh2
         void onEndDrawing(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
             addDepthOfField(rdram, GPR_U32(ctx, 4), building());
+            building().luminance = look::luminance();
             frames().publish(building());
             textures::endFrame();
+            look::endFrame();
         }
     }
 

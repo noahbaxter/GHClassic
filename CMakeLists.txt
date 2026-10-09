@@ -313,6 +313,7 @@ set(GHC_GAME_SOURCES
     src/host/scene_renderer.cpp
     src/render/camera.cpp
     src/render/frame.cpp
+    src/render/look.cpp
     src/render/mesh_capture.cpp
     src/render/native_cull.cpp
     src/render/native_environ.cpp
@@ -336,10 +337,16 @@ add_executable(GHClassic
 set(GHC_SHADER_DIR "${CMAKE_CURRENT_BINARY_DIR}/shaders")
 file(MAKE_DIRECTORY "${GHC_SHADER_DIR}")
 set(GHC_SHADER_HEADERS)
-foreach(SHADER mesh.vert mesh.frag)
+foreach(SHADER mesh.vert mesh.frag x360.vert x360.frag post.vert post.frag)
     string(REPLACE "." "_" SHADER_ID "${SHADER}")
-    string(REPLACE "mesh_vert" "kMeshVert" SHADER_VAR "${SHADER_ID}")
-    string(REPLACE "mesh_frag" "kMeshFrag" SHADER_VAR "${SHADER_VAR}")
+    string(REPLACE "." ";" SHADER_PARTS "${SHADER}")
+    set(SHADER_VAR "k")
+    foreach(PART ${SHADER_PARTS})
+        string(SUBSTRING "${PART}" 0 1 FIRST)
+        string(SUBSTRING "${PART}" 1 -1 REST)
+        string(TOUPPER "${FIRST}" FIRST)
+        string(APPEND SHADER_VAR "${FIRST}${REST}")
+    endforeach()
     set(SHADER_HEADER "${GHC_SHADER_DIR}/${SHADER_ID}.h")
     add_custom_command(
         OUTPUT "${SHADER_HEADER}"

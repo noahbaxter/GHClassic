@@ -56,6 +56,23 @@ namespace gh2
         // A font's glyphs, drawn near their own size: generated levels would
         // only blur them.
         bool text = false;
+        // A cube map: each level holds the six faces in turn, +x -x +y -y
+        // +z -z, each a level's width by height.
+        bool cube = false;
+    };
+
+    // A 360 material's own shading (render/look.h), which the x360 shader
+    // family reads. A map is null where the material has none.
+    struct Shading
+    {
+        std::shared_ptr<const TextureData> normal;
+        std::shared_ptr<const TextureData> specular;
+        std::shared_ptr<const TextureData> glow;
+        std::shared_ptr<const TextureData> ramp; // lit by n . l, from -1 to 1 across
+        std::shared_ptr<const TextureData> cube; // in place of the lights' specular
+        float emissive = 1.0f;
+        float specularColor[4] = {}; // rgb without a specular map, then the power
+        bool normalize = false;
     };
 
     // One material pass as the engine held it at draw time.
@@ -98,6 +115,8 @@ namespace gh2
         // its uv. Set for a mesh's pass only (readSphereRows).
         bool sphere = false;
         float sphereRows[4][3] = {};
+        // A converted 360 Mat's own shading, null for any other.
+        std::shared_ptr<const Shading> shading;
     };
 
     // What the current environ gives VU1's lighting programs, as
@@ -123,6 +142,12 @@ namespace gh2
         float fogStart = 0.0f;
         float fogEnd = 0.0f;
         float fogColor[3] = {};
+        // The 360's shading takes up to three point lights where VU1 takes
+        // the first: all of them, in list order, the first as above.
+        uint32_t pointCount = 0;
+        float pointColor[3][3] = {};
+        float pointPosition[3][3] = {};
+        float pointRange[3] = {};
     };
 
     struct DrawCall

@@ -220,6 +220,8 @@ namespace gh2::gh2x
             {
                 if (auto mat = matToPs2(body))
                 {
+                    if (source.look)
+                        source.look(name, *mat);
                     for (std::string &map : mat->maps)
                         if (!map.empty())
                             maps.insert(std::move(map));

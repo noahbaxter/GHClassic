@@ -101,6 +101,10 @@ namespace gh2::settings
             // x360: the 360 disc's venues, characters and guitars, converted
             // as each scene loads (gh2x/models.h).
             {"models", Type::kChoice, 0, 1, 1, kPs2, "ps2 x360"},
+            // x360: lit meshes shaded per pixel as the 360's standard.fx does,
+            // with its maps and its light range of 0 to 4, then its bloom and
+            // luminance ramp (host/shaders/x360.frag). Read at startup.
+            {"shading", Type::kChoice, 0, 1, 1, kPs2, "ps2 x360"},
         };
 
         // By its name, or one it went by before.

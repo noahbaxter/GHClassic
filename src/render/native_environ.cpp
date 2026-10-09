@@ -69,6 +69,21 @@ namespace gh2
                     e.position[c] = load<float>(rdram, world + 0x30u + c * 4u);
                 }
                 e.range = load<float>(rdram, point + milo::light::kRange);
+                for (uint32_t node = load<uint32_t>(rdram, env + milo::environment::kFirstLight);
+                     node != 0u && e.pointCount < 3u; node = load<uint32_t>(rdram, node + 4u))
+                {
+                    const uint32_t light = load<uint32_t>(rdram, node);
+                    if (load<uint32_t>(rdram, light + milo::light::kType) != milo::light::kPoint)
+                        continue;
+                    const uint32_t at = static_cast<uint32_t>(
+                        runtime->callGuestFunction(rdram, ctx, s_addresses->worldXfm, {light}));
+                    for (uint32_t c = 0; c < 3; ++c)
+                    {
+                        e.pointColor[e.pointCount][c] = load<float>(rdram, light + milo::light::kColor + c * 4u);
+                        e.pointPosition[e.pointCount][c] = load<float>(rdram, at + 0x30u + c * 4u);
+                    }
+                    e.pointRange[e.pointCount++] = load<float>(rdram, light + milo::light::kRange);
+                }
             }
             else
             {

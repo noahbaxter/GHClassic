@@ -30,11 +30,20 @@ namespace gh2::gh2x
     std::optional<Bytes> toPs2(const std::string &className, const Bytes &body);
 
     // A Mat with its normal, emissive, specular, diffuse ramp and environ
-    // maps emptied, which the PS2's has no use for, and their names.
+    // maps emptied, which the PS2's has no use for, and their names in that
+    // order. With them its diffuse texture's name and the fields only the
+    // 360's shading reads, which the PS2 body keeps: glow multiplier,
+    // specular colour and power, per pixel lighting, and normalize (its TBN
+    // in the pixel shader).
     struct Mat
     {
         Bytes body;
         std::vector<std::string> maps;
+        std::string diffuse;
+        float emissive = 1.0f;
+        float specular[4] = {};
+        bool perPixel = false;
+        bool normalize = false;
     };
     std::optional<Mat> matToPs2(const Bytes &body);
 
