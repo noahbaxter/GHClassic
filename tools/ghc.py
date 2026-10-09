@@ -149,8 +149,9 @@ def run(cmd, env, log=None, quiet=False):
 
 def main_checkout():
     """The repo's own checkout, which the worktrees in .worktrees/ sit inside."""
+    # A tree copied out of git (a test box's) has no checkout: it is its own.
     common = subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], cwd=ROOT,
-                            stdout=subprocess.PIPE, text=True).stdout.strip()
+                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True).stdout.strip()
     return Path(common).parent if common else ROOT
 
 
@@ -186,7 +187,7 @@ def build_tools(env, jobs):
 def tree_version():
     """The tag this tree is, or how git describes it from the last one."""
     return subprocess.run(["git", "describe", "--tags", "--always", "--dirty"], cwd=ROOT, stdout=subprocess.PIPE,
-                          text=True).stdout.strip() or "unknown"
+                          stderr=subprocess.DEVNULL, text=True).stdout.strip() or "unknown"
 
 
 def experimental(tag):

@@ -42,7 +42,8 @@ PCSX2 = Path(os.environ.get(
 BIOS = Path(os.environ.get("PS2_BIOS", "/Volumes/terramox/Games/Emulation/bios/ps2/ps2-0230a-20080220.bin"))
 # The main checkout's, which a worktree in .worktrees/ sits inside.
 MAIN = Path(subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], cwd=ROOT,
-                           stdout=subprocess.PIPE, text=True).stdout.strip() or ROOT / ".git").parent
+                           stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True).stdout.strip()
+            or ROOT / ".git").parent
 DISC = Path(os.environ.get("GH2_DISC", MAIN / "game" / "Guitar Hero II (USA).iso"))
 ELF = MAIN / "build" / "recomp" / "retail.elf"
 SERIAL = "SLUS-21447"
