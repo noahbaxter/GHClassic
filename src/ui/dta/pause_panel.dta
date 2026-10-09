@@ -1,0 +1,56 @@
+; The pause menus, as the game's own (pause.dta) but naming the song and its
+; artist under the buttons, as the song's intro does ({game get_song_text},
+; mtv_overlay_panel). Neither milo has a label for it, and the pause screens
+; clear VRAM of what other panels drew with (clear_vram), so the line is a
+; copy of the panel's own last button: scaled down through a group under the
+; button's, kept out of its navigation, and grey as a disabled button is.
+{func ghc_pause_song
+   ($panel $button $line $grp)
+   {do
+      ($ox 0) ($oy 0) ($oz 0)
+      ($group {$button get trans_parent})
+      {if {! {$panel find $line}}
+         {new Group $grp}
+         {$grp set trans_parent $group}
+         {$grp set_local_scale 0.7 1 0.7}
+         {new {$button class_name} $line}
+         {$line copy $button 0}
+         {$line set trans_parent $grp}
+         {$line set_local_pos 0 0 0}
+         {$line set_state kDisabled}
+         {$group insert (objects {$group size objects}) $line}
+         {{$panel loaded_dir} sync_objects}
+      }
+      {$button get_local_pos $ox $oy $oz}
+      {$grp set_local_pos $ox $oy {'-' $oz 25}}
+      {$line set_localized_text {sprintf "%s - %s" {game get_song_text} {game get_song_artist_text}}}
+   }
+}
+{retype pause_panel
+   (
+      ; From the ARK root: a path resolves against the file its array came
+      ; from, and this one comes from no file.
+      (file ui/pause.milo)
+      (focus resume.btn)
+      (reset_focus TRUE)
+      (enter {ghc_pause_song $this quit.btn pause_song.btn pause_song.grp})
+   )
+}
+{retype pract_pause_panel
+   (
+      (file ui/pract_pause.milo)
+      (enter
+         {do
+            ($career {practice_sel_section_screen get career_mode})
+            {tut_pause_career_buttons.view set_showing $career}
+            {tut_pause_buttons.view set_showing {! $career}}
+            {$this set_focus {if_else $career resume_career.btn resume.btn}}
+            ; Each set of buttons draws in a group of its own.
+            {if_else $career
+               {ghc_pause_song $this quit_career.btn pract_csong.btn pract_csong.grp}
+               {ghc_pause_song $this quit.btn pract_song.btn pract_song.grp}
+            }
+         }
+      )
+   )
+}
