@@ -143,8 +143,10 @@ namespace gh2::gh1
         // Those of GH2's characters that are there drawn under that Environ
         // of the venue's (RndDir's environ, 0x1b3de0). GH1 draws each
         // guitarist under singer<n>.env, or the one its script last set,
-        // and the rest of the band under stagechar.env (MyCharSys::Draw,
-        // GH1 0x2826d0).
+        // the rest of the band under stagechar.env (MyCharSys::Draw, GH1
+        // 0x2826d0) and the crowd under crowd.env (Arena::SetupEnvs, GH1
+        // 0x168370). The Environ is the one in the room's dir: the
+        // stand-in's chars dir has a crowd.env of its own.
         std::vector<Node> lit(std::initializer_list<const char *> characters, const std::string &by)
         {
             std::vector<Node> out;
@@ -152,7 +154,7 @@ namespace gh2::gh1
                 out.push_back(command(
                     {symbol("if"), command({symbol("exists"), symbol(who)}),
                      command({symbol(who), symbol("set"), symbol("environ"),
-                              command({{dtb::kVar, 0, 0.0f, "this", {}}, symbol("find"), symbol(by)})})}));
+                              command({command({symbol("venue.view"), symbol("dir")}), symbol("find"), symbol(by)})})}));
             return out;
         }
 
@@ -622,6 +624,11 @@ namespace gh2::gh1
                     scene.nodes.push_back(std::move(made));
         if (objects.count("stagechar.env"))
             for (Node &made : lit({"singer", "bassist", "drummer", "keyboardist"}, "stagechar.env"))
+                scene.nodes.push_back(std::move(made));
+        if (objects.count("crowd.env"))
+            for (Node &made : lit({"crowd_male01", "crowd_male02", "crowd_male03", "crowd_male04", "crowd_female01",
+                                   "crowd_female02", "crowd_female03", "crowd_female04"},
+                                  "crowd.env"))
                 scene.nodes.push_back(std::move(made));
         for (const char *name : {"gh1_music_start", "hit_gem", "set_lights_bad", "set_lights_okay_verse", "set_lights_okay_chorus",
                                  "set_lights_okay_solo", "set_lights_great_verse", "set_lights_great_chorus",

@@ -20,6 +20,7 @@
 #include "gh1/venues.h"
 
 #include "disc/ark.h"
+#include "formats/dtb.h"
 #include "gh1/cameras.h"
 #include "gh1/rig.h"
 #include "gh1/scripts.h"
@@ -980,6 +981,106 @@ namespace gh2::gh1
             }
             return out;
         }
+
+        // GH1's flat crowd in GH2's.
+        //
+        // GH1 keeps a card's place for each member of the crowd it draws
+        // flat: Crowd<nn>.mm, a MultiMesh 0 (a Draw 1, its mesh, then the
+        // places) for the nn-th of the crowd's archetypes (arena/crowd.dta;
+        // Crowd::FinishLoading, GH1 0x171558). A card is crowd_flat_height
+        // high, half that wide and about its place (FormFlatCrowd, GH1
+        // 0x170160).
+        //
+        // GH2's WorldCrowd 6 (WorldCrowd::Load, 0x26c430) keeps the same: a
+        // Draw 3, the mesh it was placed over, how many, a flag, each
+        // member's Character with its card's height, density and radius,
+        // then each one's places, and its Hmx::Object. Its card is as GH1's
+        // (BuildBillboard, 0x26bba0). So `crowd`, which the shots show
+        // (gh1/cameras.cpp), has GH1's places and height, with the stand-in's
+        // crowd members for GH1's, male before female as GH1 lists them, and
+        // any other WorldCrowd has none.
+        void crowd(milo::Dir &chars, const std::vector<const milo::Dir *> &scenes, float height)
+        {
+            std::vector<Bytes> places; // each a count, then that many transforms
+            for (int nn = 1; nn < 100; ++nn)
+            {
+                const std::string name = std::string("Crowd") + (nn < 10 ? "0" : "") + std::to_string(nn) + ".mm";
+                const Bytes *found = nullptr;
+                for (const milo::Dir *scene : scenes)
+                    for (size_t i = 0; scene && i < scene->entries.size(); ++i)
+                        if (scene->entries[i].first == "MultiMesh" && scene->entries[i].second == name)
+                            found = &scene->bodies[i];
+                if (!found || u32(*found, 0u) != 0u || u32(*found, 4u) != 1u)
+                    break;
+                size_t o = 9u;
+                names(*found, o);
+                o += 16u;
+                str(*found, o);
+                const size_t end = o + 4u + static_cast<size_t>(u32(*found, o)) * 48u;
+                if (end > found->size())
+                    break;
+                places.emplace_back(found->begin() + static_cast<std::ptrdiff_t>(o), found->begin() + static_cast<std::ptrdiff_t>(end));
+            }
+            std::vector<std::string> all;
+            for (const auto &[cls, name] : chars.entries)
+                if (cls == "Character" && name.rfind("crowd_", 0) == 0)
+                    all.push_back(name);
+            std::sort(all.begin(), all.end(), [](const std::string &l, const std::string &r)
+                      {
+                          const bool lm = l.find("female") == std::string::npos, rm = r.find("female") == std::string::npos;
+                          return lm != rm ? lm : l < r;
+                      });
+            for (size_t i = 0; i < chars.entries.size(); ++i)
+            {
+                if (chars.entries[i].first != "WorldCrowd")
+                    continue;
+                const Bytes &b = chars.bodies[i];
+                if (u32(b, 0u) != 6u || u32(b, 4u) != 3u)
+                    continue;
+                size_t o = 29u;
+                str(b, o);
+                const size_t head = o;
+                o += 5u;
+                const uint32_t count = u32(b, o);
+                o += 4u;
+                Bytes card;
+                for (uint32_t c = 0; c < count && o < b.size(); ++c)
+                {
+                    str(b, o);
+                    card.assign(b.begin() + static_cast<std::ptrdiff_t>(o + 4u), b.begin() + static_cast<std::ptrdiff_t>(o + 12u));
+                    o += 12u;
+                }
+                for (uint32_t c = 0; c < count && o < b.size(); ++c)
+                    o += 4u + static_cast<size_t>(u32(b, o)) * 48u;
+                if (o > b.size() || card.empty())
+                    continue;
+                // Every member of any of the stand-in's crowds is this one's:
+                // one that no crowd has is drawn where it was made.
+                const bool shown = chars.entries[i].second == "crowd";
+                const size_t listed = shown ? all.size() : 0u;
+                uint32_t total = 0u;
+                for (size_t c = 0; c < listed && c < places.size(); ++c)
+                    total += u32(places[c], 0u);
+                Bytes out(b.begin(), b.begin() + static_cast<std::ptrdiff_t>(head));
+                out[8] = shown ? 1u : 0u;
+                putU32(out, total);
+                out.push_back(b[head + 4u]);
+                putU32(out, static_cast<uint32_t>(listed));
+                for (size_t c = 0; c < listed; ++c)
+                {
+                    putStr(out, all[c]);
+                    putF32(out, height);
+                    out.insert(out.end(), card.begin(), card.end());
+                }
+                for (size_t c = 0; c < listed; ++c)
+                    if (c < places.size())
+                        out.insert(out.end(), places[c].begin(), places[c].end());
+                    else
+                        putU32(out, 0u);
+                out.insert(out.end(), b.begin() + static_cast<std::ptrdiff_t>(o), b.end());
+                chars.bodies[i] = std::move(out);
+            }
+        }
     }
 
     void addVenues(size_t layer, size_t disc)
@@ -989,6 +1090,14 @@ namespace gh2::gh1
             {"basement", "drum_kit.view"}, {"small_club", "drumkit.view"}, {"big_club", "drum_kit.view"},
             {"theatre", "drum_kit.view"},  {"fest", "drum_kit.view"},      {"arena", "drum kit 00.view"},
         };
+        dtb::Macros none;
+        // How high a flat crowd member's card is (crowd_flat_height in
+        // system/run/config/arena.dta, merged into config/gh.dta's arena).
+        float flatHeight = 100.8f;
+        if (const auto config = dtb::read("config/gh.dta", none, [disc](const std::string &path) { return ark::readFile(disc, path); }))
+            if (const dtb::Node *arena = dtb::find(*config, "arena"))
+                if (const dtb::Node *found = dtb::find(*arena, "crowd_flat_height"); found && found->nodes.size() > 1u)
+                    flatHeight = dtb::number(found->nodes[1]).value_or(flatHeight);
         for (const auto &[name, kit] : kVenues)
         {
             const std::string ours = venue(name);
@@ -1012,12 +1121,14 @@ namespace gh2::gh1
                                        scripted(disc, name), drivers, unreached);
             const Spots at = spots({&*lighting, &*room});
             Stage stage;
-            const auto madeChars = chars(*gh2Chars, at, stage.walks);
+            auto madeChars = chars(*gh2Chars, at, stage.walks);
             if (!madeGeom || !madeChars)
             {
                 std::cerr << "[gh1] cannot build " << name << "'s venue" << std::endl;
                 continue;
             }
+            const auto crowdScene = load(disc, theirs + "crowd.rnd_ps2");
+            crowd(*madeChars, {&*lighting, &*room, crowdScene ? &*crowdScene : nullptr}, flatHeight);
             ark::addFile(layer, geomPath, milo::write(*madeGeom));
             ark::addFile(layer, lightsPath, milo::write(lights(*gh2Lights)));
             ark::addFile(layer, charsPath, milo::write(*madeChars));
