@@ -19,9 +19,11 @@
 #include "content/setlists.h"
 #include "content/songs.h"
 #include "formats/dtb.h"
+#include "gh1/face.h"
 #include "gh1/guitarist.h"
 #include "formats/midi.h"
 
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <map>
@@ -84,6 +86,29 @@ namespace gh2::gh1
             return it != kWhat.end() ? std::pair{track->second, it->second} : std::pair<std::string, std::string>{};
         }
 
+        // The tick a measure, counted from 0, starts on, by the tempo
+        // track's time signatures, 4/4 until set. One of no beats, or of
+        // beats too short for a tick, is none.
+        uint32_t measureTick(const midi::File &in, uint32_t measure)
+        {
+            uint32_t at = 0u, from = 0u, length = in.division * 4u;
+            for (const midi::Event &e : in.tracks[0].events)
+            {
+                if (e.status != 0xffu || e.meta != 0x58u || e.data.size() < 2u)
+                    continue;
+                const uint32_t next = e.data[1] < 32u ? in.division * 4u * e.data[0] >> e.data[1] : 0u;
+                if (next == 0u)
+                    continue;
+                const uint32_t whole = (e.tick - from) / length;
+                if (at + whole >= measure)
+                    break;
+                at += whole;
+                from += whole * length;
+                length = next;
+            }
+            return from + (measure - at) * length;
+        }
+
         std::optional<midi::Bytes> chart(const midi::Bytes &gh1)
         {
             const auto in = midi::parse(gh1);
@@ -128,6 +153,31 @@ namespace gh2::gh1
                 if (const auto s = textOf(e))
                     if (const auto [track, text] = cue(*s); !track.empty())
                         made[track].events.push_back(midi::text(e.tick, text));
+            // GH2 starts the crowd's level loops, and the world's
+            // music_start, from a [music_start] text (CrowdAudio::Handle,
+            // 0x1245a8); GH1's songs have none, its BeatMatch sends it at the
+            // third measure (UpdateSongPos, GH1 0x10e75c). Without it the
+            // crowd's intro, feedback and all, loops the whole song.
+            made["EVENTS"].events.push_back(midi::text(measureTick(*in, 2u), "[music_start]"));
+
+            // GH1's kick and bass hits are TRIGGERS notes 60 and 61
+            // (config/midi_triggers.dta), GH2's note 36 of the drummer's and
+            // the bassist's tracks (midi_parsers.dta's drummer_kick_drum and
+            // speaker_pulse). Each fires its lead earlier, 90 and 50 ms
+            // (midi_triggers.dta's third field, SongDB::AddTrigger GH1
+            // 0x10bf08).
+            const midi::TempoMap tempos(*in);
+            if (triggers)
+                for (midi::Event e : triggers->events)
+                    if (e.status != 0xffu && (e.status & 0xe0u) == 0x80u && !e.data.empty() &&
+                        (e.data[0] == 60u || e.data[0] == 61u))
+                    {
+                        const bool kick = e.data[0] == 60u;
+                        const char *track = kick ? "BAND DRUMS" : "BAND BASS";
+                        e.tick = tempos.tick(std::max(tempos.seconds(e.tick) - (kick ? 0.09 : 0.05), 0.0));
+                        e.data[0] = 36u;
+                        made[track].events.push_back(std::move(e));
+                    }
 
             midi::File out{in->format, in->division, {in->tracks[0]}};
             for (const char *name : order)
@@ -141,8 +191,40 @@ namespace gh2::gh1
             return midi::write(out);
         }
 
-        dtb::Node symbol(const std::string &text) { return {dtb::kSymbol, 0, 0.0f, text}; }
-        dtb::Node array(std::vector<dtb::Node> nodes) { return {dtb::kArray, 0, 0.0f, {}, std::move(nodes)}; }
+        // When the singer's mouth is open, in seconds: the gems track's
+        // note 108 (charsys.dta's singer_events), by the tempo track.
+        std::vector<std::pair<float, float>> sung(const midi::Bytes &gh1)
+        {
+            const auto in = midi::parse(gh1);
+            std::vector<std::pair<float, float>> out;
+            if (!in || in->tracks.empty())
+                return out;
+            const midi::TempoMap tempos(*in);
+            const auto seconds = [&](uint32_t tick) { return static_cast<float>(tempos.seconds(tick)); };
+            for (const midi::Track &track : in->tracks)
+            {
+                if (track.name != "T1 GEMS")
+                    continue;
+                std::optional<uint32_t> on;
+                for (const midi::Event &e : track.events)
+                {
+                    if (e.status == 0xffu || e.data.size() < 2u || e.data[0] != 108u)
+                        continue;
+                    const bool down = (e.status & 0xf0u) == 0x90u && e.data[1] != 0u;
+                    if (down && !on)
+                        on = e.tick;
+                    else if (!down && on && ((e.status & 0xf0u) == 0x80u || (e.status & 0xf0u) == 0x90u))
+                    {
+                        out.emplace_back(seconds(*on), seconds(e.tick));
+                        on.reset();
+                    }
+                }
+            }
+            return out;
+        }
+
+        using dtb::array;
+        using dtb::symbol;
 
         // `key`'s value in an entry's (key value) array, or none.
         const dtb::Node *value(const dtb::Node &node, const std::string &key)
@@ -197,6 +279,19 @@ namespace gh2::gh1
             for (const char *key : {"anim_tempo", "preview", "bpm"})
                 if (const dtb::Node *n = dtb::find(gh1, key))
                     out.nodes.push_back(*n);
+            // A band is GH1's archetypes (band_chars.dta), each in the folder
+            // GH2 names the same character by: charsys/metal_bass.
+            if (const dtb::Node *band = dtb::find(gh1, "band"))
+            {
+                dtb::Node members = array({symbol("band")});
+                for (size_t i = 1u; i < band->nodes.size(); ++i)
+                {
+                    const dtb::Node *model = dtb::find(band->nodes[i], "outfit");
+                    if (const dtb::Node *folder = model ? value(*model, "directory") : nullptr)
+                        members.nodes.push_back(symbol(folder->text.substr(folder->text.rfind('/') + 1u)));
+                }
+                out.nodes.push_back(std::move(members));
+            }
             out.nodes.push_back(array({
                 symbol("quickplay"),
                 array({symbol("character_outfit"), symbol(outfit)}),
@@ -265,6 +360,7 @@ namespace gh2::gh1
                 }
                 songs::add(*text);
                 ark::addFile(mid, *converted);
+                addSinging(name, sung(*file));
                 // GH2's singer lip-syncs to <song>.voc; GH1's sang to chart
                 // events, so GH2's neutral track stands in.
                 ark::rename("songs/" + name + "/" + name + ".voc", gh2Disc, "songs/_blinktrack/_blinktrack.voc");

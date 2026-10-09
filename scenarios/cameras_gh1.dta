@@ -1,0 +1,111 @@
+; GH1's cameras (gh1/cameras.cpp): in the GH1 campaign each venue's world
+; holds GH1's shots as CamShots, and the categories GH1 has none for from its
+; nearest. GH2's own are untouched in its campaign.
+(needs gh1)
+#include common/first_boot.dta
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty medium}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{game set_venue theatre}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 2)
+; GH2's theatre: its lighter and encore shots, none of GH1's.
+(expect {world exists lighter} 1)
+(expect {world exists encore} 1)
+(expect {world exists Intro01_encore} 0)
+(expect {world exists balcony_lft01_lighter} 0)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+
+{set $ghc_switch gh1}
+{set $ghc_switch_next main_screen}
+{ui goto_screen ghc_switch_screen}
+(wait_screen main_screen)
+{game set_song ziggystardust}
+{{game get_player_config 0} set_difficulty medium}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{game set_venue theatre}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 2)
+; GH1's theatre: its intro plays, and GH2's shots are gone.
+(expect {== {{world current_shot} get category} INTRO} 1)
+(shot theatre_intro)
+(expect {world exists lighter} 0)
+(expect {world exists encore} 0)
+(expect {world exists Intro01} 1)
+(expect {world exists flr_far_lft01} 1)
+(expect {world exists SOLO_NEAR01} 1)
+; The categories GH2 asks for and GH1 has no group for.
+(expect {world exists Intro01_encore} 1)
+(expect {world exists Intro01_fast} 1)
+(expect {world exists Win01_encore} 1)
+(expect {world exists Win01_encore_song} 1)
+(expect {world exists Win01_game} 1)
+(expect {world exists balcony_lft01_lighter} 1)
+(wait 12)
+(shot theatre)
+(wait 6)
+(shot theatre_later)
+(wait 6)
+(shot theatre_last)
+; A shot that moves, one hung under the player, and the end of a song.
+{world do_force_shot flr_far_lft01}
+(wait 1)
+(shot theatre_zoom)
+(wait 4)
+(shot theatre_zoomed)
+{world do_force_shot SOLO_NEAR01}
+(wait 1)
+(shot theatre_solo)
+{world do_force_shot Win01}
+(wait 2)
+(shot theatre_win)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+
+; The basement, in GH2's battle of the bands.
+{game set_song iloverockandroll}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{game set_venue battle}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 2)
+(expect {== {{world current_shot} get category} INTRO} 1)
+(shot basement_intro)
+(expect {world exists farpower} 0)
+(expect {world exists lose01} 1)
+(expect {world exists Intro01_encore} 1)
+(wait 12)
+(shot basement)
+(wait 6)
+(shot basement_later)
+{world do_force_shot lose01}
+(wait 3)
+(shot basement_lose)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+
+; The arena, whose last win is GH1's own.
+{game set_song iloverockandroll}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{game set_venue arena}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 2)
+(expect {== {{world current_shot} get category} INTRO} 1)
+(expect {world exists final_win01} 1)
+(expect {world exists win01_game} 0)
+(wait 12)
+(shot arena)
+(wait 6)
+(shot arena_later)
+{world do_force_shot SOLO_NEAR01}
+(wait 1)
+(shot arena_solo)
+(quit)

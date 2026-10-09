@@ -10,7 +10,7 @@
 // stores the environ as RndEnviron::sCurrent (RndEnviron::Select, 0x1b6378),
 // which PsMat::Select reads for fog, and flushes the packet.
 //
-// Fog is not taken yet.
+// The fog it uploads (enable, start, end, colour) is kept with the environ.
 
 #include "render/native_environ.h"
 
@@ -36,6 +36,14 @@ namespace gh2
             Environ e;
             for (uint32_t i = 0; i < 3; ++i)
                 e.ambient[i] = load<float>(rdram, env + milo::environment::kAmbient + i * 4u);
+            // PsMat::Select turns a pass's fog on from this environ's enable
+            // byte (GH1 0x2ec130), and the fog scale VU1 gets comes from its
+            // start and end: F = 255 * (w - end) / (start - end).
+            e.fog = load<uint8_t>(rdram, env + milo::environment::kFogEnable) != 0u;
+            e.fogStart = load<float>(rdram, env + milo::environment::kFogStart);
+            e.fogEnd = load<float>(rdram, env + milo::environment::kFogEnd);
+            for (uint32_t i = 0; i < 3; ++i)
+                e.fogColor[i] = load<float>(rdram, env + milo::environment::kFogColor + i * 4u);
 
             uint32_t point = 0u;
             for (uint32_t node = load<uint32_t>(rdram, env + milo::environment::kFirstLight); node != 0u && point == 0u;

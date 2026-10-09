@@ -92,6 +92,13 @@ namespace gh2
             }
         }
 
+        // Whether the mesh is a card a crowd's flat member is drawn on: one
+        // under the WorldCrowd's material (BuildBillboard, 0x26bba0).
+        bool card(uint8_t *rdram, uint32_t mesh)
+        {
+            return crowdCard(load<uint32_t>(rdram, mesh + milo::mesh::kMat));
+        }
+
         // A transformable's world transform, through the engine's own WorldXfm.
         Matrix worldXfm(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t transformable)
         {
@@ -147,11 +154,20 @@ namespace gh2
                 {
                     draw.world = worldXfm(rdram, ctx, runtime, mesh + milo::mesh::kTransform);
                     draw.lightWorld = draw.world;
+                    draw.crowd = card(rdram, mesh);
                 }
                 else if (!readBones(rdram, ctx, runtime, bones, draw))
                 {
                     ctx->pc = returnTo;
                     return;
+                }
+                else
+                {
+                    // A crowd member drawn whole is a Character of its own,
+                    // named crowd_ (gh1/venues.cpp, crowd).
+                    const uint32_t object = load<uint32_t>(rdram, mesh);
+                    const uint32_t dir = object != 0u ? load<uint32_t>(rdram, object + milo::object::kDir) : 0u;
+                    draw.crowd = dir != 0u && objectName(rdram, dir).rfind("crowd", 0) == 0;
                 }
                 draw.mesh = std::move(geometry);
                 draw.environment =currentEnviron();
@@ -188,6 +204,7 @@ namespace gh2
                 draw.mesh = std::move(geometry);
                 draw.environment =currentEnviron();
                 draw.camera = currentCamera(rdram);
+                draw.crowd = card(rdram, mesh);
                 for (uint32_t node = first; node != sentinel; node = load<uint32_t>(rdram, node))
                 {
                     draw.world = readTransform(rdram, node + milo::multimesh::kInstanceXfm);

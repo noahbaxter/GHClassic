@@ -34,6 +34,7 @@ namespace gh2
         uint32_t rndTextDrawShowing;
         uint32_t worldXfm;       // RndTransformable::WorldXfm
         uint32_t setWorldXfm;    // RndTransformable::SetWorldXfm
+        uint32_t setDirty;       // RndTransformable::SetDirty
         uint32_t psMatUpdateSphereXfm;
         uint32_t sphereXfm;      // the four quadwords PsMat::UpdateSphereXfm fills
         uint32_t playMovie;
@@ -87,6 +88,12 @@ namespace gh2
         uint32_t scePadRead;
         uint32_t scePadInfoAct;
         uint32_t charHairPoll;
+        uint32_t rndMatLoad;
+        uint32_t rndMatDtor;
+        uint32_t rndMatLoadVertDyn; // where it returns to from reading a rev under 25's vertDyn
+        uint32_t rndMatLoadMultiPass; // and from reading its multiPass
+        uint32_t binStreamRead;     // (void *, int)
+        uint32_t binStreamReadEndian; // (void *, int)
         uint32_t rndMorphCtor;
         uint32_t rndMorphDtor;
         uint32_t rndMorphSetFrame; // (frame, blend)
@@ -125,6 +132,12 @@ namespace gh2
         uint32_t songProviderIsActive;
         uint32_t songProviderGetSongData; // (Symbol)
         uint32_t campaignDataGetVenueForSong;
+        uint32_t addLoadChar; // (list<Character *> &, const char *object, const char *character)
+        uint32_t worldCrowdSetFullness; // (float flat, float whole)
+        uint32_t worldCrowdBuildBillboard; // (Character *, float)
+        uint32_t psRndSetDepthOfField;  // (RndCam *, float distance, float nearest, float farthest, float amount)
+        uint32_t worldDirDrawShowing;
+        uint32_t worldDirDtor;
         uint32_t songsInsertOverflow;     // vector<DataArray *>::_M_insert_overflow
         uint32_t headersInsertOverflow;   // vector<SongHeader>::_M_insert_overflow_aux
         uint32_t helpBarFinishLoad;
@@ -221,6 +234,7 @@ namespace gh2
         .rndTextDrawShowing = 0x1dc380u,
         .worldXfm = 0x3d8ea0u,
         .setWorldXfm = 0x1dd7b8u,
+        .setDirty = 0x1dd748u,
         .psMatUpdateSphereXfm = 0x19cb78u,
         .sphereXfm = 0x46d490u,
         .playMovie = 0x21bb60u,
@@ -274,6 +288,12 @@ namespace gh2
         .scePadRead = 0x2f2c48u,
         .scePadInfoAct = 0x2f2e58u,
         .charHairPoll = 0x176fb8u,
+        .rndMatLoad = 0x1bfc00u,
+        .rndMatDtor = 0x35bb08u,
+        .rndMatLoadVertDyn = 0x1c0038u,
+        .rndMatLoadMultiPass = 0x1c0270u,
+        .binStreamRead = 0x2c8c50u,
+        .binStreamReadEndian = 0x2c8e20u,
         .rndMorphCtor = 0x200b98u,
         .rndMorphDtor = 0x374f90u,
         .rndMorphSetFrame = 0x201048u,
@@ -312,6 +332,12 @@ namespace gh2
         .songProviderIsActive = 0x117a50u,
         .songProviderGetSongData = 0x118318u,
         .campaignDataGetVenueForSong = 0x1312a0u,
+        .addLoadChar = 0x128778u,
+        .worldCrowdSetFullness = 0x26bdf0u,
+        .worldCrowdBuildBillboard = 0x26bba0u,
+        .psRndSetDepthOfField = 0x19a798u,
+        .worldDirDrawShowing = 0x26f6b8u,
+        .worldDirDtor = 0x26ddb8u,
         .songsInsertOverflow = 0x3177e0u,
         .headersInsertOverflow = 0x3175d8u,
         .helpBarFinishLoad = 0x149f40u,

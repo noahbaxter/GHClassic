@@ -3,6 +3,7 @@
 #include "gh1/clips.h"
 
 #include "disc/ark.h"
+#include "gh1/clip_set.h"
 #include "gh1/rig.h"
 
 #include <algorithm>
@@ -19,337 +20,26 @@ namespace gh2
 {
     namespace
     {
-        using gh1::bytes;
-        using gh1::gh1Bones;
-        using gh1::inverse;
-        using gh1::kTransLocal;
-        using gh1::kTransWorld;
-        using gh1::owners;
-        using gh1::xfm;
-        using gh1::Xfm;
+        using gh1::asIs;
+        using gh1::clipChannels;
+        using gh1::declareBones;
+        using gh1::Gh1Anim;
+        using gh1::gh1AnimSet;
+        using gh1::Gh1Clip;
+        using gh1::Gh1Clips;
+        using gh1::Gh2Clip;
+        using gh1::kClipTransitions;
+        using gh1::macroInt;
+        using gh1::readGh1Clip;
+        using gh1::readGh2Clip;
+        using gh1::rebuild;
+        using gh1::Replacement;
+        using gh1::Samples;
+        using gh1::writeClip;
         using milo::Bytes;
         using milo::putStr;
         using milo::putU32;
-        using milo::str;
         using milo::u32;
-
-        // A sample set as CharBonesSamples keeps one: channels by name
-        // (bone_x.quat) in type order, and per sample their values in that
-        // order, positions 12 bytes, quats 16 and rotations 4, halved but
-        // positions when compressed (LoadData 0x194978).
-        struct Samples
-        {
-            std::vector<std::string> channels;
-            uint32_t count = 0u;
-            uint32_t compressed = 0u;
-            Bytes data;
-
-            size_t width(const std::string &channel) const
-            {
-                const std::string kind = channel.substr(channel.rfind('.') + 1);
-                if (kind == "pos" || kind == "scale")
-                    return 12u;
-                return (kind == "quat" ? 16u : 4u) / (compressed ? 2u : 1u);
-            }
-
-            size_t stride() const
-            {
-                size_t s = 0u;
-                for (const std::string &c : channels)
-                    s += width(c);
-                return s;
-            }
-
-            // A channel's bytes in a sample, or none.
-            std::optional<Bytes> value(const std::string &channel, uint32_t sample) const
-            {
-                size_t o = stride() * sample;
-                for (const std::string &c : channels)
-                {
-                    if (c == channel)
-                        return Bytes(data.begin() + static_cast<std::ptrdiff_t>(o),
-                                     data.begin() + static_cast<std::ptrdiff_t>(o + width(c)));
-                    o += width(c);
-                }
-                return std::nullopt;
-            }
-
-            // A rotation channel after the rest, as rotations come last.
-            void appendRotation(const std::string &channel, const std::function<Bytes(uint32_t)> &valueAt)
-            {
-                const size_t s = stride();
-                Bytes out;
-                for (uint32_t i = 0; i < count; ++i)
-                {
-                    out.insert(out.end(), data.begin() + static_cast<std::ptrdiff_t>(s * i),
-                               data.begin() + static_cast<std::ptrdiff_t>(s * (i + 1)));
-                    const Bytes v = valueAt(i);
-                    out.insert(out.end(), v.begin(), v.end());
-                }
-                channels.push_back(channel);
-                data = std::move(out);
-            }
-        };
-
-        // Sample sets' headers, then their data. LoadHeader (0x194630) at
-        // GH1's rev (5) takes a count, names, samples and compression; at
-        // GH2's (10) a count, names, ten type offsets, compression and
-        // samples.
-        std::optional<std::vector<Samples>> readSamples(const Bytes &b, size_t o, uint32_t rev, int sets)
-        {
-            std::vector<Samples> out(static_cast<size_t>(sets));
-            for (Samples &s : out)
-            {
-                const uint32_t n = u32(b, o);
-                o += 4u;
-                for (uint32_t i = 0; i < n && o < b.size(); ++i)
-                    s.channels.push_back(str(b, o));
-                if (rev >= 10u)
-                {
-                    o += 40u;
-                    s.compressed = u32(b, o);
-                    s.count = u32(b, o + 4u);
-                }
-                else
-                {
-                    s.count = u32(b, o);
-                    s.compressed = u32(b, o + 4u);
-                }
-                o += 8u;
-            }
-            for (Samples &s : out)
-            {
-                const size_t size = s.stride() * s.count;
-                if (o + size > b.size())
-                    return std::nullopt;
-                s.data.assign(b.begin() + static_cast<std::ptrdiff_t>(o),
-                              b.begin() + static_cast<std::ptrdiff_t>(o + size));
-                o += size;
-            }
-            return out;
-        }
-
-        // GH1's AnimClipSamples (Load, GH1 0x17fa40) after its class and
-        // name: AnimClip rev 17+ (rev, start, end, rate, flags and two words
-        // GH2 has its own of), then the samples' rev and two sets.
-        struct Gh1Clip
-        {
-            float start = 0.0f, end = 0.0f, rate = 0.0f;
-            uint32_t rev = 0u;
-            std::vector<Samples> sets;
-        };
-
-        std::optional<Gh1Clip> readGh1Clip(const Bytes &acp)
-        {
-            size_t o = 0u;
-            str(acp, o);
-            str(acp, o);
-            if (u32(acp, o) < 17u || o + 32u > acp.size())
-                return std::nullopt;
-            Gh1Clip clip;
-            std::memcpy(&clip.start, acp.data() + o + 4u, 4u);
-            std::memcpy(&clip.end, acp.data() + o + 8u, 4u);
-            std::memcpy(&clip.rate, acp.data() + o + 12u, 4u);
-            clip.rev = u32(acp, o + 28u);
-            auto sets = readSamples(acp, o + 32u, clip.rev, 2);
-            if (!sets)
-                return std::nullopt;
-            clip.sets = std::move(*sets);
-            return clip;
-        }
-
-        // GH2's CharClipSamples (Load, 0x16b608): samples rev, then CharClip
-        // (0x197000) rev 5: object header, start, end, rate, flags, play
-        // flags, a float, a word, a bool, transitions (a clip, then its beat
-        // pairs), events (enter, exit, then timed ones); then three sets.
-        struct Gh2Clip
-        {
-            float start = 0.0f, end = 0.0f, rate = 0.0f;
-            size_t events = 0u, eventsEnd = 0u;
-            std::vector<Samples> sets;
-        };
-        constexpr size_t kClipTiming = 17u, kClipFlags = 29u, kClipTransitions = 46u;
-
-        std::optional<Gh2Clip> readGh2Clip(const Bytes &b)
-        {
-            if (u32(b, 0u) < 8u || u32(b, 4u) != 5u)
-                return std::nullopt;
-            Gh2Clip clip;
-            std::memcpy(&clip.start, b.data() + kClipTiming, 4u);
-            std::memcpy(&clip.end, b.data() + kClipTiming + 4u, 4u);
-            std::memcpy(&clip.rate, b.data() + kClipTiming + 8u, 4u);
-            size_t p = kClipTransitions;
-            const uint32_t clips = u32(b, p);
-            p += 4u;
-            for (uint32_t i = 0; i < clips; ++i)
-            {
-                str(b, p);
-                p += 4u + 8u * u32(b, p);
-            }
-            clip.events = p;
-            str(b, p);
-            str(b, p);
-            const uint32_t timed = u32(b, p);
-            p += 4u;
-            for (uint32_t i = 0; i < timed; ++i)
-            {
-                p += 4u;
-                str(b, p);
-            }
-            clip.eventsEnd = p;
-            auto sets = readSamples(b, p, u32(b, 0u), 3);
-            if (!sets)
-                return std::nullopt;
-            clip.sets = std::move(*sets);
-            return clip;
-        }
-
-        // A GH1 clip where GH2's was: GH1's timing and samples at GH1's
-        // rev, which GH2's CharBonesSamples still reads as GH1 wrote them,
-        // `transitions` (a count, then per clip its name and (from, to) beat
-        // pairs), and GH2's flags and events.
-        Bytes writeClip(const Gh1Clip &gh1, const Bytes &gh2, const Gh2Clip &parts, const Bytes &transitions)
-        {
-            Bytes out;
-            putU32(out, gh1.rev);
-            out.insert(out.end(), gh2.begin() + 4, gh2.begin() + kClipTiming);
-            for (const float f : {gh1.start, gh1.end, gh1.rate})
-            {
-                uint32_t v;
-                std::memcpy(&v, &f, 4u);
-                putU32(out, v);
-            }
-            out.insert(out.end(), gh2.begin() + kClipFlags, gh2.begin() + kClipTransitions);
-            out.insert(out.end(), transitions.begin(), transitions.end());
-            out.insert(out.end(), gh2.begin() + static_cast<std::ptrdiff_t>(parts.events),
-                       gh2.begin() + static_cast<std::ptrdiff_t>(parts.eventsEnd));
-            for (const Samples &s : gh1.sets)
-            {
-                putU32(out, static_cast<uint32_t>(s.channels.size()));
-                for (const std::string &c : s.channels)
-                    putStr(out, c);
-                putU32(out, s.count);
-                putU32(out, s.compressed);
-            }
-            for (const Samples &s : gh1.sets)
-                out.insert(out.end(), s.data.begin(), s.data.end());
-            return out;
-        }
-
-        // A GH1 clip's channels (bone_x.quat): two sample sets after
-        // AnimClip, each a count, names, samples and compression.
-        std::set<std::string> clipChannels(const Bytes &acp)
-        {
-            size_t o = 0u;
-            str(acp, o);
-            str(acp, o);
-            o += 28u + 4u;
-            std::set<std::string> out;
-            for (int set = 0; set < 2; ++set)
-            {
-                const uint32_t n = u32(acp, o);
-                o += 4u;
-                for (uint32_t i = 0; i < n && o < acp.size(); ++i)
-                    out.insert(str(acp, o));
-                o += 8u;
-            }
-            return out;
-        }
-
-        // A clip set animates only the channels its CharBones declare (bone_x
-        // with .trans or .mesh, as the set has it): CharBones::ScaleAdd
-        // (0x168320) seeks each clip channel among them without end. One GH1
-        // animates that GH2's lacks goes in as its parent's does, at GH1's
-        // rest under that parent; each then declares GH1's channel types.
-        bool declareBones(milo::Dir &set, const std::set<std::string> &channels, const milo::Dir &gh1)
-        {
-            const auto bones = gh1Bones(gh1);
-            const auto owner = owners(bones);
-            auto index = [&](const std::string &bone) -> std::optional<size_t>
-            {
-                for (size_t i = 0; i < set.entries.size(); ++i)
-                {
-                    const std::string &n = set.entries[i].second;
-                    if (set.entries[i].first == "CharBone" && n.substr(0, n.rfind('.')) == bone)
-                        return i;
-                }
-                return std::nullopt;
-            };
-            // bone_facing is no bone: a clip's facing set takes it
-            // (CharClipSamples::FacingSet::Set, 0x16a998).
-            auto declared = [](const std::string &bone) { return bone.rfind("bone_facing", 0) != 0; };
-            std::vector<std::string> missing;
-            for (const std::string &channel : channels)
-            {
-                const std::string b = channel.substr(0, channel.rfind('.'));
-                if (declared(b) && !index(b) && std::find(missing.begin(), missing.end(), b) == missing.end())
-                    missing.push_back(b);
-            }
-            // Parents first: each pass adds those whose parent is declared.
-            for (bool added = true; added && !missing.empty();)
-            {
-                added = false;
-                for (auto it = missing.begin(); it != missing.end();)
-                {
-                    const std::string mesh = *it + ".mesh";
-                    const auto parent = owner.find(mesh);
-                    if (!bones.count(mesh) || parent == owner.end())
-                        return false;
-                    const std::string up = parent->second.substr(0, parent->second.rfind('.'));
-                    const auto from = index(up);
-                    if (!from)
-                    {
-                        ++it;
-                        continue;
-                    }
-                    const std::string &upName = set.entries[*from].second;
-                    const std::string suffix = upName.substr(upName.rfind('.'));
-                    // CharBone: rev, header, then Trans 9 (rev, local, world,
-                    // constraint, target, preserve, parent) and its own fields.
-                    const Bytes &t = set.bodies[*from];
-                    size_t o = kTransWorld + 4u + 48u + 4u;
-                    str(t, o);
-                    o += 1u;
-                    const size_t parentAt = o;
-                    str(t, o);
-                    const Xfm world = xfm(bones.at(mesh).world, 0u);
-                    const Bytes local = bytes(world * inverse(xfm(bones.at(parent->second).world, 0u))),
-                                worldBytes = bytes(world);
-                    Bytes body(t.begin(), t.begin() + kTransLocal + 4);
-                    body.insert(body.end(), local.begin(), local.end());
-                    body.insert(body.end(), worldBytes.begin(), worldBytes.end());
-                    body.insert(body.end(), t.begin() + kTransWorld + 4 + 48, t.begin() + static_cast<std::ptrdiff_t>(parentAt));
-                    putStr(body, upName);
-                    body.insert(body.end(), t.begin() + static_cast<std::ptrdiff_t>(o), t.end());
-                    milo::add(set, "CharBone", *it + suffix, std::move(body));
-                    it = missing.erase(it);
-                    added = true;
-                }
-            }
-            if (!missing.empty())
-                return false;
-            // CharBone::Load (0x1673a8) ends on a position flag, a flag, the
-            // rotation's type (CharBones::TypeOf: quat 2 to rotz 5, 9 none)
-            // and a word.
-            constexpr const char *kRotations[] = {"quat", "rotx", "roty", "rotz"};
-            for (const std::string &channel : channels)
-            {
-                const auto dot = channel.rfind('.');
-                if (!declared(channel.substr(0, dot)))
-                    continue;
-                Bytes &body = set.bodies[*index(channel.substr(0, dot))];
-                const std::string kind = channel.substr(dot + 1);
-                if (kind == "pos")
-                    body[body.size() - 10u] = 1u;
-                for (uint32_t t = 0; t < 4u; ++t)
-                    if (kind == kRotations[t])
-                    {
-                        const uint32_t type = 2u + t;
-                        std::memcpy(body.data() + body.size() - 8u, &type, 4u);
-                    }
-            }
-            return true;
-        }
 
         // GH2's picker door swings open on its character's clips
         // (bone_door.rotz, through ui_enter, open in ui_loop) as the
@@ -389,90 +79,6 @@ namespace gh2
             }
             else
                 std::memcpy(value.data(), &open, 4u);            held.appendRotation(door, [&](uint32_t) { return value; });
-        }
-
-        // A macro GH1 defines as a number (kGuitarExtreme, config/macros.dta).
-        int32_t macroInt(const dtb::Macros &macros, const std::string &name)
-        {
-            const auto m = macros.find(name);
-            return m != macros.end() && !m->second.empty() && m->second[0].type == dtb::kInt ? m->second[0].integer
-                                                                                             : INT32_MIN;
-        }
-
-        // A clip in one of GH1's anim sets, its flags numbered.
-        struct Gh1Anim
-        {
-            std::string name;
-            std::vector<int32_t> flags;
-
-            bool has(int32_t flag) const { return std::find(flags.begin(), flags.end(), flag) != flags.end(); }
-        };
-
-        // An anim set (main::<x>.cset) by its directory (charsys/nu_metal/anims),
-        // from the macros GH1's anim scripts define.
-        struct Gh1AnimSet
-        {
-            std::string directory;
-            std::vector<Gh1Anim> anims;
-        };
-
-        std::optional<Gh1AnimSet> gh1AnimSet(const dtb::Macros &macros, const std::string &directory)
-        {
-            for (const auto &[macro, body] : macros)
-                for (const dtb::Node &cset : body)
-                {
-                    const dtb::Node *dir = dtb::find(cset, "directory");
-                    const dtb::Node *list = dtb::find(cset, "animations");
-                    if (!dir || dir->nodes.size() < 2u || dir->nodes[1].text != directory || !list)
-                        continue;
-                    Gh1AnimSet out{directory, {}};
-                    for (size_t i = 1; i < list->nodes.size(); ++i)
-                    {
-                        const dtb::Node &a = list->nodes[i];
-                        if (a.type != dtb::kArray || a.nodes.empty())
-                            continue;
-                        Gh1Anim anim{a.nodes[0].text, {}};
-                        if (const dtb::Node *flags = dtb::find(a, "flags"))
-                            for (size_t f = 1; f < flags->nodes.size(); ++f)
-                                if (flags->nodes[f].type == dtb::kInt)
-                                    anim.flags.push_back(flags->nodes[f].integer);
-                        out.anims.push_back(std::move(anim));
-                    }
-                    return out;
-                }
-            return std::nullopt;
-        }
-
-        // GH1 clips as read, by path.
-        struct Gh1Clips
-        {
-            std::map<std::string, std::optional<Gh1Clip>> read;
-
-            const Gh1Clip *get(const std::string &directory, const std::string &name)
-            {
-                const std::string path = directory + "/gen/" + name + ".acp";
-                auto it = read.find(path);
-                if (it == read.end())
-                {
-                    const auto acp = ark::readFile(path);
-                    it = read.emplace(path, acp ? readGh1Clip(*acp) : std::nullopt).first;
-                }
-                return it->second ? &*it->second : nullptr;
-            }
-        };
-
-        // A GH2 clip's samples replaced, under the transitions of the clip
-        // named (its own when it has none of that name).
-        struct Replacement
-        {
-            Gh1Clip clip;
-            std::string transitionsFrom;
-        };
-
-        std::optional<Replacement> asIs(Gh1Clips &clips, const std::string &directory, const Gh1Anim &anim)
-        {
-            const Gh1Clip *clip = clips.get(directory, anim.name);
-            return clip ? std::optional(Replacement{*clip, {}}) : std::nullopt;
         }
 
         // GH1's name for a GH2 clip's motion where they differ: one stop for
@@ -627,41 +233,6 @@ namespace gh2
             }
             return Gh1Clip{gh2.start, gh2.end, gh2.rate, donor.rev, pack(out, count, compressed)};
         }
-
-        // Every clip in `set` that `replace` gives samples for, under GH2's
-        // events and the transitions it names; the channels written go into
-        // `channels` for the set to declare.
-        bool rebuild(milo::Dir &set, std::set<std::string> &channels,
-                     const std::function<std::optional<Replacement>(const std::string &, const Gh2Clip &)> &replace)
-        {
-            std::map<std::string, Bytes> transitions;
-            std::vector<std::pair<size_t, Gh2Clip>> parsed;
-            for (size_t i = 0; i < set.entries.size(); ++i)
-            {
-                if (set.entries[i].first != "CharClipSamples")
-                    continue;
-                auto parts = readGh2Clip(set.bodies[i]);
-                if (!parts)
-                    return false;
-                transitions[set.entries[i].second] =
-                    Bytes(set.bodies[i].begin() + kClipTransitions,
-                          set.bodies[i].begin() + static_cast<std::ptrdiff_t>(parts->events));
-                parsed.emplace_back(i, std::move(*parts));
-            }
-            for (const auto &[i, parts] : parsed)
-            {
-                const std::string &name = set.entries[i].second;
-                const auto r = replace(name, parts);
-                if (!r)
-                    continue;
-                const auto t = transitions.find(r->transitionsFrom);
-                set.bodies[i] = writeClip(r->clip, set.bodies[i], parts,
-                                          t != transitions.end() ? t->second : transitions.at(name));
-                for (const Samples &s : r->clip.sets)
-                    channels.insert(s.channels.begin(), s.channels.end());
-            }
-            return true;
-        }
     }
 
     namespace gh1
@@ -781,7 +352,25 @@ namespace gh2
                         const std::string gh1 = strum(name);
                         for (const Gh1Anim &a : hand->anims)
                             if (a.name == gh1)
-                                return asIs(clips, hand->directory, a);
+                            {
+                                // GH2 starts a hand clip at most max_gap (0.24) before its
+                                // gem, fades it in over that span and has its beat 0 there
+                                // (MidiParser::AddEvent, 0x23e0d4; CharDriverMidi::
+                                // OnMidiParser, 0x173d20; CharClipDriver::Evaluate,
+                                // 0x198b00), where its own clips strike. GH1 starts its
+                                // clips their lead (AnimClip +0x20, 0.24 beats) before the
+                                // event and strikes a lead in (UpdateStrum,
+                                // UpdateLeftExpression), so beat 0 moves back by the lead:
+                                // the clip plays from its first frame, at its own speed,
+                                // onto the gem.
+                                auto r = asIs(clips, hand->directory, a);
+                                if (r)
+                                {
+                                    r->clip.start -= r->clip.lead;
+                                    r->clip.end -= r->clip.lead;
+                                }
+                                return r;
+                            }
                         return std::nullopt;
                     }) || !declareBones(*hands, handChannels, gh1))
                     return std::nullopt;

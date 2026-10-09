@@ -10,6 +10,7 @@
 #include <map>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace gh2::dtb
@@ -45,6 +46,11 @@ namespace gh2::dtb
         std::string text;        // a symbol's, string's, variable's or directive's
         std::vector<Node> nodes; // an array's
     };
+
+    // Nodes for a script made on the host.
+    inline Node symbol(const std::string &text) { return {kSymbol, 0, 0.0f, text, {}}; }
+    inline Node array(std::vector<Node> nodes) { return {kArray, 0, 0.0f, {}, std::move(nodes)}; }
+    inline Node command(std::vector<Node> nodes) { return {kCommand, 0, 0.0f, {}, std::move(nodes)}; }
 
     // Macros by name: the nodes a symbol of that name stands for.
     using Macros = std::map<std::string, std::vector<Node>>;

@@ -57,6 +57,9 @@ namespace gh2::ark
     // (content/campaigns.h).
     size_t addLayer(std::optional<size_t> disc);
     void addFile(size_t layer, const std::string &path, std::vector<uint8_t> bytes);
+    // That layer's file at `path` is that disc's at `source`, read where it
+    // is. False if the disc has none.
+    bool lend(size_t layer, const std::string &path, size_t disc, const std::string &source);
     void front(std::optional<size_t> layer);
 
     // A file's bytes as that layer in front gives them: its own, its

@@ -57,6 +57,7 @@ namespace gh2
             float pos[4];
             float color[4];
             float uv[2];
+            float fog; // F, 1.0 being the GS's 255
         };
 
         // mesh.vert's main, line for line.
@@ -113,9 +114,14 @@ namespace gh2
             for (int c = 0; c < 4; ++c)
                 out.pos[c] = pc.mvp[0 + c] * pos[0] + pc.mvp[4 + c] * pos[1] + pc.mvp[8 + c] * pos[2] +
                              pc.mvp[12 + c] * pos[3];
+            out.fog = 1.0f;
+            if (pc.fogBase >= 0)
+                out.fog = std::clamp((out.pos[3] - data[pc.fogBase].v[1]) / (data[pc.fogBase].v[0] - data[pc.fogBase].v[1]),
+                                     0.0f, 1.0f);
 
             const uint32_t mode = pc.flags & 7u;
             const float *base = (pc.flags & kFlagPrelit) ? vertexColor : pc.matColor;
+            const float *lightScale = (pc.flags & kFlagVertDyn) ? vertexColor : pc.matColor;
             float color[4] = {vertexColor[0], vertexColor[1], vertexColor[2], vertexColor[3]};
             const Vec4 *light = data + pc.lightBase;
             if (mode == kColorAmbient)
@@ -135,8 +141,8 @@ namespace gh2
                     d[i] = std::max(dot(litNormal, {light[4 + i].v[0], light[4 + i].v[1], light[4 + i].v[2]}), 0.0f);
                 for (int c = 0; c < 4; ++c)
                 {
-                    const float lit = d[0] * (light[1].v[c] * pc.matColor[c]) + d[1] * (light[2].v[c] * pc.matColor[c]) +
-                                      d[2] * (light[3].v[c] * pc.matColor[c]);
+                    const float lit = d[0] * (light[1].v[c] * lightScale[c]) + d[1] * (light[2].v[c] * lightScale[c]) +
+                                      d[2] * (light[3].v[c] * lightScale[c]);
                     color[c] = std::min(lit + base[c] * light[0].v[c], 1.0f);
                 }
             }
@@ -150,7 +156,7 @@ namespace gh2
                     color[c] = base[c] * light[0].v[c];
                 if (d2 <= light[5].v[3] && d2 > 0.0f && facing >= 0.0f)
                     for (int c = 0; c < 4; ++c)
-                        color[c] += light[1].v[c] * pc.matColor[c] * (facing * (local.v[3] + 1.0f / std::sqrt(d2)));
+                        color[c] += light[1].v[c] * lightScale[c] * (facing * (local.v[3] + 1.0f / std::sqrt(d2)));
                 for (int c = 0; c < 4; ++c)
                     color[c] = std::clamp(color[c], 0.0f, 1.0f);
             }
@@ -261,15 +267,16 @@ namespace gh2
                              "\"rect\": [%.9g, %.9g, %.9g, %.9g], "
                              "\"blend\": %u, \"zMode\": %u, \"mode\": %u, \"alphaCut\": %s, \"alphaWrite\": %s, "
                              "\"destAlphaTest\": %s, \"intensify\": %s, \"texWrap\": %s, \"skinned\": %s, "
-                             "\"renderTarget\": %u, \"highlight\": %s, ",
+                             "\"renderTarget\": %u, \"highlight\": %s, \"decal\": %s, ",
                              first ? "" : ",\n", i, draw.screen ? "true" : "false", camera.target, camera.targetWidth,
                              camera.targetHeight, camera.rect[0],
                              camera.rect[1], camera.rect[2], camera.rect[3], m.blend, m.zMode, pc.flags & 7u,
                              (pc.flags & kFlagAlphaCut) ? "true" : "false", m.alphaWrite ? "true" : "false",
                              m.destAlphaTest ? "true" : "false", (pc.flags & kFlagIntensify) ? "true" : "false",
                              m.texWrap ? "true" : "false", draw.skinned ? "true" : "false", m.renderTarget,
-                             (pc.flags & kFlagHighlight) ? "true" : "false");
-                std::fprintf(file, "\"name\": \"%s\", ", quoted(draw.name).c_str());
+                             (pc.flags & kFlagHighlight) ? "true" : "false", (pc.flags & kFlagDecal) ? "true" : "false");
+                std::fprintf(file, "\"name\": \"%s\", \"crowd\": %s, ", quoted(draw.name).c_str(),
+                             draw.crowd ? "true" : "false");
                 first = false;
                 if (m.renderTarget != 0u)
                 {
@@ -322,7 +329,18 @@ namespace gh2
                                  out.pos[0], out.pos[1], out.pos[2], out.pos[3], out.color[0], out.color[1],
                                  out.color[2], out.color[3], out.uv[0], out.uv[1]);
                 }
-                std::fprintf(file, "], \"indices\": [");
+                // The fog colour and each vertex's F in 255ths, for a draw that is fogged.
+                if (pc.fogBase >= 0)
+                {
+                    std::fprintf(file, "], \"fog\": [%.9g, %.9g, %.9g, %.9g, %.9g], \"fogF\": [",
+                                 data[pc.fogBase].v[0], data[pc.fogBase].v[1], data[pc.fogBase + 1].v[0],
+                                 data[pc.fogBase + 1].v[1], data[pc.fogBase + 1].v[2]);
+                    for (size_t v = 0; v < draw.mesh->verts.size(); ++v)
+                        std::fprintf(file, "%s%.9g", v ? ", " : "", shade(draw.mesh->verts[v], pc, data).fog * 255.0f);
+                    std::fprintf(file, "], \"indices\": [");
+                }
+                else
+                    std::fprintf(file, "], \"indices\": [");
                 for (size_t n = 0; n < draw.mesh->indices.size(); ++n)
                     std::fprintf(file, "%s%u", n ? ", " : "", draw.mesh->indices[n]);
                 std::fprintf(file, "]}");

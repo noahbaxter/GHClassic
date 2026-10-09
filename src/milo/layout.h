@@ -32,6 +32,7 @@ namespace milo
     // transform is three 16-byte rows then the position.
     namespace transformable
     {
+        constexpr uint32_t kLocal = 0x20u;
         constexpr uint32_t kWorld = 0x60u;
     }
 
@@ -108,6 +109,10 @@ namespace milo
     {
         constexpr uint32_t kFirstLight = 0x30u; // light list node*: {RndLight*, next*}
         constexpr uint32_t kAmbient = 0x40u;    // 3 floats
+        constexpr uint32_t kFogEnable = 0x50u;  // byte
+        constexpr uint32_t kFogStart = 0x54u;   // float
+        constexpr uint32_t kFogEnd = 0x58u;     // float
+        constexpr uint32_t kFogColor = 0x60u;   // 3 floats, then alpha
     }
 
     // RndLight, a RndTransformable at +0.
@@ -216,5 +221,12 @@ namespace milo
         constexpr uint32_t kMesh = 0x48u;      // RndMesh* (ObjPtr at +0x40)
         constexpr uint32_t kInstances = 0x50u; // the instance list's sentinel node; its first word is the first node
         constexpr uint32_t kInstanceXfm = 0x10u; // a node's Transform
+    }
+
+    // WorldCrowd: its flat members' cards, each a mesh BuildBillboard
+    // (0x26bba0) makes under this one material (0x26bda8).
+    namespace crowd
+    {
+        constexpr uint32_t kCardMat = 0xb4u; // RndMat*, made by the constructor (0x268fe0)
     }
 }

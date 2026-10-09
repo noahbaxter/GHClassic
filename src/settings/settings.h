@@ -29,14 +29,30 @@ namespace gh2::settings
         kWhammyHold, // a whammy bar held down bends every sustain
         kDiscPrefer, // kChd or kIso: the image taken when the disc folder has both
         kCheckUpdates, // a newer release offered when the game starts
+        kBand,       // whose backing band plays: the venue's game's, or one game's everywhere
         kDepthOfField, // the PS2's blur behind what a camera shot looks at
+        kBandShadows,  // the band's shadows in GH1's venues: none, the room's as GH1 drew them, or GH2's own
         kKeyCount,
+    };
+
+    enum BandShadows
+    {
+        kShadowsOff,
+        kShadowsClassic,
+        kShadowsGh2,
     };
 
     enum DiscFormat
     {
         kChd,
         kIso,
+    };
+
+    enum Band
+    {
+        kBandVenue,
+        kBandGh2,
+        kBandGh1,
     };
 
     int get(Key key);

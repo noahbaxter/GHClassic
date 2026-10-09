@@ -13,3 +13,4 @@ inline constexpr const char kSelCharacterDta[] = R"dta(@GHC_SEL_CHARACTER_DTA@)d
 inline constexpr const char kQuickplayDta[] = R"dta(@GHC_QUICKPLAY_DTA@)dta";
 inline constexpr const char kCampaignsDta[] = R"dta(@GHC_CAMPAIGNS_DTA@)dta";
 inline constexpr const char kGh1MenusDta[] = R"dta(@GHC_GH1_MENUS_DTA@)dta";
+inline constexpr const char kGh1ScriptsDta[] = R"dta(@GHC_GH1_SCRIPTS_DTA@)dta";

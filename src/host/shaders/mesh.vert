@@ -17,6 +17,7 @@ layout(push_constant) uniform Push
     int lightBase;
     uint flags; // colour mode in bits 0-2, prelit 8, alpha cut 16, intensify 32, skin bones less one in 6-7, projected 256, highlight 512, sphere 1024
     int envBase;
+    int fogBase; // (start, end), then the colour, in the frame data; -1 for no fog
 } pc;
 
 layout(set = 1, binding = 0, std430) readonly buffer FrameData
@@ -26,6 +27,10 @@ layout(set = 1, binding = 0, std430) readonly buffer FrameData
 
 layout(location = 0) out vec4 vColor;
 layout(location = 1) out vec2 vUv;
+// The GS's F, 1.0 being its 255, interpolated across the screen, and the
+// colour it blends toward.
+layout(location = 2) noperspective out float vFog;
+layout(location = 3) flat out vec3 vFogColor;
 
 const uint kColorVertex = 0u;
 const uint kColorAmbient = 1u;
@@ -33,6 +38,7 @@ const uint kColorDirectional = 2u;
 const uint kColorMaterial = 3u;
 const uint kColorPoint = 4u;
 const uint kFlagPrelit = 8u;
+const uint kFlagVertDyn = 8192u;
 const uint kFlagIntensify = 32u;
 const uint kSkinBonesShift = 6u;
 const uint kFlagProjected = 256u;
@@ -93,10 +99,22 @@ void main()
         }
     }
     gl_Position = pc.mvp * pos;
+    // VU1's fog scale and offset make F = 255 * (w - end) / (start - end),
+    // clamped to 0..255 (PsEnviron::Select, GH1 0x1a2528).
+    vFog = 1.0;
+    vFogColor = vec3(0.0);
+    if (pc.fogBase >= 0)
+    {
+        vec4 fog = data[pc.fogBase];
+        vFog = clamp((gl_Position.w - fog.y) / (fog.x - fog.y), 0.0, 1.0);
+        vFogColor = data[pc.fogBase + 1].rgb;
+    }
 
     // What VU1's lighting program leaves in the vertex's colour.
     uint mode = pc.flags & 7u;
     vec4 base = (pc.flags & kFlagPrelit) != 0u ? vertexColor : pc.matColor;
+    // What a light's colour is scaled by: GH1's vertDyn takes the vertex's.
+    vec4 lightScale = (pc.flags & kFlagVertDyn) != 0u ? vertexColor : pc.matColor;
     vec4 color = vertexColor;
     if (mode == kColorAmbient)
     {
@@ -116,8 +134,8 @@ void main()
         vec3 d = max(vec3(dot(litNormal, data[pc.lightBase + 4].xyz), dot(litNormal, data[pc.lightBase + 5].xyz),
                           dot(litNormal, data[pc.lightBase + 6].xyz)),
                      vec3(0.0));
-        vec4 lit = d.x * (data[pc.lightBase + 1] * pc.matColor) + d.y * (data[pc.lightBase + 2] * pc.matColor) +
-                   d.z * (data[pc.lightBase + 3] * pc.matColor);
+        vec4 lit = d.x * (data[pc.lightBase + 1] * lightScale) + d.y * (data[pc.lightBase + 2] * lightScale) +
+                   d.z * (data[pc.lightBase + 3] * lightScale);
         color = min(lit + base * ambient, vec4(1.0));
     }
     else if (mode == kColorPoint)
@@ -133,7 +151,7 @@ void main()
         float facing = dot(to, litNormal);
         color = base * data[pc.lightBase];
         if (d2 <= data[pc.lightBase + 5].w && d2 > 0.0 && facing >= 0.0)
-            color += data[pc.lightBase + 1] * pc.matColor * (facing * (local.w + inversesqrt(d2)));
+            color += data[pc.lightBase + 1] * lightScale * (facing * (local.w + inversesqrt(d2)));
         color = clamp(color, vec4(0.0), vec4(1.0));
     }
     // The two environ programs clamp at 1 alone, and FTOI0's negative

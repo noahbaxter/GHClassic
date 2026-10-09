@@ -6,6 +6,7 @@
 //   campaign    GH1's tiers and cash, each tier in the GH2 venue standing in
 //               for its own (gh1/songs.h), with no encores
 //               (content/encores.h)
+//   venues      GH1's rooms in those GH2 venues (gh1/venues.cpp)
 //   store       GH1's songs, characters and guitars at GH1's prices,
 //               the guitars GH2's models of the same Gibsons. GH1's finishes
 //               are not GH2's, so each body's finishes are GH2's at the
@@ -27,6 +28,7 @@
 #include "gh1/menu_scripts.h"
 #include "gh1/menus.h"
 #include "gh1/songs.h"
+#include "gh1/venues.h"
 
 #include <algorithm>
 #include <iostream>
@@ -37,8 +39,8 @@ namespace gh2::gh1
 {
     namespace
     {
-        dtb::Node symbol(const std::string &text) { return {dtb::kSymbol, 0, 0.0f, text, {}}; }
-        dtb::Node array(std::vector<dtb::Node> nodes) { return {dtb::kArray, 0, 0.0f, {}, std::move(nodes)}; }
+        using dtb::array;
+        using dtb::symbol;
 
         std::string keyOf(const dtb::Node &node)
         {
@@ -367,6 +369,7 @@ namespace gh2::gh1
                     if (auto file = ark::readFile("char/" + g.name() + "/og/gen/" + g.name() + suffix + ".milo_ps2"))
                         ark::addFile(layer, std::string("char/") + g.character + "/og/gen/" + g.character + suffix + ".milo_ps2",
                                      std::move(*file));
+        addVenues(layer, disc);
         campaigns::add("gh1", layer);
     }
 }

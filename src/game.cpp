@@ -2,6 +2,10 @@
 
 #include "addresses.h"
 #include "disc/ark.h"
+#include "content/band.h"
+#include "content/crowd_cards.h"
+#include "content/focus.h"
+#include "content/floor_spot.h"
 #include "content/encores.h"
 #include "content/games.h"
 #include "content/locale.h"
@@ -29,6 +33,7 @@
 #include "render/mesh_capture.h"
 #include "render/native_cull.h"
 #include "render/native_environ.h"
+#include "render/native_mat.h"
 #include "render/native_mesh.h"
 #include "render/native_particles.h"
 #include "render/native_points.h"
@@ -57,10 +62,15 @@ namespace
         gh2::installGh2x();
         gh2::installGh1Face(runtime, gh2::kSlus21447);
         gh2::outfits::install(runtime, gh2::kSlus21447);
+        gh2::band::install(runtime, gh2::kSlus21447);
+        gh2::crowd_cards::install(runtime, gh2::kSlus21447);
+        gh2::focus::install(runtime, gh2::kSlus21447);
+        gh2::floor_spot::install(runtime, gh2::kSlus21447);
         gh2::installNullRnd(runtime, gh2::kSlus21447);
         gh2::installNativeRnd(runtime, gh2::kSlus21447);
         gh2::installMeshCapture(runtime, gh2::kSlus21447);
         gh2::installTextureCapture(runtime, gh2::kSlus21447);
+        gh2::installNativeMat(runtime, gh2::kSlus21447);
         gh2::installNativeMesh(runtime, gh2::kSlus21447);
         gh2::installNativeEnviron(runtime, gh2::kSlus21447);
         gh2::installNativeRect(runtime, gh2::kSlus21447);

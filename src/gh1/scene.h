@@ -35,6 +35,10 @@ namespace gh2::gh1
 
     std::optional<Trans> trans(const Bytes &b, size_t &o);
 
+    // Where the Trans at `o` ends: a Trans 8's end, or that of GH2's 9
+    // (RndTransformable::Load, 0x3d72d0), which has no children.
+    size_t transEnd(const Bytes &b, size_t o);
+
     // A Draw 1 (RndDrawable::Load, GH1 0x30de18): whether it shows, what
     // it draws after itself, and a sphere.
     struct Draw
@@ -64,7 +68,9 @@ namespace gh2::gh1
     std::optional<Anim> anim(const Bytes &b, size_t &o);
 
     // An Anim 4 (0x1ab2d8) in place of an Anim 0: its frame, and the
-    // rate GH2's own menu anims have.
+    // rate GH2's own menu anims have. In a venue it is GH1's, 480 frames
+    // a beat (Arena::Poll, GH1 0x16a020, sets a scene's frame to the
+    // song's tick).
     void putAnim(Bytes &out);
 
     // GH2's name for the filter of an anim that has one.
@@ -122,6 +128,30 @@ namespace gh2::gh1
 
     // Whether a body holds `name` as a string.
     bool holds(const Bytes &b, const std::string &name);
+
+    // Whether any body of `dir` holds `name` as a string.
+    bool holds(const milo::Dir &dir, const std::string &name);
+
+    // That object's body in the first of those scenes that has it.
+    const Bytes *object(const std::vector<const milo::Dir *> &scenes, const char *cls, const std::string &name);
+
+    // A name numbered with two digits at least: crowd_limits00.mesh.
+    std::string numbered(const char *prefix, int nn, const char *suffix);
+
+    // The end of a DataArray at `o` (DataArray::Load, 0x2b0d88: a u16
+    // size, line and id, then its nodes), or none for a node not known.
+    std::optional<size_t> arrayEnd(const Bytes &b, size_t o);
+
+    // Where Hmx::Object's header at `o` ends (0x2c2018): a revision, the
+    // type, and TypeProps::Load's flag and array.
+    std::optional<size_t> headerEnd(const Bytes &b, size_t o);
+
+    // A dir's own object less the properties that name its objects: the
+    // dir's revisions, then Hmx::Object's header (0x2c2018: a revision,
+    // the type, and TypeProps::Load's flag and array of keys and
+    // values). An object or a list of them goes, for the type's default
+    // (world_objects.dta: no object, an empty list).
+    std::optional<Bytes> withoutObjects(const Bytes &root);
 
     std::optional<milo::Dir> loadScene(size_t disc, const std::string &path);
 

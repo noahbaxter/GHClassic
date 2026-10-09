@@ -210,8 +210,12 @@ set(GHC_GAME_SOURCES
     src/sustain_release.cpp
     src/track_start.cpp
     src/whammy_hold.cpp
+    src/content/band.cpp
     src/content/campaigns.cpp
     src/content/card.cpp
+    src/content/crowd_cards.cpp
+    src/content/focus.cpp
+    src/content/floor_spot.cpp
     src/content/encores.cpp
     src/content/games.cpp
     src/content/locale.cpp
@@ -235,8 +239,12 @@ set(GHC_GAME_SOURCES
     src/formats/dtb.cpp
     src/formats/dtb_text.cpp
     src/formats/midi.cpp
+    src/gh1/band.cpp
+    src/gh1/cameras.cpp
     src/gh1/career.cpp
+    src/gh1/clip_set.cpp
     src/gh1/clips.cpp
+    src/gh1/crowd.cpp
     src/gh1/face.cpp
     src/gh1/install.cpp
     src/gh1/look.cpp
@@ -250,7 +258,10 @@ set(GHC_GAME_SOURCES
     src/gh1/screen_pictures.cpp
     src/gh1/screen_widgets.cpp
     src/gh1/screens.cpp
+    src/gh1/scripts.cpp
     src/gh1/songs.cpp
+    src/gh1/venue_scene.cpp
+    src/gh1/venues.cpp
     src/gh2x/install.cpp
     src/gh80s/install.cpp
     src/milo/milo.cpp
@@ -341,11 +352,12 @@ file(READ src/ui/dta/sel_character.dta GHC_SEL_CHARACTER_DTA)
 file(READ src/ui/dta/quickplay.dta GHC_QUICKPLAY_DTA)
 file(READ src/ui/dta/campaigns.dta GHC_CAMPAIGNS_DTA)
 file(READ src/gh1/menus.dta GHC_GH1_MENUS_DTA)
+file(READ src/gh1/scripts.dta GHC_GH1_SCRIPTS_DTA)
 file(READ src/ui/dta/picker.dta GHC_PICKER_DTA)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     src/ui/dta/lag_panel.dta src/ui/dta/highscore_panel.dta src/ui/dta/main_menu.dta src/ui/dta/fast_boot.dta
     src/ui/dta/locale.dta src/ui/dta/crowd.dta src/ui/dta/sel_character.dta src/ui/dta/quickplay.dta
-    src/ui/dta/campaigns.dta src/gh1/menus.dta src/ui/dta/picker.dta)
+    src/ui/dta/campaigns.dta src/gh1/menus.dta src/gh1/scripts.dta src/ui/dta/picker.dta)
 configure_file(src/ui/dta/dta.h.in "${GHC_DTA_DIR}/dta.h" @ONLY)
 target_include_directories(GHClassic PRIVATE "${GHC_DTA_DIR}")
 

@@ -357,6 +357,18 @@ namespace gh2::ark
         s_layers[layer].files[key(path.c_str())] = addBytes(std::move(bytes));
     }
 
+    bool lend(size_t layer, const std::string &path, size_t disc, const std::string &source)
+    {
+        if (disc >= s_discs.size())
+            return false;
+        const auto &files = s_discs[disc].files;
+        const auto it = files.find(key(source.c_str()));
+        if (it == files.end())
+            return false;
+        s_layers[layer].files[key(path.c_str())] = it->second;
+        return true;
+    }
+
     void addMade(const std::string &path, std::function<std::optional<Made>()> make)
     {
         s_made[key(path.c_str())] = std::move(make);

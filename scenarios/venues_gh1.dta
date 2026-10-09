@@ -1,0 +1,54 @@
+; GH1's venues (gh1/venues.cpp): in the GH1 campaign each GH2 venue that
+; stands in for one of GH1's holds GH1's room, the band on GH1's spots.
+; GH2's own are untouched in its campaign.
+(needs gh1)
+#include common/first_boot.dta
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty medium}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{game set_venue theatre}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 8)
+(shot gh2_theatre)
+; GH2's theatre: its groups, none of GH1's views.
+(expect {world exists opaque.grp} 1)
+(expect {world exists venue.view} 0)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+
+{set $ghc_switch gh1}
+{set $ghc_switch_next main_screen}
+{ui goto_screen ghc_switch_screen}
+(wait_screen main_screen)
+{game set_song ziggystardust}
+{{game get_player_config 0} set_difficulty medium}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{game set_venue theatre}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 8)
+(shot theatre)
+(expect {world exists venue.view} 1)
+(expect {world exists opaque.grp} 0)
+(wait 8)
+(shot theatre_later)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+
+; The basement, in GH2's battle of the bands.
+{game set_song iloverockandroll}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{game set_venue battle}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 8)
+(shot basement)
+(expect {world exists venue.view} 1)
+(expect {world exists main_room.view} 1)
+(wait 8)
+(shot basement_later)
+(quit)

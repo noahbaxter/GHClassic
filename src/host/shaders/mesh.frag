@@ -2,6 +2,8 @@
 
 layout(location = 0) in vec4 vColor;
 layout(location = 1) in vec2 vUv;
+layout(location = 2) noperspective in float vFog;
+layout(location = 3) flat in vec3 vFogColor;
 
 layout(set = 0, binding = 0) uniform sampler2D tex;
 
@@ -15,6 +17,7 @@ layout(push_constant) uniform Push
     int lightBase;
     uint flags;
     int envBase;
+    int fogBase;
 } pc;
 
 layout(location = 0) out vec4 outColor;
@@ -23,6 +26,7 @@ const uint kFlagAlphaCut = 16u;
 const uint kFlagHighlight = 512u;
 const uint kFlagSpread = 2048u;
 const uint kFlagSetAlpha = 4096u;
+const uint kFlagDecal = 16384u;
 
 void main()
 {
@@ -34,7 +38,8 @@ void main()
         texel = 0.25 * (texture(tex, vUv + vec2(-h.x, -h.y)) + texture(tex, vUv + vec2(h.x, -h.y)) +
                         texture(tex, vUv + vec2(-h.x, h.y)) + texture(tex, vUv + vec2(h.x, h.y)));
     }
-    vec4 color = texel * vColor;
+    // TFX DECAL: the texel alone.
+    vec4 color = (pc.flags & kFlagDecal) != 0u ? texel : texel * vColor;
     if ((pc.flags & kFlagHighlight) != 0u)
     {
         // TFX HIGHLIGHT: Ct * Cf + Af, alpha At + Af. Af is the vertex
@@ -50,6 +55,10 @@ void main()
         color.rgb = (whole + max(c - whole - 4.0, vec3(0.0)) * 2.0) / 255.0;
     }
     color = min(color, vec4(1.0));
+    // The GS's fog, per pixel by the interpolated F, before the blend: F of
+    // 255 leaves the colour, 0 is the fog's alone.
+    if (pc.fogBase >= 0)
+        color.rgb = mix(vFogColor, color.rgb, vFog);
     // Alpha cut is the GS alpha test GREATER against 0, where alpha 1.0 is
     // 0x80, so the smallest alpha that passes is 1/128.
     if ((pc.flags & kFlagAlphaCut) != 0u && color.a < 1.0 / 128.0)
