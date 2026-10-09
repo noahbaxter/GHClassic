@@ -42,9 +42,10 @@ namespace gh2::gh1
         using milo::str;
         using milo::u32;
 
-        // A GH2 drawable left out of drawing, by its Draw 3's showing flag:
-        // a Mesh 28's or Group 12's after its Trans 9 (a Group's Anim 4 comes
-        // first), a Spotlight 20's (Spotlight::Load, 0x273840) before it.
+        // Hides a GH2 drawable by clearing its Draw 3's showing flag. The
+        // Draw follows the Trans 9 in a Mesh 28 or Group 12 (a Group's Anim 4
+        // comes before both) and precedes it in a Spotlight 20
+        // (Spotlight::Load, 0x273840).
         void hide(const std::string &cls, Bytes &b)
         {
             auto o = headerEnd(b, 4u);
@@ -58,13 +59,14 @@ namespace gh2::gh1
                 b[*o + 4u] = 0u;
         }
 
-        // GH2's geom dir around GH1's room: its own object, and the cameras,
-        // environs and lights the dirs above it name, with the materials
-        // those dirs' meshes take from it (big_chars' crowd_plane.mesh has
-        // ray_blocker.mat) and their textures. GH1's environs and lights
-        // come with the room, and its lighting scene's beside them.
-        // `unreached` gets the meshes GH1 never draws, which no script is
-        // to show (fest's shows solo_beam01.mesh, GH2's dir would draw it).
+        // GH2's geom dir rebuilt around GH1's room. It keeps GH2's own object
+        // and the cameras, environs and lights the dirs above name, plus the
+        // materials those dirs' meshes borrow from it (big_chars'
+        // crowd_plane.mesh uses ray_blocker.mat) and their textures. GH1's
+        // room brings its own environs and lights, and its lighting scene
+        // sits beside it. `unreached` collects the meshes GH1 never draws,
+        // which must stay hidden even when a script shows them: fest's
+        // script shows solo_beam01.mesh, and GH2's dir would draw it.
         std::optional<milo::Dir> geom(const milo::Dir &gh2, const std::vector<const milo::Dir *> &above,
                                       const milo::Dir &room, const milo::Dir &lighting,
                                       const std::set<std::string> &scripted, Drivers &drivers,
@@ -117,8 +119,7 @@ namespace gh2::gh1
             return out;
         }
 
-        // GH2's lighting dir with what it draws left out: the spotlights
-        // and fixtures of GH2's room.
+        // GH2's lighting dir with its room's spotlights and fixtures hidden.
         milo::Dir lights(const milo::Dir &gh2)
         {
             milo::Dir out = gh2;
@@ -128,10 +129,10 @@ namespace gh2::gh1
             return out;
         }
 
-        // GH1's spots, each a Mesh's world: where its band stands
-        // (stage_spot_NN.mesh; charsys.dta's band_spots has the singer and
-        // keyboard on 01, the bass on 02, the drummer on 03) and where its
-        // guitarist starts and walks to (walk_spot_NN.mesh).
+        // Where GH1's band stands and its guitarist walks, as the world
+        // transforms of stage_spot_NN.mesh (charsys.dta's band_spots puts
+        // the singer and keyboard on 01, the bass on 02 and the drummer on
+        // 03) and of walk_spot_NN.mesh, where the guitarist starts and walks.
         struct Spots
         {
             std::vector<Bytes> stage, walk;
@@ -163,8 +164,8 @@ namespace gh2::gh1
             return *o + 25u;
         }
 
-        // A Waypoint 3 as `from` is, on that spot, with those flags and
-        // links to those (Waypoint::Load, 0x192068).
+        // A copy of Waypoint 3 `from` moved onto that spot, with those flags
+        // and links (Waypoint::Load, 0x192068).
         Bytes waypoint(const Bytes &from, size_t trans, const Bytes &spot, uint32_t flags,
                        const std::vector<std::string> &links)
         {
@@ -182,13 +183,14 @@ namespace gh2::gh1
             return out;
         }
 
-        // GH2's chars dir with GH1's waypoints for its own (flags in
-        // macros.dta). The band's starts are on GH1's stage spots and the
-        // guitarist's on walk spot 01; GH1 has no second guitarist, and the
-        // two start on 02 and 01. Each walk spot has a waypoint, `onWalk`
-        // its name: the last is where a walk turns and never where one ends
-        // (StartWalk, GH1 0x284818), the rest link to it and are walked to
-        // where the venue has `walks`, `solo` before a solo.
+        // GH2's chars dir with its waypoints replaced by GH1's (flags in
+        // macros.dta). The band starts on GH1's stage spots and the
+        // guitarist on walk spot 01. GH1 has no second guitarist, so with two
+        // they start on 02 and 01. Each walk spot gets a waypoint. The last
+        // is where a walk turns, never where one ends (StartWalk, GH1
+        // 0x284818), and the others link to it. Those others are walked to
+        // only if the venue `walks`, `solo` being the one before a solo, and
+        // their names go in `onWalk`.
         std::optional<milo::Dir> chars(const milo::Dir &gh2, const Spots &at, bool walks, int solo,
                                        std::vector<std::string> &onWalk)
         {

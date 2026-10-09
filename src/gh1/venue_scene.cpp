@@ -148,8 +148,10 @@ namespace gh2::gh1
             return out;
         }
 
-        // What stands for each anim: a View's anims if it has any here,
-        // a MatAnim's later stages after it.
+        // Fills in what stands for anim `n`, and for those it drives. A View
+        // is stood for by its filter if any anim it drives is here. Any
+        // other anim is stood for by itself or its filter, and a MatAnim's
+        // later stages follow it.
         void stand(const Scan &s, Drivers &drivers, const std::string &n, int depth)
         {
             const auto it = s.pieces.find(n);

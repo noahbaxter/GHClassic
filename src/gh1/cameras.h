@@ -15,9 +15,9 @@ namespace gh2::gh1
     inline constexpr const char *kRoomView = "venue.view";
     inline constexpr const char *kLightingView = "lighting.view";
 
-    // A crowd region: the crowd members drawn whole in it, each the crowd
-    // archetype it is of and which of that one's places, and the sphere
-    // about them (gh1/venues.cpp).
+    // A crowd region (gh1/crowd.cpp): the members drawn whole in it, each as
+    // its archetype and which of that archetype's places, and the sphere
+    // around them.
     struct Region
     {
         std::vector<std::pair<uint32_t, uint32_t>> members;

@@ -71,15 +71,16 @@ namespace gh2::gh1
         return places;
     }
 
-    // A region is crowd_limits<nn>.mesh, a Mesh 25 (its Trans 8, Draw 1,
-    // material, owner, nine bytes, then its verts, 48 bytes each, and
-    // faces): the places that are over one of its faces and less than a
-    // card's height above it, in the mesh's own space, as many as the crowd
-    // has members to draw whole (Crowd::InitRegion, GH1 0x170da8). A shot
-    // names its region, and the flat cards there give way to those members
-    // (Crowd::SwitchRegion, GH1 0x1727b0). Its sphere is about the middle of
-    // the box those places are in, its radius the box's diagonal (GH1
-    // 0x171378: vsqrt of the corners' difference dotted with itself).
+    // Each region is crowd_limits<nn>.mesh, a Mesh 25 (its Trans 8, Draw 1,
+    // material, owner, nine bytes, then its verts, 48 bytes each, and its
+    // faces). It holds the places that sit over one of its faces and less
+    // than a card's height above it, in the mesh's own space, up to as many
+    // as the crowd has members to draw whole (Crowd::InitRegion, GH1
+    // 0x170da8). A shot names its region, and the flat cards there are
+    // swapped for those members (Crowd::SwitchRegion, GH1 0x1727b0). Its
+    // sphere is centred on the box around those places, with the box's full
+    // diagonal as its radius (GH1 0x171378: vsqrt of the corners'
+    // difference dotted with itself).
     std::vector<Region> crowdRegions(const std::vector<const milo::Dir *> &scenes, const std::vector<Bytes> &places,
                                      float height, size_t whole)
     {
@@ -131,17 +132,17 @@ namespace gh2::gh1
         return out;
     }
 
-    // GH2's WorldCrowd 6 (WorldCrowd::Load, 0x26c430) keeps the same as
-    // GH1's: a Draw 3, the mesh it was placed over, how many, a flag, each
+    // GH2's WorldCrowd 6 (WorldCrowd::Load, 0x26c430) holds what GH1's crowd
+    // does: a Draw 3, the mesh it was placed over, a count, a flag, each
     // member's Character with its card's height, density and radius, then
-    // each one's places, and its Hmx::Object. Its card is as GH1's
-    // (BuildBillboard, 0x26bba0). So `crowd`, which the shots show
-    // (gh1/cameras.cpp), has GH1's places and height, with the stand-in's
-    // crowd members for GH1's, male before female as GH1 lists them, and any
-    // other WorldCrowd has none.
+    // each one's places, and its Hmx::Object. GH2 builds the cards as GH1
+    // does (BuildBillboard, 0x26bba0). So the WorldCrowd named `crowd`, the
+    // one the shots show (gh1/cameras.cpp), gets GH1's places and height,
+    // with the stand-in's members in place of GH1's, male before female as
+    // GH1 lists them. Every other WorldCrowd is emptied.
     //
-    // The stamp is the first word of what follows its places: a shot's
-    // members are kept only if it has the same (CamShot::Load, 0x265508).
+    // The stamp is the first word after its places. A shot keeps its whole
+    // members only if its stamp matches (CamShot::Load, 0x265508).
     uint32_t crowd(milo::Dir &chars, const std::vector<Bytes> &places, float height)
     {
         uint32_t stamp = 0xffffffffu;

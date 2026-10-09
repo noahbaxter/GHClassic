@@ -14,13 +14,12 @@ namespace gh2::gh1
     // Each Crowd<nn>.mm's places: a count, then that many transforms.
     std::vector<milo::Bytes> crowdPlaces(const std::vector<const milo::Dir *> &scenes);
 
-    // The crowd members GH1 draws whole in each of a venue's regions, of
-    // those `places`: those a card of that `height` stands in, `whole` of
-    // them at most.
+    // The crowd members GH1 draws whole in each of a venue's regions: those
+    // of `places` whose card, `height` high, stands in it, up to `whole`.
     std::vector<Region> crowdRegions(const std::vector<const milo::Dir *> &scenes,
                                      const std::vector<milo::Bytes> &places, float height, size_t whole);
 
-    // GH2's chars dir with GH1's flat crowd, those `places` with cards of
-    // that `height`, for the stand-in's. Returns the crowd's stamp.
+    // Replaces the stand-in's crowd in GH2's chars dir with GH1's flat one:
+    // those `places`, with cards `height` high. Returns the crowd's stamp.
     uint32_t crowd(milo::Dir &chars, const std::vector<milo::Bytes> &places, float height);
 }
