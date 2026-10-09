@@ -17,6 +17,7 @@ layout(push_constant) uniform Push
     int lightBase;
     uint flags; // colour mode in bits 0-2, prelit 8, alpha cut 16, intensify 32, skin bones less one in 6-7, projected 256, highlight 512, sphere 1024
     int envBase;
+    int fogBase; // (start, end), then the colour, in the frame data; -1 for no fog
 } pc;
 
 layout(set = 1, binding = 0, std430) readonly buffer FrameData
@@ -26,6 +27,10 @@ layout(set = 1, binding = 0, std430) readonly buffer FrameData
 
 layout(location = 0) out vec4 vColor;
 layout(location = 1) out vec2 vUv;
+// The GS's F, 1.0 being its 255, interpolated across the screen, and the
+// colour it blends toward.
+layout(location = 2) noperspective out float vFog;
+layout(location = 3) flat out vec3 vFogColor;
 
 const uint kColorVertex = 0u;
 const uint kColorAmbient = 1u;
@@ -94,6 +99,16 @@ void main()
         }
     }
     gl_Position = pc.mvp * pos;
+    // VU1's fog scale and offset make F = 255 * (w - end) / (start - end),
+    // clamped to 0..255 (PsEnviron::Select, GH1 0x1a2528).
+    vFog = 1.0;
+    vFogColor = vec3(0.0);
+    if (pc.fogBase >= 0)
+    {
+        vec4 fog = data[pc.fogBase];
+        vFog = clamp((gl_Position.w - fog.y) / (fog.x - fog.y), 0.0, 1.0);
+        vFogColor = data[pc.fogBase + 1].rgb;
+    }
 
     // What VU1's lighting program leaves in the vertex's colour.
     uint mode = pc.flags & 7u;

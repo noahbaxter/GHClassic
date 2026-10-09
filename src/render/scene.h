@@ -74,6 +74,11 @@ namespace gh2
         bool vertDyn = false; // lights scaled by the vertex colour: GH1's, which GH2's loader drops
         bool highlight = false; // GS HIGHLIGHT texturing, PsMat +0x130 == 2
         bool decal = false;     // GS DECAL texturing: the texel as it is. GH1's alone
+        // Whether the pass takes fog, as PsMat::UpdatePass sets it (GH1
+        // 0x19d56c): by its blend (a source, source alpha or multiply one
+        // does, an additive or subtractive one never), and a GH1 material's
+        // first pass always.
+        bool fogPass = true;
         // Sampled as the mean of four texels, color[0] and [1] apart in u and
         // v (addDepthOfField). The colour is then the vertex's alone.
         bool spread = false;
@@ -111,6 +116,12 @@ namespace gh2
         float toLight[3][3] = {}; // world, unit length: each light's -y
         float position[3] = {};   // the point light's world position
         float range = 0.0f;       // the point light's range
+        // The fog the GS blends toward (FOGCOL) by a vertex's F, which is 255
+        // at `fogStart` and nearer and 0 at `fogEnd` and farther.
+        bool fog = false;
+        float fogStart = 0.0f;
+        float fogEnd = 0.0f;
+        float fogColor[3] = {};
     };
 
     struct DrawCall

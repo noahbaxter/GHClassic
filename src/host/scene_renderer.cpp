@@ -34,6 +34,8 @@ namespace gh2
         constexpr uint32_t kLightingVec4s = 7u;
         // A draw's environ tex gen block: see writeEnvTexGen.
         constexpr uint32_t kEnvTexGenVec4s = 4u;
+        // A draw's fog block: (start, end), then the colour.
+        constexpr uint32_t kFogVec4s = 2u;
 
         // By blend, z mode, alpha write and dest alpha test.
         constexpr uint32_t kPipelineCount =
@@ -1298,6 +1300,7 @@ namespace gh2
         std::vector<int32_t> boneBases(frame.draws.size(), -1);
         std::vector<int32_t> lightBases(frame.draws.size(), -1);
         std::vector<int32_t> envBases(frame.draws.size(), -1);
+        std::vector<int32_t> fogBases(frame.draws.size(), -1);
         std::vector<uint32_t> colorModes(frame.draws.size(), kColorVertex);
         uint32_t used = 0;
         for (size_t i = 0; i < frame.draws.size(); ++i)
@@ -1320,11 +1323,27 @@ namespace gh2
                 envBases[i] = static_cast<int32_t>(used);
                 used += kEnvTexGenVec4s;
             }
+            // Fog (PsMat::Select, GH1 0x2ec130): the pass takes it and the
+            // environ in use has it on. A rect in screen space has no depth
+            // to fog by.
+            const Environ &environment = draw.environment;
+            if (!draw.screen && draw.material.fogPass && environment.fog && environment.fogStart != environment.fogEnd)
+            {
+                fogBases[i] = static_cast<int32_t>(used);
+                used += kFogVec4s;
+            }
         }
         if (!s.growFrameData(data, used))
             return false;
         for (size_t i = 0; i < frame.draws.size(); ++i)
         {
+            if (fogBases[i] >= 0)
+            {
+                const Environ &environment = frame.draws[i].environment;
+                data.mapped[fogBases[i]] = {{environment.fogStart, environment.fogEnd, 0.0f, 0.0f}};
+                data.mapped[fogBases[i] + 1] = {{environment.fogColor[0], environment.fogColor[1],
+                                                 environment.fogColor[2], 0.0f}};
+            }
             if (boneBases[i] >= 0)
                 std::memcpy(data.mapped + boneBases[i], frame.draws[i].bones.data(), sizeof(frame.draws[i].bones));
             if (lightBases[i] >= 0)
@@ -1480,6 +1499,7 @@ namespace gh2
             push.boneBase = boneBases[i];
             push.lightBase = lightBases[i];
             push.envBase = envBases[i];
+            push.fogBase = fogBases[i];
             if (material.sphere)
                 push.flags |= kFlagSphere;
             if (material.spread)

@@ -47,6 +47,7 @@ namespace gh2
         std::unordered_set<uint32_t> s_vertDyn;           // the RndMats loaded with it
         std::unordered_map<uint32_t, uint32_t> s_passOf; // a rev under 25's pass, and its material
         std::unordered_set<uint32_t> s_modulated;        // the materials whose passes modulate: multiPass 2
+        std::unordered_set<uint32_t> s_gh1;              // the RndMats of a rev under 25, GH1's
         PS2Runtime::RecompiledFunction s_readEndian = nullptr;
 
         struct LoadTag;
@@ -55,6 +56,7 @@ namespace gh2
             s_vertDyn.erase(GPR_U32(ctx, 4));
             s_passOf.erase(GPR_U32(ctx, 4));
             s_modulated.erase(GPR_U32(ctx, 4));
+            s_gh1.erase(GPR_U32(ctx, 4));
         }
 
         struct DtorTag;
@@ -63,6 +65,7 @@ namespace gh2
             s_vertDyn.erase(GPR_U32(ctx, 4));
             s_passOf.erase(GPR_U32(ctx, 4));
             s_modulated.erase(GPR_U32(ctx, 4));
+            s_gh1.erase(GPR_U32(ctx, 4));
         }
 
         // BinStream::ReadEndian(void *, int) (0x2c8e20), as Load calls it
@@ -99,6 +102,7 @@ namespace gh2
             const uint32_t mat = GPR_U32(ctx, 17), into = GPR_U32(ctx, 5);
             runtime->callGuestFunction(rdram, ctx, s_addresses->binStreamRead,
                                        {GPR_U32(ctx, 4), into, GPR_U32(ctx, 6)}, s_read);
+            s_gh1.insert(mat);
             if (load<uint8_t>(rdram, into) != 0u)
                 s_vertDyn.insert(mat);
             for (uint32_t pass = nextPass(rdram, mat), n = 0; pass != 0u && n < 8u; pass = nextPass(rdram, pass), ++n)
@@ -236,6 +240,12 @@ namespace gh2
             readProjRows(rdram, mat, m);
         if (m.blend >= milo::mat::kBlendCount)
             m.blend = milo::mat::kBlendSrcAlpha; // Update's default case
+        // Fog (UpdatePass, GH1 0x19d56c): a pass takes it by its blend, which
+        // is a source, source alpha or multiply one (Update's default case
+        // is the last) and never an additive or subtractive one, and a GH1
+        // material's first pass takes it whatever its blend.
+        m.fogPass = m.blend == milo::mat::kBlendSrc || m.blend == milo::mat::kBlendSrcAlpha ||
+                    (pass == s_passOf.end() && s_gh1.count(mat) != 0u);
         if (m.zMode >= milo::mat::kZModeCount)
             m.zMode = milo::mat::kZNormal;
         return m;

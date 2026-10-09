@@ -38,6 +38,7 @@ namespace gh2
         int32_t lightBase; // the draw's lighting block in the frame data
         uint32_t flags;    // ColorMode in bits 0-2, then the kFlag bits and the skin bones
         int32_t envBase;   // the draw's environ, projected or sphere tex gen block in the frame data, -1 for none
+        int32_t fogBase;   // the draw's fog block in the frame data, -1 for none: (start, end), then the colour
     };
     static_assert(sizeof(PushConstants) <= 128, "past Vulkan's guaranteed push constant size");
 

@@ -57,6 +57,7 @@ namespace gh2
             float pos[4];
             float color[4];
             float uv[2];
+            float fog; // F, 1.0 being the GS's 255
         };
 
         // mesh.vert's main, line for line.
@@ -113,6 +114,10 @@ namespace gh2
             for (int c = 0; c < 4; ++c)
                 out.pos[c] = pc.mvp[0 + c] * pos[0] + pc.mvp[4 + c] * pos[1] + pc.mvp[8 + c] * pos[2] +
                              pc.mvp[12 + c] * pos[3];
+            out.fog = 1.0f;
+            if (pc.fogBase >= 0)
+                out.fog = std::clamp((out.pos[3] - data[pc.fogBase].v[1]) / (data[pc.fogBase].v[0] - data[pc.fogBase].v[1]),
+                                     0.0f, 1.0f);
 
             const uint32_t mode = pc.flags & 7u;
             const float *base = (pc.flags & kFlagPrelit) ? vertexColor : pc.matColor;
@@ -323,7 +328,18 @@ namespace gh2
                                  out.pos[0], out.pos[1], out.pos[2], out.pos[3], out.color[0], out.color[1],
                                  out.color[2], out.color[3], out.uv[0], out.uv[1]);
                 }
-                std::fprintf(file, "], \"indices\": [");
+                // The fog colour and each vertex's F in 255ths, for a draw that is fogged.
+                if (pc.fogBase >= 0)
+                {
+                    std::fprintf(file, "], \"fog\": [%.9g, %.9g, %.9g, %.9g, %.9g], \"fogF\": [",
+                                 data[pc.fogBase].v[0], data[pc.fogBase].v[1], data[pc.fogBase + 1].v[0],
+                                 data[pc.fogBase + 1].v[1], data[pc.fogBase + 1].v[2]);
+                    for (size_t v = 0; v < draw.mesh->verts.size(); ++v)
+                        std::fprintf(file, "%s%.9g", v ? ", " : "", shade(draw.mesh->verts[v], pc, data).fog * 255.0f);
+                    std::fprintf(file, "], \"indices\": [");
+                }
+                else
+                    std::fprintf(file, "], \"indices\": [");
                 for (size_t n = 0; n < draw.mesh->indices.size(); ++n)
                     std::fprintf(file, "%s%u", n ? ", " : "", draw.mesh->indices[n]);
                 std::fprintf(file, "]}");

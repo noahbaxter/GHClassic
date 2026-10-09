@@ -200,6 +200,7 @@ def our_runs(draws, width, height):
         # What the GS is told, as retail's runs are split: a skinned mesh and a rigid one of one material
         # are one run there.
         state = {k: draw[k] for k in STATE}
+        state["fogged"] = "fog" in draw  # a fog block (start, end, colour) and each vertex's F, in 255ths
         if runs and runs[-1]["state"] == state:
             runs[-1]["verts"] += our_verts(draw, width, height)
             runs[-1]["draws"].append(draw)
@@ -271,8 +272,8 @@ def state_notes(state, draw):
     # TEX0's TFX: 0 modulate, 1 decal, 2 highlight.
     if prim["tme"] and state["TEX0"]["tfx"] != (1 if draw["decal"] else 2 if draw["highlight"] else 0):
         notes.append(f"highlight {draw['highlight']}, decal {draw['decal']}, retail tfx {state['TEX0']['tfx']}")
-    if prim["fge"]:
-        notes.append("retail fogs it")
+    if bool(prim["fge"]) != draw["fogged"]:
+        notes.append("retail fogs it" if prim["fge"] else "ours fogs it, retail does not")
     return notes
 
 
