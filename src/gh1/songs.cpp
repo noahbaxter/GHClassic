@@ -25,8 +25,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <iostream>
 #include <map>
+#include <set>
+#include <vector>
 
 namespace gh2::gh1
 {
@@ -109,6 +112,56 @@ namespace gh2::gh1
             return from + (measure - at) * length;
         }
 
+        // GH2's [section <name>] texts (SongDB::SetupPracticeSections,
+        // 0x11d560), which practice starts from and the results' breakdown
+        // counts by: intro, verse_1, chorus_2, gtr_solo, bridge. GH1's
+        // EVENTS mark only verse, chorus, solo and bridge, each on the beat
+        // its part starts, its first gem a grace ahead. The first section
+        // starts on the measure of the song's first gem, an intro of its
+        // own where that is over a beat before the first mark.
+        std::vector<std::pair<uint32_t, std::string>> sections(const midi::File &in,
+                                                               const std::vector<std::pair<uint32_t, std::string>> &marks,
+                                                               uint32_t firstGem)
+        {
+            static const std::map<std::string, std::pair<std::string, std::string>> kNamed = {
+                {"verse", {"verse", "Verse"}},
+                {"chorus", {"chorus", "Chorus"}},
+                {"solo", {"gtr_solo", "Gtr solo"}},
+                {"bridge", {"bridge", "Bridge"}},
+            };
+            // GH2's locale names verse_1 to verse_5 and chorus_1 to chorus_5;
+            // GH1 has up to twelve verses.
+            static std::set<std::string> s_added;
+            std::map<std::string, int> total, seen;
+            for (const auto &[tick, mark] : marks)
+                ++total[mark];
+            std::vector<std::pair<uint32_t, std::string>> out;
+            for (const auto &[tick, mark] : marks)
+            {
+                const auto &[stem, label] = kNamed.at(mark);
+                const int n = ++seen[mark];
+                std::string name = stem;
+                if (mark == "verse" || mark == "chorus" || total[mark] > 1)
+                {
+                    name += "_" + std::to_string(n);
+                    if (n > 5 && s_added.insert(name).second)
+                        locale::add(name, label + " " + std::to_string(n));
+                }
+                out.emplace_back(tick, name);
+            }
+            if (out.empty() || firstGem >= out.front().first)
+                return out;
+            uint32_t measure = 0u;
+            while (measureTick(in, measure + 1u) <= firstGem)
+                ++measure;
+            const uint32_t start = measureTick(in, measure);
+            if (out.front().first - firstGem > in.division)
+                out.insert(out.begin(), {start, "intro"});
+            else
+                out.front().first = start;
+            return out;
+        }
+
         std::optional<midi::Bytes> chart(const midi::Bytes &gh1)
         {
             const auto in = midi::parse(gh1);
@@ -149,10 +202,23 @@ namespace gh2::gh1
                     else if (e.status != 0xffu)
                         made["PART GUITAR"].events.push_back(e);
                 }
+            std::vector<std::pair<uint32_t, std::string>> marks;
             for (const midi::Event &e : events->events)
                 if (const auto s = textOf(e))
+                {
                     if (const auto [track, text] = cue(*s); !track.empty())
                         made[track].events.push_back(midi::text(e.tick, text));
+                    if (*s == "verse" || *s == "chorus" || *s == "solo" || *s == "bridge")
+                        marks.emplace_back(e.tick, *s);
+                }
+            // GH1's gems are notes 60 to 100 of T1 GEMS, easy's to expert's.
+            uint32_t firstGem = UINT32_MAX;
+            for (const midi::Event &e : gems->events)
+                if ((e.status & 0xf0u) == 0x90u && e.data.size() > 1u && e.data[1] != 0u && e.data[0] >= 60u &&
+                    e.data[0] <= 100u)
+                    firstGem = std::min(firstGem, e.tick);
+            for (const auto &[tick, name] : sections(*in, marks, firstGem))
+                made["EVENTS"].events.push_back(midi::text(tick, "[section " + name + "]"));
             // GH2 starts the crowd's level loops, and the world's
             // music_start, from a [music_start] text (CrowdAudio::Handle,
             // 0x1245a8); GH1's songs have none, its BeatMatch sends it at the
