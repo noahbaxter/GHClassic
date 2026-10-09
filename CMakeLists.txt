@@ -162,6 +162,7 @@ endif()
 # registry, and the host window and renderer they draw through.
 set(GHC_GAME_SOURCES
     src/main.cpp
+    src/build_info.cpp
     src/game.cpp
     src/frame_step.cpp
     src/script.cpp
@@ -261,6 +262,21 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
 configure_file(src/ui/dta/dta.h.in "${GHC_DTA_DIR}/dta.h" @ONLY)
 target_include_directories(GHClassic PRIVATE "${GHC_DTA_DIR}")
 
+# What the build is (src/build_info.h), from tools/ghc.py: the tag it was made
+# from, and whether that is the experimental track's.
+set(GHC_VERSION "dev" CACHE STRING "The release this build is")
+option(GHC_EXPERIMENTAL "The experimental track: its own name, saves and settings" OFF)
+set(GHC_EXPERIMENTAL_VALUE 0)
+set(GHC_BUNDLE_NAME "GH Classic")
+set(GHC_BUNDLE_ID com.noahbaxter.ghclassic)
+if(GHC_EXPERIMENTAL)
+    set(GHC_EXPERIMENTAL_VALUE 1)
+    set(GHC_BUNDLE_NAME "GH Classic Experimental")
+    set(GHC_BUNDLE_ID com.noahbaxter.ghclassic.experimental)
+endif()
+set_source_files_properties(src/build_info.cpp PROPERTIES
+    COMPILE_DEFINITIONS "GHC_VERSION=\"${GHC_VERSION}\";GHC_EXPERIMENTAL=${GHC_EXPERIMENTAL_VALUE}")
+
 # The window icons, where SDL_GetBasePath finds them. On macOS the game is an
 # app bundle, so other apps (Finder, audio mixers) see its icon too, and the
 # base path is the bundle's Resources.
@@ -273,8 +289,8 @@ if(APPLE)
     set_source_files_properties("${GHC_MOLTENVK}" PROPERTIES MACOSX_PACKAGE_LOCATION Frameworks)
     set_target_properties(GHClassic PROPERTIES
         MACOSX_BUNDLE TRUE
-        MACOSX_BUNDLE_BUNDLE_NAME "GH Classic"
-        MACOSX_BUNDLE_GUI_IDENTIFIER com.noahbaxter.ghclassic
+        MACOSX_BUNDLE_BUNDLE_NAME "${GHC_BUNDLE_NAME}"
+        MACOSX_BUNDLE_GUI_IDENTIFIER ${GHC_BUNDLE_ID}
         MACOSX_BUNDLE_ICON_FILE icon.icns)
 else()
     configure_file(assets/icon.png "${CMAKE_CURRENT_BINARY_DIR}/icon.png" COPYONLY)

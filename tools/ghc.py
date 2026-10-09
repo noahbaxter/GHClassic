@@ -164,6 +164,18 @@ def build_tools(env, jobs):
     run(["cmake", "--build", TOOLS, "--target", "ps2_analyzer", "ps2_recomp", "-j", jobs], env)
 
 
+def tree_version():
+    """The tag this tree is, or how git describes it from the last one."""
+    return subprocess.run(["git", "describe", "--tags", "--always", "--dirty"], cwd=ROOT, stdout=subprocess.PIPE,
+                          text=True).stdout.strip() or "unknown"
+
+
+def experimental(tag):
+    """A tag with -exp (v0.6-exp.1) is the experimental track's: every game in
+    one, named and installed apart from the stable one."""
+    return "-exp" in tag
+
+
 def build(disc=None, recomp=True, lto=True):
     env = tool_env()
     jobs = str(os.cpu_count() or 4)
@@ -196,8 +208,10 @@ def build(disc=None, recomp=True, lto=True):
         print(f"generated {len(list((RECOMP / 'output').glob('*.cpp')))} files")
 
     # Configured after recompiling, so the glob in CMakeLists.txt sees the output.
+    tag = tree_version()
     run(["cmake", "-S", ROOT, "-B", GAME, "-DCMAKE_BUILD_TYPE=Release",
-         f"-DGHC_GENERATED_DIR={RECOMP / 'output'}", f"-DGHC_ENABLE_LTO={'ON' if lto else 'OFF'}"], env, quiet=True)
+         f"-DGHC_GENERATED_DIR={RECOMP / 'output'}", f"-DGHC_ENABLE_LTO={'ON' if lto else 'OFF'}",
+         f"-DGHC_VERSION={tag}", f"-DGHC_EXPERIMENTAL={'ON' if experimental(tag) else 'OFF'}"], env, quiet=True)
     run(["cmake", "--build", GAME, "--target", "GHClassic", "-j", jobs], env)
 
 
@@ -429,13 +443,14 @@ def write_licenses(dest, version):
 def release_portable(out, version):
     """A folder to unzip anywhere: the game, its icon and PUT_DISC_HERE, whose
     presence makes the game keep its settings and saves beside it too."""
-    stage = out / "GHClassic"
+    name = "GHClassic-experimental" if experimental(version) else "GHClassic"
+    stage = out / name
     (stage / "PUT_DISC_HERE").mkdir(parents=True)
     (stage / "PUT_DISC_HERE" / PLACEHOLDER).write_text("")
     shutil.copy2(game_binary(), stage)
     shutil.copy2(GAME / "icon.png", stage)
     write_licenses(stage, version)
-    archive = out / f"GHClassic-{'windows' if WINDOWS else 'linux'}-x64-{version}.zip"
+    archive = out / f"{name}-{'windows' if WINDOWS else 'linux'}-x64-{version}.zip"
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:
         for path in sorted([stage, *stage.rglob("*")]):
             info = zipfile.ZipInfo.from_file(path, path.relative_to(out).as_posix())
@@ -452,9 +467,10 @@ def release_macos(out, version):
     leaves quarantine and App Translocation behind, and keeps its disc and
     saves in Application Support. Signed with GHC_SIGN_IDENTITY (else ad hoc)
     and notarized when APPLE_ID, APPLE_TEAM_ID and APPLE_APP_PASSWORD are set."""
+    track = experimental(version)
     stage = out / "dmg"
     stage.mkdir()
-    app = stage / "GHClassic.app"
+    app = stage / ("GHClassic Experimental.app" if track else "GHClassic.app")
     shutil.copytree(GAME / "GHClassic.app", app, symlinks=True)
     write_licenses(app / "Contents" / "Resources", version)
     (stage / "Applications").symlink_to("/Applications")
@@ -467,9 +483,9 @@ def release_macos(out, version):
     env = dict(os.environ)
     run([*sign, app / "Contents" / "Frameworks" / "libMoltenVK.dylib"], env)
     run([*sign, app], env)
-    archive = out / f"GHClassic-macos-arm64-{version}.dmg"
-    run(["hdiutil", "create", "-volname", "GH Classic", "-srcfolder", stage, "-ov", "-format", "UDZO", archive],
-        env, quiet=True)
+    archive = out / f"{'GHClassic-experimental' if track else 'GHClassic'}-macos-arm64-{version}.dmg"
+    run(["hdiutil", "create", "-volname", "GH Classic Experimental" if track else "GH Classic", "-srcfolder", stage,
+         "-ov", "-format", "UDZO", archive], env, quiet=True)
     shutil.rmtree(stage)
     if identity == "-":
         print("ad hoc signed: set GHC_SIGN_IDENTITY to a Developer ID to sign", file=sys.stderr)
@@ -494,8 +510,7 @@ def cmd_release(argv):
         build(args.disc, recomp=not (RECOMP / "output").is_dir())
     if not game_binary().exists():
         sys.exit("no build; run tools/ghc.py build")
-    version = subprocess.run(["git", "describe", "--tags", "--always", "--dirty"], cwd=ROOT, stdout=subprocess.PIPE,
-                             text=True).stdout.strip() or "unknown"
+    version = tree_version()
     out = BUILD / "release"
     shutil.rmtree(out, ignore_errors=True)
     out.mkdir(parents=True)

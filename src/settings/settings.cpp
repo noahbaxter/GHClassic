@@ -1,5 +1,6 @@
 #include "settings/settings.h"
 
+#include "build_info.h"
 #include "disc/disc.h"
 #include "settings/ini.h"
 
@@ -216,16 +217,16 @@ namespace gh2::settings
         s_path = path;
     }
 
-    // A portable install keeps it all beside the executable. Otherwise the
-    // project was ghrecomp: its directory, when it is the only one, is moved
-    // over whole the first time.
+    // A portable install keeps it all beside the executable. Otherwise each
+    // track has a directory of its own. The project was ghrecomp: its
+    // directory, when it is the only one, is moved over whole the first time.
     std::string userDataPath(const std::string &file)
     {
         static const std::string dir = []
         {
             if (disc::portable())
                 return std::string(SDL_GetBasePath());
-            char *pref = SDL_GetPrefPath("", "GHClassic");
+            char *pref = SDL_GetPrefPath("", build::kExperimental ? "GHClassicExperimental" : "GHClassic");
             if (!pref)
                 return std::string();
             const std::string made = pref;
@@ -234,7 +235,7 @@ namespace gh2::settings
             std::error_code error;
             const fs::path current = fs::path(made).parent_path();
             const fs::path old = current.parent_path() / "ghrecomp";
-            if (fs::is_directory(old, error) && fs::is_empty(current, error))
+            if (!build::kExperimental && fs::is_directory(old, error) && fs::is_empty(current, error))
             {
                 fs::remove(current, error);
                 fs::rename(old, current, error);

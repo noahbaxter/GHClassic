@@ -1,7 +1,7 @@
-# A pushed tag (v0.5) builds the game on each platform and drafts a GitHub
-# Release holding the packages (tools/ghc.py release); nothing is public
-# until the draft is published by hand. Run by hand it only builds and
-# packages, uploading nothing.
+# A pushed tag (v0.5, or v0.5-exp.1 on the experimental line) builds the game
+# on each platform and drafts a GitHub Release holding the packages
+# (tools/ghc.py release); nothing is public until the draft is published by
+# hand. Run by hand it only builds and packages, uploading nothing.
 #
 # The recompile reads GH2's boot executable, which is no part of this repo:
 # it comes from a private one through a read-only deploy key (ELF_DEPLOY_KEY).
@@ -124,8 +124,13 @@ jobs:
         with:
           path: packages
           merge-multiple: true
-      - run: >
-          gh release create "$GITHUB_REF_NAME" packages/* --repo "$GITHUB_REPOSITORY" --draft
-          --title "GH Classic ${GITHUB_REF_NAME#v}" --generate-notes
+      # A pre-release on either track while the game is unfinished; a tag with
+      # -exp (v0.6-exp.1) is the experimental track's.
+      - run: |
+          title="GH Classic"
+          case "$GITHUB_REF_NAME" in *-exp*) title="GH Classic Experimental" ;; esac
+          gh release create "$GITHUB_REF_NAME" packages/* --repo "$GITHUB_REPOSITORY" --draft --prerelease \
+            --title "$title ${GITHUB_REF_NAME#v} (work in progress)" --generate-notes \
+            --notes "Work in progress: unfinished, and it will change."
         env:
           GH_TOKEN: ${{ github.token }}
