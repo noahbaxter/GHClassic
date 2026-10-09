@@ -19,6 +19,7 @@
 //   menus       GH1's screens and their text (gh1/menus.h), under GH2's
 //               scripts fitted to them
 //   music       GH1's menu loops
+//   sound       GH1's star power and stingers (gh1/sound.h)
 
 #include "gh1/career.h"
 
@@ -28,6 +29,7 @@
 #include "gh1/menu_scripts.h"
 #include "gh1/menus.h"
 #include "gh1/songs.h"
+#include "gh1/sound.h"
 #include "gh1/venues.h"
 
 #include <algorithm>
@@ -304,6 +306,7 @@ namespace gh2::gh1
         // GH1's intro movie, in its archive, where GH2 plays its own
         // (splash.dta's CUT_SCENE_VIDEO in each).
         ark::lend(layer, "videos/intro.pss", disc, "videos/ghintro.pss");
+        addSounds(layer, disc);
         const std::set<std::string> scenes = addMenus(layer, disc, text);
         for (dtb::Node &entry : locale->nodes)
             if (const auto it = text.find(keyOf(entry)); entry.type == dtb::kArray && entry.nodes.size() > 1u && it != text.end())
