@@ -317,27 +317,61 @@ namespace gh2
             };
 
             auto set = load("char/" + gh2Set + "/anims/gen/" + gh2Set + "_main.milo_ps2");
+            if (!set)
+                return std::nullopt;
+            // Each clip's GH1 anim, by its name or its situation, and whether
+            // only its arms are GH1's. Those it plays whole go from one to
+            // another by GH1's graph (hair.acg), its beats theirs: GH2's
+            // transitions are at its own clips' beats, which GH1's often end
+            // before, and a clip with no way out holds its last pose (a
+            // special_01 ending at 11.9, its exits from 15.4).
+            struct Source
+            {
+                const Gh1Anim *anim;
+                bool standIn, splice;
+            };
+            std::map<std::string, Source> sources;
+            std::map<std::string, size_t> plays;
+            for (const auto &[kind, name] : set->entries)
+            {
+                if (kind != "CharClipSamples")
+                    continue;
+                Source source{nullptr, false, false};
+                if (const auto a = byName.find(name); a != byName.end())
+                    source.anim = a->second;
+                else if (const auto b = byName.find(gh1Name(name)); b != byName.end())
+                    source.anim = b->second;
+                else if (const std::string flag = situation(name); !flag.empty())
+                    source = {pick(macroInt(macros, flag), name), true, spliced(name)};
+                if (!source.anim || !clips.get(main->directory, source.anim->name))
+                    continue;
+                sources[name] = source;
+                if (!source.splice)
+                    plays[name] = static_cast<size_t>(source.anim - main->anims.data());
+            }
+            const auto acg = ark::readFile(main->directory + "/" + main->name + ".acg");
+            const auto jumps = acg ? graph(*acg, main->anims.size()) : std::nullopt;
+
             std::set<std::string> channels;
-            if (!set || !rebuild(*set, channels, [&](const std::string &name, const Gh2Clip &parts) -> std::optional<Replacement>
+            if (!rebuild(*set, channels, [&](const std::string &name, const Gh2Clip &parts) -> std::optional<Replacement>
                 {
-                    if (const auto a = byName.find(name); a != byName.end())
-                        return asIs(clips, main->directory, *a->second);
-                    if (const auto a = byName.find(gh1Name(name)); a != byName.end())
-                        return asIs(clips, main->directory, *a->second);
-                    const std::string kind = situation(name);
-                    const Gh1Anim *source = kind.empty() ? nullptr : pick(macroInt(macros, kind), name);
-                    const Gh1Clip *donor = source ? clips.get(main->directory, source->name) : nullptr;
-                    if (!donor)
+                    const auto source = sources.find(name);
+                    if (source == sources.end())
                         return std::nullopt;
-                    if (spliced(name))
+                    const Gh1Anim &anim = *source->second.anim;
+                    if (source->second.splice)
                     {
-                        auto clip = splice(parts, *donor);
+                        auto clip = splice(parts, *clips.get(main->directory, anim.name));
                         if (!clip)
                             return std::nullopt;
                         return Replacement{std::move(*clip), name};
                     }
-                    const std::string own = source->name.rfind(prefix, 0) == 0 ? source->name.substr(prefix.size()) : source->name;
-                    return Replacement{*donor, own};
+                    auto made = asIs(clips, main->directory, anim);
+                    if (made && jumps)
+                        made->transitions = transitions((*jumps)[plays.at(name)], plays);
+                    else if (made && source->second.standIn)
+                        made->transitionsFrom = anim.name.rfind(prefix, 0) == 0 ? anim.name.substr(prefix.size()) : anim.name;
+                    return made;
                 }) || !declareBones(*set, channels, gh1))
                 return std::nullopt;
             SongSets out;
