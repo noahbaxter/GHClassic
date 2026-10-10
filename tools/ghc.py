@@ -5,7 +5,7 @@
     tools/ghc.py build [disc] [--skip-recomp] [--no-lto]
     tools/ghc.py bind [--isolated] [keyboard | <n>]   set up a controller; with no device, list them
     tools/ghc.py arm [out] [--scenario <file>] [--speed <x>] [--secs 30] [--disc <image>] [--shot-every 60]
-    tools/ghc.py scenarios [-j 4] [--speed 2] [name ...]
+    tools/ghc.py scenarios [-j 4] [--speed 2] [--review] [name ...]
     tools/ghc.py release [--skip-build] [disc]  this platform's player package, into build/release
     tools/ghc.py ci                          what builds without a disc, into build/ci
 
@@ -27,11 +27,13 @@ requirements.txt; CMake fetches the game's libraries at pinned versions.
 arm runs the game once, hidden and muted, with --fast-boot --seed 1, no
 save and default settings: a first boot. out (default
 runs/<scenario's name>) gets run.log, frames/ (frame_0012.30s.png, seconds
-since launch), shots/ and shots.png from the scenario's (shot name) steps,
-and on macOS stack.txt, a 3 s sample taken if it is still alive at --secs.
-scenarios runs the files in scenarios/ through arm side by side: a run
-passes when it reaches its last step and quits with no FAIL or STALL in its
-log.
+since launch), shots/ from the scenario's (shot name) steps, and on macOS
+stack.txt, a 3 s sample taken if it is still alive at --secs. The shots on
+one sheet go to the main checkout's review/ as <date>_<time>_<name>.png,
+where everything to look at goes. scenarios runs the files in scenarios/
+through arm side by side, the sheets staying in each run as shots.png unless
+--review: a run passes when it reaches its last step and quits with no FAIL
+or STALL in its log. Both clear runs/ of runs older than three days.
 
 release packages a build for players, who bring their own disc: a zip of
 the game beside PUT_DISC_HERE on Windows and Linux, a disk image on macOS.
@@ -379,8 +381,24 @@ def cmd_play(argv):
     return subprocess.run([str(game_binary()), disc, *args, *argv]).returncode
 
 
-def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=None):
-    """One unattended run into out. Returns 'exited before Ns' or 'alive at Ns'."""
+def review_path(what, suffix=".png"):
+    """Where something to look at goes: the main checkout's review/, flat and
+    named by when it was made, so it sorts by time."""
+    review = main_checkout() / "review"
+    review.mkdir(exist_ok=True)
+    return review / f"{time.strftime('%Y-%m-%d_%H%M')}_{what}{suffix}"
+
+
+def prune_runs(days=3):
+    """Runs older than that: their output is the tools', rebuilt by the next run."""
+    for run in (ROOT / "runs").glob("*"):
+        if time.time() - run.stat().st_mtime > days * 86400:
+            shutil.rmtree(run, ignore_errors=True) if run.is_dir() else run.unlink()
+
+
+def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=None, review=False):
+    """One unattended run into out. Returns 'exited before Ns' or 'alive at Ns'.
+    With review, its shot sheet goes to review/ rather than out."""
     from PIL import Image
 
     out = Path(out)
@@ -439,7 +457,7 @@ def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=N
             x = (i % cols) * cell_w + (cell_w - shot.width) // 2
             y = (i // cols) * cell_h + (cell_h - shot.height) // 2
             sheet.paste(shot, (x, y))
-        sheet.save(out / "shots.png")
+        sheet.save(review_path(out.name) if review else out / "shots.png")
     return state
 
 
@@ -454,7 +472,8 @@ def cmd_arm(argv):
     args = parser.parse_args(argv)
     name = Path(args.scenario).stem if args.scenario else "run"
     out = Path(args.out) if args.out else ROOT / "runs" / name
-    state = arm(out, args.scenario, args.speed, args.secs, args.disc, args.shot_every)
+    prune_runs()
+    state = arm(out, args.scenario, args.speed, args.secs, args.disc, args.shot_every, review=True)
     frames = len(list((out / "frames").iterdir()))
     print(f"{state}, {frames} frames, log {out.resolve() / 'run.log'}")
     stack = out / "stack.txt"
@@ -474,6 +493,7 @@ def cmd_scenarios(argv):
     # Song clock checks hold to about 4x on an M4 Pro and 3x on a Ryzen 7800X3D,
     # bound by the game thread; 2x holds on both, four at once.
     parser.add_argument("--speed", type=float, default=2)
+    parser.add_argument("--review", action="store_true", help="each run's shot sheet into review/")
     parser.add_argument("names", nargs="*", help="files in scenarios/ without .dta; none means all")
     args = parser.parse_args(argv)
     # Not dotfiles: pathlib's glob matches them, and a tar made on macOS
@@ -485,7 +505,7 @@ def cmd_scenarios(argv):
     def one(name):
         out = ROOT / "runs" / name
         started = time.time()
-        state = arm(out, ROOT / "scenarios" / f"{name}.dta", args.speed, 600, disc, env=env)
+        state = arm(out, ROOT / "scenarios" / f"{name}.dta", args.speed, 600, disc, env=env, review=args.review)
         log = (out / "run.log").read_text(errors="replace")
         # Anywhere in a line: the watchdog's STALL lands mid-line in the game thread's output.
         failures = [m.group(1) for m in re.finditer(r"\[scenario\] ((?:FAIL|STALL).*)", log)]
@@ -496,6 +516,7 @@ def cmd_scenarios(argv):
         return f"{verdict:<4} {name:<16} {round(time.time() - started):4d}s  {failures[0] if failures else ''}".rstrip()
 
     (ROOT / "runs").mkdir(exist_ok=True)
+    prune_runs()
     lines = []
     started = time.time()
     with ThreadPoolExecutor(args.jobs) as pool:
