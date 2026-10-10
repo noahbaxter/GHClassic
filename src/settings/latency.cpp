@@ -11,16 +11,16 @@
 //
 // So the hit window follows the picture, offset = -video, and the song clock
 // runs video - audio ahead of the audio it plays, so the sound and picture of
-// one moment arrive together. The clock is StreamEE's VarTimer, held to the
-// IOP's played position (synth.cpp), so the shift goes where the time is
-// read, not into the timer.
+// one moment arrive together. A note is judged at the song clock plus the
+// offset, the music's time less audio: video moves only the picture. The
+// clock is StreamEE's VarTimer, held to the IOP's played position
+// (synth.cpp), so the shift goes where the time is read, not into the timer.
 //
 // settings.ini owns both values, and every write of the game's offset is
 // replaced, a save load's included. The game's lag screen, which measured
 // audio but set the hit window, is replaced by src/ui/dta/lag_panel.dta, which
-// sets the two through {latency ...}. The first save load seeds video from
-// the save's offset, which leaves the hit window as it was; audio starts at
-// its default, the port's own delay (settings.cpp).
+// sets the two through {latency ...}. Both start at their defaults, the
+// port's own delays (settings.cpp); a save's offset was its TV's.
 //
 // A sound the game times off that clock would come out video - audio late
 // against the music. The one musical case: game.dta's beat handler claps in
@@ -59,18 +59,9 @@ namespace gh2
             return -static_cast<float>(settings::get(settings::kVideoLagMs));
         }
 
-        // Audio keeps its default: the save's offset is the hit window's.
-        void seed(int lagMs)
-        {
-            settings::set(settings::kVideoLagMs, lagMs);
-            settings::set(settings::kAudioLagMs, settings::get(settings::kAudioLagMs));
-        }
-
         struct SetSyncOffsetTag;
         void onSetSyncOffset(uint8_t *, R5900Context *ctx, PS2Runtime *)
         {
-            if (!settings::isSet(settings::kVideoLagMs))
-                seed(static_cast<int>(std::lround(-ctx->f[12])));
             ctx->f[12] = syncOffset();
         }
 
@@ -78,8 +69,6 @@ namespace gh2
         struct BeatMatchTag;
         void onBeatMatch(uint8_t *rdram, R5900Context *, PS2Runtime *)
         {
-            if (!settings::isSet(settings::kVideoLagMs))
-                seed(0);
             store<float>(rdram, load<uint32_t>(rdram, s_addresses->theOptions) + kSyncOffset, syncOffset());
         }
 

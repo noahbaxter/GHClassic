@@ -56,8 +56,12 @@ namespace gh2::settings
             // Off: a sphere that holds only part of its mesh hides what still
             // shows (flashpot_4.mesh in battle's fail sequence).
             {"video", "frustum_cull", Type::kBool, 0, 1, 1, 0, 1},
-            // 5 ms: finer is below what a player can feel.
-            {"latency", "video_ms", Type::kInt, -500, 500, 5, 0, 0},
+            // 5 ms: finer is below what a player can feel. 45 by default, as
+            // audio: a frame reaches the screen two or three refreshes after
+            // it is drawn (FIFO presentation, two frames in flight), and with
+            // 0 every animation, light and gem showed late against the music
+            // (Noah's Mac matched at video 80 with audio 80, 2026-10-10).
+            {"latency", "video_ms", Type::kInt, -500, 500, 5, 45, 0},
             // 45 by default: the port's own delay on macOS, SDL's CoreAudio
             // queue (about 43 ms; the song clock is held to the mixed audio,
             // synth.cpp). Not measured on Windows or Linux yet.
