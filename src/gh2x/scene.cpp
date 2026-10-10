@@ -244,6 +244,9 @@ namespace gh2::gh2x
             }
             else if (!noPs2Class(className))
                 made = toPs2(className, body);
+            if (made && className == "ParticleSys" && source.spin)
+                if (const auto spin = particleSpin(body))
+                    source.spin(name, *spin);
             if (made && className == "CamShot")
                 if (auto focus = camShotFocus(body))
                     keep(className, focusShot(name), std::move(*focus));

@@ -37,6 +37,13 @@ namespace gh2::look
     // registered one. Game thread only.
     std::shared_ptr<const Shading> find(const char *mat, uint32_t diffuse);
 
+    // A 360 ParticleSys whose particles turn, by its name and its Mat's
+    // (two venues share a system's name), and the turns a minute each
+    // particle takes, somewhere between the two.
+    void addSpin(const std::string &system, const std::string &mat, float rpmLow, float rpmHigh);
+    // That system's two rates, null when its particles do not turn.
+    const float *findSpin(const char *system, const char *mat);
+
     // Maps no draw has asked for in a while are let go.
     void endFrame();
 

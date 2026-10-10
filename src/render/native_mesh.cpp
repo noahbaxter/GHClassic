@@ -17,6 +17,7 @@
 #include "render/mesh_capture.h"
 #include "render/native_environ.h"
 #include "render/native_mat.h"
+#include "settings/settings.h"
 
 #include <algorithm>
 
@@ -59,6 +60,13 @@ namespace gh2
             {
                 camera.targetWidth = load<uint32_t>(rdram, camera.target + milo::tex::kWidth);
                 camera.targetHeight = load<uint32_t>(rdram, camera.target + milo::tex::kHeight);
+                // The 360 draws its crowd's cards from 256 by 512, twice the
+                // PS2's each way, then halves them three times as here.
+                if (settings::get(settings::kModels) == settings::kX360)
+                {
+                    camera.targetWidth *= 2u;
+                    camera.targetHeight *= 2u;
+                }
             }
         }
         return internCamera(camera);
