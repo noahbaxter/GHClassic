@@ -22,6 +22,9 @@ namespace gh2::gh2x
         constexpr float kPi = 3.14159265f;
         // The map DrawShadowBuffer last drew, until SetShadowMap takes it up.
         int32_t s_made = -1;
+        // Radii of its sphere past which a caster's vert is not the
+        // character's pose.
+        constexpr float kReachLimit = 1.5f;
 
         // The inverse of a transform: three rows and a position.
         Matrix inverse(const Matrix &m)
@@ -41,6 +44,59 @@ namespace gh2::gh2x
                 }
             out[15] = 1.0f;
             return out;
+        }
+
+        // How far the casters drawn from `first` on reach from `centre`, as
+        // posed, leaving out what is past `limit` (a guitar not yet in its
+        // guitarist's hands is several radii off for a few frames).
+        float reach(const Frame &frame, size_t first, const float centre[3], float limit)
+        {
+            float farthest = 0.0f;
+            for (size_t i = first; i < frame.draws.size(); ++i)
+            {
+                const DrawCall &draw = frame.draws[i];
+                if (!draw.shadowCaster || !draw.mesh)
+                    continue;
+                for (const Vertex &v : draw.mesh->verts)
+                {
+                    float at[3] = {};
+                    const auto through = [&](const Matrix &m, float weight)
+                    {
+                        for (size_t c = 0; c < 3; ++c)
+                            at[c] += weight * (v.pos[0] * m[c] + v.pos[1] * m[4u + c] + v.pos[2] * m[8u + c] + m[12u + c]);
+                    };
+                    if (draw.skinned)
+                        for (size_t b = 0; b < draw.bones.size(); ++b)
+                            through(draw.bones[b], v.color[b]);
+                    else
+                        through(draw.world, 1.0f);
+                    const float d[3] = {at[0] - centre[0], at[1] - centre[1], at[2] - centre[2]};
+                    const float distance = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+                    if (distance <= limit)
+                        farthest = std::max(farthest, distance);
+                }
+            }
+            return farthest;
+        }
+
+        // A shadow map's camera: the light's own rotation, back from the
+        // sphere's centre along the light's y by d = radius / tan(pi/8), with
+        // a 45 degree field of view, from d - radius to d + radius.
+        Camera shadowCamera(Matrix world, const float centre[3], float radius, int32_t index)
+        {
+            const float back = radius / std::tan(kPi / 8.0f);
+            for (uint32_t i = 0; i < 3; ++i)
+                world[12u + i] = centre[i] - back * world[4u + i];
+            Camera camera;
+            camera.id = kShadowTex + static_cast<uint32_t>(index);
+            camera.view = inverse(world);
+            std::copy_n(world.data() + 12, 3, camera.eye);
+            camera.nearPlane = back - radius;
+            camera.farPlane = back + radius;
+            camera.yFov = kPi / 4.0f;
+            camera.target = camera.id;
+            camera.targetWidth = camera.targetHeight = kShadowSize;
+            return camera;
         }
 
         // Character::DrawShadowBuffer. The camera is the light's own
@@ -87,27 +143,27 @@ namespace gh2::gh2x
             const float radius = load<float>(rdram, sphere + 0x10u);
             if (radius > 0.0f)
             {
-                const float back = radius / std::tan(kPi / 8.0f);
-                Matrix world = readTransform(rdram, static_cast<uint32_t>(runtime->callGuestFunction(
-                                                        rdram, ctx, s_addresses->worldXfm, {light})));
+                const Matrix world = readTransform(rdram, static_cast<uint32_t>(runtime->callGuestFunction(
+                                                              rdram, ctx, s_addresses->worldXfm, {light})));
+                float centre[3];
                 for (uint32_t i = 0; i < 3; ++i)
-                    world[12u + i] = load<float>(rdram, sphere + i * 4u) - back * world[4u + i];
+                    centre[i] = load<float>(rdram, sphere + i * 4u);
                 const int32_t index = static_cast<int32_t>(frame.shadows.size());
-                Camera camera;
-                camera.id = kShadowTex + static_cast<uint32_t>(index);
-                camera.view = inverse(world);
-                std::copy_n(world.data() + 12, 3, camera.eye);
-                camera.nearPlane = back - radius;
-                camera.farPlane = back + radius;
-                camera.yFov = kPi / 4.0f;
-                camera.target = camera.id;
-                camera.targetWidth = camera.targetHeight = kShadowSize;
-                frame.shadows.push_back(internCamera(camera));
+                const uint32_t camera = internCamera(shadowCamera(world, centre, radius, index));
+                frame.shadows.push_back(camera);
                 frame.casting = index;
+                const size_t first = frame.draws.size();
                 call(::milo::character::kDrawShowing, ::milo::character::kDrawShadow, 0u);
                 frame.casting = -1;
                 s_made = index;
-            }
+                // The file's sphere does not hold every pose (a guitarist
+                // with a guitar reaches 1.15 of it, a band member 1.14), and
+                // what is outside the map casts nothing: the map grows to
+                // what was drawn into it. The 360's own spheres are not the
+                // file's either, by 0.87 to 1.43 in one frame.
+                const float reached = reach(frame, first, centre, radius * kReachLimit);
+                if (reached > radius)
+                    frame.cameras[camera] = shadowCamera(world, centre, reached, index);            }
             SET_GPR_U32(ctx, 29, sp);
             ctx->pc = returnTo;
         }
