@@ -408,7 +408,9 @@ namespace gh2::gh1
 
     Bytes texWith(const Bytes &tex, const Bytes &bitmap, bool sized)
     {
-        size_t head = 16u;
+        // GH2's Tex 10 has two more words and a byte before the size.
+        const size_t at = u32(tex, 0u) >= 10u ? 13u : 4u;
+        size_t head = at + 12u;
         str(tex, head);
         head += 9u;
         if (tex.size() < head || bitmap.size() < 32u)
@@ -418,7 +420,7 @@ namespace gh2::gh1
         {
             const uint32_t size[3] = {static_cast<uint32_t>(bitmap[7] | bitmap[8] << 8),
                                       static_cast<uint32_t>(bitmap[9] | bitmap[10] << 8), bitmap[1]};
-            std::memcpy(out.data() + 4u, size, sizeof size);
+            std::memcpy(out.data() + at, size, sizeof size);
         }
         out.back() = 0u;
         out.insert(out.end(), bitmap.begin(), bitmap.end());

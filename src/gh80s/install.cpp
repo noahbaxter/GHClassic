@@ -17,6 +17,7 @@
 #include "content/outfits.h"
 #include "content/campaigns.h"
 #include "content/setlists.h"
+#include "milo/milo.h"
 
 #include <string>
 
@@ -71,6 +72,15 @@ namespace gh2
             ark::rename("track/surfaces/gen/" + name + "_keep", *disc, "track/surfaces/gen/" + base + "_keep");
             outfits::photosFrom(name, *disc, base);
             outfits::add("gh80s", base, outfit.character, name, base, outfit.label);
+            // The 80s' picker draws each of its six as GH2's did, its own art.
+            const std::string tex = std::string("char_") + outfit.character + ".tex";
+            outfits::portrait(name, false, [disc = *disc, tex](const std::vector<uint8_t> &)
+                              {
+                                  const auto file = ark::readFile(disc, "ui/gen/sel_character.milo_ps2");
+                                  const auto scene = file ? milo::read(*file) : std::nullopt;
+                                  const auto i = scene ? milo::find(*scene, tex) : std::nullopt;
+                                  return i ? scene->bodies[*i] : std::vector<uint8_t>();
+                              });
         }
     }
 }

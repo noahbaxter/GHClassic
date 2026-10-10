@@ -1,6 +1,7 @@
 #include "content/outfits.h"
 
 #include "content/campaigns.h"
+#include "content/games.h"
 #include "disc/ark.h"
 #include "guest.h"
 #include "hook.h"
@@ -10,8 +11,11 @@
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
 
+#include <algorithm>
+#include <cstring>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <set>
 #include <unordered_map>
 #include <unordered_set>
@@ -285,6 +289,69 @@ namespace gh2::outfits
             const std::string index = std::to_string(i) + "_keep";
             ark::rename("ui/image/og/gen/photo_" + outfit + index, disc, "ui/image/og/gen/photo_" + source + index);
         }
+    }
+
+    void portrait(const std::string &outfit, bool colour,
+                  std::function<std::vector<uint8_t>(const std::vector<uint8_t> &tex)> make)
+    {
+        struct Portrait
+        {
+            std::string outfit;
+            bool colour;
+            std::function<milo::Bytes(const milo::Bytes &)> make;
+        };
+        static std::vector<Portrait> s_portraits;
+        if (s_portraits.empty())
+        {
+            // Quickplay's picker is GH2's scene whatever the menus, by its own
+            // path (sel_character.dta), so this is no career's.
+            ark::addMade("ghc/gh2/ui/gen/sel_character.milo_ps2", []() -> std::optional<ark::Made>
+                         {
+                             const auto gh2 = games::disc("gh2");
+                             const auto file = gh2 ? ark::readFile(*gh2, "ui/gen/sel_character.milo_ps2") : std::nullopt;
+                             auto scene = file ? milo::read(*file) : std::nullopt;
+                             if (!scene)
+                                 return std::nullopt;
+                             for (const Portrait &p : s_portraits)
+                             {
+                                 const std::string &name = p.outfit;
+                                 const auto o = std::find_if(s_outfits.begin(), s_outfits.end(),
+                                                             [&](const Outfit &x) { return x.outfit == name; });
+                                 const std::string own = o == s_outfits.end() ? "" : "char_" + o->character;
+                                 const auto tex = milo::find(*scene, own + ".tex"), mat = milo::find(*scene, own + ".mat");
+                                 milo::Bytes image = tex && mat ? p.make(scene->bodies[*tex]) : milo::Bytes();
+                                 if (image.empty())
+                                 {
+                                     std::cerr << "[outfits] no portrait for " << name << std::endl;
+                                     continue;
+                                 }
+                                 milo::Dir over;
+                                 over.bodies = {scene->bodies[*mat]};
+                                 // GH2's are ink: grey art in the Mat's black,
+                                 // its colour at 17 in Mat 27 (r g b a).
+                                 if (p.colour && over.bodies[0].size() >= 29u)
+                                     for (size_t at : {17u, 21u, 25u})
+                                     {
+                                         const float one = 1.0f;
+                                         std::memcpy(over.bodies[0].data() + at, &one, 4u);
+                                     }
+                                 milo::replacePrefix(over, own + ".tex", "portrait_" + name + ".tex");
+                                 milo::add(*scene, "Tex", "portrait_" + name + ".tex", std::move(image));
+                                 milo::add(*scene, "Mat", "portrait_" + name + ".mat", std::move(over.bodies[0]));
+                             }
+                             auto bytes = std::make_shared<milo::Bytes>(milo::write(*scene));
+                             return ark::Made{static_cast<uint32_t>(bytes->size()),
+                                              [bytes](uint64_t offset, uint8_t *dst, size_t n)
+                                              {
+                                                  if (offset >= bytes->size())
+                                                      return size_t{0};
+                                                  n = std::min<size_t>(n, bytes->size() - offset);
+                                                  std::memcpy(dst, bytes->data() + offset, n);
+                                                  return n;
+                                              }};
+                         });
+        }
+        s_portraits.push_back({outfit, colour, std::move(make)});
     }
 
     void install(PS2Runtime &runtime, const Addresses &addresses)

@@ -45,18 +45,25 @@
             {character.lst set_selected {character_provider get_index $character}}
             {$this set old_scroll_pos {character.lst selected_pos}}
             {char_highlight.tnm set_frame [old_scroll_pos]}
-            ; Config's, which in quickplay are GH2's whatever the menus.
-            {foreach_int $i 1 {size {find $syscfg characters}}
-               {do
-                  ($c {elem {elem {find $syscfg characters} $i} 0})
-                  ($mesh {sprint "char_" $c ".mesh"})
-                  {if_else {campaign is_unlocked $c}
-                     {$mesh set_mat {sprint "char_" $c ".mat"}}
-                     {$mesh set_mat char_locked.mat}
-                  }
+            {$this show_portraits}
+            {$this light_portraits}
+         }
+      )
+      ; Config's characters, which in quickplay are GH2's whatever the menus.
+      ; char_focus shows char_outfit's own portrait where the scene has one:
+      ; quickplay's has another game's outfits' (content/outfits.h portrait).
+      (show_portraits
+         {foreach_int $i 1 {size {find $syscfg characters}}
+            {do
+               ($c {elem {elem {find $syscfg characters} $i} 0})
+               ($mesh {sprint "char_" $c ".mesh"})
+               ($own {sprint "portrait_" [char_outfit] ".mat"})
+               {cond
+                  ({! {campaign is_unlocked $c}} {$mesh set_mat char_locked.mat})
+                  ({&& {== $c [char_focus]} {exists $own}} {$mesh set_mat $own})
+                  (TRUE {$mesh set_mat {sprint "char_" $c ".mat"}})
                }
             }
-            {$this light_portraits}
          }
       )
       ; GH1's hero screen (gh1/menus.cpp) is a wall of portraits: each
@@ -260,6 +267,7 @@
                   {char_single char_event 0 animate}
                   {$this set old_scroll_pos $new_scroll_pos}
                   {char_highlight.tnm set_frame $new_scroll_pos}
+                  {$this show_portraits}
                   {$this light_portraits}
                }
             }
@@ -282,6 +290,7 @@
                      {synth play_sequence button_toggle}
                   }
                   {set [char_outfit] {elem [outfits] $idx}}
+                  {$this show_portraits}
                   ; The arrow's anim keys outfit1's place; from there it
                   ; moves as the buttons were placed.
                   {cs_arrow.tnm set_frame 0}
