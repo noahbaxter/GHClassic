@@ -44,6 +44,36 @@ namespace gh2::look
     // That system's two rates, null when its particles do not turn.
     const float *findSpin(const char *system, const char *mat);
 
+    // The Mat of that diffuse payload, when one look alone has it: for a
+    // Mat the game made by copying a scene's, which has no name (the track's
+    // side rails). Empty for none.
+    std::string matOf(uint32_t diffuse);
+
+    // A track's board: the Mat its track code made and put the guitarist's
+    // fretboard on (CharTrackSurface::SetCharTexture), a guest address. It
+    // has no name and its picture is no scene's. A song has one a player;
+    // one added long after the last begins the next song's.
+    void addBoard(uint32_t mat);
+    bool isBoard(uint32_t mat);
+    bool hasBoard();
+    constexpr const char *kBoardMat = "track_surface.mat";
+    // The environ the 360 draws the board under, where the PS2's scene has
+    // the track's one environ for everything.
+    constexpr const char *kBoardEnviron = "wood_track_surface.env";
+    // And the one it draws the bar and beat lines under (its
+    // bar_widgets.grp's), which are known by their Mats.
+    constexpr const char *kLineEnviron = "frets_beatmarkers.env";
+    constexpr const char *kLineMats[] = {"bar_line.mat", "beat_line.mat", "half_beat_line.mat"};
+
+    // Whether the track fades into the distance in its shader, as the 360's
+    // does: with its track and its shading. The PS2's Track::Draw (0x151188)
+    // copies the picture behind the track's far end and draws it back over
+    // in two rects, each with a rect that adds over it; a Xenia frame has
+    // none of them, so then neither the copies nor these Mats' rects are
+    // drawn.
+    bool trackFades();
+    constexpr const char *kStripMats[] = {"track_fade.mat", "track_fade2.mat", "track_add.mat"};
+
     // Maps no draw has asked for in a while are let go.
     void endFrame();
 

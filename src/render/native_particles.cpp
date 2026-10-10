@@ -189,6 +189,7 @@ namespace gh2
                 draw.camera = cameraIndex;
                 draw.world = identity();
                 draw.lightWorld = identity();
+                draw.environment = currentEnviron(); // for its fade: the passes are not lit by it
                 for (Material &pass : passes)
                 {
                     draw.material = std::move(pass);

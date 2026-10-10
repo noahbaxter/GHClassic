@@ -37,6 +37,14 @@ namespace gh2::gh2x
     // object that cannot be is left out.
     std::optional<milo::Dir> convertScene(const SceneSource &source);
 
+    // The PS2's track with the 360's look: the PS2's scene whole, which its
+    // track code drives by name (groups, animations, the gems' meshes), with
+    // each Mat, Tex, Light and Environ the 360's track has under the same
+    // name in its place, and those only the 360's has beside them. The 360
+    // draws its gems and lines through TrackWidgets, which the PS2 has no
+    // class for.
+    std::optional<milo::Dir> convertTrack(const SceneSource &source);
+
     // Where the PS2 disc keeps the scene at a 360 path: its ng (new
     // generation) folders are the PS2's og, x360 world/battle/ng/gen/
     // battle_geom.milo_xbox the PS2's world/battle/og/gen/battle_geom.milo_ps2.

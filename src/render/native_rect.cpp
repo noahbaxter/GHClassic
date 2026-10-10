@@ -24,8 +24,12 @@
 #include "ps2_runtime_macros.h"
 #include "render/camera.h"
 #include "render/frame.h"
+#include "render/look.h"
 #include "render/native_mat.h"
 
+#include <algorithm>
+#include <cstring>
+#include <iterator>
 #include <memory>
 
 namespace gh2
@@ -38,6 +42,17 @@ namespace gh2
         {
             for (uint32_t i = 0; i < 4; ++i)
                 out[i] = load<float>(rdram, address + i * 4u);
+        }
+
+        // One of the Mats the track's far-end strip is drawn with.
+        bool stripMat(uint8_t *rdram, uint32_t mat)
+        {
+            const uint32_t name = load<uint32_t>(rdram, mat + milo::object::kName);
+            if (name == 0u)
+                return false;
+            const char *text = reinterpret_cast<const char *>(getMemPtr(rdram, name));
+            return std::any_of(std::begin(look::kStripMats), std::end(look::kStripMats),
+                               [&](const char *strip) { return std::strcmp(text, strip) == 0; });
         }
 
         void drawRect(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
@@ -56,7 +71,7 @@ namespace gh2
             const float y = load<float>(rdram, rect + 0x4u);
             const float w = load<float>(rdram, rect + 0x8u);
             const float h = load<float>(rdram, rect + 0xcu);
-            if (width <= 0.0f || height <= 0.0f)
+            if (width <= 0.0f || height <= 0.0f || (mat != 0u && look::trackFades() && stripMat(rdram, mat)))
             {
                 ctx->pc = returnTo;
                 return;

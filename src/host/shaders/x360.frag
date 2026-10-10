@@ -5,9 +5,9 @@
 // the material's colour, or a cube map in its place, a glow map, a diffuse
 // ramp, directional or point lights, and a character's shadow map on the
 // first of them. Colour runs 0 to 4, as the 360's 10-bit target holds it
-// divided by 4 (pack_color). The environ's fog, no distance fade: of 105
-// environs in the 360's 8 venues one has fog (small2's op_Art_projection)
-// and none fades but the track's.
+// divided by 4 (pack_color). The environ's fog and fade with distance: of
+// 105 environs in the 360's 8 venues one has fog (small2's
+// op_Art_projection) and none fades but the track's.
 
 layout(location = 0) in vec4 vColor;
 layout(location = 1) in vec2 vUv;
@@ -16,6 +16,7 @@ layout(location = 3) in vec3 vNormal;
 layout(location = 4) in vec3 vTangent;
 layout(location = 5) in vec3 vBitangent;
 layout(location = 6) in float vFog;
+layout(location = 7) in vec2 vFade;
 
 layout(set = 0, binding = 0) uniform sampler2D diffuseMap;
 layout(set = 2, binding = 0) uniform sampler2D normalMap;
@@ -201,6 +202,8 @@ void main()
 
     vec4 color = vec4(emissive * data[b + 14].x + diffuse.rgb + specular, diffuse.a);
     color = mix(data[b + 20], color, vFog);
+    // lerp(gFadeColor, output, uv.zzzw), gFadeColor being 0.
+    color *= vFade.xxxy;
     color.rgb = clamp(color.rgb, 0.0, 4.0);
     color.a = min(color.a, 1.0);
     if ((pc.flags & kFlagAlphaCut) != 0u && color.a < 1.0 / 128.0)

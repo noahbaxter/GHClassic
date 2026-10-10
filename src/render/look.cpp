@@ -1,7 +1,9 @@
 #include "render/look.h"
 
 #include "render/texture_store.h"
+#include "settings/settings.h"
 
+#include <algorithm>
 #include <array>
 #include <cstring>
 #include <map>
@@ -32,6 +34,9 @@ namespace gh2::look
         // Frames a Mat's maps outlast the last draw that asked for them.
         constexpr uint64_t kHoldFrames = 600;
         uint32_t s_luminance = 0;
+        // Game thread only.
+        std::vector<uint32_t> s_boards;
+        uint64_t s_boardsAt = 0;
 
         std::shared_ptr<const TextureData> map(uint32_t id)
         {
@@ -100,6 +105,38 @@ namespace gh2::look
         const auto found = s_spins.find(std::string(system) + '/' + mat);
         // Entries are never erased, and a map's stay where they are.
         return found != s_spins.end() ? found->second.data() : nullptr;
+    }
+
+    std::string matOf(uint32_t diffuse)
+    {
+        const std::lock_guard lock(s_looksMutex);
+        std::string found;
+        for (const auto &[mat, byDiffuse] : s_looks)
+            if (byDiffuse.contains(diffuse))
+            {
+                if (!found.empty())
+                    return {};
+                found = mat;
+            }
+        return found;
+    }
+
+    void addBoard(uint32_t mat)
+    {
+        if (s_frame > s_boardsAt + kHoldFrames)
+            s_boards.clear();
+        s_boardsAt = s_frame;
+        if (!isBoard(mat))
+            s_boards.push_back(mat);
+    }
+
+    bool isBoard(uint32_t mat) { return std::find(s_boards.begin(), s_boards.end(), mat) != s_boards.end(); }
+    bool hasBoard() { return !s_boards.empty(); }
+
+    bool trackFades()
+    {
+        return settings::get(settings::kModels) == settings::kX360 &&
+               settings::get(settings::kShading) == settings::kX360;
     }
 
     void endFrame()

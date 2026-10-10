@@ -41,7 +41,7 @@ namespace gh2
         constexpr uint32_t kEnvTexGenVec4s = 4u;
         // An x360 draw's block in place of the lighting block: see
         // writeShading.
-        constexpr uint32_t kShadingVec4s = 21u;
+        constexpr uint32_t kShadingVec4s = 22u;
         constexpr VkFormat kShadowFormat = VK_FORMAT_D32_SFLOAT;
         // The x360 shading's colour target: the 360's lit colour runs 0 to 4.
         constexpr VkFormat kHdrFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
@@ -350,21 +350,34 @@ namespace gh2
         }
 
         // Whether x360 shading draws this pass: a converted 360 Mat's, with
-        // a plain, transformed or projected uv, its particles and flares
-        // too: every 360 Mat that 8 venues and 9 characters draw. The PS2's
-        // scenes (track, HUD, menus) keep the PS2's shading, whose rigs are
-        // set for its range; so do the PS2's other tex gens and rendered
-        // textures.
+        // a plain, transformed, projected or reflected uv, its particles and
+        // flares too: every 360 Mat that 8 venues, 9 characters and the
+        // track draw. The PS2's scenes (HUD, menus) keep the PS2's shading,
+        // whose rigs are set for its range; so do the PS2's sphere tex gen
+        // and rendered textures.
         bool shadedX360(const DrawCall &draw)
         {
             const Material &m = draw.material;
             const bool plainUv = m.texGen == milo::mat::kTexGenNone || m.texGen == milo::mat::kTexGenXfm ||
-                                 m.texGen == milo::mat::kTexGenXfmOrigin || m.texGen == milo::mat::kTexGenProjected;
+                                 m.texGen == milo::mat::kTexGenXfmOrigin ||
+                                 m.texGen == milo::mat::kTexGenProjected || m.texGen == milo::mat::kTexGenEnviron;
             // An unlit Mat too: the 360 draws it with the same shader, its
             // ambient 1, so nothing holds its colour at 1 (intensify takes
             // it to 2), and one that adds has none of the GS's HIGHLIGHT
             // texturing (the glow cards on lamps, signs and bulbs).
             return m.shading && plainUv && !m.sphere && !m.spread && m.renderTarget == 0u;
+        }
+
+        // The blend an x360 draw is made with. Under an environ that fades
+        // with distance a Mat that does not blend fades its alpha all the
+        // same: the track's board and side rails are src on the 360's disc
+        // and src alpha in two Xenia frames, their keys FADE_OUT 1.
+        uint32_t fadedBlend(const DrawCall &draw)
+        {
+            const Environ &under = draw.environment;
+            const bool fades = under.fade && under.fadeEnd > under.fadeStart;
+            return fades && draw.material.blend == milo::mat::kBlendSrc ? milo::mat::kBlendSrcAlpha
+                                                                        : draw.material.blend;
         }
 
         // The x360 block: the world transform's rows (unused when skinned),
@@ -423,6 +436,19 @@ namespace gh2
             const bool fog = e.fog && e.fogEnd > e.fogStart;
             out[19] = {{e.fogEnd, fog ? 1.0f / (e.fogEnd - e.fogStart) : 0.0f, fog ? 1.0f : 0.0f, 0.0f}};
             out[20] = {{e.fogColor[0], e.fogColor[1], e.fogColor[2], e.fogColor[3]}};
+            // gFadeRange, from the environ the draw was made under whether
+            // or not its Mat is lit by it (the track's unlit gems fade):
+            // the fade's end and one over its length, then which way it
+            // goes, as the 360's shader keys have it on a frame of battle.
+            // A blended draw's alpha goes (FADE_OUT 1), an added one's
+            // colour (2), and one not blended has nothing to fade into.
+            const Environ &under = draw.environment;
+            const uint32_t blend = fadedBlend(draw);
+            const float way = !under.fade || under.fadeEnd <= under.fadeStart ? 0.0f
+                              : blend == milo::mat::kBlendSrcAlpha            ? 1.0f
+                              : blend == milo::mat::kBlendAdd || blend == milo::mat::kBlendSrcAlphaAdd ? 2.0f
+                                                                                                       : 0.0f;
+            out[21] = {{under.fadeEnd, way != 0.0f ? 1.0f / (under.fadeEnd - under.fadeStart) : 0.0f, way, 0.0f}};
         }
 
         // The tangents the 360 builds for a normal-mapped mesh at load,
@@ -2326,6 +2352,14 @@ namespace gh2
                 writeSphereTexGen(frame.draws[i], data.mapped + envBases[i]);
             else if (envBases[i] >= 0 && frame.draws[i].material.texGen == milo::mat::kTexGenProjected)
                 writeProjTexGen(frame.draws[i], data.mapped + envBases[i]);
+            else if (envBases[i] >= 0 && x360Draws[i])
+            {
+                // x360.vert reflects in the world: the material's rows alone.
+                const float(&m)[3][3] = frame.draws[i].material.envRows;
+                for (uint32_t r = 0; r < 3; ++r)
+                    data.mapped[envBases[i] + r] = {{m[r][0], m[r][1], m[r][2], 0.0f}};
+                data.mapped[envBases[i] + 3] = {{0.0f, 0.0f, 0.0f, 0.0f}};
+            }
             else if (envBases[i] >= 0)
                 writeEnvTexGen(frame.draws[i], frame.cameras[frame.draws[i].camera].eye, data.mapped + envBases[i]);
         }
@@ -2461,9 +2495,10 @@ namespace gh2
             // is kept: its alpha of 0 leaves the colour, but it sets or
             // clears the bit where retail leaves it.
             const bool noZWrite = material.zMode == milo::mat::kZDisable || material.zMode == milo::mat::kZTransparent;
-            if (material.alphaCut || (material.blend == milo::mat::kBlendSrcAlpha && noZWrite))
+            const uint32_t blend = x360Draws[i] ? fadedBlend(draw) : material.blend;
+            if (material.alphaCut || (blend == milo::mat::kBlendSrcAlpha && noZWrite))
                 push.flags |= kFlagAlphaCut;
-            if (material.blend == milo::mat::kBlendSrc && !material.alphaWrite)
+            if (blend == milo::mat::kBlendSrc && !material.alphaWrite)
                 push.flags |= kFlagSetAlpha;
             // Intensify raises a textured pass's rgb scale from 128 to 255.
             if ((material.texture || material.renderTarget != 0u) && material.intensify)
@@ -2558,8 +2593,8 @@ namespace gh2
             }
             const Material &material = draw.material;
             const bool x360Family = x360Draws[i] != 0;
-            const VkPipeline pipeline =
-                s.pipeline(material.blend, material.zMode, material.alphaWrite, material.destAlphaTest, x360Family);
+            const VkPipeline pipeline = s.pipeline(x360Family ? fadedBlend(draw) : material.blend, material.zMode,
+                                                   material.alphaWrite, material.destAlphaTest, x360Family);
             if (pipeline == VK_NULL_HANDLE)
                 return;
             // Without a normal map the tangent stream is never read, so the

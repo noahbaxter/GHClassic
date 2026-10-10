@@ -139,6 +139,12 @@ namespace gh2
         float fogStart = 0.0f;
         float fogEnd = 0.0f;
         float fogColor[4] = {};
+        // Its fade with distance, the 360's shading's too: a blended draw
+        // is whole at fadeStart from the camera and gone at fadeEnd (the
+        // track's far end).
+        bool fade = false;
+        float fadeStart = 0.0f;
+        float fadeEnd = 0.0f;
     };
 
     struct DrawCall

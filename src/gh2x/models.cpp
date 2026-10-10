@@ -34,6 +34,10 @@ namespace gh2
     {
         constexpr const char *kFolders[] = {"world/", "char/"};
         constexpr const char *kGuitars = "char/og/guitars/gen/";
+        // The track: the PS2's scene, and the one of the 360's two that it
+        // draws (its track.milo_xbox is the PS2's, object for object).
+        constexpr const char *kTrack = "track/gen/track.milo_ps2";
+        constexpr const char *kTrackTwin = "track/gen/track_new.milo_xbox";
         constexpr const char *kLuminanceMap = "world/battle/ng/textures/gen/arena_luminancetest04.png_xbox";
         constexpr uint32_t kStandInSide = 64u;
         // The smallest a stand-in has room for its payload's name in.
@@ -152,7 +156,7 @@ namespace gh2
                 },
                 [](const std::string &system, const gh2x::Spin &spin)
                 { look::addSpin(system, spin.mat, spin.rpm[0], spin.rpm[1]); }};
-            return gh2x::convertScene(source);
+            return path == kTrack ? gh2x::convertTrack(source) : gh2x::convertScene(source);
         }
 
         bool has(const milo::Dir &dir, const std::string &name) { return milo::find(dir, name).has_value(); }
@@ -242,6 +246,10 @@ namespace gh2
             for (const std::string &twin : ark::paths(*xbox, folder))
                 if (endsWith(twin, ".milo_xbox"))
                     scenes.emplace_back(twin, gh2x::ps2Path(twin));
+        // Read now, as the track's file can only have one maker: with the
+        // PS2's models its 360 pictures are gh2x/textures.cpp's to swap in.
+        if (settings::get(settings::kModels) == settings::kX360)
+            scenes.emplace_back(kTrackTwin, kTrack);
         discs->any = discs->ps2;
         for (const auto &scene : scenes)
             discs->any.push_back(scene.second);

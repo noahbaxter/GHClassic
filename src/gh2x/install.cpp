@@ -25,6 +25,7 @@
 #include "gh2x/models.h"
 #include "gh2x/shadows.h"
 #include "gh2x/textures.h"
+#include "gh2x/track.h"
 
 #include <algorithm>
 #include <iostream>
@@ -236,5 +237,6 @@ namespace gh2
         installGh2xModels();
         gh2x::installFocus(runtime, addresses);
         gh2x::installShadows(runtime, addresses);
+        gh2x::installTrack(runtime, addresses);
     }
 }
