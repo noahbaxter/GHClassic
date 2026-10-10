@@ -219,6 +219,14 @@ namespace gh2::outfits
         s_outfits.push_back({game, own, character, outfit, beside, label});
     }
 
+    std::optional<std::string> named(const std::string &game, const std::string &own)
+    {
+        for (const Outfit &o : s_outfits)
+            if (o.game == game && o.own == own)
+                return o.outfit;
+        return std::nullopt;
+    }
+
     void campaignChanged()
     {
         s_configured = false;

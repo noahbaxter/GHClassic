@@ -7,6 +7,7 @@
 #include "content/focus.h"
 #include "content/floor_spot.h"
 #include "content/encores.h"
+#include "content/quickplay.h"
 #include "content/games.h"
 #include "content/locale.h"
 #include "content/outfits.h"
@@ -63,6 +64,7 @@ namespace
         gh2::installGh1Face(runtime, gh2::kSlus21447);
         gh2::outfits::install(runtime, gh2::kSlus21447);
         gh2::band::install(runtime, gh2::kSlus21447);
+        gh2::quickplay::install(runtime, gh2::kSlus21447);
         gh2::crowd_cards::install(runtime, gh2::kSlus21447);
         gh2::focus::install(runtime, gh2::kSlus21447);
         gh2::floor_spot::install(runtime, gh2::kSlus21447);

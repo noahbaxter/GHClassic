@@ -4,6 +4,7 @@
 
 #include "addresses.h"
 
+#include <optional>
 #include <string>
 
 class PS2Runtime;
@@ -21,6 +22,9 @@ namespace gh2::outfits
     // has it ({campaigns owns}).
     void add(const std::string &game, const std::string &own, const std::string &character,
              const std::string &outfit, const std::string &beside, const std::string &label);
+
+    // The outfit added for `game`'s own outfit of that name, or none.
+    std::optional<std::string> named(const std::string &game, const std::string &own);
 
     // The config and the screens are another game's now: the outfits go in
     // again as its profiles and previews are made.

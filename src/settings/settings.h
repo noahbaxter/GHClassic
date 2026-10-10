@@ -32,6 +32,7 @@ namespace gh2::settings
         kBand,       // whose backing band plays: the venue's game's, or one game's everywhere
         kDepthOfField, // the PS2's blur behind what a camera shot looks at
         kBandShadows,  // the band's shadows in GH1's venues: none, the room's as GH1 drew them, or GH2's own
+        kSongDefaults, // quickplay plays a song as its own game's guitarist, guitar and venue, unpicked
         kKeyCount,
     };
 

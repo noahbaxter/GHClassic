@@ -84,6 +84,9 @@ namespace gh2::settings
             {"game", "band", Type::kChoice, 0, 2, 1, kBandVenue, kBandVenue, "venue gh2 gh1"},
             {"video", "depth_of_field", Type::kBool, 0, 1, 1, 1, 1},
             {"video", "gh1_band_shadows", Type::kChoice, 0, 2, 1, kShadowsGh2, kShadowsGh2, "off classic gh2"},
+            // Off: the pickers. Retail's quickplay goes from the difficulty
+            // straight to the song.
+            {"game", "quickplay_song_defaults", Type::kBool, 0, 1, 1, 0, 1},
         };
 
         int snap(const Entry &entry, int value)
