@@ -356,13 +356,16 @@ namespace gh2::gh1
                     present.insert(e.second);
             addScripts(layer, disc, name, ours, drivers, present, kit, stage.walks);
             // The stand-in's sound bank (its type's (sound (bank ...)),
-            // GamePanel::RetainWorldBank, 0x108f00), silenced: GH1's
-            // arena_game.dta names crowd cheers, claps and a lost big note,
-            // but no GH1 bank holds them.
+            // GamePanel::RetainWorldBank, 0x108f00), the crowd's cheers,
+            // groans and claps, with GH1's recordings of them (gh1/sound.h).
             const std::string bankPath = world + "gen/" + ours + "_bank.milo_ps2";
             if (const auto standIn = ark::readFile(0u, bankPath))
-                if (auto quiet = silenced(*standIn))
-                    ark::addFile(layer, bankPath, std::move(*quiet));
+            {
+                if (auto bank = venueBank(*standIn, disc, name))
+                    ark::addFile(layer, bankPath, std::move(*bank));
+                else
+                    std::cerr << "[gh1] cannot read " << name << "'s sound bank" << std::endl;
+            }
             // GH1's crowd streams, which the type names (gh1/scripts.cpp).
             // What is not made here is the stand-in's: its encore streams.
             const std::string streams = std::string("venues/") + name + "/streams/";
