@@ -1,4 +1,11 @@
 cmake_minimum_required(VERSION 3.25)
+# A static library on the link line once, where the linker rescans archives
+# (Apple's, which warns of each repeat, and Windows'), keeping the first.
+foreach(POLICY_ID CMP0156 CMP0179)
+    if(POLICY ${POLICY_ID})
+        cmake_policy(SET ${POLICY_ID} NEW)
+    endif()
+endforeach()
 
 # Else the build machine's macOS, which locks out every older one. MoltenVK's
 # own floor.

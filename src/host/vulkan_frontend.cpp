@@ -20,6 +20,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <mutex>
@@ -394,6 +395,10 @@ namespace gh2
         const char *bundle = SDL_GetBasePath();
         const std::string moltenVk = std::string(bundle ? bundle : "") + "../Frameworks/libMoltenVK.dylib";
         SDL_SetHint(SDL_HINT_VULKAN_LIBRARY, moltenVk.c_str());
+        // Its errors and warnings, not the 150 lines of extensions and GPU
+        // features it lists as information at every start. One set in the
+        // environment stays.
+        setenv("MVK_CONFIG_LOG_LEVEL", "2", 0);
 #endif
         if (!SDL_Init(SDL_INIT_VIDEO))
         {

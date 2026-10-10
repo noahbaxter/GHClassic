@@ -91,6 +91,19 @@ namespace
 
 int main(int argc, char *argv[])
 {
+    // --data, taken out before anything reads the data directory, --bind
+    // included, which is handed what is left.
+    std::vector<char *> args(argv, argv + argc);
+    for (size_t i = 1; i + 1 < args.size(); ++i)
+        if (std::string(args[i]) == "--data")
+        {
+            gh2::settings::useDataDir(args[i + 1]);
+            args.erase(args.begin() + static_cast<std::ptrdiff_t>(i), args.begin() + static_cast<std::ptrdiff_t>(i) + 2);
+            break;
+        }
+    argc = static_cast<int>(args.size());
+    argv = args.data();
+
     if (argc >= 2 && std::string(argv[1]) == "--bind")
         return gh2::runBind(argc, argv);
 
