@@ -506,6 +506,58 @@ namespace gh2::campaigns
             return found->second.count(item) != 0u;
         }
 
+        // What `game`'s config has to use, read off its disc: its characters
+        // and their outfits, its guitars and their finishes.
+        struct Usable
+        {
+            std::set<std::string> items;
+            std::vector<std::string> outfits; // in config's order
+        };
+        const Usable &usable(const Campaign &campaign)
+        {
+            static std::map<std::string, Usable> s_found;
+            if (const auto it = s_found.find(campaign.game); it != s_found.end())
+                return it->second;
+            Usable &found = s_found[campaign.game];
+            const auto front = campaign.front;
+            dtb::Macros macros;
+            const auto config =
+                dtb::read(kRootConfig, macros, [front](const std::string &path) { return ark::readFront(front, path); });
+            const auto keys = [](const dtb::Node &list)
+            {
+                std::vector<std::string> out;
+                for (size_t i = 1u; i < list.nodes.size(); ++i)
+                    if (list.nodes[i].type == dtb::kArray && !list.nodes[i].nodes.empty())
+                        out.push_back(list.nodes[i].nodes[0].text);
+                return out;
+            };
+            if (const dtb::Node *characters = config ? dtb::find(*config, "characters") : nullptr)
+                for (size_t i = 1u; i < characters->nodes.size(); ++i)
+                {
+                    const dtb::Node &character = characters->nodes[i];
+                    if (character.type != dtb::kArray || character.nodes.empty())
+                        continue;
+                    found.items.insert(character.nodes[0].text);
+                    for (const std::string &outfit : keys(character))
+                    {
+                        found.items.insert(outfit);
+                        found.outfits.push_back(outfit);
+                    }
+                }
+            if (const dtb::Node *guitars = config ? dtb::find(*config, "guitars") : nullptr)
+                for (size_t i = 1u; i < guitars->nodes.size(); ++i)
+                {
+                    const dtb::Node &guitar = guitars->nodes[i];
+                    if (guitar.type != dtb::kArray || guitar.nodes.empty())
+                        continue;
+                    found.items.insert(guitar.nodes[0].text);
+                    if (const dtb::Node *skins = dtb::find(guitar, "skins"))
+                        for (const std::string &skin : keys(*skins))
+                            found.items.insert(skin);
+                }
+            return found;
+        }
+
         // That campaign's venues, in its config's order.
         const std::vector<std::string> &venuesOf(size_t index)
         {
@@ -727,6 +779,31 @@ namespace gh2::campaigns
     const std::string &venueGame()
     {
         return s_campaigns[s_venueFrom].game;
+    }
+
+    bool unlockedIn(const std::string &game, const std::string &item)
+    {
+        const auto index = indexOf(game);
+        return index && usable(s_campaigns[*index]).items.count(item) != 0u &&
+               (!sells(s_campaigns[*index], item) || save::unlockedItem(game, item));
+    }
+
+    std::vector<std::string> outfits(const std::string &game)
+    {
+        const auto index = indexOf(game);
+        return index ? usable(s_campaigns[*index]).outfits : std::vector<std::string>();
+    }
+
+    bool configFrom(const script::Call &call, const std::string &game, const std::vector<std::string> &keys)
+    {
+        const auto index = indexOf(game);
+        const Guest guest{call};
+        if (!index || !built(guest, *index))
+            return false;
+        for (size_t i = 0; i < kConfig.size(); ++i)
+            if (std::find(keys.begin(), keys.end(), kConfig[i].back()) != keys.end())
+                syncConfig(guest, s_campaigns[*index], i);
+        return true;
     }
 
     void install(PS2Runtime &runtime, const Addresses &addresses)

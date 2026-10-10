@@ -58,6 +58,7 @@
 // ("ghc/gh1/ui/sel_venue.milo"): GH2's are the game disc's.
 
 #include "addresses.h"
+#include "script.h"
 
 #include <cstddef>
 #include <optional>
@@ -80,6 +81,16 @@ namespace gh2::campaigns
     // The game whose venue a song plays in: the active one's unless
     // {campaigns venues_from} named another.
     const std::string &venueGame();
+
+    // Whether `game`'s config has `item` (a character, outfit, guitar or
+    // finish) and its career has it to use: one its store does not sell, or
+    // one a band has bought there. False for a game with no campaign.
+    bool unlockedIn(const std::string &game, const std::string &item);
+    // `game`'s own outfits, in its config's order.
+    std::vector<std::string> outfits(const std::string &game);
+    // The live config's arrays of those names (characters, guitars) as
+    // `game`'s files have them, in place, until another call or a switch.
+    bool configFrom(const script::Call &call, const std::string &game, const std::vector<std::string> &keys);
 
     void install(PS2Runtime &runtime, const Addresses &addresses);
 }
