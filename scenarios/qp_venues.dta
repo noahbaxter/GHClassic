@@ -14,6 +14,18 @@
 (wait_screen qp_selsong_screen)
 (wait 1)
 (expect {campaigns venue_game} gh2)
+; The debug actions do nothing on another game's song, whose career item
+; the menus' game lacks, and the game goes on.
+{qp_selsong_screen ghc_picked gh1}
+(wait_screen qp_selsong_twin_screen)
+(wait 1)
+{sel_song_twin_panel beat_song 5}
+{sel_song_twin_panel gold_song}
+(wait 1)
+(expect {setlist shown} gh1)
+{qp_selsong_twin_screen ghc_picked gh2}
+(wait_screen qp_selsong_screen)
+(wait 1)
 (press green)
 (wait_screen qp_diff_screen)
 (wait 1)

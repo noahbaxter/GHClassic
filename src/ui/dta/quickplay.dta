@@ -74,9 +74,12 @@
             {sel_song.view set_frame $frame}
          }
       )
+      ; The debug actions' cheats look the song up in the menus' game's
+      ; career, which has no item for another game's song: its lookup
+      ; asserts and writes past the list (debug 0x147e88). Only on its own.
       (beat_song
          ($score)
-         {if {$this is_up}
+         {if {&& {$this is_up} {== {setlist shown} {campaigns active}}}
             {do
                ($index {ss_song.lst selected_pos})
                ($song {song_provider get_symbol $index})
@@ -86,7 +89,7 @@
          }
       )
       (gold_song
-         {if {$this is_up}
+         {if {&& {$this is_up} {== {setlist shown} {campaigns active}}}
             {campaign cheat_gold_song {song_provider get_symbol {ss_song.lst selected_pos}}}
             {$this refresh}
          }
