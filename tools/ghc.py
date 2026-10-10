@@ -150,6 +150,69 @@ def run(cmd, env, log=None, quiet=False):
         sys.exit(f"failed ({result.returncode}): {' '.join(cmd)}")
 
 
+LOGS = BUILD / "logs"
+TTY = sys.stderr.isatty()
+
+
+def colour(code, text):
+    return f"\033[{code}m{text}\033[0m" if TTY else text
+
+
+def theirs(warning):
+    """Whether a warning is third-party code's (a fetched dependency's, or
+    libchdr's), which we report but do not fix here."""
+    return "_deps/" in warning or "/lib/libchdr/" in warning
+
+
+def build_step(title, cmd, env, log):
+    """One build step, its whole output into build/logs/<log>. On a terminal
+    one line counts it along by Ninja's [n/m]. Done, it says how long it took
+    and lists any warning in our own code, which should be fixed, beside a
+    count of third-party code's; failed, it shows the log's end and stops."""
+    cmd = [str(c) for c in cmd]
+    # Windows looks a bare name up on this process's PATH, not env's.
+    cmd[0] = shutil.which(cmd[0], path=env["PATH"]) or cmd[0]
+    LOGS.mkdir(parents=True, exist_ok=True)
+    path = LOGS / log
+    started = time.time()
+    warnings, steps, idle = {}, None, False
+    if TTY:
+        sys.stderr.write(f"  {title}\033[K")
+        sys.stderr.flush()
+    with open(path, "w") as out:
+        proc = subprocess.Popen(cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                                errors="replace")
+        for line in proc.stdout:
+            out.write(line)
+            # A header's warning comes once for each file including it.
+            if "warning:" in line or line.startswith("CMake Warning"):
+                warnings.setdefault(line.strip(), None)
+            idle = idle or line.startswith("ninja: no work to do")
+            if step := re.match(r"\[(\d+)/(\d+)\]", line):
+                steps = step[2]
+                if TTY:
+                    sys.stderr.write(f"\r  {title}  {step[1]}/{step[2]}\033[K")
+                    sys.stderr.flush()
+    code = proc.wait()
+    if TTY:
+        sys.stderr.write("\r\033[K")
+    if code:
+        sys.stderr.writelines(path.read_text(errors="replace").splitlines(True)[-30:])
+        sys.exit(colour(31, f"{title} failed ({code}); the whole log is {path}"))
+    if idle and not warnings:
+        return path
+    ours = [w for w in warnings if not theirs(w)]
+    note = f"{round(time.time() - started)}s" + (f", {steps} step{'s' * (steps != '1')}" if steps else "")
+    if ours:
+        note += ", " + colour(33, f"{len(ours)} warning{'s' * (len(ours) != 1)} in our code")
+    if len(warnings) > len(ours):
+        note += f", {len(warnings) - len(ours)} in third-party code"
+    print(f"  {title}  {note}" + (f"  ({path.relative_to(ROOT)})" if warnings else ""), file=sys.stderr)
+    for warning in ours[:8]:
+        print("    " + colour(33, warning), file=sys.stderr)
+    return path
+
+
 def main_checkout():
     """The repo's own checkout, which the worktrees in .worktrees/ sit inside."""
     # A tree copied out of git (a test box's) has no checkout: it is its own.
@@ -182,9 +245,11 @@ def built():
 
 def build_tools(env, jobs):
     """The analyzer and recompiler, a top-level build of lib/PS2Recomp."""
-    run(["cmake", "-S", ROOT / "lib" / "PS2Recomp", "-B", TOOLS, "-DCMAKE_BUILD_TYPE=Release",
-         "-DPS2X_BUILD_RUNTIME=OFF", "-DPS2X_BUILD_TEST=OFF", "-DPS2X_BUILD_STUDIO=OFF"], env, quiet=True)
-    run(["cmake", "--build", TOOLS, "--target", "ps2_analyzer", "ps2_recomp", "-j", jobs], env)
+    configure = ["cmake", "-S", ROOT / "lib" / "PS2Recomp", "-B", TOOLS, "-DCMAKE_BUILD_TYPE=Release",
+                 "-DPS2X_BUILD_RUNTIME=OFF", "-DPS2X_BUILD_TEST=OFF", "-DPS2X_BUILD_STUDIO=OFF"]
+    build_step("configuring recompiler", configure, env, "tools-configure.log")
+    targets = ["--target", "ps2_analyzer", "ps2_recomp", "-j", jobs]
+    build_step("building recompiler", ["cmake", "--build", TOOLS, *targets], env, "tools.log")
 
 
 def tree_version():
@@ -206,16 +271,19 @@ def build(disc=None, recomp=True, lto=True):
         disc = disc or find_disc(env)
         shutil.rmtree(RECOMP, ignore_errors=True)
         RECOMP.mkdir(parents=True)
-        run([sys.executable, ROOT / "tools" / "disc.py", "boot-elf", disc, RECOMP / "retail.elf"], env)
-        run([sys.executable, ROOT / "tools" / "symbolize.py", RECOMP / "retail.elf",
-             ROOT / "config" / "gh2-retail.symbols", ELF], env)
+        tools = ROOT / "tools"
+        build_step("reading disc's executable",
+                   [sys.executable, tools / "disc.py", "boot-elf", disc, RECOMP / "retail.elf"], env, "disc.log")
+        build_step("naming its functions",
+                   [sys.executable, tools / "symbolize.py", RECOMP / "retail.elf",
+                    ROOT / "config" / "gh2-retail.symbols", ELF], env, "symbolize.log")
 
         build_tools(env, jobs)
 
         # The analyzer writes the recompiler config, and points the generated
-        # code at output/ beside it. Both are verbose, so their output goes to logs.
+        # code at output/ beside it.
         toml = RECOMP / "gh2.toml"
-        run([TOOLS / "ps2xAnalyzer" / f"ps2_analyzer{EXE}", ELF, toml], env, log=RECOMP / "analyzer.log")
+        build_step("analysing", [TOOLS / "ps2xAnalyzer" / f"ps2_analyzer{EXE}", ELF, toml], env, "analyzer.log")
 
         # The denylist goes into [general], the first table in the analyzer's output.
         deny = [line for line in (ROOT / "config" / "stub-denylist.txt").read_text().splitlines()
@@ -227,15 +295,16 @@ def build(disc=None, recomp=True, lto=True):
         lines.insert(at, "stub_denylist = [" + ",".join(f'"{name}"' for name in deny) + "]\n")
         toml.write_text("".join(lines))
 
-        run([TOOLS / "ps2xRecomp" / f"ps2_recomp{EXE}", toml], env, log=RECOMP / "recomp.log")
-        print(f"generated {len(list((RECOMP / 'output').glob('*.cpp')))} files")
+        build_step("recompiling", [TOOLS / "ps2xRecomp" / f"ps2_recomp{EXE}", toml], env, "recomp.log")
+        print(f"  generated {len(list((RECOMP / 'output').glob('*.cpp')))} files", file=sys.stderr)
 
     # Configured after recompiling, so the glob in CMakeLists.txt sees the output.
     tag = tree_version()
-    run(["cmake", "-S", ROOT, "-B", GAME, "-DCMAKE_BUILD_TYPE=Release",
-         f"-DGHC_GENERATED_DIR={RECOMP / 'output'}", f"-DGHC_ENABLE_LTO={'ON' if lto else 'OFF'}",
-         f"-DGHC_VERSION={tag}", f"-DGHC_EXPERIMENTAL={'ON' if experimental(tag) else 'OFF'}"], env, quiet=True)
-    run(["cmake", "--build", GAME, "--target", "GHClassic", "-j", jobs], env)
+    configure = ["cmake", "-S", ROOT, "-B", GAME, "-DCMAKE_BUILD_TYPE=Release",
+                 f"-DGHC_GENERATED_DIR={RECOMP / 'output'}", f"-DGHC_ENABLE_LTO={'ON' if lto else 'OFF'}",
+                 f"-DGHC_VERSION={tag}", f"-DGHC_EXPERIMENTAL={'ON' if experimental(tag) else 'OFF'}"]
+    build_step("configuring game", configure, env, "game-configure.log")
+    build_step("building game", ["cmake", "--build", GAME, "--target", "GHClassic", "-j", jobs], env, "game.log")
 
 
 def cmd_build(argv):
@@ -271,23 +340,9 @@ def cmd_play(argv):
             sys.exit("no build; run tools/ghc.py build")
         build(disc)
     elif rebuild:
-        # Quiet unless it fails: a no-op when nothing changed. A relink with
-        # LTO takes a minute or two, so one still going after a few seconds
-        # says so rather than seem to hang. Ninja prints a step only once it
-        # is done when not on a terminal, so its output cannot tell sooner.
-        env = tool_env()
-        log = BUILD / "play-build.log"
-        with open(log, "w") as out:
-            proc = subprocess.Popen([shutil.which("cmake", path=env["PATH"]) or "cmake", "--build", GAME, "--target",
-                                     "GHClassic"], env=env, stdout=out, stderr=subprocess.STDOUT)
-            try:
-                proc.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                print("building GHClassic, a minute or two", file=sys.stderr)
-        if proc.wait():
-            sys.stderr.writelines(log.read_text(errors="replace").splitlines(True)[-20:])
-            sys.exit(f"failed ({proc.returncode}): cmake --build {GAME}")
-        log.unlink()
+        # The C++ brought up to date: a no-op when nothing changed. A relink
+        # with LTO takes a minute or two.
+        build_step("building game", ["cmake", "--build", GAME, "--target", "GHClassic"], tool_env(), "game.log")
     disc = disc or find_disc(tool_env())
     return subprocess.run([str(game_binary()), disc, *data_dir(isolated), *argv]).returncode
 
