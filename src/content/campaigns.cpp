@@ -44,6 +44,24 @@ namespace gh2::campaigns
             {"campaign"}, {"store"}, {"guitars"}, {"tips"}, {"venues"}, {"characters"}, {"synth", "metamusic"},
             {"objects", "WorldDir", "types"},
         };
+        constexpr size_t kWorldTypes = 7u; // kConfig's objects WorldDir types: each venue's script
+        // A song's venue lends its world, and the screens around the song:
+        // loading before and after, pause and its settings, lose. The 80s'
+        // pause art is pause_lose_tex, its loading words loading_word. The
+        // scenes alone: ui/gen/pause.dtb is the script every game's menus
+        // read.
+        const std::vector<const char *> kVenueFiles = {
+            "world/", "venues/", "ui/gen/loading.milo", "ui/gen/meta_loading.milo", "ui/image/og/eng/gen/loading_word",
+            "ui/gen/pause.milo", "ui/gen/pause_controller.milo", "ui/gen/pause_lose_tex.milo",
+            "ui/gen/pause_settings.milo", "ui/gen/pause_audio_settings.milo", "ui/gen/pause_video_settings.milo",
+            "ui/gen/tut_pause.milo", "ui/gen/tut_pause_controller.milo", "ui/gen/pract_pause.milo",
+            "ui/gen/multi_pause_controller.milo", "ui/gen/lose.milo",
+        };
+        const std::set<std::string> kSongPanels = {
+            "loading_panel", "meta_loading_panel", "pause_panel", "pause_controller_panel", "tut_pause_panel",
+            "tut_pause_controller_panel", "pract_pause_panel", "multi_pause_controller_panel", "lose_panel",
+            "pause_audio_settings_panel", "pause_video_settings_panel",
+        };
         constexpr const char *kRootConfig = "config/gh2.dta";
         constexpr const char *kUi = "ui/ui.dta";
         // Hmx::Object's vtable entry for SetTypeDef: a this adjustment
@@ -55,6 +73,7 @@ namespace gh2::campaigns
         const Addresses *s_addresses = nullptr;
         std::vector<Campaign> s_campaigns = {{"gh2", std::nullopt}};
         size_t s_active = 0u;
+        size_t s_venueFrom = 0u; // the campaign whose venues the next song plays in
 
         struct Pending
         {
@@ -197,15 +216,17 @@ namespace gh2::campaigns
             return init != 0u;
         }
 
-        // The live tree takes a copy of each kept array, so what the game
-        // changes in place after (outfits.cpp pushes into characters) is
-        // the live tree's alone.
-        void syncConfig(const Guest &guest, const Campaign &campaign)
+        // The live tree takes a copy of each kept array, or of only that one,
+        // so what the game changes in place after (outfits.cpp pushes into
+        // characters) is the live tree's alone.
+        void syncConfig(const Guest &guest, const Campaign &campaign, std::optional<size_t> only = std::nullopt)
         {
             const uint32_t live = guest.run(s_addresses->systemConfig, {});
             const uint32_t scratch = guest.run(s_addresses->builtinNew, {8u});
             for (size_t i = 0; i < kConfig.size(); ++i)
             {
+                if (only && i != *only)
+                    continue;
                 const uint32_t to = under(guest, live, kConfig[i]);
                 if (campaign.config[i] == 0u || to == 0u)
                 {
@@ -242,7 +263,11 @@ namespace gh2::campaigns
             return "";
         }
 
-        void retypeUi(const Guest &guest, uint32_t init, const Campaign &from, const Campaign &to)
+        // Each panel `init` makes takes its type definition from there, or
+        // only those in `only`. `was` is where a scene came from before.
+        using Origin = std::optional<std::pair<uint32_t, uint32_t>>;
+        void retypeUi(const Guest &guest, uint32_t init, const std::function<Origin(const std::string &)> &was,
+                      const std::set<std::string> *only = nullptr)
         {
             for (int i = 0; i < guest.size(init); ++i)
             {
@@ -269,10 +294,7 @@ namespace gh2::campaigns
                             continue;
                         const std::string name = reinterpret_cast<const char *>(getMemPtr(guest.call.rdram, guest.value(panels, p)));
                         const std::string scene = sceneOf(guest, init, name);
-                        ark::front(from.front);
-                        const auto was = ark::origin(scene);
-                        ark::front(to.front);
-                        if (!scene.empty() && was != ark::origin(scene))
+                        if (!scene.empty() && (!only || only->count(name) != 0u) && was(scene) != ark::origin(scene))
                             unload += "{" + name + " unload}\n";
                     }
                     script::run(guest.call.rdram, guest.call.ctx, guest.call.runtime, unload);
@@ -282,6 +304,8 @@ namespace gh2::campaigns
                 // {new Class name (...)...}, the arrays its type definition.
                 if (guest.key(command) != "new" || guest.size(command) < 4 || guest.type(command, 2) != script::kSymbol ||
                     guest.type(command, 3) != script::kArray)
+                    continue;
+                if (only && only->count(reinterpret_cast<const char *>(getMemPtr(guest.call.rdram, guest.value(command, 2)))) == 0u)
                     continue;
                 const uint32_t object = guest.run(s_addresses->dataNodeGetObj, {guest.node(command, 2), command});
                 if (object == 0u)
@@ -293,6 +317,49 @@ namespace gh2::campaigns
             }
         }
 
+
+        // That campaign's files read, if no switch has read them yet.
+        bool built(const Guest &guest, size_t index)
+        {
+            if (s_campaigns[index].init != 0u)
+                return true;
+            ark::front(s_campaigns[index].front);
+            const bool ok = build(guest, s_campaigns[index]);
+            ark::front(s_campaigns[s_active].front);
+            return ok;
+        }
+
+        // The next song's venue is that campaign's: its world and venue
+        // files from its layer, and its venues' scripts in the config's
+        // types. The active one's puts the active one's back.
+        bool venuesFrom(const script::Call &call, size_t index)
+        {
+            if (index == s_venueFrom)
+                return true;
+            const Guest guest{call};
+            if (!built(guest, index))
+                return false;
+            syncConfig(guest, s_campaigns[index], kWorldTypes);
+            // The song's panels as that game's scripts make them; one kept
+            // loaded from boot whose scene is another file now loads again.
+            const uint32_t init = guest.clone(s_campaigns[index].init);
+            std::map<std::string, Origin> was;
+            for (const std::string &panel : kSongPanels)
+                if (const std::string scene = sceneOf(guest, init, panel); !scene.empty())
+                    was[scene] = ark::origin(scene);
+            for (const char *prefix : kVenueFiles)
+            {
+                if (index == s_active)
+                    ark::unlend(prefix);
+                else
+                    ark::lend(prefix, s_campaigns[index].front);
+            }
+            retypeUi(guest, init, [&](const std::string &scene) { return was[scene]; }, &kSongPanels);
+            guest.release(init);
+            s_venueFrom = index;
+            std::cerr << "[campaign] venues from " << s_campaigns[index].game << std::endl;
+            return true;
+        }
 
         bool switchTo(const script::Call &call, size_t index)
         {
@@ -324,6 +391,11 @@ namespace gh2::campaigns
             lap("leave");
             ark::front(s_campaigns[index].front);
             s_active = index;
+            // The sync brings every array back, the venues' types too, and
+            // the retype the song's panels.
+            for (const char *prefix : kVenueFiles)
+                ark::unlend(prefix);
+            s_venueFrom = index;
             outfits::campaignChanged();
             syncConfig(guest, s_campaigns[index]);
             // GameConfig's list of the config's venues, which its constructor
@@ -338,7 +410,14 @@ namespace gh2::campaigns
             // own node (Hmx::Object::Property, 0x2c1488), which scripts
             // change in place.
             const uint32_t init = guest.clone(s_campaigns[index].init);
-            retypeUi(guest, init, s_campaigns[before], s_campaigns[index]);
+            retypeUi(guest, init,
+                     [&](const std::string &scene)
+                     {
+                         ark::front(s_campaigns[before].front);
+                         const Origin origin = ark::origin(scene);
+                         ark::front(s_campaigns[index].front);
+                         return origin;
+                     });
             guest.release(init);
             lap("retype");
             script::patchUiAgain(call.rdram, call.ctx, call.runtime);
@@ -427,6 +506,32 @@ namespace gh2::campaigns
             return found->second.count(item) != 0u;
         }
 
+        // That campaign's venues, in its config's order.
+        const std::vector<std::string> &venuesOf(size_t index)
+        {
+            static std::map<size_t, std::vector<std::string>> s_found;
+            if (const auto it = s_found.find(index); it != s_found.end())
+                return it->second;
+            const auto front = s_campaigns[index].front;
+            dtb::Macros macros;
+            const auto config =
+                dtb::read(kRootConfig, macros, [front](const std::string &path) { return ark::readFront(front, path); });
+            const dtb::Node *list = config ? dtb::find(*config, "venues") : nullptr;
+            std::vector<std::string> &venues = s_found[index];
+            for (size_t i = 1u; list && i < list->nodes.size(); ++i)
+                venues.push_back(list->nodes[i].text);
+            return venues;
+        }
+
+        // Whether a song may play in another campaign's venue outside its
+        // career: the first is always open, the rest once a band has
+        // unlocked them there.
+        bool venueOpen(size_t index, const std::string &venue)
+        {
+            const std::vector<std::string> &venues = venuesOf(index);
+            return (!venues.empty() && venues.front() == venue) || save::unlockedItem(s_campaigns[index].game, venue);
+        }
+
         std::optional<size_t> indexOf(const std::string &game)
         {
             for (size_t i = 0; i < s_campaigns.size(); ++i)
@@ -454,6 +559,26 @@ namespace gh2::campaigns
             }
             if (op == "count")
                 return {static_cast<uint32_t>(s_campaigns.size()), script::kInt};
+            if (op == "venues")
+            {
+                const auto index = indexOf(call.symbol(2));
+                std::string names;
+                for (const std::string &venue : index ? venuesOf(*index) : std::vector<std::string>())
+                    names += venue + " ";
+                return {script::parse(call.rdram, call.ctx, call.runtime, names), script::kArray};
+            }
+            if (op == "venue_open")
+            {
+                const auto index = indexOf(call.symbol(2));
+                return {index && venueOpen(*index, call.symbol(3)) ? 1u : 0u, script::kInt};
+            }
+            if (op == "venue_game")
+                return {script::symbol(call.rdram, call.ctx, call.runtime, venueGame()), script::kSymbol};
+            if (op == "venues_from")
+            {
+                const auto index = indexOf(call.symbol(2));
+                return {index && venuesFrom(call, *index) ? 1u : 0u, script::kInt};
+            }
             if (op == "owns")
             {
                 // A game with no career here has nothing to earn it in.
@@ -576,6 +701,7 @@ namespace gh2::campaigns
     void add(const std::string &game, size_t front)
     {
         s_campaigns.push_back({game, front});
+        ark::alias("ghc/" + game + "/", front);
     }
 
     const std::string &active()
@@ -591,24 +717,22 @@ namespace gh2::campaigns
         return out;
     }
 
-    const std::vector<std::string> &venues()
+    const std::vector<std::string> &venues(const std::string &game)
     {
-        static std::map<size_t, std::vector<std::string>> s_found;
-        if (const auto it = s_found.find(s_active); it != s_found.end())
-            return it->second;
-        const auto front = s_campaigns[s_active].front;
-        dtb::Macros macros;
-        const auto config = dtb::read(kRootConfig, macros, [front](const std::string &path) { return ark::readFront(front, path); });
-        const dtb::Node *list = config ? dtb::find(*config, "venues") : nullptr;
-        std::vector<std::string> &venues = s_found[s_active];
-        for (size_t i = 1u; list && i < list->nodes.size(); ++i)
-            venues.push_back(list->nodes[i].text);
-        return venues;
+        static const std::vector<std::string> s_none;
+        const auto index = indexOf(game);
+        return index ? venuesOf(*index) : s_none;
+    }
+
+    const std::string &venueGame()
+    {
+        return s_campaigns[s_venueFrom].game;
     }
 
     void install(PS2Runtime &runtime, const Addresses &addresses)
     {
         s_addresses = &addresses;
+        ark::alias("ghc/gh2/", std::nullopt);
         // The boot's logos (App::App's Splash::Show, 0x2139f0) and the card
         // check's poster, the dialog panel loaded with the UI, come before the
         // save that the switch to the last game waits for: they are that

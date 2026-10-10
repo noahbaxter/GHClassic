@@ -16,7 +16,7 @@ namespace gh2::crowd_cards
         struct FullnessTag;
         void onSetFullness(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
-            if (campaigns::active() != "gh1")
+            if (campaigns::venueGame() != "gh1")
                 return;
             const uint32_t mat = load<uint32_t>(rdram, GPR_U32(ctx, 4) + milo::crowd::kCardMat);
             if (mat != 0u)

@@ -44,6 +44,18 @@
 //   {campaigns progress <game> <band>}  how far that band (from 0) is through
 //                              that game's career, 0 to 100: the career songs
 //                              passed on the difficulty it has passed most on
+//   {campaigns venues <game>}  that game's venues, as its config lists them
+//   {campaigns venue_open <game> <venue>}  TRUE if a song may play there
+//                              outside its career: its first, or one a band
+//                              has unlocked in that game's career
+//   {campaigns venues_from <game>}  the songs from here on play in that
+//                              game's venues: its world files and its venues'
+//                              scripts, until another or the game played's
+//                              own are asked for, or a switch
+//   {campaigns venue_game}     whose venues those are
+//
+// Each campaign's own files, whichever is played, are under ghc/<game>/
+// ("ghc/gh1/ui/sel_venue.milo"): GH2's are the game disc's.
 
 #include "addresses.h"
 
@@ -62,8 +74,12 @@ namespace gh2::campaigns
     const std::string &active();
     // Every campaign's game, gh2 first.
     std::vector<std::string> games();
-    // The active game's venues, in its config's order.
-    const std::vector<std::string> &venues();
+    // That game's venues, the active game's by default, in its config's
+    // order. None for a game with no campaign.
+    const std::vector<std::string> &venues(const std::string &game = active());
+    // The game whose venue a song plays in: the active one's unless
+    // {campaigns venues_from} named another.
+    const std::string &venueGame();
 
     void install(PS2Runtime &runtime, const Addresses &addresses);
 }
