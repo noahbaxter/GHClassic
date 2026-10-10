@@ -144,6 +144,9 @@ namespace milo
         constexpr uint32_t kFogStart = 0x54u;   // float
         constexpr uint32_t kFogEnd = 0x58u;     // float
         constexpr uint32_t kFogColor = 0x60u;   // 3 floats, then alpha
+        constexpr uint32_t kFadeOut = 0x70u;    // bool
+        constexpr uint32_t kFadeStart = 0x74u;
+        constexpr uint32_t kFadeEnd = 0x78u;
     }
 
     // RndLight, a RndTransformable at +0.

@@ -206,7 +206,15 @@ namespace gh2
                 return nullptr;
             const uint32_t tex = load<uint32_t>(rdram, mat + milo::mat::kDiffuseTex);
             const uint32_t diffuse = tex != 0u ? standInPayload(tex).value_or(0u) : 0u;
-            return look::find(reinterpret_cast<const char *>(getMemPtr(rdram, name)), diffuse);
+            const char *text = reinterpret_cast<const char *>(getMemPtr(rdram, name));
+            if (text[0] != '\0')
+                return look::find(text, diffuse);
+            // A Mat the track's code copied from its scene's has no name:
+            // the board, and any other by its picture (the side rails).
+            if (look::isBoard(mat))
+                return look::find(look::kBoardMat, diffuse);
+            const std::string copied = diffuse != 0u ? look::matOf(diffuse) : std::string();
+            return copied.empty() ? nullptr : look::find(copied.c_str(), diffuse);
         }
     }
 

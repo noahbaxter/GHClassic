@@ -18,6 +18,7 @@
 #include "milo/layout.h"
 #include "ps2_runtime_macros.h"
 #include "render/frame.h"
+#include "render/look.h"
 #include "render/texture_store.h"
 
 #include <algorithm>
@@ -380,14 +381,15 @@ namespace gh2
         // PsTex::CopyFromScreen(x, y) (0x1a0d68) has the GS move the texture's
         // width by height pixels of the buffer being drawn, from x and y,
         // into its VRAM. Track::Draw (0x151290) saves the venue behind the
-        // highway's far end this way and fades the highway into it.
+        // highway's far end this way and fades the highway into it, its
+        // only caller; not when the track fades in its shader.
         struct CopyTag;
         void onCopyFromScreen(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
             const uint32_t tex = GPR_U32(ctx, 4);
             const int32_t width = load<int32_t>(rdram, tex + milo::tex::kWidth);
             const int32_t height = load<int32_t>(rdram, tex + milo::tex::kHeight);
-            if (width <= 0 || height <= 0)
+            if (width <= 0 || height <= 0 || look::trackFades())
                 return;
             Frame &frame = building();
             frame.copies.push_back({frame.draws.size(), tex, GPR_S32(ctx, 5), GPR_S32(ctx, 6),

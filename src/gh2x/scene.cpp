@@ -164,7 +164,9 @@ namespace gh2::gh2x
         return path;
     }
 
-    std::optional<milo::Dir> convertScene(const SceneSource &source)
+    // With ownRoot the 360 scene's own object has to convert; without, the
+    // PS2's stands where it does not (the track's is a GHTrackDir).
+    static std::optional<milo::Dir> convertWith(const SceneSource &source, bool ownRoot)
     {
         const milo::Dir xbox = unInline(source.xbox);
         const milo::Dir &ps2 = source.ps2;
@@ -177,8 +179,10 @@ namespace gh2::gh2x
             hud = worldHud(ps2.root).value_or("");
         const bool worldFx = xbox.className == "RndDir" && ps2.className == "WorldFx";
         auto root = worldFx ? worldFxRoot(xbox.root, ps2.root) : rootToPs2(xbox.className, xbox.root, hud);
-        if (!root)
+        if (!root && ownRoot)
             return std::nullopt;
+        if (!root)
+            root = ps2.root;
 
         milo::Dir out;
         out.version = 24u;
@@ -310,6 +314,37 @@ namespace gh2::gh2x
 
         for (const auto &[className, count] : dropped)
             std::cerr << "[gh2x] " << source.path << ": " << count << " " << className << " left out" << std::endl;
+        return out;
+    }
+
+    std::optional<milo::Dir> convertScene(const SceneSource &source) { return convertWith(source, true); }
+
+    std::optional<milo::Dir> convertTrack(const SceneSource &source)
+    {
+        const auto converted = convertWith(source, false);
+        if (!converted)
+            return std::nullopt;
+        static const std::set<std::string> kTaken = {"Mat", "Tex", "Light", "Environ"};
+        milo::Dir out = source.ps2;
+        std::map<std::string, size_t> at;
+        for (size_t i = 0; i < out.entries.size(); ++i)
+            at[out.entries[i].second] = i;
+        for (size_t i = 0; i < converted->entries.size(); ++i)
+        {
+            const auto &[className, name] = converted->entries[i];
+            if (!kTaken.contains(className))
+                continue;
+            const auto found = at.find(name);
+            if (found == at.end())
+            {
+                out.entries.emplace_back(className, name);
+                out.bodies.push_back(converted->bodies[i]);
+                out.tableCount += 2u;
+                out.tableSize += static_cast<uint32_t>(className.size() + name.size() + 2u);
+            }
+            else if (out.entries[found->second].first == className)
+                out.bodies[found->second] = converted->bodies[i];
+        }
         return out;
     }
 }

@@ -36,6 +36,7 @@ layout(location = 3) out vec3 vNormal;
 layout(location = 4) out vec3 vTangent;
 layout(location = 5) out vec3 vBitangent;
 layout(location = 6) out float vFog; // how much of the colour the fog leaves
+layout(location = 7) out vec2 vFade; // and the fade with distance, of colour and of alpha
 
 const uint kFlagPrelit = 8u;
 const uint kFlagProjected = 256u;
@@ -85,8 +86,24 @@ void main()
         mat3 wm = mat3(data[e].xyz, data[e + 1].xyz, data[e + 2].xyz);
         vUv = (wm * (pc.boneBase >= 0 ? pos.xyz : inPos) + data[e + 3].xyz).xy;
     }
+    else if (pc.envBase >= 0)
+    {
+        // TEX_GEN 3, the eye's reflection in the world through gTexCoord,
+        // whose rows a Xenia frame has as half tex_xfm's first and minus
+        // half its third, each with a half added: the block's rows are the
+        // environ tex gen's (a gem's tail and its added shine).
+        int e = pc.envBase;
+        mat3 m = mat3(data[e].xyz, data[e + 1].xyz, data[e + 2].xyz);
+        vec3 toEye = normalize(data[pc.lightBase + 4].xyz - vWorldPos);
+        vUv = (m * reflect(-toEye, normal)).xy * 0.5 + 0.5;
+    }
     // Fog by the vert's distance down the view: saturate((gFogRange.x - d)
     // * gFogRange.y).
     vec4 fog = data[pc.lightBase + 19];
     vFog = fog.z != 0.0 ? clamp((fog.x - gl_Position.w) * fog.y, 0.0, 1.0) : 1.0;
+    // And the fade, the same way from gFadeRange: into colour (z) for an
+    // added draw, into alpha (w) for a blended one.
+    vec4 fade = data[pc.lightBase + 21];
+    float left = clamp((fade.x - gl_Position.w) * fade.y, 0.0, 1.0);
+    vFade = vec2(fade.z == 2.0 ? left : 1.0, fade.z == 1.0 ? left : 1.0);
 }

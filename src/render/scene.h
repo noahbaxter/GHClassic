@@ -149,6 +149,12 @@ namespace gh2
         float pointColor[3][3] = {};
         float pointPosition[3][3] = {};
         float pointRange[3] = {};
+        // Its fade with distance, the 360's shading's: a blended draw is
+        // whole at fadeStart from the camera and gone at fadeEnd (the
+        // track's far end).
+        bool fade = false;
+        float fadeStart = 0.0f;
+        float fadeEnd = 0.0f;
     };
 
     struct DrawCall

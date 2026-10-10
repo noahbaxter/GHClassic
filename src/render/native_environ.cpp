@@ -28,11 +28,8 @@ namespace gh2
         const Addresses *s_addresses = nullptr;
         Environ s_current;
 
-        void select(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        Environ read(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t env)
         {
-            const uint32_t returnTo = GPR_U32(ctx, 31);
-            const uint32_t env = GPR_U32(ctx, 4);
-
             Environ e;
             for (uint32_t i = 0; i < 3; ++i)
                 e.ambient[i] = load<float>(rdram, env + milo::environment::kAmbient + i * 4u);
@@ -44,6 +41,9 @@ namespace gh2
             e.fogEnd = load<float>(rdram, env + milo::environment::kFogEnd);
             for (uint32_t i = 0; i < 4; ++i)
                 e.fogColor[i] = load<float>(rdram, env + milo::environment::kFogColor + i * 4u);
+            e.fade = load<uint32_t>(rdram, env + milo::environment::kFadeOut) != 0u;
+            e.fadeStart = load<float>(rdram, env + milo::environment::kFadeStart);
+            e.fadeEnd = load<float>(rdram, env + milo::environment::kFadeEnd);
 
             uint32_t point = 0u;
             for (uint32_t node = load<uint32_t>(rdram, env + milo::environment::kFirstLight); node != 0u && point == 0u;
@@ -110,11 +110,22 @@ namespace gh2
                 if (e.lightCount != 0u)
                     e.kind = Environ::kDirectional;
             }
-            s_current = e;
+            return e;
+        }
 
+        void select(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t returnTo = GPR_U32(ctx, 31);
+            const uint32_t env = GPR_U32(ctx, 4);
+            s_current = read(rdram, ctx, runtime, env);
             store<uint32_t>(rdram, s_addresses->rndEnvironCurrent, env);
             ctx->pc = returnTo;
         }
+    }
+
+    Environ readEnviron(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t env)
+    {
+        return read(rdram, ctx, runtime, env);
     }
 
     const Environ &currentEnviron()

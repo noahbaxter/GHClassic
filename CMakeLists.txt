@@ -277,6 +277,7 @@ set(GHC_GAME_SOURCES
     src/gh2x/scene.cpp
     src/gh2x/shadows.cpp
     src/gh2x/textures.cpp
+    src/gh2x/track.cpp
     src/gh80s/install.cpp
     src/milo/milo.cpp
     src/milo/objects.cpp
