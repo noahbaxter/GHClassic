@@ -27,7 +27,8 @@
 (wait_screen ghc_qp_character_screen)
 (wait_until {char_single are_chars_loaded})
 {sel_character_panel set char_focus grim}
-(expect {sel_character_panel first_outfit} grimgh1)
+(expect {sel_character_panel hover_outfit grim} grimgh1)
+{sel_character_panel find_outfits}
 (print grim {sel_character_panel get outfits})
 (expect {size {sel_character_panel get outfits}} 1)
 (expect {if_else {find_elem {sel_character_panel get outfits} grim} 1 0} 0)

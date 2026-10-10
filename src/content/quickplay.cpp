@@ -25,6 +25,7 @@ namespace gh2::quickplay
 
         bool s_quickplay = false;
         std::map<std::string, std::string> s_picked; // quickplay's last picks, by what they are
+        std::map<std::string, std::string> s_looked; // each character's outfit last looked at
         std::string s_borrowedFor; // the menus' game whose arrays are GH2's for quickplay, or none
         std::vector<std::string> s_lent;
 
@@ -162,6 +163,17 @@ namespace gh2::quickplay
             }
             if (op == "picked" && call.size() > 2)
                 return {s_picked.count(call.symbol(2)) != 0u ? 1u : 0u, script::kInt};
+            // The outfit last looked at on a character, which hovering it
+            // shows again (sel_character.dta hover_outfit); 0 if none.
+            if (op == "look" && call.size() > 2)
+            {
+                if (call.size() > 3)
+                    s_looked[call.symbol(2)] = call.symbol(3);
+                const auto it = s_looked.find(call.symbol(2));
+                if (it == s_looked.end())
+                    return {0u, script::kInt};
+                return {script::symbol(call.rdram, call.ctx, call.runtime, it->second), script::kSymbol};
+            }
             if (op == "quickplay" && call.size() > 2)
             {
                 if (call.number(2) != 0)
@@ -171,7 +183,7 @@ namespace gh2::quickplay
                 return {s_quickplay ? 1u : 0u, script::kInt};
             }
             std::cerr << "[quickplay] usage: {quickplay song_defaults [<0|1>]}, {quickplay outfit <game>}, "
-                         "{quickplay quickplay <0|1>}"
+                         "{quickplay quickplay <0|1>}, {quickplay look <character> [<outfit>]}"
                       << std::endl;
             return {};
         }

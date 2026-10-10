@@ -50,19 +50,58 @@
          }
       )
       ; Config's characters, which in quickplay are GH2's whatever the menus.
-      ; char_focus shows char_outfit's own portrait where the scene has one:
+      ; Each shows its shown_outfit's own portrait where the scene has one:
       ; quickplay's has another game's outfits' (content/outfits.h portrait).
       (show_portraits
          {foreach_int $i 1 {size {find $syscfg characters}}
             {do
                ($c {elem {elem {find $syscfg characters} $i} 0})
                ($mesh {sprint "char_" $c ".mesh"})
-               ($own {sprint "portrait_" [char_outfit] ".mat"})
+               ($own {sprint "portrait_" {$this shown_outfit $c} ".mat"})
                {cond
                   ({! {campaign is_unlocked $c}} {$mesh set_mat char_locked.mat})
-                  ({&& {== $c [char_focus]} {exists $own}} {$mesh set_mat $own})
+                  ({exists $own} {$mesh set_mat $own})
                   (TRUE {$mesh set_mat {sprint "char_" $c ".mat"}})
                }
+            }
+         }
+      )
+      ; The outfit a character shows: char_outfit on char_focus, else what
+      ; hovering it would.
+      (shown_outfit
+         ($c)
+         {if_else {== $c [char_focus]} [char_outfit] {$this hover_outfit $c}}
+      )
+      ; What hovering a character shows: the outfit last looked at on it
+      ; ({quickplay look}, kept as its outfits are left), else the one
+      ; played last on the game's character, else its first it may wear,
+      ; else the provider's first, which may be a locked one.
+      (hover_outfit
+         ($c)
+         {do
+            ($entry {find $syscfg characters $c})
+            ($look {quickplay look $c})
+            {cond
+               ({&& $look {find_exists $entry $look} {campaign is_unlocked $look}
+                     {$this may_wear {find $entry $look}}}
+                  $look)
+               ({== $c {game get_character}} {game get_character_outfit})
+               (TRUE
+                  {do
+                     ($first {character_provider get_outfit $c 0})
+                     ($found FALSE)
+                     {foreach_int $i 1 {size $entry}
+                        {do
+                           ($outfit {elem {elem $entry $i} 0})
+                           {if {&& {! $found} {campaign is_unlocked $outfit} {$this may_wear {elem $entry $i}}}
+                              {set $first $outfit}
+                              {set $found TRUE}
+                           }
+                        }
+                     }
+                     $first
+                  }
+               )
             }
          }
       )
@@ -163,15 +202,6 @@
                {campaigns owns gh2 {elem $entry 0}}}
          }
       )
-      ; The outfit char_focus shows first: its first listed, else the
-      ; provider's first, which may be a locked one.
-      (first_outfit
-         {$this find_outfits}
-         {if_else {> {size [outfits]} 0}
-            {elem [outfits] 0}
-            {character_provider get_outfit [char_focus] 0}
-         }
-      )
       ; An outfit's (name "...") in config, else its locale token, as the
       ; game's own outfits have.
       (label_outfit_button
@@ -256,10 +286,7 @@
             {if {&& {!= $new_scroll_pos [old_scroll_pos]} {character_provider is_active $new_scroll_pos}}
                {synth play_sequence button_toggle}
                {set [char_focus] {character_provider get_symbol $new_scroll_pos}}
-               {if_else {== [char_focus] {game get_character}}
-                  {set [char_outfit] {game get_character_outfit}}
-                  {set [char_outfit] {$this first_outfit}}
-               }
+               {set [char_outfit] {$this hover_outfit [char_focus]}}
                {if [char_focus]
                   {sc_char_nm.lbl set_text [char_focus]}
                   {sc_char_blurb.lbl set_localized_text {localize {sprint [char_focus] "_blurb"}}}
@@ -290,6 +317,7 @@
                      {synth play_sequence button_toggle}
                   }
                   {set [char_outfit] {elem [outfits] $idx}}
+                  {quickplay look [char_focus] [char_outfit]}
                   {$this show_portraits}
                   ; The arrow's anim keys outfit1's place; from there it
                   ; moves as the buttons were placed.
