@@ -317,6 +317,36 @@ def cmd_build(argv):
     print("run: scripts/play.sh" + (f' "{args.disc}"' if args.disc else ""))
 
 
+def stable_data():
+    """Where an installed stable build keeps saves and settings: SDL's pref
+    path for org "" and app GHClassic on each platform."""
+    if MACOS:
+        return Path.home() / "Library" / "Application Support" / "GHClassic"
+    if WINDOWS:
+        return Path(os.environ.get("APPDATA", Path.home())) / "GHClassic"
+    return Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share")) / "GHClassic"
+
+
+def show_launch(disc, args):
+    """What a run from here plays from, said before the window opens: the
+    build, the game disc and any content discs, mods, and where saves go,
+    all read from the arguments the game is given."""
+    branch = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=ROOT, stdout=subprocess.PIPE,
+                            stderr=subprocess.DEVNULL, text=True).stdout.strip()
+    tag = tree_version()
+    track = "experimental" if experimental(tag) else "stable"
+    home = str(Path.home())
+    print(colour(1, f"GH Classic {tag}") + f"  {track}" + (f", {branch}" if branch else ""), file=sys.stderr)
+    rows = [("disc", Path(disc).name)]
+    flags = dict(zip(args[::2], args[1::2]))
+    rows += [("content", Path(path).name) for flag, path in zip(args, args[1:]) if flag == "--content"]
+    rows.append(("mods", flags.get("--mods", "none").replace(home, "~")))
+    data = flags.get("--data", "")
+    rows.append(("saves", (str(stable_data()) + "  (shared)" if data == "stable" else data).replace(home, "~")))
+    for label, value in rows:
+        print(f"  {colour(2, f'{label:<8}')}{value}", file=sys.stderr)
+
+
 def data_dir(isolated):
     """GHClassic's --data for a run from here: the stable track's own
     directory, which holds the player's saves, settings and bindings, or with
@@ -344,7 +374,9 @@ def cmd_play(argv):
         # with LTO takes a minute or two.
         build_step("building game", ["cmake", "--build", GAME, "--target", "GHClassic"], tool_env(), "game.log")
     disc = disc or find_disc(tool_env())
-    return subprocess.run([str(game_binary()), disc, *data_dir(isolated), *argv]).returncode
+    args = data_dir(isolated)
+    show_launch(disc, args)
+    return subprocess.run([str(game_binary()), disc, *args, *argv]).returncode
 
 
 def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=None):
