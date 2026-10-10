@@ -55,12 +55,16 @@ namespace gh2::gh1
                 {"double_tempo", "[double_tempo]"},
                 {"half_tempo", "[half_tempo]"},
                 {"normal_tempo", "[normal_tempo]"},
+                {"double", "[double_tempo]"}, // yougotanotherthingcomin's sing_double
             };
+            // drum_norm (barkatthemoon) and drum_nomral (ironman) are the
+            // charts' own spellings of normal.
             static const std::map<std::string, std::string> kDrums = {
-                {"allbeat", "[allbeat]"}, {"normal", "[allbeat]"}, {"half", "[half_time]"}, {"double", "[double_time]"},
+                {"allbeat", "[allbeat]"}, {"normal", "[allbeat]"}, {"norm", "[allbeat]"},
+                {"nomral", "[allbeat]"},  {"half", "[half_time]"}, {"double", "[double_time]"},
             };
             static const std::map<std::string, std::string> kCrowd = {
-                {"double_tempo", "[crowd_fast_tempo]"},
+                {"double_tempo", "[crowd_double_tempo]"},
                 {"half_tempo", "[crowd_half_tempo]"},
                 {"normal_tempo", "[crowd_normal_tempo]"},
             };
