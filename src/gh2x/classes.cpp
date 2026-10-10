@@ -409,6 +409,38 @@ namespace gh2::gh2x
             return finish(r, w);
         }
 
+    }
+
+    // The fields particleSys drops, read as it reads them: rotate, then rpm
+    // low and high, rpm drag and drag (RB3's names for them; drag is 0 on
+    // every system and rpm drag on all but one).
+    std::optional<Spin> particleSpin(const Bytes &body)
+    {
+        Reader r{body};
+        r.rev(30u);
+        object(r);
+        object(r);
+        r.rev(4u);
+        r.raw(8u);
+        trans(r);
+        draw(r);
+        r.skip(36u * 4u);
+        r.str();
+        r.skip(12u);
+        Spin spin;
+        spin.mat = r.str();
+        r.skip(4u + 12u + 32u + 4u + 16u);
+        r.flag();
+        const bool rotate = r.flag();
+        spin.rpm[0] = r.f32();
+        spin.rpm[1] = r.f32();
+        if (!r.ok || !rotate)
+            return std::nullopt;
+        return spin;
+    }
+
+    namespace
+    {
         // WorldCrowd 6 on both, its Object block last.
         std::optional<Bytes> worldCrowd(const Bytes &body)
         {

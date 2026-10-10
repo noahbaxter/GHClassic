@@ -149,7 +149,9 @@ namespace gh2
                     look.emissive = shading.emissive;
                     std::copy_n(shading.specular, 4, look.specularColor);
                     look.normalize = shading.normalize;
-                }};
+                },
+                [](const std::string &system, const gh2x::Spin &spin)
+                { look::addSpin(system, spin.mat, spin.rpm[0], spin.rpm[1]); }};
             return gh2x::convertScene(source);
         }
 

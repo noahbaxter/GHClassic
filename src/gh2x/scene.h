@@ -29,6 +29,8 @@ namespace gh2::gh2x
         // Told of each Mat kept, with the 360's shading of it that its PS2
         // body has no use for. May be empty.
         std::function<void(const std::string &mat, const Mat &shading)> look;
+        // Told of each ParticleSys whose particles turn. May be empty.
+        std::function<void(const std::string &system, const Spin &spin)> spin;
     };
 
     // None when the scene's own object cannot be converted. Any other

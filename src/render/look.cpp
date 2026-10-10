@@ -2,6 +2,7 @@
 
 #include "render/texture_store.h"
 
+#include <array>
 #include <cstring>
 #include <map>
 #include <mutex>
@@ -15,6 +16,8 @@ namespace gh2::look
         // made.
         std::unordered_map<std::string, std::map<uint32_t, Look>> s_looks;
         std::mutex s_looksMutex;
+        // Turning particle systems' rates, by "system/mat".
+        std::map<std::string, std::array<float, 2>> s_spins;
 
         // Each Mat's maps once read, held while draws ask for them. Game
         // thread only.
@@ -83,6 +86,20 @@ namespace gh2::look
             held.shading = std::move(shading);
         }
         return held.shading;
+    }
+
+    void addSpin(const std::string &system, const std::string &mat, float rpmLow, float rpmHigh)
+    {
+        const std::lock_guard lock(s_looksMutex);
+        s_spins[system + '/' + mat] = {rpmLow, rpmHigh};
+    }
+
+    const float *findSpin(const char *system, const char *mat)
+    {
+        const std::lock_guard lock(s_looksMutex);
+        const auto found = s_spins.find(std::string(system) + '/' + mat);
+        // Entries are never erased, and a map's stay where they are.
+        return found != s_spins.end() ? found->second.data() : nullptr;
     }
 
     void endFrame()

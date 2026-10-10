@@ -54,6 +54,16 @@ namespace gh2::gh2x
     };
     std::optional<Mat> matToPs2(const Bytes &body);
 
+    // A 360 ParticleSys's rotation, which the PS2's body has no place for:
+    // its Mat's name and the turns a minute its particles take, each
+    // somewhere between the two. None when its particles do not turn.
+    struct Spin
+    {
+        std::string mat;
+        float rpm[2] = {};
+    };
+    std::optional<Spin> particleSpin(const Bytes &body);
+
     // Tex 10 on both. A regular one on the 360 holds its picture block
     // compressed, which the PS2 cannot draw: picture says so, with its size.
     // None when the body does not fit the layout.
