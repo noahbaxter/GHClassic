@@ -620,14 +620,17 @@ namespace gh2::gh1
             return out;
         }
 
-        // A world with all but its shots.
+        // A world with all but its shots, and what it draws: GH2's fest has
+        // a sky dome (skybox.grp) that GH1's room does not cover, showing
+        // blue under the horizon where GH1's ground is clear black.
         milo::Dir withoutShots(const milo::Dir &world)
         {
+            static const std::set<std::string> kDropped = {"CamShot", "Group", "Mesh", "Mat", "Tex"};
             milo::Dir out = world;
             out.entries.clear();
             out.bodies.clear();
             for (size_t i = 0; i < world.entries.size(); ++i)
-                if (world.entries[i].first != "CamShot")
+                if (kDropped.count(world.entries[i].first) == 0u)
                 {
                     out.entries.push_back(world.entries[i]);
                     out.bodies.push_back(world.bodies[i]);
