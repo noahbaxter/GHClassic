@@ -57,7 +57,8 @@ namespace gh2
             // DrawSprites (0x1a2a64) sends a preserved packet in place of the
             // live list.
             const uint32_t preserved = load<uint32_t>(rdram, sys + kPreserved);
-            if (first == 0u && preserved == 0u)
+            // Nor while a shadow map is drawn: only meshes cast.
+            if ((first == 0u && preserved == 0u) || building().casting >= 0)
             {
                 ctx->pc = returnTo;
                 return;

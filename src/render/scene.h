@@ -176,5 +176,11 @@ namespace gh2
         bool crowd = false;
         // The mesh's name, only while a draw dump is asked for.
         std::string name;
+        // The 360's character shadows (render/native_mesh.cpp). A caster is
+        // drawn into its camera's shadow map and nowhere else. Any other
+        // draw is lit under the shadow map of this index plus one in
+        // Frame::shadows, 0 for none.
+        bool shadowCaster = false;
+        uint32_t shadow = 0;
     };
 }

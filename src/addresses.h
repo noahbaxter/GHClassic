@@ -31,6 +31,8 @@ namespace gh2
         uint32_t memOrPoolFree;
         uint32_t psMeshDrawShowing;
         uint32_t psMultiMeshDrawShowing;
+        uint32_t characterDrawShadowBuffer; // Character::DrawShadowBuffer
+        uint32_t rndSetShadowMap;           // Rnd::SetShadowMap, which PsRnd leaves as it is
         uint32_t psParticleSysDrawShowing;
         uint32_t updateRelativeXfm; // RndParticleSys::UpdateRelativeXfm
         uint32_t psEnvironSelect;
@@ -245,6 +247,8 @@ namespace gh2
         .memOrPoolFree = 0x2cf210u,
         .psMeshDrawShowing = 0x3d88d8u,
         .psMultiMeshDrawShowing = 0x1a2f00u,
+        .characterDrawShadowBuffer = 0x1619c0u,
+        .rndSetShadowMap = 0x364820u,
         .psParticleSysDrawShowing = 0x1a2c28u,
         .updateRelativeXfm = 0x1cf7b0u,
         .psEnvironSelect = 0x1a2060u,
