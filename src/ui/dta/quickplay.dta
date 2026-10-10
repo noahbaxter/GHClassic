@@ -115,8 +115,28 @@
          {ghc_pick_panel open_with {ghc_setlists} {setlist shown}}
          TRUE
       )
+      ({&& {== $button kPad_Select} {! {ui in_transition}}}
+         {synth play_sequence button_select}
+         {ghc_pick_panel open_sticky (song_defaults) song_defaults}
+         TRUE
+      )
       (TRUE kDataUnhandled)
    }
+}
+; Select's menu (picker.dta): each row a setting, green flips it.
+{func ghc_qp_option_text ($option)
+   {switch $option
+      (song_defaults
+         {sprint "SONG DEFAULTS: " {if_else {quickplay song_defaults} "ON" "OFF"}})
+      $option
+   }
+}
+{func ghc_qp_chose ($option)
+   {switch $option
+      (song_defaults {quickplay song_defaults {! {quickplay song_defaults}}})
+   }
+   {synth play_sequence button_toggle}
+   {ghc_pick_panel relabel}
 }
 ; The setlist picked, shown by that screen.
 {func ghc_qp_picked ($panel $twin $game)
@@ -136,6 +156,8 @@
       (SELECT_START_MSG {ui goto_screen qp_diff_screen} kDataUnhandled)
       (BUTTON_DOWN_MSG {ghc_qp_button $button})
       (ghc_picked ($game) {ghc_qp_picked sel_song_panel qp_selsong_twin_screen $game})
+      (ghc_option_text ($option) {ghc_qp_option_text $option})
+      (ghc_chose ($option) {ghc_qp_chose $option})
    )
 }
 {if {! {exists qp_selsong_twin_screen}} {new GHScreen qp_selsong_twin_screen}}
@@ -148,5 +170,7 @@
       (SELECT_START_MSG {ui goto_screen qp_diff_screen} kDataUnhandled)
       (BUTTON_DOWN_MSG {ghc_qp_button $button})
       (ghc_picked ($game) {ghc_qp_picked sel_song_twin_panel qp_selsong_screen $game})
+      (ghc_option_text ($option) {ghc_qp_option_text $option})
+      (ghc_chose ($option) {ghc_qp_chose $option})
    )
 }
