@@ -85,8 +85,11 @@ namespace gh2
         // is drawn through (index into cameras), which looks from its light.
         std::vector<uint32_t> shadows;
         // The shadow map the game is drawing casters into now, -1 for none:
-        // nothing else drawn meanwhile belongs in the picture.
+        // nothing else drawn meanwhile belongs in the picture. And the one
+        // the meshes now drawn are lit under. Both set by whoever makes the
+        // maps (gh2x/shadows.h) and read as each mesh is drawn.
         int32_t casting = -1;
+        int32_t lit = -1;
     };
 
     // A shadow map's side, as the 360 has it.

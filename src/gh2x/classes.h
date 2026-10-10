@@ -32,8 +32,8 @@ namespace gh2::gh2x
     // What each of a 360 CamShot's keyframes focuses on, which the PS2's has
     // no field for: a second PS2 CamShot of as many keyframes, each with the
     // 360's focal target as its one target, for the scene to add beside the
-    // shot under look::focusShot's name. The game loads and resolves the
-    // targets; nothing plays the shot.
+    // shot under focusShot's name (gh2x/focus.h). The game loads and resolves
+    // the targets; nothing plays the shot.
     std::optional<Bytes> camShotFocus(const Bytes &body);
 
     // A Mat with its normal, emissive, specular, diffuse ramp and environ

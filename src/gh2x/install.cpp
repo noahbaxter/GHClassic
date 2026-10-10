@@ -22,6 +22,10 @@
 #include "content/songs.h"
 #include "disc/ark.h"
 #include "formats/dtb.h"
+#include "gh2x/focus.h"
+#include "gh2x/models.h"
+#include "gh2x/shadows.h"
+#include "gh2x/textures.h"
 
 #include <algorithm>
 #include <iostream>
@@ -226,5 +230,13 @@ namespace gh2
         setlists::add("gh2x", std::move(tiers), "ui/sel_song_quickplay.milo", scoreNames, setlists::required(*campaign));
         addCareer(*disc, *campaign, *strings);
         std::cerr << "[gh2x] " << count << " songs" << std::endl;
+    }
+
+    void installGh2xAssets(PS2Runtime &runtime, const Addresses &addresses)
+    {
+        installGh2xTextures();
+        installGh2xModels();
+        gh2x::installFocus(runtime, addresses);
+        gh2x::installShadows(runtime, addresses);
     }
 }
