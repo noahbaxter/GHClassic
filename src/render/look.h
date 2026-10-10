@@ -40,6 +40,17 @@ namespace gh2::look
     // Maps no draw has asked for in a while are let go.
     void endFrame();
 
+    // A converted CamShot's keyframe keeps the 360's depth of field in the
+    // PS2's three blur fields, which the game reads only with the shot's own
+    // depth of field on, and it is off: the blur depth as the near blur, the
+    // focus blur multiplier as the far blur, and the max blur as the max
+    // focal blur plus this, which no PS2 keyframe's reaches. What each
+    // keyframe focuses on is the same keyframe's target in a second shot of
+    // this name (gh2x/classes.h). The host reads both as the shot runs
+    // (render/native_rnd.cpp).
+    constexpr float kShotBlurMark = 16.0f;
+    inline std::string focusShot(const std::string &shot) { return shot + ".focus"; }
+
     // The 360's luminance map, which its post stage scales the world's
     // colour by (render/frame.h), as a payload: 0 for none.
     void setLuminance(uint32_t id);

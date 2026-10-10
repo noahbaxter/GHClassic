@@ -38,6 +38,9 @@ namespace gh2
         uint32_t psTexDestroy;
         uint32_t psTexCopyFromScreen;
         uint32_t rndTextDrawShowing;
+        uint32_t camShotFrameInterp;       // CamShotFrame::Interp
+        uint32_t camShotFrameUpdateTarget; // CamShotFrame::UpdateTarget
+        uint32_t objectDirFindObject;      // ObjectDir::FindObject
         uint32_t worldXfm;       // RndTransformable::WorldXfm
         uint32_t setWorldXfm;    // RndTransformable::SetWorldXfm
         uint32_t setDirty;       // RndTransformable::SetDirty
@@ -249,6 +252,9 @@ namespace gh2
         .psTexDestroy = 0x1a0f18u,
         .psTexCopyFromScreen = 0x1a0d68u,
         .rndTextDrawShowing = 0x1dc380u,
+        .camShotFrameInterp = 0x2665a0u,
+        .camShotFrameUpdateTarget = 0x266df8u,
+        .objectDirFindObject = 0x2bb4f0u,
         .worldXfm = 0x3d8ea0u,
         .setWorldXfm = 0x1dd7b8u,
         .setDirty = 0x1dd748u,

@@ -48,6 +48,25 @@ namespace milo
         constexpr uint32_t kTargetTex = 0x2ecu; // RndTex* (ObjPtr at +0x2e4), null for the screen
     }
 
+    // CamShot: its first word points to its Hmx::Object, and its keyframes
+    // are a vector of CamShotFrame (CamShot::GetKey 0x263410).
+    namespace camShot
+    {
+        constexpr uint32_t kObject = 0x0u;
+        constexpr uint32_t kKeyframes = 0x10u; // begin, end
+        constexpr uint32_t kKeyframeSize = 0x110u;
+    }
+
+    // CamShotFrame (CamShotFrame::Interp 0x2665a0).
+    namespace camShotFrame
+    {
+        constexpr uint32_t kNearBlur = 0x78u;
+        constexpr uint32_t kFarBlur = 0x7cu;
+        constexpr uint32_t kMaxFocalBlur = 0x80u;
+        constexpr uint32_t kTargets = 0x84u;        // vector of ShotTarget: begin, end
+        constexpr uint32_t kTargetPosition = 0xa0u; // their mean world position, as UpdateTarget leaves it
+    }
+
     // RndMat, 0x120 bytes; PsMat adds its GS state after. Enums read from
     // PsMat::Update (0x19cfe0) and its jump tables at 0x418910 and 0x418930.
     namespace mat

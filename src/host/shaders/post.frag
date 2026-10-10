@@ -6,18 +6,34 @@
 //   0 bloom.fx: what is bright enough to bloom, from the scene
 //   1 downsample.fx: the mean of a 2x2 block
 //   2 blur.fx: 15 taps along `step`, weights summing to 2.47
-//   3 postprocess.fx: the scene, its bloom added, through the luminance map
+//   3 postprocess.fx: the scene, blurred by depth of field, its bloom added,
+//     through the luminance map
 //   4 the finished frame through the display's gamma ramp
+//   5 downsample_collapse.fx: the scene's low picture for depth of field
+//   6 blur.fx: 7 equal taps along `step`
+// Built a second time with MULTISAMPLED for the last world pass (3) over a
+// multisampled depth buffer.
 
 layout(location = 0) in vec2 vUv;
 
 layout(set = 0, binding = 0) uniform sampler2D source;
 layout(set = 0, binding = 1) uniform sampler2D bloom;
 layout(set = 0, binding = 2) uniform sampler2D luminanceMap;
+layout(set = 0, binding = 3) uniform sampler2D blurred;
+#ifdef MULTISAMPLED
+layout(set = 0, binding = 4) uniform sampler2DMS depth;
+#else
+layout(set = 0, binding = 4) uniform sampler2D depth;
+#endif
 
 layout(push_constant) uniform Push
 {
-    vec4 params; // xy: a step in uv (2: the blur's, 1: one source texel); z: bloom intensity; w: 1 with a luminance map
+    // xy: a step in uv (2, 6: the blur's; 1, 5: one source texel);
+    // z: bloom intensity; w: 1 with a luminance map
+    vec4 params;
+    // Depth of field: the blur is the depth buffer's value times x plus y,
+    // either side of 0, held between z and w. w is 0 for none.
+    vec4 focus;
     uint mode;
 } pc;
 
@@ -83,9 +99,39 @@ void main()
         vec4 colour = texelFetch(source, ivec2(gl_FragCoord.xy), 0); // the same size
         outColor = vec4(ramp(colour.r), ramp(colour.g), ramp(colour.b), clamp(colour.a, 0.0, 1.0));
     }
+    else if (pc.mode == 5u)
+    {
+        // Four of the scene's texels, half of one each way from here, point
+        // sampled. The target holds 0 to 1, so the low picture has no more.
+        ivec2 size = textureSize(source, 0);
+        vec2 at = vUv * vec2(size);
+        vec3 sum = vec3(0.0);
+        for (int i = 0; i < 4; ++i)
+        {
+            vec2 corner = vec2(float(i & 1), float(i >> 1)) - 0.5;
+            sum += texelFetch(source, clamp(ivec2(floor(at + corner)), ivec2(0), size - 1), 0).rgb;
+        }
+        outColor = vec4(0.25 * sum, 0.0);
+    }
+    else if (pc.mode == 6u)
+    {
+        // At 0, 1, 1 2/3 and 2 1/3 of the 360's 640x320 texels.
+        const float kTaps[3] = float[3](1.0, 5.0 / 3.0, 7.0 / 3.0);
+        vec4 sum = texture(source, vUv);
+        for (int i = 0; i < 3; ++i)
+            sum += texture(source, vUv + kTaps[i] * pc.params.xy) + texture(source, vUv - kTaps[i] * pc.params.xy);
+        outColor = sum / 7.0;
+    }
     else
     {
         vec4 colour = texture(source, vUv);
+        if (pc.focus.w > 0.0)
+        {
+            // Toward the low picture by how far the pixel is from the focus.
+            float z = texelFetch(depth, ivec2(gl_FragCoord.xy), 0).r;
+            float blur = clamp(abs(z * pc.focus.x + pc.focus.y), pc.focus.z, pc.focus.w);
+            colour.rgb = mix(colour.rgb, texture(blurred, vUv).rgb, blur);
+        }
         vec4 glow = texture(bloom, vUv);
         glow.rgb += glow.a;
         colour += glow * pc.params.z;

@@ -2,6 +2,7 @@
 
 #include "formats/bitmap.h"
 #include "gh2x/stream.h"
+#include "render/look.h"
 
 #include <functional>
 #include <map>
@@ -230,13 +231,18 @@ namespace gh2::gh2x
         }
 
         // CamShot 27 -> 20 (the PS2 debug build's CamShot::Save, RB3's
-        // gates). A keyframe's depth of field is 360 only: the PS2's takes
-        // the blur depth as its near blur and the PS2's usual far blur and
-        // focal blur, and the shot has it off (on in all 440 of the 360's
-        // shots, off in 416 of the PS2's 441). Lost: zoom fov, the focal
-        // target and the shot's post process.
+        // gates). A keyframe's depth of field is 360 only, and the shot has
+        // the PS2's off (on in all 440 of the 360's shots, off in 416 of the
+        // PS2's 441), so its three blur fields are read by nothing in the
+        // game and carry the 360's to the host (render/look.h). A shot with
+        // the 360's off gets the PS2's usual far blur and focal blur. Lost:
+        // zoom fov and the shot's post process; the focal target goes to
+        // camShotFocus.
         constexpr float kFarBlur = 2.0f;
         constexpr float kMaxFocalBlur = 0.9f;
+        // The category of a shot that only holds focal targets, which the
+        // game never asks for a shot of.
+        const char *const kFocusCategory = "x360_focus";
 
         Bytes withoutProps(const Bytes &raw, const std::set<std::string> &names);
 
@@ -259,12 +265,14 @@ namespace gh2::gh2x
                 if (w)
                     w->u32(20u).str(entity).str(subpart);
             };
+            std::vector<size_t> blurs; // where each keyframe's far blur is written
             for (uint32_t k = 0; k < keys && r.ok; ++k)
             {
                 w.raw(r.raw(16u + 48u + 8u)); // duration, blend, ease, fov, transform, screen offset
-                const float blurDepth = r.f32();
-                r.skip(8u); // max blur, focus blur multiplier
-                w.f32(blurDepth).f32(kFarBlur).f32(kMaxFocalBlur);
+                const float blurDepth = r.f32(), maxBlur = r.f32(), focusBlur = r.f32();
+                w.f32(blurDepth);
+                blurs.push_back(w.out.size());
+                w.f32(focusBlur).f32(look::kShotBlurMark + maxBlur);
                 const uint32_t targets = r.count(64u);
                 w.u32(targets);
                 for (uint32_t t = 0; t < targets && r.ok; ++t)
@@ -275,7 +283,12 @@ namespace gh2::gh2x
                 r.skip(4u);                     // zoom fov
             }
             w.u8(r.flag()).raw(r.raw(12u)); // looping, path ease, near, far
-            r.flag();
+            if (!r.flag())
+                for (const size_t at : blurs)
+                {
+                    const float usual[2] = {kFarBlur, kMaxFocalBlur};
+                    std::memcpy(w.out.data() + at, usual, sizeof(usual));
+                }
             w.u8(0u).raw(r.raw(8u)); // depth of field, filter, clamp height
             w.str(r.str()).raw(r.raw(4u)).str(r.str()).raw(r.raw(4u)); // path, fade time, category, weight
             const uint32_t crowd = r.count(100000u);
@@ -826,6 +839,61 @@ namespace gh2::gh2x
         if (kSame.contains(className))
             return body;
         return std::nullopt;
+    }
+
+    std::optional<Bytes> camShotFocus(const Bytes &body)
+    {
+        Reader r{body};
+        r.rev(27u);
+        object(r);
+        Writer w;
+        put(w.u32(20u), Object{{}, Bytes{0u}});
+        r.rev(4u);
+        w.u32(4u).raw(r.raw(8u)); // frame, rate
+        const uint32_t keys = r.count(1000u);
+        w.u32(keys);
+        const auto target = [&](const std::string &entity, const std::string &subpart)
+        { w.u32(20u).str(entity).str(subpart); };
+        const auto skipTarget = [&]
+        {
+            r.rev(27u);
+            r.str();
+            r.str();
+        };
+        for (uint32_t k = 0; k < keys && r.ok; ++k)
+        {
+            w.raw(r.raw(16u + 48u + 8u)); // duration, blend, ease, fov, transform, screen offset
+            r.skip(12u);
+            w.f32(0.0f).f32(kFarBlur).f32(kMaxFocalBlur);
+            const uint32_t targets = r.count(64u);
+            for (uint32_t t = 0; t < targets && r.ok; ++t)
+                skipTarget();
+            r.rev(27u);
+            const std::string entity = r.str(), subpart = r.str();
+            w.u32(entity.empty() ? 0u : 1u);
+            if (!entity.empty())
+                target(entity, subpart);
+            skipTarget(); // parent
+            target({}, {});
+            r.flag();
+            r.skip(16u + 4u); // shake, zoom fov
+            w.u8(0u).f32(0.0f).f32(0.0f).f32(0.0f).f32(0.0f);
+        }
+        w.u8(r.flag()).raw(r.raw(12u)); // looping, path ease, near, far
+        r.flag();
+        w.u8(0u).raw(r.raw(8u)); // depth of field, filter, clamp height
+        r.str();
+        w.str({}).raw(r.raw(4u)); // path, fade time
+        r.str();
+        r.skip(4u);
+        w.str(kFocusCategory).f32(0.0f); // category, weight
+        r.skip(8u * r.count(100000u));
+        w.u32(0u).raw(r.raw(4u)); // crowd characters, stamp
+        r.strs();
+        r.str();
+        r.str();
+        w.strs({}).str({}).str({}); // hide list, crowd, glow spot
+        return finish(r, w);
     }
 
     std::optional<Mat> matToPs2(const Bytes &body)
