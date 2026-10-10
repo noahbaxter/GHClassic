@@ -75,6 +75,12 @@ namespace gh2
         // The 360's luminance map for its post stage, null for none
         // (render/look.h).
         std::shared_ptr<const TextureData> luminance;
+        // The 360's depth of field for its post stage, as its shader takes it
+        // (gDepthOfField): the blur of a pixel is its depth on the 360 times
+        // [0] plus [1], either side of 0, held between [2] and [3]. [3] is 0
+        // for none. And the camera it was worked out for (Camera::id).
+        float depthOfField[4] = {};
+        uint32_t focusCamera = 0;
     };
 
     // Finished frames, oldest first. The game thread publishes at EndDrawing;

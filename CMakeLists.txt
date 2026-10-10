@@ -325,6 +325,14 @@ foreach(SHADER mesh.vert mesh.frag x360.vert x360.frag post.vert post.frag)
         VERBATIM)
     list(APPEND GHC_SHADER_HEADERS "${SHADER_HEADER}")
 endforeach()
+# post.frag again, reading a multisampled depth buffer (kPostMsFrag).
+add_custom_command(
+    OUTPUT "${GHC_SHADER_DIR}/post_ms_frag.h"
+    COMMAND glslang-standalone -V -DMULTISAMPLED --vn kPostMsFrag -o "${GHC_SHADER_DIR}/post_ms_frag.h"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/host/shaders/post.frag"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/host/shaders/post.frag" glslang-standalone
+    VERBATIM)
+list(APPEND GHC_SHADER_HEADERS "${GHC_SHADER_DIR}/post_ms_frag.h")
 add_custom_target(GHClassic_shaders DEPENDS ${GHC_SHADER_HEADERS})
 add_dependencies(GHClassic GHClassic_shaders)
 target_include_directories(GHClassic PRIVATE "${GHC_SHADER_DIR}")

@@ -11,6 +11,7 @@
 #include "mesh_frag.h"
 #include "mesh_vert.h"
 #include "post_frag.h"
+#include "post_ms_frag.h"
 #include "post_vert.h"
 #include "x360_frag.h"
 #include "x360_vert.h"
@@ -46,9 +47,10 @@ namespace gh2
         // Room for this many live x360 materials' map sets.
         constexpr uint32_t kMaxShadings = 2048;
         // The post stage's passes a frame, each with its own sources: bloom
-        // extract, two downsamples, two blurs, the world's last, and the
-        // finished frame's gamma ramp.
-        constexpr uint32_t kPostPasses = 7u;
+        // extract, two downsamples, two blurs, the world's last, depth of
+        // field's low picture and its two blurs, and the finished frame's
+        // gamma ramp.
+        constexpr uint32_t kPostPasses = 10u;
 
         // By blend, z mode, alpha write and dest alpha test.
         constexpr uint32_t kPipelineCount =
@@ -472,10 +474,33 @@ namespace gh2
             return out;
         }
 
+        // The frame's depth of field for post.frag, in the depth buffer's own
+        // values: zeros unless the frame has it for the world's camera. The
+        // 360's numbers (Frame::depthOfField) are for its depth, where the
+        // world lies past its UI plane at 0.1: 0.1 + 0.9 (f/(f-n) -
+        // nf/(f-n)/w) at a distance w. The buffer here holds what
+        // viewProjection gives, c0 + c1/w, so the one is a line of the other.
+        void focusOf(const Frame &frame, const Camera *world, float out[4])
+        {
+            if (!world || frame.depthOfField[3] <= 0.0f || frame.focusCamera != world->id || world->yFov == 0.0f)
+                return;
+            const double n = world->nearPlane, f = world->farPlane;
+            const double k = (world->zRange[1] - world->zRange[0]) * 0.5;
+            const double c0 = 1.0 - world->zRange[0] - k - k * (f + n) / (f - n);
+            const double c1 = 2.0 * k * f * n / (f - n);
+            const double range = f / (f - n), slope = n * f / (f - n);
+            const double scale = frame.depthOfField[0], offset = frame.depthOfField[1];
+            out[0] = static_cast<float>(-0.9 * slope * scale / c1);
+            out[1] = static_cast<float>(scale * (0.1 + 0.9 * range + 0.9 * slope * c0 / c1) + offset);
+            out[2] = frame.depthOfField[2];
+            out[3] = frame.depthOfField[3];
+        }
+
         // What post.frag is given for one pass.
         struct PostPush
         {
             float params[4];
+            float focus[4];
             uint32_t mode;
         };
 
@@ -546,6 +571,12 @@ namespace gh2
             uint32_t height = 0;
         };
         PostImage postSource, bloomFull, bloomHalf, bloomA, bloomB;
+        // Depth of field's low picture, and a second for its blur's two
+        // passes, at the 360's 640x320 of its 1280x720. It blends by the
+        // main pass's depth, read through a view of the depth alone.
+        PostImage focusA, focusB;
+        VkImageView depthOnlyView = VK_NULL_HANDLE;
+        VkShaderModule postWorldFragment = VK_NULL_HANDLE; // post.frag for the depth buffer's samples
         VkFramebuffer postFramebuffer = VK_NULL_HANDLE; // the main colour attachment
         VkRenderPass bloomPass = VK_NULL_HANDLE;
         VkRenderPass postPass = VK_NULL_HANDLE;
@@ -940,7 +971,8 @@ namespace gh2
                        "frame data set layout"))
                 return false;
             // x360.frag's maps: normal, specular, glow, ramp, cube; and the
-            // post stage's source, bloom and luminance map.
+            // post stage's source, bloom, luminance map, low picture and
+            // depth.
             VkDescriptorSetLayoutBinding maps[5]{};
             for (uint32_t i = 0; i < 5u; ++i)
                 maps[i] = {i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
@@ -948,13 +980,12 @@ namespace gh2
             layoutInfo.pBindings = maps;
             if (!check(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &mapsSetLayout), "maps set layout"))
                 return false;
-            layoutInfo.bindingCount = 3;
             if (!check(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &postSetLayout), "post set layout"))
                 return false;
 
             const VkDescriptorPoolSize sizes[] = {
                 {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                 kMaxTextures * 2u + kMaxShadings * 5u + kFrameSlots * kPostPasses * 3u},
+                 kMaxTextures * 2u + kMaxShadings * 5u + kFrameSlots * kPostPasses * 5u},
                 {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kFrameSlots},
             };
             VkDescriptorPoolCreateInfo poolInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
@@ -1264,8 +1295,10 @@ namespace gh2
                 return false;
             postVertex = shader(kPostVert, sizeof(kPostVert));
             postFragment = shader(kPostFrag, sizeof(kPostFrag));
+            postWorldFragment = samples != VK_SAMPLE_COUNT_1_BIT ? shader(kPostMsFrag, sizeof(kPostMsFrag))
+                                                                  : shader(kPostFrag, sizeof(kPostFrag));
             return x360Vertex != VK_NULL_HANDLE && x360Fragment != VK_NULL_HANDLE && postVertex != VK_NULL_HANDLE &&
-                   postFragment != VK_NULL_HANDLE;
+                   postFragment != VK_NULL_HANDLE && postWorldFragment != VK_NULL_HANDLE;
         }
 
         // `x360Family` draws with x360.vert and x360.frag, whose verts take
@@ -1416,7 +1449,7 @@ namespace gh2
             stages[0].pName = "main";
             stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
             stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-            stages[1].module = postFragment;
+            stages[1].module = bloom ? postFragment : postWorldFragment;
             stages[1].pName = "main";
             VkPipelineVertexInputStateCreateInfo vertexInput{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
             VkPipelineInputAssemblyStateCreateInfo assembly{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
@@ -1473,7 +1506,10 @@ namespace gh2
                 vmaDestroyImage(allocator, msaa, msaaMemory);
             if (target != VK_NULL_HANDLE && output != VK_NULL_HANDLE)
                 vmaDestroyImage(allocator, target, hdrMemory);
-            for (PostImage *post : {&postSource, &bloomFull, &bloomHalf, &bloomA, &bloomB})
+            if (depthOnlyView != VK_NULL_HANDLE)
+                vkDestroyImageView(device, depthOnlyView, nullptr);
+            depthOnlyView = VK_NULL_HANDLE;
+            for (PostImage *post : {&postSource, &bloomFull, &bloomHalf, &bloomA, &bloomB, &focusA, &focusB})
             {
                 if (post->framebuffer != VK_NULL_HANDLE)
                     vkDestroyFramebuffer(device, post->framebuffer, nullptr);
@@ -1582,8 +1618,9 @@ namespace gh2
             if (resolve && !createAttachment(colorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, false, w, h, msaa,
                                              msaaMemory, msaaView))
                 return false;
-            if (!createAttachment(depthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, false, w, h, depth,
-                                  depthMemory, depthView))
+            if (!createAttachment(depthFormat,
+                                  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | (x360 ? VK_IMAGE_USAGE_SAMPLED_BIT : 0u),
+                                  false, w, h, depth, depthMemory, depthView))
                 return false;
 
             const VkImageView plain[] = {targetView, depthView};
@@ -1611,6 +1648,11 @@ namespace gh2
             fb.pAttachments = &outputView;
             if (!check(vkCreateFramebuffer(device, &fb, nullptr, &outputFramebuffer), "output framebuffer"))
                 return false;
+            view.image = depth;
+            view.format = depthFormat;
+            view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+            if (!check(vkCreateImageView(device, &view, nullptr, &depthOnlyView), "depth view"))
+                return false;
 
             // The bloom at the 360's sizes over its 1280x720: extracted at
             // full size, then halved twice.
@@ -1621,7 +1663,9 @@ namespace gh2
                    createPostImage(kColorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, w, h, bloomFull) &&
                    createPostImage(kColorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, w / 2u, h / 2u, bloomHalf) &&
                    createPostImage(kColorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, w / 4u, h / 4u, bloomA) &&
-                   createPostImage(kColorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, w / 4u, h / 4u, bloomB);
+                   createPostImage(kColorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, w / 4u, h / 4u, bloomB) &&
+                   createPostImage(kColorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, w / 2u, h * 4u / 9u, focusA) &&
+                   createPostImage(kColorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, w / 2u, h * 4u / 9u, focusB);
         }
 
         bool createBuffer(const void *data, VkDeviceSize bytes, VkBufferUsageFlags usage, VkBuffer &buffer,
@@ -1737,13 +1781,13 @@ namespace gh2
 
         void imageBarrier(VkCommandBuffer cmd, VkImage image, VkImageLayout from, VkImageLayout to,
                           VkAccessFlags was, VkAccessFlags is, VkPipelineStageFlags before,
-                          VkPipelineStageFlags after)
+                          VkPipelineStageFlags after, VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT)
         {
             VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
             barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             barrier.image = image;
-            barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+            barrier.subresourceRange = {aspect, 0, 1, 0, 1};
             barrier.oldLayout = from;
             barrier.newLayout = to;
             barrier.srcAccessMask = was;
@@ -1771,16 +1815,21 @@ namespace gh2
             vkCmdEndRenderPass(cmd);
         }
 
-        // What one pass of post.frag samples: its source, bloom and luminance
-        // map.
-        void writePostSet(VkDescriptorSet set, VkImageView source, VkImageView bloom, VkImageView luminance)
+        // What one pass of post.frag samples: its source, and for the world's
+        // last pass its bloom, luminance map, depth of field's low picture
+        // and the depth buffer. `blank` stands for what a pass does not read.
+        void writePostSet(VkDescriptorSet set, VkImageView source, VkImageView blank,
+                          VkImageView bloom = VK_NULL_HANDLE, VkImageView luminance = VK_NULL_HANDLE,
+                          VkImageView blurred = VK_NULL_HANDLE, VkImageView depth = VK_NULL_HANDLE)
         {
-            const VkImageView views[3] = {source, bloom, luminance};
-            VkDescriptorImageInfo images[3];
-            VkWriteDescriptorSet writes[3];
-            for (uint32_t b = 0; b < 3u; ++b)
+            const VkImageView views[5] = {source, bloom, luminance, blurred, depth};
+            VkDescriptorImageInfo images[5];
+            VkWriteDescriptorSet writes[5];
+            for (uint32_t b = 0; b < 5u; ++b)
             {
-                images[b] = {samplers[0], views[b], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+                images[b] = {samplers[0], views[b] != VK_NULL_HANDLE ? views[b] : blank,
+                             b == 4u && depth != VK_NULL_HANDLE ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                                                                : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
                 writes[b] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
                 writes[b].dstSet = set;
                 writes[b].dstBinding = b;
@@ -1788,7 +1837,7 @@ namespace gh2
                 writes[b].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
                 writes[b].pImageInfo = &images[b];
             }
-            vkUpdateDescriptorSets(device, 3, writes, 0, nullptr);
+            vkUpdateDescriptorSets(device, 5, writes, 0, nullptr);
         }
 
         // The 360's post stage over the world drawn so far, which the main
@@ -1797,7 +1846,7 @@ namespace gh2
         // then the luminance map. The result goes into the frame's colour
         // attachment for the main pass to take up again. Called outside a
         // render pass.
-        void runPost(VkCommandBuffer cmd, const Frame &frame, uint64_t serial)
+        void runPost(VkCommandBuffer cmd, const Frame &frame, const Camera *world, uint64_t serial)
         {
             imageBarrier(cmd, postSource.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0,
                          VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
@@ -1817,19 +1866,43 @@ namespace gh2
             const GpuTexture *luminance = frame.luminance ? gpuTexture(cmd, frame.luminance, serial) : nullptr;
             if (!blank)
                 return;
-            // Each pass's source, bloom and luminance map.
+            // The world's last pass reads the main pass's depth, which it does
+            // not draw into.
+            const VkImageAspectFlags depthAspect = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+            imageBarrier(cmd, depth, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                         VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+                         VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, depthAspect);
+
             VkDescriptorSet(&sets)[kPostPasses] = postSets[serial % kFrameSlots];
-            writePostSet(sets[0], postSource.view, blank->view, blank->view);
-            writePostSet(sets[1], bloomFull.view, blank->view, blank->view);
-            writePostSet(sets[2], bloomHalf.view, blank->view, blank->view);
-            writePostSet(sets[3], bloomA.view, blank->view, blank->view);
-            writePostSet(sets[4], bloomB.view, blank->view, blank->view);
-            writePostSet(sets[5], postSource.view, bloomA.view, luminance ? luminance->view : blank->view);
+            writePostSet(sets[0], postSource.view, blank->view);
+            writePostSet(sets[1], bloomFull.view, blank->view);
+            writePostSet(sets[2], bloomHalf.view, blank->view);
+            writePostSet(sets[3], bloomA.view, blank->view);
+            writePostSet(sets[4], bloomB.view, blank->view);
+            writePostSet(sets[5], postSource.view, blank->view, bloomA.view,
+                         luminance ? luminance->view : VK_NULL_HANDLE, focusA.view, depthOnlyView);
+            writePostSet(sets[6], postSource.view, blank->view);
+            writePostSet(sets[7], focusA.view, blank->view);
+            writePostSet(sets[8], focusB.view, blank->view);
 
             const auto texel = [](const PostImage &image)
-            { return PostPush{{1.0f / static_cast<float>(image.width), 1.0f / static_cast<float>(image.height)}, 1u}; };
+            { return PostPush{{1.0f / static_cast<float>(image.width), 1.0f / static_cast<float>(image.height)}, {}, 1u}; };
+
+            // Depth of field's low picture, blurred across then down by taps
+            // set in the 360's 640x320 texels, whatever the size here.
+            PostPush collapse = texel(postSource);
+            collapse.mode = 5u;
+            postDraw(cmd, bloomPass, focusA.framebuffer, focusA.width, focusA.height, bloomPipeline, sets[6], collapse);
+            const float focusDown = 1.0f / 320.0f;
+            const float focusAcross = 16.0f / (9.0f * 640.0f) * static_cast<float>(height) / static_cast<float>(width);
+            postDraw(cmd, bloomPass, focusB.framebuffer, focusB.width, focusB.height, bloomPipeline, sets[7],
+                     PostPush{{focusAcross, 0.0f}, {}, 6u});
+            postDraw(cmd, bloomPass, focusA.framebuffer, focusA.width, focusA.height, bloomPipeline, sets[8],
+                     PostPush{{0.0f, focusDown}, {}, 6u});
+
             postDraw(cmd, bloomPass, bloomFull.framebuffer, bloomFull.width, bloomFull.height, bloomPipeline, sets[0],
-                     PostPush{{}, 0u});
+                     PostPush{{}, {}, 0u});
             postDraw(cmd, bloomPass, bloomHalf.framebuffer, bloomHalf.width, bloomHalf.height, bloomPipeline, sets[1],
                      texel(bloomFull));
             postDraw(cmd, bloomPass, bloomA.framebuffer, bloomA.width, bloomA.height, bloomPipeline, sets[2],
@@ -1839,12 +1912,18 @@ namespace gh2
             const float down = 1.0f / 180.0f;
             const float across = down * static_cast<float>(height) / static_cast<float>(width);
             postDraw(cmd, bloomPass, bloomB.framebuffer, bloomB.width, bloomB.height, bloomPipeline, sets[3],
-                     PostPush{{0.0f, down}, 2u});
+                     PostPush{{0.0f, down}, {}, 2u});
             postDraw(cmd, bloomPass, bloomA.framebuffer, bloomA.width, bloomA.height, bloomPipeline, sets[4],
-                     PostPush{{across, 0.0f}, 2u});
+                     PostPush{{across, 0.0f}, {}, 2u});
             // gBloomIntensity as a Xenia frame of battle had it.
-            postDraw(cmd, postPass, postFramebuffer, width, height, postPipeline, sets[5],
-                     PostPush{{0.0f, 0.0f, 1.0f, luminance ? 1.0f : 0.0f}, 3u});
+            PostPush last{{0.0f, 0.0f, 1.0f, luminance ? 1.0f : 0.0f}, {}, 3u};
+            focusOf(frame, world, last.focus);
+            postDraw(cmd, postPass, postFramebuffer, width, height, postPipeline, sets[5], last);
+            imageBarrier(cmd, depth, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+                         VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_ACCESS_SHADER_READ_BIT,
+                         VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+                         depthAspect);
         }
 
         // The finished frame into the given target through the 360's gamma
@@ -1861,8 +1940,8 @@ namespace gh2
                          VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
                          VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
             const VkDescriptorSet set = postSets[serial % kFrameSlots][kPostPasses - 1u];
-            writePostSet(set, targetView, blank->view, blank->view);
-            postDraw(cmd, outputPass, outputFramebuffer, width, height, bloomPipeline, set, PostPush{{}, 4u});
+            writePostSet(set, targetView, blank->view);
+            postDraw(cmd, outputPass, outputFramebuffer, width, height, bloomPipeline, set, PostPush{{}, {}, 4u});
         }
 
         void retire(uint64_t serial)
@@ -1985,7 +2064,8 @@ namespace gh2
         for (VkPipeline pipeline : {s.bloomPipeline, s.postPipeline})
             if (pipeline != VK_NULL_HANDLE)
                 vkDestroyPipeline(s.device, pipeline, nullptr);
-        for (VkShaderModule module : {s.x360Vertex, s.x360Fragment, s.postVertex, s.postFragment})
+        for (VkShaderModule module :
+             {s.x360Vertex, s.x360Fragment, s.postVertex, s.postFragment, s.postWorldFragment})
             if (module != VK_NULL_HANDLE)
                 vkDestroyShaderModule(s.device, module, nullptr);
         for (VkPipelineLayout layout : {s.x360Layout, s.postLayout})
@@ -2254,13 +2334,15 @@ namespace gh2
         // draw took (the track and HUD come later, through their own). The
         // 360 tells them apart by depth instead (gUIPlaneDistance).
         size_t postBefore = SIZE_MAX;
+        const Camera *worldCamera = nullptr;
         {
             uint32_t world = 0u;
             bool any = false;
             for (size_t i = 0; i < frame.draws.size() && !any; ++i)
                 if (x360Draws[i] && drawRun[i] < 0 && frame.draws[i].camera < frame.cameras.size())
                 {
-                    world = frame.cameras[frame.draws[i].camera].id;
+                    worldCamera = &frame.cameras[frame.draws[i].camera];
+                    world = worldCamera->id;
                     any = true;
                 }
             for (size_t i = 0; any && i < frame.draws.size(); ++i)
@@ -2398,7 +2480,7 @@ namespace gh2
                 }
                 if (post)
                 {
-                    s.runPost(cmd, frame, serial);
+                    s.runPost(cmd, frame, worldCamera, serial);
                     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, s.layout, 1, 1, &data.set, 0,
                                             nullptr);
                     boundPipeline = VK_NULL_HANDLE;
