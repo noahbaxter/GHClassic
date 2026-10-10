@@ -8,8 +8,9 @@
 ; The lick the splash and the menu each play runs up to 6 s and nothing of
 ; the game's stops it: without a disc load after the menu it plays over the
 ; next screen. Its ten sounds get a fader of their own before either plays,
-; which leaving the menu fades out (dB, ms).
-{set $lick_fade {new Fader lick.fade}}
+; which leaving the menu fades out (dB, ms). Once: these scripts run again
+; with each change of menus.
+{if {! {exists lick.fade}} {set $lick_fade {new Fader lick.fade}}}
 {func lick_attach
    {$lick_fade set_val 0}
    {foreach_int $i 0 10 {{synth find {sprint "meta_lick" $i}} add_fader $lick_fade}}
@@ -41,10 +42,9 @@
       (enter
          {$this add_quit}
          {$this add_version}
-         ; Out of quickplay (quickplay_pickers.dta), whose characters, guitars and
-         ; venues may be another game's: the menus' game's again.
-         {campaigns venues_from {campaigns active}}
-         {quickplay quickplay 0}
+         ; Out of quickplay (quickplay_pickers.dta), whose venue may be another
+         ; game's: GH2's again.
+         {campaigns venues_from {campaigns live}}
          {set $main_entered TRUE}
          {$this reset_player_settings}
          {if {! [already_entered]}
@@ -117,12 +117,11 @@
                   }
                }
             )
-            ; Quickplay opens on the menus' game's setlist, whichever was
-            ; picked last time (quickplay.dta).
+            ; Quickplay opens on the theme's setlist, whichever was picked
+            ; last time (quickplay.dta).
             (main_quickspin.btn
                {gamecfg set mode quickplay}
                {setlist select {campaigns active}}
-               {quickplay quickplay 1}
                {ui goto_screen qp_selsong_screen}
             )
             (main_multiplayer.btn {ui goto_screen multi_screen})
@@ -196,8 +195,7 @@
 }
 ; The main screen, as the game's own but for fade_panel, which Quit fades
 ; through, and for yellow: held, it lists those games (picker.dta), and the
-; one picked becomes the campaign and so the menus and music, back on this
-; screen.
+; one picked becomes the theme, its menus and music, back on this screen.
 {retype main_screen
    (
       (panels meta main_panel helpbar ghc_pick_panel fade_panel)
@@ -232,6 +230,7 @@
          {synth play_sequence button_select}
          {set $ghc_switch $game}
          {set $ghc_switch_next main_screen}
+         {set $ghc_switch_as menus}
          {ui goto_screen ghc_switch_screen}
       )
    )

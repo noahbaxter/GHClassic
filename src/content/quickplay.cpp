@@ -21,13 +21,8 @@ namespace gh2::quickplay
 {
     namespace
     {
-        const std::vector<std::string> kPicked = {"characters", "guitars"};
-
-        bool s_quickplay = false;
         std::map<std::string, std::string> s_picked; // quickplay's last picks, by what they are
         std::map<std::string, std::string> s_looked; // each character's outfit last looked at
-        std::string s_borrowedFor; // the menus' game whose arrays are GH2's for quickplay, or none
-        std::vector<std::string> s_lent;
 
         // The first {game set_character <outfit> ...} under `node`.
         const dtb::Node *setCharacter(const dtb::Node &node)
@@ -57,49 +52,8 @@ namespace gh2::quickplay
             return s_found[game] = outfit ? outfit->text : "punk1";
         }
 
-        // Quickplay's characters and guitars are GH2's, every game's outfits
-        // among them, whatever game's menus these are; leaving, the menus'
-        // own again. The 80s disc has its own outfits at GH2's paths, so
-        // GH2's are lent from the game disc while it is in front.
-        void enter(const script::Call &call)
-        {
-            s_quickplay = true;
-            const std::string home = campaigns::active();
-            if (home == "gh2" || !s_borrowedFor.empty() || !campaigns::configFrom(call, "gh2", kPicked))
-                return;
-            s_borrowedFor = home;
-            outfits::addTo(call, "gh2");
-            std::vector<std::string> names = campaigns::outfits("gh2");
-            for (const std::string &outfit : outfits::all())
-                names.push_back(outfit);
-            outfits::preview(call, names);
-            if (home == "gh80s")
-                for (const std::string &outfit : campaigns::outfits("gh2"))
-                    for (const std::string &prefix : {"char/" + outfit + "/", "track/surfaces/gen/" + outfit + "_keep",
-                                                      "ui/image/og/gen/photo_" + outfit})
-                    {
-                        ark::lend(prefix, std::nullopt);
-                        s_lent.push_back(prefix);
-                    }
-            std::cerr << "[quickplay] " << home << "'s characters and guitars are GH2's in quickplay" << std::endl;
-        }
-
-        void leave(const script::Call &call)
-        {
-            s_quickplay = false;
-            if (s_borrowedFor.empty())
-                return;
-            for (const std::string &prefix : s_lent)
-                ark::unlend(prefix);
-            s_lent.clear();
-            // A switch since has put back its own.
-            if (s_borrowedFor == campaigns::active() && campaigns::configFrom(call, s_borrowedFor, kPicked))
-                outfits::addTo(call, s_borrowedFor);
-            s_borrowedFor.clear();
-        }
-
-        // Unlocked in quickplay where any game's career has it to use: an
-        // added outfit by its own game's name for it.
+        // Unlocked outside a career where any game's career has it to use:
+        // an added outfit by its own game's name for it.
         bool anywhere(const std::string &item)
         {
             if (const auto own = outfits::ownOf(item))
@@ -111,9 +65,8 @@ namespace gh2::quickplay
         }
 
         // Campaign::IsItemUnlocked(Symbol) (0x12d490) and (Symbol,
-        // Difficulty) (0x12d5a0), which the pickers ask outside a career:
-        // an item any band has unlocked in the game played, or in quickplay
-        // in any game.
+        // Difficulty) (0x12d5a0), which the pickers ask: an item any band
+        // has unlocked in the game played, or outside a career in any game.
         PS2Runtime::RecompiledFunction s_isItemUnlocked = nullptr, s_isItemUnlockedOn = nullptr;
         const Addresses *s_addresses = nullptr;
         template <bool kOn>
@@ -128,7 +81,7 @@ namespace gh2::quickplay
                     : static_cast<uint32_t>(runtime->callGuestFunction(rdram, ctx, s_addresses->campaignIsItemUnlocked,
                                                                        {GPR_U32(ctx, 4), GPR_U32(ctx, 5)},
                                                                        s_isItemUnlocked));
-            if ((unlocked & 0xffu) == 0u && s_quickplay && anywhere(item))
+            if ((unlocked & 0xffu) == 0u && !campaigns::inCareer(rdram) && anywhere(item))
                 unlocked = 1u;
             SET_GPR_U32(ctx, 2, unlocked);
             ctx->pc = returnTo;
@@ -146,11 +99,10 @@ namespace gh2::quickplay
             if (op == "outfit" && call.size() > 2)
             {
                 // Another game's outfit is in the config under the name it was
-                // added with (content/outfits.h); GH2's, and the game played's
-                // outside quickplay, their own.
+                // added with (content/outfits.h); the game played's, GH2's
+                // outside a career, its own.
                 const std::string game = call.symbol(2), own = bootOutfit(game);
-                const bool home = game == (s_borrowedFor.empty() ? campaigns::active() : "gh2");
-                const std::string outfit = home ? own : outfits::named(game, own).value_or(own);
+                const std::string outfit = game == campaigns::active() ? own : outfits::named(game, own).value_or(own);
                 return {script::symbol(call.rdram, call.ctx, call.runtime, outfit), script::kSymbol};
             }
             if (op == "pick" && call.size() > 2)
@@ -174,16 +126,8 @@ namespace gh2::quickplay
                     return {0u, script::kInt};
                 return {script::symbol(call.rdram, call.ctx, call.runtime, it->second), script::kSymbol};
             }
-            if (op == "quickplay" && call.size() > 2)
-            {
-                if (call.number(2) != 0)
-                    enter(call);
-                else
-                    leave(call);
-                return {s_quickplay ? 1u : 0u, script::kInt};
-            }
             std::cerr << "[quickplay] usage: {quickplay song_defaults [<0|1>]}, {quickplay outfit <game>}, "
-                         "{quickplay quickplay <0|1>}, {quickplay look <character> [<outfit>]}"
+                         "{quickplay pick|picked <what>}, {quickplay look <character> [<outfit>]}"
                       << std::endl;
             return {};
         }

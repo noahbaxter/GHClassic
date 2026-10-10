@@ -19,10 +19,7 @@
 {meta_loading_nosave_goto main_screen}
 (wait_screen main_screen 60)
 
-{set $ghc_switch gh1}
-{set $ghc_switch_next main_screen}
-{ui goto_screen ghc_switch_screen}
-(wait_screen main_screen)
+{campaigns venues_from gh1}
 {game set_song ziggystardust}
 {{game get_player_config 0} set_difficulty medium}
 {{game get_player_config 0} set autoplay TRUE}
@@ -68,6 +65,7 @@
 (wait_screen main_screen 60)
 
 ; The basement, in GH2's battle of the bands.
+{campaigns venues_from gh1}
 {game set_song iloverockandroll}
 {{game get_player_config 0} set autoplay TRUE}
 {game set_quickplay}
@@ -91,6 +89,7 @@
 (wait_screen main_screen 60)
 
 ; The arena, whose last win is GH1's own.
+{campaigns venues_from gh1}
 {game set_song iloverockandroll}
 {{game get_player_config 0} set autoplay TRUE}
 {game set_quickplay}

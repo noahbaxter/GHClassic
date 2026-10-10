@@ -82,18 +82,13 @@
             )
          )
       )
+      ; Into that game's career, all its own: by way of the switch, which
+      ; goes straight on where there is nothing to change.
       (SELECT_START_MSG
-         {do
-            ($game {elem {ghc_campaign_panel get games} {ghc_campaign_panel get picked}})
-            {if_else {== $game {campaigns active}}
-               {ui goto_screen sel_difficulty_screen}
-               {do
-                  {set $ghc_switch $game}
-                  {set $ghc_switch_next sel_difficulty_screen}
-                  {ui goto_screen ghc_switch_screen}
-               }
-            }
-         }
+         {set $ghc_switch {elem {ghc_campaign_panel get games} {ghc_campaign_panel get picked}}}
+         {set $ghc_switch_next sel_difficulty_screen}
+         {set $ghc_switch_as career}
+         {ui goto_screen ghc_switch_screen}
          kDataUnhandled
       )
       (BUTTON_DOWN_MSG
@@ -106,16 +101,23 @@
       )
    )
 }
+; To $ghc_switch's menus outside a career, or with $ghc_switch_as career
+; into its career, then on to $ghc_switch_next.
+{set $ghc_switch_as menus}
 {if {! {exists ghc_switch_screen}} {new GHScreen ghc_switch_screen}}
 {retype ghc_switch_screen
    (
       (panels)
       (allow_back FALSE)
       (animate_transition FALSE)
-      ; With no switch to make (that game is the one played, or is not
+      ; With no switch to make (that game's is what is up, or it is not
       ; there), straight on.
       (TRANSITION_COMPLETE_MSG
-         {if {! {campaigns switch $ghc_switch $ghc_switch_next}} {ui goto_screen $ghc_switch_next}}
+         {do
+            ($as $ghc_switch_as)
+            {set $ghc_switch_as menus}
+            {if {! {campaigns switch $ghc_switch $ghc_switch_next $as}} {ui goto_screen $ghc_switch_next}}
+         }
       )
    )
 }

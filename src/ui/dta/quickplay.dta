@@ -74,12 +74,12 @@
             {sel_song.view set_frame $frame}
          }
       )
-      ; The debug actions' cheats look the song up in the menus' game's
+      ; The debug actions' cheats look the song up in the active campaign's
       ; career, which has no item for another game's song: its lookup
       ; asserts and writes past the list (debug 0x147e88). Only on its own.
       (beat_song
          ($score)
-         {if {&& {$this is_up} {== {setlist shown} {campaigns active}}}
+         {if {&& {$this is_up} {== {setlist shown} {campaigns live}}}
             {do
                ($index {ss_song.lst selected_pos})
                ($song {song_provider get_symbol $index})
@@ -89,7 +89,7 @@
          }
       )
       (gold_song
-         {if {&& {$this is_up} {== {setlist shown} {campaigns active}}}
+         {if {&& {$this is_up} {== {setlist shown} {campaigns live}}}
             {campaign cheat_gold_song {song_provider get_symbol {ss_song.lst selected_pos}}}
             {$this refresh}
          }
@@ -156,8 +156,8 @@
       (focus sel_song_panel)
       (sel_song_career FALSE)
       ; Back from a song in another game's venue (quickplay_pickers.dta), the
-      ; next is the menus' game's again.
-      (enter {campaigns venues_from {campaigns active}} {ghc_qp_helpbar})
+      ; next is GH2's again.
+      (enter {campaigns venues_from {campaigns live}} {ghc_qp_helpbar})
       (SELECT_START_MSG {ui goto_screen qp_diff_screen} kDataUnhandled)
       (BUTTON_DOWN_MSG {ghc_qp_button $button})
       (ghc_picked ($game) {ghc_qp_picked sel_song_panel qp_selsong_twin_screen $game})
@@ -172,8 +172,8 @@
       (focus sel_song_twin_panel)
       (sel_song_career FALSE)
       ; Back from a song in another game's venue (quickplay_pickers.dta), the
-      ; next is the menus' game's again.
-      (enter {campaigns venues_from {campaigns active}} {ghc_qp_helpbar})
+      ; next is GH2's again.
+      (enter {campaigns venues_from {campaigns live}} {ghc_qp_helpbar})
       (SELECT_START_MSG {ui goto_screen qp_diff_screen} kDataUnhandled)
       (BUTTON_DOWN_MSG {ghc_qp_button $button})
       (ghc_picked ($game) {ghc_qp_picked sel_song_twin_panel qp_selsong_screen $game})

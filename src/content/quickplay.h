@@ -13,12 +13,11 @@
 //                                    guitar, skin, venue, venue_game), kept
 //                                    for the session through switches of menus
 //   {quickplay picked <what>}        TRUE once one has been picked
-//   {quickplay quickplay <0|1>}      into quickplay or out of it. In it the
-//                                    characters and guitars are GH2's with
-//                                    every game's outfits among them, whatever
-//                                    game's menus these are, and an item is
-//                                    unlocked where any game's career has it.
-//                                    A career keeps its own game's.
+//   {quickplay look <character> [<outfit>]}  the outfit last looked at on
+//                                    that character in quickplay's picker
+//
+// Outside a career (content/campaigns.h) an item is unlocked where any
+// game's career has it.
 
 #include "addresses.h"
 

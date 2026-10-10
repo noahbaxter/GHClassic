@@ -3,7 +3,6 @@
 // Outfits beyond config's own, for each character's outfit picker.
 
 #include "addresses.h"
-#include "script.h"
 
 #include <cstdint>
 #include <functional>
@@ -32,16 +31,6 @@ namespace gh2::outfits
     std::optional<std::string> named(const std::string &game, const std::string &own);
     // The game and own name of an outfit added, or none.
     std::optional<std::pair<std::string, std::string>> ownOf(const std::string &outfit);
-    // Every outfit added, of any game.
-    std::vector<std::string> all();
-
-    // Each outfit of another game than `home` into the live config's
-    // characters, as they go in for the game played: for quickplay, whose
-    // characters are GH2's whatever the menus (content/quickplay.h).
-    void addTo(const script::Call &call, const std::string &home);
-    // Those outfits into every preview's (load_order ...) seen so far, but
-    // the store's, so they load there.
-    void preview(const script::Call &call, const std::vector<std::string> &names);
 
     // The config and the screens are another game's now: the outfits go in
     // again as its profiles and previews are made.

@@ -1,10 +1,11 @@
-; Quickplay's pickers are GH2's whatever game's menus these are: under GH1's
-; and the 80s' the characters are GH2's with every game's outfits, and the
-; character and guitar screens GH2's scenes. Out at the main menu the menus'
-; game has its own again, as its career needs.
+; Quickplay is the same whatever the theme: under GH1's and the 80s' menus
+; GH2's campaign stays active, its characters with every game's outfits,
+; and the character and guitar screens are GH2's scenes. The main menu is
+; the theme's. Grim's Slayin' is GH2's grim, not GH1's store copy of it.
 #include common/first_boot.dta
 (needs gh1 gh80s)
 {quickplay song_defaults 0}
+{campaign set_all_access 1}
 {set $gh2_characters {size {find $syscfg characters}}}
 {set $ghc_switch gh1}
 {set $ghc_switch_next main_screen}
@@ -12,11 +13,12 @@
 (wait 3)
 (wait_screen main_screen)
 (expect {campaigns active} gh1)
-{set $gh1_characters {size {find $syscfg characters}}}
-; Into quickplay as the main menu goes there.
-{gamecfg set mode quickplay}
-{quickplay quickplay 1}
+(expect {campaigns live} gh2)
 (expect {size {find $syscfg characters}} $gh2_characters)
+(wait 2)
+(shot gh1_main)
+{gamecfg set mode quickplay}
+{setlist select {campaigns active}}
 (expect {if_else {find_exists $syscfg characters metal metalgh1} 1 0} 1)
 (expect {campaign is_unlocked metalgh1} 1)
 {ui goto_screen qp_selsong_screen}
@@ -30,24 +32,21 @@
 (wait_until {char_single are_chars_loaded})
 (wait 2)
 (shot gh1_character)
-; GH2's own load too, not only GH1's: each panel took its list again.
-(press down)
-(wait 0.6)
-(press down)
-(wait 0.6)
-(press down)
-(wait 0.6)
-(print {sel_character_panel get char_focus})
+{sel_character_panel set char_focus grim}
+{sel_character_panel set char_outfit grim}
+{sel_character_panel show_portraits}
+{char_single show_char 0 grim}
 (wait_until {char_single are_chars_loaded} 10)
-(shot gh1_menus_gh2_character)
+(wait 2)
+(shot gh1_menus_grim_slayin)
 {ui goto_screen ghc_qp_guitar_screen}
 (wait_screen ghc_qp_guitar_screen)
 (wait 3)
 (shot gh1_guitar)
 {ui goto_screen main_screen}
 (wait_screen main_screen)
-(expect {size {find $syscfg characters}} $gh1_characters)
-(expect {quickplay quickplay 0} 0)
+(expect {campaigns active} gh1)
+(expect {size {find $syscfg characters}} $gh2_characters)
 ; The 80s'.
 {set $ghc_switch gh80s}
 {set $ghc_switch_next main_screen}
@@ -55,8 +54,10 @@
 (wait 3)
 (wait_screen main_screen)
 (expect {campaigns active} gh80s)
+(expect {campaigns live} gh2)
+(wait 2)
+(shot 80s_main)
 {gamecfg set mode quickplay}
-{quickplay quickplay 1}
 {ui goto_screen qp_selsong_screen}
 (wait_screen qp_selsong_screen)
 (wait 1)

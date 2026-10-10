@@ -10,7 +10,6 @@
 {quickplay pick venue battle}
 {quickplay pick venue_game gh1}
 {gamecfg set mode quickplay}
-{quickplay quickplay 1}
 {ui goto_screen qp_selsong_screen}
 (wait_screen qp_selsong_screen)
 (wait 1)

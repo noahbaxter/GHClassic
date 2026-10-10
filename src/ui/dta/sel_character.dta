@@ -8,8 +8,8 @@
 {retype sel_character_panel
    (
       ; From the ARK root: a path resolves against the file its array came
-      ; from, and this one comes from no file. Quickplay's is GH2's whatever
-      ; game's menus these are (quickplay_pickers.dta).
+      ; from, and this one comes from no file. Quickplay's is GH2's with
+      ; every game's portraits in (content/outfits.h).
       (file {if_else {== {gamecfg get mode} quickplay} ghc/gh2/ui/sel_character.milo ui/sel_character.milo})
       (char_focus punk)
       (char_outfit punk1)
@@ -188,9 +188,9 @@
       ; Another game's outfit ((extra <game> <its name there>),
       ; content/outfits.h) is no part of a career, which is its own game's
       ; alone. In the other modes it is there once its own game's career
-      ; has it, or with all access. Config's own outfit in quickplay is
-      ; GH2's (quickplay.cpp enter), whose unlock answers for any game's item
-      ; of that name, so GH1's grim would open GH2's: GH2's career alone does.
+      ; has it, or with all access. Config's own outfit outside a career is
+      ; GH2's, whose unlock answers for any game's item of that name, so
+      ; GH1's grim would open GH2's: GH2's career alone does.
       (may_wear
          ($entry)
          {if_else {find_exists $entry extra}

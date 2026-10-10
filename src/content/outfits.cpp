@@ -39,20 +39,19 @@ namespace gh2::outfits
         };
         bool s_configured = false;
         std::unordered_set<uint32_t> s_panelDefs;
-        std::vector<std::pair<uint32_t, uint32_t>> s_panels; // each preview panel and its type definition
 
         // Run on config before the profiles are made: each outfit of another
-        // game than `home`, the one being played, where config has its
-        // character and the outfit it sits beside. (extra <game> <own name>)
-        // marks it as no part of the career, there once its own game's
-        // career has it (sel_character.dta).
-        std::string configText(const std::string &home)
+        // game than the one being played, where this one has its character
+        // and the outfit it sits beside. (extra <game> <own name>) marks it
+        // as no part of the career, there once its own game's career has it
+        // (sel_character.dta).
+        std::string configText()
         {
             std::string text;
             std::set<std::string> labelled;
             for (const Outfit &o : s_outfits)
             {
-                if (o.game == home)
+                if (o.game == campaigns::active())
                     continue;
                 const std::string character = "{find $syscfg characters " + o.character + "}";
                 std::string add = "{push_back " + character + " (" + o.outfit + " (name \"" + o.label + "\") (extra " +
@@ -91,7 +90,7 @@ namespace gh2::outfits
                 return;
             s_configured = true;
             const R5900Context saved = *ctx;
-            script::run(rdram, ctx, runtime, configText(campaigns::active()));
+            script::run(rdram, ctx, runtime, configText());
             *ctx = saved;
         }
 
@@ -104,7 +103,6 @@ namespace gh2::outfits
             const uint32_t def = GPR_U32(ctx, 5);
             if (s_outfits.empty() || def == 0u || !s_panelDefs.insert(def).second)
                 return;
-            s_panels.emplace_back(GPR_U32(ctx, 4), def);
             const R5900Context saved = *ctx;
             script::setVariable(rdram, ctx, runtime, "ghc_def", {def, script::kArray});
             script::run(rdram, ctx, runtime, loadOrderText());
@@ -225,38 +223,6 @@ namespace gh2::outfits
         s_outfits.push_back({game, own, character, outfit, beside, label});
     }
 
-    void addTo(const script::Call &call, const std::string &home)
-    {
-        script::run(call.rdram, call.ctx, call.runtime, configText(home));
-    }
-
-    void preview(const script::Call &call, const std::vector<std::string> &names)
-    {
-        std::string text = "{if {&& {find_exists $ghc_def load_order} {! {find_exists $ghc_def store}}} "
-                           "{do ($l {elem {find $ghc_def load_order} 1})";
-        for (const std::string &name : names)
-            text += " {if {! {find_elem $l " + name + "}} {push_back $l " + name + "}}";
-        text += "}}";
-        for (const uint32_t def : s_panelDefs)
-        {
-            script::setVariable(call.rdram, call.ctx, call.runtime, "ghc_def", {def, script::kArray});
-            script::run(call.rdram, call.ctx, call.runtime, text);
-        }
-        script::setVariable(call.rdram, call.ctx, call.runtime, "ghc_def", {0u, script::kInt});
-        // The model cache is made from the list as SetTypeDef finds it, so
-        // each panel takes its definition again.
-        for (const auto &[panel, def] : s_panels)
-            call.runtime->callGuestFunction(call.rdram, call.ctx, s_addresses->charsysPanelSetTypeDef, {panel, def});
-    }
-
-    std::vector<std::string> all()
-    {
-        std::vector<std::string> out;
-        for (const Outfit &o : s_outfits)
-            out.push_back(o.outfit);
-        return out;
-    }
-
     std::optional<std::pair<std::string, std::string>> ownOf(const std::string &outfit)
     {
         for (const Outfit &o : s_outfits)
@@ -277,7 +243,6 @@ namespace gh2::outfits
     {
         s_configured = false;
         s_panelDefs.clear();
-        s_panels.clear();
         s_characterOf.clear();
     }
 

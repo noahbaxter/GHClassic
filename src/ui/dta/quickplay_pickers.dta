@@ -75,11 +75,10 @@
    )
 }
 ; The guitar picker as GH2's, the 80s' and GH1's campaigns all have it
-; (career.dta), but that quickplay's shows GH2's scene whatever game's menus
-; these are, as the character picker does (sel_character.dta).
+; (career.dta).
 {retype sel_guitar_panel
    (
-      (file {if_else {== {gamecfg get mode} quickplay} ghc/gh2/ui/sel_guitar.milo ui/sel_guitar.milo})
+      (file ui/sel_guitar.milo)
       ; TRUE lists config's guitars, as unlocked (Campaign::GetQuickplayGuitars,
       ; 0x12df48), where FALSE lists the campaign's own items (GetItemData,
       ; 0x12da40): the menus' game's store, without the others' guitars.
@@ -155,7 +154,7 @@
 ; setlists do (quickplay.dta). Each game's map names its venues' buttons by
 ; GH2's venues (sv_battle.btn), GH1's standing in for them. A venue is open
 ; where its own game's career has opened it.
-{set $ghc_qp_venues gh2}
+{if {! $ghc_qp_venues} {set $ghc_qp_venues gh2}}
 {set $ghc_qp_venue_panel
    (
       (file {sprint "ghc/" $ghc_qp_venues "/ui/sel_venue.milo"})
@@ -167,7 +166,7 @@
 {if {! {exists ghc_qp_venue_twin_panel}} {new GHPanel ghc_qp_venue_twin_panel}}
 {retype ghc_qp_venue_twin_panel $ghc_qp_venue_panel}
 {func ghc_qp_venue_open ($venue)
-   {if_else {== $ghc_qp_venues {ghc_venue_game {campaigns active}}}
+   {if_else {== $ghc_qp_venues {ghc_venue_game {campaigns live}}}
       {campaign is_unlocked $venue}
       {|| {campaign all_access} {campaigns venue_open $ghc_qp_venues $venue}}
    }

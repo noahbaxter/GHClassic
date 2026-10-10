@@ -1,8 +1,8 @@
 ; GH1's campaign shows GH1's own screens past the ones menus_gh1 walks: the
 ; store and an item of each kind, a status newspaper, pause and song failed
-; in a song, the settings and band screens, its two-player hero screen, its
-; win screen's two pages on expert, and its credits. Each is driven by the
-; buttons GH2's script gives it.
+; in a song, the settings and band screens and its credits under its theme,
+; and its win screen's two pages on expert. Each is driven by the buttons
+; GH2's script gives it.
 (needs gh1)
 #include common/first_boot.dta
 {set $pick gh1}
@@ -83,8 +83,15 @@
 (press green)
 
 ; Settings: the audio screen's sliders and tick box, the memory card
-; screen's three rows, and a band's two.
+; screen's three rows, and a band's two. Out of the career these are the
+; theme's, GH1's.
 (wait_screen main_screen 60)
+{set $ghc_switch gh1}
+{set $ghc_switch_next main_screen}
+{ui goto_screen ghc_switch_screen}
+(wait 3)
+(wait_screen main_screen)
+(expect {campaigns active} gh1)
 {ui goto_screen audio_settings_screen}
 (wait_screen audio_settings_screen 20)
 (wait 2)
@@ -112,27 +119,18 @@
 (wait 10)
 (shot credits)
 
-; Two players: each on GH1's own default, lit on the wall.
+; Beating expert, back in the career: the win screen, then the Battleaxe's
+; page. Last: the win screen holds a venue.
 {ui goto_screen main_screen}
 (wait_screen main_screen 20)
-(expect {game get_character_outfit} metalgh1)
-{ui goto_screen multi_sel_character_screen}
-(wait_screen multi_sel_character_screen 30)
-(wait 8)
-(shot multi_sel_character)
-(expect {{multi_sel_character_panel find sc_char_metal_focus_p1.view} showing} 1)
-(expect {{multi_sel_character_panel find sc_char_classic_focus_p2.view} showing} 1)
-
-; Beating expert: the win screen, then the Battleaxe's page. Last: the win
-; screen holds a venue.
-{ui goto_screen main_screen}
-(wait_screen main_screen 20)
+#include common/reenter_career.dta
 {{game get_player_config 0} set_difficulty kDifficultyExpert}
 {ui goto_screen win_game_screen}
 (wait_screen win_game_screen 20)
 (wait 8)
 (shot win)
 (expect {{win_game_panel find win_screen1.view} showing} 1)
+(wait_until {win_game_screen can_continue} 20)
 (press green)
 (wait 5)
 (shot win_battleaxe)
