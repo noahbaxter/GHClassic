@@ -139,6 +139,10 @@ namespace milo
     {
         constexpr uint32_t kFirstLight = 0x30u; // light list node*: {RndLight*, next*}
         constexpr uint32_t kAmbient = 0x40u;    // 3 floats
+        constexpr uint32_t kFogEnable = 0x50u;
+        constexpr uint32_t kFogStart = 0x54u;
+        constexpr uint32_t kFogEnd = 0x58u;
+        constexpr uint32_t kFogColor = 0x60u;   // 4 floats
     }
 
     // RndLight, a RndTransformable at +0.

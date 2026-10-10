@@ -10,7 +10,7 @@
 // stores the environ as RndEnviron::sCurrent (RndEnviron::Select, 0x1b6378),
 // which PsMat::Select reads for fog, and flushes the packet.
 //
-// Fog is not taken yet.
+// Fog is read for the 360's shading alone; the PS2's does not draw it yet.
 
 #include "render/native_environ.h"
 
@@ -36,6 +36,11 @@ namespace gh2
             Environ e;
             for (uint32_t i = 0; i < 3; ++i)
                 e.ambient[i] = load<float>(rdram, env + milo::environment::kAmbient + i * 4u);
+            e.fog = load<uint32_t>(rdram, env + milo::environment::kFogEnable) != 0u;
+            e.fogStart = load<float>(rdram, env + milo::environment::kFogStart);
+            e.fogEnd = load<float>(rdram, env + milo::environment::kFogEnd);
+            for (uint32_t i = 0; i < 4; ++i)
+                e.fogColor[i] = load<float>(rdram, env + milo::environment::kFogColor + i * 4u);
 
             uint32_t point = 0u;
             for (uint32_t node = load<uint32_t>(rdram, env + milo::environment::kFirstLight); node != 0u && point == 0u;

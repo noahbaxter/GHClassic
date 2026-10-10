@@ -133,6 +133,12 @@ namespace gh2
         float pointColor[3][3] = {};
         float pointPosition[3][3] = {};
         float pointRange[3] = {};
+        // Its fog, which only the 360's shading draws: none at fogStart
+        // from the camera, all fogColor at fogEnd.
+        bool fog = false;
+        float fogStart = 0.0f;
+        float fogEnd = 0.0f;
+        float fogColor[4] = {};
     };
 
     struct DrawCall
@@ -140,6 +146,7 @@ namespace gh2
         std::shared_ptr<const MeshData> mesh;
         Matrix world{};      // identity when skinned
         bool screen = false; // verts already in clip space (PsRnd::DrawRect): no camera
+        uint32_t under = 0;  // a screen draw's: the RndCam current when it was made, as Camera::id
         uint32_t camera = 0; // index into Frame::cameras
         Material material;
         // A skinned vert is sum over b of weight[b] * (pos * bones[b]), its
