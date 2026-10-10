@@ -33,6 +33,7 @@ namespace gh2
     constexpr uint32_t kFlagRamp = 1u << 19;      // the diffuse ramp in place of n . l
     constexpr uint32_t kFlagCube = 1u << 20;      // a cube map in place of the lights' specular
     constexpr uint32_t kFlagNormalize = 1u << 21; // normal, tangent and bitangent made unit length first
+    constexpr uint32_t kFlagShadow = 1u << 22;    // its first light is cut by a shadow map
 
     struct PushConstants
     {

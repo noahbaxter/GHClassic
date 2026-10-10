@@ -41,7 +41,8 @@ namespace gh2
         constexpr uint32_t kEnvTexGenVec4s = 4u;
         // An x360 draw's block in place of the lighting block: see
         // writeShading.
-        constexpr uint32_t kShadingVec4s = 15u;
+        constexpr uint32_t kShadingVec4s = 19u;
+        constexpr VkFormat kShadowFormat = VK_FORMAT_D32_SFLOAT;
         // The x360 shading's colour target: the 360's lit colour runs 0 to 4.
         constexpr VkFormat kHdrFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
         // Room for this many live x360 materials' map sets.
@@ -365,10 +366,16 @@ namespace gh2
         // the eye, the environ's ambient, then the lights' count and kind
         // (x, and y 1 for point lights), each light's world direction to it
         // or its position with one over its range in w, each light's colour,
-        // the material's specular colour and power, and its glow multiplier
-        // and the diffuse map's intensity (standard.fx's gMultipliers).
-        void writeShading(const DrawCall &draw, const float eye[3], Vec4 *out)
+        // the material's specular colour and power, its glow multiplier and
+        // the diffuse map's intensity (standard.fx's gMultipliers), and the
+        // view and projection of the shadow map the draw is lit under, if
+        // any (gWorldToLightProj before its move to texture coordinates).
+        void writeShading(const DrawCall &draw, const float eye[3], const Matrix *shadow, Vec4 *out)
         {
+            for (uint32_t row = 0; row < 4; ++row)
+                out[15 + row] = shadow ? Vec4{{(*shadow)[row * 4 + 0], (*shadow)[row * 4 + 1], (*shadow)[row * 4 + 2],
+                                               (*shadow)[row * 4 + 3]}}
+                                       : Vec4{{0.0f, 0.0f, 0.0f, 0.0f}};
             for (uint32_t row = 0; row < 4; ++row)
                 out[row] = {{draw.world[row * 4 + 0], draw.world[row * 4 + 1], draw.world[row * 4 + 2],
                              draw.world[row * 4 + 3]}};
@@ -576,6 +583,21 @@ namespace gh2
         // main pass's depth, read through a view of the depth alone.
         PostImage focusA, focusB;
         VkImageView depthOnlyView = VK_NULL_HANDLE;
+
+        // The 360's character shadow maps (Frame::shadows): each a depth
+        // image its casters are drawn into before any other pass, which
+        // x360.frag reads as set 3.
+        struct ShadowMap
+        {
+            VkImage image = VK_NULL_HANDLE;
+            VmaAllocation memory = VK_NULL_HANDLE;
+            VkImageView view = VK_NULL_HANDLE;
+            VkFramebuffer framebuffer = VK_NULL_HANDLE;
+            VkDescriptorSet set = VK_NULL_HANDLE;
+        };
+        ShadowMap shadowMaps[kMaxShadows]{};
+        VkRenderPass shadowPass = VK_NULL_HANDLE;
+        VkPipeline shadowPipeline = VK_NULL_HANDLE;
         VkShaderModule postWorldFragment = VK_NULL_HANDLE; // post.frag for the depth buffer's samples
         VkFramebuffer postFramebuffer = VK_NULL_HANDLE; // the main colour attachment
         VkRenderPass bloomPass = VK_NULL_HANDLE;
@@ -985,12 +1007,13 @@ namespace gh2
 
             const VkDescriptorPoolSize sizes[] = {
                 {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                 kMaxTextures * 2u + kMaxShadings * 5u + kFrameSlots * kPostPasses * 5u},
+                 kMaxTextures * 2u + kMaxShadings * 5u + kFrameSlots * kPostPasses * 5u + kMaxShadows},
                 {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kFrameSlots},
             };
             VkDescriptorPoolCreateInfo poolInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
             poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-            poolInfo.maxSets = kMaxTextures * 2u + kFrameSlots + kMaxShadings + kFrameSlots * kPostPasses;
+            poolInfo.maxSets =
+                kMaxTextures * 2u + kFrameSlots + kMaxShadings + kFrameSlots * kPostPasses + kMaxShadows;
             poolInfo.poolSizeCount = 2;
             poolInfo.pPoolSizes = sizes;
             if (!check(vkCreateDescriptorPool(device, &poolInfo, nullptr, &pool), "descriptor pool"))
@@ -1278,8 +1301,9 @@ namespace gh2
             if (!x360)
                 return true;
 
-            const VkDescriptorSetLayout x360Sets[] = {setLayout, frameDataSetLayout, mapsSetLayout};
-            layoutInfo.setLayoutCount = 3;
+            // The fourth is a draw's shadow map.
+            const VkDescriptorSetLayout x360Sets[] = {setLayout, frameDataSetLayout, mapsSetLayout, setLayout};
+            layoutInfo.setLayoutCount = 4;
             layoutInfo.pSetLayouts = x360Sets;
             if (!check(vkCreatePipelineLayout(device, &layoutInfo, nullptr, &x360Layout), "x360 pipeline layout"))
                 return false;
@@ -1303,11 +1327,16 @@ namespace gh2
 
         // `x360Family` draws with x360.vert and x360.frag, whose verts take
         // their tangents from a second stream.
-        VkPipeline pipeline(uint32_t blend, uint32_t zMode, bool alphaWrite, bool destAlphaTest, bool x360Family)
+        // `shadow` is the one pipeline casters are drawn into a shadow map
+        // with: the PS2 family's vertex stage alone, depth only.
+        VkPipeline pipeline(uint32_t blend, uint32_t zMode, bool alphaWrite, bool destAlphaTest, bool x360Family,
+                            bool shadow = false)
         {
             VkPipeline &slot =
-                (x360Family ? x360Pipelines : pipelines)[((blend * milo::mat::kZModeCount + zMode) * 2u +
-                                                          (alphaWrite ? 1u : 0u)) * 2u + (destAlphaTest ? 1u : 0u)];
+                shadow ? shadowPipeline
+                       : (x360Family ? x360Pipelines : pipelines)[((blend * milo::mat::kZModeCount + zMode) * 2u +
+                                                                   (alphaWrite ? 1u : 0u)) * 2u +
+                                                                  (destAlphaTest ? 1u : 0u)];
             if (slot != VK_NULL_HANDLE)
                 return slot;
 
@@ -1353,13 +1382,13 @@ namespace gh2
             raster.lineWidth = 1.0f;
 
             VkPipelineMultisampleStateCreateInfo multisample{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
-            multisample.rasterizationSamples = samples;
+            multisample.rasterizationSamples = shadow ? VK_SAMPLE_COUNT_1_BIT : samples;
 
             const VkPipelineDepthStencilStateCreateInfo depth = depthState(zMode, alphaWrite, destAlphaTest);
 
             const VkPipelineColorBlendAttachmentState attachment = blendState(blend, alphaWrite);
             VkPipelineColorBlendStateCreateInfo colorBlend{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
-            colorBlend.attachmentCount = 1;
+            colorBlend.attachmentCount = shadow ? 0u : 1u;
             colorBlend.pAttachments = &attachment;
 
             const VkDynamicState dynamics[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
@@ -1368,7 +1397,7 @@ namespace gh2
             dynamic.pDynamicStates = dynamics;
 
             VkGraphicsPipelineCreateInfo info{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
-            info.stageCount = 2;
+            info.stageCount = shadow ? 1u : 2u;
             info.pStages = stages;
             info.pVertexInputState = &vertexInput;
             info.pInputAssemblyState = &assembly;
@@ -1379,9 +1408,101 @@ namespace gh2
             info.pColorBlendState = &colorBlend;
             info.pDynamicState = &dynamic;
             info.layout = x360Family ? x360Layout : layout;
-            info.renderPass = renderPass;
+            info.renderPass = shadow ? shadowPass : renderPass;
             check(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &info, nullptr, &slot), "pipeline");
             return slot;
+        }
+
+        // The shadow maps and the pass that draws into one, which leaves it
+        // for x360.frag to read.
+        bool createShadowMaps()
+        {
+            VkAttachmentDescription attachment{};
+            attachment.format = kShadowFormat;
+            attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+            attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            attachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+            VkAttachmentReference depthRef{0, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
+            VkSubpassDescription subpass{};
+            subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+            subpass.pDepthStencilAttachment = &depthRef;
+            VkSubpassDependency before{};
+            before.srcSubpass = VK_SUBPASS_EXTERNAL;
+            before.dstSubpass = 0;
+            before.srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            before.dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+            before.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            before.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            VkSubpassDependency after{};
+            after.srcSubpass = 0;
+            after.dstSubpass = VK_SUBPASS_EXTERNAL;
+            after.srcStageMask = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+            after.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            after.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            after.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            const VkSubpassDependency dependencies[] = {before, after};
+            VkRenderPassCreateInfo pass{VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};
+            pass.attachmentCount = 1;
+            pass.pAttachments = &attachment;
+            pass.subpassCount = 1;
+            pass.pSubpasses = &subpass;
+            pass.dependencyCount = 2;
+            pass.pDependencies = dependencies;
+            if (!check(vkCreateRenderPass(device, &pass, nullptr, &shadowPass), "shadow pass"))
+                return false;
+
+            for (ShadowMap &map : shadowMaps)
+            {
+                VkImageCreateInfo imageInfo{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
+                imageInfo.imageType = VK_IMAGE_TYPE_2D;
+                imageInfo.format = kShadowFormat;
+                imageInfo.extent = {kShadowSize, kShadowSize, 1};
+                imageInfo.mipLevels = 1;
+                imageInfo.arrayLayers = 1;
+                imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+                imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+                imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+                VmaAllocationCreateInfo alloc{};
+                alloc.usage = VMA_MEMORY_USAGE_AUTO;
+                if (!check(vmaCreateImage(allocator, &imageInfo, &alloc, &map.image, &map.memory, nullptr),
+                           "shadow map"))
+                    return false;
+                VkImageViewCreateInfo view{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+                view.image = map.image;
+                view.viewType = VK_IMAGE_VIEW_TYPE_2D;
+                view.format = kShadowFormat;
+                view.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+                if (!check(vkCreateImageView(device, &view, nullptr, &map.view), "shadow view"))
+                    return false;
+                VkFramebufferCreateInfo fb{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
+                fb.renderPass = shadowPass;
+                fb.attachmentCount = 1;
+                fb.pAttachments = &map.view;
+                fb.width = kShadowSize;
+                fb.height = kShadowSize;
+                fb.layers = 1;
+                if (!check(vkCreateFramebuffer(device, &fb, nullptr, &map.framebuffer), "shadow framebuffer"))
+                    return false;
+                VkDescriptorSetAllocateInfo setInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+                setInfo.descriptorPool = pool;
+                setInfo.descriptorSetCount = 1;
+                setInfo.pSetLayouts = &setLayout;
+                if (!check(vkAllocateDescriptorSets(device, &setInfo, &map.set), "shadow set"))
+                    return false;
+                const VkDescriptorImageInfo image{samplers[0], map.view, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL};
+                VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+                write.dstSet = map.set;
+                write.dstBinding = 0;
+                write.descriptorCount = 1;
+                write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                write.pImageInfo = &image;
+                vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
+            }
+            return true;
         }
 
         // A pass for the post stage: into a bloom image, which it leaves for
@@ -2018,7 +2139,7 @@ namespace gh2
             return false;
         s.bloomPipeline = s.createPostPipeline(true);
         s.postPipeline = s.createPostPipeline(false);
-        return s.bloomPipeline != VK_NULL_HANDLE && s.postPipeline != VK_NULL_HANDLE;
+        return s.bloomPipeline != VK_NULL_HANDLE && s.postPipeline != VK_NULL_HANDLE && s.createShadowMaps();
     }
 
     void SceneRenderer::shutdown()
@@ -2061,9 +2182,18 @@ namespace gh2
         for (VkPipeline pipeline : s.x360Pipelines)
             if (pipeline != VK_NULL_HANDLE)
                 vkDestroyPipeline(s.device, pipeline, nullptr);
-        for (VkPipeline pipeline : {s.bloomPipeline, s.postPipeline})
+        for (VkPipeline pipeline : {s.bloomPipeline, s.postPipeline, s.shadowPipeline})
             if (pipeline != VK_NULL_HANDLE)
                 vkDestroyPipeline(s.device, pipeline, nullptr);
+        for (State::ShadowMap &map : s.shadowMaps)
+        {
+            if (map.framebuffer != VK_NULL_HANDLE)
+                vkDestroyFramebuffer(s.device, map.framebuffer, nullptr);
+            if (map.view != VK_NULL_HANDLE)
+                vkDestroyImageView(s.device, map.view, nullptr);
+            if (map.image != VK_NULL_HANDLE)
+                vmaDestroyImage(s.allocator, map.image, map.memory);
+        }
         for (VkShaderModule module :
              {s.x360Vertex, s.x360Fragment, s.postVertex, s.postFragment, s.postWorldFragment})
             if (module != VK_NULL_HANDLE)
@@ -2074,7 +2204,8 @@ namespace gh2
         for (VkDescriptorSetLayout layout : {s.mapsSetLayout, s.postSetLayout})
             if (layout != VK_NULL_HANDLE)
                 vkDestroyDescriptorSetLayout(s.device, layout, nullptr);
-        for (VkRenderPass pass : {s.renderPass, s.firstPass, s.resumePass, s.bloomPass, s.postPass, s.outputPass})
+        for (VkRenderPass pass :
+             {s.renderPass, s.firstPass, s.resumePass, s.bloomPass, s.postPass, s.outputPass, s.shadowPass})
             if (pass != VK_NULL_HANDLE)
                 vkDestroyRenderPass(s.device, pass, nullptr);
         if (s.targetPass != VK_NULL_HANDLE)
@@ -2101,16 +2232,25 @@ namespace gh2
         // Which draws x360 shading takes, with their map sets.
         std::vector<char> x360Draws(frame.draws.size(), 0);
         std::vector<const GpuShading *> drawShadings(frame.draws.size(), nullptr);
+        // The shadow map each is lit under, -1 for none, and what a draw
+        // without one has in its place.
+        std::vector<int32_t> shadowOf(frame.draws.size(), -1);
+        const size_t shadowCount = std::min<size_t>(frame.shadows.size(), kMaxShadows);
+        const GpuTexture *noShadow = nullptr;
         if (s.x360)
         {
             static const std::shared_ptr<const Shading> plain = std::make_shared<Shading>();
+            noShadow = s.gpuTexture(cmd, s.white, serial);
             for (size_t i = 0; i < frame.draws.size(); ++i)
             {
                 const DrawCall &draw = frame.draws[i];
-                if (!shadedX360(draw))
+                if (draw.shadowCaster || !shadedX360(draw) || !noShadow)
                     continue;
                 drawShadings[i] = s.gpuShading(cmd, draw.material.shading ? draw.material.shading : plain, serial);
                 x360Draws[i] = drawShadings[i] != nullptr;
+                if (x360Draws[i] && draw.shadow != 0u && draw.shadow <= shadowCount &&
+                    frame.shadows[draw.shadow - 1u] < frame.cameras.size())
+                    shadowOf[i] = static_cast<int32_t>(draw.shadow - 1u);
             }
         }
 
@@ -2159,8 +2299,11 @@ namespace gh2
             {
                 static const float kNoEye[3] = {};
                 const uint32_t camera = frame.draws[i].camera;
+                Matrix shadow;
+                if (shadowOf[i] >= 0)
+                    shadow = viewProjection(frame.cameras[frame.shadows[static_cast<size_t>(shadowOf[i])]], frame.yRatio);
                 writeShading(frame.draws[i], camera < frame.cameras.size() ? frame.cameras[camera].eye : kNoEye,
-                             data.mapped + lightBases[i]);
+                             shadowOf[i] >= 0 ? &shadow : nullptr, data.mapped + lightBases[i]);
             }
             else if (lightBases[i] >= 0)
                 writeLighting(frame.draws[i], data.mapped + lightBases[i]);
@@ -2231,6 +2374,11 @@ namespace gh2
                 const DrawCall &draw = frame.draws[i];
                 if (draw.camera >= frame.cameras.size())
                     continue;
+                if (draw.shadowCaster)
+                {
+                    drawRun[i] = INT32_MAX; // into its shadow map alone
+                    continue;
+                }
                 const uint32_t rt = draw.material.renderTarget;
                 if (rt != 0u)
                 {
@@ -2326,6 +2474,8 @@ namespace gh2
                               (shading.glow ? kFlagGlowMap : 0u) | (shading.ramp ? kFlagRamp : 0u) |
                               (shading.cube ? kFlagCube : 0u) | (shading.normalize ? kFlagNormalize : 0u);
             }
+            if (shadowOf[i] >= 0)
+                push.flags |= kFlagShadow;
         }
         writeDrawDump(frame, pushes.data(), data.mapped);
 
@@ -2412,8 +2562,13 @@ namespace gh2
             vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 1,
                                     &sets[material.texWrap ? 1 : 0], 0, nullptr);
             if (x360Family)
-                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 2, 1, &drawShadings[i]->set, 0,
-                                        nullptr);
+            {
+                const VkDescriptorSet maps[2] = {
+                    drawShadings[i]->set,
+                    shadowOf[i] >= 0 ? s.shadowMaps[shadowOf[i]].set : noShadow->sets[0],
+                };
+                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 2, 2, maps, 0, nullptr);
+            }
             const VkDeviceSize offset = 0;
             if (x360Family)
                 vkCmdBindVertexBuffers(cmd, 1, 1, &tangents, &offset);
@@ -2421,6 +2576,46 @@ namespace gh2
             vkCmdBindIndexBuffer(cmd, mesh->indices, 0, VK_INDEX_TYPE_UINT16);
             vkCmdDrawIndexed(cmd, mesh->indexCount, 1, 0, 0, 0);
         };
+
+        // Each shadow map's casters, through its light's camera: depth alone,
+        // cleared to the far plane.
+        for (size_t map = 0; s.x360 && map < shadowCount; ++map)
+        {
+            VkClearValue clear{};
+            clear.depthStencil = {0.0f, 0};
+            VkRenderPassBeginInfo begin{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
+            begin.renderPass = s.shadowPass;
+            begin.framebuffer = s.shadowMaps[map].framebuffer;
+            begin.renderArea = {{0, 0}, {kShadowSize, kShadowSize}};
+            begin.clearValueCount = 1;
+            begin.pClearValues = &clear;
+            vkCmdBeginRenderPass(cmd, &begin, VK_SUBPASS_CONTENTS_INLINE);
+            const VkViewport viewport{0.0f, 0.0f, static_cast<float>(kShadowSize), static_cast<float>(kShadowSize),
+                                      0.0f, 1.0f};
+            const VkRect2D scissor{{0, 0}, {kShadowSize, kShadowSize}};
+            vkCmdSetViewport(cmd, 0, 1, &viewport);
+            vkCmdSetScissor(cmd, 0, 1, &scissor);
+            const VkPipeline pipeline =
+                s.pipeline(milo::mat::kBlendSrc, milo::mat::kZNormal, false, false, false, true);
+            for (size_t i = 0; pipeline != VK_NULL_HANDLE && i < frame.draws.size(); ++i)
+            {
+                const DrawCall &draw = frame.draws[i];
+                if (!draw.shadowCaster || draw.camera != frame.shadows[map] || !draw.mesh)
+                    continue;
+                GpuMesh *mesh = s.gpuMesh(draw.mesh, serial);
+                if (!mesh)
+                    continue;
+                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+                vkCmdPushConstants(cmd, s.layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                                   sizeof(PushConstants), &pushes[i]);
+                const VkDeviceSize offset = 0;
+                vkCmdBindVertexBuffers(cmd, 0, 1, &mesh->vertices, &offset);
+                vkCmdBindIndexBuffer(cmd, mesh->indices, 0, VK_INDEX_TYPE_UINT16);
+                vkCmdDrawIndexed(cmd, mesh->indexCount, 1, 0, 0, 0);
+            }
+            vkCmdEndRenderPass(cmd);
+            boundPipeline = VK_NULL_HANDLE;
+        }
 
         // Targets first, so a draw sampling one reads what this frame drew
         // into it, in order of first use.

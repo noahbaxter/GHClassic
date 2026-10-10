@@ -47,6 +47,18 @@ namespace milo
         constexpr uint32_t kTargetTex = 0x2ecu; // RndTex* (ObjPtr at +0x2e4), null for the screen
     }
 
+    // Character, as Character::DrawShadowBuffer (0x1619c0) calls its own
+    // virtuals: through the table at kVtable, each slot an offset to add to
+    // the drawable (16-bit) and then the function.
+    namespace character
+    {
+        constexpr uint32_t kDrawable = 0x90u;
+        constexpr uint32_t kVtable = 0xc4u;
+        constexpr uint32_t kMakeWorldSphere = 0x10u; // (Sphere &, bool): centre, then the radius at +0x10
+        constexpr uint32_t kDrawShowing = 0x20u;     // (DrawType)
+        constexpr uint32_t kDrawShadow = 2u;         // the DrawType a shadow buffer is drawn with
+    }
+
     // CamShot: its first word points to its Hmx::Object, and its keyframes
     // are a vector of CamShotFrame (CamShot::GetKey 0x263410).
     namespace camShot

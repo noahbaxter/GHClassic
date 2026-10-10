@@ -81,7 +81,21 @@ namespace gh2
         // for none. And the camera it was worked out for (Camera::id).
         float depthOfField[4] = {};
         uint32_t focusCamera = 0;
+        // The 360's character shadow maps, one a character: the camera each
+        // is drawn through (index into cameras), which looks from its light.
+        std::vector<uint32_t> shadows;
+        // The shadow map the game is drawing casters into now, -1 for none:
+        // nothing else drawn meanwhile belongs in the picture.
+        int32_t casting = -1;
     };
+
+    // A shadow map's side, as the 360 has it.
+    constexpr uint32_t kShadowSize = 512u;
+    // Shadow maps a frame; a character past them goes without.
+    constexpr uint32_t kMaxShadows = 8u;
+    // What a shadow map's camera has as its target in place of a RndTex, the
+    // index added: no guest address.
+    constexpr uint32_t kShadowTex = 0x10u;
 
     // Finished frames, oldest first. The game thread publishes at EndDrawing;
     // the host thread shows each once, in order. Game frames finish at uneven
