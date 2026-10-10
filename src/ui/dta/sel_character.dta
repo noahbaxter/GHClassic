@@ -8,8 +8,9 @@
 {retype sel_character_panel
    (
       ; From the ARK root: a path resolves against the file its array came
-      ; from, and this one comes from no file.
-      (file ui/sel_character.milo)
+      ; from, and this one comes from no file. Quickplay's is GH2's whatever
+      ; game's menus these are (quickplay_pickers.dta).
+      (file {if_else {== {gamecfg get mode} quickplay} ghc/gh2/ui/sel_character.milo ui/sel_character.milo})
       (char_focus punk)
       (char_outfit punk1)
       (old_scroll_pos 0)
@@ -44,8 +45,10 @@
             {character.lst set_selected {character_provider get_index $character}}
             {$this set old_scroll_pos {character.lst selected_pos}}
             {char_highlight.tnm set_frame [old_scroll_pos]}
-            {foreach $c CHARACTERS
+            ; Config's, which in quickplay are GH2's whatever the menus.
+            {foreach_int $i 1 {size {find $syscfg characters}}
                {do
+                  ($c {elem {elem {find $syscfg characters} $i} 0})
                   ($mesh {sprint "char_" $c ".mesh"})
                   {if_else {campaign is_unlocked $c}
                      {$mesh set_mat {sprint "char_" $c ".mat"}}
@@ -139,14 +142,27 @@
       ; Another game's outfit ((extra <game> <its name there>),
       ; content/outfits.h) is no part of a career, which is its own game's
       ; alone. In the other modes it is there once its own game's career
-      ; has it, or with all access.
+      ; has it, or with all access. Config's own outfit in quickplay is
+      ; GH2's (quickplay.cpp enter), whose unlock answers for any game's item
+      ; of that name, so GH1's grim would open GH2's: GH2's career alone does.
       (may_wear
          ($entry)
          {if_else {find_exists $entry extra}
             {&& {!= {gamecfg get mode} career}
                {|| {campaign all_access}
                   {campaigns owns {elem {find $entry extra} 1} {elem {find $entry extra} 2}}}}
-            TRUE
+            {|| {!= {gamecfg get mode} quickplay}
+               {campaign all_access}
+               {campaigns owns gh2 {elem $entry 0}}}
+         }
+      )
+      ; The outfit char_focus shows first: its first listed, else the
+      ; provider's first, which may be a locked one.
+      (first_outfit
+         {$this find_outfits}
+         {if_else {> {size [outfits]} 0}
+            {elem [outfits] 0}
+            {character_provider get_outfit [char_focus] 0}
          }
       )
       ; An outfit's (name "...") in config, else its locale token, as the
@@ -235,7 +251,7 @@
                {set [char_focus] {character_provider get_symbol $new_scroll_pos}}
                {if_else {== [char_focus] {game get_character}}
                   {set [char_outfit] {game get_character_outfit}}
-                  {set [char_outfit] {character_provider get_outfit [char_focus] 0}}
+                  {set [char_outfit] {$this first_outfit}}
                }
                {if [char_focus]
                   {sc_char_nm.lbl set_text [char_focus]}
@@ -318,6 +334,10 @@
          {if_else {> {size {sel_character_panel get outfits}} 1}
             {sel_character_panel choose_skins}
             {do
+               ; The one listed, where char_outfit may be a locked first.
+               {if {== {size {sel_character_panel get outfits}} 1}
+                  {sel_character_panel set char_outfit {elem {sel_character_panel get outfits} 0}}
+               }
                {game set_character {sel_character_panel get char_outfit} TRUE}
                {ui goto_screen {$screen get done_screen}}
             }

@@ -41,9 +41,10 @@
       (enter
          {$this add_quit}
          {$this add_version}
-         ; A quickplay song in another game's venue (quickplay_pickers.dta) left
-         ; for here by the pause menu: the next is the menus' game's again.
+         ; Out of quickplay (quickplay_pickers.dta), whose characters, guitars and
+         ; venues may be another game's: the menus' game's again.
          {campaigns venues_from {campaigns active}}
+         {quickplay quickplay 0}
          {set $main_entered TRUE}
          {$this reset_player_settings}
          {if {! [already_entered]}
@@ -121,6 +122,7 @@
             (main_quickspin.btn
                {gamecfg set mode quickplay}
                {setlist select {campaigns active}}
+               {quickplay quickplay 1}
                {ui goto_screen qp_selsong_screen}
             )
             (main_multiplayer.btn {ui goto_screen multi_screen})

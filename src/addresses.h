@@ -154,6 +154,8 @@ namespace gh2
         uint32_t venueProviderInitData; // VenueProvider::InitData(RndDir *)
         uint32_t campaignCtor;
         uint32_t campaignDtor;
+        uint32_t campaignIsItemUnlocked;   // Campaign::IsItemUnlocked(Symbol) const
+        uint32_t campaignIsItemUnlockedOn; // Campaign::IsItemUnlocked(Symbol, Difficulty) const
         uint32_t localeInit;       // Locale::Init
         uint32_t localeTerminate;  // Locale::Terminate
         uint32_t campaignStateIsEncoreSong;           // (Symbol song)
@@ -354,6 +356,8 @@ namespace gh2
         .venueProviderInitData = 0x118a90u,
         .campaignCtor = 0x12cf00u,
         .campaignDtor = 0x12d0c0u,
+        .campaignIsItemUnlocked = 0x12d490u,
+        .campaignIsItemUnlockedOn = 0x12d5a0u,
         .localeInit = 0x2cb798u,
         .localeTerminate = 0x2cba98u,
         .campaignStateIsEncoreSong = 0x131d30u,

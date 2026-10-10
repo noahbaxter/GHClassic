@@ -1,0 +1,44 @@
+; Quickplay's outfit picker opens each game's outfit by its own game's career
+; alone. GH1's career buys the Grim Ripper; GH2's has not, so quickplay lists
+; GH1's grimgh1 and not GH2's grim, though the two share the character's name.
+(needs gh1)
+#include common/first_boot.dta
+{set $pick gh1}
+#include common/career_start.dta
+{campaign buy_item grim 0}
+(expect {campaign is_unlocked grim} 1)
+{autosave_goto career_screen}
+(wait_screen career_screen 40)
+(wait 1)
+{set $ghc_switch gh2}
+{set $ghc_switch_next main_screen}
+{ui goto_screen ghc_switch_screen}
+(wait_screen main_screen)
+(expect {campaigns active} gh2)
+{quickplay song_defaults 0}
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 1)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+(press green)
+(wait_screen ghc_qp_character_screen)
+(wait_until {char_single are_chars_loaded})
+{sel_character_panel set char_focus grim}
+(expect {sel_character_panel first_outfit} grimgh1)
+(print grim {sel_character_panel get outfits})
+(expect {size {sel_character_panel get outfits}} 1)
+(expect {if_else {find_elem {sel_character_panel get outfits} grim} 1 0} 0)
+; GH2's other two store characters, which GH1 has and does not sell: bought
+; in no career, so GH2's own outfit of each is not listed.
+{sel_character_panel set char_focus funk1}
+{sel_character_panel find_outfits}
+(print funk1 {sel_character_panel get outfits})
+(expect {if_else {find_elem {sel_character_panel get outfits} funk1} 1 0} 0)
+{sel_character_panel set char_focus classic}
+{sel_character_panel find_outfits}
+(print classic {sel_character_panel get outfits})
+(expect {if_else {find_elem {sel_character_panel get outfits} classic} 1 0} 0)
+(quit)

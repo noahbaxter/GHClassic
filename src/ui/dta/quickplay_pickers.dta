@@ -62,6 +62,43 @@
       )
    )
 }
+; The guitar picker as GH2's, the 80s' and GH1's campaigns all have it
+; (career.dta), but that quickplay's shows GH2's scene whatever game's menus
+; these are, as the character picker does (sel_character.dta).
+{retype sel_guitar_panel
+   (
+      (file {if_else {== {gamecfg get mode} quickplay} ghc/gh2/ui/sel_guitar.milo ui/sel_guitar.milo})
+      ; TRUE lists config's guitars, as unlocked (Campaign::GetQuickplayGuitars,
+      ; 0x12df48), where FALSE lists the campaign's own items (GetItemData,
+      ; 0x12da40): the menus' game's store, without the others' guitars.
+      ; GuitarSelectPanel::Enter (0x1480f8) reads it into the provider.
+      (quickplay {== {gamecfg get mode} quickplay})
+      (enter {sel_guitar.tnm set_frame 0})
+      (update_display
+         ($play_sfx)
+         {do
+            ($guitar {$this get_selected_guitar 0})
+            ($skin {$this get_selected_skin 0})
+            {sg_guitar_nm.lbl set_text $guitar}
+            {sg_guitar_desc.lbl set_text {game get_guitar_desc $guitar}}
+            {sg_skin_nm.lbl set_text $skin}
+            {sg_skin_desc.lbl set_text {game get_guitar_skin_desc $skin}}
+            {sg_text_guitar.grp set_showing {! {$this is_skin_select 0}}}
+            {sg_text_skin.grp set_showing {$this is_skin_select 0}}
+            {guitar_display_panel set_env 0 guitar.env}
+            {guitar_display_panel show_guitar 0 $guitar $skin guitar.pxy guitar_single.filt}
+            {if $play_sfx {synth play_sequence button_toggle}}
+         }
+      )
+      (choose_skins {sel_guitar.tnm animate (units kTaskUISeconds) (period 0.4) (range 0 100)})
+      (unchoose_skins
+         {sel_guitar.tnm animate (units kTaskUISeconds) (period 0.4) (range 100 0)}
+         {$this set_skin_select 0 FALSE}
+         {sg_text_guitar.grp set_showing {! {$this is_skin_select 0}}}
+         {sg_text_skin.grp set_showing {$this is_skin_select 0}}
+      )
+   )
+}
 {if {! {exists ghc_qp_character_screen}} {new GHScreen ghc_qp_character_screen}}
 {retype ghc_qp_character_screen
    (

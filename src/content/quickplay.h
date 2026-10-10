@@ -9,6 +9,12 @@
 //   {quickplay outfit <game>}        the first player's outfit that game boots
 //                                    with (its ui/main.dta), as it is named
 //                                    here while another game is played
+//   {quickplay quickplay <0|1>}      into quickplay or out of it. In it the
+//                                    characters and guitars are GH2's with
+//                                    every game's outfits among them, whatever
+//                                    game's menus these are, and an item is
+//                                    unlocked where any game's career has it.
+//                                    A career keeps its own game's.
 
 #include "addresses.h"
 
