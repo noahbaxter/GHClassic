@@ -99,10 +99,11 @@ namespace gh2::gh1
                 if (!made)
                     return made;
                 made->transitions = transitions((*jumps)[anim->second], plays);
-                // GH1 goes from one clip to another by its graph alone,
-                // where the poses meet; GH2 starts a band cue's clip at once
-                // unless the clip asks for its first node (kPlayFirst).
-                made->blend = 3u;
+                // A band cue's clip comes in at once, blended, as GH2's own
+                // do: waiting for GH1's graph (kPlayFirst) took up to a whole
+                // clip, and the downbeat (char_objects.dta BAND_COMMON) asks
+                // for idle again while an idle clip still plays, so a cue
+                // could be lost for good.
                 // GH2's bassist and singer turn where they stand by their
                 // clips' bone_facing, which GH1's stand still without.
                 for (const Samples &from : gh2.sets)
