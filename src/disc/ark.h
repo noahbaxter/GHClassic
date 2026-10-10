@@ -65,6 +65,14 @@ namespace gh2::ark
     // the disc, not the archive. False if the disc has none.
     bool lendFromDisc(size_t layer, const std::string &path, size_t disc, const std::string &source);
     void front(std::optional<size_t> layer);
+    // A path starting `as` is the rest of it as it is found with that layer
+    // in front, or with none: one game's file whichever game is played
+    // ("ghc/gh2/ui/sel_character.milo" is GH2's own).
+    void alias(const std::string &as, std::optional<size_t> layer);
+    // Until unlent, a path starting `prefix` is found as it is with that
+    // layer in front, or with none: another game's venue for one song.
+    void lend(const std::string &prefix, std::optional<size_t> layer);
+    void unlend(const std::string &prefix);
     // Until cleared (no layer), these files are that layer's, where it has
     // them, ahead of every disc and the layer in front: a boot's own scenes,
     // the logos and the card check's, shown as the game the boot will open

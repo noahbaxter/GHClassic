@@ -80,6 +80,16 @@ namespace gh2::ark
         std::optional<size_t> s_front; // the layer searched before the game disc
         std::optional<size_t> s_boot;  // bootFrom's
         std::unordered_set<std::string> s_bootFiles;
+        // A path starting `prefix` found as `layer` in front would find it,
+        // without the prefix where `strip` (alias's) or as it is (lend's).
+        struct Route
+        {
+            std::string prefix;
+            std::optional<size_t> layer;
+            bool strip;
+        };
+        std::vector<Route> s_routes;
+        bool s_routing = false; // a route's own find, which takes no route again
 
         uint32_t word(const std::vector<uint8_t> &data, size_t &at)
         {
@@ -230,9 +240,31 @@ namespace gh2::ark
             return nullptr;
         }
 
-        // Loose files first, made ones as they are asked for, then the boot's
-        // own, then renames, then the layer in front if one is, then each
-        // disc in turn.
+        const Entry *find(const std::string &name);
+
+        // The first route `name` starts with, found as that route has it.
+        const Entry *routed(const std::string &name)
+        {
+            if (s_routing)
+                return nullptr;
+            for (const Route &route : s_routes)
+            {
+                if (name.compare(0u, route.prefix.size(), route.prefix) != 0)
+                    continue;
+                const auto front = s_front;
+                s_front = route.layer;
+                s_routing = true;
+                const Entry *entry = find(route.strip ? name.substr(route.prefix.size()) : name);
+                s_routing = false;
+                s_front = front;
+                return entry;
+            }
+            return nullptr;
+        }
+
+        // Loose files first, made ones as they are asked for, then the routes,
+        // then the boot's own, then renames, then the layer in front if one
+        // is, then each disc in turn.
         const Entry *find(const std::string &name)
         {
             const auto loose = s_loose.find(name);
@@ -248,6 +280,8 @@ namespace gh2::ark
                     return &(s_loose[name] = addPart({std::move(file->read), size, size}));
                 }
             }
+            if (const Entry *entry = routed(name))
+                return entry;
             if (s_boot && s_bootFiles.count(name) != 0u)
                 if (const Entry *entry = findIn(s_layers[*s_boot], name))
                     return entry;
@@ -471,6 +505,23 @@ namespace gh2::ark
     }
 
     void front(std::optional<size_t> layer) { s_front = layer; }
+
+    void alias(const std::string &as, std::optional<size_t> layer)
+    {
+        s_routes.push_back({key(as.c_str()), layer, true});
+    }
+
+    void lend(const std::string &prefix, std::optional<size_t> layer)
+    {
+        unlend(prefix);
+        s_routes.push_back({key(prefix.c_str()), layer, false});
+    }
+
+    void unlend(const std::string &prefix)
+    {
+        const std::string name = key(prefix.c_str());
+        std::erase_if(s_routes, [&](const Route &route) { return !route.strip && route.prefix == name; });
+    }
 
     void bootFrom(std::optional<size_t> layer, const std::vector<std::string> &paths)
     {
