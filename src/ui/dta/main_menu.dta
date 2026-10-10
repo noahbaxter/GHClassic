@@ -113,8 +113,11 @@
                   }
                }
             )
+            ; Quickplay opens on the menus' game's setlist, whichever was
+            ; picked last time (quickplay.dta).
             (main_quickspin.btn
                {gamecfg set mode quickplay}
+               {setlist select {campaigns active}}
                {ui goto_screen qp_selsong_screen}
             )
             (main_multiplayer.btn {ui goto_screen multi_screen})
