@@ -155,7 +155,7 @@ namespace gh2
         // Takes normals to world space for lighting (qw676..678): the world
         // transform, or for a skinned mesh the palette's fifth matrix.
         Matrix lightWorld{};
-        // The 360's character shadows (render/native_mesh.cpp). A caster is
+        // The 360's character shadows (Frame::shadows). A caster is
         // drawn into its camera's shadow map and nowhere else. Any other
         // draw is lit under the shadow map of this index plus one in
         // Frame::shadows, 0 for none.

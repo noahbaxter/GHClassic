@@ -1,8 +1,8 @@
 #include "gh2x/classes.h"
 
 #include "formats/bitmap.h"
+#include "gh2x/focus.h"
 #include "gh2x/stream.h"
-#include "render/look.h"
 
 #include <functional>
 #include <map>
@@ -234,7 +234,7 @@ namespace gh2::gh2x
         // gates). A keyframe's depth of field is 360 only, and the shot has
         // the PS2's off (on in all 440 of the 360's shots, off in 416 of the
         // PS2's 441), so its three blur fields are read by nothing in the
-        // game and carry the 360's to the host (render/look.h). A shot with
+        // game and carry the 360's to the host (gh2x/focus.h). A shot with
         // the 360's off gets the PS2's usual far blur and focal blur. Lost:
         // zoom fov and the shot's post process; the focal target goes to
         // camShotFocus.
@@ -272,7 +272,7 @@ namespace gh2::gh2x
                 const float blurDepth = r.f32(), maxBlur = r.f32(), focusBlur = r.f32();
                 w.f32(blurDepth);
                 blurs.push_back(w.out.size());
-                w.f32(focusBlur).f32(look::kShotBlurMark + maxBlur);
+                w.f32(focusBlur).f32(kShotBlurMark + maxBlur);
                 const uint32_t targets = r.count(64u);
                 w.u32(targets);
                 for (uint32_t t = 0; t < targets && r.ok; ++t)

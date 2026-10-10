@@ -1,7 +1,7 @@
 #include "gh2x/scene.h"
 
 #include "gh2x/classes.h"
-#include "render/look.h"
+#include "gh2x/focus.h"
 
 #include <algorithm>
 #include <cstring>
@@ -246,7 +246,7 @@ namespace gh2::gh2x
                 made = toPs2(className, body);
             if (made && className == "CamShot")
                 if (auto focus = camShotFocus(body))
-                    keep(className, look::focusShot(name), std::move(*focus));
+                    keep(className, focusShot(name), std::move(*focus));
             if (made)
                 keep(className, name, std::move(*made));
             else if (!noPs2Class(className))
