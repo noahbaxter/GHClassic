@@ -1,0 +1,58 @@
+; Quickplay's venue map opens on the menus' game's, yellow's list takes
+; another game's, and the song plays in that game's room: GH1's basement,
+; standing in at battle, under GH2's menus. On a new save only each game's
+; first venue is open.
+#include common/first_boot.dta
+(needs gh1 gh80s)
+{quickplay song_defaults 0}
+; Another game's venues, as a song left by the pause menu leaves them, are
+; put back by the song list.
+{campaigns venues_from gh1}
+(expect {campaigns venue_game} gh1)
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 1)
+(expect {campaigns venue_game} gh2)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+(press green)
+(wait_screen ghc_qp_character_screen)
+(wait_until {char_single are_chars_loaded})
+{ui goto_screen ghc_qp_guitar_screen}
+(wait_screen ghc_qp_guitar_screen)
+(wait 2)
+{ghc_qp_guitar_screen goto_career}
+(wait_screen ghc_qp_venue_screen)
+(wait 2)
+(expect $ghc_qp_venues gh2)
+(shot gh2_map)
+{ghc_qp_venue_screen ghc_picked gh1}
+(wait_screen ghc_qp_venue_twin_screen)
+(wait 2)
+(expect $ghc_qp_venues gh1)
+(expect {game get_venue} battle)
+(shot gh1_map)
+; GH1's career has opened nothing past its first: the map stays there.
+(press down)
+(wait 0.5)
+(press up)
+(wait 0.5)
+(expect {game get_venue} battle)
+; The 80s' map, and back to GH1's.
+{ghc_qp_venue_twin_screen ghc_picked gh80s}
+(wait_screen ghc_qp_venue_screen)
+(wait 2)
+(expect $ghc_qp_venues gh80s)
+(shot 80s_map)
+{ghc_qp_venue_screen ghc_picked gh1}
+(wait_screen ghc_qp_venue_twin_screen)
+(wait 2)
+{{game get_player_config 0} set autoplay TRUE}
+(press green)
+(wait_screen game_screen 60)
+(expect {campaigns venue_game} gh1)
+(wait 20)
+(shot gh1_room)
+(quit)

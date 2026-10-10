@@ -152,7 +152,9 @@
       (panels meta sel_song_panel helpbar ghc_pick_panel)
       (focus sel_song_panel)
       (sel_song_career FALSE)
-      (enter {ghc_qp_helpbar})
+      ; Back from a song in another game's venue (quickplay_pickers.dta), the
+      ; next is the menus' game's again.
+      (enter {campaigns venues_from {campaigns active}} {ghc_qp_helpbar})
       (SELECT_START_MSG {ui goto_screen qp_diff_screen} kDataUnhandled)
       (BUTTON_DOWN_MSG {ghc_qp_button $button})
       (ghc_picked ($game) {ghc_qp_picked sel_song_panel qp_selsong_twin_screen $game})
@@ -166,7 +168,9 @@
       (panels meta sel_song_twin_panel helpbar ghc_pick_panel)
       (focus sel_song_twin_panel)
       (sel_song_career FALSE)
-      (enter {ghc_qp_helpbar})
+      ; Back from a song in another game's venue (quickplay_pickers.dta), the
+      ; next is the menus' game's again.
+      (enter {campaigns venues_from {campaigns active}} {ghc_qp_helpbar})
       (SELECT_START_MSG {ui goto_screen qp_diff_screen} kDataUnhandled)
       (BUTTON_DOWN_MSG {ghc_qp_button $button})
       (ghc_picked ($game) {ghc_qp_picked sel_song_twin_panel qp_selsong_screen $game})

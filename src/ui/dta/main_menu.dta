@@ -41,6 +41,9 @@
       (enter
          {$this add_quit}
          {$this add_version}
+         ; A quickplay song in another game's venue (quickplay_pickers.dta) left
+         ; for here by the pause menu: the next is the menus' game's again.
+         {campaigns venues_from {campaigns active}}
          {set $main_entered TRUE}
          {$this reset_player_settings}
          {if {! [already_entered]}

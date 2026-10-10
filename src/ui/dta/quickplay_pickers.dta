@@ -2,14 +2,31 @@
 ; and outfit, the guitar and finish, and the venue, each any that a career
 ; has opened. The game's own quickplay goes from the difficulty straight to
 ; the song, as the song's entry casts it, and so does this with song
-; defaults on; off, that casting is where each screen starts. Outside a career the game counts an
-; item unlocked that any band has (Campaign::IsItemUnlocked, 0x12d490), and
-; another game's outfit is there once its own game's career has it
-; (sel_character.dta).
+; defaults on; off, that casting is where each screen starts. Outside a
+; career the game counts an item unlocked that any band has
+; (Campaign::IsItemUnlocked, 0x12d490), and another game's outfit is there
+; once its own game's career has it (sel_character.dta).
 ;
-; The screens are the career's own, with its handlers
-; (SEL_CHARACTER_COMMON, SEL_GUITAR_COMMON and SEL_VENUE_SCREEN_HANDLERS,
-; career.dta); a handler given before them is the one found.
+; The character and guitar screens are the career's own, with its handlers
+; (SEL_CHARACTER_COMMON and SEL_GUITAR_COMMON, career.dta); a handler given
+; before them is the one found.
+
+; The games with venues of their own, the 360's being GH2's, and the one a
+; setlist's songs play in.
+{func ghc_venue_games
+   {do
+      ($games)
+      {set $games ()}
+      {resize $games 0}
+      {foreach $game (gh1 gh2 gh80s)
+         {if {campaigns has $game} {push_back $games $game}}
+      }
+      $games
+   }
+}
+{func ghc_venue_game ($game)
+   {if_else {&& {campaigns has $game} {!= $game gh2x}} $game gh2}
+}
 {retype qp_diff_screen
    (
       (panels meta sel_difficulty_panel helpbar)
@@ -25,17 +42,21 @@
       )
       ; With song defaults on ({quickplay song_defaults}, select's menu on
       ; the song list) the song plays as the setlist's game boots, with
-      ; its first guitar, in the venue the song's entry casts; off, each is
-      ; picked.
+      ; its first guitar, in its own game's venue for the song's tier; off,
+      ; each is picked.
       (SELECT_START_MSG
-         {game set_quickplay}
          {if_else {quickplay song_defaults}
             {do
+               {campaigns venues_from {ghc_venue_game {setlist shown}}}
+               {game set_quickplay}
                {game set_character {quickplay outfit {setlist shown}} TRUE}
                {game set_guitar_index 0}
                {ui goto_screen loading_screen}
             }
-            {ui goto_screen ghc_qp_character_screen}
+            {do
+               {game set_quickplay}
+               {ui goto_screen ghc_qp_character_screen}
+            }
          }
          kDataUnhandled
       )
@@ -53,9 +74,11 @@
 {if {! {exists ghc_qp_guitar_screen}} {new GHScreen ghc_qp_guitar_screen}}
 {retype ghc_qp_guitar_screen
    (
-      ; What a guitar picked leads to, the career's name for it.
+      ; What a guitar picked leads to, the career's name for it. The venue
+      ; map opens on the menus' game's.
       (goto_career
          {game set_guitar {sel_guitar_panel get_selected_guitar 0} {sel_guitar_panel get_selected_skin 0}}
+         {set $ghc_qp_venues {ghc_venue_game {campaigns active}}}
          {ui goto_screen ghc_qp_venue_screen}
       )
       (go_back
@@ -66,42 +89,133 @@
       SEL_GUITAR_COMMON
    )
 }
+
+; The venue: one game's map at a time, its own (ghc/<game>/, content/
+; campaigns.h) whichever game's menus these are, and the others' from a
+; list while yellow is held (picker.dta). The panel takes its map at load,
+; so another goes to the twin screen, whose own panel loads it, as the
+; setlists do (quickplay.dta). Each game's map names its venues' buttons by
+; GH2's venues (sv_battle.btn), GH1's standing in for them. A venue is open
+; where its own game's career has opened it.
+{set $ghc_qp_venues gh2}
+{set $ghc_qp_venue_panel
+   (
+      (file {sprint "ghc/" $ghc_qp_venues "/ui/sel_venue.milo"})
+      (focus sv_battle.btn)
+   )
+}
+{if {! {exists ghc_qp_venue_panel}} {new GHPanel ghc_qp_venue_panel}}
+{retype ghc_qp_venue_panel $ghc_qp_venue_panel}
+{if {! {exists ghc_qp_venue_twin_panel}} {new GHPanel ghc_qp_venue_twin_panel}}
+{retype ghc_qp_venue_twin_panel $ghc_qp_venue_panel}
+{func ghc_qp_venue_open ($venue)
+   {if_else {== $ghc_qp_venues {ghc_venue_game {campaigns active}}}
+      {campaign is_unlocked $venue}
+      {|| {campaign all_access} {campaigns venue_open $ghc_qp_venues $venue}}
+   }
+}
+; The map's game's venues, each button enabled where it is open; the song's
+; venue focused where that game has it open, else its first.
+{func ghc_qp_venue_enter ($screen $panel)
+   {do
+      ($venues {campaigns venues $ghc_qp_venues})
+      ($index 0)
+      {foreach $venue $venues
+         {if_else {ghc_qp_venue_open $venue}
+            {$screen enable {$panel find {sprint "sv_" $venue ".btn"}}}
+            {$screen disable {$panel find {sprint "sv_" $venue ".btn"}}}
+         }
+      }
+      {if {|| {! {find_elem $venues {game get_venue}}} {! {ghc_qp_venue_open {game get_venue}}}}
+         {game set_venue {elem $venues 0}}
+      }
+      {foreach_int $i 0 {size $venues}
+         {if {== {elem $venues $i} {game get_venue}} {set $index $i}}
+      }
+      {{$panel find venue_anims.grp} set_frame {'+' $index 1}}
+      {$screen set_focus {$panel find {sprint "sv_" {game get_venue} ".btn"}}}
+      {ghc_qp_venue_helpbar}
+   }
+}
+{func ghc_qp_venue_helpbar
+   {do
+      ($array)
+      {set $array ()}
+      {resize $array 0}
+      {push_back $array (fret1 help_continue)}
+      {push_back $array (fret2 help_back)}
+      {if {> {size {ghc_venue_games}} 1} {push_back $array (fret3 ghc_map)}}
+      {push_back $array (strum help_updown)}
+      {helpbar set_display $array}
+   }
+}
+; A button focused: its venue, and the map scrolled to it.
+{func ghc_qp_venue_focus ($panel $focus)
+   {do
+      ($venues {campaigns venues $ghc_qp_venues})
+      {foreach_int $i 0 {size $venues}
+         {if {== {sprint "sv_" {elem $venues $i} ".btn"} {sprint {$focus name}}}
+            {game set_venue {elem $venues $i}}
+            {{$panel find venue_anims.grp} animate (dest {'+' $i 1}) (period 0.3) (units kTaskUISeconds)}
+         }
+      }
+   }
+}
+{func ghc_qp_venue_button ($button)
+   {cond
+      ({ghc_pick_button $button} TRUE)
+      ({== $button kPad_Tri}
+         {{ui current_screen} backwards_anim}
+         {synth play_sequence button_back.cue}
+         {ui goto_screen ghc_qp_guitar_screen}
+         TRUE
+      )
+      ({&& {== $button kPad_Circle} {> {size {ghc_venue_games}} 1} {! {ui in_transition}}}
+         {ghc_pick_panel open_with {ghc_venue_games} $ghc_qp_venues}
+         TRUE
+      )
+      (TRUE kDataUnhandled)
+   }
+}
 {if {! {exists ghc_qp_venue_screen}} {new GHScreen ghc_qp_venue_screen}}
+{if {! {exists ghc_qp_venue_twin_screen}} {new GHScreen ghc_qp_venue_twin_screen}}
 {retype ghc_qp_venue_screen
    (
+      (panels meta ghc_qp_venue_panel helpbar ghc_pick_panel)
+      (focus ghc_qp_venue_panel)
       (allow_back FALSE)
-      (next_screen loading_screen)
-      ; As the career's, but that the venue it starts on is the song's
-      ; (the first where no band has reached that one), not the career's
-      ; next.
-      (enter
-         {campaign foreach_venue $venue
-            {do
-               ($button {$this venue_button_name $venue})
-               {if_else {campaign is_unlocked $venue}
-                  {$this enable {sel_venue_panel find $button}}
-                  {$this disable {sel_venue_panel find $button}}
-               }
-            }
-         }
-         {if {! {campaign is_unlocked {game get_venue}}}
-            {game set_venue {elem {find $syscfg venues} 1}}
-         }
-         {do
-            ($index {game get_venue_index})
-            ($venue {game get_venue})
-            {{sel_venue_panel find venue_anims.grp} set_frame {'+' $index 1}}
-            {$this set_focus {$this venue_button $venue}}
-         }
-      )
-      SEL_VENUE_SCREEN_HANDLERS
-      (BUTTON_DOWN_MSG
-         {if {== $button kPad_Tri}
-            {$this backwards_anim}
-            {synth play_sequence button_back.cue}
-            {ui goto_screen ghc_qp_guitar_screen}
-         }
+      (enter {ghc_qp_venue_enter $this ghc_qp_venue_panel})
+      (FOCUS_MSG {if {! {ui in_transition}} {ghc_qp_venue_focus ghc_qp_venue_panel $new_focus}})
+      (SELECT_START_MSG
+         {campaigns venues_from $ghc_qp_venues}
+         {ui goto_screen loading_screen}
          kDataUnhandled
+      )
+      (BUTTON_DOWN_MSG {ghc_qp_venue_button $button})
+      (ghc_picked ($game)
+         {synth play_sequence button_select}
+         {set $ghc_qp_venues $game}
+         {ui goto_screen ghc_qp_venue_twin_screen}
+      )
+   )
+}
+{retype ghc_qp_venue_twin_screen
+   (
+      (panels meta ghc_qp_venue_twin_panel helpbar ghc_pick_panel)
+      (focus ghc_qp_venue_twin_panel)
+      (allow_back FALSE)
+      (enter {ghc_qp_venue_enter $this ghc_qp_venue_twin_panel})
+      (FOCUS_MSG {if {! {ui in_transition}} {ghc_qp_venue_focus ghc_qp_venue_twin_panel $new_focus}})
+      (SELECT_START_MSG
+         {campaigns venues_from $ghc_qp_venues}
+         {ui goto_screen loading_screen}
+         kDataUnhandled
+      )
+      (BUTTON_DOWN_MSG {ghc_qp_venue_button $button})
+      (ghc_picked ($game)
+         {synth play_sequence button_select}
+         {set $ghc_qp_venues $game}
+         {ui goto_screen ghc_qp_venue_screen}
       )
    )
 }

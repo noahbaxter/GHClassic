@@ -48,6 +48,7 @@
 (press green)
 (wait_screen game_screen 60)
 (expect {game get_character_outfit} {quickplay outfit gh1})
+(expect {campaigns venue_game} gh1)
 (print {game get_character_outfit} {game get_guitar} {game get_venue} {gamecfg get_song})
 (wait 15)
 (shot song)
