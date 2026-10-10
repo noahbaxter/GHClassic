@@ -24,6 +24,7 @@
 #include "gh1/career.h"
 
 #include "content/campaigns.h"
+#include "content/locale.h"
 #include "disc/ark.h"
 #include "formats/dtb.h"
 #include "gh1/menu_scripts.h"
@@ -314,8 +315,14 @@ namespace gh2::gh1
                 entry.nodes[1] = {dtb::kString, 0, 0.0f, it->second, {}};
                 text.erase(it);
             }
+        // What GH2's locale has no token for is GH1's alone, so every game's
+        // has it: GH1's venue map shows in quickplay under any menus
+        // (quickplay_pickers.dta).
         for (const auto &[key, value] : text)
+        {
             locale->nodes.push_back(array({symbol(key), {dtb::kString, 0, 0.0f, value, {}}}));
+            locale::add(key, value);
+        }
 
         ark::addFile(layer, "config/gen/gh2.dtb", dtb::write(*root));
         ark::addFile(layer, "config/gen/campaign.dtb", dtb::write(*campaign));
