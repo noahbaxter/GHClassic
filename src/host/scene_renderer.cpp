@@ -43,7 +43,7 @@ namespace gh2
         constexpr uint32_t kFogVec4s = 2u;
         // An x360 draw's block in place of the lighting block: see
         // writeShading.
-        constexpr uint32_t kShadingVec4s = 19u;
+        constexpr uint32_t kShadingVec4s = 21u;
         constexpr VkFormat kShadowFormat = VK_FORMAT_D32_SFLOAT;
         // The x360 shading's colour target: the 360's lit colour runs 0 to 4.
         constexpr VkFormat kHdrFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
@@ -351,17 +351,22 @@ namespace gh2
             out[3] = {{g[3][0], g[3][1], g[3][2], 0.0f}};
         }
 
-        // Whether x360 shading draws this pass: a converted 360 Mat's, lit,
-        // with a plain or transformed uv. The PS2's scenes (track, HUD,
-        // menus) keep the PS2's shading, whose rigs are set for its range;
-        // so do the PS2's tex gens, GS texturing modes and rendered textures.
+        // Whether x360 shading draws this pass: a converted 360 Mat's, with
+        // a plain, transformed or projected uv, its particles and flares
+        // too: every 360 Mat that 8 venues and 9 characters draw. The PS2's
+        // scenes (track, HUD, menus) keep the PS2's shading, whose rigs are
+        // set for its range; so do the PS2's other tex gens and rendered
+        // textures.
         bool shadedX360(const DrawCall &draw)
         {
             const Material &m = draw.material;
             const bool plainUv = m.texGen == milo::mat::kTexGenNone || m.texGen == milo::mat::kTexGenXfm ||
-                                 m.texGen == milo::mat::kTexGenXfmOrigin;
-            return m.shading && m.useEnviron && !draw.screen && plainUv && !m.sphere && !m.highlight && !m.spread &&
-                   m.renderTarget == 0u;
+                                 m.texGen == milo::mat::kTexGenXfmOrigin || m.texGen == milo::mat::kTexGenProjected;
+            // An unlit Mat too: the 360 draws it with the same shader, its
+            // ambient 1, so nothing holds its colour at 1 (intensify takes
+            // it to 2), and one that adds has none of the GS's HIGHLIGHT
+            // texturing (the glow cards on lamps, signs and bulbs).
+            return m.shading && plainUv && !m.sphere && !m.spread && m.renderTarget == 0u;
         }
 
         // The x360 block: the world transform's rows (unused when skinned),
@@ -371,7 +376,8 @@ namespace gh2
         // the material's specular colour and power, its glow multiplier and
         // the diffuse map's intensity (standard.fx's gMultipliers), and the
         // view and projection of the shadow map the draw is lit under, if
-        // any (gWorldToLightProj before its move to texture coordinates).
+        // any (gWorldToLightProj before its move to texture coordinates),
+        // and the environ's fog.
         void writeShading(const DrawCall &draw, const float eye[3], const Matrix *shadow, Vec4 *out)
         {
             for (uint32_t row = 0; row < 4; ++row)
@@ -382,7 +388,9 @@ namespace gh2
                 out[row] = {{draw.world[row * 4 + 0], draw.world[row * 4 + 1], draw.world[row * 4 + 2],
                              draw.world[row * 4 + 3]}};
             out[4] = {{eye[0], eye[1], eye[2], 1.0f}};
-            const Environ &e = draw.environment;
+            // A Mat outside the environ has no lights and its colour in full.
+            static const Environ kUnlit{Environ::kAmbient, {1.0f, 1.0f, 1.0f}};
+            const Environ &e = draw.material.useEnviron ? draw.environment : kUnlit;
             out[5] = {{e.ambient[0], e.ambient[1], e.ambient[2], 1.0f}};
             const bool point = e.kind == Environ::kPoint;
             const uint32_t count = point ? e.pointCount : e.kind == Environ::kDirectional ? e.lightCount : 0u;
@@ -409,7 +417,14 @@ namespace gh2
             out[13] = shading ? Vec4{{shading->specularColor[0], shading->specularColor[1],
                                       shading->specularColor[2], shading->specularColor[3]}}
                               : Vec4{{0.0f, 0.0f, 0.0f, 0.0f}};
-            out[14] = {{shading ? shading->emissive : 1.0f, 1.0f, 0.0f, 0.0f}};
+            // Intensity is 2 for a Mat with intensify, as 22 draws of a Xenia
+            // frame have it.
+            out[14] = {{shading ? shading->emissive : 1.0f, draw.material.intensify ? 2.0f : 1.0f, 0.0f, 0.0f}};
+            // gFogRange: the fog's end and one over its length, then whether
+            // there is any; and gFogColor.
+            const bool fog = e.fog && e.fogEnd > e.fogStart;
+            out[19] = {{e.fogEnd, fog ? 1.0f / (e.fogEnd - e.fogStart) : 0.0f, fog ? 1.0f : 0.0f, 0.0f}};
+            out[20] = {{e.fogColor[0], e.fogColor[1], e.fogColor[2], e.fogColor[3]}};
         }
 
         // The tangents the 360 builds for a normal-mapped mesh at load,
@@ -2561,8 +2576,11 @@ namespace gh2
 
         // The post stage runs once the world is drawn, before what is drawn
         // over it: after the last draw through the camera the first x360
-        // draw took (the track and HUD come later, through their own). The
-        // 360 tells them apart by depth instead (gUIPlaneDistance).
+        // draw took (the track and HUD come later, through their own), a
+        // screen rect drawn while it was current being one of them: the
+        // world's flares and fades, which the 360 also draws before its post
+        // stage. The 360 tells them apart by depth instead
+        // (gUIPlaneDistance).
         size_t postBefore = SIZE_MAX;
         const Camera *worldCamera = nullptr;
         {
@@ -2577,7 +2595,7 @@ namespace gh2
                 }
             for (size_t i = 0; any && i < frame.draws.size(); ++i)
                 if (drawRun[i] < 0 && frame.draws[i].camera < frame.cameras.size() &&
-                    frame.cameras[frame.draws[i].camera].id == world)
+                    (frame.draws[i].screen ? frame.draws[i].under : frame.cameras[frame.draws[i].camera].id) == world)
                     postBefore = i + 1u;
         }
 
@@ -2751,18 +2769,27 @@ namespace gh2
                 // copied from or post processed, and goes on from what it
                 // kept.
                 vkCmdEndRenderPass(cmd);
-                for (; copy && nextCopy < copyRuns.size() && runs[copyRuns[nextCopy]].before <= i; ++nextCopy)
-                {
-                    const TargetRun &run = runs[copyRuns[nextCopy]];
-                    if (run.image)
-                        s.copyFromTarget(cmd, *run.image, run.x, run.y);
-                }
                 if (post)
                 {
                     s.runPost(cmd, frame, worldCamera, serial);
                     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, s.layout, 1, 1, &data.set, 0,
                                             nullptr);
                     boundPipeline = VK_NULL_HANDLE;
+                    // What draws next copies the picture as the post stage
+                    // left it (the track's far end, drawn back over itself):
+                    // a pass with nothing in it puts that in the target.
+                    if (copy)
+                    {
+                        begin.renderPass = s.resumePass;
+                        vkCmdBeginRenderPass(cmd, &begin, VK_SUBPASS_CONTENTS_INLINE);
+                        vkCmdEndRenderPass(cmd);
+                    }
+                }
+                for (; copy && nextCopy < copyRuns.size() && runs[copyRuns[nextCopy]].before <= i; ++nextCopy)
+                {
+                    const TargetRun &run = runs[copyRuns[nextCopy]];
+                    if (run.image)
+                        s.copyFromTarget(cmd, *run.image, run.x, run.y);
                 }
                 begin.renderPass = s.resumePass;
                 vkCmdBeginRenderPass(cmd, &begin, VK_SUBPASS_CONTENTS_INLINE);

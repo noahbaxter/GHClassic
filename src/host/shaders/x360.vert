@@ -35,8 +35,10 @@ layout(location = 2) out vec3 vWorldPos;
 layout(location = 3) out vec3 vNormal;
 layout(location = 4) out vec3 vTangent;
 layout(location = 5) out vec3 vBitangent;
+layout(location = 6) out float vFog; // how much of the colour the fog leaves
 
 const uint kFlagPrelit = 8u;
+const uint kFlagProjected = 256u;
 
 mat4 rows(int i)
 {
@@ -75,4 +77,16 @@ void main()
     vec4 base = (pc.flags & kFlagPrelit) != 0u ? vertexColor : pc.matColor;
     vColor = base * vec4(data[pc.lightBase + 5].rgb, 1.0);
     vUv = inUv.x * pc.uvRows.xy + inUv.y * pc.uvRows.zw + pc.uvOffset;
+    if (pc.envBase >= 0 && (pc.flags & kFlagProjected) != 0u)
+    {
+        // TEX_GEN 2, the world position through gTexCoord: the projected
+        // tex gen's block, as mesh.vert takes it (the spotlights' beams).
+        int e = pc.envBase;
+        mat3 wm = mat3(data[e].xyz, data[e + 1].xyz, data[e + 2].xyz);
+        vUv = (wm * (pc.boneBase >= 0 ? pos.xyz : inPos) + data[e + 3].xyz).xy;
+    }
+    // Fog by the vert's distance down the view: saturate((gFogRange.x - d)
+    // * gFogRange.y).
+    vec4 fog = data[pc.lightBase + 19];
+    vFog = fog.z != 0.0 ? clamp((fog.x - gl_Position.w) * fog.y, 0.0, 1.0) : 1.0;
 }

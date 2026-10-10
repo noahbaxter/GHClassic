@@ -32,6 +32,8 @@ namespace gh2
 {
     namespace
     {
+        const Addresses *s_addresses = nullptr;
+
         void readColor(uint8_t *rdram, uint32_t address, float out[4])
         {
             for (uint32_t i = 0; i < 4; ++i)
@@ -103,6 +105,7 @@ namespace gh2
             DrawCall draw;
             draw.mesh = mesh;
             draw.screen = true;
+            draw.under = load<uint32_t>(rdram, s_addresses->rndCamCurrent);
             draw.camera = internCamera(Camera{}); // the whole screen: the verts are in clip space
             draw.world = identity();
             draw.lightWorld = identity();
@@ -132,6 +135,7 @@ namespace gh2
 
     void installNativeRect(PS2Runtime &runtime, const Addresses &addresses)
     {
+        s_addresses = &addresses;
         runtime.replaceFunction(addresses.psRndDrawRect, drawRect);
     }
 }

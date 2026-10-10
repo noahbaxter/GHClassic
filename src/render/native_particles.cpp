@@ -31,6 +31,7 @@
 #include "render/native_mesh.h"
 
 #include <memory>
+#include <vector>
 
 namespace gh2
 {
@@ -75,7 +76,12 @@ namespace gh2
             uint32_t mat = load<uint32_t>(rdram, sys + kMat);
             if (mat == 0u)
                 mat = load<uint32_t>(rdram, s_addresses->defaultMat);
-            const bool lit = mat != 0u && load<uint32_t>(rdram, mat + milo::mat::kUseEnviron) != 0u;
+            std::vector<Material> passes;
+            for (uint32_t pass = mat; pass != 0u; pass = nextPass(rdram, pass))
+                passes.push_back(readMaterial(rdram, pass));
+            // A 360 Mat's particles take no ambient under its shading: none
+            // of the 360's twelve particle shaders reads the environ's.
+            const bool lit = !passes.empty() && passes.front().useEnviron && !passes.front().shading;
             const float *ambient = currentEnviron().ambient;
 
             auto mesh = std::make_shared<MeshData>();
@@ -147,9 +153,9 @@ namespace gh2
                 draw.camera = cameraIndex;
                 draw.world = identity();
                 draw.lightWorld = identity();
-                for (uint32_t pass = mat; pass != 0u; pass = nextPass(rdram, pass))
+                for (Material &pass : passes)
                 {
-                    draw.material = readMaterial(rdram, pass);
+                    draw.material = std::move(pass);
                     draw.material.highlight = false; // TEX0's TFX is put back to modulate (0x1a2da0)
                     // The colours are final; sprites take their uvs as given.
                     draw.material.useEnviron = false;

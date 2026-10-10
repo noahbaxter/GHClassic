@@ -42,7 +42,7 @@ namespace gh2
             e.fog = load<uint8_t>(rdram, env + milo::environment::kFogEnable) != 0u;
             e.fogStart = load<float>(rdram, env + milo::environment::kFogStart);
             e.fogEnd = load<float>(rdram, env + milo::environment::kFogEnd);
-            for (uint32_t i = 0; i < 3; ++i)
+            for (uint32_t i = 0; i < 4; ++i)
                 e.fogColor[i] = load<float>(rdram, env + milo::environment::kFogColor + i * 4u);
 
             uint32_t point = 0u;

@@ -137,11 +137,12 @@ namespace gh2
         float position[3] = {};   // the point light's world position
         float range = 0.0f;       // the point light's range
         // The fog the GS blends toward (FOGCOL) by a vertex's F, which is 255
-        // at `fogStart` and nearer and 0 at `fogEnd` and farther.
+        // at `fogStart` and nearer and 0 at `fogEnd` and farther. The 360's
+        // shading draws the same fog, with the colour's alpha.
         bool fog = false;
         float fogStart = 0.0f;
         float fogEnd = 0.0f;
-        float fogColor[3] = {};
+        float fogColor[4] = {};
         // The 360's shading takes up to three point lights where VU1 takes
         // the first: all of them, in list order, the first as above.
         uint32_t pointCount = 0;
@@ -155,6 +156,7 @@ namespace gh2
         std::shared_ptr<const MeshData> mesh;
         Matrix world{};      // identity when skinned
         bool screen = false; // verts already in clip space (PsRnd::DrawRect): no camera
+        uint32_t under = 0;  // a screen draw's: the RndCam current when it was made, as Camera::id
         uint32_t camera = 0; // index into Frame::cameras
         Material material;
         // A skinned vert is sum over b of weight[b] * (pos * bones[b]), its
