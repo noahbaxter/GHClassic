@@ -24,6 +24,7 @@ namespace gh2::quickplay
         const std::vector<std::string> kPicked = {"characters", "guitars"};
 
         bool s_quickplay = false;
+        std::map<std::string, std::string> s_picked; // quickplay's last picks, by what they are
         std::string s_borrowedFor; // the menus' game whose arrays are GH2's for quickplay, or none
         std::vector<std::string> s_lent;
 
@@ -151,6 +152,16 @@ namespace gh2::quickplay
                 const std::string outfit = home ? own : outfits::named(game, own).value_or(own);
                 return {script::symbol(call.rdram, call.ctx, call.runtime, outfit), script::kSymbol};
             }
+            if (op == "pick" && call.size() > 2)
+            {
+                if (call.size() > 3)
+                    s_picked[call.symbol(2)] = call.symbol(3);
+                const auto it = s_picked.find(call.symbol(2));
+                return {script::symbol(call.rdram, call.ctx, call.runtime, it != s_picked.end() ? it->second : ""),
+                        script::kSymbol};
+            }
+            if (op == "picked" && call.size() > 2)
+                return {s_picked.count(call.symbol(2)) != 0u ? 1u : 0u, script::kInt};
             if (op == "quickplay" && call.size() > 2)
             {
                 if (call.number(2) != 0)

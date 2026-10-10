@@ -27,6 +27,17 @@
 {func ghc_venue_game ($game)
    {if_else {&& {campaigns has $game} {!= $game gh2x}} $game gh2}
 }
+; What was last picked ({quickplay pick}, kept through a switch of menus),
+; put back over the song's own casting, so each screen starts there and
+; green on each plays as before: the outfit, the guitar and finish, and the
+; venue with its game's map. None until a song is started from the pickers.
+{func ghc_qp_recall
+   {if {quickplay picked outfit}
+      {game set_character {quickplay pick outfit} TRUE}
+      {game set_guitar {quickplay pick guitar} {quickplay pick skin}}
+      {game set_venue {quickplay pick venue}}
+   }
+}
 {retype qp_diff_screen
    (
       (panels meta sel_difficulty_panel helpbar)
@@ -55,6 +66,7 @@
             }
             {do
                {game set_quickplay}
+               {ghc_qp_recall}
                {ui goto_screen ghc_qp_character_screen}
             }
          }
@@ -112,10 +124,19 @@
 {retype ghc_qp_guitar_screen
    (
       ; What a guitar picked leads to, the career's name for it. The venue
-      ; map opens on the menus' game's.
+      ; map opens on the game's whose venue was last played, else the
+      ; menus' game's.
       (goto_career
          {game set_guitar {sel_guitar_panel get_selected_guitar 0} {sel_guitar_panel get_selected_skin 0}}
-         {set $ghc_qp_venues {ghc_venue_game {campaigns active}}}
+         {quickplay pick outfit {game get_character_outfit}}
+         {quickplay pick guitar {sel_guitar_panel get_selected_guitar 0}}
+         {quickplay pick skin {sel_guitar_panel get_selected_skin 0}}
+         {set $ghc_qp_venues
+            {if_else {quickplay picked venue_game}
+               {quickplay pick venue_game}
+               {ghc_venue_game {campaigns active}}
+            }
+         }
          {ui goto_screen ghc_qp_venue_screen}
       )
       (go_back
@@ -225,6 +246,8 @@
       (FOCUS_MSG {if {! {ui in_transition}} {ghc_qp_venue_focus ghc_qp_venue_panel $new_focus}})
       (SELECT_START_MSG
          {campaigns venues_from $ghc_qp_venues}
+         {quickplay pick venue {game get_venue}}
+         {quickplay pick venue_game $ghc_qp_venues}
          {ui goto_screen loading_screen}
          kDataUnhandled
       )
@@ -245,6 +268,8 @@
       (FOCUS_MSG {if {! {ui in_transition}} {ghc_qp_venue_focus ghc_qp_venue_twin_panel $new_focus}})
       (SELECT_START_MSG
          {campaigns venues_from $ghc_qp_venues}
+         {quickplay pick venue {game get_venue}}
+         {quickplay pick venue_game $ghc_qp_venues}
          {ui goto_screen loading_screen}
          kDataUnhandled
       )

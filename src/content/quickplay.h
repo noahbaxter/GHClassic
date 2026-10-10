@@ -9,6 +9,10 @@
 //   {quickplay outfit <game>}        the first player's outfit that game boots
 //                                    with (its ui/main.dta), as it is named
 //                                    here while another game is played
+//   {quickplay pick <what> [<value>]}  quickplay's last pick of that (outfit,
+//                                    guitar, skin, venue, venue_game), kept
+//                                    for the session through switches of menus
+//   {quickplay picked <what>}        TRUE once one has been picked
 //   {quickplay quickplay <0|1>}      into quickplay or out of it. In it the
 //                                    characters and guitars are GH2's with
 //                                    every game's outfits among them, whatever
