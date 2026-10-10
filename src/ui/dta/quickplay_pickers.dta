@@ -1,8 +1,8 @@
 ; Quickplay's pickers: after the song and its difficulty, the guitarist
 ; and outfit, the guitar and finish, and the venue, each any that a career
-; has opened. The game's own quickplay (quickplay.dta) goes from the
-; difficulty straight to the song, as the song's entry casts it; here that
-; casting is where each screen starts. Outside a career the game counts an
+; has opened. The game's own quickplay goes from the difficulty straight to
+; the song, as the song's entry casts it, and so does this with song
+; defaults on; off, that casting is where each screen starts. Outside a career the game counts an
 ; item unlocked that any band has (Campaign::IsItemUnlocked, 0x12d490), and
 ; another game's outfit is there once its own game's career has it
 ; (sel_character.dta).
@@ -23,9 +23,20 @@
             )
          )
       )
+      ; With song defaults on ({quickplay song_defaults}, select's menu on
+      ; the song list) the song plays as the setlist's game boots, with
+      ; its first guitar, in the venue the song's entry casts; off, each is
+      ; picked.
       (SELECT_START_MSG
          {game set_quickplay}
-         {ui goto_screen ghc_qp_character_screen}
+         {if_else {quickplay song_defaults}
+            {do
+               {game set_character {quickplay outfit {setlist shown}} TRUE}
+               {game set_guitar_index 0}
+               {ui goto_screen loading_screen}
+            }
+            {ui goto_screen ghc_qp_character_screen}
+         }
          kDataUnhandled
       )
    )

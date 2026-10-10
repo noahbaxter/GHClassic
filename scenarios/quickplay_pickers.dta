@@ -2,6 +2,7 @@
 ; the guitar and the venue, and the song plays with what was picked. Holds
 ; with any set of discs.
 #include common/first_boot.dta
+{quickplay song_defaults 0}
 {gamecfg set mode quickplay}
 {ui goto_screen qp_selsong_screen}
 (wait_screen qp_selsong_screen)

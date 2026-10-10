@@ -1,0 +1,54 @@
+; Quickplay with song defaults: it opens on the menus' game's setlist
+; whatever was picked last, select's menu flips the defaults (off at first),
+; and with them on a GH1 song plays as GH1 boots (metal), straight from the
+; difficulty.
+#include common/first_boot.dta
+(needs gh1)
+{setlist select gh1}
+; Into quickplay as a player goes: a first boot leaves the main menu on
+; options, with no tutorial or multiplayer rows to pass.
+(wait 1)
+(press up)
+(wait 0.5)
+(expect {main_panel focus_name} main_quickspin.btn)
+(press green)
+(wait_screen qp_selsong_screen)
+(wait 1)
+(expect {setlist shown} gh2)
+; Select opens the menu and it stays open; green flips its row; select
+; shuts it.
+(press star_power)
+(wait 0.5)
+(expect {ghc_pick_panel get open} 1)
+(shot menu)
+(expect {quickplay song_defaults} 0)
+(press green)
+(wait 0.5)
+(expect {quickplay song_defaults} 1)
+(expect {ghc_pick_panel get open} 1)
+(shot menu_on)
+(press green)
+(wait 0.5)
+(expect {quickplay song_defaults} 0)
+(press green)
+(wait 0.5)
+(expect {quickplay song_defaults} 1)
+(press star_power)
+(wait 0.5)
+(expect {ghc_pick_panel get open} 0)
+; GH1's setlist, by yellow's list: GH1 is its first row.
+{qp_selsong_screen ghc_picked gh1}
+(wait_screen qp_selsong_twin_screen)
+(wait 1)
+(expect {setlist shown} gh1)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+{{game get_player_config 0} set autoplay TRUE}
+(press green)
+(wait_screen game_screen 60)
+(expect {game get_character_outfit} {quickplay outfit gh1})
+(print {game get_character_outfit} {game get_guitar} {game get_venue} {gamecfg get_song})
+(wait 15)
+(shot song)
+(quit)
