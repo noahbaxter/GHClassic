@@ -203,7 +203,9 @@ namespace gh2::gh1
                         if (s->rfind("HandMap_", 0) == 0)
                             made["PART GUITAR"].events.push_back(midi::text(e.tick, "[map " + *s + "]"));
                     }
-                    else if (e.status != 0xffu)
+                    // The fret hand's places, 40 to 59. getready2rokk's four
+                    // 60s (GH1's finger_powerchord_1) would be easy gems.
+                    else if (e.status != 0xffu && !e.data.empty() && e.data[0] >= 40u && e.data[0] <= 59u)
                         made["PART GUITAR"].events.push_back(e);
                 }
             std::vector<std::pair<uint32_t, std::string>> marks;
