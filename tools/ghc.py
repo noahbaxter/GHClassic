@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Build GH Classic from a disc, play it, and run scenarios, on macOS, Linux and Windows.
 
-    tools/ghc.py play [--no-build] [disc] [GHClassic options, e.g. --res native]
+    tools/ghc.py play [--no-build] [--isolated] [disc] [GHClassic options, e.g. --res native]
     tools/ghc.py build [disc] [--skip-recomp] [--no-lto]
-    tools/ghc.py bind [keyboard | <n>]       set up a controller; with no device, list them
+    tools/ghc.py bind [--isolated] [keyboard | <n>]   set up a controller; with no device, list them
     tools/ghc.py arm [out] [--scenario <file>] [--speed <x>] [--secs 30] [--disc <image>] [--shot-every 60]
     tools/ghc.py scenarios [-j 4] [--speed 2] [name ...]
     tools/ghc.py release [--skip-build] [disc]  this platform's player package, into build/release
@@ -11,6 +11,9 @@
 
 play builds everything from the disc on its first run, then brings the C++
 build up to date before each launch (not the recompile) unless --no-build.
+play and bind keep saves, settings and bindings where an installed stable
+build does, whichever tree or track this is; --isolated keeps them in this
+tree's build/data instead, apart from everything.
 The disc defaults to the GH2 image in game/, which is only ever read;
 everything made lands in build/, which is safe to delete. build and release
 also take the disc's boot executable alone (SLUS_214.47), which is all the
@@ -245,10 +248,19 @@ def cmd_build(argv):
     print("run: scripts/play.sh" + (f' "{args.disc}"' if args.disc else ""))
 
 
+def data_dir(isolated):
+    """GHClassic's --data for a run from here: the stable track's own
+    directory, which holds the player's saves, settings and bindings, or with
+    isolated this tree's build/data."""
+    return ["--data", str(BUILD / "data") if isolated else "stable"]
+
+
 def cmd_play(argv):
     rebuild = True
-    if argv[:1] == ["--no-build"]:
-        rebuild = False
+    isolated = False
+    while argv[:1] in (["--no-build"], ["--isolated"]):
+        rebuild = rebuild and argv[0] != "--no-build"
+        isolated = isolated or argv[0] == "--isolated"
         argv = argv[1:]
     disc = None
     if argv and not argv[0].startswith("-"):
@@ -277,7 +289,7 @@ def cmd_play(argv):
             sys.exit(f"failed ({proc.returncode}): cmake --build {GAME}")
         log.unlink()
     disc = disc or find_disc(tool_env())
-    return subprocess.run([str(game_binary()), disc, *argv]).returncode
+    return subprocess.run([str(game_binary()), disc, *data_dir(isolated), *argv]).returncode
 
 
 def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=None):
@@ -428,7 +440,9 @@ def cmd_ci(argv):
 def cmd_bind(argv):
     if not built():
         sys.exit("no build; run tools/ghc.py build")
-    return subprocess.run([str(game_binary()), "--bind", *argv]).returncode
+    isolated = argv[:1] == ["--isolated"]
+    argv = argv[1:] if isolated else argv
+    return subprocess.run([str(game_binary()), "--bind", *argv, *data_dir(isolated)]).returncode
 
 
 PLACEHOLDER = "Put your Guitar Hero II (USA) disc image here (.iso, .chd or .bin).txt"

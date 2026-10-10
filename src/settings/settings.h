@@ -48,6 +48,12 @@ namespace gh2::settings
     // settings.ini. Before the first get or set.
     void usePath(const std::string &path);
 
+    // Keep everything in `dir` in place of the user data directory: saves,
+    // settings, bindings, cards and the log. "stable" is the stable track's
+    // own, which a development build of either track can share. Before the
+    // first userDataPath.
+    void useDataDir(const std::string &dir);
+
     // `file` in the user data directory, which is made if missing.
     std::string userDataPath(const std::string &file);
 }

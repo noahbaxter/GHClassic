@@ -218,6 +218,16 @@ namespace gh2::settings
         s_path = path;
     }
 
+    namespace
+    {
+        std::string s_dataDir;
+    }
+
+    void useDataDir(const std::string &dir)
+    {
+        s_dataDir = dir;
+    }
+
     // A portable install keeps it all beside the executable. Otherwise each
     // track has a directory of its own. The project was ghrecomp: its
     // directory, when it is the only one, is moved over whole the first time.
@@ -225,9 +235,16 @@ namespace gh2::settings
     {
         static const std::string dir = []
         {
-            if (disc::portable())
+            if (!s_dataDir.empty() && s_dataDir != "stable")
+            {
+                std::error_code error;
+                std::filesystem::create_directories(s_dataDir, error);
+                return (std::filesystem::path(s_dataDir) / "").string();
+            }
+            if (s_dataDir.empty() && disc::portable())
                 return std::string(SDL_GetBasePath());
-            char *pref = SDL_GetPrefPath("", build::kExperimental ? "GHClassicExperimental" : "GHClassic");
+            const bool own = build::kExperimental && s_dataDir.empty();
+            char *pref = SDL_GetPrefPath("", own ? "GHClassicExperimental" : "GHClassic");
             if (!pref)
                 return std::string();
             const std::string made = pref;
