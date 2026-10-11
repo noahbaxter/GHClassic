@@ -8,6 +8,7 @@
 #include <iostream>
 #include <map>
 #include <set>
+#include <tuple>
 #include <vector>
 
 namespace gh2::gh2x
@@ -319,6 +320,14 @@ namespace gh2::gh2x
 
     std::optional<milo::Dir> convertScene(const SceneSource &source) { return convertWith(source, true); }
 
+    namespace
+    {
+        constexpr const char *kSwing = "wood_track_surface_starpower.tnm";
+        constexpr const char *kSwingFilter = "wood_track_surface.filt";
+        constexpr const char *kLightning = "lightning_track.view";
+        constexpr const char *kLightningFirst = "lightning_1.mnm";
+    }
+
     std::optional<milo::Dir> convertTrack(const SceneSource &source)
     {
         const auto converted = convertWith(source, false);
@@ -344,6 +353,37 @@ namespace gh2::gh2x
             }
             else if (out.entries[found->second].first == className)
                 out.bodies[found->second] = converted->bodies[i];
+        }
+        // The 360 swings the board's second light in star power
+        // (wood_track_surface.filt over wood_track_surface_starpower.tnm,
+        // in its lightning.grp). The PS2's track animates its
+        // lightning_track.view then (Track::SetupLightning 0x150bb0), so the
+        // filter goes first in that group's list, found by its first name.
+        const auto swing = milo::find(*converted, kSwing), filter = milo::find(*converted, kSwingFilter);
+        const auto group = milo::find(out, kLightning);
+        if (swing && filter && group && !at.contains(kSwing) && !at.contains(kSwingFilter))
+        {
+            milo::Bytes first, added;
+            milo::putStr(first, kLightningFirst);
+            milo::putStr(added, kSwingFilter);
+            milo::Bytes &body = out.bodies[*group];
+            const auto list = std::search(body.begin(), body.end(), first.begin(), first.end());
+            if (list != body.end() && list - body.begin() >= 4)
+            {
+                uint32_t count;
+                std::memcpy(&count, &*(list - 4), 4u);
+                ++count;
+                std::memcpy(&*(list - 4), &count, 4u);
+                body.insert(list, added.begin(), added.end());
+                for (const auto &[className, name, from] :
+                     {std::tuple{"TransAnim", kSwing, *swing}, std::tuple{"AnimFilter", kSwingFilter, *filter}})
+                {
+                    out.entries.emplace_back(className, name);
+                    out.bodies.push_back(converted->bodies[from]);
+                    out.tableCount += 2u;
+                    out.tableSize += static_cast<uint32_t>(std::strlen(className) + std::strlen(name) + 2u);
+                }
+            }
         }
         return out;
     }

@@ -186,7 +186,11 @@ namespace gh2
             const uint32_t env = static_cast<uint32_t>(
                 runtime->callGuestFunction(rdram, ctx, s_addresses->objectDirFindObject, {dir, text, 0u}));
             if (env != 0u)
+            {
                 out = readEnviron(rdram, ctx, runtime, env);
+                if (name == look::kBoardEnviron)
+                    look::restBoard(out);
+            }
             SET_GPR_U32(ctx, 29, sp);
         }
 

@@ -60,6 +60,13 @@ namespace gh2::look
     // The environ the 360 draws the board under, where the PS2's scene has
     // the track's one environ for everything.
     constexpr const char *kBoardEnviron = "wood_track_surface.env";
+    // Star power, as the game starts and stops it (gh2x/track.cpp). The
+    // 360's board light swings while it is on, with the track's lightning;
+    // when it goes off the PS2's track leaves that animation where it
+    // stood, so the board's lights are then put back as they were before
+    // the song's first.
+    void setStarPower(bool on);
+    void restBoard(Environ &board);
     // And the one it draws the bar and beat lines under (its
     // bar_widgets.grp's), which are known by their Mats.
     constexpr const char *kLineEnviron = "frets_beatmarkers.env";
