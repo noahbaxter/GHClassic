@@ -107,9 +107,21 @@ namespace gh2::campaigns
     const std::string &venueGame();
 
     // Whether `game`'s config has `item` (a character, outfit, guitar or
-    // finish) and its career has it to use: one its store does not sell, or
-    // one a band has bought there. False for a game with no campaign.
+    // finish) and its career has it to use: one a band has bought there, or
+    // one its store does not sell, unless it is earned another way (a
+    // finish with its guitar, the Battle Axe by winning, the Grim Ripper's
+    // guitar with him). False for a game with no campaign.
     bool unlockedIn(const std::string &game, const std::string &item);
+    // Whether any game's career has that guitar or finish to use, a guitar
+    // under either name where a game has its own for it. None if it is no
+    // game's guitar or finish.
+    std::optional<bool> guitarUnlocked(const std::string &item);
+    // Whether `item` is a finish of another game's than the active one.
+    bool lentFinish(const std::string &item);
+    // A script that gives the live config's guitars every other game's
+    // finishes of them, and whole each guitar it has none of, each once,
+    // for the pickers outside a career.
+    const std::string &lendFinishes();
     // `game`'s own outfits, in its config's order.
     std::vector<std::string> outfits(const std::string &game);
     // In a career, where every pick is its own game's: the game's mode is

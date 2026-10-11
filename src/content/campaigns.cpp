@@ -15,6 +15,7 @@
 #include "runtime/ee_scheduler.h"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstring>
 #include <functional>
@@ -600,6 +601,11 @@ namespace gh2::campaigns
             s_menus = index;
             outfits::campaignChanged();
             syncConfig(guest, s_campaigns[index]);
+            // Outside a career the guitars have every game's finishes from
+            // here, not from the first picker: a guitar picked before the
+            // switch is set again in one of them (ghc_qp_recall).
+            if (!s_career)
+                script::run(call.rdram, call.ctx, call.runtime, lendFinishes());
             // GameConfig's list of the config's venues, which its constructor
             // (0x125c98) builds once: the career's map opens on the last
             // venue unlocked before the first in it that is not
@@ -739,11 +745,19 @@ namespace gh2::campaigns
 
         // What `game`'s config has to use, read off its disc: its characters
         // and their outfits, its guitars and their finishes.
+        struct Guitar
+        {
+            // (as <guitar>) names the game disc's guitar this one is a model
+            // of, where the two are named apart (gh1/career.cpp).
+            std::string key, type, as;
+            std::vector<std::array<std::string, 3>> skins; // key, outfit, mat
+        };
         struct Usable
         {
             std::set<std::string> items;
             std::vector<std::string> outfits; // in config's order
             std::vector<std::string> characters;
+            std::vector<Guitar> guitars;
         };
         const Usable &usable(const Campaign &campaign)
         {
@@ -784,9 +798,22 @@ namespace gh2::campaigns
                     if (guitar.type != dtb::kArray || guitar.nodes.empty())
                         continue;
                     found.items.insert(guitar.nodes[0].text);
-                    if (const dtb::Node *skins = dtb::find(guitar, "skins"))
-                        for (const std::string &skin : keys(*skins))
-                            found.items.insert(skin);
+                    const auto word = [&](const char *key)
+                    {
+                        const dtb::Node *node = dtb::find(guitar, key);
+                        return node && node->nodes.size() > 1u ? node->nodes[1].text : std::string();
+                    };
+                    Guitar &kept = found.guitars.emplace_back(Guitar{guitar.nodes[0].text, word("type"), word("as"), {}});
+                    const dtb::Node *skins = dtb::find(guitar, "skins");
+                    for (size_t s = 1u; skins && s < skins->nodes.size(); ++s)
+                    {
+                        const dtb::Node &skin = skins->nodes[s];
+                        const dtb::Node *outfit = dtb::find(skin, "outfit"), *mat = dtb::find(skin, "mat");
+                        if (skin.type != dtb::kArray || !outfit || !mat || outfit->nodes.size() < 2u || mat->nodes.size() < 2u)
+                            continue;
+                        found.items.insert(skin.nodes[0].text);
+                        kept.skins.push_back({skin.nodes[0].text, outfit->nodes[1].text, mat->nodes[1].text});
+                    }
                 }
             return found;
         }
@@ -1110,8 +1137,80 @@ namespace gh2::campaigns
     bool unlockedIn(const std::string &game, const std::string &item)
     {
         const auto index = indexOf(game);
-        return index && usable(s_campaigns[*index]).items.count(item) != 0u &&
-               (!sells(s_campaigns[*index], item) || save::unlockedItem(game, item));
+        if (!index || usable(s_campaigns[*index]).items.count(item) == 0u)
+            return false;
+        if (sells(s_campaigns[*index], item))
+            return save::unlockedItem(game, item);
+        // What no store sells is a band's from the start, but for a finish
+        // of a guitar that is not, the guitar named battleaxe, which the
+        // game keeps locked until it is handed over
+        // (ProfileState::InitGuitars, 0x13a888), and the Grim Ripper's own,
+        // which comes with him.
+        for (const Guitar &guitar : usable(s_campaigns[*index]).guitars)
+        {
+            if (guitar.key == item)
+                return item == "battleaxe" ? save::unlockedItem(game, item) : guitar.type != "grim" || unlockedIn(game, "grim");
+            for (const auto &skin : guitar.skins)
+                if (skin[0] == item)
+                    return unlockedIn(game, guitar.key);
+        }
+        return true;
+    }
+
+    std::optional<bool> guitarUnlocked(const std::string &item)
+    {
+        bool known = false;
+        for (const Campaign &campaign : s_campaigns)
+            for (const Guitar &guitar : usable(campaign).guitars)
+            {
+                const bool finish = std::any_of(guitar.skins.begin(), guitar.skins.end(),
+                                                [&](const auto &skin) { return skin[0] == item; });
+                if (!finish && (guitar.as.empty() ? guitar.key : guitar.as) != item)
+                    continue;
+                known = true;
+                if (unlockedIn(campaign.game, finish ? item : guitar.key))
+                    return true;
+            }
+        return known ? std::optional<bool>(false) : std::nullopt;
+    }
+
+    bool lentFinish(const std::string &item)
+    {
+        if (usable(s_campaigns[s_active]).items.count(item) != 0u)
+            return false;
+        for (const Campaign &campaign : s_campaigns)
+            for (const Guitar &guitar : usable(campaign).guitars)
+                for (const auto &skin : guitar.skins)
+                    if (skin[0] == item)
+                        return true;
+        return false;
+    }
+
+    const std::string &lendFinishes()
+    {
+        static std::map<size_t, std::string> s_text;
+        const auto made = s_text.find(s_active);
+        if (made != s_text.end())
+            return made->second;
+        std::string &text = s_text[s_active];
+        for (size_t i = 0; i < s_campaigns.size(); ++i)
+            for (const Guitar &guitar : i == s_active ? std::vector<Guitar>() : usable(s_campaigns[i]).guitars)
+            {
+                const std::string body = guitar.as.empty() ? guitar.key : guitar.as;
+                // A guitar the live config has none of comes whole. No band
+                // has an item for it (ProfileState::InitGuitars ran on the
+                // config before this), so no career's picker lists it.
+                if (guitar.type == "guitar")
+                    text += "{if {! {find_exists $syscfg guitars " + body + "}} {push_back {find $syscfg guitars} (" + body +
+                            " (type guitar) (skins))}}\n";
+                for (const auto &skin : guitar.skins)
+                {
+                    const std::string skins = "$syscfg guitars " + body + " skins";
+                    text += "{if {&& {find_exists " + skins + "} {! {find_exists " + skins + " " + skin[0] + "}}} {push_back {find " +
+                            skins + "} (" + skin[0] + " (outfit " + skin[1] + ") (mat " + skin[2] + "))}}\n";
+                }
+            }
+        return text;
     }
 
     std::vector<std::string> outfits(const std::string &game)

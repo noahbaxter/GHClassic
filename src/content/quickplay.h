@@ -26,7 +26,9 @@
 //                                    follow one another (ui/meta_music.cpp)
 //
 // Outside a career (content/campaigns.h) an item is unlocked where any
-// game's career has it.
+// game's career has it. The guitars are GH2's with every game's finishes of
+// them, the Grim Ripper's among them for anyone once he is a band's, and he
+// plays any.
 
 #include "addresses.h"
 

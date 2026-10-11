@@ -5,11 +5,11 @@
 ; and two of GH2's own to set them against.
 (needs gh1)
 #include common/first_boot.dta
-{set $ghc_switch gh1}
-{set $ghc_switch_next main_screen}
-{ui goto_screen ghc_switch_screen}
-(wait_screen main_screen)
-(expect {campaigns active} gh1)
+; As its career has them: out of one the guitars are GH2's with every
+; game's finishes (qp_guitars.dta).
+{set $pick gh1}
+#include common/career_start.dta
+(expect {campaigns live} gh1)
 (expect {size {find $syscfg guitars sg skins}} 5)
 (expect {elem {elem {find $syscfg guitars sg skins} 2} 0} sg_worn)
 (expect {elem {find $syscfg guitars sg skins sg_worn outfit} 1} gh1_sg)
@@ -26,7 +26,8 @@
 (expect {localize fv_worn} "Worn Cherry Gibson Flying V")
 (expect {localize battleaxe_gh1} "Battle Axe")
 (expect {localize scythe_gh1} "Scythe")
-; Every finish to pick from, as the unlock-all cheat leaves them.
+; Every finish to pick from, as the unlock-all cheat leaves them. The songs
+; are quickplay's, out of the career, where each is lent to GH2's guitar.
 {set $cheat_enabled_unlock_all 1}
 {campaign set_all_access 1}
 {set $disable_save 1}
@@ -85,14 +86,14 @@
 #include common/guitar_near.dta
 (shot lp_dbl_red_near)
 
-{set $ghc_guitar battleaxe}
+{set $ghc_guitar battleaxe_reward}
 {set $ghc_finish battleaxe_gh1}
 #include common/guitar_shot.dta
 (shot battleaxe_gh1_far)
 #include common/guitar_near.dta
 (shot battleaxe_gh1_near)
 
-; The Grim Ripper's own, which only he plays.
+; The Grim Ripper's own.
 {set $ghc_character grimgh1}
 {set $ghc_guitar scythe}
 {set $ghc_finish scythe_gh1}

@@ -202,6 +202,8 @@ namespace gh2::gh1
         if (dtb::Node *axe = child(*guitars, "battleaxe_reward"))
         {
             axe->nodes[0].text = "battleaxe";
+            // Outside a career it is a finish of GH2's (content/campaigns.h).
+            axe->nodes.push_back(array({symbol("as"), symbol("battleaxe_reward")}));
             std::erase_if(axe->nodes, [](const dtb::Node &n) { return keyOf(n) == "require" || keyOf(n) == "difficulty"; });
         }
         std::set<std::string> bodies;

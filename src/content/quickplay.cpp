@@ -68,6 +68,11 @@ namespace gh2::quickplay
         // Campaign::IsItemUnlocked(Symbol) (0x12d490) and (Symbol,
         // Difficulty) (0x12d5a0), which the pickers ask: an item any band
         // has unlocked in the game played, or outside a career in any game.
+        // A guitar or finish outside a career is there by the careers alone
+        // (campaigns::guitarUnlocked) or the unlock-all cheat (+0x80): the
+        // game counts every one no store sells a band's. In a career
+        // another game's finish, lent to the config, is nobody's.
+        constexpr uint32_t kAllAccess = 0x80u;
         PS2Runtime::RecompiledFunction s_isItemUnlocked = nullptr, s_isItemUnlockedOn = nullptr;
         const Addresses *s_addresses = nullptr;
         template <bool kOn>
@@ -75,6 +80,7 @@ namespace gh2::quickplay
         {
             const uint32_t returnTo = GPR_U32(ctx, 31);
             const std::string item = reinterpret_cast<const char *>(getMemPtr(rdram, GPR_U32(ctx, 5)));
+            const bool allAccess = load<uint32_t>(rdram, GPR_U32(ctx, 4) + kAllAccess) != 0u;
             uint32_t unlocked =
                 kOn ? static_cast<uint32_t>(runtime->callGuestFunction(rdram, ctx, s_addresses->campaignIsItemUnlockedOn,
                                                                        {GPR_U32(ctx, 4), GPR_U32(ctx, 5), GPR_U32(ctx, 6)},
@@ -82,9 +88,48 @@ namespace gh2::quickplay
                     : static_cast<uint32_t>(runtime->callGuestFunction(rdram, ctx, s_addresses->campaignIsItemUnlocked,
                                                                        {GPR_U32(ctx, 4), GPR_U32(ctx, 5)},
                                                                        s_isItemUnlocked));
-            if ((unlocked & 0xffu) == 0u && !campaigns::inCareer(rdram) && anywhere(item))
+            if (campaigns::inCareer(rdram))
+            {
+                if (campaigns::lentFinish(item))
+                    unlocked = 0u;
+            }
+            else if (const auto guitar = campaigns::guitarUnlocked(item))
+                unlocked = allAccess || *guitar ? 1u : 0u;
+            else if ((unlocked & 0xffu) == 0u && anywhere(item))
                 unlocked = 1u;
             SET_GPR_U32(ctx, 2, unlocked);
+            ctx->pc = returnTo;
+        }
+
+        // SelectGuitarProvider::InitData (0x119060) lists a player's
+        // guitars: for the Grim Ripper (+0x3c) the scythe alone, else
+        // quickplay's (Campaign::GetQuickplayGuitars, 0x12df48: config's of
+        // type guitar that are unlocked) or the career's. Outside a career
+        // the config has every game's finishes, the scythe is a guitar like
+        // any other, and the Grim Ripper has them all. The list is
+        // quickplay's (+0x40) there whoever asks: the career's is the
+        // band's items, which a guitar lent whole is not one of.
+        constexpr uint32_t kProviderCharacter = 0x3cu, kProviderQuickplay = 0x40u;
+        PS2Runtime::RecompiledFunction s_guitarsInitData = nullptr;
+        void guitarsInitData(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t returnTo = GPR_U32(ctx, 31), provider = GPR_U32(ctx, 4), dir = GPR_U32(ctx, 5);
+            const bool free = !campaigns::inCareer(rdram);
+            script::run(rdram, ctx, runtime,
+                        std::string("{if {find_exists $syscfg guitars scythe type} {set_elem {find $syscfg guitars scythe type} 1 ") +
+                            (free ? "guitar" : "grim") + "}}\n" + (free ? campaigns::lendFinishes() : std::string()));
+            const uint32_t character = load<uint32_t>(rdram, provider + kProviderCharacter);
+            const bool grim = free && character != 0u &&
+                              std::string(reinterpret_cast<const char *>(getMemPtr(rdram, character))) == "grim";
+            if (grim)
+                store<uint32_t>(rdram, provider + kProviderCharacter, script::symbol(rdram, ctx, runtime, ""));
+            const uint32_t quickplay = load<uint32_t>(rdram, provider + kProviderQuickplay);
+            if (free)
+                store<uint32_t>(rdram, provider + kProviderQuickplay, 1u);
+            runtime->callGuestFunction(rdram, ctx, s_addresses->selectGuitarProviderInitData, {provider, dir}, s_guitarsInitData);
+            store<uint32_t>(rdram, provider + kProviderQuickplay, quickplay);
+            if (grim)
+                store<uint32_t>(rdram, provider + kProviderCharacter, character);
             ctx->pc = returnTo;
         }
 
@@ -163,5 +208,7 @@ namespace gh2::quickplay
         runtime.replaceFunction(addresses.campaignIsItemUnlocked, &isItemUnlocked<false>);
         s_isItemUnlockedOn = runtime.lookupFunction(addresses.campaignIsItemUnlockedOn);
         runtime.replaceFunction(addresses.campaignIsItemUnlockedOn, &isItemUnlocked<true>);
+        s_guitarsInitData = runtime.lookupFunction(addresses.selectGuitarProviderInitData);
+        runtime.replaceFunction(addresses.selectGuitarProviderInitData, &guitarsInitData);
     }
 }
