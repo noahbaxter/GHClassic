@@ -15,10 +15,13 @@
 #include "disc/ark.h"
 #include "milo/milo.h"
 
+#include <algorithm>
 #include <iostream>
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
+#include <vector>
 
 namespace gh2::gh1
 {
@@ -32,41 +35,46 @@ namespace gh2::gh1
             uint32_t rate = 0u;
         };
 
-        // A GH1 .bnk: its version and two words, a count of regions and
-        // that many of 16 bytes (the sample each plays first), 16 bytes, a
-        // count of names and each (u16 region, a byte, the name, u32 1000),
-        // then a count of samples and each one's offset, size and rate in
-        // the .nse beside it, PS-ADPCM.
-        std::map<std::string, Sample> gh1Samples(const Bytes &bnk, const Bytes &nse)
+        // A GH1 bank's samples, and each sound's: one sample per region it
+        // plays, a sound of several (a left and a right, or layers) named
+        // once for each.
+        struct Bank
         {
-            std::map<std::string, Sample> out;
+            std::vector<Sample> samples;
+            std::map<std::string, std::vector<uint32_t>> sounds;
+        };
+
+        // A GH1 .bnk: its version and two words, a count of regions and
+        // that many of 16 bytes (the sample each plays first), a count of
+        // 12-byte entries and those, a count of names and each (u16 region,
+        // a byte, the name, u32 1000), then a count of samples and each
+        // one's offset, size and rate in the .nse beside it, PS-ADPCM.
+        Bank gh1Bank(const Bytes &bnk, const Bytes &nse)
+        {
+            Bank out;
             const uint32_t regions = milo::u32(bnk, 12u);
-            size_t o = 16u + regions * 16u + 16u;
+            size_t o = 16u + regions * 16u;
+            o += 4u + 12u * milo::u32(bnk, o);
             const uint32_t names = milo::u32(bnk, o);
             o += 4u;
-            std::map<std::string, uint32_t> region;
             for (uint32_t i = 0; i < names && o + 7u <= bnk.size(); ++i)
             {
                 const uint32_t r = bnk[o] | (bnk[o + 1u] << 8);
                 size_t at = o + 3u;
                 const std::string name = milo::str(bnk, at);
-                region.emplace(name, r);
+                if (r < regions)
+                    out.sounds[name].push_back(milo::u32(bnk, 16u + r * 16u));
                 o = at + 4u;
             }
             const uint32_t count = milo::u32(bnk, o);
             o += 4u;
-            for (const auto &[name, r] : region)
+            for (uint32_t index = 0; index < count && o + index * 12u + 12u <= bnk.size(); ++index)
             {
-                const uint32_t index = r < regions ? milo::u32(bnk, 16u + r * 16u) : count;
-                if (index >= count || o + index * 12u + 12u > bnk.size())
-                    continue;
                 const uint32_t offset = milo::u32(bnk, o + index * 12u), size = milo::u32(bnk, o + index * 12u + 4u);
-                if (offset + size > nse.size())
-                    continue;
                 // GH1 ends a sample on a block flagged 1, then 07 77 77...;
                 // GH2's blocks are each flagged 2 and end at the count.
                 Sample s{{}, milo::u32(bnk, o + index * 12u + 8u)};
-                for (size_t b = offset; b + 16u <= offset + size; b += 16u)
+                for (size_t b = offset; offset + size <= nse.size() && b + 16u <= offset + size; b += 16u)
                 {
                     const uint8_t flags = nse[b + 1u];
                     s.adpcm.insert(s.adpcm.end(), nse.begin() + static_cast<std::ptrdiff_t>(b),
@@ -75,8 +83,19 @@ namespace gh2::gh1
                     if (flags & 1u)
                         break;
                 }
-                out.emplace(name, std::move(s));
+                out.samples.push_back(std::move(s));
             }
+            return out;
+        }
+
+        // The sample a sound plays first, as the in-game bank's are swapped.
+        std::map<std::string, Sample> gh1Samples(const Bytes &bnk, const Bytes &nse)
+        {
+            const Bank bank = gh1Bank(bnk, nse);
+            std::map<std::string, Sample> out;
+            for (const auto &[name, indices] : bank.sounds)
+                if (!indices.empty() && indices.front() < bank.samples.size() && !bank.samples[indices.front()].adpcm.empty())
+                    out.emplace(name, bank.samples[indices.front()]);
             return out;
         }
 
@@ -158,15 +177,57 @@ namespace gh2::gh1
         ark::addFile(layer, "sfx/gen/ingame_bank.milo_ps2", milo::write(*dir));
     }
 
-    std::optional<std::vector<uint8_t>> silenced(const std::vector<uint8_t> &bank)
+    std::optional<std::vector<uint8_t>> venueBank(const std::vector<uint8_t> &standIn, size_t disc, const std::string &venue)
     {
-        auto dir = milo::read(bank);
-        if (!dir)
+        const std::string stem = "venues/" + venue + "/gen/" + venue;
+        const auto bnk = ark::readFile(disc, stem + ".bnk"), nse = ark::readFile(disc, stem + ".nse");
+        auto dir = milo::read(standIn);
+        if (!bnk || !nse || !dir)
             return std::nullopt;
+        const Bank bank = gh1Bank(*bnk, *nse);
+        std::vector<std::set<std::string>> theirs(bank.samples.size());
+        for (const auto &[name, indices] : bank.sounds)
+            for (const uint32_t index : indices)
+                if (index < theirs.size())
+                    theirs[index].insert(name);
+        // Each of GH2's samples, by the GH1 sounds whose Sfx name it.
+        std::map<std::string, std::set<std::string>> ours;
+        for (const auto &[cls, name] : dir->entries)
+            if (cls == "SynthSample")
+                ours[name];
         for (size_t i = 0; i < dir->entries.size(); ++i)
-            if (dir->entries[i].first == "SynthSample")
-                if (auto body = withData(dir->bodies[i], kSilence, 22050u))
-                    dir->bodies[i] = std::move(*body);
+        {
+            if (dir->entries[i].first != "Sfx" || bank.sounds.count(dir->entries[i].second) == 0u)
+                continue;
+            const Bytes &body = dir->bodies[i];
+            for (auto &[sample, sounds] : ours)
+            {
+                Bytes named;
+                milo::putStr(named, sample);
+                if (std::search(body.begin(), body.end(), named.begin(), named.end()) != body.end())
+                    sounds.insert(dir->entries[i].second);
+            }
+        }
+        size_t matched = 0u;
+        for (size_t i = 0; i < dir->entries.size(); ++i)
+        {
+            if (dir->entries[i].first != "SynthSample")
+                continue;
+            const std::set<std::string> &sounds = ours[dir->entries[i].second];
+            const auto it = sounds.empty() ? theirs.end() : std::find(theirs.begin(), theirs.end(), sounds);
+            const Sample *sample = it != theirs.end() ? &bank.samples[static_cast<size_t>(it - theirs.begin())] : nullptr;
+            if (sample && sample->adpcm.empty())
+                sample = nullptr;
+            if (sample)
+                ++matched;
+            else if (!sounds.empty())
+                std::cerr << "[gh1] " << venue << ": no sample of GH1's for " << dir->entries[i].second << std::endl;
+            if (auto body = sample ? withData(dir->bodies[i], sample->adpcm, sample->rate)
+                                   : withData(dir->bodies[i], kSilence, 22050u))
+                dir->bodies[i] = std::move(*body);
+        }
+        if (matched == 0u)
+            return std::nullopt;
         return milo::write(*dir);
     }
 }
