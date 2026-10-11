@@ -84,9 +84,7 @@
 {campaign add_cash 111}
 {ui goto_screen bootup_load}
 (wait_screen main_screen 40)
-(expect {campaigns active} gh80s)
-{gamecfg set mode career}
-{campaign set_profile_slot 0}
+#include common/reenter_career.dta
 (expect {campaign cash} $cash)
 (expect {campaign career_score} $score)
 (expect {campaign profile_name 0} "The Testers")

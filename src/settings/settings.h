@@ -1,7 +1,9 @@
 #pragma once
 
-// The player's settings, one table entry each: the entry drives
-// settings.ini, and later the overlay row and the "PS2 mode" preset.
+// The player's settings. config/settings.template.ini, compiled in, holds
+// each one's default, section and words, and settings.ini is written from it;
+// a table entry here holds its kind and what the PS2 did, for the overlay row
+// and the "PS2 mode" preset later.
 
 #include <string>
 
@@ -32,7 +34,43 @@ namespace gh2::settings
         kBand,       // whose backing band plays: the venue's game's, or one game's everywhere
         kDepthOfField, // the PS2's blur behind what a camera shot looks at
         kBandShadows,  // the band's shadows in GH1's venues: none, the room's as GH1 drew them, or GH2's own
+        kSongDefaults, // quickplay plays a song as its own game's guitarist, guitar and venue, unpicked
+        kInSongUi,     // outside a career, whose loading, pause, fail, results, HUD and tips a song has
+        kGems,         // outside a career, whose gems: the in-song look's, or one game's
+        kMenuMusic,    // outside a career, whose menu loops: the theme's, one game's, or every game's
+        kMenuMusicOrder, // the loops one after another in order, one over and over, or shuffled
         kKeyCount,
+    };
+
+    enum MenuMusic
+    {
+        kMusicTheme,
+        kMusicGh1,
+        kMusicGh2,
+        kMusicGh80s,
+        kMusicAll,
+    };
+
+    enum MenuMusicOrder
+    {
+        kOrderPlaylist,
+        kOrderLoop,
+        kOrderShuffle,
+    };
+
+    enum InSongUi
+    {
+        kInSongVenue,
+        kInSongGh1,
+        kInSongGh2,
+        kInSongGh80s,
+    };
+
+    enum Gems
+    {
+        kGemsAuto,
+        kGemsGh1,
+        kGemsGh2,
     };
 
     enum BandShadows

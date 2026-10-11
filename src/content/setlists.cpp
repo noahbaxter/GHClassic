@@ -216,10 +216,10 @@ namespace gh2::setlists
                                            {GPR_U32(ctx, 4), GPR_U32(ctx, 5)}, s_venueForSong));
             if (load<uint8_t>(rdram, venue) == 0u)
             {
-                // Its tier's venue, or where the game played has none of
-                // that name (the 80s lack GH2's big and stone), the venue as
-                // far into its own list.
-                const std::vector<std::string> venues = campaigns::venues();
+                // Its tier's venue, or where the game whose venues are
+                // played has none of that name (the 80s lack GH2's big and
+                // stone), the venue as far into its own list.
+                const std::vector<std::string> venues = campaigns::venues(campaigns::venueGame());
                 for (const auto &[name, setlist] : s_setlists)
                     for (size_t t = 0; t < setlist.tiers.size(); ++t)
                     {

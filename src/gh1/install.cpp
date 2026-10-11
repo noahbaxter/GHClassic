@@ -25,6 +25,7 @@
 #include "gh1/face.h"
 #include "gh1/guitarist.h"
 #include "gh1/rig.h"
+#include "gh1/scene.h"
 #include "gh1/songs.h"
 #include "milo/milo.h"
 #include "save/gh1_stream.h"
@@ -160,6 +161,13 @@ namespace gh2
             outfits::photosFrom(name, *gh2Disc, base);
             // GH1's store sells the character, by GH2's name here (gh1/career.cpp).
             outfits::add("gh1", guitarist.character, guitarist.character, name, base, guitarist.label);
+            // GH1's hero screen portrait, unframed: GH2's highlight frames it.
+            outfits::portrait(name, true, [disc = *gh1Disc, path = "ghui/image/gen/char_select_" + folder + ".png_ps2"](
+                                        const std::vector<uint8_t> &tex)
+                              {
+                                  const auto bitmap = ark::readFile(disc, path);
+                                  return bitmap ? gh1::texWith(tex, *bitmap, true) : std::vector<uint8_t>();
+                              });
             done.push_back(guitarist);
         }
         gh1::addCareer(*gh1Disc, done);

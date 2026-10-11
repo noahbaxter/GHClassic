@@ -8,6 +8,11 @@
 ; ({ghc_pick_button}), opens it on yellow ({ghc_pick_panel open_with}), and
 ; is told the pick, where it is not the one the list opened on:
 ; (ghc_picked ($option)).
+;
+; Opened with open_sticky it is a menu instead: it stays open when yellow
+; is let go, green tells the screen the row picked, (ghc_chose ($option)),
+; and select or red shuts it. Its rows' text is the screen's
+; (ghc_option_text ($option)), a setlist's name otherwise.
 {if {! {exists ghc_pick_panel}} {new GHPanel ghc_pick_panel}}
 {retype ghc_pick_panel
    (
@@ -29,6 +34,7 @@
       (picked 0)
       (first 0)
       (open FALSE)
+      (sticky FALSE)
       ; A row's height, its text's size against the help bar's, and the
       ; room either side of the widest (x right, z up, the screen's middle
       ; 0). The width is the open list's.
@@ -102,7 +108,7 @@
          {set [width] 0}
          {foreach_int $i 0 {size $options}
             {do
-               ($text {localize {sprint "setlist_" {elem $options $i}}})
+               ($text {$this text {elem $options $i}})
                ($wide {'*' [size] {help_bar.txt get_string_width $text}})
                {{$this find {elem [rows] $i}} set_text $text}
                {if {> $wide [width]} {set [width] $wide}}
@@ -129,6 +135,20 @@
          {set [open] TRUE}
          {$this paint}
       )
+      (text
+         ($option)
+         {if_else [sticky]
+            {{ui current_screen} ghc_option_text $option}
+            {localize {sprint "setlist_" $option}}
+         }
+      )
+      (open_sticky
+         ($options $current)
+         {set [sticky] TRUE}
+         {$this open_with $options $current}
+      )
+      ; Its rows' text again, the same row picked.
+      (relabel {$this open_with [options] {elem [options] [picked]}})
       ; The fill has no round ends to draw.
       (paint
          {$this stretch [fill] {$this row_z [picked]} [height]}
@@ -149,10 +169,11 @@
             {foreach_int $i 0 3 {{$this find {elem $copy $i}} set_showing FALSE}}
          }
          {set [open] FALSE}
+         {set [sticky] FALSE}
       )
       ; Yellow let go: the pick, to the screen.
       (poll
-         {if {&& [open] {! {pad_held yellow}}}
+         {if {&& [open] {! [sticky]} {! {pad_held yellow}}}
             {$this shut}
             {if {!= [picked] [first]}
                {{ui current_screen} ghc_picked {elem [options] [picked]}}
@@ -168,6 +189,18 @@
       {do
          {if {== $button kPad_DUp} {ghc_pick_panel step -1}}
          {if {== $button kPad_DDown} {ghc_pick_panel step 1}}
+         {if {ghc_pick_panel get sticky}
+            {cond
+               ({== $button kPad_X}
+                  {{ui current_screen} ghc_chose
+                     {elem {ghc_pick_panel get options} {ghc_pick_panel get picked}}}
+               )
+               ({|| {== $button kPad_Select} {== $button kPad_Tri}}
+                  {synth play_sequence button_back.cue}
+                  {ghc_pick_panel shut}
+               )
+            }
+         }
          TRUE
       }
       FALSE

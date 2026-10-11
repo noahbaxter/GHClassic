@@ -155,7 +155,7 @@ namespace gh2::gh1
 
     std::optional<milo::Dir> loadScene(size_t disc, const std::string &path);
 
-    // A Tex 8 around that bitmap (RndTex::Load, GH1 0x1e2260): its size,
+    // A Tex 8, or GH2's 10, around that bitmap (RndTex::Load, GH1 0x1e2260): its size,
     // bits a pixel and path, nine bytes, then a bitmap in a built scene,
     // which GH2 reads after a last byte of 0. A bitmap's own header
     // (RndBitmap::LoadHeader, 0x1adeb8) has its bits a pixel at 1, its

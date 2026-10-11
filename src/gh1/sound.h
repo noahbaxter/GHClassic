@@ -10,9 +10,8 @@
 
 namespace gh2::gh1
 {
-    // GH2's in-game bank with GH1's own star power and win stingers, and
-    // silent where GH2 has a sound GH1 does not, and GH1's credits music,
-    // onto `layer`.
+    // GH1's credits music onto `layer`, and GH2's in-game bank with GH1's
+    // win stingers for every game.
     void addSounds(size_t layer, size_t disc);
 
     // The GH2 venue standing in for GH1's `venue`'s bank (`standIn`) with

@@ -63,12 +63,13 @@ namespace gh2::save
     // being rebuilt. leaveGame puts the career as it stands into the save's
     // sections, in memory, where the next save writes it and the two above
     // read it. enterGame takes the new Campaign as `game`'s fresh one and
-    // loads that game's career from its own sections, and writes `game` to
-    // state.ini beside save.bin.
-    // The game last entered, which the next boot opens as: state.ini's,
-    // else the save's (read from disk before the boot loads it); gh2 for
-    // neither.
+    // loads that game's career from its own sections, and keeps `game` as
+    // the last.
+    // The game whose menus were last up, which the next boot opens with:
+    // state.ini's, else the save's (read from disk before the boot loads
+    // it); gh2 for neither. Kept in state.ini beside save.bin.
     std::string lastGame();
+    void keepLastGame(const std::string &game);
     void leaveGame(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
     void enterGame(const std::string &game, uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
 

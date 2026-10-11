@@ -1,0 +1,6 @@
+#pragma once
+
+// config/settings.template.ini, compiled in by CMake: every setting at its
+// default, in the order, sections and words settings.ini is written in.
+
+inline constexpr const char kSettingsTemplate[] = R"ini(@GHC_SETTINGS_TEMPLATE@)ini";

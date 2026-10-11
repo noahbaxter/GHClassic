@@ -19,18 +19,22 @@
 //   menus       GH1's screens and their text (gh1/menus.h), under GH2's
 //               scripts fitted to them
 //   music       GH1's menu loops
-//   sound       GH1's star power, stingers and credits music (gh1/sound.h)
+//   sound       GH1's stingers, for every game, and credits music (gh1/sound.h)
+//   gems        GH1's colours on GH2's track (addGems)
 
 #include "gh1/career.h"
 
 #include "content/campaigns.h"
+#include "content/locale.h"
 #include "disc/ark.h"
 #include "formats/dtb.h"
 #include "gh1/menu_scripts.h"
 #include "gh1/menus.h"
+#include "gh1/scene.h"
 #include "gh1/songs.h"
 #include "gh1/sound.h"
 #include "gh1/venues.h"
+#include "milo/milo.h"
 
 #include <algorithm>
 #include <iostream>
@@ -101,6 +105,26 @@ namespace gh2::gh1
         {
             const auto file = ark::readFile(0u, path);
             return file ? dtb::raw(*file) : std::nullopt;
+        }
+
+        // GH1's gems: GH2's track, whose gem meshes are GH1's, with GH1's
+        // colours in its gem.tex, flat and bright where GH2's are shaded.
+        // track/textures/gen/gem.png is the bitmap GH1's track.rnd holds.
+        void addGems(size_t layer, size_t disc)
+        {
+            constexpr const char *kTrack = "track/gen/track.milo_ps2";
+            const auto bitmap = ark::readFile(disc, "track/textures/gen/gem.png_ps2");
+            const auto file = ark::readFile(0u, kTrack);
+            auto track = file ? milo::read(*file) : std::nullopt;
+            const auto tex = track ? milo::find(*track, "gem.tex") : std::nullopt;
+            milo::Bytes gems = bitmap && tex ? texWith(track->bodies[*tex], *bitmap, true) : milo::Bytes();
+            if (gems.empty())
+            {
+                std::cerr << "[gh1] cannot make GH1's gems" << std::endl;
+                return;
+            }
+            track->bodies[*tex] = std::move(gems);
+            ark::addFile(layer, kTrack, milo::write(*track));
         }
 
         // `key` with a part of it that is a GH1 name (whole, or set off by
@@ -307,6 +331,7 @@ namespace gh2::gh1
         // (splash.dta's CUT_SCENE_VIDEO in each).
         ark::lend(layer, "videos/intro.pss", disc, "videos/ghintro.pss");
         addSounds(layer, disc);
+        addGems(layer, disc);
         const std::set<std::string> scenes = addMenus(layer, disc, text);
         for (dtb::Node &entry : locale->nodes)
             if (const auto it = text.find(keyOf(entry)); entry.type == dtb::kArray && entry.nodes.size() > 1u && it != text.end())
@@ -314,8 +339,14 @@ namespace gh2::gh1
                 entry.nodes[1] = {dtb::kString, 0, 0.0f, it->second, {}};
                 text.erase(it);
             }
+        // What GH2's locale has no token for is GH1's alone, so every game's
+        // has it: GH1's venue map shows in quickplay under any menus
+        // (quickplay_pickers.dta).
         for (const auto &[key, value] : text)
+        {
             locale->nodes.push_back(array({symbol(key), {dtb::kString, 0, 0.0f, value, {}}}));
+            locale::add(key, value);
+        }
 
         ark::addFile(layer, "config/gen/gh2.dtb", dtb::write(*root));
         ark::addFile(layer, "config/gen/campaign.dtb", dtb::write(*campaign));

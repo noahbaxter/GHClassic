@@ -7,8 +7,8 @@
 // venue's singer, bassist or drummer by what its name holds
 // (GameConfig::OnChangeChars, 0x1289c8). A game with a band of its own has
 // each member as a character beside GH2's, and that one loads instead when
-// the band is that game's: the game being played, whose venues they are, or
-// the one settings.ini's [game] band names.
+// the band is that game's: the one whose venue the song plays in
+// (campaigns::venueGame), or the one settings.ini's [game] band names.
 //
 //   {band from}          whose band plays: venue, gh2 or gh1
 //   {band from <which>}  that one's from the next song on

@@ -1,0 +1,13 @@
+; From the main menu back into $pick's career for band 0, on its difficulty
+; screen: out of one, GH2's campaign is active, and a career is its own
+; game's once entered.
+(expect {campaigns live} gh2)
+{gamecfg set mode career}
+{campaign set_profile_slot 0}
+{ui goto_screen ghc_campaign_screen}
+(wait_screen ghc_campaign_screen)
+(wait 1)
+#include pick_campaign.dta
+(press green)
+(wait_screen sel_difficulty_screen)
+(expect {campaigns active} $pick)

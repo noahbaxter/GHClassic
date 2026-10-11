@@ -33,7 +33,7 @@ namespace gh2::band
             case settings::kBandGh2:
                 return "gh2";
             default:
-                return campaigns::active();
+                return campaigns::venueGame();
             }
         }
 
@@ -51,7 +51,7 @@ namespace gh2::band
             const auto own = s_own.find({from, character});
             if (own == s_own.end())
                 return;
-            const std::string &name = campaigns::active() == from ? own->second.home : own->second.away;
+            const std::string &name = campaigns::venueGame() == from ? own->second.home : own->second.away;
             auto symbol = s_symbols.find(name);
             if (symbol == s_symbols.end())
             {
@@ -73,7 +73,7 @@ namespace gh2::band
             if (call.symbol(1) == "room_kit")
             {
                 const std::string from = game();
-                return {s_roomKits.count(from) != 0u && campaigns::active() == from ? 1u : 0u, script::kInt};
+                return {s_roomKits.count(from) != 0u && campaigns::venueGame() == from ? 1u : 0u, script::kInt};
             }
             if (call.symbol(1) == "shadows")
             {

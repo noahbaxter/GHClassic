@@ -1,4 +1,4 @@
-; Every character's every outfit in the career outfit picker, after the
+; Every character's every outfit in quickplay's outfit picker, after the
 ; unlock-all cheat (long_cheats.dta's own lines, saving off with it).
 ; arm.sh puts one shot per outfit in shots/, named character_slot, and the
 ; log pairs each name with the outfit the panel picked.
@@ -23,12 +23,11 @@
 {campaign set_all_access 1}
 {set $disable_save 1}
 {set $disable_career 1}
-{gamecfg set mode career}
-{campaign set_profile_slot 0}
-{ui goto_screen career_screen}
-(wait_screen career_screen)
-{ui goto_screen sel_character_edit_screen}
-(wait_screen sel_character_edit_screen)
+{gamecfg set mode quickplay}
+{game set_song shoutatthedevil}
+{game set_quickplay}
+{ui goto_screen ghc_qp_character_screen}
+(wait_screen ghc_qp_character_screen)
 
 {ghc_char punk} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
 {ghc_pick 0} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)

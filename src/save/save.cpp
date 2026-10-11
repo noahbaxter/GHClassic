@@ -724,13 +724,18 @@ namespace gh2::save
         return game ? *game : "gh2";
     }
 
-    void enterGame(const std::string &game, uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+    void keepLastGame(const std::string &game)
     {
-        s_game = game;
         s_store.section(kOwnSection).set("campaign", game);
         if (!s_inMemory)
             if (ini::writeReplacing(statePath(), [&](std::ofstream &out) { out << "[game]\nlast = " << game << "\n"; }))
                 std::cerr << "[save] could not write " << statePath() << std::endl;
+    }
+
+    void enterGame(const std::string &game, uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        s_game = game;
+        keepLastGame(game);
         s_fresh = saveCampaign(rdram, ctx, runtime);
         if (!s_fresh)
         {

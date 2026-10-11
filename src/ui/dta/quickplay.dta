@@ -74,9 +74,12 @@
             {sel_song.view set_frame $frame}
          }
       )
+      ; The debug actions' cheats look the song up in the active campaign's
+      ; career, which has no item for another game's song: its lookup
+      ; asserts and writes past the list (debug 0x147e88). Only on its own.
       (beat_song
          ($score)
-         {if {$this is_up}
+         {if {&& {$this is_up} {== {setlist shown} {campaigns live}}}
             {do
                ($index {ss_song.lst selected_pos})
                ($song {song_provider get_symbol $index})
@@ -86,7 +89,7 @@
          }
       )
       (gold_song
-         {if {$this is_up}
+         {if {&& {$this is_up} {== {setlist shown} {campaigns live}}}
             {campaign cheat_gold_song {song_provider get_symbol {ss_song.lst selected_pos}}}
             {$this refresh}
          }
@@ -115,8 +118,28 @@
          {ghc_pick_panel open_with {ghc_setlists} {setlist shown}}
          TRUE
       )
+      ({&& {== $button kPad_Select} {! {ui in_transition}}}
+         {synth play_sequence button_select}
+         {ghc_pick_panel open_sticky (song_defaults) song_defaults}
+         TRUE
+      )
       (TRUE kDataUnhandled)
    }
+}
+; Select's menu (picker.dta): each row a setting, green flips it.
+{func ghc_qp_option_text ($option)
+   {switch $option
+      (song_defaults
+         {sprint "SONG DEFAULTS: " {if_else {quickplay song_defaults} "ON" "OFF"}})
+      $option
+   }
+}
+{func ghc_qp_chose ($option)
+   {switch $option
+      (song_defaults {quickplay song_defaults {! {quickplay song_defaults}}})
+   }
+   {synth play_sequence button_toggle}
+   {ghc_pick_panel relabel}
 }
 ; The setlist picked, shown by that screen.
 {func ghc_qp_picked ($panel $twin $game)
@@ -132,10 +155,14 @@
       (panels meta sel_song_panel helpbar ghc_pick_panel)
       (focus sel_song_panel)
       (sel_song_career FALSE)
-      (enter {ghc_qp_helpbar})
+      ; Back from a song in another game's venue (quickplay_pickers.dta), the
+      ; next is GH2's again.
+      (enter {campaigns venues_from {campaigns live}} {ghc_qp_helpbar})
       (SELECT_START_MSG {ui goto_screen qp_diff_screen} kDataUnhandled)
       (BUTTON_DOWN_MSG {ghc_qp_button $button})
       (ghc_picked ($game) {ghc_qp_picked sel_song_panel qp_selsong_twin_screen $game})
+      (ghc_option_text ($option) {ghc_qp_option_text $option})
+      (ghc_chose ($option) {ghc_qp_chose $option})
    )
 }
 {if {! {exists qp_selsong_twin_screen}} {new GHScreen qp_selsong_twin_screen}}
@@ -144,9 +171,13 @@
       (panels meta sel_song_twin_panel helpbar ghc_pick_panel)
       (focus sel_song_twin_panel)
       (sel_song_career FALSE)
-      (enter {ghc_qp_helpbar})
+      ; Back from a song in another game's venue (quickplay_pickers.dta), the
+      ; next is GH2's again.
+      (enter {campaigns venues_from {campaigns live}} {ghc_qp_helpbar})
       (SELECT_START_MSG {ui goto_screen qp_diff_screen} kDataUnhandled)
       (BUTTON_DOWN_MSG {ghc_qp_button $button})
       (ghc_picked ($game) {ghc_qp_picked sel_song_twin_panel qp_selsong_screen $game})
+      (ghc_option_text ($option) {ghc_qp_option_text $option})
+      (ghc_chose ($option) {ghc_qp_chose $option})
    )
 }

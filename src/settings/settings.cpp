@@ -3,6 +3,7 @@
 #include "build_info.h"
 #include "disc/disc.h"
 #include "settings/ini.h"
+#include "settings_template.h"
 
 #include <SDL3/SDL.h>
 
@@ -13,8 +14,10 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <optional>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace gh2::settings
@@ -28,14 +31,14 @@ namespace gh2::settings
             kChoice, // one of `choices`, its value the word's position
         };
 
+        // A setting's kind. Its default, section and place in the file, and
+        // the words a player reads, are config/settings.template.ini's.
         struct Entry
         {
-            const char *section;
             const char *name;
             Type type;
             int min, max;
             int step;      // values snap to multiples of it
-            int modern;    // the default
             int authentic; // what the PS2 did
             const char *choices = nullptr; // kChoice's words, space separated
         };
@@ -47,44 +50,74 @@ namespace gh2::settings
         }
 
         const Entry kEntries[kKeyCount] = {
-            {"video", "widescreen", Type::kBool, 0, 1, 1, 1, 0},
-            {"video", "frame_rate_cap", Type::kInt, 0, 500, 1, 0, 60},
+            {"widescreen", Type::kBool, 0, 1, 1, 0},
+            {"frame_rate_cap", Type::kInt, 0, 500, 1, 60},
             // Most of GH2's textures have no mip chain (443 of 470 loaded into
             // a song), so drawn small they shimmer: the highway's far end.
-            {"video", "mipmaps", Type::kBool, 0, 1, 1, 1, 0},
-            {"video", "msaa", Type::kInt, 1, 16, 1, 4, 1},
+            {"mipmaps", Type::kBool, 0, 1, 1, 0},
+            {"msaa", Type::kInt, 1, 16, 1, 1},
             // Off: a sphere that holds only part of its mesh hides what still
             // shows (flashpot_4.mesh in battle's fail sequence).
-            {"video", "frustum_cull", Type::kBool, 0, 1, 1, 0, 1},
+            {"frustum_cull", Type::kBool, 0, 1, 1, 1},
             // 5 ms: finer is below what a player can feel.
-            {"latency", "video_ms", Type::kInt, -500, 500, 5, 0, 0},
+            {"video_ms", Type::kInt, -500, 500, 5, 0},
             // 45 by default: the port's own delay on macOS, SDL's CoreAudio
             // queue (about 43 ms; the song clock is held to the mixed audio,
             // synth.cpp). Not measured on Windows or Linux yet.
-            {"latency", "audio_ms", Type::kInt, -500, 500, 5, 45, 0},
+            {"audio_ms", Type::kInt, -500, 500, 5, 0},
             // OptionData's (retail 0x10d2e0), which the save carried.
-            {"audio", "band_volume", Type::kInt, 0, 11, 1, 11, 11},
-            {"audio", "guitar_volume", Type::kInt, 0, 11, 1, 11, 11},
-            {"audio", "fx_volume", Type::kInt, 0, 11, 1, 11, 11},
-            {"audio", "stereo", Type::kBool, 0, 1, 1, 1, 1},
-            {"game", "fast_boot", Type::kBool, 0, 1, 1, 1, 0},
-            {"game", "lefty", Type::kBool, 0, 1, 1, 0, 0},
-            {"game", "lefty_p2", Type::kBool, 0, 1, 1, 0, 0},
+            {"band_volume", Type::kInt, 0, 11, 1, 11},
+            {"guitar_volume", Type::kInt, 0, 11, 1, 11},
+            {"fx_volume", Type::kInt, 0, 11, 1, 11},
+            {"stereo", Type::kBool, 0, 1, 1, 1},
+            {"fast_boot", Type::kBool, 0, 1, 1, 0},
+            {"lefty", Type::kBool, 0, 1, 1, 0},
+            {"lefty_p2", Type::kBool, 0, 1, 1, 0},
             // Off: PCSX2 holds a card it has loaded open.
-            {"save", "export_card", Type::kBool, 0, 1, 1, 0, 0},
-            {"game", "track_on_at_start", Type::kBool, 0, 1, 1, 1, 0},
+            {"export_card", Type::kBool, 0, 1, 1, 0},
+            {"track_on_at_start", Type::kBool, 0, 1, 1, 0},
             // 100: the hit window (slop, beatmatcher.dta), so the note after
             // can be hit from when the release stops muting.
-            {"game", "sustain_release_ms", Type::kInt, 0, 500, 5, 100, 0},
-            {"game", "whammy_hold", Type::kBool, 0, 1, 1, 1, 0},
+            {"sustain_release_ms", Type::kInt, 0, 500, 5, 0},
+            {"whammy_hold", Type::kBool, 0, 1, 1, 0},
             // With both in PUT_DISC_HERE. A .chd is smaller; an .iso reads
             // faster, which only shows with the game run far above 1x.
-            {"disc", "prefer", Type::kChoice, 0, 1, 1, kChd, kChd, "chd iso"},
-            {"game", "check_updates", Type::kBool, 0, 1, 1, 1, 1},
-            {"game", "band", Type::kChoice, 0, 2, 1, kBandVenue, kBandVenue, "venue gh2 gh1"},
-            {"video", "depth_of_field", Type::kBool, 0, 1, 1, 1, 1},
-            {"video", "gh1_band_shadows", Type::kChoice, 0, 2, 1, kShadowsGh2, kShadowsGh2, "off classic gh2"},
+            {"prefer", Type::kChoice, 0, 1, 1, kChd, "chd iso"},
+            {"check_updates", Type::kBool, 0, 1, 1, 1},
+            {"band", Type::kChoice, 0, 2, 1, kBandVenue, "venue gh2 gh1"},
+            {"depth_of_field", Type::kBool, 0, 1, 1, 1},
+            {"gh1_band_shadows", Type::kChoice, 0, 2, 1, kShadowsGh2, "off classic gh2"},
+            // Off: the pickers. Retail's quickplay goes from the difficulty
+            // straight to the song.
+            {"song_defaults", Type::kBool, 0, 1, 1, 1},
+            {"in_song_ui", Type::kChoice, 0, 3, 1, kInSongVenue, "venue gh1 gh2 gh80s"},
+            {"gems", Type::kChoice, 0, 2, 1, kGemsAuto, "auto gh1 gh2"},
+            {"menu_music", Type::kChoice, 0, 4, 1, kMusicTheme, "theme gh1 gh2 gh80s all"},
+            // Retail plays one loop over and over.
+            {"menu_music_order", Type::kChoice, 0, 2, 1, kOrderLoop, "playlist loop shuffle"},
         };
+
+        // By its name, or one it went by before.
+        const Entry *entryNamed(const std::string &name)
+        {
+            const std::string now = name == "quickplay_song_defaults" ? "song_defaults" : name;
+            const Entry *entry = std::find_if(std::begin(kEntries), std::end(kEntries),
+                                              [&](const Entry &e) { return now == e.name; });
+            return entry != std::end(kEntries) ? entry : nullptr;
+        }
+
+        // A `key = value  # note` line's key and value, or none for any other
+        // line.
+        std::optional<std::pair<std::string, std::string>> assignment(const std::string &line)
+        {
+            const std::string trimmed = ini::trim(line);
+            const size_t eq = trimmed.find('=');
+            if (ini::skipped(trimmed) || ini::sectionName(trimmed) || eq == std::string::npos)
+                return std::nullopt;
+            const size_t note = trimmed.find('#', eq);
+            return std::make_pair(ini::trim(trimmed.substr(0, eq)),
+                                  ini::trim(trimmed.substr(eq + 1, note == std::string::npos ? std::string::npos : note - eq - 1)));
+        }
 
         int snap(const Entry &entry, int value)
         {
@@ -134,41 +167,52 @@ namespace gh2::settings
             }
         }
 
+        // The template's values are the defaults; settings.ini's over them,
+        // each by its name whatever section it is under.
         State load()
         {
             State state;
+            std::array<bool, kKeyCount> defaulted{};
+            std::istringstream defaults(kSettingsTemplate);
+            for (std::string line; std::getline(defaults, line);)
+                if (const auto pair = assignment(line))
+                {
+                    const Entry *entry = entryNamed(pair->first);
+                    int value = 0;
+                    if (entry && parse(*entry, pair->second, value))
+                    {
+                        state.value[entry - kEntries] = value;
+                        defaulted[entry - kEntries] = true;
+                    }
+                    else
+                        std::cerr << "[settings] template: ignored: " << line << std::endl;
+                }
             for (int k = 0; k < kKeyCount; ++k)
-                state.value[k] = kEntries[k].modern;
+                if (!defaulted[k])
+                {
+                    std::cerr << "[settings] template has no " << kEntries[k].name << std::endl;
+                    state.value[k] = kEntries[k].min;
+                }
 
             const std::string file = path();
             std::ifstream in(file);
-            std::string line, section;
+            std::string line;
             int number = 0;
             while (std::getline(in, line))
             {
                 ++number;
-                line = ini::trim(line);
-                if (ini::skipped(line))
+                const auto pair = assignment(line);
+                if (!pair)
                     continue;
-                if (const auto name = ini::sectionName(line))
-                {
-                    section = *name;
-                    continue;
-                }
-                const size_t eq = line.find('=');
-                const std::string name = eq == std::string::npos ? "" : ini::trim(line.substr(0, eq));
-                const Entry *entry = std::find_if(std::begin(kEntries), std::end(kEntries), [&](const Entry &e) {
-                    return section == e.section && name == e.name;
-                });
+                const Entry *entry = entryNamed(pair->first);
                 int value = 0;
-                if (entry == std::end(kEntries) || !parse(*entry, ini::trim(line.substr(eq + 1)), value))
+                if (!entry || !parse(*entry, pair->second, value))
                 {
-                    std::cerr << "[settings] " << file << ":" << number << ": ignored: " << line << std::endl;
+                    std::cerr << "[settings] " << file << ":" << number << ": ignored: " << ini::trim(line) << std::endl;
                     continue;
                 }
-                const size_t k = entry - kEntries;
-                state.value[k] = value;
-                state.set[k] = true;
+                state.value[entry - kEntries] = value;
+                state.set[entry - kEntries] = true;
             }
             return state;
         }
@@ -179,26 +223,33 @@ namespace gh2::settings
             return s;
         }
 
-        // Every entry, set or not, so the file lists what can be set.
+        std::string text(const Entry &e, int v)
+        {
+            return e.type == Type::kBool ? (v ? "true" : "false") : e.type == Type::kChoice ? choices(e)[v] : std::to_string(v);
+        }
+
+        // The template with each value as it is now, so the file lists what
+        // can be set, in its sections, with its notes in their column.
         void save()
         {
             const std::string file = path();
             const std::error_code error = ini::writeReplacing(file, [](std::ofstream &out) {
-                const char *section = "";
-                for (int k = 0; k < kKeyCount; ++k)
+                std::istringstream lines(kSettingsTemplate);
+                for (std::string line; std::getline(lines, line);)
                 {
-                    const Entry &e = kEntries[k];
-                    if (std::string(section) != e.section)
+                    const auto pair = assignment(line);
+                    const Entry *entry = pair ? entryNamed(pair->first) : nullptr;
+                    if (!entry)
                     {
-                        out << (k ? "\n[" : "[") << e.section << "]\n";
-                        section = e.section;
+                        out << line << "\n";
+                        continue;
                     }
-                    const int v = state().value[k];
-                    out << e.name << " = "
-                        << (e.type == Type::kBool     ? (v ? "true" : "false")
-                            : e.type == Type::kChoice ? choices(e)[v]
-                                                      : std::to_string(v))
-                        << "\n";
+                    const size_t eq = line.find('='), note = line.find('#', eq);
+                    std::string value = text(*entry, state().value[entry - kEntries]);
+                    if (note != std::string::npos)
+                        value.resize(std::max(value.size() + 1u, note - eq - 2u), ' ');
+                    out << line.substr(0, eq + 1) << " " << value
+                        << (note != std::string::npos ? line.substr(note) : "") << "\n";
                 }
             });
             if (error)

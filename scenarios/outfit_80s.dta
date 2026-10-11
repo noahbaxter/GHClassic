@@ -1,6 +1,6 @@
-; The 80s outfits in the career outfit picker: each character's list holds
-; only unlocked outfits, and the 80s one shows on the door when focused.
-; A new career in profile slot 0.
+; The 80s outfits in quickplay's outfit picker: each character's list holds
+; only unlocked outfits, and the 80s one shows on the door when focused. In
+; a career's picker they are not listed: a career is its own game's alone.
 ;
 ; Buttons are focused as objects: a bare name means nothing outside the
 ; panel, and focus would go nowhere.
@@ -10,9 +10,17 @@
 {campaign set_profile_slot 0}
 {ui goto_screen career_screen}
 (wait_screen career_screen)
-(wait 2)
 {ui goto_screen sel_character_edit_screen}
 (wait_screen sel_character_edit_screen)
+(wait 2)
+{sel_character_panel set char_focus metal}
+{sel_character_panel find_outfits}
+(expect {size {sel_character_panel get outfits}} 1)
+{gamecfg set mode quickplay}
+{game set_song shoutatthedevil}
+{game set_quickplay}
+{ui goto_screen ghc_qp_character_screen}
+(wait_screen ghc_qp_character_screen)
 (wait 2)
 
 ; As the list's scroll brings a character on, then select opens the picker.

@@ -10,7 +10,7 @@ namespace gh2::focus
         struct FocusTag;
         void onSetDepthOfField(uint8_t *, R5900Context *ctx, PS2Runtime *)
         {
-            if (ctx->f[15] > 0.0f && campaigns::active() == "gh1")
+            if (ctx->f[15] > 0.0f && campaigns::venueGame() == "gh1")
                 ctx->f[14] = 2.0f * ctx->f[12] / ctx->f[15];
         }
     }
