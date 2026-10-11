@@ -1,0 +1,21 @@
+; A song as the outfit $ghc_character with $ghc_guitar in its finish
+; $ghc_finish, from the menu or the
+; song before, to a shot from the front. A (shot), then guitar_near.dta for
+; one close on the player.
+{if {== {ui current_screen} game_screen} {meta_loading_nosave_goto main_screen}}
+(wait_screen main_screen 60)
+{game set_song ziggystardust}
+{{game get_player_config 0} set_difficulty medium}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{game set_venue theatre}
+; A character picked takes its own guitar, the Grim Ripper the one nobody
+; else can be handed.
+{{game get_player_config 0} set_character $ghc_character TRUE}
+{if {!= $ghc_guitar scythe} {{game get_player_config 0} set_guitar $ghc_guitar $ghc_finish}}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(expect {{game get_player_config 0} get_guitar_skin} $ghc_finish)
+(wait 14)
+{world do_force_shot flr_far_lft01}
+(wait 5)

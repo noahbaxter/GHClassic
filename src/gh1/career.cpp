@@ -7,15 +7,15 @@
 //               for its own (gh1/songs.h), with no encores
 //               (content/encores.h)
 //   venues      GH1's rooms in those GH2 venues (gh1/venues.cpp)
-//   store       GH1's songs, characters and guitars at GH1's prices,
-//               the guitars GH2's models of the same Gibsons. GH1's finishes
-//               are not GH2's, so each body's finishes are GH2's at the
-//               prices of GH1's for that body, in order.
-//   guitars     GH2's, less the bodies GH1 has none of
+//   store       GH1's songs, characters, guitars and finishes at GH1's
+//               prices, the guitars GH2's models of the same Gibsons
+//   guitars     GH2's, less the bodies GH1 has none of, each with GH1's
+//               finishes of it (gh1/guitars.h), the Battle Axe locked
+//               until the career is won on expert
 //   characters  GH1's eight, each its GH1 guitarist (gh1/install.cpp), in
 //               the root config and the UI's lists of them
 //   text        GH2's locale with GH1's names and blurbs for the venues,
-//               characters, videos, songs and tips
+//               characters, guitars, finishes, videos, songs and tips
 //   menus       GH1's screens and their text (gh1/menus.h), under GH2's
 //               scripts fitted to them
 //   music       GH1's menu loops
@@ -26,6 +26,7 @@
 #include "content/campaigns.h"
 #include "disc/ark.h"
 #include "formats/dtb.h"
+#include "gh1/guitars.h"
 #include "gh1/menu_scripts.h"
 #include "gh1/menus.h"
 #include "gh1/songs.h"
@@ -33,6 +34,7 @@
 #include "gh1/venues.h"
 
 #include <algorithm>
+#include <cstring>
 #include <iostream>
 #include <map>
 #include <set>
@@ -57,15 +59,10 @@ namespace gh2::gh1
             return nullptr;
         }
 
-        // GH1's Gibsons by GH2's names for the same bodies.
-        std::string body(std::string gh1)
+        bool ends(const std::string &s, const char *with)
         {
-            static const std::map<std::string, std::string> kBodies = {
-                {"xplorer", "explorer"}, {"lespaul_special", "lespaul_doublecut"}};
-            if (gh1.rfind("gibson_", 0) == 0)
-                gh1 = gh1.substr(7);
-            const auto it = kBodies.find(gh1);
-            return it != kBodies.end() ? it->second : gh1;
+            const size_t n = std::strlen(with);
+            return s.size() >= n && s.compare(s.size() - n, n, with) == 0;
         }
 
         // (key (price n))
@@ -134,13 +131,12 @@ namespace gh2::gh1
         const auto theirTips = dtb::read("config/tips.dta", none, theirs);
         const auto strings = dtb::read("ghui/eng/locale.dta", none, theirs);
         const auto gameCampaign = dtb::read("config/campaign.dta", none, game);
-        const auto gameStore = dtb::read("config/store.dta", none, game);
         auto guitars = dtb::read("config/guitars.dta", none, game);
         auto tips = dtb::read("config/tips.dta", none, game);
         auto root = raw("config/gen/gh2.dtb");
         auto ui = raw("ui/gen/ui.dtb");
         auto locale = raw("ui/eng/gen/locale.dtb");
-        if (!campaign || !theirStore || !theirGuitars || !theirTips || !strings || !gameCampaign || !gameStore ||
+        if (!campaign || !theirStore || !theirGuitars || !theirTips || !strings || !gameCampaign ||
             !guitars || !tips || !root || !ui || !locale || guitarists.empty())
         {
             std::cerr << "[gh1] cannot read GH1's career" << std::endl;
@@ -168,33 +164,50 @@ namespace gh2::gh1
             if (n.type == dtb::kArray && !dtb::find(*campaign, keyOf(n)))
                 campaign->nodes.push_back(n);
 
-        // Guitars: the bodies GH1 has, and everything that is no body of
-        // either's (basses, the scythe, the cheat's).
-        std::set<std::string> bodies;
-        std::map<std::string, std::vector<int32_t>> finishPrices; // by body, GH1's store's
-        std::map<std::string, std::string> bodyOfTheirSkin;
-        for (const dtb::Node &guitar : theirGuitars->nodes)
-        {
-            bodies.insert(body(keyOf(guitar)));
+        // Guitars: the bodies GH1 has, each with GH1's finishes of it in
+        // GH1's order, and everything that is no body of either's (basses).
+        std::map<std::string, dtb::Node> gameSkins; // GH2's, by key
+        for (const dtb::Node &guitar : guitars->nodes)
             if (const dtb::Node *skins = dtb::find(guitar, "skins"))
                 for (size_t i = 1u; i < skins->nodes.size(); ++i)
-                    bodyOfTheirSkin[keyOf(skins->nodes[i])] = body(keyOf(guitar));
+                    gameSkins[keyOf(skins->nodes[i])] = skins->nodes[i];
+        // The Battle Axe under GH1's name for it: a guitar no store sells is
+        // a band's from the start unless it is named battleaxe
+        // (ProfileState::InitGuitars, 0x13a888), so it is locked as GH1's
+        // is, until its career is won on expert (menus.dta).
+        if (dtb::Node *axe = child(*guitars, "battleaxe_reward"))
+        {
+            axe->nodes[0].text = "battleaxe";
+            std::erase_if(axe->nodes, [](const dtb::Node &n) { return keyOf(n) == "require" || keyOf(n) == "difficulty"; });
         }
-        bodies.insert("battleaxe_reward");
-        if (const dtb::Node *skins = dtb::find(*theirStore, "skin"))
-            for (size_t i = 1u; i < skins->nodes.size(); ++i)
-                finishPrices[bodyOfTheirSkin[keyOf(skins->nodes[i])]].push_back(priceOf(skins->nodes[i]));
-        std::map<std::string, std::string> bodyOfSkin; // GH2's
+        std::set<std::string> bodies;
+        for (const dtb::Node &guitar : theirGuitars->nodes)
+        {
+            dtb::Node *ours = child(*guitars, body(keyOf(guitar)));
+            dtb::Node *skins = ours ? child(*ours, "skins") : nullptr;
+            const dtb::Node *theirSkins = dtb::find(guitar, "skins");
+            if (!skins || !theirSkins)
+                continue;
+            bodies.insert(keyOf(*ours));
+            skins->nodes.resize(1u);
+            for (size_t i = 1u; i < theirSkins->nodes.size(); ++i)
+            {
+                const Finish *f = finish(keyOf(theirSkins->nodes[i]));
+                if (!f)
+                    continue;
+                if (f->outfit)
+                    skins->nodes.push_back(array({symbol(f->key), array({symbol("outfit"), symbol(f->outfit)}),
+                                                  array({symbol("mat"), symbol(f->mat)})}));
+                else if (const auto own = gameSkins.find(f->key); own != gameSkins.end())
+                    skins->nodes.push_back(own->second);
+            }
+        }
         std::erase_if(guitars->nodes, [&](const dtb::Node &guitar)
                       {
                           const dtb::Node *type = dtb::find(guitar, "type");
                           const bool isGuitar = type && type->nodes.size() > 1u && type->nodes[1].text == "guitar";
                           return guitar.type == dtb::kArray && isGuitar && bodies.count(keyOf(guitar)) == 0u;
                       });
-        for (const dtb::Node &guitar : guitars->nodes)
-            if (const dtb::Node *skins = dtb::find(guitar, "skins"))
-                for (size_t i = 1u; i < skins->nodes.size(); ++i)
-                    bodyOfSkin[keyOf(skins->nodes[i])] = keyOf(guitar);
 
         // Store.
         dtb::Node store = array({});
@@ -204,19 +217,10 @@ namespace gh2::gh1
                 list.nodes.push_back(priced(body(keyOf(sold->nodes[i])), priceOf(sold->nodes[i])));
         store.nodes.push_back(list);
         list = array({symbol("skin")});
-        std::map<std::string, size_t> taken;
-        if (const dtb::Node *sold = dtb::find(*gameStore, "skin"))
+        if (const dtb::Node *sold = dtb::find(*theirStore, "skin"))
             for (size_t i = 1u; i < sold->nodes.size(); ++i)
-            {
-                const auto owner = bodyOfSkin.find(keyOf(sold->nodes[i]));
-                if (owner == bodyOfSkin.end())
-                    continue;
-                const std::vector<int32_t> &prices = finishPrices[owner->second];
-                if (prices.empty())
-                    continue;
-                const size_t n = std::min(taken[owner->second]++, prices.size() - 1u);
-                list.nodes.push_back(priced(keyOf(sold->nodes[i]), prices[n]));
-            }
+                if (const Finish *f = finish(keyOf(sold->nodes[i])))
+                    list.nodes.push_back(priced(f->key, priceOf(sold->nodes[i])));
         store.nodes.push_back(list);
         if (const dtb::Node *sold = dtb::find(*theirStore, "song"))
             store.nodes.push_back(*sold);
@@ -293,14 +297,23 @@ namespace gh2::gh1
             static const std::set<std::string> kStore = {"category_cost", "guitar_shop_desc", "skin_shop_desc",
                                                          "song_shop_desc", "character_shop_desc"};
             const auto starts = [&](const char *with) { return key.rfind(with, 0) == 0; };
+            // A guitar's name or a finish's, and what the picker and the
+            // store say of it, by its key here. The Battle Axe and the
+            // scythe are named as both.
+            const std::string of = stem != key ? stem : ends(key, "_desc") ? key.substr(0, key.size() - 5u) : key;
+            const Finish *f = finish(of);
+            const bool guitar = dtb::find(*theirGuitars, of) != nullptr && bodies.count(body(of)) != 0u;
+            if (f)
+                text[f->key + key.substr(of.size())] = entry.nodes[1].text;
+            if (guitar)
+                text[body(of) + key.substr(of.size())] = entry.nodes[1].text;
+            if (f || guitar)
+                continue;
             if (const auto as = renamed(key, names))
                 text[*as] = entry.nodes[1].text;
             else if (starts("loading_tip") || starts("video") || starts("store_") || songs.count(stem) != 0u ||
                      kStore.count(key) != 0u)
                 text[key] = entry.nodes[1].text;
-            // What the store says of a guitar, by GH2's name for that body.
-            else if (stem != key && dtb::find(*theirGuitars, stem) != nullptr && bodies.count(body(stem)) != 0u)
-                text[body(stem) + "_shop_desc"] = entry.nodes[1].text;
         }
         const size_t layer = ark::addLayer(std::nullopt);
         // GH1's intro movie, in its archive, where GH2 plays its own

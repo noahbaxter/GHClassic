@@ -1,0 +1,117 @@
+; GH1's finishes in its campaign (gh1/guitars.cpp): each guitar holds GH1's
+; own, and the ones built from GH1's disc load and play, shot from the front
+; and close on the guitarist's hands: the six guitars GH2 has no model of,
+; the three that are a texture on GH2's model, two GH2's scenes hold unsold,
+; and two of GH2's own to set them against.
+(needs gh1)
+#include common/first_boot.dta
+{set $ghc_switch gh1}
+{set $ghc_switch_next main_screen}
+{ui goto_screen ghc_switch_screen}
+(wait_screen main_screen)
+(expect {campaigns active} gh1)
+(expect {size {find $syscfg guitars sg skins}} 5)
+(expect {elem {elem {find $syscfg guitars sg skins} 2} 0} sg_worn)
+(expect {elem {find $syscfg guitars sg skins sg_worn outfit} 1} gh1_sg)
+(expect {elem {elem {find $syscfg guitars es335 skins} 1} 0} es_triburst)
+(expect {elem {elem {find $syscfg guitars battleaxe skins} 1} 0} battleaxe_gh1)
+(expect {elem {elem {find $syscfg guitars scythe skins} 1} 0} scythe_gh1)
+(expect {elem {find $syscfg store skin sg_ebony price} 1} 150)
+(expect {elem {find $syscfg store skin lp_dbl_custom price} 1} 250)
+(expect {size {find $syscfg store skin}} 29)
+; GH1's names, for a finish of GH2's and for ones that are not.
+(expect {localize sg_cherry} "Cherry Gibson SG")
+(expect {localize sg_ebony} "Ebony Gibson SG")
+(expect {localize fv_worn} "Worn Cherry Gibson Flying V")
+(expect {localize battleaxe_gh1} "Battle Axe")
+(expect {localize scythe_gh1} "Scythe")
+; Every finish to pick from, as the unlock-all cheat leaves them.
+{set $cheat_enabled_unlock_all 1}
+{campaign set_all_access 1}
+{set $disable_save 1}
+
+{set $ghc_character metalgh1}
+{set $ghc_guitar sg}
+{set $ghc_finish sg_cherry}
+#include common/guitar_shot.dta
+(shot sg_cherry_far)
+#include common/guitar_near.dta
+(shot sg_cherry_near)
+{set $ghc_finish sg_ebony}
+#include common/guitar_shot.dta
+(shot sg_ebony_far)
+#include common/guitar_near.dta
+(shot sg_ebony_near)
+{set $ghc_finish sg_worn}
+#include common/guitar_shot.dta
+(shot sg_worn_far)
+#include common/guitar_near.dta
+(shot sg_worn_near)
+
+{set $ghc_guitar flying_v}
+{set $ghc_finish fv_white}
+#include common/guitar_shot.dta
+(shot fv_white_far)
+#include common/guitar_near.dta
+(shot fv_white_near)
+{set $ghc_finish fv_bluecrack}
+#include common/guitar_shot.dta
+(shot fv_bluecrack_far)
+#include common/guitar_near.dta
+(shot fv_bluecrack_near)
+{set $ghc_finish fv_worn}
+#include common/guitar_shot.dta
+(shot fv_worn_far)
+#include common/guitar_near.dta
+(shot fv_worn_near)
+
+{set $ghc_guitar es335}
+{set $ghc_finish es_triburst}
+#include common/guitar_shot.dta
+(shot es_triburst_far)
+#include common/guitar_near.dta
+(shot es_triburst_near)
+
+{set $ghc_guitar lespaul_doublecut}
+{set $ghc_finish lp_dbl_custom}
+#include common/guitar_shot.dta
+(shot lp_dbl_custom_far)
+#include common/guitar_near.dta
+(shot lp_dbl_custom_near)
+{set $ghc_finish lp_dbl_red}
+#include common/guitar_shot.dta
+(shot lp_dbl_red_far)
+#include common/guitar_near.dta
+(shot lp_dbl_red_near)
+
+{set $ghc_guitar battleaxe}
+{set $ghc_finish battleaxe_gh1}
+#include common/guitar_shot.dta
+(shot battleaxe_gh1_far)
+#include common/guitar_near.dta
+(shot battleaxe_gh1_near)
+
+; The Grim Ripper's own, which only he plays.
+{set $ghc_character grimgh1}
+{set $ghc_guitar scythe}
+{set $ghc_finish scythe_gh1}
+#include common/guitar_shot.dta
+(shot scythe_gh1_far)
+#include common/guitar_near.dta
+(shot scythe_gh1_near)
+
+{set $ghc_character metalgh1}
+{set $ghc_guitar lespaul}
+{set $ghc_finish lp_gold}
+#include common/guitar_shot.dta
+(shot lp_gold_far)
+#include common/guitar_near.dta
+(shot lp_gold_near)
+
+{set $ghc_guitar corvus}
+{set $ghc_finish cor_snake}
+#include common/guitar_shot.dta
+(shot cor_snake_far)
+#include common/guitar_near.dta
+(shot cor_snake_near)
+(quit)

@@ -1,0 +1,3 @@
+; The shot hung under the player's guitar, settled.
+{world do_force_shot SOLO_NEAR01}
+(wait 1.5)
