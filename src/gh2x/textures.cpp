@@ -33,6 +33,7 @@ namespace gh2
     namespace
     {
         constexpr const char *kFolders[] = {"track/", "hud/", "ui/", "system/run/ui/"};
+        constexpr const char *kBoards = "track/surfaces/";
 
         bool wanted() { return settings::get(settings::kTextures) == settings::kX360; }
 
@@ -133,7 +134,10 @@ namespace gh2
         // A stand-in for a bitmap file the 360 has at the same path.
         std::optional<ark::Made> makeBitmap(size_t xbox, const std::string &path, const std::string &twin)
         {
-            if (!wanted())
+            // A fretboard goes with the 360's track too, whose normal and
+            // specular maps are drawn for its picture.
+            const bool board = path.starts_with(kBoards) && settings::get(settings::kModels) == settings::kX360;
+            if (!wanted() && !board)
                 return std::nullopt;
             const auto ours = ark::readFile(0u, path), theirs = ark::readFile(xbox, twin);
             const auto own = ours ? bitmap::read(ours->data(), ours->size()) : std::nullopt;
