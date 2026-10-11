@@ -11,13 +11,21 @@
 #include "addresses.h"
 
 #include <cstddef>
+#include <filesystem>
 #include <optional>
 #include <string>
+#include <vector>
 
 class PS2Runtime;
 
 namespace gh2::games
 {
+    // Every other game's disc among `images`, the first of each game, added
+    // to the archive in the order their archives are searched whatever the
+    // images are called: Rocks the 80s, GH1, then 360 GH2. An image that is
+    // no supported release is named in the log. Before ark::install.
+    void mount(const std::vector<std::filesystem::path> &images);
+
     // Its disc's index in the archive (ark::readFile), once ark::install has
     // run, or none when not mounted.
     std::optional<size_t> disc(const std::string &game);

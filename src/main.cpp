@@ -8,7 +8,9 @@
 //   GHClassic --bind [keyboard | <n>]
 //
 // Without a disc, the first image in PUT_DISC_HERE (disc/disc.h) with this
-// build's executable. The game runs from that executable, read off the disc.
+// build's executable, and with no --content either, every other game's disc
+// in that folder (content/games.h). The game runs from that executable, read
+// off the disc.
 // --content adds another disc's archive, searched after the game disc's, in
 // the order given. --mods serves the files under a folder by their paths in
 // the archive, ahead of every disc. --scenario runs a file of steps
@@ -27,6 +29,7 @@
 // sets up a controller or the keyboard in input.ini; with no device it
 // lists them.
 
+#include "content/games.h"
 #include "disc/ark.h"
 #include "disc/disc.h"
 #include "ui/fast_boot.h"
@@ -114,6 +117,7 @@ int main(int argc, char *argv[])
         return gh2::runBind(argc, argv);
 
     std::filesystem::path discPath;
+    bool contentGiven = false;
     PS2Runtime::HostOptions hostOptions;
     gh2::RenderSize renderSize;
     double speed = 1.0;
@@ -140,6 +144,7 @@ int main(int argc, char *argv[])
         {
             if (!gh2::ark::addDisc(argv[++i]))
                 return 1;
+            contentGiven = true;
         }
         else if (arg == "--mods" && hasValue)
         {
@@ -239,6 +244,9 @@ int main(int argc, char *argv[])
             return fail(hostOptions, "Put your Guitar Hero II (USA) disc image (.iso, .chd or .bin) in\n" +
                                          folder.string() + "\nthen start GH Classic again.\n\n" + why);
         }
+        // The other games' discs from beside it, unless the run named its own.
+        if (!contentGiven)
+            gh2::games::mount(gh2::disc::images());
     }
     const std::vector<uint8_t> elf = gh2::disc::bootElf(discPath, why);
     if (elf.empty())

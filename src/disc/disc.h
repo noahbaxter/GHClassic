@@ -23,6 +23,10 @@ namespace gh2::disc
     // The image's boot executable if it is this build's, else empty and why.
     std::vector<uint8_t> bootElf(const std::filesystem::path &image, std::string &why);
 
+    // The images in folder(): settings.ini's [disc] prefer first, then by
+    // name.
+    std::vector<std::filesystem::path> images();
+
     // The first image in folder() with this build's executable, else empty
     // and why each image there was turned down.
     std::filesystem::path find(std::string &why);

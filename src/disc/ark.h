@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <functional>
 #include <optional>
 #include <utility>
@@ -17,7 +18,7 @@ namespace gh2::ark
     // A content disc, PS2 or 360, whose archive is searched after the game
     // disc's, in the order added. False, with the reason printed, if it
     // cannot be read.
-    bool addDisc(const std::string &path);
+    bool addDisc(const std::filesystem::path &path);
 
     // A file served at `path`, ahead of every disc: a loose mod file, or
     // one built at startup.

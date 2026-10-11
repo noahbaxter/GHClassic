@@ -335,13 +335,13 @@ namespace gh2::ark
         }
     }
 
-    bool addDisc(const std::string &path)
+    bool addDisc(const std::filesystem::path &path)
     {
         std::string error;
         std::unique_ptr<Volume> disc = Volume::open(path, error);
         if (!disc)
         {
-            std::cerr << "[ark] " << path << ": " << error << std::endl;
+            std::cerr << "[ark] " << path.string() << ": " << error << std::endl;
             return false;
         }
         s_added.push_back(std::move(disc));
