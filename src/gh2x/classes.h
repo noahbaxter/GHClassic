@@ -49,7 +49,6 @@ namespace gh2::gh2x
         std::string diffuse;
         float emissive = 1.0f;
         float specular[4] = {};
-        bool perPixel = false;
         bool normalize = false;
     };
     std::optional<Mat> matToPs2(const Bytes &body);

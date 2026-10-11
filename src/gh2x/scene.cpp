@@ -4,6 +4,7 @@
 #include "gh2x/focus.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstring>
 #include <iostream>
 #include <map>
@@ -16,11 +17,6 @@ namespace gh2::gh2x
     namespace
     {
         using milo::Bytes;
-
-        bool endsWith(const std::string &text, const std::string &end)
-        {
-            return text.size() >= end.size() && text.compare(text.size() - end.size(), end.size(), end) == 0;
-        }
 
         // Every ng folder in a path as og.
         std::string ogFolders(std::string path)
@@ -63,8 +59,9 @@ namespace gh2::gh2x
         // battle_lighting.milo_ps2).
         bool haveScene(const SceneSource &source, const std::string &base, const std::string &path)
         {
-            std::string full = resolve(base, path);
-            std::replace(full.begin(), full.end(), '\\', '/');
+            std::string forward = path;
+            std::replace(forward.begin(), forward.end(), '\\', '/');
+            const std::string full = resolve(base, forward);
             const size_t slash = full.rfind('/');
             const std::string folder = slash == std::string::npos ? "" : full.substr(0u, slash + 1u);
             const std::string name = full.substr(slash == std::string::npos ? 0u : slash + 1u);
@@ -160,7 +157,7 @@ namespace gh2::gh2x
     std::string ps2Path(const std::string &xboxPath)
     {
         std::string path = ogFolders(xboxPath);
-        if (endsWith(path, ".milo_xbox"))
+        if (path.ends_with(".milo_xbox"))
             path.replace(path.size() - 4u, 4u, "ps2");
         return path;
     }
@@ -269,10 +266,14 @@ namespace gh2::gh2x
 
         // The pictures, but those only a normal, specular, glow, ramp or
         // environ map names: the PS2 draws none of those.
-        std::vector<const Bytes *> held;
-        for (const Bytes &body : out.bodies)
-            held.push_back(&body);
-        held.push_back(&*root);
+        // The bodies so far, counted: the list grows as Texes are kept.
+        const size_t held = out.bodies.size();
+        const auto named = [&](const std::string &name)
+        {
+            return names(*root, name) ||
+                   std::any_of(out.bodies.begin(), out.bodies.begin() + static_cast<std::ptrdiff_t>(held),
+                               [&](const Bytes &body) { return names(body, name); });
+        };
         std::vector<std::pair<size_t, Tex>> pictures;
         for (const size_t i : texes)
         {
@@ -285,8 +286,7 @@ namespace gh2::gh2x
                 if (auto made = texToPs2(xbox.bodies[i], {}))
                     keep("Tex", name, std::move(*made));
             }
-            else if (!maps.contains(name) ||
-                     std::any_of(held.begin(), held.end(), [&](const Bytes *b) { return names(*b, name); }))
+            else if (!maps.contains(name) || named(name))
                 pictures.emplace_back(i, *tex);
         }
         for (const auto &[i, tex] : pictures)

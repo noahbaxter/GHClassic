@@ -43,11 +43,6 @@ namespace gh2
         // The smallest a stand-in has room for its payload's name in.
         constexpr uint32_t kStandInLeast = 16u;
 
-        bool endsWith(const std::string &text, const std::string &end)
-        {
-            return text.size() >= end.size() && text.compare(text.size() - end.size(), end.size(), end) == 0;
-        }
-
         bool holds(const std::vector<std::string> &paths, const std::string &path)
         {
             return std::binary_search(paths.begin(), paths.end(), path);
@@ -218,14 +213,7 @@ namespace gh2
             addSkins(discs, path, twin, *converted, looks);
             for (const auto &[mat, shading] : looks)
                 look::add(mat, shading);
-            const auto file = std::make_shared<const std::vector<uint8_t>>(milo::write(*converted));
-            return ark::Made{static_cast<uint32_t>(file->size()), [file](uint64_t offset, uint8_t *dst, size_t want)
-                             {
-                                 const size_t n =
-                                     offset < file->size() ? std::min<size_t>(want, file->size() - offset) : 0u;
-                                 std::memcpy(dst, file->data() + offset, n);
-                                 return n;
-                             }};
+            return ark::held(milo::write(*converted));
         }
     }
 
@@ -244,7 +232,7 @@ namespace gh2
         std::vector<std::pair<std::string, std::string>> scenes; // 360 path, PS2 path
         for (const char *folder : kFolders)
             for (const std::string &twin : ark::paths(*xbox, folder))
-                if (endsWith(twin, ".milo_xbox"))
+                if (twin.ends_with(".milo_xbox"))
                     scenes.emplace_back(twin, gh2x::ps2Path(twin));
         // Read now, as the track's file can only have one maker: with the
         // PS2's models its 360 pictures are gh2x/textures.cpp's to swap in.

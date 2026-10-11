@@ -18,7 +18,6 @@ namespace gh2::textures
     {
         // What a stand-in's pixel bytes start with, its payload's id after.
         constexpr uint32_t kMagic = 0x58544847u; // "GHTX"
-        constexpr size_t kNameBytes = 8u;
 
         // Held only by what draws it: the capture's entry for each guest
         // texture, then the renderer's copy for a few frames more.

@@ -35,7 +35,7 @@ namespace gh2
         // Textures whose bitmap is a stand-in, each with its host payload's
         // id. Its pixels join s_textures at its first draw.
         std::unordered_map<uint32_t, uint32_t> s_standIns;
-        constexpr uint32_t kNameBytes = 8u; // a stand-in's magic and id
+        constexpr uint32_t kNameBytes = static_cast<uint32_t>(textures::kNameBytes);
         bool s_foreign = false; // after forgetTextureAddresses
 
         struct Bitmap

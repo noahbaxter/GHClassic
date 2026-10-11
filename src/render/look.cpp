@@ -37,6 +37,7 @@ namespace gh2::look
         // Game thread only.
         std::vector<uint32_t> s_boards;
         uint64_t s_boardsAt = 0;
+        constexpr size_t kPlayers = 2;
         bool s_star = false;
         bool s_swung = false; // star power has been on since the boards were made
         float s_rest[3][3] = {};
@@ -127,13 +128,16 @@ namespace gh2::look
     void addBoard(uint32_t mat)
     {
         if (s_frame > s_boardsAt + kHoldFrames)
-        {
             s_boards.clear();
-            s_star = s_swung = false;
-        }
         s_boardsAt = s_frame;
-        if (!isBoard(mat))
-            s_boards.push_back(mat);
+        // A new board is a new song's, whose star power is off; a song
+        // restarted at once adds its boards to the last's, so only as many
+        // as there are players are kept.
+        s_star = s_swung = false;
+        std::erase(s_boards, mat);
+        s_boards.push_back(mat);
+        if (s_boards.size() > kPlayers)
+            s_boards.erase(s_boards.begin());
     }
 
     void setStarPower(bool on)
@@ -171,9 +175,14 @@ namespace gh2::look
 
     std::shared_ptr<const TextureData> luminance()
     {
+        // Read once: one that cannot be read is not asked for every frame.
         static std::shared_ptr<const TextureData> held;
-        if (!held && s_luminance != 0u)
+        static bool asked = false;
+        if (!asked && s_luminance != 0u)
+        {
+            asked = true;
             held = textures::get(s_luminance);
+        }
         return held;
     }
 }

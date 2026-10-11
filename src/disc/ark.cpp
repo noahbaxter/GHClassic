@@ -372,6 +372,17 @@ namespace gh2::ark
         s_layers[layer].files[key(path.c_str())] = addBytes(std::move(bytes));
     }
 
+    Made held(std::vector<uint8_t> bytes)
+    {
+        const auto file = std::make_shared<const std::vector<uint8_t>>(std::move(bytes));
+        return {static_cast<uint32_t>(file->size()), [file](uint64_t offset, uint8_t *dst, size_t want)
+                {
+                    const size_t n = offset < file->size() ? std::min<size_t>(want, file->size() - offset) : 0u;
+                    std::memcpy(dst, file->data() + offset, n);
+                    return n;
+                }};
+    }
+
     void addMade(const std::string &path, std::function<std::optional<Made>()> make)
     {
         s_made[key(path.c_str())] = std::move(make);

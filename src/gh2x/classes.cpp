@@ -113,6 +113,8 @@ namespace gh2::gh2x
         // length, CharClipGroup 328 of 329 exact).
         std::optional<Bytes> objectAt4(const Bytes &body)
         {
+            if (body.size() < 4u)
+                return std::nullopt;
             Reader r{body, 4u};
             const Object o = object(r);
             if (!r.ok)
@@ -762,7 +764,12 @@ namespace gh2::gh2x
                 Writer w;
                 put(w.u32(14u).u32(16u), o).raw(head).raw(values);
                 for (uint32_t i = 0; i < n && t.ok; ++i)
-                    w.str(t.str()).u32(t.u32()).u32(t.u32() - kClipSizeDelta);
+                {
+                    w.str(t.str()).u32(t.u32());
+                    const uint32_t size = t.u32();
+                    t.ok = t.ok && size >= kClipSizeDelta;
+                    w.u32(size - kClipSizeDelta);
+                }
                 w.u8(t.flag()).strs(t.strs()).strs(t.strs()).u8(t.flag()).str(t.str()).u32(t.u32());
                 if (t.done())
                     return std::move(w.out);
@@ -949,9 +956,8 @@ namespace gh2::gh2x
             mat.maps.push_back(r.str());
             w.str("");
         }
-        mat.perPixel = r.flag();
-        mat.normalize = r.flag();
-        w.u8(mat.perPixel).u8(mat.normalize);
+        w.u8(r.flag()); // per pixel lit
+        w.u8(mat.normalize = r.flag());
         r.u32(); // stencil mode
         if (!r.done())
             return std::nullopt;
@@ -1108,15 +1114,19 @@ namespace gh2::gh2x
         theirs.rev(1u);
         theirs.rev(8u);
         theirs.rev(16u);
+        theirs.rev(0u); // the Object's
         const std::string type = theirs.str();
         const auto dirRoot = dir("RndDir", root, nullptr);
         if (!theirs.ok || !dirRoot)
             return std::nullopt;
         Reader ours{*dirRoot};
         ours.skip(8u);
+        ours.rev(0u);
         ours.str();
+        if (!ours.ok)
+            return std::nullopt;
         Writer w;
-        w.u32(1u).u32(8u).u32(16u).str(type);
+        w.u32(1u).u32(8u).u32(16u).u32(0u).str(type);
         return std::move(w.raw(dirRoot->data() + ours.o, dirRoot->size() - ours.o).out);
     }
 
