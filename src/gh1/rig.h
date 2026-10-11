@@ -51,6 +51,13 @@ namespace gh2
         // the face's morphs named <outfit>_face.mrf for gh1/face.
         milo::Dir graft(const milo::Dir &gh2, const milo::Dir &gh1, const milo::Dir &face, const std::string &outfit);
 
+        // GH2's guitar `gh2` as GH1's guitar `gh1` (charsys/guitars, a v10
+        // scene whose bones are those of GH2's guitars under the same
+        // names): GH1's meshes, Mats and Texs off GH2's guitar spot at
+        // GH1's offsets from it, the hands' bones and the neck's spots
+        // where GH1 has them, and GH2's shadow group cast by GH1's body.
+        milo::Dir guitar(const milo::Dir &gh2, const milo::Dir &gh1);
+
         // Leaves out of drawing the meshes of `gh1` that none of its views
         // list: Bip01.mesh, the ponytails hair is skinned to. Retail's frame
         // has none of a band member's.

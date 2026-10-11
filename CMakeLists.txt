@@ -246,6 +246,7 @@ set(GHC_GAME_SOURCES
     src/gh1/clips.cpp
     src/gh1/crowd.cpp
     src/gh1/face.cpp
+    src/gh1/guitars.cpp
     src/gh1/install.cpp
     src/gh1/look.cpp
     src/gh1/menu_scripts.cpp

@@ -1,0 +1,36 @@
+#pragma once
+
+// GH1's guitar finishes as finishes of GH2's guitars.
+//
+// Most of GH1's guitars are GH2's models of the same Gibsons, and most of
+// its finishes are on GH2's disc, sold or not. The rest are built here from
+// GH1's disc: a finish that is only a texture goes on GH2's model, and a
+// guitar GH2 has no model of comes over whole (gh1/rig.h), as one more
+// finish of GH2's guitar of that body.
+
+#include <cstddef>
+#include <optional>
+#include <string>
+
+namespace gh2::gh1
+{
+    // A GH1 finish in GH2's guitars config. With no outfit it is GH2's own
+    // finish of that key.
+    struct Finish
+    {
+        const char *skin;   // GH1's
+        const char *key;    // GH2's, or ours
+        const char *outfit; // the scene under char/og/guitars
+        const char *mat;
+    };
+
+    const Finish *finish(const std::string &skin);
+
+    // A GH1 guitar's name in its career's config: its Gibsons by GH2's names
+    // for the same bodies and the Grim Ripper's as GH2's, the Battle Axe
+    // by its own.
+    std::string body(std::string gh1);
+
+    // The scenes those finishes name that no disc has, from GH1's disc.
+    void addGuitars(size_t gh1Disc);
+}

@@ -126,6 +126,9 @@ namespace gh2::gh1
     // The strings in a body that end `suffix`.
     std::vector<std::string> named(const Bytes &b, const std::string &suffix);
 
+    // A body with its first string `from` as `to`.
+    Bytes renamed(const Bytes &b, const std::string &from, const std::string &to);
+
     // Whether a body holds `name` as a string.
     bool holds(const Bytes &b, const std::string &name);
 

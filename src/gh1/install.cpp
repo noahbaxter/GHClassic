@@ -24,6 +24,7 @@
 #include "gh1/clips.h"
 #include "gh1/face.h"
 #include "gh1/guitarist.h"
+#include "gh1/guitars.h"
 #include "gh1/rig.h"
 #include "gh1/songs.h"
 #include "milo/milo.h"
@@ -162,6 +163,7 @@ namespace gh2
             outfits::add("gh1", guitarist.character, guitarist.character, name, base, guitarist.label);
             done.push_back(guitarist);
         }
+        gh1::addGuitars(*gh1Disc);
         gh1::addCareer(*gh1Disc, done);
         const auto ms =
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
