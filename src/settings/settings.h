@@ -33,7 +33,24 @@ namespace gh2::settings
         kDepthOfField, // the PS2's blur behind what a camera shot looks at
         kBandShadows,  // the band's shadows in GH1's venues: none, the room's as GH1 drew them, or GH2's own
         kSongDefaults, // quickplay plays a song as its own game's guitarist, guitar and venue, unpicked
+        kInSongUi,     // outside a career, whose loading, pause, fail, results, HUD and tips a song has
+        kGems,         // outside a career, whose gems: the in-song look's, or one game's
         kKeyCount,
+    };
+
+    enum InSongUi
+    {
+        kInSongVenue,
+        kInSongGh1,
+        kInSongGh2,
+        kInSongGh80s,
+    };
+
+    enum Gems
+    {
+        kGemsAuto,
+        kGemsGh1,
+        kGemsGh2,
     };
 
     enum BandShadows

@@ -87,6 +87,8 @@ namespace gh2::settings
             // Off: the pickers. Retail's quickplay goes from the difficulty
             // straight to the song.
             {"game", "quickplay_song_defaults", Type::kBool, 0, 1, 1, 0, 1},
+            {"game", "in_song_ui", Type::kChoice, 0, 3, 1, kInSongVenue, kInSongVenue, "venue gh1 gh2 gh80s"},
+            {"game", "gems", Type::kChoice, 0, 2, 1, kGemsAuto, kGemsAuto, "auto gh1 gh2"},
         };
 
         int snap(const Entry &entry, int value)

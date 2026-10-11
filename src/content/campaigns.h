@@ -66,7 +66,11 @@
 //   {campaigns venues_from <game>}  the songs from here on play in that
 //                              game's venues: its world files and its venues'
 //                              scripts, until another or the game played's
-//                              own are asked for, or a switch
+//                              own are asked for, or a switch. Outside a
+//                              career the screens around a song, the HUD and
+//                              the loading tips are in_song_ui's game's, the
+//                              venue's by default, and the gems gems' game's,
+//                              the in-song look's by default (settings.h)
 //   {campaigns venue_game}     whose venues those are
 //
 // Each campaign's own files, whichever is played, are under ghc/<game>/

@@ -9,6 +9,7 @@
 #include "hook.h"
 #include "save/save.h"
 #include "script.h"
+#include "settings/settings.h"
 
 #include "ps2_runtime.h"
 #include "runtime/ee_scheduler.h"
@@ -66,23 +67,36 @@ namespace gh2::campaigns
         const std::vector<const char *> kMenuFiles = {
             "videos/intro.pss", "config/gen/credits.dtb", "ui/gen/list_credits.milo_ps2", "sfx/streams/credits.vgs",
         };
-        // A song's venue lends its world, and the screens around the song:
-        // loading before and after, pause and its settings, lose. The 80s'
-        // pause art is pause_lose_tex, its loading words loading_word. The
-        // scenes alone: ui/gen/pause.dtb is the script every game's menus
-        // read.
-        const std::vector<const char *> kVenueFiles = {
-            "world/", "venues/", "ui/gen/loading.milo", "ui/gen/meta_loading.milo", "ui/image/og/eng/gen/loading_word",
-            "ui/gen/pause.milo", "ui/gen/pause_controller.milo", "ui/gen/pause_lose_tex.milo",
-            "ui/gen/pause_settings.milo", "ui/gen/pause_audio_settings.milo", "ui/gen/pause_video_settings.milo",
-            "ui/gen/tut_pause.milo", "ui/gen/tut_pause_controller.milo", "ui/gen/pract_pause.milo",
-            "ui/gen/multi_pause_controller.milo", "ui/gen/lose.milo",
-        };
+        // A song's venue lends its world: its rooms, crowd and lights, and
+        // its venues' scripts (kWorldTypes).
+        const std::vector<const char *> kVenueFiles = {"world/", "venues/"};
+        // The in-song look lends the screens around the song: loading before
+        // and after, pause and its settings, lose, the results and the high
+        // scores, and the HUD. Their scenes as its scripts name them, and the
+        // pieces beside them: the 80s' pause art is pause_lose_tex, its
+        // loading words loading_word, and the results' photo picture_endgame.
         const std::set<std::string> kSongPanels = {
-            "loading_panel", "meta_loading_panel", "pause_panel", "pause_controller_panel", "tut_pause_panel",
-            "tut_pause_controller_panel", "pract_pause_panel", "multi_pause_controller_panel", "lose_panel",
-            "pause_audio_settings_panel", "pause_video_settings_panel",
+            "loading_panel",          "loading_screen",           "practice_loading_screen",
+            "meta_loading_panel",     "meta_loading_screen",      "pause_panel",
+            "pause_screen",           "pause_controller_panel",   "pause_controller_screen",
+            "multi_pause_controller_panel", "multi_pause_controller_screen", "pract_pause_panel",
+            "pract_pause_screen",     "practice_pause_controller_screen", "tut_pause_panel",
+            "tut_pause_screen",       "tut_pause_controller_panel", "tut_pause_controller_screen",
+            "lefty_restart_panel",    "lefty_restart_screen",     "pause_audio_settings_panel",
+            "pause_audio_settings_screen", "pause_video_settings_panel", "pause_video_settings_screen",
+            "lose_panel",             "lose_screen",              "endgame_panel",
+            "endgame_screen",         "endgame_encore_panel",     "endgame_encore_screen",
+            "endgame_stats_panel",    "endgame_stats_screen",     "highscore_screen",
+            "practice_end_panel",     "practice_end_screen",
         };
+        // highscore_panel is ours whichever game's (highscore_panel.dta), over
+        // the look's scene.
+        const std::vector<const char *> kSongFiles = {
+            "ui/image/og/eng/gen/loading_word", "ui/gen/pause_settings.milo", "ui/gen/pause_lose_tex.milo",
+            "ui/gen/picture_endgame.milo",      "ui/gen/highscore.milo",      "hud/gen/",
+        };
+        constexpr const char *kTrack = "track/gen/track.milo_ps2"; // the gems
+        constexpr size_t kTips = 3u;                                // kConfig's tips: the loading screen's
         constexpr const char *kRootConfig = "config/gh2.dta";
         constexpr const char *kUi = "ui/ui.dta";
         // Hmx::Object's vtable entry for SetTypeDef: a this adjustment
@@ -98,7 +112,9 @@ namespace gh2::campaigns
         size_t s_theme = 0u;     // the menus picked for outside a career
         bool s_career = false;   // in a career, where everything is the active one's
         size_t s_venueFrom = 0u; // the campaign whose venues the next song plays in
-        std::vector<std::string> s_menusLent;
+        size_t s_lookFrom = 0u;  // whose screens around it and HUD it has
+        size_t s_gemsFrom = 0u;  // and whose gems
+        std::vector<std::string> s_menusLent, s_lookLent;
 
         struct Pending
         {
@@ -267,9 +283,11 @@ namespace gh2::campaigns
         }
 
         // The scene a panel made in `init` loads, {new Class name (file
-        // x.milo) ...}, as the archive holds it: ui/gen/x.milo_ps2.
+        // x.milo) ...}, as the archive holds it: ui/gen/x.milo_ps2. None for
+        // one that works its file out when it loads, or has none.
         std::string sceneOf(const Guest &guest, uint32_t init, const std::string &panel)
         {
+            constexpr uint32_t kString = 0x12u;
             for (int i = 0; i < guest.size(init); ++i)
             {
                 if (guest.type(init, i) != script::kCommand)
@@ -279,12 +297,16 @@ namespace gh2::campaigns
                     panel != reinterpret_cast<const char *>(getMemPtr(guest.call.rdram, guest.value(command, 2))))
                     continue;
                 const uint32_t file = guest.find(command, "file");
-                if (file == 0u || guest.size(file) < 2)
+                if (file == 0u || guest.size(file) < 2 ||
+                    (guest.type(file, 1) != script::kSymbol && guest.type(file, 1) != kString))
                     return "";
                 // A string node holds an array whose nodes are its characters.
                 const uint32_t text = guest.type(file, 1) == script::kSymbol ? guest.value(file, 1)
                                                                               : load<uint32_t>(guest.call.rdram, guest.value(file, 1));
-                return std::string("ui/gen/") + reinterpret_cast<const char *>(getMemPtr(guest.call.rdram, text)) + "_ps2";
+                const std::string name = reinterpret_cast<const char *>(getMemPtr(guest.call.rdram, text));
+                if (name.size() <= 5u || name.compare(name.size() - 5u, 5u, ".milo") != 0)
+                    return "";
+                return "ui/gen/" + name + "_ps2";
             }
             return "";
         }
@@ -355,35 +377,96 @@ namespace gh2::campaigns
             return ok;
         }
 
+        std::optional<size_t> indexOf(const std::string &game);
+
+        // Outside a career, the game whose screens around a song and HUD it
+        // has (in_song_ui): the venue's, or one game's where it is there.
+        // In a career, the active one's.
+        size_t lookFor(uint8_t *rdram, size_t venue)
+        {
+            static const char *const kGames[] = {"", "gh1", "gh2", "gh80s"};
+            const int pick = settings::get(settings::kInSongUi);
+            if (inCareer(rdram))
+                return s_active;
+            if (pick > settings::kInSongVenue && pick <= settings::kInSongGh80s)
+                if (const auto index = indexOf(kGames[pick]))
+                    return *index;
+            return venue;
+        }
+
+        // And whose gems: the look's, or one game's.
+        size_t gemsFor(uint8_t *rdram, size_t look)
+        {
+            const int pick = settings::get(settings::kGems);
+            if (inCareer(rdram))
+                return s_active;
+            if (pick == settings::kGemsGh2)
+                return 0u;
+            if (pick == settings::kGemsGh1)
+                if (const auto index = indexOf("gh1"))
+                    return *index;
+            return look;
+        }
+
         // The next song's venue is that campaign's: its world and venue
         // files from its layer, and its venues' scripts in the config's
-        // types. The active one's puts the active one's back.
+        // types. Its screens around it, HUD and loading tips are the look's
+        // (lookFor), and its gems gemsFor's. The active one's puts the
+        // active one's back.
         bool venuesFrom(const script::Call &call, size_t index)
         {
-            if (index == s_venueFrom)
+            const size_t look = lookFor(call.rdram, index), gems = gemsFor(call.rdram, look);
+            if (index == s_venueFrom && look == s_lookFrom && gems == s_gemsFrom)
                 return true;
             const Guest guest{call};
-            if (!built(guest, index))
+            if (!built(guest, index) || !built(guest, look) || !built(guest, gems))
                 return false;
-            syncConfig(guest, s_campaigns[index], kWorldTypes);
-            // The song's panels as that game's scripts make them; one kept
-            // loaded from boot whose scene is another file now loads again.
-            const uint32_t init = guest.clone(s_campaigns[index].init);
-            std::map<std::string, Origin> was;
-            for (const std::string &panel : kSongPanels)
-                if (const std::string scene = sceneOf(guest, init, panel); !scene.empty())
-                    was[scene] = ark::origin(scene);
-            for (const char *prefix : kVenueFiles)
+            const auto lendFrom = [](const std::string &prefix, size_t from)
             {
-                if (index == s_active)
+                if (from == s_active)
                     ark::unlend(prefix);
                 else
-                    ark::lend(prefix, s_campaigns[index].front);
+                    ark::lend(prefix, s_campaigns[from].front);
+            };
+            if (index != s_venueFrom)
+            {
+                syncConfig(guest, s_campaigns[index], kWorldTypes);
+                for (const char *prefix : kVenueFiles)
+                    lendFrom(prefix, index);
+                s_venueFrom = index;
             }
-            retypeUi(guest, init, [&](const std::string &scene) { return was[scene]; }, &kSongPanels);
-            guest.release(init);
-            s_venueFrom = index;
-            std::cerr << "[campaign] venues from " << s_campaigns[index].game << std::endl;
+            if (look != s_lookFrom)
+            {
+                syncConfig(guest, s_campaigns[look], kTips);
+                // The song's panels as that game's scripts make them; one kept
+                // loaded from boot whose scene is another file now loads again.
+                const uint32_t init = guest.clone(s_campaigns[look].init);
+                std::map<std::string, Origin> was;
+                for (const std::string &panel : kSongPanels)
+                    if (const std::string scene = sceneOf(guest, init, panel); !scene.empty())
+                        was[scene] = ark::origin(scene);
+                for (const std::string &prefix : s_lookLent)
+                    ark::unlend(prefix);
+                s_lookLent.clear();
+                if (look != s_active)
+                {
+                    for (const auto &[scene, origin] : was)
+                        s_lookLent.push_back(scene);
+                    s_lookLent.insert(s_lookLent.end(), kSongFiles.begin(), kSongFiles.end());
+                    for (const std::string &prefix : s_lookLent)
+                        ark::lend(prefix, s_campaigns[look].front);
+                }
+                retypeUi(guest, init, [&](const std::string &scene) { return was[scene]; }, &kSongPanels);
+                guest.release(init);
+                s_lookFrom = look;
+            }
+            if (gems != s_gemsFrom)
+            {
+                lendFrom(kTrack, gems);
+                s_gemsFrom = gems;
+            }
+            std::cerr << "[campaign] venues from " << s_campaigns[index].game << ", screens around the song from "
+                      << s_campaigns[look].game << ", gems from " << s_campaigns[gems].game << std::endl;
             return true;
         }
 
@@ -454,7 +537,11 @@ namespace gh2::campaigns
             // the retype the song's panels and the menus.
             for (const char *prefix : kVenueFiles)
                 ark::unlend(prefix);
-            s_venueFrom = index;
+            for (const std::string &prefix : s_lookLent)
+                ark::unlend(prefix);
+            ark::unlend(kTrack);
+            s_lookLent.clear();
+            s_venueFrom = s_lookFrom = s_gemsFrom = index;
             for (const std::string &prefix : s_menusLent)
                 ark::unlend(prefix);
             s_menusLent.clear();

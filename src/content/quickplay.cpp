@@ -12,6 +12,7 @@
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
 
+#include <algorithm>
 #include <iostream>
 #include <map>
 #include <string>
@@ -96,6 +97,20 @@ namespace gh2::quickplay
                     settings::set(settings::kSongDefaults, call.number(2) != 0 ? 1 : 0);
                 return {settings::get(settings::kSongDefaults) ? 1u : 0u, script::kInt};
             }
+            // A choice setting by its word, kept in settings.ini; the word.
+            const auto choice = [&](settings::Key key, std::vector<std::string> words) -> script::Node
+            {
+                if (call.size() > 2)
+                    if (const auto it = std::find(words.begin(), words.end(), call.symbol(2)); it != words.end())
+                        settings::set(key, static_cast<int>(it - words.begin()));
+                const size_t at = static_cast<size_t>(settings::get(key));
+                return {script::symbol(call.rdram, call.ctx, call.runtime, at < words.size() ? words[at] : ""),
+                        script::kSymbol};
+            };
+            if (op == "in_song_ui")
+                return choice(settings::kInSongUi, {"venue", "gh1", "gh2", "gh80s"});
+            if (op == "gems")
+                return choice(settings::kGems, {"auto", "gh1", "gh2"});
             if (op == "outfit" && call.size() > 2)
             {
                 // Another game's outfit is in the config under the name it was
@@ -127,7 +142,8 @@ namespace gh2::quickplay
                 return {script::symbol(call.rdram, call.ctx, call.runtime, it->second), script::kSymbol};
             }
             std::cerr << "[quickplay] usage: {quickplay song_defaults [<0|1>]}, {quickplay outfit <game>}, "
-                         "{quickplay pick|picked <what>}, {quickplay look <character> [<outfit>]}"
+                         "{quickplay pick|picked <what>}, {quickplay look <character> [<outfit>]}, "
+                         "{quickplay in_song_ui [venue|gh1|gh2|gh80s]}, {quickplay gems [auto|gh1|gh2]}"
                       << std::endl;
             return {};
         }
