@@ -1,7 +1,9 @@
 #pragma once
 
-// The player's settings, one table entry each: the entry drives
-// settings.ini, and later the overlay row and the "PS2 mode" preset.
+// The player's settings. config/settings.template.ini, compiled in, holds
+// each one's default, section and words, and settings.ini is written from it;
+// a table entry here holds its kind and what the PS2 did, for the overlay row
+// and the "PS2 mode" preset later.
 
 #include <string>
 
