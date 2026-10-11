@@ -475,6 +475,53 @@ namespace gh2::campaigns
             return true;
         }
 
+        // That campaign's menu loops, as its (synth metamusic music) names
+        // them, off its files.
+        const std::vector<std::string> &musicOf(size_t index)
+        {
+            static std::map<size_t, std::vector<std::string>> s_found;
+            if (const auto it = s_found.find(index); it != s_found.end())
+                return it->second;
+            const auto front = s_campaigns[index].front;
+            dtb::Macros macros;
+            const auto synth =
+                dtb::read("config/synth.dta", macros, [front](const std::string &path) { return ark::readFront(front, path); });
+            const dtb::Node *metamusic = synth ? dtb::find(*synth, "metamusic") : nullptr;
+            const dtb::Node *music = metamusic ? dtb::find(*metamusic, "music") : nullptr;
+            std::vector<std::string> &loops = s_found[index];
+            for (size_t i = 1u; music && i < music->nodes.size(); ++i)
+                loops.push_back(music->nodes[i].text);
+            return loops;
+        }
+
+        // The menus' music outside a career (menu_music): the menus' game's,
+        // one game's, or every game's loops, the menus' game's first and all
+        // streamed, as GH1's are. In a career, the career's own.
+        void musicFrom(const script::Call &call)
+        {
+            static const char *const kGames[] = {"", "gh1", "gh2", "gh80s"};
+            const Guest guest{call};
+            const int pick = settings::get(settings::kMenuMusic);
+            size_t from = s_menus;
+            if (!s_career && pick > settings::kMusicTheme && pick < settings::kMusicAll)
+                if (const auto index = indexOf(kGames[pick]))
+                    from = *index;
+            if (!built(guest, from))
+                return;
+            syncConfig(guest, s_campaigns[from], kMetaMusic);
+            if (s_career || pick != settings::kMusicAll)
+                return;
+            // The 360's are GH2's, each loop once.
+            std::set<std::string> listed(musicOf(from).begin(), musicOf(from).end());
+            std::string text = "{do ($m {find $syscfg synth metamusic})";
+            for (size_t i = 0; i < s_campaigns.size(); ++i)
+                for (const std::string &loop : musicOf(i))
+                    if (listed.insert(loop).second)
+                        text += " {push_back {find $m music} " + loop + "}";
+            text += " {set_elem {find $m play_from_memory} 1 0}}";
+            script::run(call.rdram, call.ctx, call.runtime, text);
+        }
+
         // The menus from here on are that campaign's: its scripts' for the
         // menus' panels and screens (kMenuPanels), their scenes and the
         // files beside them, and its menu music. The active one's take back
@@ -502,8 +549,8 @@ namespace gh2::campaigns
             }
             retypeUi(guest, init, [&](const std::string &scene) { return was[scene]; }, &kMenuPanels);
             guest.release(init);
-            syncConfig(guest, s_campaigns[index], kMetaMusic);
             s_menus = index;
+            musicFrom(call);
             std::cerr << "[campaign] menus from " << s_campaigns[index].game << ", " << was.size() << " scenes" << std::endl;
             return true;
         }
@@ -617,6 +664,8 @@ namespace gh2::campaigns
                     return false;
                 script::patchUiAgain(call.rdram, call.ctx, call.runtime);
             }
+            else
+                musicFrom(call);
             save::keepLastGame(s_campaigns[index].game);
             return true;
         }
@@ -989,6 +1038,9 @@ namespace gh2::campaigns
                 script::run(rdram, ctx, runtime,
                             "{set $ghc_switch " + last + "} {set $ghc_switch_next " + kOpening[opening] +
                                 "} {set $ghc_switch_as menus}");
+            // With no switch, the menu music picked is set here.
+            else if (opening >= 0 && settings::get(settings::kMenuMusic) != settings::kMusicTheme)
+                musicFrom(script::Call{rdram, ctx, runtime, 0u});
             *ctx = saved;
             if (opening < 0)
                 return;

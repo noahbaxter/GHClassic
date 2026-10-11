@@ -39,6 +39,8 @@ namespace gh2::ark
 
     // A file's bytes as the game would get them, from wherever it lives.
     std::optional<std::vector<uint8_t>> readFile(const std::string &path);
+    // Its first `most` bytes at most: a stream's header.
+    std::optional<std::vector<uint8_t>> readStart(const std::string &path, size_t most);
 
     // A file's bytes from that disc's archive alone.
     std::optional<std::vector<uint8_t>> readFile(size_t disc, const std::string &path);

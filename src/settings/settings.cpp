@@ -89,6 +89,9 @@ namespace gh2::settings
             {"game", "quickplay_song_defaults", Type::kBool, 0, 1, 1, 0, 1},
             {"game", "in_song_ui", Type::kChoice, 0, 3, 1, kInSongVenue, kInSongVenue, "venue gh1 gh2 gh80s"},
             {"game", "gems", Type::kChoice, 0, 2, 1, kGemsAuto, kGemsAuto, "auto gh1 gh2"},
+            {"audio", "menu_music", Type::kChoice, 0, 4, 1, kMusicTheme, kMusicTheme, "theme gh1 gh2 gh80s all"},
+            // Retail plays one loop over and over.
+            {"audio", "menu_music_order", Type::kChoice, 0, 2, 1, kOrderPlaylist, kOrderLoop, "playlist loop shuffle"},
         };
 
         int snap(const Entry &entry, int value)

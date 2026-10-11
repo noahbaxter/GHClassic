@@ -35,7 +35,25 @@ namespace gh2::settings
         kSongDefaults, // quickplay plays a song as its own game's guitarist, guitar and venue, unpicked
         kInSongUi,     // outside a career, whose loading, pause, fail, results, HUD and tips a song has
         kGems,         // outside a career, whose gems: the in-song look's, or one game's
+        kMenuMusic,    // outside a career, whose menu loops: the theme's, one game's, or every game's
+        kMenuMusicOrder, // the loops one after another in order, one over and over, or shuffled
         kKeyCount,
+    };
+
+    enum MenuMusic
+    {
+        kMusicTheme,
+        kMusicGh1,
+        kMusicGh2,
+        kMusicGh80s,
+        kMusicAll,
+    };
+
+    enum MenuMusicOrder
+    {
+        kOrderPlaylist,
+        kOrderLoop,
+        kOrderShuffle,
     };
 
     enum InSongUi

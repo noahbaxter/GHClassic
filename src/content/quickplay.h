@@ -19,6 +19,11 @@
 //                                    song and HUD outside a career, kept in
 //                                    settings.ini (content/campaigns.h)
 //   {quickplay gems [<auto|gh1|gh2>]}  and whose gems
+//   {quickplay menu_music [<theme|gh1|gh2|gh80s|all>]}  whose menu loops
+//                                    outside a career, from the next change
+//                                    of menus (content/campaigns.h)
+//   {quickplay menu_music_order [<playlist|loop|shuffle>]}  and how they
+//                                    follow one another (ui/meta_music.cpp)
 //
 // Outside a career (content/campaigns.h) an item is unlocked where any
 // game's career has it.

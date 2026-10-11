@@ -454,11 +454,11 @@ namespace gh2::ark
 
     namespace
     {
-        std::optional<std::vector<uint8_t>> read(const Entry *entry)
+        std::optional<std::vector<uint8_t>> read(const Entry *entry, size_t most = SIZE_MAX)
         {
             if (!entry)
                 return std::nullopt;
-            std::vector<uint8_t> bytes(entry->size);
+            std::vector<uint8_t> bytes(std::min<size_t>(entry->size, most));
             if (s_parts[entry->part].read(entry->offset, bytes.data(), bytes.size()) != bytes.size())
                 return std::nullopt;
             return bytes;
@@ -468,6 +468,11 @@ namespace gh2::ark
     std::optional<std::vector<uint8_t>> readFile(const std::string &path)
     {
         return read(find(key(path.c_str())));
+    }
+
+    std::optional<std::vector<uint8_t>> readStart(const std::string &path, size_t most)
+    {
+        return read(find(key(path.c_str())), most);
     }
 
     std::optional<Made> openFront(const std::string &path)
