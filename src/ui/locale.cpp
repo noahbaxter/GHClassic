@@ -1,10 +1,12 @@
 // Locale::Localize (retail 0x2cbaf8) turns a token into the disc's text for
 // it. Tokens in ui/dta/locale.dta get ours instead: the file is the disc's
 // locale.dta format, `(token "text")`, read by the game's own parser, so the
-// strings are the game's and live as long as the parsed array.
+// strings are the game's and live as long as the parsed array. Else a token
+// another game owns now gets that game's (content/locale.h).
 
 #include "ui/locale.h"
 
+#include "content/locale.h"
 #include "dta.h"
 #include "guest.h"
 #include "script.h"
@@ -76,9 +78,13 @@ namespace gh2
                     symbol ? s_text.find(reinterpret_cast<const char *>(getMemPtr(rdram, symbol))) : s_text.end();
                 found = s_bySymbol.emplace(symbol, text == s_text.end() ? 0u : text->second).first;
             }
-            if (found->second == 0u)
+            const uint32_t text =
+                found->second != 0u
+                    ? found->second
+                    : (symbol ? locale::owned(reinterpret_cast<const char *>(getMemPtr(rdram, symbol))) : 0u);
+            if (text == 0u)
                 return s_original(rdram, ctx, runtime);
-            SET_GPR_U32(ctx, 2, found->second);
+            SET_GPR_U32(ctx, 2, text);
             ctx->pc = GPR_U32(ctx, 31);
         }
     }

@@ -21,6 +21,7 @@
 #include <iostream>
 #include <map>
 #include <set>
+#include <unordered_map>
 
 namespace gh2::campaigns
 {
@@ -373,6 +374,8 @@ namespace gh2::campaigns
                 return true;
             ark::front(s_campaigns[index].front);
             const bool ok = build(guest, s_campaigns[index]);
+            if (ok)
+                locale::build(s_campaigns[index].game, guest.call.rdram, guest.call.ctx, guest.call.runtime);
             ark::front(s_campaigns[s_active].front);
             return ok;
         }
@@ -416,6 +419,8 @@ namespace gh2::campaigns
         bool venuesFrom(const script::Call &call, size_t index)
         {
             const size_t look = lookFor(call.rdram, index), gems = gemsFor(call.rdram, look);
+            // The venue's name is its game's, wherever it shows.
+            locale::own(locale::kVenue, s_campaigns[index].game);
             if (index == s_venueFrom && look == s_lookFrom && gems == s_gemsFrom)
                 return true;
             const Guest guest{call};
@@ -689,6 +694,7 @@ namespace gh2::campaigns
         {
             std::set<std::string> items;
             std::vector<std::string> outfits; // in config's order
+            std::vector<std::string> characters;
         };
         const Usable &usable(const Campaign &campaign)
         {
@@ -715,6 +721,7 @@ namespace gh2::campaigns
                     if (character.type != dtb::kArray || character.nodes.empty())
                         continue;
                     found.items.insert(character.nodes[0].text);
+                    found.characters.push_back(character.nodes[0].text);
                     for (const std::string &outfit : keys(character))
                     {
                         found.items.insert(outfit);
@@ -810,6 +817,18 @@ namespace gh2::campaigns
                 const auto index = indexOf(call.symbol(2));
                 return {index && venuesFrom(call, *index) ? 1u : 0u, script::kInt};
             }
+            // Whose names the venues show from here on (a map's), and whose
+            // a character's name and blurbs are: the outfit's game's.
+            if (op == "text_venues" || op == "text_outfit")
+            {
+                const auto own = op == "text_venues" ? std::optional<std::pair<std::string, std::string>>()
+                                                     : outfits::ownOf(call.symbol(2));
+                const auto index = indexOf(op == "text_venues" ? call.symbol(2) : own ? own->first : active());
+                if (!index || !built(Guest{call}, *index))
+                    return {0u, script::kInt};
+                locale::own(op == "text_venues" ? locale::kVenue : locale::kCharacter, s_campaigns[*index].game);
+                return {1u, script::kInt};
+            }
             if (op == "owns")
             {
                 // A game with no career here has nothing to earn it in.
@@ -884,6 +903,50 @@ namespace gh2::campaigns
         // the last entered (save::lastGame), by way of the screen the switch
         // happens on (campaigns.dta), so the movie, the splash and the menus
         // are all that one's.
+        // Whose text a screen's own tokens take (content/locale.h): the
+        // menus' game's on the menus, the in-song look's on the screens
+        // around a song, else the active one's. The venues' names and the
+        // characters' are owned apart, by the venue and the outfit.
+        void ownScreen(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t screen)
+        {
+            static std::unordered_map<uint32_t, bool> s_menuScreens; // each menu's or song's screen, true for a menu's
+            if (s_menuScreens.empty())
+            {
+                const R5900Context saved = *ctx;
+                std::vector<std::pair<std::string, bool>> names;
+                for (const auto *set : {&kMenuPanels, &kSongPanels})
+                    for (const std::string &name : *set)
+                        if (name.size() > 7u && name.compare(name.size() - 7u, 7u, "_screen") == 0)
+                            names.emplace_back(name, set == &kMenuPanels);
+                // The song's own, whose HUD is the look's too.
+                names.emplace_back("game_screen", false);
+                names.emplace_back("practice_game_screen", false);
+                std::string text;
+                for (const auto &[name, menu] : names)
+                    text += name + " ";
+                const uint32_t parsed = script::parse(rdram, ctx, runtime, text);
+                for (size_t i = 0; parsed != 0u && i < names.size(); ++i)
+                    if (const uint32_t object = static_cast<uint32_t>(runtime->callGuestFunction(
+                            rdram, ctx, s_addresses->dataNodeGetObj,
+                            {load<uint32_t>(rdram, parsed) + 8u * static_cast<uint32_t>(i), parsed})))
+                        s_menuScreens.emplace(object, names[i].second);
+                // The venues' names and the characters', with their blurbs.
+                std::set<std::string> venues, characters;
+                for (size_t i = 0; i < s_campaigns.size(); ++i)
+                    for (const std::string &venue : venuesOf(i))
+                        venues.insert(venue);
+                for (const std::string &character : usable(s_campaigns[0]).characters)
+                    for (const char *suffix : {"", "_blurb", "_outfit_blurb"})
+                        characters.insert(character + suffix);
+                locale::ownTokens(locale::kVenue, venues);
+                locale::ownTokens(locale::kCharacter, characters);
+                *ctx = saved;
+            }
+            const auto it = s_menuScreens.find(screen);
+            const size_t owner = it == s_menuScreens.end() ? s_active : it->second ? s_menus : s_lookFrom;
+            locale::own(locale::kScreen, s_campaigns[owner].game);
+        }
+
         struct GotoScreenTag;
         void onGotoScreen(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
@@ -892,6 +955,7 @@ namespace gh2::campaigns
             static const char *const kOpening[] = {"cut_scene_screen", "main_screen"};
             const uint32_t screen = GPR_U32(ctx, 5);
             s_toSwitch = screen != 0u && screen == screens[2];
+            ownScreen(rdram, ctx, runtime, screen);
             // Out of a career to the main menu, by way of the switch to the
             // menus picked for outside one.
             if (s_opened && s_career && screen != 0u && screen == screens[1])

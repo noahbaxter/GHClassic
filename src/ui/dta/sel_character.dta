@@ -38,6 +38,8 @@
             ($outfit {game get_character_outfit})
             {char_single show_char 0 $outfit}
             {char_single char_event 0 animate}
+            ; The name and blurb its outfit's game's.
+            {campaigns text_outfit $outfit}
             {sc_char_nm.lbl set_text $character}
             {sc_char_blurb.lbl set_localized_text {localize {sprint $character "_blurb"}}}
             {$this set char_focus $character}
@@ -288,6 +290,7 @@
                {set [char_focus] {character_provider get_symbol $new_scroll_pos}}
                {set [char_outfit] {$this hover_outfit [char_focus]}}
                {if [char_focus]
+                  {campaigns text_outfit [char_outfit]}
                   {sc_char_nm.lbl set_text [char_focus]}
                   {sc_char_blurb.lbl set_localized_text {localize {sprint [char_focus] "_blurb"}}}
                   {char_single show_char 0 [char_outfit]}
@@ -344,6 +347,10 @@
                         }
                      }
                   }
+                  ; The name and blurbs the outfit's game's.
+                  {campaigns text_outfit [char_outfit]}
+                  {sc_char_nm.lbl set_text [char_focus]}
+                  {sc_char_blurb.lbl set_localized_text {localize {sprint [char_focus] "_blurb"}}}
                   {sc_char_outfit_blurb.lbl set_localized_text {localize {sprint [char_focus] "_outfit_blurb"}}}
                }
             }

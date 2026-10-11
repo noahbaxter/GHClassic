@@ -62,6 +62,7 @@
                {game set_quickplay}
                {game set_character {quickplay outfit {setlist shown}} TRUE}
                {game set_guitar_index 0}
+               {campaigns text_outfit {game get_character_outfit}}
                {ui goto_screen loading_screen}
             }
             {do
@@ -136,6 +137,7 @@
                {ghc_venue_game {campaigns active}}
             }
          }
+         {campaigns text_venues $ghc_qp_venues}
          {ui goto_screen ghc_qp_venue_screen}
       )
       (go_back
@@ -218,6 +220,15 @@
       }
    }
 }
+; A venue picked: the song in its game's venues, the character's name its
+; outfit's game's.
+{func ghc_qp_venue_select
+   {campaigns venues_from $ghc_qp_venues}
+   {quickplay pick venue {game get_venue}}
+   {quickplay pick venue_game $ghc_qp_venues}
+   {campaigns text_outfit {game get_character_outfit}}
+   {ui goto_screen loading_screen}
+}
 {func ghc_qp_venue_button ($button)
    {cond
       ({ghc_pick_button $button} TRUE)
@@ -243,17 +254,12 @@
       (allow_back FALSE)
       (enter {ghc_qp_venue_enter $this ghc_qp_venue_panel})
       (FOCUS_MSG {if {! {ui in_transition}} {ghc_qp_venue_focus ghc_qp_venue_panel $new_focus}})
-      (SELECT_START_MSG
-         {campaigns venues_from $ghc_qp_venues}
-         {quickplay pick venue {game get_venue}}
-         {quickplay pick venue_game $ghc_qp_venues}
-         {ui goto_screen loading_screen}
-         kDataUnhandled
-      )
+      (SELECT_START_MSG {ghc_qp_venue_select} kDataUnhandled)
       (BUTTON_DOWN_MSG {ghc_qp_venue_button $button})
       (ghc_picked ($game)
          {synth play_sequence button_select}
          {set $ghc_qp_venues $game}
+         {campaigns text_venues $game}
          {ui goto_screen ghc_qp_venue_twin_screen}
       )
    )
@@ -265,17 +271,12 @@
       (allow_back FALSE)
       (enter {ghc_qp_venue_enter $this ghc_qp_venue_twin_panel})
       (FOCUS_MSG {if {! {ui in_transition}} {ghc_qp_venue_focus ghc_qp_venue_twin_panel $new_focus}})
-      (SELECT_START_MSG
-         {campaigns venues_from $ghc_qp_venues}
-         {quickplay pick venue {game get_venue}}
-         {quickplay pick venue_game $ghc_qp_venues}
-         {ui goto_screen loading_screen}
-         kDataUnhandled
-      )
+      (SELECT_START_MSG {ghc_qp_venue_select} kDataUnhandled)
       (BUTTON_DOWN_MSG {ghc_qp_venue_button $button})
       (ghc_picked ($game)
          {synth play_sequence button_select}
          {set $ghc_qp_venues $game}
+         {campaigns text_venues $game}
          {ui goto_screen ghc_qp_venue_screen}
       )
    )
