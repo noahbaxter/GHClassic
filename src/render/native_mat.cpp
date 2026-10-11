@@ -160,7 +160,12 @@ namespace gh2
         else if (m.texGen == milo::mat::kTexGenProjected)
             readProjRows(rdram, mat, m);
         if (settings::get(settings::kShading) == settings::kX360)
+        {
             m.shading = readShading(rdram, mat);
+            // EXPERIMENT: a PS2 Mat the environ lights, through the 360's shader.
+            if (!m.shading && m.useEnviron)
+                m.shading = look::backport(m.texture);
+        }
         if (m.blend >= milo::mat::kBlendCount)
             m.blend = milo::mat::kBlendSrcAlpha; // Update's default case
         if (m.zMode >= milo::mat::kZModeCount)

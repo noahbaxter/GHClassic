@@ -5,6 +5,9 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <map>
 #include <mutex>
@@ -95,6 +98,68 @@ namespace gh2::look
             held.shading = std::move(shading);
         }
         return held.shading;
+    }
+
+    std::shared_ptr<const Shading> backport(const std::shared_ptr<const TextureData> &diffuse)
+    {
+        static const int level = std::getenv("GHC_HD") ? std::atoi(std::getenv("GHC_HD")) : 0;
+        if (level <= 0)
+            return nullptr;
+        static float spec[4] = {0.25f, 0.25f, 0.25f, 24.0f};
+        static float bump = 2.0f;
+        static bool read = false;
+        if (!read)
+        {
+            read = true;
+            if (const char *text = std::getenv("GHC_HD_SPEC"))
+                std::sscanf(text, "%f %f %f %f", &spec[0], &spec[1], &spec[2], &spec[3]);
+            if (const char *text = std::getenv("GHC_HD_BUMP"))
+                bump = static_cast<float>(std::atof(text));
+        }
+        struct Made
+        {
+            std::shared_ptr<const TextureData> diffuse;
+            std::shared_ptr<const Shading> shading;
+        };
+        static std::unordered_map<const TextureData *, Made> made;
+        Made &entry = made[diffuse.get()];
+        if (entry.shading)
+            return entry.shading;
+        auto shading = std::make_shared<Shading>();
+        shading->specularColor[3] = 10.0f;
+        if (level >= 2)
+            std::memcpy(shading->specularColor, spec, sizeof(spec));
+        if (level >= 3 && diffuse && !diffuse->cube && !diffuse->text && diffuse->width >= 16u &&
+            diffuse->height >= 16u && diffuse->rgba.size() >= size_t(diffuse->width) * diffuse->height * 4u)
+        {
+            // Height is the picture's brightness; the normal its slope, x in
+            // red and y in green as x360.frag reads them.
+            const uint32_t w = diffuse->width, h = diffuse->height;
+            const auto height = [&](uint32_t x, uint32_t y)
+            {
+                const uint8_t *p = &diffuse->rgba[(size_t(y % h) * w + x % w) * 4u];
+                return (0.299f * p[0] + 0.587f * p[1] + 0.114f * p[2]) / 255.0f;
+            };
+            auto normal = std::make_shared<TextureData>();
+            normal->width = w;
+            normal->height = h;
+            normal->rgba.resize(size_t(w) * h * 4u);
+            for (uint32_t y = 0; y < h; ++y)
+                for (uint32_t x = 0; x < w; ++x)
+                {
+                    const float dx = (height(x + 1u, y) - height(x + w - 1u, y)) * bump;
+                    const float dy = (height(x, y + 1u) - height(x, y + h - 1u)) * bump;
+                    const float length = std::sqrt(dx * dx + dy * dy + 1.0f);
+                    uint8_t *out = &normal->rgba[(size_t(y) * w + x) * 4u];
+                    out[0] = static_cast<uint8_t>(std::clamp((-dx / length) * 0.5f + 0.5f, 0.0f, 1.0f) * 255.0f);
+                    out[1] = static_cast<uint8_t>(std::clamp((-dy / length) * 0.5f + 0.5f, 0.0f, 1.0f) * 255.0f);
+                    out[2] = 255;
+                    out[3] = 255;
+                }
+            shading->normal = std::move(normal);
+        }
+        entry = {diffuse, std::move(shading)};
+        return entry.shading;
     }
 
     void addSpin(const std::string &system, const std::string &mat, float rpmLow, float rpmHigh)

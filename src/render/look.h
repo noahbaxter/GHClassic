@@ -81,6 +81,12 @@ namespace gh2::look
     bool trackFades();
     constexpr const char *kStripMats[] = {"track_fade.mat", "track_fade2.mat", "track_add.mat"};
 
+    // EXPERIMENT (GHC_HD=1..3): a shading for a Mat no 360 scene has, so
+    // the 360's shader draws it: 1 its lighting alone, 2 with a shine
+    // (GHC_HD_SPEC, "r g b power"), 3 with a bump map made from the picture
+    // (GHC_HD_BUMP, its strength). Null when off.
+    std::shared_ptr<const Shading> backport(const std::shared_ptr<const TextureData> &diffuse);
+
     // Maps no draw has asked for in a while are let go.
     void endFrame();
 
