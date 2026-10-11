@@ -58,6 +58,9 @@ namespace gh2::campaigns
 {
     // `game` can be played as itself, with that layer in front.
     void add(const std::string &game, size_t front);
+    // The game disc's own campaign with that layer in front of it: files
+    // made here over the disc's own.
+    void over(size_t layer);
 
     const std::string &active();
     // Every campaign's game, gh2 first.

@@ -108,12 +108,7 @@ namespace gh2::gh1
         const char *const kObjects = "char/gen/char_objects.dtb";
     }
 
-    const Extra kExtra = {"tobac",
-                          "The Tobacco",
-                          "Found on the Guitar Hero disc with no name, no price and no place in the game. It plays all the same.",
-                          {nullptr, "tobac_sunburst", "gh1_tobac", "tobacco.mat"},
-                          "Tobacco Sunburst",
-                          "The only finish it was ever given."};
+    const Extra kExtra = {"tobac", {nullptr, "tobac_sunburst", "gh1_tobac", "tobacco.mat"}};
 
     const Finish *finish(const std::string &skin)
     {

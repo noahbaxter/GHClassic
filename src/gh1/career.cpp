@@ -291,10 +291,6 @@ namespace gh2::gh1
         if (const dtb::Node *sold = dtb::find(*theirStore, "song"))
             for (size_t i = 1u; i < sold->nodes.size(); ++i)
                 songs.insert(keyOf(sold->nodes[i]));
-        text[kExtra.guitar] = kExtra.name;
-        text[std::string(kExtra.guitar) + "_desc"] = kExtra.blurb;
-        text[kExtra.finish.key] = kExtra.finishName;
-        text[std::string(kExtra.finish.key) + "_desc"] = kExtra.finishBlurb;
         for (const dtb::Node &entry : strings->nodes)
         {
             if (entry.type != dtb::kArray || entry.nodes.size() < 2u)

@@ -8,6 +8,7 @@
 #include "content/floor_spot.h"
 #include "content/encores.h"
 #include "content/games.h"
+#include "content/hidden_guitars.h"
 #include "content/locale.h"
 #include "content/outfits.h"
 #include "content/campaigns.h"
@@ -60,6 +61,7 @@ namespace
         gh2::installEighties();
         gh2::installGh1();
         gh2::installGh2x();
+        gh2::installHiddenGuitars();
         gh2::installGh1Face(runtime, gh2::kSlus21447);
         gh2::outfits::install(runtime, gh2::kSlus21447);
         gh2::band::install(runtime, gh2::kSlus21447);

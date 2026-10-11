@@ -578,6 +578,13 @@ namespace gh2::campaigns
         s_campaigns.push_back({game, front});
     }
 
+    void over(size_t layer)
+    {
+        s_campaigns[0].front = layer;
+        if (s_active == 0u)
+            ark::front(layer);
+    }
+
     const std::string &active()
     {
         return s_campaigns[s_active].game;

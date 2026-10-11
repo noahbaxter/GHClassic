@@ -29,12 +29,11 @@ namespace gh2::gh1
     // The guitar GH1's disc holds and nothing on it names
     // (guitar_tobac.rnd): a double-cut in tobacco sunburst, with no name,
     // blurb or price of GH1's. Here it is one more guitar of GH1's career,
-    // a band's from the start, under a name and blurb of ours.
+    // a band's from the start, its name and blurb content/guitar_copy.dta's.
     struct Extra
     {
-        const char *guitar, *name, *blurb;
+        const char *guitar;
         Finish finish;
-        const char *finishName, *finishBlurb;
     };
     extern const Extra kExtra;
 

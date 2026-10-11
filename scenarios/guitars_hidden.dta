@@ -1,0 +1,45 @@
+; The guitars and finishes the game disc holds and never offers
+; (content/hidden_guitars.h), in GH2's career: sold at their prices, the
+; controller asking for hard's tour, no new band's, and each in a song.
+#include common/first_boot.dta
+(expect {elem {find $syscfg store skin exp_peppermint price} 1} 450)
+(expect {elem {find $syscfg store skin exp_lipstick price} 1} 550)
+(expect {elem {find $syscfg store guitar guitar_red_octane price} 1} 6000)
+(expect {elem {find $syscfg store guitar air_guitar price} 1} 1000)
+(expect {elem {find $syscfg guitars guitar_red_octane type} 1} guitar)
+(expect {elem {find $syscfg guitars guitar_red_octane require} 1} tour_passed)
+(expect {localize guitar_red_octane} "Guitar Hero guitar")
+(expect {localize air_guitar} "Air Guitar")
+{set $pick gh2}
+#include common/career_start.dta
+(expect {campaign is_unlocked exp_peppermint} 0)
+(expect {campaign is_unlocked guitar_red_octane} 0)
+(expect {campaign is_unlocked air_guitar} 0)
+; Every one to pick from, as the unlock-all cheat leaves them.
+{set $cheat_enabled_unlock_all 1}
+{campaign set_all_access 1}
+{set $disable_save 1}
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+
+{set $ghc_character punk1}
+{set $ghc_guitar explorer}
+{set $ghc_finish exp_peppermint}
+#include common/guitar_shot.dta
+#include common/guitar_near.dta
+(shot exp_peppermint)
+{set $ghc_finish exp_lipstick}
+#include common/guitar_shot.dta
+#include common/guitar_near.dta
+(shot exp_lipstick)
+{set $ghc_guitar guitar_red_octane}
+{set $ghc_finish guitar_red_octane}
+#include common/guitar_shot.dta
+#include common/guitar_near.dta
+(shot guitar_red_octane)
+{set $ghc_guitar air_guitar}
+{set $ghc_finish air_guitar}
+#include common/guitar_shot.dta
+#include common/guitar_near.dta
+(shot air_guitar)
+(quit)
