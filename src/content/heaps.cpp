@@ -2,8 +2,9 @@
 // (heaps ...)), which gh2.dta includes from config/mem.dta: main 19630000
 // and rnd 5900000 on the disc. Each is one malloc, cut to the largest block
 // libc has, and with ps2_clamp_32 (TRUE in the engine's default.dta) to one
-// ending below 0x1f70000 (GetLargestFreeSysMem, 0x2ce888). The game's own keys come before default.dta's in
-// the merge, so the flag set here is the one read.
+// ending below 0x1f70000 (GetLargestFreeSysMem, 0x2ce888). The game's own
+// keys come before default.dta's in the merge, so the flag set here is the
+// one read.
 
 #include "content/heaps.h"
 

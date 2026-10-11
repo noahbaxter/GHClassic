@@ -99,12 +99,9 @@ namespace gh2::gh2x
             return camera;
         }
 
-        // Character::DrawShadowBuffer. The camera is the light's own
-        // rotation, back from the sphere's centre along the light's y by
-        // d = radius / tan(pi/8), with a 45 degree field of view, from
-        // d - radius to d + radius. The PS2's code has sin where that has
-        // tan; a Xenia frame's three shadow matrices all have a far to near
-        // of 2.41421, which is tan's
+        // Character::DrawShadowBuffer, with shadowCamera's camera. The PS2's
+        // code has sin where that has tan; a Xenia frame's three shadow
+        // matrices all have a far to near of 2.41421, which is tan's
         // (.planning/gh2x-look/xenia/shadow_matrices.json).
         void drawShadowBuffer(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
@@ -163,7 +160,8 @@ namespace gh2::gh2x
                 // file's either, by 0.87 to 1.43 in one frame.
                 const float reached = reach(frame, first, centre, radius * kReachLimit);
                 if (reached > radius)
-                    frame.cameras[camera] = shadowCamera(world, centre, reached, index);            }
+                    frame.cameras[camera] = shadowCamera(world, centre, reached, index);
+            }
             SET_GPR_U32(ctx, 29, sp);
             ctx->pc = returnTo;
         }

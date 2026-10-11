@@ -30,6 +30,9 @@ namespace gh2::textures
     // mounts the same discs. Nothing is read.
     uint32_t add(const Source &source);
 
+    // The bytes a stand-in's pixels start with: a magic word and the id.
+    constexpr size_t kNameBytes = 8u;
+
     // A bitmap file naming that payload: width by height in the smallest
     // form RndBitmap::Load (0x1b10d0) and PsTex::SyncBitmap take, 4 bits a
     // pixel in the PS2 disc's own order, no mips. Empty when its pixels

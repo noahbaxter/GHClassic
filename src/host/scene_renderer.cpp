@@ -426,13 +426,13 @@ namespace gh2
                 if (!present)
                     out[10 + i] = {{0.0f, 0.0f, 0.0f, 0.0f}};
             }
-            const Shading *shading = draw.material.shading.get();
-            out[13] = shading ? Vec4{{shading->specularColor[0], shading->specularColor[1],
-                                      shading->specularColor[2], shading->specularColor[3]}}
-                              : Vec4{{0.0f, 0.0f, 0.0f, 0.0f}};
+            // An x360 draw has its Mat's shading (shadedX360).
+            const Shading &shading = *draw.material.shading;
+            out[13] = {{shading.specularColor[0], shading.specularColor[1], shading.specularColor[2],
+                        shading.specularColor[3]}};
             // Intensity is 2 for a Mat with intensify, as 22 draws of a Xenia
             // frame have it.
-            out[14] = {{shading ? shading->emissive : 1.0f, draw.material.intensify ? 2.0f : 1.0f, 0.0f, 0.0f}};
+            out[14] = {{shading.emissive, draw.material.intensify ? 2.0f : 1.0f, 0.0f, 0.0f}};
             // gFogRange: the fog's end and one over its length, then whether
             // there is any; and gFogColor.
             const bool fog = e.fog && e.fogEnd > e.fogStart;
@@ -584,7 +584,7 @@ namespace gh2
         // The x360 shading, from the shading setting at startup: its own
         // shader pair and pipelines, a float colour target, and the post
         // stage (runPost). Its pipeline layout matches the PS2's in sets 0
-        // and 1 and adds the maps as set 2.
+        // and 1 and adds the maps as set 2 and the shadow map as set 3.
         bool x360 = false;
         VkFormat colorFormat = kColorFormat;
         VkDescriptorSetLayout mapsSetLayout = VK_NULL_HANDLE;
@@ -1750,6 +1750,8 @@ namespace gh2
                 return true;
             vkDeviceWaitIdle(device);
             destroyAttachments();
+            // Until all of it is made again, no size matches.
+            width = height = 0u;
 
             VkImage frame = image;
             if (x360)
@@ -2059,7 +2061,8 @@ namespace gh2
         }
 
         // The 360's post stage over the world drawn so far, which the main
-        // pass, just ended, left in the frame (TRANSFER_SRC_OPTIMAL): bloom
+        // pass, just ended, left in the frame (TRANSFER_SRC_OPTIMAL): depth
+        // of field's low picture and its blurs where the frame has any, bloom
         // taken from it at full size, halved twice and blurred, added back,
         // then the luminance map. The result goes into the frame's colour
         // attachment for the main pass to take up again. Called outside a
@@ -2336,14 +2339,13 @@ namespace gh2
         const GpuTexture *noShadow = nullptr;
         if (s.x360)
         {
-            static const std::shared_ptr<const Shading> plain = std::make_shared<Shading>();
             noShadow = s.gpuTexture(cmd, s.white, serial);
             for (size_t i = 0; i < frame.draws.size(); ++i)
             {
                 const DrawCall &draw = frame.draws[i];
                 if (draw.shadowCaster || !shadedX360(draw) || !noShadow)
                     continue;
-                drawShadings[i] = s.gpuShading(cmd, draw.material.shading ? draw.material.shading : plain, serial);
+                drawShadings[i] = s.gpuShading(cmd, draw.material.shading, serial);
                 x360Draws[i] = drawShadings[i] != nullptr;
                 if (x360Draws[i] && draw.shadow != 0u && draw.shadow <= shadowCount &&
                     frame.shadows[draw.shadow - 1u] < frame.cameras.size())
@@ -2597,7 +2599,7 @@ namespace gh2
                 push.flags |= kFlagProjected;
             std::memcpy(push.uvRows, material.uvXfm, sizeof(push.uvRows));
             std::memcpy(push.uvOffset, material.uvXfm + 4, sizeof(push.uvOffset));
-            if (x360Draws[i] && material.shading)
+            if (x360Draws[i])
             {
                 const Shading &shading = *material.shading;
                 push.flags |= (shading.normal ? kFlagNormalMap : 0u) | (shading.specular ? kFlagSpecularMap : 0u) |

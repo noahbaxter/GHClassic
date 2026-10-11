@@ -18,6 +18,7 @@
 #include "milo/layout.h"
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
+#include "settings/settings.h"
 
 #include <cmath>
 
@@ -69,7 +70,9 @@ namespace gh2
                     e.position[c] = load<float>(rdram, world + 0x30u + c * 4u);
                 }
                 e.range = load<float>(rdram, point + milo::light::kRange);
-                for (uint32_t node = load<uint32_t>(rdram, env + milo::environment::kFirstLight);
+                // Up to three, for the 360's shading alone.
+                const bool all = settings::get(settings::kShading) == settings::kX360;
+                for (uint32_t node = all ? load<uint32_t>(rdram, env + milo::environment::kFirstLight) : 0u;
                      node != 0u && e.pointCount < 3u; node = load<uint32_t>(rdram, node + 4u))
                 {
                     const uint32_t light = load<uint32_t>(rdram, node);

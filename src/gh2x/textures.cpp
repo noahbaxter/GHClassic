@@ -37,17 +37,6 @@ namespace gh2
 
         bool wanted() { return settings::get(settings::kTextures) == settings::kX360; }
 
-        ark::Made held(std::vector<uint8_t> bytes)
-        {
-            const auto file = std::make_shared<const std::vector<uint8_t>>(std::move(bytes));
-            return {static_cast<uint32_t>(file->size()), [file](uint64_t offset, uint8_t *dst, size_t want)
-                    {
-                        const size_t n = offset < file->size() ? std::min<size_t>(want, file->size() - offset) : 0u;
-                        std::memcpy(dst, file->data() + offset, n);
-                        return n;
-                    }};
-        }
-
         // A 360 bitmap that is a picture: DXT1 or DXT5, not empty.
         bool isPicture(const uint8_t *data, size_t size)
         {
@@ -128,7 +117,7 @@ namespace gh2
                 body.insert(body.end(), standIn.begin(), standIn.end());
                 ++paired;
             }
-            return paired ? std::optional(held(milo::write(*scene))) : std::nullopt;
+            return paired ? std::optional(ark::held(milo::write(*scene))) : std::nullopt;
         }
 
         // A stand-in for a bitmap file the 360 has at the same path.
@@ -144,12 +133,7 @@ namespace gh2
             if (!own || !theirs || !isPicture(theirs->data(), theirs->size()))
                 return std::nullopt;
             std::vector<uint8_t> standIn = textures::standIn(textures::add({xbox, twin, {}}), own->width, own->height);
-            return standIn.empty() ? std::nullopt : std::optional(held(std::move(standIn)));
-        }
-
-        bool endsWith(const std::string &text, const std::string &end)
-        {
-            return text.size() >= end.size() && text.compare(text.size() - end.size(), end.size(), end) == 0;
+            return standIn.empty() ? std::nullopt : std::optional(ark::held(std::move(standIn)));
         }
     }
 
@@ -164,8 +148,8 @@ namespace gh2
             const std::vector<std::string> theirs = ark::paths(*xbox, folder);
             for (const std::string &path : ark::paths(0u, folder))
             {
-                const bool scene = endsWith(path, ".milo_ps2");
-                if (!scene && !endsWith(path, ".bmp_ps2") && !endsWith(path, ".png_ps2"))
+                const bool scene = path.ends_with(".milo_ps2");
+                if (!scene && !path.ends_with(".bmp_ps2") && !path.ends_with(".png_ps2"))
                     continue;
                 const std::string twin = path.substr(0u, path.size() - 3u) + "xbox";
                 if (!std::binary_search(theirs.begin(), theirs.end(), twin))
