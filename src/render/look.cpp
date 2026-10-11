@@ -37,6 +37,9 @@ namespace gh2::look
         // Game thread only.
         std::vector<uint32_t> s_boards;
         uint64_t s_boardsAt = 0;
+        bool s_star = false;
+        bool s_swung = false; // star power has been on since the boards were made
+        float s_rest[3][3] = {};
 
         std::shared_ptr<const TextureData> map(uint32_t id)
         {
@@ -124,10 +127,29 @@ namespace gh2::look
     void addBoard(uint32_t mat)
     {
         if (s_frame > s_boardsAt + kHoldFrames)
+        {
             s_boards.clear();
+            s_star = s_swung = false;
+        }
         s_boardsAt = s_frame;
         if (!isBoard(mat))
             s_boards.push_back(mat);
+    }
+
+    void setStarPower(bool on)
+    {
+        s_star = on;
+        s_swung = s_swung || on;
+    }
+
+    void restBoard(Environ &board)
+    {
+        if (s_star)
+            return;
+        if (s_swung)
+            std::memcpy(board.toLight, s_rest, sizeof(s_rest));
+        else
+            std::memcpy(s_rest, board.toLight, sizeof(s_rest));
     }
 
     bool isBoard(uint32_t mat) { return std::find(s_boards.begin(), s_boards.end(), mat) != s_boards.end(); }

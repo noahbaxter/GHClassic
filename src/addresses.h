@@ -34,6 +34,8 @@ namespace gh2
         uint32_t characterDrawShadowBuffer; // Character::DrawShadowBuffer
         uint32_t rndSetShadowMap;           // Rnd::SetShadowMap, which PsRnd leaves as it is
         uint32_t charTrackSurfaceSetCharTexture; // CharTrackSurface::SetCharTexture(RndMat *)
+        uint32_t playerMatcherOnStartStarpower;  // PlayerMatcher::OnStartStarpower
+        uint32_t playerMatcherOnStopStarpower;   // PlayerMatcher::OnStopStarpower
         uint32_t psParticleSysDrawShowing;
         uint32_t updateRelativeXfm; // RndParticleSys::UpdateRelativeXfm
         uint32_t psEnvironSelect;
@@ -225,6 +227,8 @@ namespace gh2
         .characterDrawShadowBuffer = 0x1619c0u,
         .rndSetShadowMap = 0x364820u,
         .charTrackSurfaceSetCharTexture = 0x155470u,
+        .playerMatcherOnStartStarpower = 0x117018u,
+        .playerMatcherOnStopStarpower = 0x117060u,
         .psParticleSysDrawShowing = 0x1a2c28u,
         .updateRelativeXfm = 0x1cf7b0u,
         .psEnvironSelect = 0x1a2060u,
