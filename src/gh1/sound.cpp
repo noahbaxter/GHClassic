@@ -1,14 +1,14 @@
 // GH1's sounds where GH2's differ.
 //
-// Most of GH1's banks are GH2's recordings byte for byte: the buttons,
-// the cash register, the nowbar ticks, the star power gem hits. What
-// differs is its star power (sp_deployed, sp_depleted, sp_available) and
-// its stingers for beating the game (beat_easy, beat_other), and that GH1
-// plays nothing where GH2 adds a riser to star power (sp_deploystart.cue)
-// and a sound for a lost streak (streak_broken_<n>x.cue). GH2 reads its
-// in-game bank afresh for each song (GamePanel::LoadBanks, 0x106190;
-// loading.dta resets the bank loader), so the GH1 layer's copy is the one
-// a GH1 song plays and GH2's comes back with GH2's campaign.
+// GH1's banks are GH2's recordings: the buttons, the cash register, the
+// nowbar ticks and the star power gem hits byte for byte, and its star
+// power (sp_deployed, sp_depleted, sp_available) the same takes mixed
+// louder, which GH2 re-encoded at half the level. Its stingers for beating
+// the game (beat_easy, beat_other) are the same takes at 22050 Hz, where
+// GH2 keeps them at 12000, so GH2's in-game bank, every game's, takes
+// GH1's. GH2's riser to star power (sp_deploystart.cue) and its sound for
+// a lost streak (streak_broken_<n>x.cue), which GH1 never had, stay in for
+// every game too.
 
 #include "gh1/sound.h"
 
@@ -128,13 +128,10 @@ namespace gh2::gh1
             return;
         }
         const std::map<std::string, Sample> theirs = gh1Samples(*bnk, *nse);
-        // GH2's sample of each sound, by its file, and GH1's sound in its
-        // place; none for a sound GH1 does not have.
+        // GH2's sample of each stinger, by its file, and GH1's in its place.
         const std::map<std::string, const char *> kSwap = {
-            {"sp_deployed_elec3.wav", "sp_deployed"}, {"sp_depleted_elec2.wav", "sp_depleted"},
-            {"sp_available_tube2.wav", "sp_available"}, {"beat_easy.wav", "beat_easy"},
-            {"beat_other.wav", "beat_other"}, {"sp_deploystart2_22.wav", nullptr},
-            {"streak_broken1_22.wav", nullptr},
+            {"beat_easy.wav", "beat_easy"},
+            {"beat_other.wav", "beat_other"},
         };
         size_t done = 0u;
         for (size_t i = 0; i < dir->entries.size(); ++i)
@@ -142,20 +139,18 @@ namespace gh2::gh1
             const auto it = kSwap.find(dir->entries[i].second);
             if (dir->entries[i].first != "SynthSample" || it == kSwap.end())
                 continue;
-            const auto sample = it->second ? theirs.find(it->second) : theirs.end();
-            if (it->second && sample == theirs.end())
+            const auto sample = theirs.find(it->second);
+            if (sample == theirs.end())
                 continue;
-            const auto body = sample != theirs.end() ? withData(dir->bodies[i], sample->second.adpcm, sample->second.rate)
-                                                     : withData(dir->bodies[i], kSilence, 22050u);
-            if (body)
+            if (auto body = withData(dir->bodies[i], sample->second.adpcm, sample->second.rate))
             {
                 dir->bodies[i] = std::move(*body);
                 ++done;
             }
         }
         if (done != kSwap.size())
-            std::cerr << "[gh1] " << done << " of " << kSwap.size() << " in-game sounds made GH1's" << std::endl;
-        ark::addFile(layer, "sfx/gen/ingame_bank.milo_ps2", milo::write(*dir));
+            std::cerr << "[gh1] " << done << " of " << kSwap.size() << " stingers made GH1's" << std::endl;
+        ark::addFile("sfx/gen/ingame_bank.milo_ps2", milo::write(*dir));
     }
 
     std::optional<std::vector<uint8_t>> silenced(const std::vector<uint8_t> &bank)
