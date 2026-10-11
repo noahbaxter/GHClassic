@@ -202,6 +202,11 @@ namespace gh2::gh1
                     skins->nodes.push_back(own->second);
             }
         }
+        guitars->nodes.push_back(
+            array({symbol(kExtra.guitar), array({symbol("type"), symbol("guitar")}),
+                   array({symbol("skins"), array({symbol(kExtra.finish.key), array({symbol("outfit"), symbol(kExtra.finish.outfit)}),
+                                                  array({symbol("mat"), symbol(kExtra.finish.mat)})})})}));
+        bodies.insert(kExtra.guitar);
         std::erase_if(guitars->nodes, [&](const dtb::Node &guitar)
                       {
                           const dtb::Node *type = dtb::find(guitar, "type");
@@ -286,6 +291,10 @@ namespace gh2::gh1
         if (const dtb::Node *sold = dtb::find(*theirStore, "song"))
             for (size_t i = 1u; i < sold->nodes.size(); ++i)
                 songs.insert(keyOf(sold->nodes[i]));
+        text[kExtra.guitar] = kExtra.name;
+        text[std::string(kExtra.guitar) + "_desc"] = kExtra.blurb;
+        text[kExtra.finish.key] = kExtra.finishName;
+        text[std::string(kExtra.finish.key) + "_desc"] = kExtra.finishBlurb;
         for (const dtb::Node &entry : strings->nodes)
         {
             if (entry.type != dtb::kArray || entry.nodes.size() < 2u)

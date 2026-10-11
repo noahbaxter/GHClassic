@@ -26,6 +26,18 @@ namespace gh2::gh1
 
     const Finish *finish(const std::string &skin);
 
+    // The guitar GH1's disc holds and nothing on it names
+    // (guitar_tobac.rnd): a double-cut in tobacco sunburst, with no name,
+    // blurb or price of GH1's. Here it is one more guitar of GH1's career,
+    // a band's from the start, under a name and blurb of ours.
+    struct Extra
+    {
+        const char *guitar, *name, *blurb;
+        Finish finish;
+        const char *finishName, *finishBlurb;
+    };
+    extern const Extra kExtra;
+
     // A GH1 guitar's name in its career's config: its Gibsons by GH2's names
     // for the same bodies and the Grim Ripper's as GH2's, the Battle Axe
     // by its own.

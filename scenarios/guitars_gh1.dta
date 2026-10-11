@@ -114,4 +114,13 @@
 (shot cor_snake_far)
 #include common/guitar_near.dta
 (shot cor_snake_near)
+
+; The guitar on GH1's disc that nothing there names.
+(expect {localize tobac} "The Tobacco")
+{set $ghc_guitar tobac}
+{set $ghc_finish tobac_sunburst}
+#include common/guitar_shot.dta
+(shot tobac_far)
+#include common/guitar_near.dta
+(shot tobac_near)
 (quit)

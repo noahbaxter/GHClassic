@@ -76,7 +76,17 @@ namespace gh2::gh1
             {"gh1_lespaul_dbl_custom", "lp_dbl_white", "guitar_lespaul_dbl_custom"},
             {"gh1_battleaxe", "battleaxe", "guitar_battleaxe"},
             {"gh1_ripper", "scythe", "guitar_ripper"},
+            // On GH1's disc and named by nothing on it (kExtra).
+            {"gh1_tobac", "guitar_sg", "guitar_tobac"},
         };
+
+        // The tobacco guitar's rig was left unfinished: its neck's bone was
+        // moved to its neck, 1.4 across and 1.5 along from the Flying V's it
+        // was made from, with the fret hand's bone under it held where the
+        // Flying V's is, off the neck. It takes the Flying V's place under
+        // the neck's bone, as every finished guitar's has.
+        const char *const kUnfitted = "guitar_tobac", *const kFitted = "guitar_fv", *const kFretHand = "bone_fret_hand.mesh";
+        constexpr size_t kLocal = 8u, kXfm = 48u; // a GH1 Mesh's local transform
 
         // A GH1 finish that is a texture on a model GH2 has: GH2's scene
         // with one more Mat, GH2's `like` naming that Tex, which comes from
@@ -97,6 +107,13 @@ namespace gh2::gh1
         const char *const kTheirs = "charsys/guitars/gen/", *const kOurs = "char/og/guitars/gen/";
         const char *const kObjects = "char/gen/char_objects.dtb";
     }
+
+    const Extra kExtra = {"tobac",
+                          "The Tobacco",
+                          "Found on the Guitar Hero disc with no name, no price and no place in the game. It plays all the same.",
+                          {nullptr, "tobac_sunburst", "gh1_tobac", "tobacco.mat"},
+                          "Tobacco Sunburst",
+                          "The only finish it was ever given."};
 
     const Finish *finish(const std::string &skin)
     {
@@ -144,11 +161,20 @@ namespace gh2::gh1
         ark::addFile(kObjects, dtb::write(*root));
         for (const Model &m : kModels)
         {
-            const auto base = ours(m.base), gh1 = theirs(m.theirs);
+            const auto base = ours(m.base);
+            auto gh1 = theirs(m.theirs);
             if (!base || !gh1)
             {
                 std::cerr << "[gh1] cannot read " << m.theirs << " or " << m.base << std::endl;
                 continue;
+            }
+            if (std::string(m.theirs) == kUnfitted)
+            {
+                const auto fitted = theirs(kFitted);
+                const auto from = fitted ? milo::find(*fitted, kFretHand) : std::nullopt;
+                const auto to = milo::find(*gh1, kFretHand);
+                if (from && to && fitted->bodies[*from].size() >= kLocal + kXfm && gh1->bodies[*to].size() >= kLocal + kXfm)
+                    std::copy_n(fitted->bodies[*from].begin() + kLocal, kXfm, gh1->bodies[*to].begin() + kLocal);
             }
             ark::addFile(std::string(kOurs) + m.scene + ".milo_ps2", milo::write(guitar(*base, *gh1)));
         }
