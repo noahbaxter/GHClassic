@@ -205,7 +205,8 @@ namespace gh2
         return !s_request.empty() || s_writing;
     }
 
-    void writeDrawDump(const Frame &frame, const PushConstants *pushes, const Vec4 *data)
+    void writeDrawDump(const Frame &frame, const PushConstants *pushes, const Vec4 *data, const char *x360,
+                       uint32_t x360Vec4s)
     {
         std::filesystem::path path;
         {
@@ -274,9 +275,12 @@ namespace gh2
                     std::fprintf(file, "\"texture\": null, ");
                 // What the lighting program is given: the material colour
                 // (qw690) and the draw's block of writeLighting.
-                std::fprintf(file, "\"flags\": %u, \"matColor\": [%.9g, %.9g, %.9g, %.9g], \"light\": [", pc.flags,
-                             pc.matColor[0], pc.matColor[1], pc.matColor[2], pc.matColor[3]);
-                for (int l = 0; pc.lightBase >= 0 && l < 7; ++l)
+                // An x360 draw's block is writeShading's, all of it.
+                const bool shaded = x360 && x360[i];
+                std::fprintf(file, "\"flags\": %u, \"matColor\": [%.9g, %.9g, %.9g, %.9g], \"x360\": %s, \"light\": [",
+                             pc.flags, pc.matColor[0], pc.matColor[1], pc.matColor[2], pc.matColor[3],
+                             shaded ? "true" : "false");
+                for (uint32_t l = 0; pc.lightBase >= 0 && l < (shaded ? x360Vec4s : 7u); ++l)
                     std::fprintf(file, "%s[%.9g, %.9g, %.9g, %.9g]", l ? ", " : "", data[pc.lightBase + l].v[0],
                                  data[pc.lightBase + l].v[1], data[pc.lightBase + l].v[2], data[pc.lightBase + l].v[3]);
                 // The matrices VU1 is given: the mesh's world (qw676..679 when rigid) and a

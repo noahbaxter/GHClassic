@@ -2527,7 +2527,7 @@ namespace gh2
             if (shadowOf[i] >= 0)
                 push.flags |= kFlagShadow;
         }
-        writeDrawDump(frame, pushes.data(), data.mapped);
+        writeDrawDump(frame, pushes.data(), data.mapped, x360Draws.data(), kShadingVec4s);
 
         // The post stage runs once the world is drawn, before what is drawn
         // over it: after the last draw through the camera the first x360
