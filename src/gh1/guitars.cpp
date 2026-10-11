@@ -6,6 +6,9 @@
 #include "gh1/scene.h"
 #include "milo/milo.h"
 
+#include "flyingv_old_layout.h"
+
+#include <algorithm>
 #include <cstring>
 #include <iostream>
 #include <map>
@@ -110,6 +113,43 @@ namespace gh2::gh1
 
     const Extra kExtra = {"tobac", {nullptr, "tobac_sunburst", "gh1_tobac", "tobacco.mat"}};
 
+    const Unoffered kUnoffered[3] = {
+        {"flying_v", {nullptr, "fv_black", "gh1_fv_black", "guitar_fv_black.mat"}, 250,
+         "charsys/guitars/textures/gen/flyingv_black.bmp_ps2"},
+        {"flying_v", {nullptr, "fv_blue", "gh1_fv_blue", "guitar_fv_blue.mat"}, 250,
+         "charsys/guitars/textures/gen/flyingv_blue.bmp_ps2"},
+        {"flying_v", {nullptr, "fv_yellow", "gh1_fv_yellow", "guitar_fv_yellow.mat"}, 250,
+         "charsys/guitars/textures/gen/flyingv_yellow.bmp_ps2"},
+    };
+
+    namespace
+    {
+        // GH2's Flying V, whose one Tex and Mat a repainted finish is made
+        // like. A bitmap is 32 bytes (its depth at 1, its width at 7 and
+        // height at 9), 256 colours of four bytes, then a byte a texel; a
+        // Tex ends in its bitmap.
+        constexpr const char *kV = "fv_white", *kVMat = "fv_white.mat", *kVTex = "flyingv_white.tex";
+        constexpr size_t kHead = 32u, kPalette = 1024u, kSide = 256u, kOldRows = 128u;
+
+        // The old layout's bitmap as the shipped V's: the same colours, each
+        // texel the old one the table names.
+        Bytes repainted(const Bytes &old)
+        {
+            if (old.size() != kHead + kPalette + kSide * kOldRows || old[1] != 8u || sizeof kFlyingVOldLayout != kSide * kSide * 2u)
+                return {};
+            Bytes out(old.begin(), old.begin() + kHead + kPalette);
+            out[9] = 0u;
+            out[10] = 1u;
+            out.resize(kHead + kPalette + kSide * kSide);
+            for (size_t i = 0; i < kSide * kSide; ++i)
+            {
+                const size_t column = kFlyingVOldLayout[i * 2u], row = std::min<size_t>(kFlyingVOldLayout[i * 2u + 1u], kOldRows - 1u);
+                out[kHead + kPalette + i] = old[kHead + kPalette + row * kSide + column];
+            }
+            return out;
+        }
+    }
+
     const Finish *finish(const std::string &skin)
     {
         for (const Finish &f : kFinishes)
@@ -153,6 +193,8 @@ namespace gh2::gh1
             listed->nodes.push_back(dtb::array({dtb::symbol(m.scene)}));
         for (const Texture &t : kTextures)
             listed->nodes.push_back(dtb::array({dtb::symbol(t.scene)}));
+        for (const Unoffered &u : kUnoffered)
+            listed->nodes.push_back(dtb::array({dtb::symbol(u.finish.outfit)}));
         ark::addFile(kObjects, dtb::write(*root));
         for (const Model &m : kModels)
         {
@@ -189,6 +231,25 @@ namespace gh2::gh1
                 milo::add(*scene, "Tex", t.tex, gh1->bodies[*tex]);
             milo::add(*scene, "Mat", t.mat, renamed(scene->bodies[*like], was[0], t.tex));
             ark::addFile(std::string(kOurs) + t.scene + ".milo_ps2", milo::write(*scene));
+        }
+        for (const Unoffered &u : kUnoffered)
+        {
+            auto scene = ours(kV);
+            const auto like = scene ? milo::find(*scene, kVMat) : std::nullopt;
+            const auto tex = scene ? milo::find(*scene, kVTex) : std::nullopt;
+            const auto old = ark::readFile(gh1Disc, u.file);
+            const Bytes bitmap = old ? repainted(*old) : Bytes();
+            if (!like || !tex || bitmap.empty() || scene->bodies[*tex].size() < bitmap.size())
+            {
+                std::cerr << "[gh1] cannot build " << u.finish.outfit << std::endl;
+                continue;
+            }
+            const std::string name = std::string(u.finish.key) + ".tex";
+            Bytes body(scene->bodies[*tex].begin(), scene->bodies[*tex].end() - static_cast<std::ptrdiff_t>(bitmap.size()));
+            body.insert(body.end(), bitmap.begin(), bitmap.end());
+            milo::add(*scene, "Tex", name, std::move(body));
+            milo::add(*scene, "Mat", u.finish.mat, renamed(scene->bodies[*like], kVTex, name));
+            ark::addFile(std::string(kOurs) + u.finish.outfit + ".milo_ps2", milo::write(*scene));
         }
     }
 }

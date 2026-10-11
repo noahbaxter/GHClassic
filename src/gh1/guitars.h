@@ -37,6 +37,24 @@ namespace gh2::gh1
     };
     extern const Extra kExtra;
 
+    // Three Flying V finishes GH1's disc holds as loose textures no scene
+    // draws (flyingv_black, _blue and _yellow.bmp), painted for an older
+    // model of the V that only a GH2 demo disc has, in a layout the V that
+    // shipped cannot wear. Each is repainted here into the shipped V's
+    // layout, texel by texel, by a table of where each texel of the one
+    // sits in the other (flyingv_old_layout.bin: the nearest point of the
+    // old model's surface to each texel's place on the shipped one, worked
+    // out once with the demo's model). Finishes of GH1's career's Flying V,
+    // sold at the price of its dearest.
+    struct Unoffered
+    {
+        const char *guitar;
+        Finish finish;
+        int price;
+        const char *file; // on GH1's disc
+    };
+    extern const Unoffered kUnoffered[3];
+
     // A GH1 guitar's name in its career's config: its Gibsons by GH2's names
     // for the same bodies and the Grim Ripper's as GH2's, the Battle Axe
     // by its own.

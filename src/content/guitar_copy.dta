@@ -29,6 +29,17 @@
 (air_guitar_desc "")
 (air_guitar_shop_desc "")
 
+; Three Flying V finishes GH1's disc holds and never offers (GH1's store).
+(fv_black "")
+(fv_black_desc "")
+(fv_black_shop_desc "")
+(fv_blue "")
+(fv_blue_desc "")
+(fv_blue_shop_desc "")
+(fv_yellow "")
+(fv_yellow_desc "")
+(fv_yellow_shop_desc "")
+
 ; GH1's guitar that nothing on its disc names, and its one finish (a band's
 ; from the start of GH1's career, in no store).
 (tobac "")

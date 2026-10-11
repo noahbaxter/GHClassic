@@ -18,7 +18,8 @@
 (expect {elem {elem {find $syscfg guitars scythe skins} 1} 0} scythe_gh1)
 (expect {elem {find $syscfg store skin sg_ebony price} 1} 150)
 (expect {elem {find $syscfg store skin lp_dbl_custom price} 1} 250)
-(expect {size {find $syscfg store skin}} 29)
+(expect {size {find $syscfg store skin}} 32)
+(expect {elem {find $syscfg store skin fv_black price} 1} 250)
 ; GH1's names, for a finish of GH2's and for ones that are not.
 (expect {localize sg_cherry} "Cherry Gibson SG")
 (expect {localize sg_ebony} "Ebony Gibson SG")
@@ -114,6 +115,23 @@
 (shot cor_snake_far)
 #include common/guitar_near.dta
 (shot cor_snake_near)
+
+; The three Flying V finishes GH1's disc holds as loose textures, repainted
+; for the V that shipped.
+{set $ghc_guitar flying_v}
+{set $ghc_finish fv_black}
+#include common/guitar_shot.dta
+(shot fv_black_far)
+#include common/guitar_near.dta
+(shot fv_black_near)
+{set $ghc_finish fv_blue}
+#include common/guitar_shot.dta
+#include common/guitar_near.dta
+(shot fv_blue_near)
+{set $ghc_finish fv_yellow}
+#include common/guitar_shot.dta
+#include common/guitar_near.dta
+(shot fv_yellow_near)
 
 ; The guitar on GH1's disc that nothing there names.
 {set $ghc_guitar tobac}

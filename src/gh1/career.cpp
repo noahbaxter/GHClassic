@@ -202,6 +202,11 @@ namespace gh2::gh1
                     skins->nodes.push_back(own->second);
             }
         }
+        for (const Unoffered &u : kUnoffered)
+            if (dtb::Node *guitar = child(*guitars, u.guitar))
+                if (dtb::Node *skins = child(*guitar, "skins"))
+                    skins->nodes.push_back(array({symbol(u.finish.key), array({symbol("outfit"), symbol(u.finish.outfit)}),
+                                                  array({symbol("mat"), symbol(u.finish.mat)})}));
         guitars->nodes.push_back(
             array({symbol(kExtra.guitar), array({symbol("type"), symbol("guitar")}),
                    array({symbol("skins"), array({symbol(kExtra.finish.key), array({symbol("outfit"), symbol(kExtra.finish.outfit)}),
@@ -226,6 +231,8 @@ namespace gh2::gh1
             for (size_t i = 1u; i < sold->nodes.size(); ++i)
                 if (const Finish *f = finish(keyOf(sold->nodes[i])))
                     list.nodes.push_back(priced(f->key, priceOf(sold->nodes[i])));
+        for (const Unoffered &u : kUnoffered)
+            list.nodes.push_back(priced(u.finish.key, u.price));
         store.nodes.push_back(list);
         if (const dtb::Node *sold = dtb::find(*theirStore, "song"))
             store.nodes.push_back(*sold);
