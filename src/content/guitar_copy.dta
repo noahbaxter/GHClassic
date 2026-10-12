@@ -15,36 +15,37 @@
 (exp_lipstick_desc "")
 (exp_lipstick_shop_desc "")
 
-; Nine of GH1's finishes that GH2's scenes still hold (GH2's store). GH1's
-; disc names each (its locale.dta, by gibson_<body>_<finish>), which GH1's
-; career shows them by.
+; Nine of GH1's finishes that GH2's scenes still hold (GH2's store). Their
+; blurbs are GH1's own (its locale.dta, by gibson_<body>_<finish>). Its names
+; are the whole guitar's ("Goldtop Gibson Les Paul Standard"), where GH2
+; names a finish under its guitar ("Ebony Finish"): those are still to write.
 (lp_ebony "")
-(lp_ebony_desc "")
-(lp_ebony_shop_desc "")
+(lp_ebony_desc "The all-time favorite Gibson model, the Les Paul Standard is recognized the world over as an icon for rock and roll.")
+(lp_ebony_shop_desc "This classic Gibson Les Paul Standard comes in an Ebony finish.  It isn't fancy, but it rocks!")
 (lp_gold "")
-(lp_gold_desc "")
-(lp_gold_shop_desc "")
+(lp_gold_desc "When the original Les Paul made its debut in 1952, the model featured a striking Goldtop finish. The Goldtop finish was originally offered from 1952-1958, returning in 1968 and still going strong today.")
+(lp_gold_shop_desc "The Goldtop finish was originally offered from 1952-1958, returning in 1968 and still going strong today.")
 (fb_copper "")
-(fb_copper_desc "")
-(fb_copper_shop_desc "")
+(fb_copper_desc "The top-of-the-line Firebird features mother-of-pearl fingerboard inlays that place it in the ranks of Gibson's most prestigious models.")
+(fb_copper_shop_desc "This sleek copper finish compliments the unconventional shape of the Gibson Firebird.")
 (fb_hippie "")
-(fb_hippie_desc "")
-(fb_hippie_shop_desc "")
+(fb_hippie_desc "The Harmonix custom shop did the paint job on this Custom Gibson Firebird.  The inspiration was drawn from years of Friday night Led Zeppelin laser shows.")
+(fb_hippie_shop_desc "Trade in your hard earned cash for this crazy cool custom finish on this Gibson Firebird.")
 (mod_black "")
-(mod_black_desc "")
-(mod_black_shop_desc "")
+(mod_black_desc "A bizarre mutation of the Flying V, the Moderne was designed in the 1950s but never went to market until the 1980s.")
+(mod_black_shop_desc "Make a statement with the Gibson Moderne.  The post-modern design will get you noticed.")
 (mod_dragon "")
-(mod_dragon_desc "")
-(mod_dragon_shop_desc "")
+(mod_dragon_desc "The Gibson Moderne's already innovative shape takes flight with the custom Night Dragon finish.  Only rock will soothe this savage beast!")
+(mod_dragon_shop_desc "The Gibson Moderne's already innovative shape takes flight with the custom Night Dragon finish. Only rock can soothe this savage beast!")
 (cor_white "")
-(cor_white_desc "")
-(cor_white_shop_desc "")
+(cor_white_desc "The mysterious shape of the Gibson Corvus attracted Xavier Stone at an early age.  One of his first guitars, it has accompanied him on more than 7 world tours.")
+(cor_white_shop_desc "A classic take on a guitar that is anything but ordinary.  The Gibson Corvus.")
 (cor_snake "")
-(cor_snake_desc "")
-(cor_snake_shop_desc "")
+(cor_snake_desc "Reptilian rockers love the Custom Snakeskin Gibson Corvus. Shed your conventional skin and slither your way into rock-stardom with this distinctive take on an already unique guitar.")
+(cor_snake_shop_desc "A distinctive slant on an already unusual guitar, the Custom Snakeskin Gibson Corvus makes a memorable impression.")
 (es_ebony "")
-(es_ebony_desc "")
-(es_ebony_shop_desc "")
+(es_ebony_desc "\qES\q stands for Electric Spanish.  Typically, Spanish guitars are acoustic and have nylon strings.  The ES-335 brings a little something different to the world of rock electric guitar.")
+(es_ebony_shop_desc "As classy as they come, you'll definitely raise some eyebrows playing this Ebony Gibson ES-335.")
 
 ; The controller as a guitar (GH2's store, once hard's tour is passed). Its
 ; name and blurb are GH1's own for it (GH1's locale.dta), where it is a
