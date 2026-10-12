@@ -43,6 +43,7 @@ namespace gh2
 
         // A side of the PS2 store's album art (its us_logo pictures).
         constexpr uint32_t kAlbumArtSide = 256u;
+        constexpr const char *kSongsToContinue = "song_current_venue";
 
         // Paths under songs/<name>/ moved to songs/x_<name>/, practice keys
         // dropped.
@@ -166,7 +167,17 @@ namespace gh2
             if (const dtb::Node *tip = dtb::find(strings, "loading_tip14"); tip && tip->nodes.size() > 1u)
                 locale::add("loading_tip14", tip->nodes[1].text);
 
+            // The setlist's "Beat %i/5 songs to continue": a 360 venue has
+            // five songs before its encore where PS2's has four.
+            auto text = dtb::read("ui/eng/locale.dta", none, game);
+            const dtb::Node *theirLine = dtb::find(strings, kSongsToContinue);
+            dtb::Node *line = text ? child(*text, kSongsToContinue) : nullptr;
+            if (line && theirLine && line->nodes.size() > 1u && theirLine->nodes.size() > 1u)
+                line->nodes[1].text = theirLine->nodes[1].text;
+
             const size_t layer = ark::addLayer(std::nullopt);
+            if (line)
+                ark::addFile(layer, "ui/eng/gen/locale.dtb", dtb::write(*text));
             ark::addFile(layer, "config/gen/campaign.dtb", dtb::write(campaign));
             ark::addFile(layer, "config/gen/store.dtb", dtb::write(*store));
             ark::addFile(layer, "config/gen/guitars.dtb", dtb::write(*guitars));
