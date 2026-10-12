@@ -130,7 +130,12 @@ namespace gh2
                     (font != fonts->end() && !font->second))
                     continue;
                 const auto own = oneLevel(body.data() + tex->bitmap, body.size() - tex->bitmap);
-                const auto at = std::find(other->entries.begin(), other->entries.end(), scene->entries[i]);
+                // A picture with words in it has one Tex a language on the
+                // 360, the English one named _eng (setlist_top_eng.tex).
+                auto at = std::find(other->entries.begin(), other->entries.end(), scene->entries[i]);
+                if (at == other->entries.end() && name.ends_with(".tex"))
+                    at = std::find(other->entries.begin(), other->entries.end(),
+                                   std::pair<std::string, std::string>("Tex", name.substr(0u, name.size() - 4u) + "_eng.tex"));
                 if (!own || at == other->entries.end())
                     continue;
                 const milo::Bytes &theirBody = other->bodies[static_cast<size_t>(at - other->entries.begin())];
@@ -156,7 +161,7 @@ namespace gh2
                         scene->bodies[(*font->second)[f].first] = std::move(made[f]);
                 }
                 const std::vector<uint8_t> standIn =
-                    textures::standIn(textures::add({xbox, twin, name}), own->width, own->height);
+                    textures::standIn(textures::add({xbox, twin, at->second}), own->width, own->height);
                 const auto shape = bitmap::read(standIn.data(), standIn.size());
                 if (!shape)
                     continue;
@@ -195,7 +200,12 @@ namespace gh2
                 const bool scene = path.ends_with(".milo_ps2");
                 if (!scene && !path.ends_with(".bmp_ps2") && !path.ends_with(".png_ps2"))
                     continue;
-                const std::string twin = path.substr(0u, path.size() - 3u) + "xbox";
+                // The PS2's og folders are the 360's ng (ui/image/og/gen,
+                // the store's posters and album art).
+                std::string twin = path.substr(0u, path.size() - 3u) + "xbox";
+                if (const size_t og = twin.find("/og/");
+                    og != std::string::npos && !std::binary_search(theirs.begin(), theirs.end(), twin))
+                    twin.replace(og, 4u, "/ng/");
                 if (!std::binary_search(theirs.begin(), theirs.end(), twin))
                     continue;
                 const auto make = scene ? makeScene : makeBitmap;
