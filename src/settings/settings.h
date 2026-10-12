@@ -30,6 +30,8 @@ namespace gh2::settings
         kTrackOnAtStart, // the player's track heard before its first hit
         kSustainReleaseMs, // a sustain let go this close to its end stays heard
         kWhammyHold, // a whammy bar held down bends every sustain
+        kNoteSpeedEasy, // Clone Hero's note speed in tenths, on easy and medium
+        kNoteSpeedHard, // and on hard and expert
         kDiscPrefer, // kChd or kIso: the image taken when the disc folder has both
         kCheckUpdates, // a newer release offered when the game starts
         kBand,       // whose backing band plays: the venue's game's, or one game's everywhere

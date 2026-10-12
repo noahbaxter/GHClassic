@@ -22,6 +22,7 @@
 #include "render/texture_store.h"
 
 #include <algorithm>
+#include <functional>
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>
@@ -272,6 +273,23 @@ namespace gh2
             return out;
         }
 
+        // A slider's scale (ui/slider.milo's slider_base.tex, 128 by 32) is
+        // white on clear: a 0, a hand-drawn track of eleven ticks, an 11.
+        // That is the volume's. A slider of anything else (ui/slider_scale.h)
+        // is drawn with the same track without the digits. Known by its
+        // name: the 360's disc has it too, in other pixels.
+        constexpr const char *kSliderScale = "slider_base.tex";
+
+        bool named(uint8_t *rdram, uint32_t object, const char *name)
+        {
+            const uint32_t at = load<uint32_t>(rdram, object + milo::object::kName);
+            return at != 0u && std::strcmp(reinterpret_cast<const char *>(getMemPtr(rdram, at)), name) == 0;
+        }
+        std::shared_ptr<const TextureData> s_volumeScale;
+        std::vector<uint32_t> s_sliderScales;
+        std::shared_ptr<const TextureData> s_scaleDrawn; // in the volume's place, or null
+        std::function<void(const float *)> s_scaleColour;
+
         // Textures a font draws with, by RndTex: found at RndText::DrawShowing
         // (0x1dc380), through its font (+0x11c), the font's material (+0x30)
         // and that material's texture.
@@ -286,7 +304,9 @@ namespace gh2
             return out;
         }
 
-        void store(uint32_t tex, std::shared_ptr<const TextureData> data)
+        // Not `store`: guest.h's of that name takes these and writes them
+        // to guest memory.
+        void keep(uint8_t *rdram, uint32_t tex, std::shared_ptr<const TextureData> data)
         {
             if (s_textTextures.contains(tex))
                 data = asText(std::move(data));
@@ -306,6 +326,12 @@ namespace gh2
                     if (s_greenFretIcon)
                         data = yellowed(*s_greenFretIcon);
                 }
+            }
+            if (data && data->width == 128u && data->height == 32u && named(rdram, tex, kSliderScale))
+            {
+                s_volumeScale = data;
+                if (std::find(s_sliderScales.begin(), s_sliderScales.end(), tex) == s_sliderScales.end())
+                    s_sliderScales.push_back(tex);
             }
             s_textures[tex] = std::move(data);
         }
@@ -332,7 +358,7 @@ namespace gh2
             if (!id)
             {
                 s_standIns.erase(tex);
-                store(tex, decodeWithMips(rdram, bitmap));
+                keep(rdram, tex, decodeWithMips(rdram, bitmap));
                 return;
             }
             // Synced again with the same payload, it keeps what it holds.
@@ -376,6 +402,7 @@ namespace gh2
             s_standIns.erase(tex);
             s_textTextures.erase(tex);
             std::erase(s_yellowFretIcons, tex);
+            std::erase(s_sliderScales, tex);
         }
 
         // PsTex::CopyFromScreen(x, y) (0x1a0d68) has the GS move the texture's
@@ -418,6 +445,8 @@ namespace gh2
 
     std::shared_ptr<const TextureData> capturedTexture(uint8_t *rdram, uint32_t tex)
     {
+        if (s_scaleDrawn && std::find(s_sliderScales.begin(), s_sliderScales.end(), tex) != s_sliderScales.end())
+            return s_scaleDrawn;
         if (const auto found = s_textures.find(tex); found != s_textures.end())
             return found->second;
         if (s_foreign && tex != 0u && !s_standIns.contains(tex))
@@ -429,9 +458,36 @@ namespace gh2
             capture(rdram, tex);
         }
         if (const auto payload = s_standIns.find(tex); payload != s_standIns.end())
-            store(tex, textures::get(payload->second));
+            keep(rdram, tex, textures::get(payload->second));
         const auto found = s_textures.find(tex);
         return found != s_textures.end() ? found->second : nullptr;
+    }
+
+    std::shared_ptr<const TextureData> plainSliderScale()
+    {
+        // The track runs these columns, the digits either side of them.
+        constexpr uint32_t kLeft = 15u, kRight = 108u;
+        if (!s_volumeScale)
+            return nullptr;
+        auto scale = std::make_shared<TextureData>(*s_volumeScale);
+        scale->mips.clear();
+        for (uint32_t y = 0; y < scale->height; ++y)
+            for (uint32_t x = 0; x < scale->width; ++x)
+                if (x < kLeft || x > kRight)
+                    scale->rgba[(static_cast<size_t>(y) * scale->width + x) * 4u + 3u] = 0u;
+        return scale;
+    }
+
+    void drawSliderScalesAs(std::shared_ptr<const TextureData> scale, std::function<void(const float *)> drawn)
+    {
+        s_scaleDrawn = std::move(scale);
+        s_scaleColour = std::move(drawn);
+    }
+
+    void sliderScaleDrawn(uint32_t tex, const float *colour)
+    {
+        if (s_scaleColour && std::find(s_sliderScales.begin(), s_sliderScales.end(), tex) != s_sliderScales.end())
+            s_scaleColour(colour);
     }
 
     void forgetTextureAddresses()
@@ -440,6 +496,7 @@ namespace gh2
         s_standIns.clear();
         s_textTextures.clear();
         s_yellowFretIcons.clear();
+        s_sliderScales.clear();
         s_foreign = true;
     }
 

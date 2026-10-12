@@ -206,6 +206,7 @@ set(GHC_GAME_SOURCES
     src/build_info.cpp
     src/game.cpp
     src/frame_step.cpp
+    src/note_speed.cpp
     src/script.cpp
     src/sustain_release.cpp
     src/track_start.cpp
@@ -305,6 +306,7 @@ set(GHC_GAME_SOURCES
     src/ui/help_bar.cpp
     src/ui/menus.cpp
     src/ui/meta_music.cpp
+    src/ui/slider_scale.cpp
     src/host/audio.cpp
     src/host/bind.cpp
     src/host/bindings.cpp
@@ -394,7 +396,8 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     src/ui/dta/lag_panel.dta src/ui/dta/highscore_panel.dta src/ui/dta/main_menu.dta src/ui/dta/fast_boot.dta
     src/ui/dta/locale.dta src/ui/dta/crowd.dta src/ui/dta/sel_character.dta src/ui/dta/quickplay.dta
     src/ui/dta/campaigns.dta src/gh1/menus.dta src/gh1/scripts.dta src/ui/dta/picker.dta src/ui/dta/quickplay_pickers.dta
-    src/content/guitar_copy.dta)
+    src/content/guitar_copy.dta src/ui/dta/game_settings.dta)
+file(READ src/ui/dta/game_settings.dta GHC_GAME_SETTINGS_DTA)
 configure_file(src/ui/dta/dta.h.in "${GHC_DTA_DIR}/dta.h" @ONLY)
 file(READ config/settings.template.ini GHC_SETTINGS_TEMPLATE)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS config/settings.template.ini)

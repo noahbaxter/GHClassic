@@ -30,8 +30,10 @@
 #include "ui/locale.h"
 #include "ui/menus.h"
 #include "ui/meta_music.h"
+#include "ui/slider_scale.h"
 #include "movie/movie.h"
 #include "dev/cheats.h"
+#include "note_speed.h"
 #include "dev/null_rnd.h"
 #include "host/pad.h"
 #include "render/mesh_capture.h"
@@ -91,6 +93,8 @@ namespace
         gh2::installSustainRelease(runtime, gh2::kSlus21447);
         gh2::installWhammyHold(runtime, gh2::kSlus21447);
         gh2::installTourOrHigher(runtime, gh2::kSlus21447);
+        gh2::installNoteSpeed(runtime, gh2::kSlus21447);
+        gh2::slider_scale::install(runtime, gh2::kSlus21447);
         gh2::installMovies(runtime, gh2::kSlus21447);
         gh2::installVideoOptions(runtime, gh2::kSlus21447);
         gh2::card::install(runtime, gh2::kSlus21447);

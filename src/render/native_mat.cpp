@@ -240,6 +240,7 @@ namespace gh2
         {
             const uint32_t tex = load<uint32_t>(rdram, mat + milo::mat::kDiffuseTex);
             m.texture = capturedTexture(rdram, tex);
+            sliderScaleDrawn(tex, m.color);
             const uint32_t type = tex != 0u ? load<uint32_t>(rdram, tex + milo::tex::kType) : 0u;
             if ((type & milo::tex::kTypeRendered) != 0u)
                 m.renderTarget = tex;

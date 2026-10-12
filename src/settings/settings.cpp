@@ -80,6 +80,11 @@ namespace gh2::settings
             // can be hit from when the release stops muting.
             {"sustain_release_ms", Type::kInt, 0, 500, 5, 0},
             {"whammy_hold", Type::kBool, 0, 1, 1, 0},
+            // 70 is Clone Hero's 7.0. The defaults are retail's: 43 is easy and
+            // medium's own speed and 60 hard and expert's; the hyperspeed cheat
+            // made them 64 and 90 (note_speed.cpp).
+            {"note_speed_easy", Type::kInt, 43, 200, 1, 43},
+            {"note_speed_hard", Type::kInt, 43, 200, 1, 60},
             // With both in PUT_DISC_HERE. A .chd is smaller; an .iso reads
             // faster, which only shows with the game run far above 1x.
             {"prefer", Type::kChoice, 0, 1, 1, kChd, "chd iso"},
