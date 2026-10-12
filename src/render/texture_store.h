@@ -27,8 +27,13 @@ namespace gh2::textures
     };
 
     // Its payload's id, the same for the same source, in any run that
-    // mounts the same discs. Nothing is read.
+    // mounts the same discs. Nothing is read. Any thread.
     uint32_t add(const Source &source);
+
+    // Those payloads read on the worker's thread, ahead of the draw that
+    // will first ask for them, and held for it a while: a scene's, as the
+    // game loads the scene. Game thread only.
+    void prefetch(const std::vector<uint32_t> &ids);
 
     // The bytes a stand-in's pixels start with: a magic word and the id.
     constexpr size_t kNameBytes = 8u;

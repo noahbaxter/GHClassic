@@ -6,12 +6,14 @@
 #include "milo/layout.h"
 #include "milo/milo.h"
 #include "milo/objects.h"
+#include "worker.h"
 
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <mutex>
 #include <unordered_map>
 
 namespace gh2::textures
@@ -32,6 +34,9 @@ namespace gh2::textures
             std::weak_ptr<const TextureData> data;
         };
         std::unordered_map<uint32_t, Payload> s_payloads;
+        // Over the payloads and the fetches: a scene is made, and its
+        // pictures read ahead, on the worker's thread too.
+        std::mutex s_mutex;
 
         // The scene file last read from. A screen's textures are first drawn
         // in the same frame, and a file is inflated whole to reach one.
@@ -41,7 +46,20 @@ namespace gh2::textures
             std::string path;
             milo::Dir dir;
         };
-        std::optional<Open> s_open;
+        std::optional<Open> s_open; // the game thread's
+
+        // A payload read ahead of its first draw (prefetch): by whichever
+        // thread comes to it first, the other waiting. Held until a draw
+        // takes it, or for kFetchFrames.
+        struct Fetch
+        {
+            std::once_flag once;
+            std::shared_ptr<const TextureData> data;
+            uint64_t asked = 0;
+        };
+        std::unordered_map<uint32_t, std::shared_ptr<Fetch>> s_fetches;
+        uint64_t s_frame = 0;
+        constexpr uint64_t kFetchFrames = 600;
 
         bool same(const Source &a, const Source &b)
         {
@@ -170,6 +188,8 @@ namespace gh2::textures
         {
             static std::unordered_map<size_t, std::unordered_map<std::string, std::vector<std::string>>> byDisc;
             static const std::vector<std::string> kNone;
+            static std::mutex mutex;
+            const std::lock_guard lock(mutex);
             auto found = byDisc.find(disc);
             if (found == byDisc.end())
             {
@@ -207,23 +227,24 @@ namespace gh2::textures
             return apart < uint64_t(own.width) * own.height * 4u * kSamePictureLevels;
         }
 
-        std::shared_ptr<TextureData> read(const Source &source)
+        // `open` is the reading thread's own.
+        std::shared_ptr<TextureData> read(const Source &source, std::optional<Open> &open)
         {
             if (source.tex.empty())
             {
                 const auto file = ark::readFile(source.disc, source.path);
                 return file ? decode(file->data(), file->size()) : nullptr;
             }
-            if (!s_open || s_open->disc != source.disc || s_open->path != source.path)
+            if (!open || open->disc != source.disc || open->path != source.path)
             {
-                s_open.reset();
+                open.reset();
                 const auto file = ark::readFile(source.disc, source.path);
                 auto dir = file ? milo::read(*file) : std::nullopt;
                 if (!dir)
                     return nullptr;
-                s_open = Open{source.disc, source.path, std::move(*dir)};
+                open = Open{source.disc, source.path, std::move(*dir)};
             }
-            const milo::Dir &dir = s_open->dir;
+            const milo::Dir &dir = open->dir;
             const std::pair<std::string, std::string> entry("Tex", source.tex);
             const auto found = std::find(dir.entries.begin(), dir.entries.end(), entry);
             if (found == dir.entries.end())
@@ -258,6 +279,7 @@ namespace gh2::textures
     uint32_t add(const Source &source)
     {
         // Its hash, or the next id free when another source has that.
+        const std::lock_guard lock(s_mutex);
         uint32_t id = hash(source);
         for (auto found = s_payloads.find(id); found != s_payloads.end(); found = s_payloads.find(++id))
             if (same(found->second.source, source))
@@ -293,23 +315,74 @@ namespace gh2::textures
             return std::nullopt;
         std::memcpy(&magic, pixels, 4u);
         std::memcpy(&id, pixels + 4u, 4u);
+        const std::lock_guard lock(s_mutex);
         return magic == kMagic && s_payloads.contains(id) ? std::optional(id) : std::nullopt;
     }
 
     std::shared_ptr<const TextureData> get(uint32_t id)
     {
-        const auto found = s_payloads.find(id);
-        if (found == s_payloads.end())
-            return nullptr;
-        Payload &payload = found->second;
-        if (auto held = payload.data.lock())
-            return held;
-        std::shared_ptr<const TextureData> data = read(payload.source);
+        Source source;
+        std::shared_ptr<Fetch> fetch;
+        {
+            const std::lock_guard lock(s_mutex);
+            const auto found = s_payloads.find(id);
+            if (found == s_payloads.end())
+                return nullptr;
+            if (auto held = found->second.data.lock())
+                return held;
+            source = found->second.source;
+            if (const auto ahead = s_fetches.find(id); ahead != s_fetches.end())
+            {
+                fetch = std::move(ahead->second);
+                s_fetches.erase(ahead);
+            }
+        }
+        std::shared_ptr<const TextureData> data;
+        if (fetch)
+        {
+            std::call_once(fetch->once, [&] { fetch->data = read(source, s_open); });
+            data = fetch->data;
+        }
+        else
+            data = read(source, s_open);
         if (!data)
-            std::cerr << "[textures] cannot read " << payload.source.path << " " << payload.source.tex << std::endl;
-        payload.data = data;
+            std::cerr << "[textures] cannot read " << source.path << " " << source.tex << std::endl;
+        const std::lock_guard lock(s_mutex);
+        s_payloads[id].data = data;
         return data;
     }
 
-    void endFrame() { s_open.reset(); }
+    void prefetch(const std::vector<uint32_t> &ids)
+    {
+        std::vector<std::pair<Source, std::shared_ptr<Fetch>>> wanted;
+        {
+            const std::lock_guard lock(s_mutex);
+            for (const uint32_t id : ids)
+            {
+                const auto found = s_payloads.find(id);
+                if (found == s_payloads.end() || !found->second.data.expired() || s_fetches.contains(id))
+                    continue;
+                auto fetch = std::make_shared<Fetch>();
+                fetch->asked = s_frame;
+                s_fetches[id] = fetch;
+                wanted.emplace_back(found->second.source, std::move(fetch));
+            }
+        }
+        if (wanted.empty())
+            return;
+        worker::run([wanted = std::move(wanted)]
+        {
+            std::optional<Open> open;
+            for (const auto &[source, fetch] : wanted)
+                std::call_once(fetch->once, [&] { fetch->data = read(source, open); });
+        });
+    }
+
+    void endFrame()
+    {
+        s_open.reset();
+        const std::lock_guard lock(s_mutex);
+        ++s_frame;
+        std::erase_if(s_fetches, [](const auto &fetch) { return fetch.second->asked + kFetchFrames < s_frame; });
+    }
 }
