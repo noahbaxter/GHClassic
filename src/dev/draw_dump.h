@@ -23,5 +23,8 @@ namespace gh2
 
     // The renderer's side: writes the dump asked for, if one was, from the
     // frame's draws, their push constants and the frame data they index.
-    void writeDrawDump(const Frame &frame, const PushConstants *pushes, const Vec4 *data);
+    // `x360` marks the draws x360 shading takes, whose blocks are
+    // `x360Vec4s` long.
+    void writeDrawDump(const Frame &frame, const PushConstants *pushes, const Vec4 *data, const char *x360,
+                       uint32_t x360Vec4s);
 }

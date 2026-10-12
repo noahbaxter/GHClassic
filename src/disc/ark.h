@@ -33,6 +33,21 @@ namespace gh2::ark
         std::function<size_t(uint64_t offset, uint8_t *dst, size_t size)> read;
     };
     void addMade(const std::string &path, std::function<std::optional<Made>()> make);
+    // One that is those bytes, kept for as long as it is read.
+    Made held(std::vector<uint8_t> bytes);
+
+    // A file served in place of that disc's own copy of `path`, wherever its
+    // copy would be (as a rename's source, under a layer over it, or in the
+    // disc's turn) and nowhere else, made when the game first asks for it.
+    // None leaves the disc's own. With `when`, it is served only while that
+    // holds, asked each time the file is looked for, and made the first time
+    // it does. Once install has run.
+    void addMade(size_t disc, const std::string &path, std::function<std::optional<Made>()> make,
+                 std::function<bool()> when = {});
+
+    // That disc's archive paths starting `prefix`, in order, once install
+    // has run.
+    std::vector<std::string> paths(size_t disc, const std::string &prefix);
 
     // Every file under `root`, at its path relative to it. False, with the
     // reason printed, if it cannot be read.

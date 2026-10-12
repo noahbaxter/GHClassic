@@ -28,6 +28,18 @@ namespace gh2
     constexpr uint32_t kFlagVertDyn = 1u << 13;  // a light's colour is scaled by the vertex colour, not the material's
     constexpr uint32_t kFlagDecal = 1u << 14;    // GS DECAL texturing in place of modulate
     constexpr uint32_t kFlagAdd16 = 1u << 15;    // an add as a 16-bit frame keeps it under dither
+    // x360.vert and x360.frag's, which take kFlagPrelit, kFlagAlphaCut and
+    // kFlagSetAlpha as above, and lightBase as their block.
+    constexpr uint32_t kFlagNormalMap = 1u << 16;
+    constexpr uint32_t kFlagSpecularMap = 1u << 17;
+    constexpr uint32_t kFlagGlowMap = 1u << 18;
+    constexpr uint32_t kFlagRamp = 1u << 19;      // the diffuse ramp in place of n . l
+    constexpr uint32_t kFlagCube = 1u << 20;      // a cube map in place of the lights' specular
+    constexpr uint32_t kFlagNormalize = 1u << 21; // normal, tangent and bitangent made unit length first
+    constexpr uint32_t kFlagShadow = 1u << 22;    // its first light is cut by a shadow map
+    // mesh.frag's again: the alpha cut is at a half, for a rendered
+    // texture's card in a picture larger than its machine's.
+    constexpr uint32_t kFlagCutHalf = 1u << 23;
 
     struct PushConstants
     {

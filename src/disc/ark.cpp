@@ -53,6 +53,12 @@ namespace gh2::ark
             std::string serial; // Volume::serial's
             std::unordered_map<std::string, Entry> files; // dir/name -> entry
             Volume *volume = nullptr;
+            // Files served in place of its own (addMade): those still to
+            // make, those made, and when each is served (always, for one
+            // with none).
+            std::unordered_map<std::string, std::function<std::optional<Made>()>> makers;
+            std::unordered_map<std::string, Entry> made;
+            std::unordered_map<std::string, std::function<bool()>> when;
         };
 
         // Paths under `as` are `source`'s on one disc, and nowhere else.
@@ -226,18 +232,35 @@ namespace gh2::ark
                             size, size});
         }
 
+        // A disc's file as the game gets it: the one made in its place while
+        // that is served, made now if it is still to be, else its own.
+        const Entry *findOn(Disc &disc, const std::string &name)
+        {
+            const auto own = disc.files.find(name);
+            if (own == disc.files.end())
+                return nullptr;
+            if (const auto when = disc.when.find(name); when != disc.when.end() && !when->second())
+                return &own->second;
+            if (const auto maker = disc.makers.find(name); maker != disc.makers.end())
+            {
+                const auto make = std::move(maker->second);
+                disc.makers.erase(maker);
+                if (auto file = make())
+                {
+                    const uint32_t size = file->size;
+                    disc.made[name] = addPart({std::move(file->read), size, size});
+                }
+            }
+            const auto made = disc.made.find(name);
+            return made != disc.made.end() ? &made->second : &own->second;
+        }
+
         // A layer's own file, else its disc's.
         const Entry *findIn(const Layer &layer, const std::string &name)
         {
             if (const auto it = layer.files.find(name); it != layer.files.end())
                 return &it->second;
-            if (layer.disc)
-            {
-                const auto &files = s_discs[*layer.disc].files;
-                if (const auto it = files.find(name); it != files.end())
-                    return &it->second;
-            }
-            return nullptr;
+            return layer.disc ? findOn(s_discs[*layer.disc], name) : nullptr;
         }
 
         const Entry *find(const std::string &name);
@@ -264,7 +287,8 @@ namespace gh2::ark
 
         // Loose files first, made ones as they are asked for, then the routes,
         // then the boot's own, then renames, then the layer in front if one
-        // is, then each disc in turn.
+        // is, then each disc in turn. A file made in place of a disc's own is
+        // found wherever that disc's is.
         const Entry *find(const std::string &name)
         {
             const auto loose = s_loose.find(name);
@@ -289,19 +313,14 @@ namespace gh2::ark
             {
                 if (name.compare(0u, rename.as.size(), rename.as) != 0)
                     continue;
-                const auto &files = s_discs[rename.disc].files;
-                const auto it = files.find(rename.source + name.substr(rename.as.size()));
-                return it != files.end() ? &it->second : nullptr;
+                return findOn(s_discs[rename.disc], rename.source + name.substr(rename.as.size()));
             }
             if (s_front)
                 if (const Entry *entry = findIn(s_layers[*s_front], name))
                     return entry;
-            for (const Disc &disc : s_discs)
-            {
-                const auto it = disc.files.find(name);
-                if (it != disc.files.end())
-                    return &it->second;
-            }
+            for (Disc &disc : s_discs)
+                if (const Entry *entry = findOn(disc, name))
+                    return entry;
             return nullptr;
         }
 
@@ -424,9 +443,43 @@ namespace gh2::ark
         return true;
     }
 
+    Made held(std::vector<uint8_t> bytes)
+    {
+        const auto file = std::make_shared<const std::vector<uint8_t>>(std::move(bytes));
+        return {static_cast<uint32_t>(file->size()), [file](uint64_t offset, uint8_t *dst, size_t want)
+                {
+                    const size_t n = offset < file->size() ? std::min<size_t>(want, file->size() - offset) : 0u;
+                    std::memcpy(dst, file->data() + offset, n);
+                    return n;
+                }};
+    }
+
     void addMade(const std::string &path, std::function<std::optional<Made>()> make)
     {
         s_made[key(path.c_str())] = std::move(make);
+    }
+
+    void addMade(size_t disc, const std::string &path, std::function<std::optional<Made>()> make,
+                 std::function<bool()> when)
+    {
+        if (disc >= s_discs.size())
+            return;
+        s_discs[disc].makers[key(path.c_str())] = std::move(make);
+        if (when)
+            s_discs[disc].when[key(path.c_str())] = std::move(when);
+        else
+            s_discs[disc].when.erase(key(path.c_str()));
+    }
+
+    std::vector<std::string> paths(size_t disc, const std::string &prefix)
+    {
+        std::vector<std::string> out;
+        if (disc < s_discs.size())
+            for (const auto &[name, entry] : s_discs[disc].files)
+                if (name.compare(0u, prefix.size(), prefix) == 0)
+                    out.push_back(name);
+        std::sort(out.begin(), out.end());
+        return out;
     }
 
     bool addFolder(const std::string &root)

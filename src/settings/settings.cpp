@@ -84,7 +84,7 @@ namespace gh2::settings
             // faster, which only shows with the game run far above 1x.
             {"prefer", Type::kChoice, 0, 1, 1, kChd, "chd iso"},
             {"check_updates", Type::kBool, 0, 1, 1, 1},
-            {"band", Type::kChoice, 0, 2, 1, kBandVenue, "venue gh2 gh1"},
+            {"band", Type::kChoice, 0, 3, 1, kBandVenue, "venue gh2 gh1 gh2x"},
             {"depth_of_field", Type::kBool, 0, 1, 1, 1},
             {"gh1_band_shadows", Type::kChoice, 0, 2, 1, kShadowsGh2, "off classic gh2"},
             // Off: the pickers. Retail's quickplay goes from the difficulty
@@ -95,6 +95,19 @@ namespace gh2::settings
             {"menu_music", Type::kChoice, 0, 4, 1, kMusicTheme, "theme gh1 gh2 gh80s all"},
             // Retail plays one loop over and over.
             {"menu_music_order", Type::kChoice, 0, 2, 1, kOrderLoop, "playlist loop shuffle"},
+            // hd: the 360 disc's venues, characters and guitars, and its
+            // track, each converted as its scene loads (gh2x/models.h).
+            {"venues", Type::kChoice, 0, 1, 1, kClassic, "classic hd"},
+            {"characters", Type::kChoice, 0, 1, 1, kClassic, "classic hd"},
+            {"highway", Type::kChoice, 0, 1, 1, kClassic, "classic hd"},
+            // hd: the 360 disc's sharper pictures on the HUD and menus, taken
+            // as each scene loads (gh2x/textures.h).
+            {"ui_art", Type::kChoice, 0, 2, 1, kUiClassic, "auto classic hd"},
+            // hd: lit meshes shaded per pixel as the 360's standard.fx does,
+            // with its maps and its light range of 0 to 4, then its bloom and
+            // luminance ramp (host/shaders/x360.frag).
+            {"lighting", Type::kChoice, 0, 1, 1, kClassic, "classic hd"},
+            {"graphics", Type::kChoice, 0, 3, 1, kLastGen, "authentic last_gen next_gen custom"},
         };
 
         // By its name, or one it went by before.
@@ -262,6 +275,33 @@ namespace gh2::settings
         return state().value[key];
     }
 
+    namespace
+    {
+        std::function<bool()> s_nextGenGame;
+    }
+
+    void setNextGenGame(std::function<bool()> now) { s_nextGenGame = std::move(now); }
+
+    bool hd(Key key)
+    {
+        switch (get(kGraphics))
+        {
+        case kAuthentic:
+            // The HUD's and menus' pictures are the same ones drawn larger,
+            // so the sharper are taken for every game's.
+            return key == kUiArt || (s_nextGenGame && s_nextGenGame());
+        case kLastGen:
+            return false;
+        case kNextGen:
+            return true;
+        default:
+            break;
+        }
+        if (key == kUiArt && get(kUiArt) != kUiAuto)
+            return get(kUiArt) == kUiHd;
+        return get(key == kUiArt ? kHighway : key) == kHd;
+    }
+
     bool isSet(Key key)
     {
         return state().set[key];
@@ -329,5 +369,31 @@ namespace gh2::settings
         state().value[key] = snap(kEntries[key], value);
         state().set[key] = true;
         save();
+    }
+
+    void rereadGraphics()
+    {
+        std::error_code error;
+        const auto written = std::filesystem::last_write_time(path(), error);
+        static auto seen = written;
+        if (error || written == seen)
+            return;
+        seen = written;
+        std::ifstream in(path());
+        for (std::string line; std::getline(in, line);)
+        {
+            const auto pair = assignment(line);
+            const Entry *entry = pair ? entryNamed(pair->first) : nullptr;
+            if (!entry)
+                continue;
+            const Key key = static_cast<Key>(entry - kEntries);
+            int value = 0;
+            if ((key != kBand && (key < kVenues || key > kGraphics)) || !parse(*entry, pair->second, value) ||
+                value == state().value[key])
+                continue;
+            state().value[key] = value;
+            state().set[key] = true;
+            std::cerr << "[settings] " << entry->name << " now " << pair->second << std::endl;
+        }
     }
 }

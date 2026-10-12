@@ -7,6 +7,9 @@
 // ConvertColor (0x1ae538) for the channel order. The original still runs,
 // since its VRAM bookkeeping is shared with PsTex's other paths until PsTex
 // is replaced whole.
+//
+// A bitmap that is a stand-in for a host payload (render/texture_store.h) is
+// not decoded: the payload's pixels are the texture's, from its first draw.
 
 #include "render/texture_capture.h"
 
@@ -15,8 +18,11 @@
 #include "milo/layout.h"
 #include "ps2_runtime_macros.h"
 #include "render/frame.h"
+#include "render/look.h"
+#include "render/texture_store.h"
 
 #include <algorithm>
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -26,6 +32,10 @@ namespace gh2
     {
         const Addresses *s_addresses = nullptr;
         std::unordered_map<uint32_t, std::shared_ptr<const TextureData>> s_textures;
+        // Textures whose bitmap is a stand-in, each with its host payload's
+        // id. Its pixels join s_textures at its first draw.
+        std::unordered_map<uint32_t, uint32_t> s_standIns;
+        constexpr uint32_t kNameBytes = static_cast<uint32_t>(textures::kNameBytes);
         bool s_foreign = false; // after forgetTextureAddresses
 
         struct Bitmap
@@ -300,6 +310,39 @@ namespace gh2
             s_textures[tex] = std::move(data);
         }
 
+        // The host payload a bitmap stands in for, named in its first pixel
+        // bytes (render/texture_store.h).
+        std::optional<uint32_t> standIn(uint8_t *rdram, uint32_t bitmap)
+        {
+            const uint32_t pixels = load<uint32_t>(rdram, bitmap + milo::bitmap::kPixels);
+            const uint32_t bytes = static_cast<uint32_t>(load<uint16_t>(rdram, bitmap + milo::bitmap::kRowBytes)) *
+                                   load<uint16_t>(rdram, bitmap + milo::bitmap::kHeight);
+            if (pixels == 0u || bytes < kNameBytes)
+                return std::nullopt;
+            const std::vector<uint8_t> name = copyGuest(rdram, pixels, kNameBytes);
+            return textures::named(name.data(), name.size());
+        }
+
+        // A texture's bitmap as it now is: decoded, or for a stand-in its
+        // payload noted, which is read when first drawn.
+        void capture(uint8_t *rdram, uint32_t tex)
+        {
+            const uint32_t bitmap = tex + milo::tex::kBitmap;
+            const auto id = standIn(rdram, bitmap);
+            if (!id)
+            {
+                s_standIns.erase(tex);
+                store(tex, decodeWithMips(rdram, bitmap));
+                return;
+            }
+            // Synced again with the same payload, it keeps what it holds.
+            const auto was = s_standIns.find(tex);
+            if (was != s_standIns.end() && was->second == *id)
+                return;
+            s_standIns[tex] = *id;
+            s_textures.erase(tex);
+        }
+
         struct SyncTag;
         struct DestroyTag;
 
@@ -318,15 +361,19 @@ namespace gh2
             }
             const uint32_t tex = GPR_U32(ctx, 4);
             if (load<uint32_t>(rdram, tex + milo::tex::kType) & milo::tex::kTypeNoPixels)
+            {
                 s_textures.erase(tex);
+                s_standIns.erase(tex);
+            }
             else
-                store(tex, decodeWithMips(rdram, tex + milo::tex::kBitmap));
+                capture(rdram, tex);
         }
 
         void onDestroy(uint8_t *, R5900Context *ctx, PS2Runtime *)
         {
             const uint32_t tex = GPR_U32(ctx, 4);
             s_textures.erase(tex);
+            s_standIns.erase(tex);
             s_textTextures.erase(tex);
             std::erase(s_yellowFretIcons, tex);
         }
@@ -334,14 +381,15 @@ namespace gh2
         // PsTex::CopyFromScreen(x, y) (0x1a0d68) has the GS move the texture's
         // width by height pixels of the buffer being drawn, from x and y,
         // into its VRAM. Track::Draw (0x151290) saves the venue behind the
-        // highway's far end this way and fades the highway into it.
+        // highway's far end this way and fades the highway into it, its
+        // only caller; not when the track fades in its shader.
         struct CopyTag;
         void onCopyFromScreen(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
             const uint32_t tex = GPR_U32(ctx, 4);
             const int32_t width = load<int32_t>(rdram, tex + milo::tex::kWidth);
             const int32_t height = load<int32_t>(rdram, tex + milo::tex::kHeight);
-            if (width <= 0 || height <= 0)
+            if (width <= 0 || height <= 0 || look::trackFades())
                 return;
             Frame &frame = building();
             frame.copies.push_back({frame.draws.size(), tex, GPR_S32(ctx, 5), GPR_S32(ctx, 6),
@@ -362,25 +410,34 @@ namespace gh2
         }
     }
 
+    std::optional<uint32_t> standInPayload(uint32_t tex)
+    {
+        const auto found = s_standIns.find(tex);
+        return found != s_standIns.end() ? std::optional(found->second) : std::nullopt;
+    }
+
     std::shared_ptr<const TextureData> capturedTexture(uint8_t *rdram, uint32_t tex)
     {
-        const auto found = s_textures.find(tex);
-        if (found != s_textures.end())
+        if (const auto found = s_textures.find(tex); found != s_textures.end())
             return found->second;
-        if (!s_foreign || tex == 0u)
-            return nullptr;
-        // Memory from another run: this texture never synced here, and its
-        // bitmap is still in it.
-        if (load<uint32_t>(rdram, tex + milo::tex::kType) & milo::tex::kTypeNoPixels)
-            s_textures[tex] = nullptr;
-        else
-            store(tex, decodeWithMips(rdram, tex + milo::tex::kBitmap));
-        return s_textures[tex];
+        if (s_foreign && tex != 0u && !s_standIns.contains(tex))
+        {
+            // Memory from another run: this texture never synced here, and
+            // its bitmap is still in it.
+            if (load<uint32_t>(rdram, tex + milo::tex::kType) & milo::tex::kTypeNoPixels)
+                return s_textures[tex] = nullptr;
+            capture(rdram, tex);
+        }
+        if (const auto payload = s_standIns.find(tex); payload != s_standIns.end())
+            store(tex, textures::get(payload->second));
+        const auto found = s_textures.find(tex);
+        return found != s_textures.end() ? found->second : nullptr;
     }
 
     void forgetTextureAddresses()
     {
         s_textures.clear();
+        s_standIns.clear();
         s_textTextures.clear();
         s_yellowFretIcons.clear();
         s_foreign = true;

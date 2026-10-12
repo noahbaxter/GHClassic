@@ -1,10 +1,9 @@
 // Mesh geometry in the engine's neutral form, taken when a mesh syncs.
 //
-// PsMesh::Sync converts verts and faces into a PS2 face packet and, for
-// static meshes, frees them. The copy is taken on entry, before that. The
-// conversion itself still runs, because its strip bookkeeping (a global list
-// that loading fills and the conversion drains) has to stay balanced until
-// Sync is replaced whole.
+// PsMesh::Sync (0x3d4f08) has UpdateFacePacket turn verts and faces into a
+// VU1 packet and, for static meshes, frees them. The copy is taken on entry,
+// before that, and no packet is built: nothing native reads one, and the
+// 196608 bytes retail builds one in (0x3d48d4) hold no larger mesh.
 
 #include "render/mesh_capture.h"
 
@@ -22,6 +21,9 @@ namespace gh2
     {
         std::unordered_map<uint32_t, std::shared_ptr<const MeshData>> s_meshes;
         bool s_fromPackets = false;
+        const Addresses *s_addresses = nullptr;
+        PS2Runtime::RecompiledFunction s_updateFacePacket = nullptr;
+        PS2Runtime::RecompiledFunction s_copy = nullptr;
 
         void readVerts(uint8_t *rdram, uint32_t mesh, MeshData &out)
         {
@@ -55,7 +57,6 @@ namespace gh2
         }
 
         struct SyncTag;
-        struct FixVertsTag;
         struct DestroyTag;
 
         // PsMesh::Sync(flags). Retail acts only when the mesh owns its data.
@@ -74,21 +75,65 @@ namespace gh2
             slot = std::move(next);
         }
 
-        // PsMesh::FixVerts(src, packet, count), which PsMesh::Copy calls
-        // only once it has swapped in a copy of the source's packet (0x19dd4c),
-        // after RndMesh::Copy has synced this mesh from what it holds. A clone
-        // of a static mesh holds no verts, so that sync captured nothing and
-        // the source's geometry is what it draws. A clone that kept verts has
-        // its packet pointed back at them, so it keeps its own.
-        void onFixVerts(uint8_t *, R5900Context *ctx, PS2Runtime *)
+        // PsMesh::UpdateFacePacket, retail 0x3d47f0, less the packet: the old
+        // one let go (0x3d4828), and for a mesh with faces and verts (0x3d4838,
+        // 0x3d4844) one entry of the strips its file came with taken off their
+        // list for each face group (0x3d4ae4), as loading put them there.
+        void updateFacePacket(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
-            const uint32_t mesh = GPR_U32(ctx, 4);
-            const auto source = s_meshes.find(GPR_U32(ctx, 5));
-            if (source == s_meshes.end())
+            if (s_fromPackets)
+            {
+                s_updateFacePacket(rdram, ctx, runtime);
                 return;
-            std::shared_ptr<const MeshData> &slot = s_meshes[mesh];
-            if (!slot || slot->verts.empty())
-                slot = source->second;
+            }
+            const uint32_t returnTo = GPR_U32(ctx, 31);
+            const uint32_t mesh = GPR_U32(ctx, 4);
+            runtime->callGuestFunction(rdram, ctx, s_addresses->psRndSyncFree,
+                                       {s_addresses->thePsRnd, load<uint32_t>(rdram, mesh + milo::mesh::kPacket)});
+            store<uint32_t>(rdram, mesh + milo::mesh::kPacket, 0u);
+            const bool faces = load<uint32_t>(rdram, mesh + milo::mesh::kFacesBegin) !=
+                               load<uint32_t>(rdram, mesh + milo::mesh::kFacesEnd);
+            if (faces && load<uint32_t>(rdram, mesh + milo::mesh::kVertCount) != 0u)
+            {
+                const uint32_t groups = mesh + milo::mesh::kGroups;
+                const uint32_t sentinel = s_addresses->meshStrips + 4u;
+                for (uint32_t group = load<uint32_t>(rdram, groups); group != groups; group = load<uint32_t>(rdram, group))
+                {
+                    const uint32_t node = load<uint32_t>(rdram, sentinel);
+                    if (node == sentinel)
+                        break;
+                    runtime->callGuestFunction(rdram, ctx, s_addresses->memFree, {load<uint32_t>(rdram, node + 0xcu)});
+                    const uint32_t next = load<uint32_t>(rdram, node);
+                    const uint32_t prev = load<uint32_t>(rdram, node + 4u);
+                    store<uint32_t>(rdram, prev, next);
+                    store<uint32_t>(rdram, next + 4u, prev);
+                    runtime->callGuestFunction(rdram, ctx, s_addresses->memOrPoolFree, {0x18u, node});
+                }
+            }
+            ctx->pc = returnTo;
+        }
+
+        // PsMesh::Copy, retail 0x19dc38. RndMesh::Copy syncs this mesh from
+        // what it holds. A clone of a static mesh holds no verts, so that
+        // sync captured nothing and the source's geometry is what it draws;
+        // a clone that kept verts keeps its own.
+        void copy(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t returnTo = GPR_U32(ctx, 31);
+            const uint32_t mesh = GPR_U32(ctx, 4);
+            const uint32_t from = GPR_U32(ctx, 5);
+            runtime->callGuestFunction(rdram, ctx, s_addresses->psMeshCopy, {mesh, from, GPR_U32(ctx, 6)}, s_copy);
+            // The object `from` is part of, as the cast finds it (0x19dc78).
+            const uint32_t whole =
+                from != 0u ? from + static_cast<int32_t>(load<int16_t>(rdram, load<uint32_t>(rdram, from))) : 0u;
+            const auto source = s_meshes.find(whole);
+            if (source != s_meshes.end() && load<uint32_t>(rdram, mesh + milo::mesh::kOwner) == mesh)
+            {
+                std::shared_ptr<const MeshData> &slot = s_meshes[mesh];
+                if (!slot || slot->verts.empty())
+                    slot = source->second;
+            }
+            ctx->pc = returnTo;
         }
 
         void onDestroy(uint8_t *, R5900Context *ctx, PS2Runtime *)
@@ -113,8 +158,12 @@ namespace gh2
 
     void installMeshCapture(PS2Runtime &runtime, const Addresses &addresses)
     {
+        s_addresses = &addresses;
         EntryHook<SyncTag>::install(runtime, addresses.psMeshSync, onSync);
-        EntryHook<FixVertsTag>::install(runtime, addresses.psMeshFixVerts, onFixVerts);
+        s_updateFacePacket = runtime.lookupFunction(addresses.psMeshUpdateFacePacket);
+        runtime.replaceFunction(addresses.psMeshUpdateFacePacket, updateFacePacket);
+        s_copy = runtime.lookupFunction(addresses.psMeshCopy);
+        runtime.replaceFunction(addresses.psMeshCopy, copy);
         EntryHook<DestroyTag>::install(runtime, addresses.psMeshDestroy, onDestroy);
     }
 }

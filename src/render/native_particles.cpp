@@ -26,11 +26,14 @@
 #include "ps2_runtime_macros.h"
 #include "render/camera.h"
 #include "render/frame.h"
+#include "render/look.h"
 #include "render/native_environ.h"
 #include "render/native_mat.h"
 #include "render/native_mesh.h"
 
+#include <cmath>
 #include <memory>
+#include <vector>
 
 namespace gh2
 {
@@ -57,7 +60,8 @@ namespace gh2
             // DrawSprites (0x1a2a64) sends a preserved packet in place of the
             // live list.
             const uint32_t preserved = load<uint32_t>(rdram, sys + kPreserved);
-            if (first == 0u && preserved == 0u)
+            // Nor while a shadow map is drawn: only meshes cast.
+            if ((first == 0u && preserved == 0u) || building().casting >= 0)
             {
                 ctx->pc = returnTo;
                 return;
@@ -74,8 +78,42 @@ namespace gh2
             uint32_t mat = load<uint32_t>(rdram, sys + kMat);
             if (mat == 0u)
                 mat = load<uint32_t>(rdram, s_addresses->defaultMat);
-            const bool lit = mat != 0u && load<uint32_t>(rdram, mat + milo::mat::kUseEnviron) != 0u;
+            std::vector<Material> passes;
+            for (uint32_t pass = mat; pass != 0u; pass = nextPass(rdram, pass))
+                passes.push_back(readMaterial(rdram, pass));
+            // A 360 Mat's particles take no ambient under its shading: none
+            // of the 360's twelve particle shaders reads the environ's.
+            const bool lit = !passes.empty() && passes.front().useEnviron && !passes.front().shading;
             const float *ambient = currentEnviron().ambient;
+
+            // A 360 system whose particles turn (particles.fx: each corner
+            // about the centre by the particle's angle). The 360 gives a
+            // particle an angle anywhere at birth and a rate between the
+            // system's two (RB3's RndParticleSys::InitParticle, rpm times
+            // 2 pi / 1800 a 30th of a second); the PS2's particle has no
+            // slot for either, so both come from where it is in memory,
+            // which a later particle there takes up, and the frame's count
+            // at 60 a second.
+            const float *spin = nullptr;
+            if (!passes.empty() && passes.front().shading && mat != 0u)
+            {
+                const uint32_t sysName = load<uint32_t>(rdram, sys + milo::object::kName);
+                const uint32_t matName = load<uint32_t>(rdram, mat + milo::object::kName);
+                if (sysName != 0u && matName != 0u)
+                    spin = look::findSpin(reinterpret_cast<const char *>(getMemPtr(rdram, sysName)),
+                                          reinterpret_cast<const char *>(getMemPtr(rdram, matName)));
+            }
+            const float seconds = static_cast<float>(building().serial % 216000u) / 60.0f;
+            const auto angleOf = [&](uint32_t key) {
+                uint32_t h = key * 2654435761u;
+                h ^= h >> 15;
+                h *= 2246822519u;
+                h ^= h >> 13;
+                const float start = static_cast<float>(h & 0xffffu) / 65536.0f * 6.2831853f;
+                const float part = static_cast<float>(h >> 16) / 65536.0f;
+                const float rpm = spin[0] + (spin[1] - spin[0]) * part;
+                return start + rpm * 6.2831853f / 60.0f * seconds;
+            };
 
             auto mesh = std::make_shared<MeshData>();
             const auto addSprite = [&](uint32_t colorAt, uint32_t posAt, float half) {
@@ -99,11 +137,16 @@ namespace gh2
                 const float sx[4] = {-1.0f, -1.0f, 1.0f, 1.0f};
                 const float sy[4] = {-1.0f, 1.0f, -1.0f, 1.0f};
                 const uint16_t base = static_cast<uint16_t>(mesh->verts.size());
+                const float angle = spin ? angleOf(colorAt) : 0.0f;
+                const float cosA = std::cos(angle);
+                const float sinA = std::sin(angle);
                 for (int i = 0; i < 4; ++i)
                 {
                     Vertex v{};
+                    const float along = sx[i] * cosA + sy[i] * sinA;
+                    const float above = sy[i] * cosA - sx[i] * sinA;
                     for (uint32_t c = 0; c < 3; ++c)
-                        v.pos[c] = center[c] + half * (sx[i] * right[c] + sy[i] * up[c]);
+                        v.pos[c] = center[c] + half * (along * right[c] + above * up[c]);
                     for (uint32_t c = 0; c < 4; ++c)
                         v.color[c] = color[c];
                     v.uv[0] = sx[i] < 0.0f ? 0.0f : 1.0f;
@@ -146,9 +189,10 @@ namespace gh2
                 draw.camera = cameraIndex;
                 draw.world = identity();
                 draw.lightWorld = identity();
-                for (uint32_t pass = mat; pass != 0u; pass = nextPass(rdram, pass))
+                draw.environment = currentEnviron(); // for its fade: the passes are not lit by it
+                for (Material &pass : passes)
                 {
-                    draw.material = readMaterial(rdram, pass);
+                    draw.material = std::move(pass);
                     draw.material.highlight = false; // TEX0's TFX is put back to modulate (0x1a2da0)
                     // The colours are final; sprites take their uvs as given.
                     draw.material.useEnviron = false;

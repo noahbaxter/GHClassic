@@ -23,8 +23,17 @@
 #include "content/songs.h"
 #include "disc/ark.h"
 #include "formats/dtb.h"
+#include "gh2x/focus.h"
+#include "gh2x/models.h"
+#include "gh2x/shadows.h"
+#include "gh2x/textures.h"
+#include "gh2x/track.h"
+#include "ps2_runtime.h"
+#include "render/texture_store.h"
+#include "settings/settings.h"
 
 #include <algorithm>
+#include <functional>
 #include <iostream>
 #include <string>
 
@@ -33,6 +42,11 @@ namespace gh2
     namespace
     {
         std::string ours(const std::string &name) { return "x_" + name; }
+
+        // A side of the PS2 store's album art (its us_logo pictures).
+        constexpr uint32_t kAlbumArtSide = 256u;
+        constexpr const char *kSongsToContinue = "song_current_venue";
+        constexpr const char *kGamePanel = "ui/gen/game.dtb";
 
         // Paths under songs/<name>/ moved to songs/x_<name>/, practice keys
         // dropped.
@@ -126,6 +140,45 @@ namespace gh2
         }
 
         // The career's files, in a layer over the game disc.
+        // The symbol a script compares `{object method}` to: battle in
+        // {== {game get_venue} battle}.
+        const dtb::Node *comparedTo(const dtb::Node &node, const char *object, const char *method)
+        {
+            if (node.nodes.size() != 3u || node.nodes[0].text != "==" || node.nodes[2].type != dtb::kSymbol)
+                return nullptr;
+            const dtb::Node &call = node.nodes[1];
+            return call.nodes.size() == 2u && call.nodes[0].text == object && call.nodes[1].text == method ? &node.nodes[2]
+                                                                                                           : nullptr;
+        }
+
+        // Every test in a script for one venue's one song, {&& {== {game
+        // get_venue} battle} ... {== {gamecfg get_song} tonightimgonna}}:
+        // game.dta's two, for the encore whose drummer explodes.
+        void encoreTests(dtb::Node &node, std::vector<std::pair<dtb::Node *, dtb::Node *>> &out)
+        {
+            if (!node.nodes.empty() && node.nodes[0].text == "&&")
+            {
+                dtb::Node *venue = nullptr, *song = nullptr;
+                const std::function<void(dtb::Node &)> look = [&](dtb::Node &n)
+                {
+                    if (const dtb::Node *v = comparedTo(n, "game", "get_venue"))
+                        venue = const_cast<dtb::Node *>(v);
+                    if (const dtb::Node *s = comparedTo(n, "gamecfg", "get_song"))
+                        song = const_cast<dtb::Node *>(s);
+                    for (dtb::Node &c : n.nodes)
+                        look(c);
+                };
+                look(node);
+                if (venue && song)
+                {
+                    out.emplace_back(venue, song);
+                    return;
+                }
+            }
+            for (dtb::Node &c : node.nodes)
+                encoreTests(c, out);
+        }
+
         void addCareer(size_t disc, dtb::Node campaign, const dtb::Node &strings)
         {
             const dtb::Files theirs = [disc](const std::string &path) { return ark::readFile(disc, path); };
@@ -158,7 +211,40 @@ namespace gh2
             if (const dtb::Node *tip = dtb::find(strings, "loading_tip14"); tip && tip->nodes.size() > 1u)
                 locale::add("loading_tip14", tip->nodes[1].text);
 
+            // The setlist's "Beat %i/5 songs to continue": a 360 venue has
+            // five songs before its encore where PS2's has four.
+            auto text = dtb::read("ui/eng/locale.dta", none, game);
+            const dtb::Node *theirLine = dtb::find(strings, kSongsToContinue);
+            dtb::Node *line = text ? child(*text, kSongsToContinue) : nullptr;
+            if (line && theirLine && line->nodes.size() > 1u && theirLine->nodes.size() > 1u)
+                line->nodes[1].text = theirLine->nodes[1].text;
+
+            // The encore whose drummer explodes at its end: PS2's game.dta
+            // asks for Tonight I'm Gonna Rock You at battle, the 360's for
+            // it at small1, where its career has it.
+            const auto gamePanel = ark::readFile(0u, kGamePanel), theirGamePanel = ark::readFile(disc, kGamePanel);
+            auto panel = gamePanel ? dtb::raw(*gamePanel) : std::nullopt;
+            auto theirPanel = theirGamePanel ? dtb::raw(*theirGamePanel) : std::nullopt;
+            std::vector<std::pair<dtb::Node *, dtb::Node *>> tests, theirTests;
+            if (panel && theirPanel)
+            {
+                encoreTests(*panel, tests);
+                encoreTests(*theirPanel, theirTests);
+            }
+            const bool drummer = !tests.empty() && tests.size() == theirTests.size();
+            for (size_t i = 0; drummer && i < tests.size(); ++i)
+            {
+                tests[i].first->text = theirTests[i].first->text;
+                tests[i].second->text = ours(theirTests[i].second->text);
+            }
+
             const size_t layer = ark::addLayer(std::nullopt);
+            if (line)
+                ark::addFile(layer, "ui/eng/gen/locale.dtb", dtb::write(*text));
+            if (drummer)
+                ark::addFile(layer, kGamePanel, dtb::write(*panel));
+            else
+                std::cerr << "[gh2x] no encore test in " << kGamePanel << std::endl;
             ark::addFile(layer, "config/gen/campaign.dtb", dtb::write(campaign));
             ark::addFile(layer, "config/gen/store.dtb", dtb::write(*store));
             ark::addFile(layer, "config/gen/guitars.dtb", dtb::write(*guitars));
@@ -197,6 +283,7 @@ namespace gh2
         // The career's tiers, then the store's songs, as the 360 heads them.
         std::vector<setlists::Tier> tiers;
         size_t count = 0u;
+        const std::vector<std::string> logos = ark::paths(*disc, "ui/image/ng/gen/us_logo_");
         for (size_t i = 1u; i <= order->nodes.size(); ++i)
         {
             const bool isStore = i == order->nodes.size();
@@ -217,6 +304,17 @@ namespace gh2
                 }
                 tier.songs.push_back(ours(name));
                 ++count;
+                // The store's album art for it, asked for by our name: the
+                // 360's picture, at the size the PS2's are.
+                const std::string art = "ui/image/ng/gen/us_logo_" + name + "_keep.png_xbox";
+                if (isStore && std::binary_search(logos.begin(), logos.end(), art))
+                    ark::addMade("ui/image/og/gen/us_logo_" + ours(name) + "_keep.png_ps2",
+                                 [xbox = *disc, art]() -> std::optional<ark::Made>
+                                 {
+                                     std::vector<uint8_t> standIn =
+                                         textures::standIn(textures::add({xbox, art, {}}), kAlbumArtSide, kAlbumArtSide);
+                                     return standIn.empty() ? std::nullopt : std::optional(ark::held(std::move(standIn)));
+                                 });
                 // The store's name and blurb for it, and its loading tip.
                 for (const auto &[token, as] : {std::pair{name, ours(name)},
                                                 std::pair{name + "_shop_desc", ours(name) + "_shop_desc"},
@@ -232,5 +330,18 @@ namespace gh2
         setlists::add("gh2x", std::move(tiers), "ui/sel_song_quickplay.milo", scoreNames, setlists::required(*campaign));
         addCareer(*disc, *campaign, *strings);
         std::cerr << "[gh2x] " << count << " songs" << std::endl;
+    }
+
+    void installGh2xAssets(PS2Runtime &runtime, const Addresses &addresses)
+    {
+        // The 360's look is its own songs' and career's (settings' authentic).
+        uint8_t *rdram = runtime.memory().getRDRAM();
+        settings::setNextGenGame(
+            [rdram] { return (campaigns::inCareer(rdram) ? campaigns::active() : setlists::shown()) == "gh2x"; });
+        installGh2xTextures();
+        installGh2xModels();
+        gh2x::installFocus(runtime, addresses);
+        gh2x::installShadows(runtime, addresses);
+        gh2x::installTrack(runtime, addresses);
     }
 }

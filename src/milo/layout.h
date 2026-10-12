@@ -48,6 +48,36 @@ namespace milo
         constexpr uint32_t kTargetTex = 0x2ecu; // RndTex* (ObjPtr at +0x2e4), null for the screen
     }
 
+    // Character, as Character::DrawShadowBuffer (0x1619c0) calls its own
+    // virtuals: through the table at kVtable, each slot an offset to add to
+    // the drawable (16-bit) and then the function.
+    namespace character
+    {
+        constexpr uint32_t kDrawable = 0x90u;
+        constexpr uint32_t kVtable = 0xc4u;
+        constexpr uint32_t kMakeWorldSphere = 0x10u; // (Sphere &, bool): centre, then the radius at +0x10
+        constexpr uint32_t kDrawShowing = 0x20u;     // (DrawType)
+        constexpr uint32_t kDrawShadow = 2u;         // the DrawType a shadow buffer is drawn with
+    }
+
+    // CamShot: its first word points to its Hmx::Object, and its keyframes
+    // are a vector of CamShotFrame (CamShot::GetKey 0x263410).
+    namespace camShot
+    {
+        constexpr uint32_t kObject = 0x0u;
+        constexpr uint32_t kKeyframes = 0x10u; // begin, end
+    }
+
+    // CamShotFrame (CamShotFrame::Interp 0x2665a0).
+    namespace camShotFrame
+    {
+        constexpr uint32_t kNearBlur = 0x78u;
+        constexpr uint32_t kFarBlur = 0x7cu;
+        constexpr uint32_t kMaxFocalBlur = 0x80u;
+        constexpr uint32_t kTargets = 0x84u;        // vector of ShotTarget: begin, end
+        constexpr uint32_t kTargetPosition = 0xa0u; // their mean world position, as UpdateTarget leaves it
+    }
+
     // RndMat, 0x120 bytes; PsMat adds its GS state after. Enums read from
     // PsMat::Update (0x19cfe0) and its jump tables at 0x418910 and 0x418930.
     namespace mat
@@ -113,6 +143,9 @@ namespace milo
         constexpr uint32_t kFogStart = 0x54u;   // float
         constexpr uint32_t kFogEnd = 0x58u;     // float
         constexpr uint32_t kFogColor = 0x60u;   // 3 floats, then alpha
+        constexpr uint32_t kFadeOut = 0x70u;    // bool
+        constexpr uint32_t kFadeStart = 0x74u;
+        constexpr uint32_t kFadeEnd = 0x78u;
     }
 
     // RndLight, a RndTransformable at +0.
@@ -189,7 +222,8 @@ namespace milo
         constexpr uint32_t kTransform = 0x40u;   // the RndTransformable base
         constexpr uint32_t kObjectBase = 0x160u; // the Hmx::Object virtual base, in a PsMesh
         constexpr uint32_t kMutable = 0x140u;    // the sync bits that change again: such parts are kept
-        constexpr uint32_t kPacket = 0x150u;     // PsMesh's face packet MemHandle*, null until synced
+        constexpr uint32_t kGroups = 0x128u;     // the face groups' list, its own sentinel
+        constexpr uint32_t kPacket = 0x150u;     // PsMesh's face packet MemHandle*: retail's, never built here
         constexpr uint32_t kPacketQuads = 0x154u; // u16, the packet's length
         constexpr uint32_t kVertSize = 0x40u;
         constexpr uint32_t kFaceSize = 6u;

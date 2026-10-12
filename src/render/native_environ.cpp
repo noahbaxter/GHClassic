@@ -18,6 +18,7 @@
 #include "milo/layout.h"
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
+#include "settings/settings.h"
 
 #include <cmath>
 
@@ -28,11 +29,8 @@ namespace gh2
         const Addresses *s_addresses = nullptr;
         Environ s_current;
 
-        void select(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        Environ read(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t env)
         {
-            const uint32_t returnTo = GPR_U32(ctx, 31);
-            const uint32_t env = GPR_U32(ctx, 4);
-
             Environ e;
             for (uint32_t i = 0; i < 3; ++i)
                 e.ambient[i] = load<float>(rdram, env + milo::environment::kAmbient + i * 4u);
@@ -42,8 +40,11 @@ namespace gh2
             e.fog = load<uint8_t>(rdram, env + milo::environment::kFogEnable) != 0u;
             e.fogStart = load<float>(rdram, env + milo::environment::kFogStart);
             e.fogEnd = load<float>(rdram, env + milo::environment::kFogEnd);
-            for (uint32_t i = 0; i < 3; ++i)
+            for (uint32_t i = 0; i < 4; ++i)
                 e.fogColor[i] = load<float>(rdram, env + milo::environment::kFogColor + i * 4u);
+            e.fade = load<uint32_t>(rdram, env + milo::environment::kFadeOut) != 0u;
+            e.fadeStart = load<float>(rdram, env + milo::environment::kFadeStart);
+            e.fadeEnd = load<float>(rdram, env + milo::environment::kFadeEnd);
 
             uint32_t point = 0u;
             for (uint32_t node = load<uint32_t>(rdram, env + milo::environment::kFirstLight); node != 0u && point == 0u;
@@ -69,6 +70,23 @@ namespace gh2
                     e.position[c] = load<float>(rdram, world + 0x30u + c * 4u);
                 }
                 e.range = load<float>(rdram, point + milo::light::kRange);
+                // Up to three, for the 360's shading alone.
+                const bool all = settings::hd(settings::kLighting);
+                for (uint32_t node = all ? load<uint32_t>(rdram, env + milo::environment::kFirstLight) : 0u;
+                     node != 0u && e.pointCount < 3u; node = load<uint32_t>(rdram, node + 4u))
+                {
+                    const uint32_t light = load<uint32_t>(rdram, node);
+                    if (load<uint32_t>(rdram, light + milo::light::kType) != milo::light::kPoint)
+                        continue;
+                    const uint32_t at = static_cast<uint32_t>(
+                        runtime->callGuestFunction(rdram, ctx, s_addresses->worldXfm, {light}));
+                    for (uint32_t c = 0; c < 3; ++c)
+                    {
+                        e.pointColor[e.pointCount][c] = load<float>(rdram, light + milo::light::kColor + c * 4u);
+                        e.pointPosition[e.pointCount][c] = load<float>(rdram, at + 0x30u + c * 4u);
+                    }
+                    e.pointRange[e.pointCount++] = load<float>(rdram, light + milo::light::kRange);
+                }
             }
             else
             {
@@ -95,11 +113,22 @@ namespace gh2
                 if (e.lightCount != 0u)
                     e.kind = Environ::kDirectional;
             }
-            s_current = e;
+            return e;
+        }
 
+        void select(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t returnTo = GPR_U32(ctx, 31);
+            const uint32_t env = GPR_U32(ctx, 4);
+            s_current = read(rdram, ctx, runtime, env);
             store<uint32_t>(rdram, s_addresses->rndEnvironCurrent, env);
             ctx->pc = returnTo;
         }
+    }
+
+    Environ readEnviron(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t env)
+    {
+        return read(rdram, ctx, runtime, env);
     }
 
     const Environ &currentEnviron()

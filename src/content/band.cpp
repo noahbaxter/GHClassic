@@ -31,6 +31,7 @@ namespace gh2::band
             case settings::kBandGh1:
                 return "gh1";
             case settings::kBandGh2:
+            case settings::kBandGh2x: // GH2's members, the 360's files (gh2x/models.cpp)
                 return "gh2";
             default:
                 return campaigns::venueGame();
@@ -64,7 +65,7 @@ namespace gh2::band
         }
 
         // settings::Band's words.
-        constexpr const char *kFrom[] = {"venue", "gh2", "gh1"};
+        constexpr const char *kFrom[] = {"venue", "gh2", "gh1", "gh2x"};
         // settings::BandShadows' words.
         constexpr const char *kShadows[] = {"off", "classic", "gh2"};
 
@@ -84,7 +85,7 @@ namespace gh2::band
                         script::kSymbol};
             }
             if (call.symbol(1) == "from" && call.size() > 2)
-                for (int i = 0; i < 3; ++i)
+                for (int i = 0; i < 4; ++i)
                     if (call.symbol(2) == kFrom[i])
                         settings::set(settings::kBand, i);
             return {script::symbol(call.rdram, call.ctx, call.runtime, kFrom[settings::get(settings::kBand)]),

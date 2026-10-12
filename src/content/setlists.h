@@ -60,5 +60,9 @@ namespace gh2::setlists
     // already, as the game disc's are.
     void addDisc(const std::string &game, size_t disc, bool inConfig);
 
+    // The setlist quickplay shows: the one picked, or after a campaign
+    // switch the game now played's own.
+    const std::string &shown();
+
     void install(PS2Runtime &runtime, const Addresses &addresses);
 }

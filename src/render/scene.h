@@ -56,6 +56,23 @@ namespace gh2
         // A font's glyphs, drawn near their own size: generated levels would
         // only blur them.
         bool text = false;
+        // A cube map: each level holds the six faces in turn, +x -x +y -y
+        // +z -z, each a level's width by height.
+        bool cube = false;
+    };
+
+    // A 360 material's own shading (render/look.h), which the x360 shader
+    // family reads. A map is null where the material has none.
+    struct Shading
+    {
+        std::shared_ptr<const TextureData> normal;
+        std::shared_ptr<const TextureData> specular;
+        std::shared_ptr<const TextureData> glow;
+        std::shared_ptr<const TextureData> ramp; // lit by n . l, from -1 to 1 across
+        std::shared_ptr<const TextureData> cube; // in place of the lights' specular
+        float emissive = 1.0f;
+        float specularColor[4] = {}; // rgb without a specular map, then the power
+        bool normalize = false;
     };
 
     // One material pass as the engine held it at draw time.
@@ -98,6 +115,8 @@ namespace gh2
         // its uv. Set for a mesh's pass only (readSphereRows).
         bool sphere = false;
         float sphereRows[4][3] = {};
+        // A converted 360 Mat's own shading, null for any other.
+        std::shared_ptr<const Shading> shading;
     };
 
     // What the current environ gives VU1's lighting programs, as
@@ -118,11 +137,24 @@ namespace gh2
         float position[3] = {};   // the point light's world position
         float range = 0.0f;       // the point light's range
         // The fog the GS blends toward (FOGCOL) by a vertex's F, which is 255
-        // at `fogStart` and nearer and 0 at `fogEnd` and farther.
+        // at `fogStart` and nearer and 0 at `fogEnd` and farther. The 360's
+        // shading draws the same fog, with the colour's alpha.
         bool fog = false;
         float fogStart = 0.0f;
         float fogEnd = 0.0f;
-        float fogColor[3] = {};
+        float fogColor[4] = {};
+        // The 360's shading takes up to three point lights where VU1 takes
+        // the first: all of them, in list order, the first as above.
+        uint32_t pointCount = 0;
+        float pointColor[3][3] = {};
+        float pointPosition[3][3] = {};
+        float pointRange[3] = {};
+        // Its fade with distance, the 360's shading's: a blended draw is
+        // whole at fadeStart from the camera and gone at fadeEnd (the
+        // track's far end).
+        bool fade = false;
+        float fadeStart = 0.0f;
+        float fadeEnd = 0.0f;
     };
 
     struct DrawCall
@@ -130,6 +162,7 @@ namespace gh2
         std::shared_ptr<const MeshData> mesh;
         Matrix world{};      // identity when skinned
         bool screen = false; // verts already in clip space (PsRnd::DrawRect): no camera
+        uint32_t under = 0;  // a screen draw's: the RndCam current when it was made, as Camera::id
         uint32_t camera = 0; // index into Frame::cameras
         Material material;
         // A skinned vert is sum over b of weight[b] * (pos * bones[b]), its
@@ -149,7 +182,15 @@ namespace gh2
         // what reaches past the GS's window is left out (scene_renderer.cpp,
         // inWindow).
         bool crowd = false;
+        // A 360 guitar's strings, by their mesh's name (strings.mesh).
+        bool strings = false;
         // The mesh's name, only while a draw dump is asked for.
         std::string name;
+        // The 360's character shadows (Frame::shadows). A caster is
+        // drawn into its camera's shadow map and nowhere else. Any other
+        // draw is lit under the shadow map of this index plus one in
+        // Frame::shadows, 0 for none.
+        bool shadowCaster = false;
+        uint32_t shadow = 0;
     };
 }

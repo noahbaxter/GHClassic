@@ -219,6 +219,7 @@ set(GHC_GAME_SOURCES
     src/content/encores.cpp
     src/content/quickplay.cpp
     src/content/games.cpp
+    src/content/heaps.cpp
     src/content/locale.cpp
     src/content/mogg.cpp
     src/content/hidden_guitars.cpp
@@ -240,8 +241,10 @@ set(GHC_GAME_SOURCES
     src/disc/disc.cpp
     src/disc/sha1.cpp
     src/disc/volume.cpp
+    src/formats/bitmap.cpp
     src/formats/dtb.cpp
     src/formats/dtb_text.cpp
+    src/formats/dxt.cpp
     src/formats/midi.cpp
     src/gh1/band.cpp
     src/gh1/cameras.cpp
@@ -268,9 +271,17 @@ set(GHC_GAME_SOURCES
     src/gh1/songs.cpp
     src/gh1/venue_scene.cpp
     src/gh1/venues.cpp
+    src/gh2x/classes.cpp
+    src/gh2x/focus.cpp
     src/gh2x/install.cpp
+    src/gh2x/models.cpp
+    src/gh2x/scene.cpp
+    src/gh2x/shadows.cpp
+    src/gh2x/textures.cpp
+    src/gh2x/track.cpp
     src/gh80s/install.cpp
     src/milo/milo.cpp
+    src/milo/objects.cpp
     src/movie/movie.cpp
     src/movie/pss.cpp
     src/movie/screen.cpp
@@ -306,6 +317,7 @@ set(GHC_GAME_SOURCES
     src/host/scene_renderer.cpp
     src/render/camera.cpp
     src/render/frame.cpp
+    src/render/look.cpp
     src/render/mesh_capture.cpp
     src/render/native_cull.cpp
     src/render/native_environ.cpp
@@ -316,6 +328,7 @@ set(GHC_GAME_SOURCES
     src/render/native_rect.cpp
     src/render/native_rnd.cpp
     src/render/texture_capture.cpp
+    src/render/texture_store.cpp
 )
 
 add_executable(GHClassic
@@ -328,10 +341,16 @@ add_executable(GHClassic
 set(GHC_SHADER_DIR "${CMAKE_CURRENT_BINARY_DIR}/shaders")
 file(MAKE_DIRECTORY "${GHC_SHADER_DIR}")
 set(GHC_SHADER_HEADERS)
-foreach(SHADER mesh.vert mesh.frag)
+foreach(SHADER mesh.vert mesh.frag x360.vert x360.frag post.vert post.frag)
     string(REPLACE "." "_" SHADER_ID "${SHADER}")
-    string(REPLACE "mesh_vert" "kMeshVert" SHADER_VAR "${SHADER_ID}")
-    string(REPLACE "mesh_frag" "kMeshFrag" SHADER_VAR "${SHADER_VAR}")
+    string(REPLACE "." ";" SHADER_PARTS "${SHADER}")
+    set(SHADER_VAR "k")
+    foreach(PART ${SHADER_PARTS})
+        string(SUBSTRING "${PART}" 0 1 FIRST)
+        string(SUBSTRING "${PART}" 1 -1 REST)
+        string(TOUPPER "${FIRST}" FIRST)
+        string(APPEND SHADER_VAR "${FIRST}${REST}")
+    endforeach()
     set(SHADER_HEADER "${GHC_SHADER_DIR}/${SHADER_ID}.h")
     add_custom_command(
         OUTPUT "${SHADER_HEADER}"
@@ -341,6 +360,14 @@ foreach(SHADER mesh.vert mesh.frag)
         VERBATIM)
     list(APPEND GHC_SHADER_HEADERS "${SHADER_HEADER}")
 endforeach()
+# post.frag again, reading a multisampled depth buffer (kPostMsFrag).
+add_custom_command(
+    OUTPUT "${GHC_SHADER_DIR}/post_ms_frag.h"
+    COMMAND glslang-standalone -V -DMULTISAMPLED --vn kPostMsFrag -o "${GHC_SHADER_DIR}/post_ms_frag.h"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/host/shaders/post.frag"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/host/shaders/post.frag" glslang-standalone
+    VERBATIM)
+list(APPEND GHC_SHADER_HEADERS "${GHC_SHADER_DIR}/post_ms_frag.h")
 add_custom_target(GHClassic_shaders DEPENDS ${GHC_SHADER_HEADERS})
 add_dependencies(GHClassic GHClassic_shaders)
 target_include_directories(GHClassic PRIVATE "${GHC_SHADER_DIR}")

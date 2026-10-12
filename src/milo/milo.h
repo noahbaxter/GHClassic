@@ -16,7 +16,7 @@ namespace gh2::milo
     // A directory: its header, entries and each object's body as stored.
     struct Dir
     {
-        uint32_t version = 0;          // 10 is GH1's, 24 GH2's
+        uint32_t version = 0;          // 10 is GH1's, 24 GH2's, 25 360 GH2's
         std::string className, name;   // v24's root, e.g. BandCharacter "punk"
         uint32_t tableCount = 0;       // v24 string table sizing hints
         uint32_t tableSize = 0;

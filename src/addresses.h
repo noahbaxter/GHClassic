@@ -21,10 +21,21 @@ namespace gh2
         uint32_t gamePanelExit;
         uint32_t winCampaignSong; // GameConfig::WinCampaignSong
         uint32_t psMeshSync;
-        uint32_t psMeshFixVerts;
+        uint32_t psMeshUpdateFacePacket;
+        uint32_t psMeshCopy;
         uint32_t psMeshDestroy;
+        uint32_t psRndSyncFree; // PsRnd::SyncFree(MemHandle *)
+        uint32_t thePsRnd;
+        uint32_t meshStrips; // the list of strips RndMesh::Load read, a mesh's face groups in order
+        uint32_t memFree;
+        uint32_t memOrPoolFree;
         uint32_t psMeshDrawShowing;
         uint32_t psMultiMeshDrawShowing;
+        uint32_t characterDrawShadowBuffer; // Character::DrawShadowBuffer
+        uint32_t rndSetShadowMap;           // Rnd::SetShadowMap, which PsRnd leaves as it is
+        uint32_t charTrackSurfaceSetCharTexture; // CharTrackSurface::SetCharTexture(RndMat *)
+        uint32_t playerMatcherOnStartStarpower;  // PlayerMatcher::OnStartStarpower
+        uint32_t playerMatcherOnStopStarpower;   // PlayerMatcher::OnStopStarpower
         uint32_t psParticleSysDrawShowing;
         uint32_t updateRelativeXfm; // RndParticleSys::UpdateRelativeXfm
         uint32_t psEnvironSelect;
@@ -32,6 +43,9 @@ namespace gh2
         uint32_t psTexDestroy;
         uint32_t psTexCopyFromScreen;
         uint32_t rndTextDrawShowing;
+        uint32_t camShotFrameInterp;       // CamShotFrame::Interp
+        uint32_t camShotFrameUpdateTarget; // CamShotFrame::UpdateTarget
+        uint32_t objectDirFindObject;      // ObjectDir::FindObject
         uint32_t worldXfm;       // RndTransformable::WorldXfm
         uint32_t setWorldXfm;    // RndTransformable::SetWorldXfm
         uint32_t setDirty;       // RndTransformable::SetDirty
@@ -226,10 +240,21 @@ namespace gh2
         .gamePanelExit = 0x106d50u,
         .winCampaignSong = 0x126f10u,
         .psMeshSync = 0x3d4f08u,
-        .psMeshFixVerts = 0x19dbb8u,
+        .psMeshUpdateFacePacket = 0x3d47f0u,
+        .psMeshCopy = 0x19dc38u,
         .psMeshDestroy = 0x19dd88u,
+        .psRndSyncFree = 0x19b758u,
+        .thePsRnd = 0x46cb20u,
+        .meshStrips = 0x471dd8u,
+        .memFree = 0x2ceb48u,
+        .memOrPoolFree = 0x2cf210u,
         .psMeshDrawShowing = 0x3d88d8u,
         .psMultiMeshDrawShowing = 0x1a2f00u,
+        .characterDrawShadowBuffer = 0x1619c0u,
+        .rndSetShadowMap = 0x364820u,
+        .charTrackSurfaceSetCharTexture = 0x155470u,
+        .playerMatcherOnStartStarpower = 0x117018u,
+        .playerMatcherOnStopStarpower = 0x117060u,
         .psParticleSysDrawShowing = 0x1a2c28u,
         .updateRelativeXfm = 0x1cf7b0u,
         .psEnvironSelect = 0x1a2060u,
@@ -237,6 +262,9 @@ namespace gh2
         .psTexDestroy = 0x1a0f18u,
         .psTexCopyFromScreen = 0x1a0d68u,
         .rndTextDrawShowing = 0x1dc380u,
+        .camShotFrameInterp = 0x2665a0u,
+        .camShotFrameUpdateTarget = 0x266df8u,
+        .objectDirFindObject = 0x2bb4f0u,
         .worldXfm = 0x3d8ea0u,
         .setWorldXfm = 0x1dd7b8u,
         .setDirty = 0x1dd748u,
