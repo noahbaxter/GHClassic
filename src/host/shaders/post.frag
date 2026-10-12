@@ -11,8 +11,9 @@
 //   4 the finished frame through the display's gamma ramp
 //   5 downsample_collapse.fx: the scene's low picture for depth of field
 //   6 blur.fx: 7 equal taps along `step`
+//   7 the multisampled scene into one sample a pixel (ours, not the 360's)
 // Built a second time with MULTISAMPLED for the last world pass (3) over a
-// multisampled depth buffer.
+// multisampled depth buffer, and for 7.
 
 layout(location = 0) in vec2 vUv;
 
@@ -122,6 +123,29 @@ void main()
             sum += texture(source, vUv + kTaps[i] * pc.params.xy) + texture(source, vUv - kTaps[i] * pc.params.xy);
         outColor = sum / 7.0;
     }
+#ifdef MULTISAMPLED
+    else if (pc.mode == 7u)
+    {
+        // The scene's samples (bound as `depth`) into one: their mean where
+        // every one is past 1, else the mean of each held to a luminance of
+        // 1. A plain mean of a sample near 4 and a dark one is still past
+        // white, which leaves a lit edge as jagged as with one sample.
+        ivec2 at = ivec2(gl_FragCoord.xy);
+        int count = textureSamples(depth);
+        vec4 mean = vec4(0.0);
+        vec4 held = vec4(0.0);
+        float dimmest = 4.0;
+        for (int i = 0; i < count; ++i)
+        {
+            vec4 tap = texelFetch(depth, at, i);
+            float lum = dot(tap.rgb, kLuminance);
+            dimmest = min(dimmest, lum);
+            mean += tap;
+            held += vec4(tap.rgb / max(lum, 1.0), tap.a);
+        }
+        outColor = (dimmest > 1.0 ? mean : held) / float(count);
+    }
+#endif
     else
     {
         vec4 colour = texture(source, vUv);
