@@ -14,6 +14,7 @@
 #include "disc/ark.h"
 #include "content/card.h"
 #include "content/games.h"
+#include "content/hidden_guitars.h"
 #include "content/outfits.h"
 #include "content/campaigns.h"
 #include "content/setlists.h"
@@ -57,6 +58,18 @@ namespace gh2
         // But for its intro movie, which is on the disc beside the archive.
         const size_t layer = ark::addLayer(*disc);
         ark::lendFromDisc(layer, "videos/intro.pss", *disc, "VIDEOS/INTRO.PSS");
+        // Its store sells what its disc holds unoffered, as GH2's does.
+        {
+            const dtb::Files theirs = [disc](const std::string &path) { return ark::readFile(*disc, path); };
+            dtb::Macros none;
+            auto guitars = dtb::read("config/guitars.dta", none, theirs);
+            auto store = dtb::read("config/store.dta", none, theirs);
+            if (guitars && store && offerHiddenGuitars(*guitars, *store))
+            {
+                ark::addFile(layer, "config/gen/guitars.dtb", dtb::write(*guitars));
+                ark::addFile(layer, "config/gen/store.dtb", dtb::write(*store));
+            }
+        }
         campaigns::add("gh80s", layer);
         setlists::addDisc("gh80s", *disc, false);
         // GH2's save code at GH2's addresses, its own folder: a 0x29c00-byte

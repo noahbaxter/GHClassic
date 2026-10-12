@@ -41,6 +41,10 @@
 (expect {game get_difficulty_sym 0} medium)
 (expect {game get_character_outfit} punk1)
 (expect {game get_guitar} flying_v)
+; What its disc holds unoffered is its store's (content/hidden_guitars.h).
+(expect {elem {find $syscfg store skin exp_lipstick price} 1} 550)
+(expect {elem {find $syscfg store guitar guitar_red_octane price} 1} 6000)
+(expect {elem {find $syscfg guitars air_guitar type} 1} guitar)
 {set $cash {campaign cash}}
 (expect $cash {campaign starting_cash})
 (press green)

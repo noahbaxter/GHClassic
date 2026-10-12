@@ -15,6 +15,7 @@
 
 #include "content/campaigns.h"
 #include "content/games.h"
+#include "content/hidden_guitars.h"
 #include "content/locale.h"
 #include "content/mogg.h"
 #include "content/setlists.h"
@@ -147,6 +148,7 @@ namespace gh2
             if (dtb::Node *songs = child(*store, "song"))
                 rename(*songs);
             requireAs(*guitars, *theirGuitars);
+            offerHiddenGuitars(*guitars, *store);
             // loading_tip13 is about the Xbox Live leaderboards.
             for (dtb::Node &list : tips->nodes)
                 std::erase_if(list.nodes, [](const dtb::Node &n) { return keyOf(n) == "loading_tip13"; });

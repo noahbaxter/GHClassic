@@ -166,27 +166,14 @@ namespace gh2
         return faceFront(scene, stand);
     }
 
-    void installHiddenGuitars()
+    bool offerHiddenGuitars(dtb::Node &guitars, dtb::Node &store)
     {
-        if (const auto copy = dtb::parse(kGuitarCopyDta))
-            for (const dtb::Node &line : copy->nodes)
-                if (line.type == dtb::kArray && line.nodes.size() > 1u && !line.nodes[1].text.empty())
-                    locale::add(line.nodes[0].text, line.nodes[1].text);
-
-        const dtb::Files game = [](const std::string &path) { return ark::readFile(0u, path); };
-        dtb::Macros none;
-        auto guitars = dtb::read("config/guitars.dta", none, game);
-        auto store = dtb::read("config/store.dta", none, game);
-        dtb::Node *sold = store ? child(*store, "guitar") : nullptr, *finishes = store ? child(*store, "skin") : nullptr;
-        dtb::Node *controller = guitars ? child(*guitars, kController) : nullptr;
-        dtb::Node *earned = guitars ? child(*guitars, kEarnedAs) : nullptr;
+        dtb::Node *sold = child(store, "guitar"), *finishes = child(store, "skin");
+        dtb::Node *controller = child(guitars, kController), *earned = child(guitars, kEarnedAs);
         if (!sold || !finishes || !controller || !earned)
-        {
-            std::cerr << "[guitars] cannot read the game disc's guitars and store" << std::endl;
-            return;
-        }
+            return false;
         for (const Finish &f : kFinishes)
-            if (dtb::Node *skins = child(*guitars, f.guitar) ? child(*child(*guitars, f.guitar), "skins") : nullptr)
+            if (dtb::Node *skins = child(guitars, f.guitar) ? child(*child(guitars, f.guitar), "skins") : nullptr)
             {
                 skins->nodes.push_back(skin(f.key, f.outfit, f.mat));
                 finishes->nodes.push_back(priced(f.key, f.price));
@@ -201,6 +188,30 @@ namespace gh2
             type->nodes[1] = symbol("guitar");
         controller->nodes.insert(controller->nodes.begin() + 2, terms.begin(), terms.end());
         sold->nodes.push_back(priced(kController, kControllerPrice));
+        guitars.nodes.push_back(array({symbol(kAir), array({symbol("type"), symbol("guitar")}),
+                                       array({symbol("skins"), skin(kAir, kAir, kAirMat)})}));
+        sold->nodes.push_back(priced(kAir, kAirPrice));
+        return true;
+    }
+
+    void installHiddenGuitars()
+    {
+        if (const auto copy = dtb::parse(kGuitarCopyDta))
+            for (const dtb::Node &line : copy->nodes)
+                if (line.type == dtb::kArray && line.nodes.size() > 1u && !line.nodes[1].text.empty())
+                    locale::add(line.nodes[0].text, line.nodes[1].text);
+
+        const dtb::Files game = [](const std::string &path) { return ark::readFile(0u, path); };
+        dtb::Macros none;
+        auto guitars = dtb::read("config/guitars.dta", none, game);
+        auto store = dtb::read("config/store.dta", none, game);
+        if (!guitars || !store || !offerHiddenGuitars(*guitars, *store))
+        {
+            std::cerr << "[guitars] cannot read the game disc's guitars and store" << std::endl;
+            return;
+        }
+        // The scenes are served ahead of every disc, so whichever game is
+        // played has them.
         {
             const std::string path = std::string(kScenes) + kControllerScene + ".milo_ps2";
             const auto file = ark::readFile(0u, path), like = ark::readFile(0u, std::string(kScenes) + kMeshFrom + ".milo_ps2");
@@ -220,9 +231,6 @@ namespace gh2
         {
             milo::add(*air, "Mesh", kMesh, *mesh);
             ark::addFile(airPath, milo::write(*air));
-            guitars->nodes.push_back(array({symbol(kAir), array({symbol("type"), symbol("guitar")}),
-                                            array({symbol("skins"), skin(kAir, kAir, kAirMat)})}));
-            sold->nodes.push_back(priced(kAir, kAirPrice));
         }
         else
             std::cerr << "[guitars] cannot make the air guitar a guitar to pick" << std::endl;

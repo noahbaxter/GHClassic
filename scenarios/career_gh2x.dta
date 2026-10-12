@@ -91,6 +91,9 @@
 (expect {elem {find $syscfg store character classic price} 1} 5000)
 (expect {elem {find $syscfg store song x_drinkup price} 1} 550)
 (expect {elem {find $syscfg store guitar log_reward price} 1} 8000)
+(expect {elem {find $syscfg store skin exp_lipstick price} 1} 550)
+(expect {elem {find $syscfg store guitar guitar_red_octane price} 1} 6000)
+(expect {elem {find $syscfg guitars air_guitar type} 1} guitar)
 ; A bass asks what the 360 asks, of PS2's model.
 (expect {elem {find $syscfg guitars bass_sg_mahogany require songs} 1} 1)
 (expect {elem {find $syscfg guitars bass_sg_mahogany skins bass_sg_mahog mat} 1} bass_sg_mahog.mat)
