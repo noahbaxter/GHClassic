@@ -44,6 +44,11 @@ namespace gh2
     // changed, if the two are not that game's config.
     bool offerHiddenGuitars(dtb::Node &guitars, dtb::Node &store, bool gh1);
 
+    // guitar_copy.dta's text. Before any game adds its own for the same
+    // tokens (GH1 names the finishes it shares by the whole guitar): the
+    // first added is the one read.
+    void installGuitarCopy();
+
     // After ark::install, and before locale::install.
     void installHiddenGuitars();
 }

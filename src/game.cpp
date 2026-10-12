@@ -62,6 +62,7 @@ namespace
     {
         gh2::ark::install(runtime, gh2::kSlus21447);
         gh2::installHeaps();
+        gh2::installGuitarCopy();
         gh2::installEighties();
         gh2::installGh1();
         gh2::installGh2x();

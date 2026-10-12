@@ -24,6 +24,8 @@
 (expect {elem {find $syscfg guitars guitar_red_octane require} 1} tour_passed)
 (expect {localize guitar_red_octane} "Guitar Hero guitar")
 (expect {localize air_guitar} "Air Guitar")
+; A finish GH1 shares is named as GH2 names one, GH1's disc there or not.
+(expect {localize lp_gold} "Goldtop Standard")
 (expect {localize cor_white_shop_desc} "A classic take on a guitar that is anything but ordinary.  The Gibson Corvus.")
 {set $pick gh2}
 #include common/career_start.dta

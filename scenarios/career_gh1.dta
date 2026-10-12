@@ -41,6 +41,8 @@
 (wait 1)
 (shot career)
 (expect {game get_difficulty_sym 0} medium)
+; A finish GH2's store sells too keeps GH1's name for it here.
+(expect {localize lp_gold} "Goldtop Gibson Les Paul Standard")
 {set $cash {campaign cash}}
 (expect $cash 0)
 (press green)

@@ -303,13 +303,16 @@ namespace gh2
         return true;
     }
 
-    void installHiddenGuitars()
+    void installGuitarCopy()
     {
         if (const auto copy = dtb::parse(kGuitarCopyDta))
             for (const dtb::Node &line : copy->nodes)
                 if (line.type == dtb::kArray && line.nodes.size() > 1u && !line.nodes[1].text.empty())
                     locale::add(line.nodes[0].text, line.nodes[1].text);
+    }
 
+    void installHiddenGuitars()
+    {
         const dtb::Files game = [](const std::string &path) { return ark::readFile(0u, path); };
         dtb::Macros none;
         auto guitars = dtb::read("config/guitars.dta", none, game);
