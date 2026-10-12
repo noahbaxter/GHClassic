@@ -287,7 +287,9 @@ namespace gh2::settings
         switch (get(kGraphics))
         {
         case kAuthentic:
-            return s_nextGenGame && s_nextGenGame();
+            // The HUD's and menus' pictures are the same ones drawn larger,
+            // so the sharper are taken for every game's.
+            return key == kUiArt || (s_nextGenGame && s_nextGenGame());
         case kLastGen:
             return false;
         case kNextGen:

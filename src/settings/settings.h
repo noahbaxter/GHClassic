@@ -111,7 +111,7 @@ namespace gh2::settings
 
     enum GraphicsMode
     {
-        kAuthentic, // each game as its machine drew it: the 360's songs and career kHd, the rest kClassic
+        kAuthentic, // each game as its machine drew it: the 360's songs and career kHd, the rest kClassic but kUiArt
         kLastGen,   // kClassic everywhere
         kNextGen,   // kHd everywhere
         kCustom,    // the five keys' own choices
