@@ -223,6 +223,7 @@ set(GHC_GAME_SOURCES
     src/content/mogg.cpp
     src/content/hidden_guitars.cpp
     src/content/outfits.cpp
+    src/content/payouts.cpp
     src/content/setlists.cpp
     src/content/songs.cpp
     src/content/status_line.cpp

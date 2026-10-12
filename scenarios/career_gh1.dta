@@ -63,8 +63,10 @@
 (wait_screen endgame_screen 400)
 (wait 4)
 (shot results)
-; Five stars pay each star level's award: 100, 200 and 350 in GH1.
-(expect {- {campaign cash} $cash} 650)
+; Five stars pay each star level's award.
+#include common/medium_five_stars.dta
+(expect {> $pay 0} 1)
+(expect {- {campaign cash} $cash} $pay)
 (press green)
 (wait_screen cashaward_screen)
 (wait 2)

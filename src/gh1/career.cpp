@@ -27,6 +27,7 @@
 #include "content/campaigns.h"
 #include "content/hidden_guitars.h"
 #include "content/locale.h"
+#include "content/payouts.h"
 #include "disc/ark.h"
 #include "formats/dtb.h"
 #include "gh1/guitars.h"
@@ -380,6 +381,10 @@ namespace gh2::gh1
         }
 
         ark::addFile(layer, "config/gen/gh2.dtb", dtb::write(*root));
+        // GH1 keeps a wallet and a store to each difficulty; here, as in
+        // GH2, a band has one of each, paid for across the four.
+        if (!scalePayouts(*campaign, store))
+            std::cerr << "[gh1] cannot scale GH1's cash to its store" << std::endl;
         ark::addFile(layer, "config/gen/campaign.dtb", dtb::write(*campaign));
         ark::addFile(layer, "config/gen/store.dtb", dtb::write(store));
         ark::addFile(layer, "config/gen/guitars.dtb", dtb::write(*guitars));
@@ -419,6 +424,8 @@ namespace gh2::gh1
                 if (!file)
                     continue;
                 const bool fitted = fitScript(*file, scenes);
+                if (name == "career")
+                    openEasyStore(*file);
                 if (name == "main" || name == "career")
                 {
                     replaceSymbol(*file, "punk1", first);

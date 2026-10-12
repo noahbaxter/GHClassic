@@ -1,0 +1,8 @@
+; $pay: what a song new to the band pays at five stars on medium, read from
+; the campaign's cash table (content/payouts.h): each star level's award,
+; from easy's row and medium's.
+{set $stars {find $syscfg campaign cash star_awards}}
+{set $pay 0}
+{foreach_int $row 1 3
+   {foreach_int $star 1 4
+      {set $pay {+ $pay {elem {elem $stars $row} $star}}}}}

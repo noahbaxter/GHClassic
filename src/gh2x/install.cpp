@@ -18,6 +18,7 @@
 #include "content/hidden_guitars.h"
 #include "content/locale.h"
 #include "content/mogg.h"
+#include "content/payouts.h"
 #include "content/setlists.h"
 #include "content/songs.h"
 #include "disc/ark.h"
@@ -149,6 +150,8 @@ namespace gh2
                 rename(*songs);
             requireAs(*guitars, *theirGuitars);
             offerHiddenGuitars(*guitars, *store, false);
+            if (!scalePayouts(campaign, *store))
+                std::cerr << "[gh2x] cannot scale the 360 career's cash to its store" << std::endl;
             // loading_tip13 is about the Xbox Live leaderboards.
             for (dtb::Node &list : tips->nodes)
                 std::erase_if(list.nodes, [](const dtb::Node &n) { return keyOf(n) == "loading_tip13"; });
@@ -160,6 +163,9 @@ namespace gh2
             ark::addFile(layer, "config/gen/store.dtb", dtb::write(*store));
             ark::addFile(layer, "config/gen/guitars.dtb", dtb::write(*guitars));
             ark::addFile(layer, "config/gen/tips.dtb", dtb::write(*tips));
+            if (const auto file = game(kCareerScript))
+                if (auto script = dtb::raw(*file); script && openEasyStore(*script))
+                    ark::addFile(layer, kCareerScript, dtb::write(*script));
             campaigns::add("gh2x", layer);
         }
     }

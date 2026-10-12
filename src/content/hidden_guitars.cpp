@@ -2,6 +2,7 @@
 
 #include "content/campaigns.h"
 #include "content/locale.h"
+#include "content/payouts.h"
 #include "content/tour_or_higher.h"
 #include "disc/ark.h"
 #include "dta.h"
@@ -346,6 +347,14 @@ namespace gh2
         const size_t layer = ark::addLayer(std::nullopt);
         ark::addFile(layer, "config/gen/guitars.dtb", dtb::write(*guitars));
         ark::addFile(layer, "config/gen/store.dtb", dtb::write(*store));
+        // And its career pays for them.
+        if (auto campaign = dtb::read("config/campaign.dta", none, game); campaign && scalePayouts(*campaign, *store))
+            ark::addFile(layer, "config/gen/campaign.dtb", dtb::write(*campaign));
+        else
+            std::cerr << "[guitars] cannot scale the game disc's cash to its store" << std::endl;
+        if (const auto file = ark::readFile(0u, kCareerScript))
+            if (auto script = dtb::raw(*file); script && openEasyStore(*script))
+                ark::addFile(layer, kCareerScript, dtb::write(*script));
         campaigns::over(layer);
     }
 }

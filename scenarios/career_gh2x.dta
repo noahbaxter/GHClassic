@@ -64,9 +64,10 @@
 (wait_screen endgame_screen 400)
 (wait 4)
 (shot results)
-; Five stars pay each star level's award: 150, 200 and 250 on the 360,
-; where PS2 pays 100, 150 and 200.
-(expect {- {campaign cash} $cash} 600)
+; Five stars pay each star level's award.
+#include common/medium_five_stars.dta
+(expect {> $pay 0} 1)
+(expect {- {campaign cash} $cash} $pay)
 (press green)
 (wait_screen cashaward_screen)
 (wait 2)
