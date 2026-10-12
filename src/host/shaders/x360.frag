@@ -55,20 +55,15 @@ const uint kFlagCube = 1u << 20;
 const uint kFlagNormalize = 1u << 21;
 const uint kFlagShadow = 1u << 22;
 
-// One texel of a 32x32 noise texture that repeats.
-float noiseOf(vec2 texel)
-{
-    return fract(sin(dot(mod(texel, 32.0), vec2(12.9898, 78.233))) * 43758.5453);
-}
-
 // shadowfactor.fx's ComputeShadowFactor: how much of the first light reaches
-// a character's pixel, from eight taps of its shadow map two texels about,
-// turned by an angle that changes over the world. The 360 reads that angle
-// from a 32x32 noise texture a unit of world x and y across, filtered when
-// magnified, which is not on the disc; a hash stands in. Each tap is point
-// sampled from the map after downsample_depth.fx has taken the farthest of
-// each texel and its eight neighbours, done here at the tap, and passes only
-// where that is farther than the pixel. No bias.
+// a character's pixel, from taps of its shadow map two texels about. The 360
+// takes eight, turned by an angle from a noise texture a unit of world x and
+// y across: the same up a wall, so a shadow's edge is columns of 9 levels, a
+// screen door on a face drawn larger than its 720 lines. Here the eight are
+// taken at each quarter turn, unturned. Each tap is point sampled from the
+// map after downsample_depth.fx has taken the farthest of each texel and its
+// eight neighbours, done here at the tap, and passes only where that is
+// farther than the pixel. No bias.
 float shadowOf(int b)
 {
     vec4 lit = mat4(data[b + 15], data[b + 16], data[b + 17], data[b + 18]) * vec4(vWorldPos, 1.0);
@@ -77,23 +72,22 @@ float shadowOf(int b)
     const vec2 kTaps[8] = vec2[8](vec2(0.000000, 0.000000), vec2(0.527837, -0.085868), vec2(-0.040088, 0.536087),
                                   vec2(-0.670445, -0.179949), vec2(-0.419418, -0.616039),
                                   vec2(0.440453, -0.639399), vec2(-0.757088, 0.349334), vec2(0.574619, 0.685879));
-    vec2 cell = vWorldPos.xy * 32.0 - 0.5;
-    vec2 part = fract(cell);
-    float noise = mix(mix(noiseOf(floor(cell)), noiseOf(floor(cell) + vec2(1.0, 0.0)), part.x),
-                      mix(noiseOf(floor(cell) + vec2(0.0, 1.0)), noiseOf(floor(cell) + vec2(1.0, 1.0)), part.x), part.y);
-    float angle = (noise * 2.0 - 1.0) * 3.14159;
-    vec2 turn = vec2(sin(angle), cos(angle)) / 256.0;
+    vec2 turn = vec2(0.0, 1.0) / 256.0;
     ivec2 size = textureSize(shadowMap, 0);
     float reached = 0.0;
-    for (int i = 0; i < 8; ++i)
+    for (int quarter = 0; quarter < 4; ++quarter)
     {
-        vec2 tap = uv + kTaps[i].x * turn + kTaps[i].y * vec2(-turn.y, turn.x);
-        ivec2 texel = ivec2(floor(tap * vec2(size)));
-        float farthest = 1.0;
-        for (int y = -1; y <= 1; ++y)
-            for (int x = -1; x <= 1; ++x)
-                farthest = min(farthest, texelFetch(shadowMap, clamp(texel + ivec2(x, y), ivec2(0), size - 1), 0).r);
-        reached += farthest < at.z ? 0.125 : 0.0;
+        for (int i = 0; i < 8; ++i)
+        {
+            vec2 tap = uv + kTaps[i].x * turn + kTaps[i].y * vec2(-turn.y, turn.x);
+            ivec2 texel = ivec2(floor(tap * vec2(size)));
+            float farthest = 1.0;
+            for (int y = -1; y <= 1; ++y)
+                for (int x = -1; x <= 1; ++x)
+                    farthest = min(farthest, texelFetch(shadowMap, clamp(texel + ivec2(x, y), ivec2(0), size - 1), 0).r);
+            reached += farthest < at.z ? 0.03125 : 0.0;
+        }
+        turn = vec2(-turn.y, turn.x);
     }
     return reached;
 }
