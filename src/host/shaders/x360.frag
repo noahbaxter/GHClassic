@@ -126,6 +126,23 @@ float specularOf(vec3 normal, vec3 toLight, vec3 toEye, float power)
     return pow(clamp(dot(reflect(-toLight, normal), toEye), 0.0, 1.0), max(power, 1e-4));
 }
 
+// A specular power for a pixel whose normal turns across it, and how much
+// of the highlight is left: x the power, y the scale. A bump map's detail
+// finer than a pixel puts a highlight on one pixel and not the next, a
+// different one each frame, which no edge antialiasing reaches. The
+// highlight is spread by how far the normal turns over the pixel and
+// dimmed to hold its light the same (Kaplanyan and others, Filtering
+// Distributions of Normals for Shading Antialiasing, 2016), a Phong
+// power p being a lobe of width 2 / (p + 2).
+vec2 steadied(vec3 normal, float power)
+{
+    vec3 across = dFdx(normal), down = dFdy(normal);
+    float turn = min(0.5 * (dot(across, across) + dot(down, down)), 0.18);
+    float width = 2.0 / (power + 2.0);
+    float steady = max(2.0 / (width + turn) - 2.0, 1e-4);
+    return vec2(steady, (steady + 2.0) / (power + 2.0));
+}
+
 void main()
 {
     int b = pc.lightBase;
@@ -171,6 +188,7 @@ void main()
     // nothing at its range.
     vec3 lit = vec3(0.0);
     vec3 specular = vec3(0.0);
+    vec2 steady = steadied(normal, specFactor.a);
     int count = int(data[b + 6].x);
     bool point = data[b + 6].y != 0.0;
     for (int i = 0; i < count; ++i)
@@ -189,13 +207,13 @@ void main()
             float near = 1.0 - clamp(len * light.w, 0.0, 1.0);
             lit += color * diffuseOf(normal, to).x * near;
             if (!cube)
-                specular += color * specularOf(normal, to, toEye, specFactor.a) * near;
+                specular += color * specularOf(normal, to, toEye, steady.x) * steady.y * near;
         }
         else
         {
             lit += color * diffuseOf(normal, light.xyz);
             if (!cube)
-                specular += color * specularOf(normal, light.xyz, toEye, specFactor.a);
+                specular += color * specularOf(normal, light.xyz, toEye, steady.x) * steady.y;
         }
     }
     // The material colour goes on the lights twice, as written: in

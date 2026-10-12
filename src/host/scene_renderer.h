@@ -39,8 +39,9 @@ namespace gh2
         ~SceneRenderer();
 
         // `samples` per pixel in every pass, resolved before anything reads
-        // the result.
-        bool initialize(VkDevice device, VmaAllocator allocator, VkSampleCountFlagBits samples);
+        // the result. `everySample`: the device shades each of them apart
+        // (sampleRateShading), which the 360's surfaces are then drawn with.
+        bool initialize(VkDevice device, VmaAllocator allocator, VkSampleCountFlagBits samples, bool everySample);
         void shutdown();
 
         // Renders into `target` (R8G8B8A8, width x height), which ends in
@@ -54,7 +55,7 @@ namespace gh2
 
     private:
         // With the 360's shading and post, or the PS2's.
-        bool create(VkDevice device, VmaAllocator allocator, VkSampleCountFlagBits samples, bool x360);
+        bool create(VkDevice device, VmaAllocator allocator, VkSampleCountFlagBits samples, bool everySample, bool x360);
 
         struct State;
         std::unique_ptr<State> m_state;

@@ -549,6 +549,11 @@ namespace gh2
             std::cerr << "[vulkan] device: " << physical.error().message() << std::endl;
             return false;
         }
+        // Shading at every sample of a pixel, where the GPU has it: the 360's
+        // highlights need it (SceneRenderer::initialize).
+        VkPhysicalDeviceFeatures wanted{};
+        wanted.sampleRateShading = VK_TRUE;
+        const bool everySample = physical.value().enable_features_if_present(wanted);
         auto device = vkb::DeviceBuilder(physical.value()).build();
         if (!device)
         {
@@ -602,7 +607,7 @@ namespace gh2
         while (samples * 2u <= static_cast<uint32_t>(settings::get(settings::kMsaa)) && (supported & (samples * 2u)))
             samples *= 2u;
         std::cerr << "[video] msaa " << samples << "x" << std::endl;
-        if (!s.scene.initialize(s.device.device, s.allocator, static_cast<VkSampleCountFlagBits>(samples)))
+        if (!s.scene.initialize(s.device.device, s.allocator, static_cast<VkSampleCountFlagBits>(samples), everySample))
             return false;
         if (!s.hidden && !s.createSwapchain())
             return false;

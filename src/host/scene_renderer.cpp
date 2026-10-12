@@ -715,7 +715,7 @@ namespace gh2
 
         VkDescriptorSetLayout setLayout = VK_NULL_HANDLE;
         VkDescriptorPool pool = VK_NULL_HANDLE;
-        VkSampler samplers[2]{}; // clamped, wrapped
+        VkSampler samplers[3]{}; // clamped, wrapped, and wrapped between two levels for an x360 Mat's maps
         std::unordered_map<const TextureData *, GpuTexture> textures;
         // What an untextured pass samples, so every pass multiplies by a
         // texture.
@@ -734,6 +734,8 @@ namespace gh2
 
         // Samples per pixel for every pass, from the msaa setting.
         VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
+        // The device shades each sample apart when a pipeline asks.
+        bool everySample = false;
 
         // The frame log's counts. With it on, each frame slot has a pool of
         // the GPU's times: at record's start, then at each span's end
@@ -1186,6 +1188,11 @@ namespace gh2
                 info.maxLod = VK_LOD_CLAMP_NONE;
                 if (!check(vkCreateSampler(device, &info, nullptr, &samplers[wrap]), "sampler"))
                     return false;
+                // A normal or specular map between two of its levels: the
+                // nearest one alone has a highlight jump as a surface turns.
+                info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+                if (wrap && !check(vkCreateSampler(device, &info, nullptr, &samplers[2]), "map sampler"))
+                    return false;
             }
 
             auto pixel = std::make_shared<TextureData>();
@@ -1528,6 +1535,15 @@ namespace gh2
 
             VkPipelineMultisampleStateCreateInfo multisample{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
             multisample.rasterizationSamples = shadow ? VK_SAMPLE_COUNT_1_BIT : samples;
+            // A 360 surface is shaded at each sample, not once a pixel: its
+            // bump map puts a highlight on one pixel and not the next, a
+            // different one each frame, and resolving the samples only
+            // smooths a mesh's edges. The chains and chrome sparkle without.
+            if (x360Family && !shadow && everySample && samples != VK_SAMPLE_COUNT_1_BIT)
+            {
+                multisample.sampleShadingEnable = VK_TRUE;
+                multisample.minSampleShading = 1.0f;
+            }
 
             const VkPipelineDepthStencilStateCreateInfo depth = depthState(zMode, alphaWrite, destAlphaTest);
 
@@ -2249,7 +2265,7 @@ namespace gh2
                 VkWriteDescriptorSet writes[5];
                 for (uint32_t i = 0; i < 5u; ++i)
                 {
-                    images[i] = {samplers[i < 3u ? 1 : 0], views[i], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+                    images[i] = {samplers[i < 3u ? 2 : 0], views[i], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
                     writes[i] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
                     writes[i].dstSet = gpu.set;
                     writes[i].dstBinding = i;
@@ -2514,17 +2530,20 @@ namespace gh2
     SceneRenderer::SceneRenderer() = default;
     SceneRenderer::~SceneRenderer() = default;
 
-    bool SceneRenderer::initialize(VkDevice device, VmaAllocator allocator, VkSampleCountFlagBits samples)
+    bool SceneRenderer::initialize(VkDevice device, VmaAllocator allocator, VkSampleCountFlagBits samples,
+                                   bool everySample)
     {
-        return create(device, allocator, samples, settings::hd(settings::kLookLighting));
+        return create(device, allocator, samples, everySample, settings::hd(settings::kLookLighting));
     }
 
-    bool SceneRenderer::create(VkDevice device, VmaAllocator allocator, VkSampleCountFlagBits samples, bool x360)
+    bool SceneRenderer::create(VkDevice device, VmaAllocator allocator, VkSampleCountFlagBits samples, bool everySample,
+                               bool x360)
     {
         m_state = std::make_unique<State>();
         m_state->device = device;
         m_state->allocator = allocator;
         m_state->samples = samples;
+        m_state->everySample = everySample;
         VmaAllocatorInfo allocatorInfo{};
         vmaGetAllocatorInfo(allocator, &allocatorInfo);
         VkFormatProperties depthProperties{};
@@ -2669,9 +2688,10 @@ namespace gh2
             const VkDevice device = m_state->device;
             const VmaAllocator allocator = m_state->allocator;
             const VkSampleCountFlagBits samples = m_state->samples;
+            const bool everySample = m_state->everySample;
             vkDeviceWaitIdle(device);
             shutdown();
-            if (!create(device, allocator, samples, frame.hdLighting))
+            if (!create(device, allocator, samples, everySample, frame.hdLighting))
                 return false;
         }
         State &s = *m_state;
