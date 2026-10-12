@@ -84,7 +84,7 @@ namespace gh2::settings
             // faster, which only shows with the game run far above 1x.
             {"prefer", Type::kChoice, 0, 1, 1, kChd, "chd iso"},
             {"check_updates", Type::kBool, 0, 1, 1, 1},
-            {"band", Type::kChoice, 0, 2, 1, kBandVenue, "venue gh2 gh1"},
+            {"band", Type::kChoice, 0, 3, 1, kBandVenue, "venue gh2 gh1 gh2x"},
             {"depth_of_field", Type::kBool, 0, 1, 1, 1},
             {"gh1_band_shadows", Type::kChoice, 0, 2, 1, kShadowsGh2, "off classic gh2"},
             // Off: the pickers. Retail's quickplay goes from the difficulty
@@ -107,6 +107,7 @@ namespace gh2::settings
             // with its maps and its light range of 0 to 4, then its bloom and
             // luminance ramp (host/shaders/x360.frag). Read at startup.
             {"lighting", Type::kChoice, 0, 1, 1, kClassic, "classic hd"},
+            {"graphics", Type::kChoice, 0, 3, 1, kLastGen, "authentic last_gen next_gen custom"},
         };
 
         // By its name, or one it went by before.
@@ -274,8 +275,26 @@ namespace gh2::settings
         return state().value[key];
     }
 
+    namespace
+    {
+        std::function<bool()> s_nextGenGame;
+    }
+
+    void setNextGenGame(std::function<bool()> now) { s_nextGenGame = std::move(now); }
+
     bool hd(Key key)
     {
+        switch (get(kGraphics))
+        {
+        case kAuthentic:
+            return s_nextGenGame && s_nextGenGame();
+        case kLastGen:
+            return false;
+        case kNextGen:
+            return true;
+        default:
+            break;
+        }
         if (key == kUiArt && get(kUiArt) != kUiAuto)
             return get(kUiArt) == kUiHd;
         return get(key == kUiArt ? kHighway : key) == kHd;

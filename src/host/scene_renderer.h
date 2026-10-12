@@ -29,6 +29,9 @@ namespace gh2
                     uint64_t serial);
 
     private:
+        // With the 360's shading and post, or the PS2's.
+        bool create(VkDevice device, VmaAllocator allocator, VkSampleCountFlagBits samples, bool x360);
+
         struct State;
         std::unique_ptr<State> m_state;
     };

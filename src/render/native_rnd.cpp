@@ -132,6 +132,7 @@ namespace gh2
         void onEndDrawing(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
             addDepthOfField(rdram, GPR_U32(ctx, 4), building());
+            building().hdLighting = settings::hd(settings::kLighting);
             building().luminance = look::luminance();
             frames().publish(building());
             textures::endFrame();

@@ -72,6 +72,9 @@ namespace gh2
             uint32_t height = 0;
         };
         std::vector<ScreenCopy> copies;
+        // Drawn with the 360's shading and post (settings' lighting), which
+        // can change from one song to the next.
+        bool hdLighting = false;
         // The 360's luminance map for its post stage, null for none
         // (render/look.h).
         std::shared_ptr<const TextureData> luminance;

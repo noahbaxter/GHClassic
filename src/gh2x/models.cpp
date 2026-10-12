@@ -33,6 +33,9 @@ namespace gh2
     namespace
     {
         constexpr const char *kVenues = "world/";
+        // GH2's band: config's default_band and every song's (band ...).
+        constexpr const char *kBand[] = {"metal_singer", "metal_bass", "metal_drummer", "metal_keyboard",
+                                         "female_singer"};
         constexpr const char *kFolders[] = {kVenues, "char/"};
         constexpr const char *kGuitars = "char/og/guitars/gen/";
         // The track: the PS2's scene, and the one of the 360's two that it
@@ -200,11 +203,25 @@ namespace gh2
             }
         }
 
+        // Whether the 360's scene is the one served at a PS2 path now.
+        bool wanted(const std::string &path)
+        {
+            // A band member is the band setting's first: the 360's or the
+            // PS2's whatever the graphics, when it names either.
+            for (const char *member : kBand)
+                if (path.starts_with(std::string("char/") + member + "/"))
+                {
+                    if (settings::get(settings::kBand) == settings::kBandGh2x)
+                        return true;
+                    if (settings::get(settings::kBand) == settings::kBandGh2)
+                        return false;
+                }
+            return settings::hd(path == kTrack ? settings::kHighway
+                                : path.starts_with(kVenues) ? settings::kVenues : settings::kCharacters);
+        }
+
         std::optional<ark::Made> make(const Discs &discs, const std::string &path, const std::string &twin)
         {
-            if (!settings::hd(path == kTrack ? settings::kHighway
-                              : path.starts_with(kVenues) ? settings::kVenues : settings::kCharacters))
-                return std::nullopt;
             Looks looks;
             auto converted = convert(discs, twin, path, looks);
             if (!converted)
@@ -236,10 +253,7 @@ namespace gh2
             for (const std::string &twin : ark::paths(*xbox, folder))
                 if (twin.ends_with(".milo_xbox"))
                     scenes.emplace_back(twin, gh2x::ps2Path(twin));
-        // Read now, as the track's file can only have one maker: with the
-        // PS2's models its 360 pictures are gh2x/textures.cpp's to swap in.
-        if (settings::hd(settings::kHighway))
-            scenes.emplace_back(kTrackTwin, kTrack);
+        scenes.emplace_back(kTrackTwin, kTrack);
         discs->any = discs->ps2;
         for (const auto &scene : scenes)
             discs->any.push_back(scene.second);
@@ -257,7 +271,7 @@ namespace gh2
         {
             auto made = [discs, path, twin] { return make(*discs, path, twin); };
             if (holds(discs->ps2, path))
-                ark::addMade(0u, path, std::move(made));
+                ark::addMade(0u, path, std::move(made), [path] { return wanted(path); });
             else
                 ark::addMade(path, std::move(made));
         }

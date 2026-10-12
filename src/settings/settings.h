@@ -5,6 +5,7 @@
 // a table entry here holds its kind and what the PS2 did, for the overlay row
 // and the "PS2 mode" preset later.
 
+#include <functional>
 #include <string>
 
 namespace gh2::settings
@@ -44,6 +45,7 @@ namespace gh2::settings
         kHighway,    // its track, gems and fretboards
         kUiArt,      // its HUD and menu pictures: the highway's choice, or one of its own
         kLighting,   // its shading, shadows, bloom, colour and focus blur
+        kGraphics,   // which of those five's choices are taken: each game's own machine's, one for all, or theirs
         kKeyCount,
     };
 
@@ -96,6 +98,7 @@ namespace gh2::settings
         kBandVenue,
         kBandGh2,
         kBandGh1,
+        kBandGh2x, // GH2's members as the 360 has them, whatever the graphics
     };
 
     // Which version's graphics: each game's as its PS2 drew it, or the best
@@ -106,6 +109,14 @@ namespace gh2::settings
         kHd,
     };
 
+    enum GraphicsMode
+    {
+        kAuthentic, // each game as its machine drew it: the 360's songs and career kHd, the rest kClassic
+        kLastGen,   // kClassic everywhere
+        kNextGen,   // kHd everywhere
+        kCustom,    // the five keys' own choices
+    };
+
     enum UiArt
     {
         kUiAuto, // as kHighway
@@ -114,8 +125,12 @@ namespace gh2::settings
     };
 
     int get(Key key);
-    // Whether one of the graphics keys asks for kHd, kUiArt's auto read through.
+    // Whether one of the five graphics keys comes to kHd now, by kGraphics:
+    // it can change from one song to the next.
     bool hd(Key key);
+    // Who says whether the song or career now played is a next-gen game's
+    // (kAuthentic). Until one is given, none is.
+    void setNextGenGame(std::function<bool()> now);
     // Whether settings.ini holds the key, rather than it taking its default.
     bool isSet(Key key);
     // Snapped to the entry's step and range; written to settings.ini at once.

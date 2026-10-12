@@ -85,8 +85,6 @@ namespace gh2
         // nothing pairs.
         std::optional<ark::Made> makeScene(size_t xbox, const std::string &path, const std::string &twin)
         {
-            if (!wanted(path))
-                return std::nullopt;
             const auto ours = ark::readFile(0u, path), theirs = ark::readFile(xbox, twin);
             auto scene = ours ? milo::read(*ours) : std::nullopt;
             const auto other = theirs ? milo::read(*theirs) : std::nullopt;
@@ -128,8 +126,6 @@ namespace gh2
         // A stand-in for a bitmap file the 360 has at the same path.
         std::optional<ark::Made> makeBitmap(size_t xbox, const std::string &path, const std::string &twin)
         {
-            if (!wanted(path))
-                return std::nullopt;
             const auto ours = ark::readFile(0u, path), theirs = ark::readFile(xbox, twin);
             const auto own = ours ? bitmap::read(ours->data(), ours->size()) : std::nullopt;
             if (!own || !theirs || !isPicture(theirs->data(), theirs->size()))
@@ -157,7 +153,8 @@ namespace gh2
                 if (!std::binary_search(theirs.begin(), theirs.end(), twin))
                     continue;
                 const auto make = scene ? makeScene : makeBitmap;
-                ark::addMade(0u, path, [make, disc = *xbox, path, twin] { return make(disc, path, twin); });
+                ark::addMade(0u, path, [make, disc = *xbox, path, twin] { return make(disc, path, twin); },
+                             [path] { return wanted(path); });
             }
         }
     }

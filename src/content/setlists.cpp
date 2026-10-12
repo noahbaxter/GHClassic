@@ -362,6 +362,8 @@ namespace gh2::setlists
         add(game, std::move(tiers), game + "/" + kOwnLook, scoreNames, required(*campaign));
     }
 
+    const std::string &shown() { return selected(); }
+
     void install(PS2Runtime &runtime, const Addresses &addresses)
     {
         s_addresses = &addresses;

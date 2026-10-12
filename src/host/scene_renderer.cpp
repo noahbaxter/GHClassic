@@ -2212,6 +2212,11 @@ namespace gh2
 
     bool SceneRenderer::initialize(VkDevice device, VmaAllocator allocator, VkSampleCountFlagBits samples)
     {
+        return create(device, allocator, samples, settings::hd(settings::kLighting));
+    }
+
+    bool SceneRenderer::create(VkDevice device, VmaAllocator allocator, VkSampleCountFlagBits samples, bool x360)
+    {
         m_state = std::make_unique<State>();
         m_state->device = device;
         m_state->allocator = allocator;
@@ -2223,7 +2228,7 @@ namespace gh2
         if ((depthProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) == 0u)
             m_state->depthFormat = VK_FORMAT_D24_UNORM_S8_UINT;
         State &s = *m_state;
-        s.x360 = settings::hd(settings::kLighting);
+        s.x360 = x360;
         s.colorFormat = s.x360 ? kHdrFormat : kColorFormat;
         if (!(s.createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, false, false, s.renderPass) &&
               s.createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, true, false, s.firstPass) &&
@@ -2316,6 +2321,19 @@ namespace gh2
     bool SceneRenderer::record(VkCommandBuffer cmd, const Frame &frame, VkImage target, uint32_t width,
                                uint32_t height, uint64_t serial)
     {
+        if (frame.hdLighting != m_state->x360)
+        {
+            // The lighting changed, as it does between two games' songs: the
+            // passes, pipelines and targets are all of one colour format, so
+            // everything is made again for the other.
+            const VkDevice device = m_state->device;
+            const VmaAllocator allocator = m_state->allocator;
+            const VkSampleCountFlagBits samples = m_state->samples;
+            vkDeviceWaitIdle(device);
+            shutdown();
+            if (!create(device, allocator, samples, frame.hdLighting))
+                return false;
+        }
         State &s = *m_state;
         if (!s.ensureAttachments(target, width, height))
             return false;

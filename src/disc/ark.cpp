@@ -54,9 +54,11 @@ namespace gh2::ark
             std::unordered_map<std::string, Entry> files; // dir/name -> entry
             Volume *volume = nullptr;
             // Files served in place of its own (addMade): those still to
-            // make, and those made.
+            // make, those made, and when each is served (always, for one
+            // with none).
             std::unordered_map<std::string, std::function<std::optional<Made>()>> makers;
             std::unordered_map<std::string, Entry> made;
+            std::unordered_map<std::string, std::function<bool()>> when;
         };
 
         // Paths under `as` are `source`'s on one disc, and nowhere else.
@@ -230,13 +232,15 @@ namespace gh2::ark
                             size, size});
         }
 
-        // A disc's file as the game gets it: the one made in its place, made
-        // now if it is still to be, else its own.
+        // A disc's file as the game gets it: the one made in its place while
+        // that is served, made now if it is still to be, else its own.
         const Entry *findOn(Disc &disc, const std::string &name)
         {
             const auto own = disc.files.find(name);
             if (own == disc.files.end())
                 return nullptr;
+            if (const auto when = disc.when.find(name); when != disc.when.end() && !when->second())
+                return &own->second;
             if (const auto maker = disc.makers.find(name); maker != disc.makers.end())
             {
                 const auto make = std::move(maker->second);
@@ -455,10 +459,16 @@ namespace gh2::ark
         s_made[key(path.c_str())] = std::move(make);
     }
 
-    void addMade(size_t disc, const std::string &path, std::function<std::optional<Made>()> make)
+    void addMade(size_t disc, const std::string &path, std::function<std::optional<Made>()> make,
+                 std::function<bool()> when)
     {
-        if (disc < s_discs.size())
-            s_discs[disc].makers[key(path.c_str())] = std::move(make);
+        if (disc >= s_discs.size())
+            return;
+        s_discs[disc].makers[key(path.c_str())] = std::move(make);
+        if (when)
+            s_discs[disc].when[key(path.c_str())] = std::move(when);
+        else
+            s_discs[disc].when.erase(key(path.c_str()));
     }
 
     std::vector<std::string> paths(size_t disc, const std::string &prefix)

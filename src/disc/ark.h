@@ -39,8 +39,11 @@ namespace gh2::ark
     // A file served in place of that disc's own copy of `path`, wherever its
     // copy would be (as a rename's source, under a layer over it, or in the
     // disc's turn) and nowhere else, made when the game first asks for it.
-    // None leaves the disc's own. Once install has run.
-    void addMade(size_t disc, const std::string &path, std::function<std::optional<Made>()> make);
+    // None leaves the disc's own. With `when`, it is served only while that
+    // holds, asked each time the file is looked for, and made the first time
+    // it does. Once install has run.
+    void addMade(size_t disc, const std::string &path, std::function<std::optional<Made>()> make,
+                 std::function<bool()> when = {});
 
     // That disc's archive paths starting `prefix`, in order, once install
     // has run.
