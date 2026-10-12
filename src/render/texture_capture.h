@@ -31,6 +31,19 @@ namespace gh2
     // A material with that texture is being drawn in that colour.
     void sliderScaleDrawn(uint32_t tex, const float *colour);
 
+    // What is drawn next is in that colour (r, g, b), as a widget that is
+    // off: a slider's meshes up to its scale, or one mesh, a tick box's. Game
+    // thread only.
+    enum class Off
+    {
+        kNone,
+        kSlider,
+        kOne,
+    };
+    void drawOff(Off what, const float *rgb = nullptr);
+    // A material with that texture is being drawn: in that colour, if so.
+    void colourOff(uint32_t tex, float *colour);
+
     // Before guest memory is replaced with another run's (dev/transplant.h):
     // every texture is then somewhere else, and is decoded when first drawn.
     void forgetTextureAddresses();

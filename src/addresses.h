@@ -61,6 +61,7 @@ namespace gh2
         uint32_t playerSetWhammyBar; // Player::SetWhammyBar
         uint32_t trackCtor;          // Track::Track
         uint32_t bandSliderDrawShowing; // BandSlider::DrawShowing
+        uint32_t checkBoxDrawShowing;   // CheckBox::DrawShowing
         uint32_t optionsSyncVideo; // Options::SyncVideoOptions
         uint32_t optionsSetSyncOffset;
         uint32_t beatMatchCtor;
@@ -286,6 +287,7 @@ namespace gh2
         .playerSetWhammyBar = 0x111d88u,
         .trackCtor = 0x14fa70u,
         .bandSliderDrawShowing = 0x296bd8u,
+        .checkBoxDrawShowing = 0x29bde8u,
         .optionsSyncVideo = 0x10db80u,
         .optionsSetSyncOffset = 0x10ded8u,
         .beatMatchCtor = 0x120f48u,

@@ -5,27 +5,36 @@
 #include "script.h"
 
 #include <algorithm>
+#include <array>
 #include <map>
 #include <memory>
+#include <optional>
 
 namespace gh2::slider_scale
 {
     namespace
     {
-        // A plain slider's Hmx::Object, and the colour its scale was last
-        // drawn in.
-        struct Colour
+        using Rgb = std::array<float, 3>;
+
+        // A plain slider's Hmx::Object, the colour its scale was last drawn
+        // in, and the colour it is drawn in while it is off.
+        struct Slider
         {
             float rgb[3] = {1.0f, 1.0f, 1.0f};
+            std::optional<Rgb> off;
         };
-        std::map<uint32_t, Colour> s_plain;
+        std::map<uint32_t, Slider> s_plain;
+        std::map<uint32_t, Rgb> s_offBoxes; // by a CheckBox's Hmx::Object
         std::shared_ptr<const TextureData> s_scale; // made at the first draw
 
         struct DrawTag;
+        struct BoxTag;
 
         // A BandSlider's Hmx::Object, which script names it by, from the
         // slider itself.
         constexpr uint32_t kObject = 0x160u;
+        // And a CheckBox's, from the box.
+        constexpr uint32_t kBoxObject = 0x150u;
 
         // BandSlider::DrawShowing (retail 0x296bd8) has the slider's meshes
         // drawn, the scale among them, and they are drawn after it has left
@@ -35,11 +44,22 @@ namespace gh2::slider_scale
         {
             const auto found = s_plain.find(GPR_U32(ctx, 4) + kObject);
             if (found == s_plain.end())
+            {
+                drawOff(Off::kNone);
                 return drawSliderScalesAs(nullptr);
+            }
             if (!s_scale)
                 s_scale = plainSliderScale();
-            Colour *colour = &found->second; // a map's values stay where they are
-            drawSliderScalesAs(s_scale, [colour](const float *rgb) { std::copy(rgb, rgb + 3, colour->rgb); });
+            Slider *slider = &found->second; // a map's values stay where they are
+            drawOff(Off::kSlider, slider->off ? slider->off->data() : nullptr);
+            drawSliderScalesAs(s_scale, [slider](const float *rgb) { std::copy(rgb, rgb + 3, slider->rgb); });
+        }
+
+        // CheckBox::DrawShowing (retail 0x29bde8): its one mesh follows.
+        void onBox(uint8_t *, R5900Context *ctx, PS2Runtime *)
+        {
+            const auto found = s_offBoxes.find(GPR_U32(ctx, 4) + kBoxObject);
+            drawOff(Off::kOne, found != s_offBoxes.end() ? found->second.data() : nullptr);
         }
 
         script::Node command(const script::Call &call)
@@ -48,10 +68,32 @@ namespace gh2::slider_scale
             if (op == "clear")
             {
                 s_plain.clear();
+                s_offBoxes.clear();
                 drawSliderScalesAs(nullptr);
+                drawOff(Off::kNone);
             }
             else if (op == "plain")
                 s_plain[call.object(2)];
+            else if (op == "off" || op == "on")
+            {
+                // A plain slider, or else a tick box. The colour is as
+                // {pack_color r g b} makes one.
+                const uint32_t object = call.object(2);
+                std::optional<Rgb> colour;
+                if (op == "off")
+                {
+                    const uint32_t packed = call.arg(3).value;
+                    colour = Rgb{};
+                    for (int i = 0; i < 3; ++i)
+                        (*colour)[i] = static_cast<float>((packed >> (8 * i)) & 0xffu) / 255.0f;
+                }
+                if (const auto found = s_plain.find(object); found != s_plain.end())
+                    found->second.off = colour;
+                else if (colour)
+                    s_offBoxes[object] = *colour;
+                else
+                    s_offBoxes.erase(object);
+            }
             else if (op == "colour")
             {
                 // As {pack_color r g b} makes one.
@@ -70,6 +112,7 @@ namespace gh2::slider_scale
     void install(PS2Runtime &runtime, const Addresses &addresses)
     {
         EntryHook<DrawTag>::install(runtime, addresses.bandSliderDrawShowing, onDraw);
+        EntryHook<BoxTag>::install(runtime, addresses.checkBoxDrawShowing, onBox);
         script::addCommand("slider_scales", command);
     }
 }

@@ -289,6 +289,9 @@ namespace gh2
         std::vector<uint32_t> s_sliderScales;
         std::shared_ptr<const TextureData> s_scaleDrawn; // in the volume's place, or null
         std::function<void(const float *)> s_scaleColour;
+        Off s_off = Off::kNone;
+        int s_offLeft = 0;
+        float s_offColour[3] = {};
 
         // Textures a font draws with, by RndTex: found at RndText::DrawShowing
         // (0x1dc380), through its font (+0x11c), the font's material (+0x30)
@@ -488,6 +491,25 @@ namespace gh2
     {
         if (s_scaleColour && std::find(s_sliderScales.begin(), s_sliderScales.end(), tex) != s_sliderScales.end())
             s_scaleColour(colour);
+    }
+
+    void drawOff(Off what, const float *rgb)
+    {
+        s_off = rgb ? what : Off::kNone;
+        if (rgb)
+            std::copy(rgb, rgb + 3, s_offColour);
+        // A slider's knob and its scale; one that draws neither is not left
+        // to colour what follows it.
+        s_offLeft = s_off == Off::kSlider ? 2 : s_off == Off::kOne ? 1 : 0;
+    }
+
+    void colourOff(uint32_t tex, float *colour)
+    {
+        if (s_offLeft <= 0)
+            return;
+        const bool scale = std::find(s_sliderScales.begin(), s_sliderScales.end(), tex) != s_sliderScales.end();
+        s_offLeft = s_off == Off::kSlider && scale ? 0 : s_offLeft - 1;
+        std::copy(s_offColour, s_offColour + 3, colour);
     }
 
     void forgetTextureAddresses()

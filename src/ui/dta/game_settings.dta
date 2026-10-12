@@ -3,8 +3,12 @@
 ; note_speed.cpp).
 ;
 ; The hyperspeed cheat goes: note speed replaces it. It is the fourth of
-; gh2.dta's long_cheats, after the array's name.
-{remove_elem {find $syscfg long_cheats} {elem {find $syscfg long_cheats} 4}}
+; gh2.dta's long_cheats, after the array's name. Once: this is run again
+; where the screens take another game's scripts, and the cheats stay.
+{if {! $ghc_hyper_speed_gone}
+   {set $ghc_hyper_speed_gone TRUE}
+   {remove_elem {find $syscfg long_cheats} {elem {find $syscfg long_cheats} 4}}
+}
 
 ; The options menu, as the game's own (options.dta) with a Game Settings row
 ; under Video Settings. options.milo has six rows, each button in a group of
@@ -60,42 +64,47 @@
    )
 }
 
-; The pause menu, as the game's own (pause.dta) with a Game Settings row
-; under Video Settings: Video Settings cloned on entry into Quit's place,
-; Quit a row lower, and every row half a row higher to keep them centred.
-; The screen takes the selects (pause.dta), so it is retyped for the row.
+; The pause menu, as the game's own (pause.dta) with one Settings row where
+; it has one for audio and one for video: Resume, Restart, Settings, Quit.
+; Settings leads to a menu of its own, the same scene again with its rows
+; named Audio, Video, Game and Back, and each settings screen leads back to
+; that (the screens take the selects and the buttons, so each is retyped).
+;
+; The scene's five rows as four: Video Settings' put away, Quit in its
+; place, and every row half a row lower to keep them centred. Each time the
+; scene loads; one of four rows (GH1's) is left as it is.
+#define PAUSE_FOUR_ROWS (
+   (four_rows
+      {if {&& {exists video_options.btn} {video_options.btn showing}}
+         {do
+            ($x 0) ($y 0) ($z 0) ($above 0) ($row 0)
+            {audio_options.btn get_local_pos $x $y $above}
+            {video_options.btn get_local_pos $x $y $row}
+            {quit.btn get_local_pos $x $y $z}
+            {quit.btn set_local_pos $x $y $row}
+            {set $row {'-' $row $above}}
+            {video_options.btn set_showing FALSE}
+            {video_options.btn set_state kDisabled}
+            {audio_options.btn set nav_down quit.btn}
+            {foreach $btn (resume.btn restart.btn audio_options.btn quit.btn)
+               {$btn get_local_pos $x $y $z}
+               {$btn set_local_pos $x $y {'+' $z {'/' $row 2.0}}}
+            }
+         }
+      }
+   )
+)
 {retype pause_panel
    (
       (file ui/pause.milo)
       (focus resume.btn)
       (reset_focus TRUE)
-      (enter {$this add_game})
-      (add_game
-         {if {! {exists game_options.btn}}
-            {do
-               ($x 0) ($y 0) ($z 0) ($above 0) ($row 0)
-               ($draw {video_options.btn get trans_parent})
-               {audio_options.btn get_local_pos $x $y $above}
-               {video_options.btn get_local_pos $x $y $z}
-               {set $row {'-' $z $above}}
-               {new {video_options.btn class_name} game_options.btn}
-               {game_options.btn copy video_options.btn 0}
-               {game_options.btn set trans_parent $draw}
-               {game_options.btn set_local_pos $x $y {'+' $z $row}}
-               {game_options.btn set text_token "GAME SETTINGS"}
-               {quit.btn get_local_pos $x $y $z}
-               {quit.btn set_local_pos $x $y {'+' $z $row}}
-               {video_options.btn set nav_down game_options.btn}
-               {game_options.btn set nav_down quit.btn}
-               {foreach $btn (resume.btn restart.btn audio_options.btn video_options.btn game_options.btn quit.btn)
-                  {$btn get_local_pos $x $y $z}
-                  {$btn set_local_pos $x $y {'-' $z {'/' $row 2.0}}}
-               }
-               {$draw insert (objects {$draw size objects}) game_options.btn}
-               {{$this loaded_dir} sync_objects}
-            }
-         }
+      (enter
+         {$this four_rows}
+         ; A token with no string reads as itself.
+         {audio_options.btn set text_token "SETTINGS"}
       )
+      PAUSE_FOUR_ROWS
    )
 }
 {retype pause_screen
@@ -109,9 +118,7 @@
          {switch $component
             (resume.btn {$this resume})
             (restart.btn {$this restart})
-            (audio_options.btn {ui goto_screen pause_audio_settings_screen})
-            (video_options.btn {ui goto_screen pause_video_settings_screen})
-            (game_options.btn {ui goto_screen pause_game_settings_screen})
+            (audio_options.btn {ui goto_screen pause_settings_screen})
             (quit.btn
                {if {== career {gamecfg get mode}} {gamecfg set continue_screen sel_song_screen}}
                {meta_loading_goto {gamecfg get continue_screen}}
@@ -119,6 +126,193 @@
          }
       )
       (BUTTON_DOWN_MSG {if {== $button kPad_Start} {$this resume}} kDataUnhandled)
+   )
+}
+{if {! {exists pause_settings_screen}}
+   {new GHPanel pause_settings_panel}
+   {new GHScreen pause_settings_screen}
+}
+{retype pause_settings_panel
+   (
+      (file ui/pause.milo)
+      (focus resume.btn)
+      (reset_focus TRUE)
+      (enter
+         {$this four_rows}
+         ; Three of the four: the last put away, and the rest half a row
+         ; lower. Red leads back, as the help bar says.
+         {if {quit.btn showing}
+            {do
+               ($x 0) ($y 0) ($z 0) ($row 0)
+               {resume.btn get_local_pos $x $y $z}
+               {restart.btn get_local_pos $x $y $row}
+               {set $row {'-' $row $z}}
+               {quit.btn set_showing FALSE}
+               {quit.btn set_state kDisabled}
+               {audio_options.btn set nav_down resume.btn}
+               {foreach $btn (resume.btn restart.btn audio_options.btn)
+                  {$btn get_local_pos $x $y $z}
+                  {$btn set_local_pos $x $y {'+' $z {'/' $row 2.0}}}
+               }
+            }
+         }
+         {pause_title.lbl set_localized "SETTINGS"}
+         {resume.btn set text_token "AUDIO"}
+         {restart.btn set text_token "VIDEO"}
+         {audio_options.btn set text_token "GAME"}
+      )
+      PAUSE_FOUR_ROWS
+   )
+}
+{retype pause_settings_screen
+   (
+      (panels GAME_PANELS pause_settings_panel helpbar)
+      (focus pause_settings_panel)
+      (in_game TRUE)
+      PAUSE_SCREEN_HANDLERS
+      (helpbar (default ((fret1 help_select) (fret2 help_back) (strum help_updown))))
+      (SELECT_START_MSG
+         {switch $component
+            (resume.btn {ui goto_screen pause_audio_settings_screen})
+            (restart.btn {ui goto_screen pause_video_settings_screen})
+            (audio_options.btn
+               {pause_game_settings_screen stash_lefty}
+               {ui goto_screen pause_game_settings_screen}
+            )
+         }
+      )
+      (BUTTON_DOWN_MSG
+         {if {== $button kPad_Start} {$this resume}}
+         {if {== $button kPad_Tri} {ui goto_screen pause_screen}}
+         kDataUnhandled
+      )
+   )
+}
+; The game's own two settings screens there (options.dta), each leading back
+; to that menu where it led to the pause menu.
+{retype pause_audio_settings_screen
+   (
+      (panels GAME_PANELS pause_audio_settings_panel helpbar)
+      (focus pause_audio_settings_panel)
+      (in_game TRUE)
+      (allow_back FALSE)
+      (animate_transition FALSE)
+      ; Under Settings each is named for what it holds.
+      (enter {{pause_audio_settings_panel find gs_title.lbl} set_localized "AUDIO"})
+      (BUTTON_DOWN_MSG
+         {if {&& {! {pause_audio_settings_panel slider_selected}} {== $button kPad_Tri}}
+            {$this set_volumes}
+            {ui goto_screen pause_settings_screen}
+         }
+         kDataUnhandled
+      )
+   )
+}
+{retype pause_video_settings_screen
+   (
+      (panels GAME_PANELS pause_video_settings_panel helpbar)
+      (focus pause_video_settings_panel)
+      (in_game TRUE)
+      (allow_back FALSE)
+      (animate_transition FALSE)
+      (BUTTON_DOWN_MSG
+         {if {== $button kPad_Tri} {ui goto_screen pause_settings_screen}}
+         kDataUnhandled
+      )
+   )
+}
+{retype video_settings_screen
+   (
+      (panels meta video_settings_panel helpbar)
+      (focus video_settings_panel)
+      (allow_back FALSE)
+      (BUTTON_DOWN_MSG
+         {if {== $button kPad_Tri}
+            {$this backwards_anim}
+            {synth play_sequence button_back.cue}
+            {autosave_goto options_screen}
+         }
+         kDataUnhandled
+      )
+   )
+}
+
+; Video Settings keeps its widescreen row alone, in its top row's place.
+; Playing left handed and the lag screen are Game Settings' now, and
+; progressive scan is gone: it changes nothing a window shows.
+#define VIDEO_ROW_HANDLERS (
+   (focus widescreen.btn)
+   (enter
+      ; Into the top row's place while that row still shows: once for each
+      ; time the scene loads, and not in a scene that is not the game's own
+      ; (GH1's, where the row is placed as it is made).
+      {if {gs_left_p1.btn showing}
+         {do
+            ($x 0) ($y 0) ($z 0) ($top 0) ($from 0)
+            {gs_left_p1.btn get_local_pos $x $y $top}
+            {widescreen.btn get_local_pos $x $y $from}
+            {widescreen.btn set_local_pos $x $y $top}
+            {widescreen.chk get_local_pos $x $y $z}
+            {widescreen.chk set_local_pos $x $y {'+' $z {'-' $top $from}}}
+         }
+      }
+      {foreach $o (gs_left_p1.btn gs_left_p2.btn p_scan.btn calibrate_lag.btn)
+         {{$this find $o} set_showing FALSE}
+         {{$this find $o} set_state kDisabled}
+      }
+      {foreach $o (lefty1.chk lefty2.chk p_scan.chk)
+         {{$this find $o} set_showing FALSE}
+      }
+      ; GH1's frame is its audio settings', whose own rows go.
+      {foreach $o (gs_band.sld gs_guitar.sld gs_sfx.sld gs_stereo.btn stereo.chk)
+         {if {exists $o}
+            {{$this find $o} set_showing FALSE}
+            {{$this find $o} set_state kDisabled}
+         }
+      }
+      {if {== {$this name} pause_video_settings_panel} {gs_title.lbl set_localized "VIDEO"}}
+      {widescreen.btn set nav_down widescreen.btn}
+      {widescreen.chk set_check {options get_widescreen}}
+      {helpbar set_display ((fret1 help_onoff) (fret2 help_back))}
+   )
+   (SELECT_START_MSG
+      {if {== $component widescreen.btn}
+         {widescreen.chk toggle}
+         {options set_widescreen {widescreen.chk get_check}}
+      }
+      kDataUnhandled
+   )
+)
+{retype video_settings_panel ((file ui/video_settings.milo) VIDEO_ROW_HANDLERS)}
+{retype pause_video_settings_panel ((file ui/pause_video_settings.milo) VIDEO_ROW_HANDLERS)}
+
+; Left handed play changed in a song asks for a restart, as the game's own
+; Video Settings did (options.dta's pause_video_settings_screen, pause.dta's
+; lefty_restart_screen): its No puts the change back and leads here.
+{retype lefty_restart_screen
+   (
+      (panels GAME_PANELS lefty_restart_panel helpbar)
+      (focus lefty_restart_panel)
+      (in_game TRUE)
+      (lefty_switch 0)
+      PAUSE_SCREEN_HANDLERS
+      (SELECT_START_MSG
+         {switch $component
+            (restart.btn {$this restart})
+            (reset.btn
+               {switch [lefty_switch]
+                  (0 {options set_lefty 0 {! {options get_lefty 0}}})
+                  (1 {options set_lefty 1 {! {options get_lefty 1}}})
+                  (2
+                     {options set_lefty 0 {! {options get_lefty 0}}}
+                     {options set_lefty 1 {! {options get_lefty 1}}}
+                  )
+               }
+               {ui goto_screen pause_game_settings_screen}
+            )
+         }
+      )
+      (helpbar (default ((fret1 help_continue))))
    )
 }
 
@@ -146,21 +340,59 @@
    (finish_load
       {gs_band.sld set_num_steps {note_speed stops}}
       {gs_guitar.sld set_num_steps {note_speed stops}}
+      {gs_sfx.sld set_num_steps 31}
    )
    (enter
-      {gs_title.lbl set_localized "GAME SETTINGS"}
-      {gs_sfx.sld set_showing FALSE}
-      {gs_sfx.sld set_state kDisabled}
+      ; In a song it is under Settings, and named for what it holds.
+      {gs_title.lbl set_localized {if_else {== {$this name} pause_game_settings_panel} "GAME" "GAME SETTINGS"}}
       {gs_stereo.btn set_showing FALSE}
       {gs_stereo.btn set_state kDisabled}
       {stereo.chk set_showing FALSE}
-      {gs_guitar.sld set nav_down gs_guitar.sld}
-      {foreach $row ((gs_band.sld gs_easy.lbl "E/M SPEED" gs_easy.grp) (gs_guitar.sld gs_hard.lbl "H/X SPEED" gs_hard.grp))
+      ; GH1's scene has two rows more, for playing left handed.
+      {foreach $o (gs_left_p1.btn gs_left_p2.btn)
+         {if {exists $o}
+            {{$this find $o} set_showing FALSE}
+            {{$this find $o} set_state kDisabled}
+         }
+      }
+      {$this lay_out}
+      ; Back from the lag screen in a song, which puts these away
+      ; (options.dta's pause_lag_screen).
+      {if {== {$this name} pause_game_settings_panel}
+         {hud set_showing TRUE}
+         {track_panel set_showing TRUE}
+         {world_panel set_showing TRUE}
+      }
+      ; The third slider is the highway's length, which nothing sets yet:
+      ; shown at the game's own, 110 of 50 to 200 by fives, and passed over.
+      {gs_sfx.sld set_current 12}
+      {gs_sfx.sld set_state kDisabled}
+      {gm_p1.chk set_check {options get_lefty 0}}
+      {gm_p2.chk set_check {options get_lefty 1}}
+      {gm_p2.btn set_state {if_else {$this two_players} kNormal kDisabled}}
+      ; A box has no look for being off: in the colour the scene has for it.
+      {if_else {$this two_players}
+         {slider_scales on gm_p2.chk}
+         {slider_scales off gm_p2.chk {{$this loaded_dir} get disabled_color}}
+      }
+      ; Down the rows and round: GH1's scene links none of its own.
+      {gs_band.sld set nav_down gs_guitar.sld}
+      {gs_guitar.sld set nav_down gm_p1.btn}
+      {if_else {$this two_players}
+         {gm_p1.btn set nav_down gm_p2.btn}
+         {gm_p1.btn set nav_down gm_lag.btn}
+      }
+      {gm_p2.btn set nav_down gm_lag.btn}
+      {gm_lag.btn set nav_down gs_band.sld}
+      {foreach $row
+         (
+            (gs_band.sld gs_easy.lbl "E/M SPEED" gs_easy.grp)
+            (gs_guitar.sld gs_hard.lbl "H/X SPEED" gs_hard.grp)
+            (gs_sfx.sld gs_length.lbl "HWY LENGTH" gs_length.grp)
+         )
          {do
             ($slider {elem $row 0})
             ($x 0) ($y 0) ($z 0) ($bx 0) ($by 0) ($bz 0) ($first 0) ($second 0)
-            ; Drawn with the sliders, after them.
-            ($rows {$slider get trans_parent})
             {slider_scales plain $slider}
             ; A slider's label is a token; one with no string reads as itself.
             {$slider set text_token {symbol {elem $row 2}}}
@@ -190,32 +422,124 @@
                   {{elem $row 1} set fit_text 0}
                   {{elem $row 1} set text_size [value_size]}
                   {{elem $row 1} set alignment 65} ; left, the title's height
-                  {$rows insert (objects {$rows size objects}) {elem $row 1}}
-                  ; Right, to make room for a label longer than the volumes'.
-                  {$slider set_local_pos {'+' $x [shift]} $y $z}
+                  ; Each digit a little off its line, as the letters of
+                  ; the game's buttons are (the options rows by 1 and 2).
+                  {{elem $row 1} set deltaZ [value_dip]}
+                  {{elem $row 1} set deltaRot [value_tilt]}
+                  ; No group lists the number, so the scene's dir draws it,
+                  ; in the order of its draws: after the rest, which are at
+                  ; 0 and in no order among themselves.
+                  {{$this find {elem $row 1}} set draw_order 1}
+                  ; Along, to make room for a label longer than the volumes'
+                  ; and the number: by GH1's scene's own where it is that
+                  ; one, which has those rows.
+                  {$slider set_local_pos {'+' $x {if_else {exists gs_left_p1.btn} [shift_gh1] [shift]}} $y $z}
                   {{$this loaded_dir} sync_objects}
                }
             }
          }
       }
+      ; Nor have a slider's knob and scale, once it is a plain one.
+      {slider_scales off gs_sfx.sld {{$this loaded_dir} get disabled_color}}
       {gs_band.sld set_current {note_speed stop easy}}
       {gs_guitar.sld set_current {note_speed stop hard}}
       {set [at] "gs_band.sld"}
       {$this sync_look}
+   )
+   ; The rows under the sliders, once for each time the scene loads: left
+   ; handed play, a box for each player on one row, and the lag screen's.
+   ; Each is the stereo row's button or box again, under the sliders' own
+   ; parent, so it stands by them the same in any scene: a row is the
+   ; sliders' own gap, by [pitch]. The parent takes [block], the size of all
+   ; of it.
+   (lay_out
+      {if {! {exists gm_lag.btn}}
+         {do
+            ($x 0) ($y 0) ($z 0) ($sx 0) ($top 0) ($gap 0) ($i 0)
+            ($view {gs_band.sld get trans_parent})
+            {gs_band.sld get_local_pos $sx $y $top}
+            {gs_guitar.sld get_local_pos $x $y $z}
+            {set $gap {'*' [pitch] {'-' $z $top}}}
+            {gs_guitar.sld set_local_pos $x $y {'+' $top $gap}}
+            ; The third under the two, where some scenes have it to one side.
+            {gs_sfx.sld set_local_pos $sx $y {'+' $top {'*' 2 $gap}}}
+            ; A button: its row, where its text starts from the sliders, its
+            ; text. The last is centred on that.
+            {foreach $row ((gm_lefty.btn 3 "LEFTY FLIP") (gm_p1.btn 3 "P1") (gm_p2.btn 3 "P2") (gm_lag.btn 4 "CALIBRATE LAG"))
+               {do
+                  ($b {elem $row 0})
+                  {new {gs_stereo.btn class_name} $b}
+                  {{$this find $b} copy gs_stereo.btn 0}
+                  {{$this find $b} set trans_parent $view}
+                  ; A token with no string reads as itself.
+                  {{$this find $b} set text_token {symbol {elem $row 2}}}
+                  ; Its own size, or where the look gives it a width, drawn
+                  ; in to that: GH1's faces are wide, and its own rows are
+                  ; drawn in so.
+                  {if_else {> {elem {$this look fit} $i} 0}
+                     {do
+                        {{$this find $b} set fit_text 1}
+                        {{$this find $b} set width {elem {$this look fit} $i}}
+                     }
+                     {{$this find $b} set fit_text 0}
+                  }
+                  {{$this find $b} set alignment {if_else {== $i 3} 34 33}}
+                  {{$this find $b} set text_size {if_else {== $i 3} {$this look lag_size} {$this look lefty_size}}}
+                  {{$this find $b} set_local_pos {'+' $sx {elem {$this look text_x} $i}} $y
+                     {'+' {'+' $top {'*' {elem $row 1} $gap}} {$this look text_dz}}}
+                  {{$this find $b} set_showing TRUE}
+                  {{$this find $b} set_state kNormal}
+                  {{$this find $b} set draw_order 1}
+                  {set $i {'+' $i 1}}
+               }
+            }
+            {set $i 0}
+            {foreach $box (gm_p1.chk gm_p2.chk)
+               {new {stereo.chk class_name} $box}
+               {{$this find $box} copy stereo.chk 0}
+               {{$this find $box} set trans_parent $view}
+               {{$this find $box} set_local_pos {'+' $sx {elem {$this look box_x} $i}} $y
+                  {'+' {'+' $top {'*' 3 $gap}} {$this look box_dz}}}
+               {{$this find $box} set_showing TRUE}
+               {{$this find $box} set draw_order 1}
+               {set $i {'+' $i 1}}
+            }
+            ; The row's name is no stop: it leads to itself, and nothing to it.
+            {gm_lefty.btn set nav_down gm_lefty.btn}
+            {$view get_local_pos $x $y $z}
+            {$view set_local_pos {'+' $x {elem {$this look block} 1}} $y {'+' $z {elem {$this look block} 2}}}
+            {$view set_local_scale {elem {$this look block} 0} 1 {elem {$this look block} 0}}
+            {{$this loaded_dir} sync_objects}
+         }
+      }
    )
    ; Each number in the colour its track was last drawn in, whatever the
    ; scene and the state: a frame behind it.
    (poll {$this sync_numbers})
    (exit {slider_scales clear})
    ; Each number as its slider is, and the help bar. A label given a colour
-   ; goes back to its token's text, so the text is set after.
+   ; goes back to its token's text, so the text is set after: as the label
+   ; sets its own, which is what puts its letters off their line.
    (sync_numbers
       {foreach $row ((gs_band.sld gs_easy.lbl easy) (gs_guitar.sld gs_hard.lbl hard))
          {do
             ($tenths {note_speed value {note_speed stop {elem $row 2}}})
             {{elem $row 1} set color {slider_scales colour {elem $row 0}}}
-            {{elem $row 1} set_localized {sprintf "%d.%d" {int {/ $tenths 10}} {mod $tenths 10}}}
+            {{elem $row 1} set_localized_text {sprintf "%d.%d" {int {/ $tenths 10}} {mod $tenths 10}}}
          }
+      }
+      ; The length's, in the colour the scene has for what is off.
+      {gs_length.lbl set color {{$this loaded_dir} get disabled_color}}
+      {gs_length.lbl set_localized_text "11.0"}
+   )
+   ; GH1's scenes, known by their rows' text, which is centred.
+   (gh1_scene {== {gs_stereo.btn get alignment} 34})
+   ; A measure of the rows' look: the panel's own, or in GH1's scene what
+   ; [gh1] has for it.
+   (look ($key)
+      {if_else {&& {$this gh1_scene} {find_exists [gh1] $key}}
+         {elem {find [gh1] $key} 1}
+         {$this get $key}
       }
    )
    (sync_look
@@ -223,10 +547,17 @@
       {helpbar set_display
          {if_else {$this slider_selected}
             ((fret1 help_confirm) (fret2 help_cancel) (fret3 help_reset) (strum help_updown))
-            ((fret1 help_select) (fret2 help_back) (fret3 help_reset) (strum help_updown))
+            {if_else {$this on_slider}
+               ((fret1 help_select) (fret2 help_back) (fret3 help_reset) (strum help_updown))
+               {if_else {== [at] "gm_lag.btn"}
+                  ((fret1 help_select) (fret2 help_back) (strum help_updown))
+                  ((fret1 help_onoff) (fret2 help_back) (strum help_updown))
+               }
+            }
          }
       }
    )
+   (on_slider {|| {== [at] "gs_band.sld"} {== [at] "gs_guitar.sld"}})
    (which {if_else {== [at] "gs_band.sld"} easy hard})
    (slider {if_else {== [at] "gs_band.sld"} gs_band.sld gs_guitar.sld})
    (FOCUS_MSG
@@ -237,7 +568,9 @@
    ; 0x296d18).
    (slider_start_msg
       ($component)
-      {note_speed set_stop {if_else {== $component gs_band.sld} easy hard} {$component current}}
+      {if {!= $component gs_sfx.sld}
+         {note_speed set_stop {if_else {== $component gs_band.sld} easy hard} {$component current}}
+      }
       {$this sync_look}
    )
    (slider_select_cancel
@@ -248,12 +581,26 @@
       kDataUnhandled
    )
    (SELECT_START_MSG
-      {set [picked_at] {{$this slider} current}}
-      {$this sync_look}
-      kDataUnhandled
+      ; A slider's is the panel's to take; a row's is done here.
+      {if_else {$this on_slider}
+         {do
+            {set [picked_at] {{$this slider} current}}
+            {$this sync_look}
+            kDataUnhandled
+         }
+         {do
+            {switch $component
+               (gm_p1.btn {gm_p1.chk toggle} {options set_lefty 0 {gm_p1.chk get_check}})
+               (gm_p2.btn {gm_p2.chk toggle} {options set_lefty 1 {gm_p2.chk get_check}})
+               (gm_lag.btn {lag_panel set from_panel $this} {ui goto_screen [lag_screen]})
+            }
+            {synth play_sequence button_toggle}
+            {$this sync_look}
+         }
+      }
    )
    (BUTTON_DOWN_MSG
-      {if_else {== $button kPad_Circle}
+      {if_else {&& {== $button kPad_Circle} {$this on_slider}}
          {do
             {{$this slider} set_current {note_speed reset {$this which}}}
             {synth play_sequence button_toggle}
@@ -263,14 +610,32 @@
       }
    )
 )
+; Made once, where this is run again.
+{if {! {exists game_settings_screen}}
 {new SliderPanel game_settings_panel
    (file ui/game_settings.milo)
    (shift 0)
+   (shift_gh1 -10)
    (value_dx 147)
    (value_dz -19)
    (value_size 42)
    (value_squish 0.5)
    (value_shrink 0.72)
+   (value_dip 1)
+   (value_tilt 4)
+   (pitch 0.9)
+   (block (0.88 0 12))
+   (text_x (-124 44 122 35))
+   (box_x (16 94))
+   (text_dz 0)
+   (box_dz 0)
+   (lefty_size 21)
+   (lag_size 30)
+   (fit (0 0 0 0))
+   (gh1 ((lefty_size 30) (lag_size 44) (fit (100 24 24 250))))
+   (lag_screen lag_screen)
+   ; As the main menu has it for its two-player row (main.dta).
+   (two_players {! {game is_missing_multi_controller}})
    GAME_SETTINGS_HANDLERS
 }
 {new GHScreen game_settings_screen
@@ -294,6 +659,20 @@
    (value_size 34)
    (value_squish 0.5)
    (value_shrink 0.8)
+   (value_dip 1)
+   (value_tilt 4)
+   (pitch 0.9)
+   (block (0.88 0 12))
+   (text_x (-124 44 122 35))
+   (box_x (16 94))
+   (text_dz 0)
+   (box_dz 0)
+   (lefty_size 21)
+   (lag_size 30)
+   (fit (0 0 0 0))
+   (gh1 ((block (0.88 16 -2)) (lefty_size 30) (lag_size 44) (fit (100 24 24 250))))
+   (lag_screen pause_lag_screen)
+   (two_players {> {game num_players} 1})
    GAME_SETTINGS_HANDLERS
 }
 {new GHScreen pause_game_settings_screen
@@ -302,10 +681,30 @@
    (in_game TRUE)
    (allow_back FALSE)
    (animate_transition FALSE)
+   ; How each player played as this was come to from the pause menu's
+   ; settings: a change asks for a restart on the way back.
+   (old_lefty_0 0)
+   (old_lefty_1 0)
+   (stash_lefty
+      {set [old_lefty_0] {options get_lefty 0}}
+      {set [old_lefty_1] {options get_lefty 1}}
+   )
    (BUTTON_DOWN_MSG
       {if {&& {! {pause_game_settings_panel slider_selected}} {== $button kPad_Tri}}
-         {ui goto_screen pause_screen}
+         {if_else {|| {!= [old_lefty_0] {options get_lefty 0}} {!= [old_lefty_1] {options get_lefty 1}}}
+            {do
+               {lefty_restart_screen set lefty_switch
+                  {if_else {&& {!= [old_lefty_0] {options get_lefty 0}} {!= [old_lefty_1] {options get_lefty 1}}}
+                     2
+                     {if_else {!= [old_lefty_0] {options get_lefty 0}} 0 1}
+                  }
+               }
+               {ui goto_screen lefty_restart_screen}
+            }
+            {ui goto_screen pause_settings_screen}
+         }
       }
       kDataUnhandled
    )
+}
 }

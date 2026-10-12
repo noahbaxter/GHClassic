@@ -8,6 +8,10 @@
 //   {slider_scales plain <slider>}   that slider drawn plain
 //   {slider_scales colour <slider>}  the colour a plain slider's scale was
 //                           last drawn in, for what sits beside it to take
+//   {slider_scales off <slider or box> <colour>}  a plain slider's knob and
+//                           scale, or a tick box, drawn in that colour, as
+//                           one that is off: neither has a look of its own
+//                           for that. {slider_scales on ...} is as it was
 //   {slider_scales clear}   every slider the volume's again: a screen that
 //                           made its sliders plain says so as it leaves,
 //                           before they go and another's take their place
