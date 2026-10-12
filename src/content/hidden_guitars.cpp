@@ -7,6 +7,7 @@
 #include "dta.h"
 #include "formats/dtb.h"
 #include "gh1/rig.h"
+#include "gh1/scene.h"
 #include "milo/milo.h"
 
 #include <algorithm>
@@ -35,6 +36,13 @@ namespace gh2
         // and is earned as this reward guitar is, on hard (2) or above.
         constexpr const char *kController = "guitar_red_octane", *kEarnedAs = "snaketapus_reward";
         constexpr int32_t kControllerPrice = 6000, kControllerFrom = 2;
+        // GH2's own controller, which no disc has: the first game's with its
+        // black plastic red, its white pickguard black and its neck black,
+        // painted from the disc's texture as a finish of it.
+        constexpr const char *kRed = "guitar_red_octane_gh2", *kRedMat = "guitar_redoctane_gh2.mat";
+        constexpr const char *kRedTex = "redoctane_gh2.tex", *kControllerTex = "redoctane.tex";
+        constexpr const char *kControllerMat = "guitar_redoctane.mat";
+        constexpr int32_t kRedPrice = 550;
         constexpr const char *kAir = "air_guitar", *kAirMat = "guitar_lespaul_burst.mat";
         constexpr int32_t kAirPrice = 1000;
 
@@ -140,6 +148,89 @@ namespace gh2
                 }
             return true;
         }
+
+        // The controller's Tex as GH2's controller is coloured. Its bitmap
+        // is 32 bytes, 256 colours of four (the PS2's order: indices with
+        // bit 3 or 4 alone set swap), then a byte a texel, 256 by 128. The
+        // black plastic and the neck's brown change wherever they are, the strum
+        // bar's surround with them. Three parts of the picture differ, so
+        // their texels take colours of their own from the unused ones: the
+        // pickguard, whose white goes black; the whammy bar's tip, which
+        // stays black; and the neck, where the pale edges of the fret
+        // buttons go black with it. Each is left, top, right, bottom.
+        constexpr size_t kBitmapHead = 32u, kColours = 256u, kTexWide = 256u, kTexHigh = 128u;
+        constexpr size_t kGuard[4] = {48u, 50u, 138u, 81u};
+        constexpr size_t kTip[4] = {0u, 56u, 17u, 96u}, kNeck[4] = {0u, 0u, 255u, 23u};
+        bool within(const size_t box[4], size_t x, size_t y)
+        {
+            return x >= box[0] && x <= box[2] && y >= box[1] && y <= box[3];
+        }
+        std::optional<milo::Bytes> redController(const milo::Bytes &tex)
+        {
+            const size_t size = kBitmapHead + kColours * 4u + kTexWide * kTexHigh;
+            if (tex.size() < size || tex[tex.size() - size + 1u] != 8u)
+                return std::nullopt;
+            milo::Bytes out = tex;
+            uint8_t *palette = out.data() + out.size() - size + kBitmapHead, *texels = palette + kColours * 4u;
+            const auto slot = [&](size_t index) { return palette + ((index & 0x18u) == 8u || (index & 0x18u) == 16u ? index ^ 0x18u : index) * 4u; };
+            bool used[kColours] = {};
+            for (size_t i = 0; i < kTexWide * kTexHigh; ++i)
+                used[texels[i]] = true;
+            // In those parts a colour goes to a spare one, kept as it was or
+            // made black: 0 for no part, 1 kept, 2 black.
+            int spare[3][kColours];
+            std::fill(&spare[0][0], &spare[0][0] + 3 * kColours, -1);
+            size_t next = 0u;
+            for (size_t y = 0; y < kTexHigh; ++y)
+                for (size_t x = 0; x < kTexWide; ++x)
+                {
+                    uint8_t &texel = texels[y * kTexWide + x];
+                    const uint8_t *from = slot(texel);
+                    const int high = std::max({from[0], from[1], from[2]}), low = std::min({from[0], from[1], from[2]});
+                    int as = 0;
+                    // The body's black around the pickguard is in its box
+                    // too, and goes red as the rest does.
+                    if (within(kGuard, x, y))
+                        as = high >= 90 ? 2 : 0;
+                    else if (within(kTip, x, y))
+                        as = 1;
+                    else if (within(kNeck, x, y) && high - low < 60 && high > 60)
+                        as = 2;
+                    if (as == 0)
+                        continue;
+                    if (spare[as][texel] < 0)
+                    {
+                        while (next < kColours && used[next])
+                            ++next;
+                        if (next == kColours)
+                            return std::nullopt;
+                        uint8_t *to = slot(next);
+                        std::copy(from, from + 4, to);
+                        if (as == 2)
+                            to[0] = to[1] = to[2] = static_cast<uint8_t>(6 + low / 24);
+                        spare[as][texel] = static_cast<int>(next++);
+                    }
+                    texel = static_cast<uint8_t>(spare[as][texel]);
+                }
+            for (size_t i = 0; i < kColours; ++i)
+            {
+                if (!used[i])
+                    continue;
+                uint8_t *c = slot(i);
+                const int high = std::max({c[0], c[1], c[2]}), low = std::min({c[0], c[1], c[2]});
+                const int light = (c[0] * 299 + c[1] * 587 + c[2] * 114) / 1000;
+                if (high < 90 && high - low < 30)
+                {
+                    c[0] = static_cast<uint8_t>(120 + 110 * light / 90);
+                    c[1] = static_cast<uint8_t>(8 + 40 * light / 90);
+                    c[2] = static_cast<uint8_t>(14 + 44 * light / 90);
+                }
+                else if (c[0] > c[1] && c[1] > c[2] && high - low > 30 && high - low < high * 6 / 10 && c[1] * 2 > c[0])
+                    c[0] = c[1] = c[2] = static_cast<uint8_t>(light * 16 / 100);
+            }
+            return out;
+        }
+
         std::optional<milo::Bytes> hiddenMesh()
         {
             const auto file = ark::readFile(0u, std::string(kScenes) + kMeshFrom + ".milo_ps2");
@@ -188,6 +279,11 @@ namespace gh2
             type->nodes[1] = symbol("guitar");
         controller->nodes.insert(controller->nodes.begin() + 2, terms.begin(), terms.end());
         sold->nodes.push_back(priced(kController, kControllerPrice));
+        if (dtb::Node *skins = child(*controller, "skins"))
+        {
+            skins->nodes.push_back(skin(kRed, kControllerScene, kRedMat));
+            finishes->nodes.push_back(priced(kRed, kRedPrice));
+        }
         guitars.nodes.push_back(array({symbol(kAir), array({symbol("type"), symbol("guitar")}),
                                        array({symbol("skins"), skin(kAir, kAir, kAirMat)})}));
         sold->nodes.push_back(priced(kAir, kAirPrice));
@@ -219,7 +315,17 @@ namespace gh2
             const auto ours = like ? milo::read(*like) : std::nullopt;
             const auto mesh = ours ? milo::find(*ours, kMesh) : std::nullopt;
             if (scene && mesh && faceFront(*scene, gh1::xfm(ours->bodies[*mesh], kMeshLocal)))
+            {
+                const auto tex = milo::find(*scene, kControllerTex), mat = milo::find(*scene, kControllerMat);
+                if (const auto red = tex && mat ? redController(scene->bodies[*tex]) : std::nullopt)
+                {
+                    milo::add(*scene, "Tex", kRedTex, *red);
+                    milo::add(*scene, "Mat", kRedMat, gh1::renamed(scene->bodies[*mat], kControllerTex, kRedTex));
+                }
+                else
+                    std::cerr << "[guitars] cannot paint the controller as GH2's" << std::endl;
                 ark::addFile(path, milo::write(*scene));
+            }
             else
                 std::cerr << "[guitars] cannot turn the controller to face the front" << std::endl;
         }

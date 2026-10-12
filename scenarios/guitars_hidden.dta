@@ -6,6 +6,7 @@
 (expect {elem {find $syscfg store skin exp_lipstick price} 1} 550)
 (expect {elem {find $syscfg store guitar guitar_red_octane price} 1} 6000)
 (expect {elem {find $syscfg store guitar air_guitar price} 1} 1000)
+(expect {elem {find $syscfg store skin guitar_red_octane_gh2 price} 1} 550)
 (expect {elem {find $syscfg guitars guitar_red_octane type} 1} guitar)
 (expect {elem {find $syscfg guitars guitar_red_octane require} 1} tour_passed)
 (expect {localize guitar_red_octane} "Guitar Hero guitar")
@@ -89,6 +90,10 @@
 #include common/guitar_shot.dta
 #include common/guitar_near.dta
 (shot guitar_red_octane)
+{set $ghc_finish guitar_red_octane_gh2}
+#include common/guitar_shot.dta
+#include common/guitar_near.dta
+(shot guitar_red_octane_gh2)
 {set $ghc_guitar air_guitar}
 {set $ghc_finish air_guitar}
 #include common/guitar_shot.dta

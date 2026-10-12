@@ -22,6 +22,10 @@
 (guitar_red_octane_desc "The most ultimate axe ever!")
 (guitar_red_octane_shop_desc "")
 (guitar_red_octane_locked_desc "")
+; GH2's red controller, a finish of it painted from the disc's.
+(guitar_red_octane_gh2 "")
+(guitar_red_octane_gh2_desc "")
+(guitar_red_octane_gh2_shop_desc "")
 
 ; The air guitar (GH2's store). Its name is GH2's own for the cheat
 ; (cheat_air_guitar).
