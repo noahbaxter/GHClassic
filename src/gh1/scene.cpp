@@ -285,6 +285,19 @@ namespace gh2::gh1
         return out;
     }
 
+    Bytes renamed(const Bytes &b, const std::string &from, const std::string &to)
+    {
+        Bytes key;
+        putStr(key, from);
+        const auto at = std::search(b.begin(), b.end(), key.begin(), key.end());
+        if (at == b.end())
+            return b;
+        Bytes out(b.begin(), at);
+        putStr(out, to);
+        out.insert(out.end(), at + static_cast<std::ptrdiff_t>(key.size()), b.end());
+        return out;
+    }
+
     bool holds(const Bytes &b, const std::string &name)
     {
         Bytes key;

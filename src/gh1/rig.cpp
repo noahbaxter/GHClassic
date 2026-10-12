@@ -538,6 +538,193 @@ namespace gh2
             return out;
         }
 
+        // A GH1 Mesh 25's verts, and its Draw's sphere, moved by `by`: past
+        // its Draw are its mat, its geometry's owner, nine bytes and a
+        // count, then each vert's place and normal first of its 48 bytes.
+        void turnVerts(Bytes &mesh, const Xfm &by)
+        {
+            const auto p = parts("Mesh", mesh);
+            if (!p)
+                return;
+            size_t o = p->rest;
+            str(mesh, o);
+            str(mesh, o);
+            o += 9u;
+            if (o + 4u > mesh.size())
+                return;
+            const size_t count = u32(mesh, o);
+            o += 4u;
+            if (o + count * 48u > mesh.size())
+                return;
+            const auto move = [&](size_t at, bool place)
+            {
+                float v[3], r[3];
+                std::memcpy(v, mesh.data() + at, 12u);
+                for (int j = 0; j < 3; ++j)
+                    r[j] = (place ? by.v[j] : 0.0f) + v[0] * by.m[j] + v[1] * by.m[3 + j] + v[2] * by.m[6 + j];
+                std::memcpy(mesh.data() + at, r, 12u);
+            };
+            for (size_t i = 0; i < count; ++i)
+            {
+                move(o + i * 48u, true);
+                move(o + i * 48u + 12u, false);
+            }
+        }
+
+        milo::Dir guitar(const milo::Dir &gh2, const milo::Dir &gh1)
+        {
+            std::map<std::string, size_t> theirs;
+            std::set<std::string> meshes;
+            std::map<std::string, std::string> owner; // by every GH1 mesh's child list
+            for (size_t i = 0; i < gh1.entries.size(); ++i)
+            {
+                const auto &[c, n] = gh1.entries[i];
+                theirs[n] = i;
+                if (c != "Mesh")
+                    continue;
+                if (!startsWith(n, "spot_") && !startsWith(n, "bone_"))
+                    meshes.insert(n);
+                for (const std::string &child : gh1Bone(gh1.bodies[i]).children)
+                    owner[child] = n;
+            }
+            std::vector<std::string> drawn;
+            for (size_t i = 0; i < gh1.entries.size(); ++i)
+                if (gh1.entries[i].first == "View")
+                    for (const std::string &n : viewMeshes(gh1.bodies[i], meshes))
+                        if (std::find(drawn.begin(), drawn.end(), n) == drawn.end())
+                            drawn.push_back(n);
+
+            // GH2's shadow group stays, with the Mat its meshes are drawn
+            // in. GH1 has no shadow mesh of a guitar: the body's own meshes
+            // cast it, the strings and the star power fire left out.
+            std::set<std::string> was, kept;
+            for (size_t i = 0; i < gh2.entries.size(); ++i)
+            {
+                const auto &[c, n] = gh2.entries[i];
+                if (c == "Group" && n.find("shadow") != std::string::npos)
+                    for (const std::string &mesh : groupNames(gh2.bodies[i]))
+                        was.insert(mesh);
+            }
+            std::string shadowMat;
+            for (size_t i = 0; i < gh2.entries.size(); ++i)
+                if (was.count(gh2.entries[i].second))
+                    for (const std::string &mat : named(gh2.bodies[i], ".mat"))
+                    {
+                        kept.insert(mat);
+                        shadowMat = mat;
+                    }
+            std::vector<std::string> casts, shadows;
+            for (const std::string &n : drawn)
+                if (!shadowMat.empty() && n.find("strings") == std::string::npos && n.find("fire") == std::string::npos)
+                {
+                    casts.push_back(n);
+                    shadows.push_back("shadow_" + n);
+                }
+
+            milo::Dir out = gh2;
+            out.entries.clear();
+            out.bodies.clear();
+            const std::string spot = "bone_pos_guitar.mesh";
+            std::map<std::string, Xfm> world;
+            for (size_t i = 0; i < gh2.entries.size(); ++i)
+                if (gh2.entries[i].second == spot)
+                    world[spot] = xfm(gh2.bodies[i], kTransWorld);
+            // Where a GH1 object is once it hangs off GH2's guitar spot: by
+            // its GH1 local under its GH1 parent, or for one GH1 hangs off
+            // nothing, where it is from GH1's spot.
+            std::function<std::pair<Xfm, Xfm>(const std::string &)> placed = [&](const std::string &n)
+            {
+                const Bytes &body = gh1.bodies[theirs[n]];
+                const auto up = owner.find(n);
+                Xfm local = xfm(body, 8u);
+                if (up == owner.end())
+                    local = xfm(body, 56u) * inverse(xfm(gh1.bodies[theirs[spot]], 56u));
+                const std::string parent = up == owner.end() ? spot : up->second;
+                if (!world.count(parent))
+                    world[parent] = placed(parent).second;
+                return std::make_pair(local, local * world[parent]);
+            };
+            for (size_t i = 0; i < gh2.entries.size(); ++i)
+            {
+                const auto &[c, n] = gh2.entries[i];
+                if (((c == "Mesh" || c == "Mat") && !kept.count(n)) || c == "Tex")
+                    continue;
+                out.entries.push_back(gh2.entries[i]);
+                out.bodies.push_back(c != "Group" ? gh2.bodies[i]
+                                                  : groupWith(gh2.bodies[i], n.find("shadow") == std::string::npos ? drawn : shadows));
+                // The hands' bones and the neck's spots where GH1 has them
+                // on this guitar. A spot keeps GH2's axes: GH1's are scaled
+                // along the neck (gh1/cameras.cpp).
+                if (c != "Trans" || n == spot || !theirs.count(n) || !owner.count(n))
+                    continue;
+                auto [local, at] = placed(n);
+                if (startsWith(n, "spot_"))
+                {
+                    const Xfm own = xfm(gh2.bodies[i], kTransLocal);
+                    std::copy(own.m, own.m + 9, local.m);
+                    at = local * world[owner[n]];
+                }
+                const Bytes l = bytes(local), w = bytes(at);
+                std::copy(l.begin(), l.end(), out.bodies.back().begin() + kTransLocal);
+                std::copy(w.begin(), w.end(), out.bodies.back().begin() + kTransWorld);
+            }
+
+            // GH1's guitar: what its view draws, in that order, with the
+            // Mats and Texs those name.
+            std::optional<Xfm> stand; // GH2's guitar.mesh under its spot (a Mesh 28's local is 17 bytes in)
+            for (size_t i = 0; i < gh2.entries.size(); ++i)
+                if (gh2.entries[i] == std::make_pair(std::string("Mesh"), std::string("guitar.mesh")) &&
+                    gh2.bodies[i].size() >= 17u + 48u)
+                    stand = xfm(gh2.bodies[i], 17u);
+            std::vector<std::string> wanted;
+            for (size_t i = 0; i < drawn.size(); ++i)
+            {
+                const std::string &n = drawn[i];
+                auto [local, at] = placed(n);
+                Bytes body = gh1.bodies[theirs[n]];
+                // A guitar shown on its own (the picker, the store) stands by
+                // its mesh's turn under the guitar spot, which GH2's guitars
+                // share and GH1's do not: half of GH1's are turned about the
+                // neck, their verts the other way to match, so in a hand they
+                // are right and on show they face away. A mesh under the spot
+                // takes GH2's guitar.mesh's place there, its verts moved by
+                // the difference, and what hangs off it (the strings) moves
+                // by the same to stay where it was.
+                const std::string parent = owner.count(n) ? owner[n] : spot;
+                if (stand && parent == spot)
+                {
+                    turnVerts(body, local * inverse(*stand));
+                    local = *stand;
+                    at = *stand * world[spot];
+                }
+                else if (stand && theirs.count(parent) && std::find(drawn.begin(), drawn.end(), parent) != drawn.end() &&
+                         (!owner.count(parent) || owner[parent] == spot))
+                    local = local * (placed(parent).first * inverse(*stand));
+                const Bytes w = bytes(at);
+                std::copy(w.begin(), w.end(), body.begin() + 56);
+                body = reparent(body, parent, local);
+                setDrawOrder(body, static_cast<float>(i + 1u));
+                const std::vector<std::string> mats = named(gh1.bodies[theirs[n]], ".mat");
+                wanted.insert(wanted.end(), mats.begin(), mats.end());
+                if (!mats.empty() && std::find(casts.begin(), casts.end(), n) != casts.end())
+                    milo::add(out, "Mesh", "shadow_" + n, renamed(body, mats[0], shadowMat));
+                milo::add(out, "Mesh", n, std::move(body));
+            }
+            std::set<std::string> added;
+            for (size_t i = 0; i < wanted.size(); ++i)
+            {
+                const auto it = theirs.find(wanted[i]);
+                if (it == theirs.end() || !added.insert(wanted[i]).second)
+                    continue;
+                const Bytes &body = gh1.bodies[it->second];
+                for (const char *suffix : {".mat", ".tex"})
+                    for (const std::string &n : named(body, suffix))
+                        wanted.push_back(n);
+                milo::add(out, gh1.entries[it->second].first, wanted[i], body);
+            }
+            return out;
+        }
+
         void hideUnviewed(milo::Dir &outfit, const milo::Dir &gh1)
         {
             std::set<std::string> meshes, viewed;

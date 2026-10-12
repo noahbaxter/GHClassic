@@ -1,0 +1,48 @@
+; Names and blurbs for the guitars and finishes no disc names
+; (content/hidden_guitars.h, gh1/guitars.h). Noah's to write: a token left ""
+; is not added, and shows in game as its own name.
+;
+;   <key>              its name, on the guitar picker and in the store
+;   <key>_desc         the picker's blurb
+;   <key>_shop_desc    the store's blurb
+;   <key>_locked_desc  the store's blurb while a guitar is still to be earned
+
+; The Explorer's two unsold finishes (GH2's store).
+(exp_peppermint "")
+(exp_peppermint_desc "")
+(exp_peppermint_shop_desc "")
+(exp_lipstick "")
+(exp_lipstick_desc "")
+(exp_lipstick_shop_desc "")
+
+; The controller as a guitar (GH2's store, once hard's tour is passed). Its
+; name and blurb are GH1's own for it (GH1's locale.dta), where it is a
+; cheat's.
+(guitar_red_octane "Guitar Hero guitar")
+(guitar_red_octane_desc "The most ultimate axe ever!")
+(guitar_red_octane_shop_desc "")
+(guitar_red_octane_locked_desc "")
+
+; The air guitar (GH2's store). Its name is GH2's own for the cheat
+; (cheat_air_guitar).
+(air_guitar "Air Guitar")
+(air_guitar_desc "")
+(air_guitar_shop_desc "")
+
+; Three Flying V finishes GH1's disc holds and never offers (GH1's store).
+(fv_black "")
+(fv_black_desc "")
+(fv_black_shop_desc "")
+(fv_blue "")
+(fv_blue_desc "")
+(fv_blue_shop_desc "")
+(fv_yellow "")
+(fv_yellow_desc "")
+(fv_yellow_shop_desc "")
+
+; GH1's guitar that nothing on its disc names, and its one finish (a band's
+; from the start of GH1's career, in no store).
+(tobac "")
+(tobac_desc "")
+(tobac_sunburst "")
+(tobac_sunburst_desc "")

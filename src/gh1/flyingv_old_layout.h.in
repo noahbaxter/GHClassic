@@ -1,0 +1,6 @@
+#pragma once
+
+// src/gh1/flyingv_old_layout.bin (gh1/guitars.h): for each texel of the
+// Flying V's 256x256 texture, row by row, the column and row of the old
+// 256x128 layout's texel that belongs there.
+inline constexpr unsigned char kFlyingVOldLayout[] = {@GHC_FLYINGV_OLD_LAYOUT@};

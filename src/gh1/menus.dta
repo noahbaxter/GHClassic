@@ -106,11 +106,25 @@
          {win_screen1.view set_showing TRUE}
          {win_screen2.view set_showing FALSE}}))
 
-; Beating GH1 on expert wins the Battleaxe, on the second page of its win
-; screen (GH1's endgame.dta, display_battleaxe): green turns to it once,
-; and leaves as ever after (endgame.dta). The guitar is the band's from the
-; start here, its career's store not selling it.
+; Beating GH1 on expert wins the Battle Axe (GH1's endgame.dta,
+; display_battleaxe): green fades to white over a second and in again over
+; four on the second page of its win screen, the guitar turning on it, and
+; the guitar is the band's from then on (gh1/career.cpp); green leaves as
+; ever after. GH1's own guitar display is not converted: the guitar is on
+; GH2's for a guitar unlocked, that scene's own picture and text hidden.
+(unlock_guitar_panel
+   (= enter
+      {fullscreen.mesh set_showing FALSE}
+      {ug_congrats.lbl set_showing FALSE}
+      {ug_blurb1.lbl set_showing FALSE}
+      {ug_blurb2.lbl set_showing FALSE}
+      {ug_guitar.lbl set_showing FALSE}
+      {if {== kDifficultyExpert {game get_difficulty 0}}
+         {unlock_guitar_display_panel show_guitar 0 battleaxe '' ug_guitar.pxy ug_guitar.filt}}
+      {unlock_guitar_display_panel set_showing FALSE}))
 (win_game_screen
+   (needs win_expert)
+   (= panels GAME_PANELS win_game_panel unlock_guitar_display_panel unlock_guitar_panel helpbar fade_panel)
    (= BUTTON_DOWN_MSG
       {if {&& {$this can_continue} {== $button kPad_X}}
          {if_else
@@ -119,10 +133,16 @@
                {! {{win_game_panel find win_screen2.view} showing}}}
             {do
                {synth play_sequence button_select}
-               {{win_game_panel find win_screen1.view} set_showing FALSE}
-               {{win_game_panel find win_screen2.view} set_showing TRUE}
+               {campaign buy_item battleaxe 0}
                {helpbar set_display ()}
-               {set [continue_time] {'+' {taskmgr ui_seconds} 3}}}
+               {set [continue_time] {'+' {taskmgr ui_seconds} 6}}
+               {fade_panel start_fade 1 (color 1 1 1) (fade_synth FALSE) (fade_out TRUE)}
+               {script_task (delay 1) (units kTaskUISeconds)
+                  (script
+                     {{win_game_panel find win_screen1.view} set_showing FALSE}
+                     {{win_game_panel find win_screen2.view} set_showing TRUE}
+                     {unlock_guitar_display_panel set_showing TRUE}
+                     {fade_panel start_fade 4 (color 1 1 1) (fade_synth FALSE) (fade_out FALSE)})}}
             {do
                {fade_panel start_fade 1 (color 0 0 0) (fade_synth FALSE) (fade_out TRUE)}
                {synth play_sequence button_select}

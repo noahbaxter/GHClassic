@@ -9,6 +9,8 @@
 #include "content/encores.h"
 #include "content/quickplay.h"
 #include "content/games.h"
+#include "content/hidden_guitars.h"
+#include "content/tour_or_higher.h"
 #include "content/locale.h"
 #include "content/outfits.h"
 #include "content/campaigns.h"
@@ -61,6 +63,7 @@ namespace
         gh2::installEighties();
         gh2::installGh1();
         gh2::installGh2x();
+        gh2::installHiddenGuitars();
         gh2::installGh1Face(runtime, gh2::kSlus21447);
         gh2::outfits::install(runtime, gh2::kSlus21447);
         gh2::band::install(runtime, gh2::kSlus21447);
@@ -84,6 +87,7 @@ namespace
         gh2::installTrackStart(runtime, gh2::kSlus21447);
         gh2::installSustainRelease(runtime, gh2::kSlus21447);
         gh2::installWhammyHold(runtime, gh2::kSlus21447);
+        gh2::installTourOrHigher(runtime, gh2::kSlus21447);
         gh2::installMovies(runtime, gh2::kSlus21447);
         gh2::installVideoOptions(runtime, gh2::kSlus21447);
         gh2::card::install(runtime, gh2::kSlus21447);
