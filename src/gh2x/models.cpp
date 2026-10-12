@@ -249,9 +249,12 @@ namespace gh2
         discs->xbox = *xbox;
         discs->ps2 = ark::paths(0u, "");
         std::vector<std::pair<std::string, std::string>> scenes; // 360 path, PS2 path
+        // A venue's sound bank stays the PS2's: its samples are the PS2's
+        // either way, and a converted one is loaded into sound memory beside
+        // the PS2's, where half of battle's then find no room.
         for (const char *folder : kFolders)
             for (const std::string &twin : ark::paths(*xbox, folder))
-                if (twin.ends_with(".milo_xbox"))
+                if (twin.ends_with(".milo_xbox") && !twin.ends_with("_bank.milo_xbox"))
                     scenes.emplace_back(twin, gh2x::ps2Path(twin));
         scenes.emplace_back(kTrackTwin, kTrack);
         discs->any = discs->ps2;
