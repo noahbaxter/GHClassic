@@ -1,5 +1,7 @@
 #include "milo/objects.h"
 
+#include <cstring>
+
 namespace gh2::milo
 {
     namespace
@@ -44,6 +46,22 @@ namespace gh2::milo
         if (!enter(body, version, 15u, o))
             return std::nullopt;
         return str(body, o);
+    }
+
+    std::optional<Font> readFont(const Bytes &body, uint32_t version)
+    {
+        size_t o = 0u;
+        if (!enter(body, version, 15u, o))
+            return std::nullopt;
+        str(body, o);
+        if (o + 8u > body.size())
+            return std::nullopt;
+        Font font;
+        font.cell = o;
+        std::memcpy(&font.cellWidth, body.data() + o, 4u);
+        std::memcpy(&font.cellHeight, body.data() + o + 4u, 4u);
+        font.rest.assign(body.begin() + static_cast<std::ptrdiff_t>(o + 8u), body.end());
+        return font;
     }
 
     std::optional<std::string> matDiffuse(const Bytes &body, uint32_t version)

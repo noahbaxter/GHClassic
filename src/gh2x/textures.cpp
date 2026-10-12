@@ -9,8 +9,8 @@
 //
 // Left as they are: a Tex with no pixels of its own (rendered, movie, frame
 // buffer), one with no source picture (filled at run time), one a Font in
-// its file draws (four 360 fonts pack their glyphs another way), and one
-// whose twin is a normal map.
+// its file draws unless every such Font takes the 360's glyphs with it
+// (takeFont), and one whose twin is a normal map.
 
 #include "gh2x/textures.h"
 
@@ -25,6 +25,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <map>
 #include <memory>
 #include <set>
 
@@ -61,11 +62,16 @@ namespace gh2
             return header && header->mips == 0u && header->width != 0u && bytes == size ? header : std::nullopt;
         }
 
+        // A scene's Fonts on one sheet, each with the 360's Font of its name.
+        // None when one of them has no such Font, or that one draws through
+        // another Mat: the sheet is then left as it is.
+        using SheetFonts = std::optional<std::vector<std::pair<size_t, size_t>>>;
+
         // The Tex each Font in a scene draws its glyphs from, through its
         // Mat. None when a Font or its Mat cannot be read.
-        std::optional<std::set<std::string>> fontTextures(const milo::Dir &dir)
+        std::optional<std::map<std::string, SheetFonts>> fontTextures(const milo::Dir &dir, const milo::Dir &other)
         {
-            std::set<std::string> out;
+            std::map<std::string, SheetFonts> out;
             for (size_t i = 0; i < dir.entries.size(); ++i)
             {
                 if (dir.entries[i].first != "Font")
@@ -75,9 +81,30 @@ namespace gh2
                 const auto tex = mat ? milo::matDiffuse(dir.bodies[*mat], dir.version) : std::nullopt;
                 if (!tex)
                     return std::nullopt;
-                out.insert(*tex);
+                const auto twin = std::find(other.entries.begin(), other.entries.end(), dir.entries[i]);
+                const size_t theirs = static_cast<size_t>(twin - other.entries.begin());
+                SheetFonts &fonts = out.try_emplace(*tex, std::vector<std::pair<size_t, size_t>>{}).first->second;
+                if (twin == other.entries.end() || milo::fontMat(other.bodies[theirs], other.version) != name)
+                    fonts.reset();
+                else if (fonts)
+                    fonts->emplace_back(i, theirs);
             }
             return out;
+        }
+
+        // The PS2's Font with the 360's glyphs: its characters, widths and
+        // kerning, and its cell in the PS2 sheet's pixels, which the game
+        // still measures by. The 360's sheet is `across` by `down` times it.
+        bool takeFont(milo::Bytes &body, const milo::Bytes &theirBody, float across, float down)
+        {
+            const auto ours = milo::readFont(body, 24u), theirs = milo::readFont(theirBody, 25u);
+            if (!ours || !theirs)
+                return false;
+            const float cell[2] = {theirs->cellWidth / across, theirs->cellHeight / down};
+            body.resize(ours->cell);
+            body.insert(body.end(), reinterpret_cast<const uint8_t *>(cell), reinterpret_cast<const uint8_t *>(cell) + 8u);
+            body.insert(body.end(), theirs->rest.begin(), theirs->rest.end());
+            return true;
         }
 
         // The game disc's scene with a stand-in for every Tex that pairs
@@ -88,7 +115,7 @@ namespace gh2
             const auto ours = ark::readFile(0u, path), theirs = ark::readFile(xbox, twin);
             auto scene = ours ? milo::read(*ours) : std::nullopt;
             const auto other = theirs ? milo::read(*theirs) : std::nullopt;
-            const auto fonts = scene ? fontTextures(*scene) : std::nullopt;
+            const auto fonts = scene && other ? fontTextures(*scene, *other) : std::nullopt;
             if (!other || !fonts || scene->version != 24u || other->version != 25u)
                 return std::nullopt;
 
@@ -98,7 +125,9 @@ namespace gh2
                 const auto &[className, name] = scene->entries[i];
                 milo::Bytes &body = scene->bodies[i];
                 const auto tex = className == "Tex" ? milo::readTex(body, 24u) : std::nullopt;
-                if (!tex || tex->source.empty() || (tex->type & ::milo::tex::kTypeNoPixels) || fonts->contains(name))
+                const auto font = fonts->find(name);
+                if (!tex || tex->source.empty() || (tex->type & ::milo::tex::kTypeNoPixels) ||
+                    (font != fonts->end() && !font->second))
                     continue;
                 const auto own = oneLevel(body.data() + tex->bitmap, body.size() - tex->bitmap);
                 const auto at = std::find(other->entries.begin(), other->entries.end(), scene->entries[i]);
@@ -109,6 +138,23 @@ namespace gh2
                 if (!theirTex || (theirTex->type & ::milo::tex::kTypeNoPixels) ||
                     !isPicture(theirBody.data() + theirTex->bitmap, theirBody.size() - theirTex->bitmap))
                     continue;
+                if (font != fonts->end())
+                {
+                    const auto sheet = bitmap::read(theirBody.data() + theirTex->bitmap, theirBody.size() - theirTex->bitmap);
+                    const float across = static_cast<float>(sheet->width) / static_cast<float>(own->width);
+                    const float down = static_cast<float>(sheet->height) / static_cast<float>(own->height);
+                    bool taken = true;
+                    std::vector<milo::Bytes> made;
+                    for (const auto &[mine, their] : *font->second)
+                    {
+                        made.push_back(scene->bodies[mine]);
+                        taken = taken && takeFont(made.back(), other->bodies[their], across, down);
+                    }
+                    if (!taken)
+                        continue;
+                    for (size_t f = 0; f < made.size(); ++f)
+                        scene->bodies[(*font->second)[f].first] = std::move(made[f]);
+                }
                 const std::vector<uint8_t> standIn =
                     textures::standIn(textures::add({xbox, twin, name}), own->width, own->height);
                 const auto shape = bitmap::read(standIn.data(), standIn.size());

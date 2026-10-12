@@ -23,6 +23,17 @@ namespace gh2::milo
     // The Mat a Font body (revision 15) draws its glyphs with.
     std::optional<std::string> fontMat(const Bytes &body, uint32_t version);
 
+    // A Font body past its Mat: a glyph's cell in its sheet's pixels, then
+    // everything after (its characters, their widths and kerning).
+    struct Font
+    {
+        size_t cell = 0; // where the cell's two floats are
+        float cellWidth = 0.0f;
+        float cellHeight = 0.0f;
+        Bytes rest;
+    };
+    std::optional<Font> readFont(const Bytes &body, uint32_t version);
+
     // The Tex a Mat body (revision 27 on PS2, 28 on 360) has as its diffuse.
     std::optional<std::string> matDiffuse(const Bytes &body, uint32_t version);
 }
