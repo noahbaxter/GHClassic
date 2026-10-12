@@ -8,6 +8,8 @@
 #include "milo/objects.h"
 
 #include <algorithm>
+#include <cctype>
+#include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <unordered_map>
@@ -18,6 +20,9 @@ namespace gh2::textures
     {
         // What a stand-in's pixel bytes start with, its payload's id after.
         constexpr uint32_t kMagic = 0x58544847u; // "GHTX"
+        // How far apart, of 255 and on average, two sizes of one picture
+        // can be (samePicture): compression leaves them a few levels off.
+        constexpr uint64_t kSamePictureLevels = 12u;
 
         // Held only by what draws it: the capture's entry for each guest
         // texture, then the renderer's copy for a few frames more.
@@ -149,6 +154,59 @@ namespace gh2::textures
             return nullptr;
         }
 
+        // A path's file name without its folders or what follows its first
+        // dot, in lower case.
+        std::string stem(const std::string &path)
+        {
+            const size_t slash = path.find_last_of("/\\");
+            std::string name = path.substr(slash == std::string::npos ? 0u : slash + 1u);
+            name = name.substr(0u, name.find('.'));
+            std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return std::tolower(c); });
+            return name;
+        }
+
+        // A disc's loose picture files of that name, wherever they are.
+        const std::vector<std::string> &picturesNamed(size_t disc, const std::string &name)
+        {
+            static std::unordered_map<size_t, std::unordered_map<std::string, std::vector<std::string>>> byDisc;
+            static const std::vector<std::string> kNone;
+            auto found = byDisc.find(disc);
+            if (found == byDisc.end())
+            {
+                found = byDisc.emplace(disc, std::unordered_map<std::string, std::vector<std::string>>{}).first;
+                for (const std::string &path : ark::paths(disc, ""))
+                    if (path.ends_with(".bmp_xbox") || path.ends_with(".png_xbox"))
+                        found->second[stem(path)].push_back(path);
+            }
+            const auto named = found->second.find(name);
+            return named != found->second.end() ? named->second : kNone;
+        }
+
+        // Whether `larger`, a whole number of times `own` each way, is the
+        // same picture: each of its blocks' mean within a few levels of the
+        // pixel of `own` it covers, on the whole.
+        bool samePicture(const TextureData &larger, const TextureData &own)
+        {
+            const uint32_t times = larger.width / own.width;
+            if (times < 2u || larger.width != own.width * times || larger.height != own.height * times ||
+                larger.rgba.size() != size_t(larger.width) * larger.height * 4u ||
+                own.rgba.size() != size_t(own.width) * own.height * 4u)
+                return false;
+            uint64_t apart = 0u;
+            for (uint32_t y = 0; y < own.height; ++y)
+                for (uint32_t x = 0; x < own.width; ++x)
+                    for (uint32_t c = 0; c < 4u; ++c)
+                    {
+                        uint32_t sum = 0u;
+                        for (uint32_t v = 0; v < times; ++v)
+                            for (uint32_t u = 0; u < times; ++u)
+                                sum += larger.rgba[(size_t(y * times + v) * larger.width + x * times + u) * 4u + c];
+                        const int32_t mean = static_cast<int32_t>(sum / (times * times));
+                        apart += static_cast<uint32_t>(std::abs(mean - int32_t(own.rgba[(size_t(y) * own.width + x) * 4u + c])));
+                    }
+            return apart < uint64_t(own.width) * own.height * 4u * kSamePictureLevels;
+        }
+
         std::shared_ptr<TextureData> read(const Source &source)
         {
             if (source.tex.empty())
@@ -177,7 +235,25 @@ namespace gh2::textures
             }
             const milo::Bytes &body = dir.bodies[static_cast<size_t>(found - dir.entries.begin())];
             const auto tex = milo::readTex(body, dir.version);
-            return tex ? decode(body.data() + tex->bitmap, body.size() - tex->bitmap) : nullptr;
+            auto own = tex ? decode(body.data() + tex->bitmap, body.size() - tex->bitmap) : nullptr;
+            if (!tex || tex->source.empty() || dir.version != 25u)
+                return own;
+            if (!own)
+                return own;
+            // The largest copy of its picture the disc has. The scene's own
+            // is the size of the file it names, but some 50 have a larger
+            // one of the same name in another folder (the store's cassette,
+            // the rock meter's glow, speaker cones), which no scene of the
+            // 360's draws: taken when it is the same picture.
+            std::shared_ptr<TextureData> best = own;
+            for (const std::string &path : picturesNamed(source.disc, stem(tex->source)))
+            {
+                const auto file = ark::readFile(source.disc, path);
+                const auto larger = file ? decode(file->data(), file->size()) : nullptr;
+                if (larger && larger->width > best->width && samePicture(*larger, *own))
+                    best = larger;
+            }
+            return best;
         }
     }
 
