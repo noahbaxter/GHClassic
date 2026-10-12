@@ -72,6 +72,8 @@
 //                              venue's by default, and the gems gems' game's,
 //                              the in-song look's by default (settings.h)
 //   {campaigns venue_game}     whose venues those are
+//   {campaigns read_text}      every campaign's text read now, as the boot
+//                              does, so none is read mid-screen
 //
 // Each campaign's own files, whichever is played, are under ghc/<game>/
 // ("ghc/gh1/ui/sel_venue.milo"): GH2's are the game disc's.
