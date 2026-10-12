@@ -2699,7 +2699,7 @@ namespace gh2
         {
             uint32_t world = 0u;
             bool any = false;
-            for (size_t i = 0; i < frame.draws.size() && !any; ++i)
+            for (size_t i = 0; frame.venue && i < frame.draws.size() && !any; ++i)
                 if (x360Draws[i] && drawRun[i] < 0 && frame.draws[i].camera < frame.cameras.size())
                 {
                     worldCamera = &frame.cameras[frame.draws[i].camera];

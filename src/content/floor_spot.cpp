@@ -3,6 +3,7 @@
 #include "guest.h"
 #include "hook.h"
 #include "milo/layout.h"
+#include "render/frame.h"
 #include "script.h"
 
 #include <array>
@@ -72,6 +73,7 @@ namespace gh2::floor_spot
         struct DrawTag;
         void onDraw(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
+            building().venue = true;
             if (s_mesh == 0u)
                 return;
             const EntryArgs args(ctx);

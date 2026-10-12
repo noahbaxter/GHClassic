@@ -136,6 +136,7 @@ namespace gh2
             building().hdLighting = settings::hd(settings::kLighting);
             building().luminance = look::luminance();
             frames().publish(building());
+            building().venue = false;
             textures::endFrame();
             look::endFrame();
         }

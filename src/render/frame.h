@@ -75,6 +75,10 @@ namespace gh2
         // Drawn with the 360's shading and post (settings' lighting), which
         // can change from one song to the next.
         bool hdLighting = false;
+        // A venue drew into it. The 360's post stage is the venue's (only
+        // its venues' scenes have a PostProc): a menu with a character in
+        // it has none.
+        bool venue = false;
         // The 360's luminance map for its post stage, null for none
         // (render/look.h).
         std::shared_ptr<const TextureData> luminance;
