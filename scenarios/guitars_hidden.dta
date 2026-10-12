@@ -6,6 +6,17 @@
 (expect {elem {find $syscfg store skin exp_lipstick price} 1} 550)
 (expect {elem {find $syscfg store guitar guitar_red_octane price} 1} 6000)
 (expect {elem {find $syscfg store guitar air_guitar price} 1} 1000)
+; GH1's nine that the scenes still hold, two a body and the ES-335's one.
+(expect {elem {find $syscfg store skin lp_ebony price} 1} 450)
+(expect {elem {find $syscfg store skin lp_gold price} 1} 550)
+(expect {elem {find $syscfg store skin fb_copper price} 1} 450)
+(expect {elem {find $syscfg store skin fb_hippie price} 1} 550)
+(expect {elem {find $syscfg store skin mod_black price} 1} 450)
+(expect {elem {find $syscfg store skin mod_dragon price} 1} 550)
+(expect {elem {find $syscfg store skin cor_white price} 1} 450)
+(expect {elem {find $syscfg store skin cor_snake price} 1} 550)
+(expect {elem {find $syscfg store skin es_ebony price} 1} 450)
+(expect {elem {find $syscfg guitars corvus skins cor_snake mat} 1} guitar_corvus_snake.mat)
 ; GH2's controller is the red one alone (GH1's black is GH1's store's).
 (expect {size {find $syscfg guitars guitar_red_octane skins}} 2)
 (expect {elem {elem {find $syscfg guitars guitar_red_octane skins} 1} 0} guitar_red_octane_gh2)

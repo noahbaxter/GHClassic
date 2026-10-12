@@ -15,6 +15,37 @@
 (exp_lipstick_desc "")
 (exp_lipstick_shop_desc "")
 
+; Nine of GH1's finishes that GH2's scenes still hold (GH2's store). GH1's
+; disc names each (its locale.dta, by gibson_<body>_<finish>), which GH1's
+; career shows them by.
+(lp_ebony "")
+(lp_ebony_desc "")
+(lp_ebony_shop_desc "")
+(lp_gold "")
+(lp_gold_desc "")
+(lp_gold_shop_desc "")
+(fb_copper "")
+(fb_copper_desc "")
+(fb_copper_shop_desc "")
+(fb_hippie "")
+(fb_hippie_desc "")
+(fb_hippie_shop_desc "")
+(mod_black "")
+(mod_black_desc "")
+(mod_black_shop_desc "")
+(mod_dragon "")
+(mod_dragon_desc "")
+(mod_dragon_shop_desc "")
+(cor_white "")
+(cor_white_desc "")
+(cor_white_shop_desc "")
+(cor_snake "")
+(cor_snake_desc "")
+(cor_snake_shop_desc "")
+(es_ebony "")
+(es_ebony_desc "")
+(es_ebony_shop_desc "")
+
 ; The controller as a guitar (GH2's store, once hard's tour is passed). Its
 ; name and blurb are GH1's own for it (GH1's locale.dta), where it is a
 ; cheat's.

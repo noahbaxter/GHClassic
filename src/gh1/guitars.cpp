@@ -20,8 +20,8 @@ namespace gh2::gh1
     {
         // GH1's finishes in its guitars.dta's order. Of the same model and
         // texture as GH2's (compared triangle by triangle and pixel by
-        // pixel), a finish is GH2's; GH2's scenes still hold nine it does
-        // not sell.
+        // pixel), a finish is GH2's; GH2's scenes still hold nine its disc
+        // never offers (content/hidden_guitars.h).
         constexpr Finish kFinishes[] = {
             {"gibson_sg_cherry", "sg_cherry", nullptr, nullptr},
             {"gibson_sg_platinum", "sg_worn", "gh1_sg", "guitar_sg_worn.mat"},

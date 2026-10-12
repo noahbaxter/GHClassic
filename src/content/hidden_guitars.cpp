@@ -32,6 +32,16 @@ namespace gh2
         constexpr Finish kFinishes[] = {
             {"explorer", "exp_peppermint", "xplorer", "guitar_xplorer_peppermint.mat", 450},
             {"explorer", "exp_lipstick", "xplorer", "guitar_xplorer_lipstick.mat", 550},
+            // GH1's, by the keys GH1's career has them under (gh1/guitars.cpp).
+            {"lespaul", "lp_ebony", "lespaull", "guitar_lespaul_ebony.mat", 450},
+            {"lespaul", "lp_gold", "lespaull", "guitar_lespaul_gold.mat", 550},
+            {"firebird", "fb_copper", "firebird", "guitar_firebird_copper.mat", 450},
+            {"firebird", "fb_hippie", "firebird", "guitar_firebird_hippie.mat", 550},
+            {"moderne", "mod_black", "moderne", "guitar_moderne_black.mat", 450},
+            {"moderne", "mod_dragon", "moderne", "guitar_moderne_dragon.mat", 550},
+            {"corvus", "cor_white", "corvus", "guitar_corvus_white.mat", 450},
+            {"corvus", "cor_snake", "corvus", "guitar_corvus_snake.mat", 550},
+            {"es335", "es_ebony", "es335_ebony_maple", "guitar_es335_ebony.mat", 450},
         };
         // The controller costs more than any guitar the disc sells (5000),
         // and is earned as a reward guitar is, on hard (2) or above.

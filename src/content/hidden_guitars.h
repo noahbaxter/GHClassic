@@ -6,6 +6,11 @@
 //
 //   exp_peppermint, exp_lipstick  two finishes in the Explorer's scene
 //                       (xplorer.milo) that no skin names
+//   lp_ebony, lp_gold, fb_copper, fb_hippie, mod_black, mod_dragon,
+//   cor_white, cor_snake, es_ebony  nine of GH1's finishes left in the
+//                       scenes of the bodies GH2 kept, which no skin names
+//                       either. GH1's career sells them from these scenes
+//                       too (gh1/guitars.h), under the same keys
 //   guitar_red_octane   the controller as a guitar: a cheat's in GH1, and in
 //                       the config here as a cheat's that no cheat picks.
 //                       Earned as the reward guitars are, by passing hard's
