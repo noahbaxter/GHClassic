@@ -70,10 +70,12 @@ namespace gh2::look
             const auto byMat = s_looks.find(mat);
             if (byMat == s_looks.end())
                 return nullptr;
-            // A diffuse texture with no stand-in (no picture of its own) is
-            // known by the Mat's name alone when only one scene has it.
+            // A Mat with no picture of its own is known by its name alone
+            // when only one scene has it. One the 360 gave a picture, asked
+            // for without it, is the PS2's Mat of that name: its guitar
+            // beside the 360's guitarist, drawn as the PS2 shades it.
             auto byDiffuse = byMat->second.find(diffuse);
-            if (byDiffuse == byMat->second.end() && byMat->second.size() == 1u)
+            if (byDiffuse == byMat->second.end() && byMat->second.size() == 1u && byMat->second.begin()->first == 0u)
                 byDiffuse = byMat->second.begin();
             if (byDiffuse == byMat->second.end())
                 return nullptr;

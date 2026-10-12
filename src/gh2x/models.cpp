@@ -255,6 +255,10 @@ namespace gh2
             std::string path, twin;
             std::once_flag once;
             std::optional<std::vector<uint8_t>> bytes; // until the game takes them
+            // Its Mats' shading, known to the renderer from when the game
+            // takes the scene: two guitars' Mats can share a name, and one
+            // not on show must not answer for the one that is.
+            Looks looks;
             std::vector<uint32_t> pictures;
             std::atomic<bool> done{false};
         };
@@ -263,16 +267,14 @@ namespace gh2
         {
             std::call_once(scene.once, [&]
             {
-                Looks looks;
-                auto converted = convert(discs, scene.twin, scene.path, looks, scene.pictures);
+                auto converted = convert(discs, scene.twin, scene.path, scene.looks, scene.pictures);
                 if (!converted)
                 {
                     std::cerr << "[gh2x] " << scene.twin << " cannot be converted; the PS2's own stays" << std::endl;
+                    scene.looks.clear();
                     return;
                 }
-                addSkins(discs, scene.path, scene.twin, *converted, looks, scene.pictures);
-                for (const auto &[mat, shading] : looks)
-                    look::add(mat, shading);
+                addSkins(discs, scene.path, scene.twin, *converted, scene.looks, scene.pictures);
                 scene.bytes = milo::write(*converted);
             });
             scene.done = true;
@@ -283,6 +285,9 @@ namespace gh2
         std::optional<ark::Made> make(const Discs &discs, Scene &scene)
         {
             convertOnce(discs, scene);
+            for (const auto &[mat, shading] : scene.looks)
+                look::add(mat, shading);
+            scene.looks.clear();
             textures::prefetch(scene.pictures);
             if (!scene.bytes)
                 return std::nullopt;
