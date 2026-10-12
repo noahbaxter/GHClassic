@@ -10,6 +10,9 @@
 #include "ps2_runtime_macros.h"
 #include "render/camera.h"
 #include "render/frame.h"
+#include "render/look.h"
+#include "render/texture_store.h"
+#include "settings/settings.h"
 
 #include <memory>
 
@@ -72,7 +75,8 @@ namespace gh2
         void addDepthOfField(uint8_t *rdram, uint32_t rnd, Frame &frame)
         {
             const uint32_t focus = load<uint32_t>(rdram, rnd + milo::rnd::kFocusZ);
-            if (focus == 0u || load<uint32_t>(rdram, rnd + milo::rnd::kNoDepthOfField) != 0u)
+            if (focus == 0u || load<uint32_t>(rdram, rnd + milo::rnd::kNoDepthOfField) != 0u ||
+                !settings::get(settings::kDepthOfField))
                 return;
             const float width = static_cast<float>(frame.width);
             const float height = static_cast<float>(frame.height);
@@ -128,7 +132,14 @@ namespace gh2
         void onEndDrawing(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
             addDepthOfField(rdram, GPR_U32(ctx, 4), building());
+            settings::rereadGraphics();
+            look::setInVenue(building().venue);
+            building().hdLighting = settings::hd(settings::kLookLighting);
+            building().luminance = look::luminance();
             frames().publish(building());
+            building().venue = false;
+            textures::endFrame();
+            look::endFrame();
         }
     }
 

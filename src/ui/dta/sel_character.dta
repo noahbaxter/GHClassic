@@ -1,0 +1,409 @@
+; The character screen's panel, as the game's own (career.dta) but for the
+; outfit picker. The game's has two buttons and shows the first two outfits
+; config lists, locked or not; a locked one never loads (the door stays on
+; Loading). Here the picker lists the character's unlocked outfits, one
+; button each, up to four: outfit3 and outfit4 are outfit2 cloned on entry,
+; and all are stepped down by outfit1 to outfit2's spacing, four starting a
+; step higher.
+{retype sel_character_panel
+   (
+      ; From the ARK root: a path resolves against the file its array came
+      ; from, and this one comes from no file. Quickplay's is GH2's with
+      ; every game's portraits in (content/outfits.h).
+      (file {if_else {== {gamecfg get mode} quickplay} ghc/gh2/ui/sel_character.milo ui/sel_character.milo})
+      (char_focus punk)
+      (char_outfit punk1)
+      (old_scroll_pos 0)
+      (focus character.lst)
+      (skin_select FALSE)
+      (outfits ()) ; char_focus's unlocked outfits, as the buttons show them
+      (outfit_buttons (outfit1.btn outfit2.btn outfit3.btn outfit4.btn))
+      (outfit_x 0) (outfit_y 0) (outfit_z 0) ; outfit1.btn's own place
+      (outfit_step 0)  ; outfit1 to outfit2, in z (falls going down)
+      (outfit_lift 0)  ; the list's start above outfit1's place: half a step for four
+      (outfit_space 0) ; between buttons: a step, closer for four
+      (blurb_z 0)      ; sc_char_outfit_blurb.lbl's own z, under two buttons
+      (enter
+         {$this add_outfit_buttons}
+         {character.lst set_provider character_provider}
+         {animate_forever_30fps $this sel_character.view}
+         {sel_skin.tnm set_frame 0}
+         {char_highlight.mnm animate (loop 0 3) (period 0.25) (units kTaskUISeconds)}
+         {set [skin_select] FALSE}
+         {$this set_focus character.lst}
+         {text_character.grp set_showing TRUE}
+         {text_skin.grp set_showing FALSE}
+         {do
+            ($character {game get_character})
+            ($outfit {game get_character_outfit})
+            {char_single show_char 0 $outfit}
+            {char_single char_event 0 animate}
+            ; The name and blurb its outfit's game's.
+            {campaigns text_outfit $outfit}
+            {sc_char_nm.lbl set_text $character}
+            {sc_char_blurb.lbl set_localized_text {localize {sprint $character "_blurb"}}}
+            {$this set char_focus $character}
+            {$this set char_outfit $outfit}
+            {character.lst set_selected {character_provider get_index $character}}
+            {$this set old_scroll_pos {character.lst selected_pos}}
+            {char_highlight.tnm set_frame [old_scroll_pos]}
+            {$this show_portraits}
+            {$this light_portraits}
+         }
+      )
+      ; Config's characters, which in quickplay are GH2's whatever the menus.
+      ; Each shows its shown_outfit's own portrait where the scene has one:
+      ; quickplay's has another game's outfits' (content/outfits.h portrait).
+      (show_portraits
+         {foreach_int $i 1 {size {find $syscfg characters}}
+            {do
+               ($c {elem {elem {find $syscfg characters} $i} 0})
+               ($mesh {sprint "char_" $c ".mesh"})
+               ($own {sprint "portrait_" {$this shown_outfit $c} ".mat"})
+               {cond
+                  ({! {campaign is_unlocked $c}} {$mesh set_mat char_locked.mat})
+                  ({exists $own} {$mesh set_mat $own})
+                  (TRUE {$mesh set_mat {sprint "char_" $c ".mat"}})
+               }
+            }
+         }
+      )
+      ; The outfit a character shows: char_outfit on char_focus, else what
+      ; hovering it would.
+      (shown_outfit
+         ($c)
+         {if_else {== $c [char_focus]} [char_outfit] {$this hover_outfit $c}}
+      )
+      ; What hovering a character shows: the outfit last looked at on it
+      ; ({quickplay look}, kept as its outfits are left), else the one
+      ; played last on the game's character, else its first it may wear,
+      ; else the provider's first, which may be a locked one.
+      (hover_outfit
+         ($c)
+         {do
+            ($entry {find $syscfg characters $c})
+            ($look {quickplay look $c})
+            {cond
+               ({&& $look {find_exists $entry $look} {campaign is_unlocked $look}
+                     {$this may_wear {find $entry $look}}}
+                  $look)
+               ({== $c {game get_character}} {game get_character_outfit})
+               (TRUE
+                  {do
+                     ($first {character_provider get_outfit $c 0})
+                     ($found FALSE)
+                     {foreach_int $i 1 {size $entry}
+                        {do
+                           ($outfit {elem {elem $entry $i} 0})
+                           {if {&& {! $found} {campaign is_unlocked $outfit} {$this may_wear {elem $entry $i}}}
+                              {set $first $outfit}
+                              {set $found TRUE}
+                           }
+                        }
+                     }
+                     $first
+                  }
+               )
+            }
+         }
+      )
+      ; GH1's hero screen (gh1/menus.cpp) is a wall of portraits: each
+      ; character's lit one shows while it is the pick, and one the store
+      ; still sells shows its locked picture in place of its own.
+      ; The characters are config's and the sold ones its store's, as they
+      ; stand now: CHARACTERS here is the game's this was read under.
+      (light_portraits
+         {if {exists sc_buttons_focus.view}
+            {do
+               ($dir {$this loaded_dir})
+               ($all {find $syscfg characters})
+               ($sold {find $syscfg store character})
+               {foreach_int $i 1 {size $all}
+                  {do
+                     ($c {elem {elem $all $i} 0})
+                     {{$dir find {sprint "sc_char_" $c "_focus.view"}} set_showing {== $c [char_focus]}}
+                  }
+               }
+               {foreach_int $i 1 {size $sold}
+                  {do
+                     ($c {elem {elem $sold $i} 0})
+                     {{$dir find {sprint "sc_char_" $c ".pic"}} set_showing {campaign is_unlocked $c}}
+                     {{$dir find {sprint "sc_char_" $c "_lock.pic"}} set_showing {! {campaign is_unlocked $c}}}
+                  }
+               }
+            }
+         }
+      )
+      (poll {scl_loading.lbl set_showing {! {char_single are_chars_loaded}}})
+      (exit {set [skin_select] FALSE})
+      (add_outfit_buttons
+         {if {! {exists outfit3.btn}}
+            {do
+               ($x1 0) ($y1 0) ($z1 0) ($x2 0) ($y2 0) ($z2 0)
+               {outfit1.btn get_local_pos $x1 $y1 $z1}
+               {outfit2.btn get_local_pos $x2 $y2 $z2}
+               {$this set outfit_x $x1}
+               {$this set outfit_y $y1}
+               {$this set outfit_z $z1}
+               {$this set outfit_step {'-' $z2 $z1}}
+               {do
+                  ($bx 0) ($by 0) ($bz 0)
+                  {sc_char_outfit_blurb.lbl get_local_pos $bx $by $bz}
+                  {$this set blurb_z $bz}
+               }
+               ; Placed by choose_skins.
+               {$this clone_outfit_button outfit3.btn $x2 $y2 $z2}
+               {$this clone_outfit_button outfit4.btn $x2 $y2 $z2}
+               {{$this loaded_dir} sync_objects}
+            }
+         }
+      )
+      (clone_outfit_button
+         ($name $x $y $z)
+         {do
+            ($group {outfit2.btn get trans_parent})
+            ($btn {new {outfit2.btn class_name} $name})
+            {$btn copy outfit2.btn 0}
+            {$btn set trans_parent $group}
+            {$btn set_local_pos $x $y $z}
+            ; text_skin.grp draws cs_arrow.mesh first, then the buttons, so
+            ; the bar sits under the text. Second, after the arrow.
+            {$group insert (objects 1) $btn}
+         }
+      )
+      ; char_focus's outfits that are unlocked, in config's order, into
+      ; outfits' own array (the game has no new_array).
+      (find_outfits
+         {resize [outfits] 0}
+         {do
+            ($entry {find $syscfg characters [char_focus]})
+            {foreach_int $i 1 {size $entry}
+               {do
+                  ($outfit {elem {elem $entry $i} 0})
+                  {if {&& {campaign is_unlocked $outfit} {$this may_wear {elem $entry $i}}}
+                     {push_back [outfits] $outfit}
+                  }
+               }
+            }
+         }
+      )
+      ; Another game's outfit ((extra <game> <its name there>),
+      ; content/outfits.h) is no part of a career, which is its own game's
+      ; alone. In the other modes it is there once its own game's career
+      ; has it, or with all access. Config's own outfit outside a career is
+      ; GH2's, whose unlock answers for any game's item of that name, so
+      ; GH1's grim would open GH2's: GH2's career alone does.
+      (may_wear
+         ($entry)
+         {if_else {find_exists $entry extra}
+            {&& {!= {gamecfg get mode} career}
+               {|| {campaign all_access}
+                  {campaigns owns {elem {find $entry extra} 1} {elem {find $entry extra} 2}}}}
+            {|| {!= {gamecfg get mode} quickplay}
+               {campaign all_access}
+               {campaigns owns gh2 {elem $entry 0}}}
+         }
+      )
+      ; An outfit's (name "...") in config, else its locale token, as the
+      ; game's own outfits have.
+      (label_outfit_button
+         ($btn $outfit)
+         {do
+            ($entry {find $syscfg characters [char_focus] $outfit})
+            {if_else {find_exists $entry name}
+               {$btn set_localized_text {elem {find $entry name} 1}}
+               {$btn set_text {sprint $outfit _outfit}}
+            }
+         }
+      )
+      (choose_skins
+         {$this find_outfits}
+         {set [skin_select] TRUE}
+         {text_character.grp set_showing FALSE}
+         {text_skin.grp set_showing TRUE}
+         {sel_skin.tnm animate (units kTaskUISeconds) (period 0.4) (range 0 10)}
+         {do
+            ($count {size [outfits]})
+            ($focus 0)
+            {foreach_int $i 0 {size [outfit_buttons]}
+               {do
+                  ($btn {elem [outfit_buttons] $i})
+                  {if_else {< $i $count}
+                     {do
+                        {{{$this loaded_dir} find $btn} set_showing TRUE}
+                        {$this enable $btn}
+                        {$this label_outfit_button {{$this loaded_dir} find $btn} {elem [outfits] $i}}
+                        {if {== {elem [outfits] $i} [char_outfit]} {set $focus $i}}
+                     }
+                     {do
+                        {{{$this loaded_dir} find $btn} set_showing FALSE}
+                        {$this disable $btn}
+                        {{{$this loaded_dir} find $btn} set nav_down {{$this loaded_dir} find $btn}}
+                     }
+                  }
+               }
+            }
+            ; Four start half a step higher, clear of the title, and sit
+            ; closer, so the longest likes and dislikes still fit above the
+            ; controls.
+            {$this set outfit_lift {if_else {> $count 3} {'/' [outfit_step] -2} 0}}
+            {$this set outfit_space {if_else {> $count 3} {'*' [outfit_step] 0.9} [outfit_step]}}
+            {foreach_int $i 0 $count
+               {{{$this loaded_dir} find {elem [outfit_buttons] $i}} set_local_pos [outfit_x] [outfit_y]
+                  {'+' [outfit_z] {'+' [outfit_lift] {'*' $i [outfit_space]}}}}
+            }
+            ; The likes and dislikes start under the second button: down as
+            ; far as the last one is past it.
+            {do
+               ($bx 0) ($by 0) ($bz 0)
+               ($last {'+' [outfit_lift] {'*' {'-' $count 1} [outfit_space]}})
+               {sc_char_outfit_blurb.lbl get_local_pos $bx $by $bz}
+               {sc_char_outfit_blurb.lbl set_local_pos $bx $by
+                  {'+' [blurb_z] {min 0 {'-' $last [outfit_step]}}}}
+            }
+            ; Down steps through the listed ones and wraps. Up is the first
+            ; component whose nav_down is the focus, or past it while that is
+            ; disabled (PanelDir::ComponentNav, 0x211040), so a hidden button
+            ; links to itself above, out of the way.
+            {foreach_int $i 0 $count
+               {{{$this loaded_dir} find {elem [outfit_buttons] $i}} set nav_down
+                  {{$this loaded_dir} find {elem [outfit_buttons] {mod {'+' $i 1} $count}}}
+               }
+            }
+            {$this set_focus {elem [outfit_buttons] $focus}}
+         }
+      )
+      (unchoose_skins
+         {set [skin_select] FALSE}
+         {text_skin.grp set_showing FALSE}
+         {text_character.grp set_showing TRUE}
+         {sel_skin.tnm animate (units kTaskUISeconds) (period 0.4) (range 10 0)}
+         {$this set_focus character.lst}
+         {synth play_sequence button_back.cue}
+      )
+      (open_door)
+      (SCROLL_MSG
+         {do
+            ($new_scroll_pos {character.lst selected_pos})
+            {if {&& {!= $new_scroll_pos [old_scroll_pos]} {character_provider is_active $new_scroll_pos}}
+               {synth play_sequence button_toggle}
+               {set [char_focus] {character_provider get_symbol $new_scroll_pos}}
+               {set [char_outfit] {$this hover_outfit [char_focus]}}
+               {if [char_focus]
+                  {campaigns text_outfit [char_outfit]}
+                  {sc_char_nm.lbl set_text [char_focus]}
+                  {sc_char_blurb.lbl set_localized_text {localize {sprint [char_focus] "_blurb"}}}
+                  {char_single show_char 0 [char_outfit]}
+                  {char_single char_event 0 animate}
+                  {$this set old_scroll_pos $new_scroll_pos}
+                  {char_highlight.tnm set_frame $new_scroll_pos}
+                  {$this show_portraits}
+                  {$this light_portraits}
+                  {ghc_qp_character_helpbar}
+               }
+            }
+         }
+      )
+      (FOCUS_MSG
+         {if [skin_select]
+            {do
+               ($idx -1)
+               ($old_char)
+               ; $new_focus is the button; focus_name still names the old one.
+               {foreach_int $i 0 {size [outfits]}
+                  {if {== {sprint {$new_focus name}} {sprint {elem [outfit_buttons] $i}}} {set $idx $i}}
+               }
+               {if {>= $idx 0}
+                  ; The UI's own FOCUS_MSG (sfx.dta) sounds it on every
+                  ; screen but the career's two.
+                  {if {|| {== {{ui current_screen} name} sel_character_new_screen}
+                        {== {{ui current_screen} name} sel_character_edit_screen}}
+                     {synth play_sequence button_toggle}
+                  }
+                  {set [char_outfit] {elem [outfits] $idx}}
+                  {quickplay look [char_focus] [char_outfit]}
+                  {$this show_portraits}
+                  {ghc_qp_character_helpbar}
+                  ; The arrow's anim keys outfit1's place; from there it
+                  ; moves as the buttons were placed.
+                  {cs_arrow.tnm set_frame 0}
+                  {do
+                     ($x 0) ($y 0) ($z 0)
+                     {cs_arrow.mesh get_local_pos $x $y $z}
+                     {cs_arrow.mesh set_local_pos $x $y
+                        {'+' $z {'+' [outfit_lift] {'*' $idx [outfit_space]}}}}
+                  }
+                  {set $old_char {char_single get_char 0}}
+                  {if {char_single show_char 0 [char_outfit]}
+                     {do
+                        ($new_char {char_single get_char 0})
+                        ; Transfer copies the playing clips over (0x170db0), so
+                        ; only between outfits on one clip set.
+                        {if_else {&& $old_char $new_char
+                              {== {{$old_char find main.drv} get_clips} {{$new_char find main.drv} get_clips}}}
+                           {do
+                              {reset_hair $new_char}
+                              {{$new_char find main.drv} transfer {$old_char find main.drv}}
+                           }
+                           {char_single char_event 0 select}
+                        }
+                     }
+                  }
+                  ; The name and blurbs the outfit's game's.
+                  {campaigns text_outfit [char_outfit]}
+                  {sc_char_nm.lbl set_text [char_focus]}
+                  {sc_char_blurb.lbl set_localized_text {localize {sprint [char_focus] "_blurb"}}}
+                  {sc_char_outfit_blurb.lbl set_localized_text {localize {sprint [char_focus] "_outfit_blurb"}}}
+               }
+            }
+         }
+         kDataUnhandled
+      )
+   )
+}
+; The career's two character screens, as the game's own (career.dta) but
+; that the picker opens for a character with more than one outfit it would
+; list (find_outfits), where the game's counts config's: another game's
+; outfit is no part of a career, and a locked one is not listed.
+{func ghc_sel_character
+   ($screen)
+   {if_else {sel_character_panel get skin_select}
+      {do
+         ($sel_outfit {sel_character_panel get char_outfit})
+         {if {&& $sel_outfit {!= {game get_character_outfit} $sel_outfit}}
+            {game set_character $sel_outfit}
+         }
+         {ui goto_screen {$screen get done_screen}}
+      }
+      {do
+         {sel_character_panel find_outfits}
+         {if_else {> {size {sel_character_panel get outfits}} 1}
+            {sel_character_panel choose_skins}
+            {do
+               ; The one listed, where char_outfit may be a locked first.
+               {if {== {size {sel_character_panel get outfits}} 1}
+                  {sel_character_panel set char_outfit {elem {sel_character_panel get outfits} 0}}
+               }
+               {game set_character {sel_character_panel get char_outfit} TRUE}
+               {ui goto_screen {$screen get done_screen}}
+            }
+         }
+      }
+   }
+}
+{retype sel_character_new_screen
+   (
+      (done_screen sel_guitar_new_screen)
+      (back_screen sel_difficulty_screen)
+      SEL_CHARACTER_COMMON
+      (SELECT_START_MSG {ghc_sel_character $this} kDataUnhandled)
+   )
+}
+{retype sel_character_edit_screen
+   (
+      (done_screen career_screen)
+      (back_screen career_screen)
+      SEL_CHARACTER_COMMON
+      (SELECT_START_MSG {ghc_sel_character $this} {campaign set_character_info} kDataUnhandled)
+   )
+}

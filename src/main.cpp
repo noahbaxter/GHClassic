@@ -1,20 +1,26 @@
 // GH Classic's entry point: the player's GH2 disc, and options for unattended
 // runs.
 //
-//   GHClassic [disc] [--scenario <file>] [--hidden] [--mute] [--speed <x>] [--fast-boot] [--seed <n>]
-//            [--save <file>] [--import-card <ps2>] [--export-card <ps2>]
+//   GHClassic [disc] [--content <disc>]... [--mods <dir>] [--scenario <file>] [--hidden] [--mute] [--speed <x>]
+//            [--fast-boot] [--seed <n>] [--cheats] [--save <file>] [--import-card <ps2>] [--export-card <ps2>]
 //            [--settings <file>] [--shots <dir>] [--shot-every <n>]
 //            [--res window|native|480p|720p|1080p|1440p|2160p]
 //   GHClassic --bind [keyboard | <n>]
 //
 // Without a disc, the first image in PUT_DISC_HERE (disc/disc.h) with this
-// build's executable. The game runs from that executable, read off the disc.
-// --scenario runs a file of steps (dev/scenario.h). --speed runs the game's
-// clock that many times real time, hidden and muted only, as nothing else
-// paces it. --fast-boot boots straight to the main menu, past the logos'
-// padding, the intro movie and the press-start splash, whatever settings.ini's
-// fast_boot says. --seed starts the
-// game's random numbers from n rather than the time of day.
+// build's executable, and with no --content either, every other game's disc
+// in that folder (content/games.h). The game runs from that executable, read
+// off the disc.
+// --content adds another disc's archive, searched after the game disc's, in
+// the order given. --mods serves the files under a folder by their paths in
+// the archive, ahead of every disc. --scenario runs a file of steps
+// (dev/scenario.h). --speed runs the game's clock that many times real time,
+// hidden and muted only, as nothing else paces it. --fast-boot boots
+// straight to the main menu, past the logos' padding, the intro movie and
+// the press-start splash, whatever settings.ini's fast_boot says. --seed
+// starts the game's random numbers from n rather than the time of day.
+// --cheats turns on the testing keys (dev/cheats.h) and keeps saves in
+// memory, so nothing won by them reaches the save file.
 // --res is what the scene is drawn at: the window's size (the default), the
 // game's own (512x448), or that height at the picture's aspect. --settings
 // and --save read and write that file in place of the user data directory's.
@@ -23,12 +29,15 @@
 // sets up a controller or the keyboard in input.ini; with no device it
 // lists them.
 
+#include "content/games.h"
+#include "disc/ark.h"
 #include "disc/disc.h"
 #include "ui/fast_boot.h"
 #include "host/bind.h"
 #include "host/update.h"
 #include "host/vulkan_frontend.h"
 #include "save/save.h"
+#include "dev/cheats.h"
 #include "dev/scenario.h"
 #include "dev/seed.h"
 #include "settings/settings.h"
@@ -108,6 +117,7 @@ int main(int argc, char *argv[])
         return gh2::runBind(argc, argv);
 
     std::filesystem::path discPath;
+    bool contentGiven = false;
     PS2Runtime::HostOptions hostOptions;
     gh2::RenderSize renderSize;
     double speed = 1.0;
@@ -125,6 +135,22 @@ int main(int argc, char *argv[])
             gh2::fast_boot::enable();
         else if (arg == "--seed" && hasValue)
             gh2::seed::fix(std::atoi(argv[++i]));
+        else if (arg == "--cheats")
+        {
+            gh2::cheats::enable();
+            gh2::save::keepInMemory();
+        }
+        else if (arg == "--content" && hasValue)
+        {
+            if (!gh2::ark::addDisc(argv[++i]))
+                return 1;
+            contentGiven = true;
+        }
+        else if (arg == "--mods" && hasValue)
+        {
+            if (!gh2::ark::addFolder(argv[++i]))
+                return 1;
+        }
         else if (arg == "--scenario" && hasValue)
         {
             if (!gh2::scenario::load(argv[++i]))
@@ -218,6 +244,9 @@ int main(int argc, char *argv[])
             return fail(hostOptions, "Put your Guitar Hero II (USA) disc image (.iso, .chd or .bin) in\n" +
                                          folder.string() + "\nthen start GH Classic again.\n\n" + why);
         }
+        // The other games' discs from beside it, unless the run named its own.
+        if (!contentGiven)
+            gh2::games::mount(gh2::disc::images());
     }
     const std::vector<uint8_t> elf = gh2::disc::bootElf(discPath, why);
     if (elf.empty())

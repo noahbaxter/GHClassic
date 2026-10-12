@@ -5,6 +5,7 @@
     tools/ghc.py build [disc] [--skip-recomp] [--no-lto]
     tools/ghc.py bind [--isolated] [keyboard | <n>]   set up a controller; with no device, list them
     tools/ghc.py arm [out] [--scenario <file>] [--speed <x>] [--secs 30] [--disc <image>] [--shot-every 60]
+                     [--res 1080p]
     tools/ghc.py scenarios [-j 4] [--speed 2] [--review] [name ...]
     tools/ghc.py release [--skip-build] [disc]  this platform's player package, into build/release
     tools/ghc.py ci                          what builds without a disc, into build/ci
@@ -26,7 +27,8 @@ requirements.txt; CMake fetches the game's libraries at pinned versions.
 
 arm runs the game once, hidden and muted, with --fast-boot --seed 1, no
 save and default settings: a first boot. out (default
-runs/<scenario's name>) gets run.log, frames/ (frame_0012.30s.png, seconds
+runs/<date>_<time>_<scenario's name>, so runs sort oldest first and none
+overwrites another) gets run.log, frames/ (frame_0012.30s.png, seconds
 since launch), shots/ from the scenario's (shot name) steps, and on macOS
 stack.txt, a 3 s sample taken if it is still alive at --secs. The shots on
 one sheet go to the main checkout's review/ as <date>_<time>_<name>.png,
@@ -48,6 +50,7 @@ import shutil
 import subprocess
 import sys
 import time
+import tomllib
 import urllib.request
 import venv
 import zipfile
@@ -241,6 +244,47 @@ def find_disc(env):
     return result.stdout.strip()
 
 
+def content_games():
+    """The games whose discs come along when their images are in game/, in
+    the order their archives are searched: Rocks the 80s, GH1, then 360 GH2,
+    then any other config/executables.toml gives content releases."""
+    with open(ROOT / "config" / "executables.toml", "rb") as f:
+        releases = tomllib.load(f)["release"]
+    games = list(dict.fromkeys(r["game"] for r in releases if r.get("role") == "content"))
+    order = ["gh80s", "gh1", "gh2x"]
+    return sorted(games, key=lambda g: order.index(g) if g in order else len(order))
+
+
+def discs_arg(value):
+    """--discs gh2,gh1: the content discs to mount; gh2, the game disc, is
+    always there."""
+    games = [g for g in value.split(",") if g and g != "gh2"]
+    unknown = [g for g in games if g not in content_games()]
+    if unknown:
+        raise argparse.ArgumentTypeError(f"unknown {', '.join(unknown)}; games are gh2, {', '.join(content_games())}")
+    return games
+
+
+def content(env, games=None):
+    """GHClassic's --content for each content game's disc in game/, any of
+    its releases (or only those of `games`), and --mods for mods/ when it
+    exists."""
+    images = sorted(str(p) for p in discs_dir().glob("*"))
+    args = []
+    for game in content_games():
+        if games is not None and game not in games:
+            continue
+        result = subprocess.run([sys.executable, ROOT / "tools" / "disc.py", "find", game, *images],
+                                env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        if not result.returncode:
+            args += ["--content", result.stdout.strip()]
+    # The same as game/: this tree's own, else the main checkout's.
+    mods = ROOT / "mods" if (ROOT / "mods").is_dir() else main_checkout() / "mods"
+    if mods.is_dir():
+        args += ["--mods", str(mods)]
+    return args
+
+
 def built():
     return ELF.exists() and game_binary().exists()
 
@@ -359,7 +403,12 @@ def data_dir(isolated):
 def cmd_play(argv):
     rebuild = True
     isolated = False
-    while argv[:1] in (["--no-build"], ["--isolated"]):
+    games = None
+    while argv[:1] in (["--no-build"], ["--isolated"], ["--discs"]):
+        if argv[0] == "--discs":
+            games = discs_arg(argv[1]) if len(argv) > 1 else sys.exit("--discs needs a list")
+            argv = argv[2:]
+            continue
         rebuild = rebuild and argv[0] != "--no-build"
         isolated = isolated or argv[0] == "--isolated"
         argv = argv[1:]
@@ -376,7 +425,7 @@ def cmd_play(argv):
         # with LTO takes a minute or two.
         build_step("building game", ["cmake", "--build", GAME, "--target", "GHClassic"], tool_env(), "game.log")
     disc = disc or find_disc(tool_env())
-    args = data_dir(isolated)
+    args = [*content(tool_env(), games), *data_dir(isolated)]
     show_launch(disc, args)
     return subprocess.run([str(game_binary()), disc, *args, *argv]).returncode
 
@@ -396,9 +445,10 @@ def prune_runs(days=3):
             shutil.rmtree(run, ignore_errors=True) if run.is_dir() else run.unlink()
 
 
-def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=None, review=False):
+def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=None, res=None, games=None,
+        review=None):
     """One unattended run into out. Returns 'exited before Ns' or 'alive at Ns'.
-    With review, its shot sheet goes to review/ rather than out."""
+    With review, its shot sheet goes to review/ under that name rather than out."""
     from PIL import Image
 
     out = Path(out)
@@ -411,11 +461,13 @@ def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=N
 
     # No save and default settings, so every run starts from a first boot on
     # any machine and never touches the player's.
-    cmd = [str(game_binary()), disc]
+    cmd = [str(game_binary()), disc, *content(env or tool_env(), games)]
     if scenario:
         cmd += ["--scenario", str(Path(scenario).resolve())]
     if speed:
         cmd += ["--speed", str(speed)]
+    if res:
+        cmd += ["--res", res]
     cmd += ["--fast-boot", "--seed", "1", "--hidden", "--mute", "--save", str(out / "save.bin"),
             "--settings", str(out / "settings.ini"), "--shots", str(out / "frames"), "--shot-every", str(shot_every)]
 
@@ -457,7 +509,7 @@ def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=N
             x = (i % cols) * cell_w + (cell_w - shot.width) // 2
             y = (i // cols) * cell_h + (cell_h - shot.height) // 2
             sheet.paste(shot, (x, y))
-        sheet.save(review_path(out.name) if review else out / "shots.png")
+        sheet.save(review_path(review) if review else out / "shots.png")
     return state
 
 
@@ -469,11 +521,14 @@ def cmd_arm(argv):
     parser.add_argument("--secs", type=int, default=30, help="real seconds before it is stopped")
     parser.add_argument("--disc")
     parser.add_argument("--shot-every", type=int, default=60)
+    parser.add_argument("--res", help="the game's own --res, the size frames and shots come out at")
+    parser.add_argument("--discs", type=discs_arg, help="content discs to mount, as gh2,gh1; default every one in game/")
     args = parser.parse_args(argv)
     name = Path(args.scenario).stem if args.scenario else "run"
-    out = Path(args.out) if args.out else ROOT / "runs" / name
+    out = Path(args.out) if args.out else ROOT / "runs" / f"{time.strftime('%Y-%m-%d_%H%M%S')}_{name}"
     prune_runs()
-    state = arm(out, args.scenario, args.speed, args.secs, args.disc, args.shot_every, review=True)
+    state = arm(out, args.scenario, args.speed, args.secs, args.disc, args.shot_every, res=args.res, games=args.discs,
+                review=Path(args.out).name if args.out else name)
     frames = len(list((out / "frames").iterdir()))
     print(f"{state}, {frames} frames, log {out.resolve() / 'run.log'}")
     stack = out / "stack.txt"
@@ -494,6 +549,9 @@ def cmd_scenarios(argv):
     # bound by the game thread; 2x holds on both, four at once.
     parser.add_argument("--speed", type=float, default=2)
     parser.add_argument("--review", action="store_true", help="each run's shot sheet into review/")
+    parser.add_argument("--discs", type=discs_arg,
+                        help="content discs to mount, as gh2,gh1; default every one in game/. A scenario that "
+                             "(needs) another skips")
     parser.add_argument("names", nargs="*", help="files in scenarios/ without .dta; none means all")
     args = parser.parse_args(argv)
     # Not dotfiles: pathlib's glob matches them, and a tar made on macOS
@@ -505,15 +563,20 @@ def cmd_scenarios(argv):
     def one(name):
         out = ROOT / "runs" / name
         started = time.time()
-        state = arm(out, ROOT / "scenarios" / f"{name}.dta", args.speed, 600, disc, env=env, review=args.review)
+        # The longest plays a career's whole first tier, five songs.
+        state = arm(out, ROOT / "scenarios" / f"{name}.dta", args.speed, 900, disc, env=env, games=args.discs,
+                    review=name if args.review else None)
         log = (out / "run.log").read_text(errors="replace")
         # Anywhere in a line: the watchdog's STALL lands mid-line in the game thread's output.
         failures = [m.group(1) for m in re.finditer(r"\[scenario\] ((?:FAIL|STALL).*)", log)]
+        skips = [line.removeprefix("[scenario] ") for line in log.splitlines()
+                 if line.startswith("[scenario] SKIP")]
         # A game that dies mid-run exits too, with its steps unfinished.
-        if not failures and not re.search(r"^\[scenario\] (done|\S+ s: \(quit\))", log, re.M):
+        if not failures and not skips and not re.search(r"^\[scenario\] (done|\S+ s: \(quit\))", log, re.M):
             failures = ["ended before its last step"]
-        verdict = "pass" if state.startswith("exited") and not failures else "FAIL"
-        return f"{verdict:<4} {name:<16} {round(time.time() - started):4d}s  {failures[0] if failures else ''}".rstrip()
+        verdict = "FAIL" if failures or not state.startswith("exited") else "skip" if skips else "pass"
+        note = failures[0] if failures else skips[0] if skips else ""
+        return f"{verdict:<4} {name:<16} {round(time.time() - started):4d}s  {note}".rstrip()
 
     (ROOT / "runs").mkdir(exist_ok=True)
     prune_runs()
@@ -572,6 +635,8 @@ def notices():
         ("GLFW", deps / "raylib-src" / "src" / "external" / "glfw" / "LICENSE.md"),
         ("libchdr", ROOT / "lib" / "libchdr" / "LICENSE.txt"),
         ("libmpeg2", deps / "libmpeg2-src" / "COPYING"),
+        ("libogg", deps / "ogg-src" / "COPYING"),
+        ("libvorbis", deps / "vorbis-src" / "COPYING"),
         ("zstd", ROOT / "config" / "licenses" / "zstd.txt"),
         ("PS2Recomp", ROOT / "lib" / "PS2Recomp" / "LICENSE"),
     ]

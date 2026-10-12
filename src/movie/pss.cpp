@@ -76,8 +76,11 @@ namespace gh2::movie
                 std::memcmp(data + 8u + kSShdBytes, "SSbd", 4) != 0)
                 return false;
             const uint8_t *shd = data + 8;
-            if (le32(shd) != 1u || le32(shd + 4) != kRate || le32(shd + 8) != 2u || le32(shd + 12) != kInterleave)
+            const uint32_t rate = le32(shd + 4);
+            if (le32(shd) != 1u || (rate != 48000u && rate != 44100u) || le32(shd + 8) != 2u ||
+                le32(shd + 12) != kInterleave)
                 return false;
+            m_rate = rate;
             data += kHeaders;
             size -= kHeaders;
             m_started = true;

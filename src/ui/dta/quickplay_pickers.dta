@@ -1,0 +1,384 @@
+; Quickplay's pickers: after the song and its difficulty, the guitarist
+; and outfit, the guitar and finish, and the venue, each any that a career
+; has opened. The game's own quickplay goes from the difficulty straight to
+; the song, as the song's entry casts it, and so does this with song
+; defaults on; off, that casting is where each screen starts. Outside a
+; career the game counts an item unlocked that any band has
+; (Campaign::IsItemUnlocked, 0x12d490), and another game's outfit is there
+; once its own game's career has it (sel_character.dta).
+;
+; The character and guitar screens are the career's own, with its handlers
+; (SEL_CHARACTER_COMMON and SEL_GUITAR_COMMON, career.dta); a handler given
+; before them is the one found.
+
+; The games with venues of their own, the 360's being GH2's, and the one a
+; setlist's songs play in.
+{func ghc_venue_games
+   {do
+      ($games)
+      {set $games ()}
+      {resize $games 0}
+      {foreach $game (gh1 gh2 gh80s)
+         {if {campaigns has $game} {push_back $games $game}}
+      }
+      $games
+   }
+}
+{func ghc_venue_game ($game)
+   {if_else {&& {campaigns has $game} {!= $game gh2x}} $game gh2}
+}
+; GH2's map with the 360 disc: blue turns its venues between the PS2's and
+; the 360's ({quickplay venues}), named as what a song there will show.
+{func ghc_qp_venue_has_hd
+   {&& {== $ghc_qp_venues gh2} {campaigns has gh2x}}
+}
+; The guitarist's and the guitar's screens: blue turns every guitarist
+; and the band, or every guitar, between the PS2's models and the 360's
+; ({quickplay characters}, {quickplay guitars}), named as what shows now.
+; It is there on one the 360 has its own of.
+{func ghc_qp_hd_helpbar ($what $has)
+   {do
+      ($array)
+      {set $array ()}
+      {resize $array 0}
+      {push_back $array (fret1 help_continue)}
+      {push_back $array (fret2 help_back)}
+      {if $has
+         {push_back $array {if_else {== {quickplay $what} hd} (fret4 ghc_hd) (fret4 ghc_sd)}}
+      }
+      {push_back $array (strum help_updown)}
+      {helpbar set_display $array}
+   }
+}
+{func ghc_qp_character_has_hd
+   {quickplay has_hd outfit {sel_character_panel get char_outfit}}
+}
+{func ghc_qp_character_helpbar
+   {if {!= {gamecfg get mode} career}
+      {ghc_qp_hd_helpbar characters {ghc_qp_character_has_hd}}
+   }
+}
+{func ghc_qp_guitar_has_hd
+   {do
+      ($guitar {sel_guitar_panel get_selected_guitar 0})
+      ($skin {sel_guitar_panel get_selected_skin 0})
+      {&& {find_exists $syscfg guitars $guitar skins $skin outfit}
+         {quickplay has_hd guitar {elem {find $syscfg guitars $guitar skins $skin outfit} 1}}}
+   }
+}
+{func ghc_qp_guitar_helpbar
+   {if {!= {gamecfg get mode} career}
+      {ghc_qp_hd_helpbar guitars {ghc_qp_guitar_has_hd}}
+   }
+}
+; What was last picked ({quickplay pick}, kept through a switch of menus),
+; put back over the song's own casting, so each screen starts there and
+; green on each plays as before: the outfit, the guitar and finish, and the
+; venue with its game's map. None until a song is started from the pickers.
+{func ghc_qp_recall
+   {if {quickplay picked outfit}
+      {game set_character {quickplay pick outfit} TRUE}
+      {game set_guitar {quickplay pick guitar} {quickplay pick skin}}
+      {game set_venue {quickplay pick venue}}
+   }
+}
+{retype qp_diff_screen
+   (
+      (panels meta sel_difficulty_panel helpbar)
+      (focus sel_difficulty_panel)
+      (helpbar
+         (default
+            (
+               (fret1 help_continue)
+               (fret2 help_back)
+               (strum help_updown)
+            )
+         )
+      )
+      ; With song defaults on ({quickplay song_defaults}, select's menu on
+      ; the song list) the song plays as the setlist's game boots, with
+      ; its first guitar, in its own game's venue for the song's tier; off,
+      ; each is picked.
+      (SELECT_START_MSG
+         {if_else {quickplay song_defaults}
+            {do
+               {campaigns venues_from {ghc_venue_game {setlist shown}}}
+               {game set_quickplay}
+               {game set_character {quickplay outfit {setlist shown}} TRUE}
+               {game set_guitar_index 0}
+               {campaigns text_outfit {game get_character_outfit}}
+               {ui goto_screen loading_screen}
+            }
+            {do
+               {game set_quickplay}
+               {ghc_qp_recall}
+               {ui goto_screen ghc_qp_character_screen}
+            }
+         }
+         kDataUnhandled
+      )
+   )
+}
+; The guitar picker as GH2's, the 80s' and GH1's campaigns all have it
+; (career.dta).
+{retype sel_guitar_panel
+   (
+      (file ui/sel_guitar.milo)
+      ; TRUE lists config's guitars, as unlocked (Campaign::GetQuickplayGuitars,
+      ; 0x12df48), where FALSE lists the campaign's own items (GetItemData,
+      ; 0x12da40): the menus' game's store, without the others' guitars.
+      ; GuitarSelectPanel::Enter (0x1480f8) reads it into the provider.
+      (quickplay {== {gamecfg get mode} quickplay})
+      (enter {sel_guitar.tnm set_frame 0})
+      (update_display
+         ($play_sfx)
+         {do
+            ($guitar {$this get_selected_guitar 0})
+            ($skin {$this get_selected_skin 0})
+            {sg_guitar_nm.lbl set_text $guitar}
+            {sg_guitar_desc.lbl set_text {game get_guitar_desc $guitar}}
+            {sg_skin_nm.lbl set_text $skin}
+            {sg_skin_desc.lbl set_text {game get_guitar_skin_desc $skin}}
+            {sg_text_guitar.grp set_showing {! {$this is_skin_select 0}}}
+            {sg_text_skin.grp set_showing {$this is_skin_select 0}}
+            {guitar_display_panel set_env 0 guitar.env}
+            {guitar_display_panel show_guitar 0 $guitar $skin guitar.pxy guitar_single.filt}
+            {if $play_sfx {synth play_sequence button_toggle}}
+            {ghc_qp_guitar_helpbar}
+         }
+      )
+      (choose_skins {sel_guitar.tnm animate (units kTaskUISeconds) (period 0.4) (range 0 100)})
+      (unchoose_skins
+         {sel_guitar.tnm animate (units kTaskUISeconds) (period 0.4) (range 100 0)}
+         {$this set_skin_select 0 FALSE}
+         {sg_text_guitar.grp set_showing {! {$this is_skin_select 0}}}
+         {sg_text_skin.grp set_showing {$this is_skin_select 0}}
+      )
+   )
+}
+{if {! {exists ghc_qp_character_screen}} {new GHScreen ghc_qp_character_screen}}
+{retype ghc_qp_character_screen
+   (
+      (done_screen ghc_qp_guitar_screen)
+      (back_screen qp_diff_screen)
+      ; Blue, which the UI gets as orange too (host/pad.cpp), then red as
+      ; SEL_CHARACTER_COMMON has it.
+      (BUTTON_DOWN_MSG
+         {cond
+            ({&& {== $button kPad_Square} {ghc_qp_character_has_hd} {! {ui in_transition}}}
+               {quickplay characters {if_else {== {quickplay characters} hd} sd hd}}
+               {synth play_sequence button_toggle}
+               ; The one on show loads again, and moves once it has.
+               {char_single char_event 0 animate}
+               {ghc_qp_character_helpbar}
+               TRUE
+            )
+            ({== $button kPad_Tri}
+               {if_else {sel_character_panel get skin_select}
+                  {sel_character_panel unchoose_skins}
+                  {do
+                     {$this backwards_anim}
+                     {synth play_sequence button_back.cue}
+                     {ui goto_screen [back_screen]}
+                  }
+               }
+               kDataUnhandled
+            )
+            (TRUE kDataUnhandled)
+         }
+      )
+      ; As SEL_CHARACTER_COMMON's, then the help bar over the screen's own.
+      (TRANSITION_COMPLETE_MSG
+         {char_single set_placer 0 {sel_character_panel find char_single.placer}}
+         {char_single set_env 0 {sel_character_panel find character.env}}
+         {ghc_qp_character_helpbar}
+      )
+      SEL_CHARACTER_COMMON
+      (SELECT_START_MSG {ghc_sel_character $this} kDataUnhandled)
+   )
+}
+{if {! {exists ghc_qp_guitar_screen}} {new GHScreen ghc_qp_guitar_screen}}
+{retype ghc_qp_guitar_screen
+   (
+      ; What a guitar picked leads to, the career's name for it. The venue
+      ; map opens on the game's whose venue was last played, else the
+      ; menus' game's.
+      (goto_career
+         {game set_guitar {sel_guitar_panel get_selected_guitar 0} {sel_guitar_panel get_selected_skin 0}}
+         {quickplay pick outfit {game get_character_outfit}}
+         {quickplay pick guitar {sel_guitar_panel get_selected_guitar 0}}
+         {quickplay pick skin {sel_guitar_panel get_selected_skin 0}}
+         {set $ghc_qp_venues
+            {if_else {quickplay picked venue_game}
+               {quickplay pick venue_game}
+               {ghc_venue_game {campaigns active}}
+            }
+         }
+         {campaigns text_venues $ghc_qp_venues}
+         {ui goto_screen ghc_qp_venue_screen}
+      )
+      (go_back
+         {$this backwards_anim}
+         {synth play_sequence button_back.cue}
+         {ui goto_screen ghc_qp_character_screen}
+      )
+      ; Blue, then red as SEL_GUITAR_COMMON has it.
+      (BUTTON_DOWN_MSG
+         {cond
+            ({&& {== $button kPad_Square} {ghc_qp_guitar_has_hd} {! {ui in_transition}}}
+               {quickplay guitars {if_else {== {quickplay guitars} hd} sd hd}}
+               {sel_guitar_panel update_display TRUE}
+               TRUE
+            )
+            ({== $button kPad_Tri}
+               {if_else {sel_guitar_panel is_skin_select 0} {$this unchoose_skins} {$this go_back}}
+            )
+            (TRUE kDataUnhandled)
+         }
+      )
+      (TRANSITION_COMPLETE_MSG {ghc_qp_guitar_helpbar})
+      SEL_GUITAR_COMMON
+   )
+}
+
+; The venue: one game's map at a time, its own (ghc/<game>/, content/
+; campaigns.h) whichever game's menus these are, and the others' from a
+; list while yellow is held (picker.dta). The panel takes its map at load,
+; so another goes to the twin screen, whose own panel loads it, as the
+; setlists do (quickplay.dta). Each game's map names its venues' buttons by
+; GH2's venues (sv_battle.btn), GH1's standing in for them. A venue is open
+; where its own game's career has opened it.
+{if {! $ghc_qp_venues} {set $ghc_qp_venues gh2}}
+{set $ghc_qp_venue_panel
+   (
+      (file {sprint "ghc/" $ghc_qp_venues "/ui/sel_venue.milo"})
+      (focus sv_battle.btn)
+   )
+}
+{if {! {exists ghc_qp_venue_panel}} {new GHPanel ghc_qp_venue_panel}}
+{retype ghc_qp_venue_panel $ghc_qp_venue_panel}
+{if {! {exists ghc_qp_venue_twin_panel}} {new GHPanel ghc_qp_venue_twin_panel}}
+{retype ghc_qp_venue_twin_panel $ghc_qp_venue_panel}
+{func ghc_qp_venue_open ($venue)
+   {if_else {== $ghc_qp_venues {ghc_venue_game {campaigns live}}}
+      {|| {campaign is_unlocked $venue} {&& {campaigns has gh2x} {campaigns venue_open gh2x $venue}}}
+      {|| {campaign all_access} {campaigns venue_open $ghc_qp_venues $venue}}
+   }
+}
+; The map's game's venues, each button enabled where it is open; the song's
+; venue focused where that game has it open, else its first.
+{func ghc_qp_venue_enter ($screen $panel)
+   {do
+      ($venues {campaigns venues $ghc_qp_venues})
+      ($index 0)
+      {foreach $venue $venues
+         {if_else {ghc_qp_venue_open $venue}
+            {$screen enable {$panel find {sprint "sv_" $venue ".btn"}}}
+            {$screen disable {$panel find {sprint "sv_" $venue ".btn"}}}
+         }
+      }
+      {if {|| {! {find_elem $venues {game get_venue}}} {! {ghc_qp_venue_open {game get_venue}}}}
+         {game set_venue {elem $venues 0}}
+      }
+      {foreach_int $i 0 {size $venues}
+         {if {== {elem $venues $i} {game get_venue}} {set $index $i}}
+      }
+      {{$panel find venue_anims.grp} set_frame {'+' $index 1}}
+      {$screen set_focus {$panel find {sprint "sv_" {game get_venue} ".btn"}}}
+      {ghc_qp_venue_helpbar}
+   }
+}
+{func ghc_qp_venue_helpbar
+   {do
+      ($array)
+      {set $array ()}
+      {resize $array 0}
+      {push_back $array (fret1 help_continue)}
+      {push_back $array (fret2 help_back)}
+      {if {> {size {ghc_venue_games}} 1} {push_back $array (fret3 ghc_map)}}
+      {if {ghc_qp_venue_has_hd}
+         {push_back $array {if_else {== {quickplay venues} hd} (fret4 ghc_hd) (fret4 ghc_sd)}}
+      }
+      {push_back $array (strum help_updown)}
+      {helpbar set_display $array}
+   }
+}
+; A button focused: its venue, and the map scrolled to it.
+{func ghc_qp_venue_focus ($panel $focus)
+   {do
+      ($venues {campaigns venues $ghc_qp_venues})
+      {foreach_int $i 0 {size $venues}
+         {if {== {sprint "sv_" {elem $venues $i} ".btn"} {sprint {$focus name}}}
+            {game set_venue {elem $venues $i}}
+            {{$panel find venue_anims.grp} animate (dest {'+' $i 1}) (period 0.3) (units kTaskUISeconds)}
+         }
+      }
+   }
+}
+; A venue picked: the song in its game's venues, the character's name its
+; outfit's game's.
+{func ghc_qp_venue_select
+   {campaigns venues_from $ghc_qp_venues}
+   {quickplay pick venue {game get_venue}}
+   {quickplay pick venue_game $ghc_qp_venues}
+   {campaigns text_outfit {game get_character_outfit}}
+   {ui goto_screen loading_screen}
+}
+{func ghc_qp_venue_button ($button)
+   {cond
+      ({ghc_pick_button $button} TRUE)
+      ({== $button kPad_Tri}
+         {{ui current_screen} backwards_anim}
+         {synth play_sequence button_back.cue}
+         {ui goto_screen ghc_qp_guitar_screen}
+         TRUE
+      )
+      ({&& {== $button kPad_Circle} {> {size {ghc_venue_games}} 1} {! {ui in_transition}}}
+         {ghc_pick_panel open_with {ghc_venue_games} $ghc_qp_venues}
+         TRUE
+      )
+      ({&& {== $button kPad_Square} {ghc_qp_venue_has_hd} {! {ui in_transition}}}
+         {quickplay venues {if_else {== {quickplay venues} hd} sd hd}}
+         {synth play_sequence button_toggle}
+         {ghc_qp_venue_helpbar}
+         TRUE
+      )
+      (TRUE kDataUnhandled)
+   }
+}
+{if {! {exists ghc_qp_venue_screen}} {new GHScreen ghc_qp_venue_screen}}
+{if {! {exists ghc_qp_venue_twin_screen}} {new GHScreen ghc_qp_venue_twin_screen}}
+{retype ghc_qp_venue_screen
+   (
+      (panels meta ghc_qp_venue_panel helpbar ghc_pick_panel)
+      (focus ghc_qp_venue_panel)
+      (allow_back FALSE)
+      (enter {ghc_qp_venue_enter $this ghc_qp_venue_panel})
+      (FOCUS_MSG {if {! {ui in_transition}} {ghc_qp_venue_focus ghc_qp_venue_panel $new_focus}})
+      (SELECT_START_MSG {ghc_qp_venue_select} kDataUnhandled)
+      (BUTTON_DOWN_MSG {ghc_qp_venue_button $button})
+      (ghc_picked ($game)
+         {synth play_sequence button_select}
+         {set $ghc_qp_venues $game}
+         {campaigns text_venues $game}
+         {ui goto_screen ghc_qp_venue_twin_screen}
+      )
+   )
+}
+{retype ghc_qp_venue_twin_screen
+   (
+      (panels meta ghc_qp_venue_twin_panel helpbar ghc_pick_panel)
+      (focus ghc_qp_venue_twin_panel)
+      (allow_back FALSE)
+      (enter {ghc_qp_venue_enter $this ghc_qp_venue_twin_panel})
+      (FOCUS_MSG {if {! {ui in_transition}} {ghc_qp_venue_focus ghc_qp_venue_twin_panel $new_focus}})
+      (SELECT_START_MSG {ghc_qp_venue_select} kDataUnhandled)
+      (BUTTON_DOWN_MSG {ghc_qp_venue_button $button})
+      (ghc_picked ($game)
+         {synth play_sequence button_select}
+         {set $ghc_qp_venues $game}
+         {campaigns text_venues $game}
+         {ui goto_screen ghc_qp_venue_screen}
+      )
+   )
+}

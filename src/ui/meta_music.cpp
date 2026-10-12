@@ -22,19 +22,33 @@
 // file to jump to, it gets the next pick. All nine loops are 22050 Hz stereo,
 // which DoJump needs, as it keeps the first file's header.
 //
-// PickLoopIndex only steers clear of the last three, fine for one pick per
-// visit to the menus but not for playing on, so it deals from a shuffled
-// deck of all of them instead, on the game's Rand, never repeating across a
-// reshuffle.
+// The order is menu_music_order's (settings.h). Playlist plays them in
+// (music ...)'s order, carrying on where the last visit to the menus left
+// off. Loop plays one over and over, as retail does, and the next visit
+// the same one. Shuffle deals from a shuffled deck of all of them, on the
+// game's Rand: none again until all have played, and none within three of
+// its last play, across a reshuffle too. PickLoopIndex only steered clear
+// of the last three, fine for one pick per visit but not for playing on.
+//
+// Playing on, the next loop must be of the playing one's rate: the jump
+// keeps the first file's header. GH1's are 44100 Hz, GH2's and the 80s'
+// 22050, so with every game's loops (menu_music all) a run stays with its
+// rate, and the next visit to the menus can start one of the other.
 
 #include "ui/meta_music.h"
 
+#include "disc/ark.h"
 #include "guest.h"
 #include "hook.h"
 #include "ps2_runtime_macros.h"
+#include "settings/settings.h"
 
+#include <algorithm>
 #include <cstring>
+#include <deque>
+#include <functional>
 #include <iostream>
+#include <map>
 #include <string>
 #include <utility>
 #include <vector>
@@ -91,38 +105,95 @@ namespace gh2
         bool s_chainFailed = false;
 
         std::vector<uint32_t> s_deck; // indices into (music ...), dealt from the back
+        std::deque<uint32_t> s_recent; // the last three played
         uint32_t s_deckSize = 0u, s_dealt = 0u;
 
-        // The next of indices 1 to size - 1, (music ...)'s names.
-        uint32_t deal(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t size)
+        // The next of indices 1 to size - 1, (music ...)'s names, that
+        // `fits`; 0 for none.
+        uint32_t next(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t size,
+                      const std::function<bool(uint32_t)> &fits)
         {
             if (size != s_deckSize)
             {
                 s_deck.clear();
+                s_recent.clear();
                 s_deckSize = size;
                 s_dealt = 0u;
             }
-            if (s_deck.empty())
+            if (size < 2u)
+                return 0u;
+            uint32_t pick = 0u;
+            switch (settings::get(settings::kMenuMusicOrder))
             {
-                for (uint32_t i = size - 1u; i >= 1u; --i)
-                    s_deck.push_back(i);
-                for (uint32_t i = static_cast<uint32_t>(s_deck.size()) - 1u; i >= 1u; --i)
-                    std::swap(s_deck[i], s_deck[runtime->callGuestFunction(rdram, ctx, s_addresses->randomInt, {0u, i + 1u})]);
-                if (s_deck.size() > 1u && s_deck.back() == s_dealt)
-                    std::swap(s_deck.back(), s_deck.front());
+            case settings::kOrderLoop:
+                pick = s_dealt != 0u ? s_dealt
+                                     : 1u + static_cast<uint32_t>(runtime->callGuestFunction(
+                                                rdram, ctx, s_addresses->randomInt, {0u, size - 1u}));
+                break;
+            case settings::kOrderPlaylist:
+                for (uint32_t i = 0u, at = s_dealt; i + 1u < size && pick == 0u; ++i)
+                {
+                    at = at % (size - 1u) + 1u;
+                    if (fits(at))
+                        pick = at;
+                }
+                break;
+            default:
+                // From the back, the last that fits and has not played
+                // lately, else the last that fits; a fresh deck where none
+                // left does.
+                for (int round = 0; round < 2 && pick == 0u; ++round)
+                {
+                    if (s_deck.empty() || round == 1)
+                    {
+                        s_deck.clear();
+                        for (uint32_t i = size - 1u; i >= 1u; --i)
+                            s_deck.push_back(i);
+                        for (uint32_t i = static_cast<uint32_t>(s_deck.size()) - 1u; i >= 1u; --i)
+                            std::swap(s_deck[i],
+                                      s_deck[runtime->callGuestFunction(rdram, ctx, s_addresses->randomInt, {0u, i + 1u})]);
+                    }
+                    for (const bool lately : {false, true})
+                        for (size_t i = s_deck.size(); i-- > 0u && pick == 0u;)
+                            if (fits(s_deck[i]) &&
+                                (lately || std::find(s_recent.begin(), s_recent.end(), s_deck[i]) == s_recent.end()))
+                            {
+                                pick = s_deck[i];
+                                s_deck.erase(s_deck.begin() + static_cast<std::ptrdiff_t>(i));
+                            }
+                }
+                break;
             }
-            s_dealt = s_deck.back();
-            s_deck.pop_back();
-            return s_dealt;
+            if (pick == 0u)
+                return 0u;
+            s_dealt = pick;
+            s_recent.push_back(pick);
+            if (s_recent.size() > 3u)
+                s_recent.pop_front();
+            return pick;
         }
 
-        // MetaPanel::PickLoopIndex(this, size).
+        // MetaPanel::PickLoopIndex(this, size): a fresh stream, any rate.
         void pickLoopIndex(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
             const uint32_t returnTo = GPR_U32(ctx, 31);
-            const uint32_t index = deal(rdram, ctx, runtime, GPR_U32(ctx, 5));
-            SET_GPR_U32(ctx, 2, index);
+            const uint32_t index = next(rdram, ctx, runtime, GPR_U32(ctx, 5), [](uint32_t) { return true; });
+            SET_GPR_U32(ctx, 2, index != 0u ? index : 1u);
             ctx->pc = returnTo;
+        }
+
+        // A loop's rate, off its stream's header: "VgS!", its version, then
+        // the rate.
+        uint32_t rateOf(const std::string &path)
+        {
+            static std::map<std::string, uint32_t> s_rates;
+            if (const auto it = s_rates.find(path); it != s_rates.end())
+                return it->second;
+            const auto head = ark::readStart(path + ".vgs", 12u);
+            uint32_t rate = 0u;
+            if (head && head->size() == 12u)
+                std::memcpy(&rate, head->data() + 8u, 4u);
+            return s_rates[path] = rate;
         }
 
         struct PanelPollTag;
@@ -131,7 +202,8 @@ namespace gh2
         {
             const uint32_t panel = GPR_U32(ctx, 4);
             const uint32_t music = load<uint32_t>(rdram, panel + kMusic);
-            if (s_chainFailed || music == 0u || !load<uint32_t>(rdram, music + kPlaying) ||
+            if (s_chainFailed || settings::get(settings::kMenuMusicOrder) == settings::kOrderLoop || music == 0u ||
+                !load<uint32_t>(rdram, music + kPlaying) ||
                 !load<uint32_t>(rdram, music + kLoop) || load<uint32_t>(rdram, music + kRampingDown))
                 return;
             const uint32_t stream = load<uint32_t>(rdram, music + kStream);
@@ -163,9 +235,17 @@ namespace gh2
 
             const uint32_t list = call(s_addresses->systemConfig3, {symbol("synth"), symbol("metamusic"), symbol("music")});
             const uint32_t size = static_cast<uint32_t>(load<int16_t>(rdram, list + 8u));
-            const uint32_t pick = deal(rdram, ctx, runtime, size);
-            const uint32_t name = load<uint32_t>(rdram, load<uint32_t>(rdram, list) + 8u * pick);
-            const std::string path = "sfx/streams/" + std::string(reinterpret_cast<const char *>(getMemPtr(rdram, name)));
+            const auto pathOf = [&](uint32_t i)
+            {
+                const uint32_t name = load<uint32_t>(rdram, load<uint32_t>(rdram, list) + 8u * i);
+                return "sfx/streams/" + std::string(reinterpret_cast<const char *>(getMemPtr(rdram, name)));
+            };
+            const uint32_t playing = s_dealt != 0u && s_dealt < size ? rateOf(pathOf(s_dealt)) : 0u;
+            const uint32_t pick =
+                next(rdram, ctx, runtime, size, [&](uint32_t i) { return playing == 0u || rateOf(pathOf(i)) == playing; });
+            if (pick == 0u)
+                return;
+            const std::string path = pathOf(pick);
 
             const uint32_t file = guestString(path, 0u);
             ctx->f[12] = load<float>(rdram, s_addresses->streamEndMs);
@@ -179,6 +259,8 @@ namespace gh2
                 std::cerr << "[meta_music] couldn't open " << path << ".vgs, looping instead" << std::endl;
                 s_chainFailed = true;
             }
+            else
+                std::cerr << "[meta_music] next " << path << std::endl;
         }
     }
 

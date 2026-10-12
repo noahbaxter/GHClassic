@@ -1,0 +1,40 @@
+; Quickplay's pickers: the song and its difficulty lead to the guitarist,
+; the guitar and the venue, and the song plays with what was picked. Holds
+; with any set of discs.
+#include common/first_boot.dta
+{quickplay song_defaults 0}
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 1)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+(press green)
+(wait_screen ghc_qp_character_screen)
+(wait_until {char_single are_chars_loaded})
+(wait 2)
+(shot character)
+; The song's own casting is where each pick starts: its venue, arena, is
+; locked on a new save, so its tier's stands in (GameConfig::SetQuickplay,
+; 0x126828).
+(expect {game get_character_outfit} glam1)
+(expect {game get_guitar} flying_v)
+(expect {game get_venue} battle)
+{game set_character punk1 TRUE}
+{ui goto_screen ghc_qp_guitar_screen}
+(wait_screen ghc_qp_guitar_screen)
+(wait 3)
+(shot guitar)
+{ghc_qp_guitar_screen goto_career}
+(wait_screen ghc_qp_venue_screen)
+(wait 2)
+(shot venue)
+{{game get_player_config 0} set autoplay TRUE}
+(press green)
+(wait_screen game_screen 60)
+(expect {gamecfg get_song} shoutatthedevil)
+(expect {game get_character_outfit} punk1)
+(wait 20)
+(shot song)
+(quit)

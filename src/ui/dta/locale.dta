@@ -119,3 +119,7 @@
 
 ; "SAVE ERROR: Data could not be saved to the unformatted memory card (8MB)(for PlayStation®2) in MEMORY CARD slot {SLOT}. Retry or continue without saving?"
 (no_format_warn_ps2 "SAVE ERROR: Data could not be saved to the unformatted save file. Retry or continue without saving?")
+
+; A career without encores (content/encores.h) asks for songs of the venue's
+; five where the disc's song_current_venue_encore asks for the encore.
+(song_current_venue_gh1 "Beat %i/5 songs to continue")

@@ -8,23 +8,35 @@
 
 #include "render/native_mesh.h"
 
+#include "dev/draw_dump.h"
 #include "guest.h"
 #include "milo/layout.h"
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
 #include "render/camera.h"
 #include "render/frame.h"
+#include "render/look.h"
 #include "render/mesh_capture.h"
 #include "render/native_environ.h"
 #include "render/native_mat.h"
+#include "settings/settings.h"
 
 #include <algorithm>
+#include <cstring>
 
 namespace gh2
 {
     namespace
     {
         const Addresses *s_addresses = nullptr;
+
+        // The name of the Hmx::Object an object's first word points to.
+        std::string objectName(uint8_t *rdram, uint32_t address)
+        {
+            const uint32_t object = address != 0u ? load<uint32_t>(rdram, address) : 0u;
+            const uint32_t name = object != 0u ? load<uint32_t>(rdram, object + milo::object::kName) : 0u;
+            return name != 0u ? reinterpret_cast<const char *>(getMemPtr(rdram, name)) : "";
+        }
     }
 
     Matrix readTransform(uint8_t *rdram, uint32_t address)
@@ -59,6 +71,13 @@ namespace gh2
             {
                 camera.targetWidth = load<uint32_t>(rdram, camera.target + milo::tex::kWidth);
                 camera.targetHeight = load<uint32_t>(rdram, camera.target + milo::tex::kHeight);
+                // The 360 draws its crowd's cards from 256 by 512, twice the
+                // PS2's each way, then halves them three times as here.
+                if (settings::hd(settings::kLookVenue))
+                {
+                    camera.targetWidth *= 2u;
+                    camera.targetHeight *= 2u;
+                }
             }
         }
         return internCamera(camera);
@@ -81,6 +100,13 @@ namespace gh2
                     readSphereRows(rdram, ctx, runtime, *s_addresses, mat, draw.material);
                 building().draws.push_back(draw);
             }
+        }
+
+        // Whether the mesh is a card a crowd's flat member is drawn on: one
+        // under the WorldCrowd's material (BuildBillboard, 0x26bba0).
+        bool card(uint8_t *rdram, uint32_t mesh)
+        {
+            return crowdCard(load<uint32_t>(rdram, mesh + milo::mesh::kMat));
         }
 
         // A transformable's world transform, through the engine's own WorldXfm.
@@ -121,6 +147,53 @@ namespace gh2
             return true;
         }
 
+        // The environ the 360 draws one of the track's meshes under, where
+        // the PS2's scene has one for the whole track: its board's, and its
+        // bar and beat lines', found by name in the track's scene. `out` is
+        // left as it is for any other mesh, and where the scene has none.
+        // Calls into the guest, with its stack moved down past the name for
+        // ObjectDir::FindObject.
+        void trackEnviron(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t mesh, Environ &out)
+        {
+            // Only the track's environ fades.
+            const uint32_t mat = load<uint32_t>(rdram, mesh + milo::mesh::kMat);
+            if (!look::hasBoard() || mat == 0u || !out.fade)
+                return;
+            std::string name;
+            if (look::isBoard(mat))
+                name = look::kBoardEnviron;
+            else if (const uint32_t matName = load<uint32_t>(rdram, mat + milo::object::kName); matName != 0u)
+            {
+                const char *text = reinterpret_cast<const char *>(getMemPtr(rdram, matName));
+                for (const char *line : look::kLineMats)
+                    if (std::strcmp(text, line) == 0)
+                        name = look::kLineEnviron;
+            }
+            if (name.empty())
+                return;
+            // The board's mesh and the environ it is drawn under are the
+            // track code's copies, in no directory; the mesh it was copied
+            // from, which owns its geometry, is the scene's.
+            const uint32_t owner = load<uint32_t>(rdram, mesh + milo::mesh::kOwner);
+            const uint32_t dir =
+                owner != 0u ? load<uint32_t>(rdram, owner + milo::mesh::kObjectBase + milo::object::kDir) : 0u;
+            if (dir == 0u)
+                return;
+            const uint32_t sp = GPR_U32(ctx, 29);
+            const uint32_t text = (sp - 0x40u - static_cast<uint32_t>(name.size())) & ~0xfu;
+            std::memcpy(getMemPtr(rdram, text), name.c_str(), name.size() + 1u);
+            SET_GPR_U32(ctx, 29, text - 0x20u);
+            const uint32_t env = static_cast<uint32_t>(
+                runtime->callGuestFunction(rdram, ctx, s_addresses->objectDirFindObject, {dir, text, 0u}));
+            if (env != 0u)
+            {
+                out = readEnviron(rdram, ctx, runtime, env);
+                if (name == look::kBoardEnviron)
+                    look::restBoard(out);
+            }
+            SET_GPR_U32(ctx, 29, sp);
+        }
+
         void drawShowing(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
             const uint32_t returnTo = GPR_U32(ctx, 31);
@@ -128,9 +201,8 @@ namespace gh2
             const uint32_t owner = load<uint32_t>(rdram, mesh + milo::mesh::kOwner);
             std::shared_ptr<const MeshData> geometry = capturedMesh(rdram, owner);
             // Retail draws nothing, and calls nothing, until the owner has a
-            // packet (0x3d890c).
-            const bool synced = load<uint32_t>(rdram, owner + milo::mesh::kPacket) != 0u;
-            if (synced && geometry && !geometry->indices.empty())
+            // packet (0x3d890c), which a sync with faces and verts gives it.
+            if (geometry && !geometry->indices.empty() && !geometry->verts.empty())
             {
                 DrawCall draw;
                 const uint32_t bones = load<uint32_t>(rdram, mesh + milo::mesh::kBones);
@@ -138,16 +210,43 @@ namespace gh2
                 {
                     draw.world = worldXfm(rdram, ctx, runtime, mesh + milo::mesh::kTransform);
                     draw.lightWorld = draw.world;
+                    draw.crowd = card(rdram, mesh);
                 }
                 else if (!readBones(rdram, ctx, runtime, bones, draw))
                 {
                     ctx->pc = returnTo;
                     return;
                 }
+                else
+                {
+                    // A crowd member drawn whole is a Character of its own,
+                    // named crowd_ (gh1/venues.cpp, crowd).
+                    const uint32_t object = load<uint32_t>(rdram, mesh);
+                    const uint32_t dir = object != 0u ? load<uint32_t>(rdram, object + milo::object::kDir) : 0u;
+                    draw.crowd = dir != 0u && objectName(rdram, dir).rfind("crowd", 0) == 0;
+                }
                 draw.mesh = std::move(geometry);
-                draw.environment =currentEnviron();
-                draw.camera = currentCamera(rdram);
-                pushPasses(rdram, ctx, runtime, mesh, draw);
+                draw.environment = currentEnviron();
+                trackEnviron(rdram, ctx, runtime, mesh, draw.environment);
+                const std::string name = objectName(rdram, mesh);
+                draw.strings = name == "strings.mesh";
+                if (drawDumpPending())
+                    draw.name = name;
+                const Frame &frame = building();
+                if (frame.casting >= 0)
+                {
+                    // Into the shadow map, whatever its material.
+                    draw.camera = frame.shadows[static_cast<size_t>(frame.casting)];
+                    draw.shadowCaster = true;
+                    building().draws.push_back(draw);
+                }
+                else
+                {
+                    draw.camera = currentCamera(rdram);
+                    if (frame.lit >= 0 && static_cast<size_t>(frame.lit) < frame.shadows.size())
+                        draw.shadow = static_cast<uint32_t>(frame.lit) + 1u;
+                    pushPasses(rdram, ctx, runtime, mesh, draw);
+                }
             }
             ctx->pc = returnTo;
         }
@@ -161,13 +260,17 @@ namespace gh2
         {
             const uint32_t returnTo = GPR_U32(ctx, 31);
             const uint32_t multi = GPR_U32(ctx, 4);
+            if (building().casting >= 0) // only a character's meshes cast
+            {
+                ctx->pc = returnTo;
+                return;
+            }
             const uint32_t mesh = load<uint32_t>(rdram, multi + milo::multimesh::kMesh);
             const uint32_t owner = mesh != 0u ? load<uint32_t>(rdram, mesh + milo::mesh::kOwner) : 0u;
             std::shared_ptr<const MeshData> geometry = owner != 0u ? capturedMesh(rdram, owner) : nullptr;
-            const bool synced = owner != 0u && load<uint32_t>(rdram, owner + milo::mesh::kPacket) != 0u;
             const uint32_t sentinel = multi + milo::multimesh::kInstances;
             const uint32_t first = load<uint32_t>(rdram, sentinel);
-            if (synced && geometry && !geometry->indices.empty() && first != sentinel)
+            if (geometry && !geometry->indices.empty() && !geometry->verts.empty() && first != sentinel)
             {
                 // Retail asks for the camera's world on every draw (0x1a31d0).
                 const Matrix cameraWorld =
@@ -175,8 +278,10 @@ namespace gh2
                 const bool faceCamera = load<uint32_t>(rdram, mesh + milo::mesh::kInstanceMode) == milo::mesh::kFaceCamera;
                 DrawCall draw;
                 draw.mesh = std::move(geometry);
-                draw.environment =currentEnviron();
+                draw.environment = currentEnviron();
+                trackEnviron(rdram, ctx, runtime, mesh, draw.environment);
                 draw.camera = currentCamera(rdram);
+                draw.crowd = card(rdram, mesh);
                 for (uint32_t node = first; node != sentinel; node = load<uint32_t>(rdram, node))
                 {
                     draw.world = readTransform(rdram, node + milo::multimesh::kInstanceXfm);

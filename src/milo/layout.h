@@ -21,10 +21,18 @@ namespace milo
         constexpr uint32_t kFocusZ = 0x510u;         // the GS Z depth of field starts at, 0 for none
     }
 
+    // Hmx::Object, the virtual base an object's first word points to.
+    namespace object
+    {
+        constexpr uint32_t kName = 0x14u; // const char*
+        constexpr uint32_t kDir = 0x18u;  // ObjectDir*
+    }
+
     // RndTransformable: local transform at +0x20, world at +0x60. A
     // transform is three 16-byte rows then the position.
     namespace transformable
     {
+        constexpr uint32_t kLocal = 0x20u;
         constexpr uint32_t kWorld = 0x60u;
     }
 
@@ -38,6 +46,36 @@ namespace milo
         constexpr uint32_t kZRange = 0x2ccu; // 2 floats
         constexpr uint32_t kRect = 0x2d4u;  // normalized x, y, w, h
         constexpr uint32_t kTargetTex = 0x2ecu; // RndTex* (ObjPtr at +0x2e4), null for the screen
+    }
+
+    // Character, as Character::DrawShadowBuffer (0x1619c0) calls its own
+    // virtuals: through the table at kVtable, each slot an offset to add to
+    // the drawable (16-bit) and then the function.
+    namespace character
+    {
+        constexpr uint32_t kDrawable = 0x90u;
+        constexpr uint32_t kVtable = 0xc4u;
+        constexpr uint32_t kMakeWorldSphere = 0x10u; // (Sphere &, bool): centre, then the radius at +0x10
+        constexpr uint32_t kDrawShowing = 0x20u;     // (DrawType)
+        constexpr uint32_t kDrawShadow = 2u;         // the DrawType a shadow buffer is drawn with
+    }
+
+    // CamShot: its first word points to its Hmx::Object, and its keyframes
+    // are a vector of CamShotFrame (CamShot::GetKey 0x263410).
+    namespace camShot
+    {
+        constexpr uint32_t kObject = 0x0u;
+        constexpr uint32_t kKeyframes = 0x10u; // begin, end
+    }
+
+    // CamShotFrame (CamShotFrame::Interp 0x2665a0).
+    namespace camShotFrame
+    {
+        constexpr uint32_t kNearBlur = 0x78u;
+        constexpr uint32_t kFarBlur = 0x7cu;
+        constexpr uint32_t kMaxFocalBlur = 0x80u;
+        constexpr uint32_t kTargets = 0x84u;        // vector of ShotTarget: begin, end
+        constexpr uint32_t kTargetPosition = 0xa0u; // their mean world position, as UpdateTarget leaves it
     }
 
     // RndMat, 0x120 bytes; PsMat adds its GS state after. Enums read from
@@ -101,6 +139,13 @@ namespace milo
     {
         constexpr uint32_t kFirstLight = 0x30u; // light list node*: {RndLight*, next*}
         constexpr uint32_t kAmbient = 0x40u;    // 3 floats
+        constexpr uint32_t kFogEnable = 0x50u;  // byte
+        constexpr uint32_t kFogStart = 0x54u;   // float
+        constexpr uint32_t kFogEnd = 0x58u;     // float
+        constexpr uint32_t kFogColor = 0x60u;   // 3 floats, then alpha
+        constexpr uint32_t kFadeOut = 0x70u;    // bool
+        constexpr uint32_t kFadeStart = 0x74u;
+        constexpr uint32_t kFadeEnd = 0x78u;
     }
 
     // RndLight, a RndTransformable at +0.
@@ -177,7 +222,8 @@ namespace milo
         constexpr uint32_t kTransform = 0x40u;   // the RndTransformable base
         constexpr uint32_t kObjectBase = 0x160u; // the Hmx::Object virtual base, in a PsMesh
         constexpr uint32_t kMutable = 0x140u;    // the sync bits that change again: such parts are kept
-        constexpr uint32_t kPacket = 0x150u;     // PsMesh's face packet MemHandle*, null until synced
+        constexpr uint32_t kGroups = 0x128u;     // the face groups' list, its own sentinel
+        constexpr uint32_t kPacket = 0x150u;     // PsMesh's face packet MemHandle*: retail's, never built here
         constexpr uint32_t kPacketQuads = 0x154u; // u16, the packet's length
         constexpr uint32_t kVertSize = 0x40u;
         constexpr uint32_t kFaceSize = 6u;
@@ -209,5 +255,12 @@ namespace milo
         constexpr uint32_t kMesh = 0x48u;      // RndMesh* (ObjPtr at +0x40)
         constexpr uint32_t kInstances = 0x50u; // the instance list's sentinel node; its first word is the first node
         constexpr uint32_t kInstanceXfm = 0x10u; // a node's Transform
+    }
+
+    // WorldCrowd: its flat members' cards, each a mesh BuildBillboard
+    // (0x26bba0) makes under this one material (0x26bda8).
+    namespace crowd
+    {
+        constexpr uint32_t kCardMat = 0xb4u; // RndMat*, made by the constructor (0x268fe0)
     }
 }

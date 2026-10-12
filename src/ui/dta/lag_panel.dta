@@ -145,9 +145,9 @@
       (BUTTON_DOWN_MSG
          {if_else {== [state] browse}
             {if_else {== $button kPad_Tri}
-               {if_else {== [from_panel] video_settings_panel}
-                  {ui goto_screen video_settings_screen}
-                  {ui goto_screen pause_video_settings_screen}
+               {if_else {== [from_panel] game_settings_panel}
+                  {ui goto_screen game_settings_screen}
+                  {ui goto_screen pause_game_settings_screen}
                }
                kDataUnhandled
             }

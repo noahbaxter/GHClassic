@@ -1,0 +1,46 @@
+; Outside a career the table is GH2's, and a token another game names for
+; itself takes its owner's text: a venue's name its venue's game's, a
+; character's blurb its outfit's game's, the rest its screen's.
+(needs gh1 gh80s)
+#include common/first_boot.dta
+(expect {campaigns live} gh2)
+{set $fest {localize fest}}
+{set $battle {localize battle}}
+{set $blurb {localize alterna_blurb}}
+{set $tip {localize loading_tip1}}
+(print gh2 $fest $battle)
+
+; The venues' names: the 80s' fest, GH1's room at battle; GH2's again.
+{campaigns text_venues gh80s}
+(expect {== {localize fest} $fest} 0)
+(print gh80s {localize fest})
+{campaigns text_venues gh1}
+(expect {== {localize battle} $battle} 0)
+(print gh1 {localize battle})
+{campaigns text_venues gh2}
+(expect {localize fest} $fest)
+
+; A character's blurb: the 80s' for its outfit, GH2's for GH2's.
+{campaigns text_outfit alterna3}
+(expect {== {localize alterna_blurb} $blurb} 0)
+(print alterna3 {localize alterna_blurb})
+{campaigns text_outfit alterna1}
+(expect {localize alterna_blurb} $blurb)
+
+; The screens around a song: GH1's tips on GH1's loading screen.
+{gamecfg set mode quickplay}
+{{game get_player_config 0} set_difficulty medium}
+{game set_song shoutatthedevil}
+{game set_quickplay}
+{game set_venue battle}
+{campaigns venues_from gh1}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(expect {== {localize loading_tip1} $tip} 0)
+(print song {localize loading_tip1})
+(expect {== {localize battle} $battle} 0)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+(expect {localize loading_tip1} $tip)
+(expect {localize battle} $battle)
+(quit)

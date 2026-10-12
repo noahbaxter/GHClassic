@@ -7,6 +7,7 @@
 // Sources: PCSX2's pcsx2/SIO/Memcard (MemoryCardFile.cpp, MemoryCardFolder.h),
 // ps2sdk's mcman (main.c, ps2mc_fio.c) and mymc (ps2mc.py, ps2mc_dir.py).
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -15,6 +16,22 @@
 
 namespace gh2::save
 {
+    // A save's icon.sys (ps2sdk's sceMcIconSys, 964 bytes) as the games build
+    // it from config/mc.dta's ps2_icon (MCInitPS2IconData, GH2 0x2a73e0) and
+    // their title (MCSetPS2IconTitle 0x2a7740), which goes to full-width
+    // Shift-JIS (Ascii2Sjis 0x2d2580) and breaks after `lineBreak` characters.
+    struct IconSys
+    {
+        uint32_t transparency = 0;
+        std::array<std::array<int32_t, 3>, 4> colors{};
+        std::array<std::array<float, 3>, 3> lightDirs{}, lightColors{};
+        std::array<float, 3> ambient{};
+        std::string title;
+        int lineBreak = 0;
+        std::string iconFile;
+    };
+    std::vector<uint8_t> makeIconSys(const IconSys &icon);
+
     class Ps2Card
     {
     public:

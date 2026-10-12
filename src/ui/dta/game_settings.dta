@@ -1,0 +1,960 @@
+; Game Settings: a screen of the port's own under Options and in the pause
+; menu, beside Audio and Video, holding the note speed ({note_speed ...},
+; note_speed.cpp).
+;
+; The hyperspeed cheat goes: note speed replaces it. It is the fourth of
+; gh2.dta's long_cheats, after the array's name. Once: this is run again
+; where the screens take another game's scripts, and the cheats stay.
+{if {! $ghc_hyper_speed_gone}
+   {set $ghc_hyper_speed_gone TRUE}
+   {remove_elem {find $syscfg long_cheats} {elem {find $syscfg long_cheats} 4}}
+}
+
+; The highway's length ({highway_length}, note_speed.cpp) is where a gem
+; first shows, the track's horizon_y (track_graphics.dta): its camera sees
+; that far, and its pools of gems and tails hold as many more as it is
+; longer. The board is made longer as each track is built.
+{func ghc_highway
+   {do
+      ($n {highway_length})
+      ($track {find $syscfg track_graphics})
+      {set_elem {find $track horizon_y} 1 $n}
+      {set_elem {find $track cam far_plane} 1 {if_else {> $n 110} {'+' $n 90} 200}}
+      {set_elem {find $track init_gems} 1 {int {/ {'*' 25 {max $n 110}} 110}}}
+      {set_elem {find $track init_tails} 1 {int {/ {'*' 16 {max $n 110}} 110}}}
+   }
+}
+{ghc_highway}
+
+; The options menu, as the game's own (options.dta) with a Game Settings row
+; under Video Settings. options.milo has six rows, each button in a group of
+; its own that fans it about the poster's corner; the seventh is Video
+; Settings cloned on entry into a group turned between its neighbours', and
+; the three rows under it moved down to keep the gaps even (x right, z up, in
+; op_buttons.view).
+{retype options_panel
+   (
+      ; From the ARK root: a path resolves against the file its array came
+      ; from, and this one comes from no file.
+      (file ui/options.milo)
+      (focus op_audio.btn)
+      (enter {$this add_game})
+      (add_game
+         {if {! {exists game_settings.btn}}
+            {do
+               ($x 0) ($y 0) ($z 0)
+               ($draw {video_settings.btn get trans_parent})
+               {new Group game_settings.grp}
+               {game_settings.grp set trans_parent op_buttons.view}
+               {game_settings.grp set_local_rot 0 8 0}
+               {new {video_settings.btn class_name} game_settings.btn}
+               {game_settings.btn copy video_settings.btn 0}
+               {game_settings.btn set trans_parent game_settings.grp}
+               {game_settings.btn set_local_pos 24 0 -14}
+               ; A token with no string reads as itself.
+               {game_settings.btn set text_token "Game Settings"}
+               {video_settings.btn set nav_down game_settings.btn}
+               {game_settings.btn set nav_down op_data.btn}
+               {foreach $row ((op_data.view -15) (op_memory_card.grp -9) (op_bonus.view -5))
+                  {{elem $row 0} get_local_pos $x $y $z}
+                  {{elem $row 0} set_local_pos $x $y {'+' $z {elem $row 1}}}
+               }
+               {$draw insert (objects {$draw size objects}) game_settings.btn}
+               {{$this loaded_dir} sync_objects}
+            }
+         }
+      )
+      (poll {if $disable_save {op_data.btn set_state kDisabled} {memory_card.btn set_state kDisabled}})
+      (SELECT_START_MSG
+         {switch $component
+            (op_audio.btn {ui goto_screen audio_settings_screen})
+            (video_settings.btn {ui goto_screen video_settings_screen})
+            (game_settings.btn {ui goto_screen game_settings_screen})
+            (op_data.btn {ui goto_screen options_chooseprof_screen})
+            (memory_card.btn {ui goto_screen mem_card_screen})
+            (op_bonus.btn {ui goto_screen bonus_material_screen})
+            (op_credit.btn {ui goto_screen credits_screen})
+         }
+         kDataUnhandled
+      )
+   )
+}
+
+; The pause menu, as the game's own (pause.dta) with one Settings row where
+; it has one for audio and one for video: Resume, Restart, Settings, Quit.
+; Settings leads to a menu of its own, the same scene again with its rows
+; named Audio, Video, Game and Back, and each settings screen leads back to
+; that (the screens take the selects and the buttons, so each is retyped).
+;
+; The scene's five rows as four: Video Settings' put away, Quit in its
+; place, and every row half a row lower to keep them centred. Each time the
+; scene loads; one of four rows (GH1's) is left as it is.
+#define PAUSE_FOUR_ROWS (
+   (four_rows
+      {if {&& {exists video_options.btn} {video_options.btn showing}}
+         {do
+            ($x 0) ($y 0) ($z 0) ($above 0) ($row 0)
+            {audio_options.btn get_local_pos $x $y $above}
+            {video_options.btn get_local_pos $x $y $row}
+            {quit.btn get_local_pos $x $y $z}
+            {quit.btn set_local_pos $x $y $row}
+            {set $row {'-' $row $above}}
+            {video_options.btn set_showing FALSE}
+            {video_options.btn set_state kDisabled}
+            {audio_options.btn set nav_down quit.btn}
+            {foreach $btn (resume.btn restart.btn audio_options.btn quit.btn)
+               {$btn get_local_pos $x $y $z}
+               {$btn set_local_pos $x $y {'+' $z {'/' $row 2.0}}}
+            }
+         }
+      }
+   )
+)
+{retype pause_panel
+   (
+      (file ui/pause.milo)
+      (focus resume.btn)
+      (reset_focus TRUE)
+      (enter
+         {$this four_rows}
+         ; A token with no string reads as itself.
+         {audio_options.btn set text_token "SETTINGS"}
+      )
+      PAUSE_FOUR_ROWS
+   )
+}
+{retype pause_screen
+   (
+      (panels GAME_PANELS pause_panel)
+      (focus pause_panel)
+      (clear_vram TRUE)
+      (in_game TRUE)
+      PAUSE_SCREEN_HANDLERS
+      (SELECT_START_MSG
+         {switch $component
+            (resume.btn {$this resume})
+            (restart.btn {$this restart})
+            (audio_options.btn {ui goto_screen pause_settings_screen})
+            (quit.btn
+               {if {== career {gamecfg get mode}} {gamecfg set continue_screen sel_song_screen}}
+               {meta_loading_goto {gamecfg get continue_screen}}
+            )
+         }
+      )
+      (BUTTON_DOWN_MSG {if {== $button kPad_Start} {$this resume}} kDataUnhandled)
+   )
+}
+{if {! {exists pause_settings_screen}}
+   {new GHPanel pause_settings_panel}
+   {new GHScreen pause_settings_screen}
+}
+{retype pause_settings_panel
+   (
+      (file ui/pause.milo)
+      (focus resume.btn)
+      (reset_focus TRUE)
+      (enter
+         {$this four_rows}
+         ; Three of the four: the last put away, and the rest half a row
+         ; lower. Red leads back, as the help bar says.
+         {if {quit.btn showing}
+            {do
+               ($x 0) ($y 0) ($z 0) ($row 0)
+               {resume.btn get_local_pos $x $y $z}
+               {restart.btn get_local_pos $x $y $row}
+               {set $row {'-' $row $z}}
+               {quit.btn set_showing FALSE}
+               {quit.btn set_state kDisabled}
+               {audio_options.btn set nav_down resume.btn}
+               {foreach $btn (resume.btn restart.btn audio_options.btn)
+                  {$btn get_local_pos $x $y $z}
+                  {$btn set_local_pos $x $y {'+' $z {'/' $row 2.0}}}
+               }
+            }
+         }
+         {pause_title.lbl set_localized "SETTINGS"}
+         {resume.btn set text_token "AUDIO"}
+         {restart.btn set text_token "VIDEO"}
+         {audio_options.btn set text_token "GAME"}
+      )
+      PAUSE_FOUR_ROWS
+   )
+}
+{retype pause_settings_screen
+   (
+      (panels GAME_PANELS pause_settings_panel helpbar)
+      (focus pause_settings_panel)
+      (in_game TRUE)
+      PAUSE_SCREEN_HANDLERS
+      (helpbar (default ((fret1 help_select) (fret2 help_back) (strum help_updown))))
+      (SELECT_START_MSG
+         {switch $component
+            (resume.btn {ui goto_screen pause_audio_settings_screen})
+            (restart.btn {ui goto_screen pause_video_settings_screen})
+            (audio_options.btn {ui goto_screen pause_game_settings_screen})
+         }
+      )
+      (BUTTON_DOWN_MSG
+         {if {== $button kPad_Start} {$this resume}}
+         {if {== $button kPad_Tri} {ui goto_screen pause_screen}}
+         kDataUnhandled
+      )
+   )
+}
+; The game's own two settings screens there (options.dta), each leading back
+; to that menu where it led to the pause menu.
+{retype pause_audio_settings_screen
+   (
+      (panels GAME_PANELS pause_audio_settings_panel helpbar)
+      (focus pause_audio_settings_panel)
+      (in_game TRUE)
+      (allow_back FALSE)
+      (animate_transition FALSE)
+      ; Under Settings each is named for what it holds.
+      (enter {{pause_audio_settings_panel find gs_title.lbl} set_localized "AUDIO"})
+      (BUTTON_DOWN_MSG
+         {if {&& {! {pause_audio_settings_panel slider_selected}} {== $button kPad_Tri}}
+            {$this set_volumes}
+            {ui goto_screen pause_settings_screen}
+         }
+         kDataUnhandled
+      )
+   )
+}
+{retype pause_video_settings_screen
+   (
+      (panels GAME_PANELS pause_video_settings_panel helpbar)
+      (focus pause_video_settings_panel)
+      (in_game TRUE)
+      (allow_back FALSE)
+      (animate_transition FALSE)
+      (BUTTON_DOWN_MSG
+         {if {== $button kPad_Tri} {ui goto_screen pause_settings_screen}}
+         kDataUnhandled
+      )
+   )
+}
+{retype video_settings_screen
+   (
+      (panels meta video_settings_panel helpbar)
+      (focus video_settings_panel)
+      (allow_back FALSE)
+      (BUTTON_DOWN_MSG
+         {if {== $button kPad_Tri}
+            {$this backwards_anim}
+            {synth play_sequence button_back.cue}
+            {autosave_goto options_screen}
+         }
+         kDataUnhandled
+      )
+   )
+}
+
+; Video Settings keeps its widescreen row alone, in its top row's place.
+; Playing left handed and the lag screen are Game Settings' now, and
+; progressive scan is gone: it changes nothing a window shows.
+#define VIDEO_ROW_HANDLERS (
+   (focus widescreen.btn)
+   (enter
+      ; Into the top row's place while that row still shows: once for each
+      ; time the scene loads, and not in a scene that is not the game's own
+      ; (GH1's, where the row is placed as it is made).
+      {if {gs_left_p1.btn showing}
+         {do
+            ($x 0) ($y 0) ($z 0) ($top 0) ($from 0)
+            {gs_left_p1.btn get_local_pos $x $y $top}
+            {widescreen.btn get_local_pos $x $y $from}
+            {widescreen.btn set_local_pos $x $y $top}
+            {widescreen.chk get_local_pos $x $y $z}
+            {widescreen.chk set_local_pos $x $y {'+' $z {'-' $top $from}}}
+         }
+      }
+      {foreach $o (gs_left_p1.btn gs_left_p2.btn p_scan.btn calibrate_lag.btn)
+         {{$this find $o} set_showing FALSE}
+         {{$this find $o} set_state kDisabled}
+      }
+      {foreach $o (lefty1.chk lefty2.chk p_scan.chk)
+         {{$this find $o} set_showing FALSE}
+      }
+      ; GH1's frame is its audio settings', whose own rows go.
+      {foreach $o (gs_band.sld gs_guitar.sld gs_sfx.sld gs_stereo.btn stereo.chk)
+         {if {exists $o}
+            {{$this find $o} set_showing FALSE}
+            {{$this find $o} set_state kDisabled}
+         }
+      }
+      {if {== {$this name} pause_video_settings_panel} {gs_title.lbl set_localized "VIDEO"}}
+      {widescreen.btn set nav_down widescreen.btn}
+      {widescreen.chk set_check {options get_widescreen}}
+      {helpbar set_display ((fret1 help_onoff) (fret2 help_back))}
+   )
+   (SELECT_START_MSG
+      {if {== $component widescreen.btn}
+         {widescreen.chk toggle}
+         {options set_widescreen {widescreen.chk get_check}}
+      }
+      kDataUnhandled
+   )
+)
+{retype video_settings_panel ((file ui/video_settings.milo) VIDEO_ROW_HANDLERS)}
+{retype pause_video_settings_panel ((file ui/pause_video_settings.milo) VIDEO_ROW_HANDLERS)}
+
+; The screen is Audio Settings' scene (game_settings.milo, and the pause
+; menu's pause_audio_settings.milo) under another name, its rows put to
+; other use. Its first two sliders are the note speeds, easy and medium's
+; and hard and expert's, a step for each of {note_speed}'s stops, their
+; scales drawn without the volume's 0 and 11 ({slider_scales plain}); its
+; third slider and the stereo
+; row are put away.
+;
+; Past each track's end, where the volume's 11 stood, is the number: a label,
+; which takes a font and a colour of its own where a button takes its
+; scene's, and it takes the colour its track is drawn in, whatever the scene
+; and the state ({slider_scales colour}).
+;
+; A change is kept as it is made; red on a picked slider puts back what it
+; was picked at, and yellow puts the focused one back to retail's.
+#define GAME_SETTINGS_HANDLERS (
+   (focus gs_band.sld)
+   (reset_focus TRUE)
+   (picked_at 0)
+   (at "gs_band.sld")
+   ; The rows under the sliders: a row's button, how many rows down it is,
+   ; its text, and its label.
+   (rows
+      (
+         (gm_lefty.btn 3 "LEFTY FLIP" gm_lefty.lbl)
+         (gm_p1.btn 3 "P1" gm_p1.lbl)
+         (gm_p2.btn 3 "P2" gm_p2.lbl)
+         (gm_lag.btn 4 "CALIBRATE LAG" gm_lag.lbl)
+      )
+   )
+   ; What a row does when it is lit. A button's text swells and its letters
+   ; shake, as every menu row of the game's does: P1, P2 and CALIBRATE LAG.
+   ; A slider's name only changes colour: E/M SPEED, H/X SPEED, NOTE SPEED,
+   ; HWY LENGTH, and the volumes on Audio Settings. A row named here is
+   ; drawn by its label, which holds still as a slider's name does; take a
+   ; name out, or put one of [rows] in, to change which it is.
+   (steady (gm_lefty.btn))
+   ; The rows as lay_out leaves them: the first's height, the gap to the
+   ; next, and how high their parent stands.
+   (row_top 0)
+   (row_gap 0)
+   (view_z 0)
+   ; A slider being tuned in a song: whether one is, where the rows' parent
+   ; stood, and how far right of that it is put.
+   (tuning 0)
+   (tune_x 0)
+   (tune_dx 250)
+   ; The black behind it: from the slider, right and up, and its size.
+   (tune_bg (-152 -5 22.2 1.4))
+   (tune_bg_unit 16.03)
+   ; A round end: how wide it comes out, and its size. As wide as it is
+   ; tall, which is how its picture is drawn: any narrower and its curve
+   ; is a sliver.
+   (tune_bg_end (56 3.51 3.51))
+   ; How much of the venue it hides: 1 is all of it.
+   (tune_bg_alpha 0.85)
+   (finish_load
+      {gs_band.sld set_num_steps {note_speed stops}}
+      {gs_guitar.sld set_num_steps {note_speed stops}}
+      {gs_sfx.sld set_num_steps 31}
+   )
+   (enter
+      ; In a song it is under Settings, and named for what it holds.
+      {gs_title.lbl set_localized {if_else {== {$this name} pause_game_settings_panel} "GAME" "GAME SETTINGS"}}
+      {stereo.chk set_showing FALSE}
+      ; The stereo row is put away, and the two more GH1's scene has for
+      ; playing left handed. Each leads to itself: up is to whatever leads
+      ; down to the focus, the first the scene lists, and from a row that
+      ; is off to what leads to that, so one left leading to the top row
+      ; stops up from there short of the bottom.
+      {foreach $o (gs_stereo.btn gs_left_p1.btn gs_left_p2.btn)
+         {if {exists $o}
+            {{$this find $o} set_showing FALSE}
+            {{$this find $o} set_state kDisabled}
+            {{$this find $o} set nav_down {$this find $o}}
+         }
+      }
+      {$this lay_out}
+      ; Back from the lag screen in a song, which puts these away
+      ; (options.dta's pause_lag_screen).
+      {if {== {$this name} pause_game_settings_panel}
+         {hud set_showing TRUE}
+         {track_panel set_showing TRUE}
+         {world_panel set_showing TRUE}
+      }
+      {gm_p1.chk set_check {options get_lefty 0}}
+      {gm_p2.chk set_check {options get_lefty 1}}
+      {gm_p2.btn set_state {if_else {$this two_players} kNormal kDisabled}}
+      ; A box has no look for being off: in the colour the scene has for it.
+      {if_else {$this two_players}
+         {slider_scales on gm_p2.chk}
+         {slider_scales off gm_p2.chk {{$this loaded_dir} get disabled_color}}
+      }
+      ; Down the rows and round: GH1's scene links none of its own.
+      {gs_band.sld set nav_down gs_guitar.sld}
+      {gs_guitar.sld set nav_down gs_sfx.sld}
+      {gs_sfx.sld set nav_down gm_p1.btn}
+      {if_else {$this two_players}
+         {gm_p1.btn set nav_down gm_p2.btn}
+         {gm_p1.btn set nav_down gm_lag.btn}
+      }
+      {gm_p2.btn set nav_down gm_lag.btn}
+      {gm_lag.btn set nav_down gs_band.sld}
+      {foreach $row
+         (
+            (gs_band.sld gs_easy.lbl "E/M SPEED" gs_easy.grp)
+            (gs_guitar.sld gs_hard.lbl "H/X SPEED" gs_hard.grp)
+            (gs_sfx.sld gs_length.lbl "HWY LENGTH" gs_length.grp)
+         )
+         {do
+            ($slider {elem $row 0})
+            ($x 0) ($y 0) ($z 0) ($bx 0) ($by 0) ($bz 0) ($first 0) ($second 0)
+            {slider_scales plain $slider}
+            ; A slider's label is a token; one with no string reads as itself.
+            {$slider set text_token {symbol {elem $row 2}}}
+            ; Once for each time the scene loads.
+            {if {! {exists {elem $row 1}}}
+               {do
+                  {gs_band.sld get_local_pos $x $y $first}
+                  {gs_guitar.sld get_local_pos $x $y $second}
+                  {$slider get_local_pos $x $y $z}
+                  {gs_stereo.btn get_local_pos $bx $by $bz}
+                  ; The number rides on its slider, so it is where the track
+                  ; ends in any scene, at the stereo row's depth.
+                  {new BandLabel {elem $row 1}}
+                  {{elem $row 1} copy gs_title.lbl 0}
+                  {{elem $row 1} set_type impactor}
+                  ; In a group that sizes it: the scale's own digits were
+                  ; drawn small, tall and thin.
+                  {new Group {elem $row 3}}
+                  {{elem $row 3} set trans_parent $slider}
+                  {{elem $row 3} set_local_scale [value_squish] 1 [value_shrink]}
+                  {{elem $row 1} set trans_parent {elem $row 3}}
+                  {{elem $row 1} set_local_pos 0 0 0}
+                  ; Not the title's own turn and size, which differ by scene.
+                  {{elem $row 1} set_local_rot 0 0 0}
+                  {{elem $row 1} set_local_scale 1 1 1}
+                  {{elem $row 3} set_local_pos [value_dx] {'-' $by $y} [value_dz]}
+                  {{elem $row 1} set fit_text 0}
+                  {{elem $row 1} set text_size [value_size]}
+                  {{elem $row 1} set alignment 65} ; left, the title's height
+                  ; Each digit a little off its line, as the letters of
+                  ; the game's buttons are (the options rows by 1 and 2).
+                  {{elem $row 1} set deltaZ [value_dip]}
+                  {{elem $row 1} set deltaRot [value_tilt]}
+                  ; No group lists the number, so the scene's dir draws it,
+                  ; in the order of its draws: after the rest, which are at
+                  ; 0 and in no order among themselves.
+                  {{$this find {elem $row 1}} set draw_order 1}
+                  ; Along, to make room for a label longer than the volumes'
+                  ; and the number: by GH1's scene's own where it is that
+                  ; one, which has those rows.
+                  {$slider set_local_pos {'+' $x {if_else {exists gs_left_p1.btn} [shift_gh1] [shift]}} $y $z}
+                  {{$this loaded_dir} sync_objects}
+               }
+            }
+         }
+      }
+      {gs_band.sld set_current {note_speed stop easy}}
+      {gs_guitar.sld set_current {note_speed stop hard}}
+      {gs_sfx.sld set_current {$this length_stop}}
+      {set [at] "gs_band.sld"}
+      ; With one speed to set, the other's row goes: the one left is named
+      ; for what it is and stands in the second row, and every row a row
+      ; higher, so it is the first.
+      {do
+         ($one {$this one_speed})
+         ($x 0) ($y 0) ($z 0)
+         ($view {gs_band.sld get trans_parent})
+         {set [tuning] 0}
+         ; First, as the focus leaving a row puts it back on.
+         {if {== $one hard}
+            {$this set_focus gs_guitar.sld}
+            {set [at] "gs_guitar.sld"}
+         }
+         {foreach $row ((gs_band.sld gs_easy.lbl easy) (gs_guitar.sld gs_hard.lbl hard))
+            {do
+               ($off {&& {!= $one none} {!= $one {elem $row 2}}})
+               ; Back on only from off: the row the focus is on is left lit.
+               {if {!= $off {! {{elem $row 0} showing}}}
+                  {{elem $row 0} set_state {if_else $off kDisabled kNormal}}
+               }
+               {{elem $row 0} set_showing {! $off}}
+               {{elem $row 1} set_showing {! $off}}
+               {if {== $one {elem $row 2}} {{elem $row 0} set text_token {symbol "NOTE SPEED"}}}
+               {{elem $row 0} get_local_pos $x $y $z}
+               {{elem $row 0} set_local_pos $x $y
+                  {if_else {|| {!= $one none} {== {elem $row 2} hard}} {'+' [row_top] [row_gap]} [row_top]}
+               }
+            }
+         }
+         {$view get_local_pos $x $y $z}
+         {$view set_local_pos $x $y
+            {if_else {== $one none} [view_z] {'-' [view_z] {'*' {elem {$this look block} 0} [row_gap]}}}
+         }
+      }
+      {$this sync_look}
+   )
+   ; The rows under the sliders, once for each time the scene loads: left
+   ; handed play, a box for each player on one row, and the lag screen's.
+   ; Each is the stereo row's button or box again, under the sliders' own
+   ; parent, so it stands by them the same in any scene: a row is the
+   ; sliders' own gap, by [pitch]. The parent takes [block], the size of all
+   ; of it.
+   (lay_out
+      {if {! {exists gm_lag.btn}}
+         {do
+            ($x 0) ($y 0) ($z 0) ($sx 0) ($top 0) ($gap 0) ($i 0)
+            ($view {gs_band.sld get trans_parent})
+            {gs_band.sld get_local_pos $sx $y $top}
+            {gs_guitar.sld get_local_pos $x $y $z}
+            {set $gap {'*' [pitch] {'-' $z $top}}}
+            {gs_guitar.sld set_local_pos $x $y {'+' $top $gap}}
+            ; The third under the two, where some scenes have it to one side.
+            {gs_sfx.sld set_local_pos $sx $y {'+' $top {'*' 2 $gap}}}
+            ; A button: its row, where its text starts from the sliders, its
+            ; text. The last is centred on that.
+            {foreach $row [rows]
+               {do
+                  ($b {elem $row 0})
+                  ($l {elem $row 3})
+                  {new {gs_stereo.btn class_name} $b}
+                  {{$this find $b} copy gs_stereo.btn 0}
+                  {{$this find $b} set trans_parent $view}
+                  ; A token with no string reads as itself.
+                  {{$this find $b} set text_token {symbol {elem $row 2}}}
+                  ; Its own size, or where the look gives it a width, drawn
+                  ; in to that: GH1's faces are wide, and its own rows are
+                  ; drawn in so.
+                  {if_else {> {elem {$this look fit} $i} 0}
+                     {do
+                        {{$this find $b} set fit_text 1}
+                        {{$this find $b} set width {elem {$this look fit} $i}}
+                     }
+                     {{$this find $b} set fit_text 0}
+                  }
+                  {{$this find $b} set alignment {if_else {== $i 3} 34 33}}
+                  {{$this find $b} set text_size {if_else {== $i 3} {$this look lag_size} {$this look lefty_size}}}
+                  {{$this find $b} set_local_pos {'+' $sx {elem {$this look text_x} $i}} $y
+                     {'+' {'+' $top {'*' {elem $row 1} $gap}} {$this look text_dz}}}
+                  {{$this find $b} set_showing TRUE}
+                  {{$this find $b} set_state kNormal}
+                  {{$this find $b} set draw_order 1}
+                  ; And a label of the same text in the same place and
+                  ; face, which is what shows of a row in [steady]
+                  ; (sync_rows).
+                  {new BandLabel $l}
+                  {{$this find $l} copy gs_title.lbl 0}
+                  {{$this find $l} set_type {{$this find $b} get_type}}
+                  {{$this find $l} set trans_parent $view}
+                  {{$this find $l} set_local_rot 0 0 0}
+                  {{$this find $l} set_local_scale 1 1 1}
+                  {foreach $prop (fit_text width alignment text_size kerning deltaZ deltaRot)
+                     {{$this find $l} set $prop {{$this find $b} get $prop}}
+                  }
+                  {{$this find $b} get_local_pos $x $y $z}
+                  {{$this find $l} set_local_pos $x $y $z}
+                  {{$this find $l} set draw_order 1}
+                  {set $i {'+' $i 1}}
+               }
+            }
+            {set $i 0}
+            {foreach $box (gm_p1.chk gm_p2.chk)
+               {new {stereo.chk class_name} $box}
+               {{$this find $box} copy stereo.chk 0}
+               {{$this find $box} set trans_parent $view}
+               {{$this find $box} set_local_pos {'+' $sx {elem {$this look box_x} $i}} $y
+                  {'+' {'+' $top {'*' 3 $gap}} {$this look box_dz}}}
+               {{$this find $box} set_showing TRUE}
+               {{$this find $box} set draw_order 1}
+               {set $i {'+' $i 1}}
+            }
+            ; The row's name is no stop: it leads to itself, and nothing to it.
+            {gm_lefty.btn set nav_down gm_lefty.btn}
+            {$view get_local_pos $x $y $z}
+            {$view set_local_pos {'+' $x {elem {$this look block} 1}} $y {'+' $z {elem {$this look block} 2}}}
+            {$view set_local_scale {elem {$this look block} 0} 1 {elem {$this look block} 0}}
+            {set [row_top] $top}
+            {set [row_gap] $gap}
+            {set [view_z] {'+' $z {elem {$this look block} 2}}}
+            {{$this loaded_dir} sync_objects}
+         }
+      }
+   )
+   ; Each number in the colour its track was last drawn in, whatever the
+   ; scene and the state: a frame behind it.
+   (poll {$this sync_numbers} {$this sync_tune})
+   ; Each number as its slider is, and the help bar. A label given a colour
+   ; goes back to its token's text, so the text is set after: as the label
+   ; sets its own, which is what puts its letters off their line.
+   (sync_numbers
+      {foreach $row ((gs_band.sld gs_easy.lbl easy) (gs_guitar.sld gs_hard.lbl hard) (gs_sfx.sld gs_length.lbl length))
+         {do
+            ($tenths
+               {if_else {== {elem $row 2} length}
+                  {highway_length}
+                  {note_speed tenths {elem $row 2}}
+               }
+            )
+            {{elem $row 1} set color {slider_scales colour {elem $row 0}}}
+            {{elem $row 1} set_localized_text {sprintf "%d.%d" {int {/ $tenths 10}} {mod $tenths 10}}}
+         }
+      }
+   )
+   ; GH1's scenes, known by their rows' text, which is centred.
+   (gh1_scene {== {gs_stereo.btn get alignment} 34})
+   ; A measure of the rows' look: the panel's own, or in GH1's scene what
+   ; [gh1] has for it.
+   (look ($key)
+      {if_else {&& {$this gh1_scene} {find_exists [gh1] $key}}
+         {elem {find [gh1] $key} 1}
+         {$this get $key}
+      }
+   )
+   (sync_look
+      {$this sync_numbers}
+      {$this sync_rows}
+      {helpbar set_display
+         {if_else {$this slider_selected}
+            ((fret1 help_confirm) (fret2 help_cancel) (fret3 help_reset) (strum help_updown))
+            {if_else {$this on_slider}
+               ((fret1 help_select) (fret2 help_back) (fret3 help_reset) (strum help_updown))
+               {if_else {== [at] "gm_lag.btn"}
+                  ((fret1 help_select) (fret2 help_back) (strum help_updown))
+                  ((fret1 help_onoff) (fret2 help_back) (strum help_updown))
+               }
+            }
+         }
+      }
+   )
+   (on_slider {|| {== [at] "gs_band.sld"} {== [at] "gs_guitar.sld"} {== [at] "gs_sfx.sld"}})
+   ; The rows under the sliders, each its button or, for one in [steady],
+   ; its label: in the colour the scene has for a row that is lit, off or
+   ; neither, and none of them while a slider is being tuned. The lefty
+   ; row's name is lit with either of its boxes, and P2's is off with one
+   ; player.
+   (sync_rows
+      ; Not before lay_out has made them: the focus is given first.
+      {foreach $row {if_else {exists gm_lag.lbl} [rows] ()}
+         {do
+            ($b {elem $row 0})
+            ($l {elem $row 3})
+            ($steady FALSE)
+            ($dir {$this loaded_dir})
+            {foreach $s [steady] {if {== $s $b} {set $steady TRUE}}}
+            {{$this find $b} set_showing {&& {! $steady} {! [tuning]}}}
+            {{$this find $l} set_showing {&& $steady {! [tuning]}}}
+            {if $steady
+               {{$this find $l} set color
+                  {cond
+                     ({&& {== $b gm_p2.btn} {! {$this two_players}}} {$dir get disabled_color})
+                     ({|| {== [at] {sprint $b}} {&& {== $b gm_lefty.btn} {|| {== [at] "gm_p1.btn"} {== [at] "gm_p2.btn"}}}}
+                        {$dir get focus_color})
+                     (TRUE {$dir get normal_color})
+                  }
+               }
+               ; A label given a colour goes back to its token's text.
+               {{$this find $l} set_localized_text {elem $row 2}}
+            }
+         }
+      }
+   )
+   ; The highway's length is 50 to 200 by fives; one the settings file has
+   ; past that is on the last.
+   (length_stop {min 30 {int {/ {'-' {highway_length} 50} 5}}})
+   ; That slider's setting, put to that stop: when it is another stop, so
+   ; a setting past the last, which the settings file alone can make, is
+   ; kept until its slider is moved.
+   (keep ($slider $stop)
+      {switch $slider
+         (gs_band.sld {if {!= $stop {note_speed stop easy}} {note_speed set_stop easy $stop} {$this retrack}})
+         (gs_guitar.sld {if {!= $stop {note_speed stop hard}} {note_speed set_stop hard $stop} {$this retrack}})
+         (gs_sfx.sld
+            {if {!= $stop {$this length_stop}}
+               {highway_length set {'+' 50 {'*' 5 $stop}}}
+               {ghc_highway}
+               {$this retrack}
+            }
+         )
+      }
+   )
+   ; In a song its tracks are made again as they are set, where the song
+   ; has got to: as the game makes them when its intro is skipped
+   ; (track_panel.dta's intro_skip).
+   (retrack {if {$this in_song} {track_panel intro_skip}})
+   (in_song {== {$this name} pause_game_settings_panel})
+   ; In a song, the one note speed its tracks go by, easy or hard, and the
+   ; other is put away: none where there are both to set, out of a song or
+   ; with two players a pair apart.
+   (one_speed
+      {if_else {$this in_song}
+         {do
+            ($first {>= {game get_difficulty 0} kDifficultyHard})
+            {if_else {&& {> {game num_players} 1} {!= $first {>= {game get_difficulty 1} kDifficultyHard}}}
+               none
+               {if_else $first hard easy}
+            }
+         }
+         none
+      }
+   )
+   ; A slider picked in a song is tuned by eye: the poster, its title and
+   ; every other row go, and the slider stands to the right of the tracks
+   ; until it is let go. What went comes back as the screen is entered.
+   (sync_tune
+      {if {$this in_song}
+         {do
+            ($now {if_else {$this slider_selected} 1 0})
+            {if {!= $now [tuning]}
+               {set [tuning] $now}
+               {$this tune $now}
+            }
+         }
+      }
+   )
+   (tune ($on)
+      {do
+         ($x 0) ($y 0) ($z 0)
+         ($view {gs_band.sld get trans_parent})
+         {foreach $o
+            (gs_tile1.mesh gs_tile2.mesh gs_tile3.mesh gs_tile4.mesh gs_title.lbl gm_p1.chk gm_p2.chk)
+            {if {exists $o} {{$this find $o} set_showing {! $on}}}
+         }
+         {$this sync_rows}
+         {foreach $row ((gs_band.sld gs_easy.lbl easy) (gs_guitar.sld gs_hard.lbl hard) (gs_sfx.sld gs_length.lbl length))
+            {do
+               ($shown
+                  {if_else $on
+                     {== [at] {sprint {elem $row 0}}}
+                     {|| {== {$this one_speed} none} {== {elem $row 2} length} {== {elem $row 2} {$this one_speed}}}
+                  }
+               )
+               {{elem $row 0} set_showing $shown}
+               {{elem $row 1} set_showing $shown}
+            }
+         }
+         {$view get_local_pos $x $y $z}
+         {if $on {set [tune_x] $x}}
+         {$view set_local_pos {if_else $on {'+' $x [tune_dx]} [tune_x]} $y $z}
+         ; Black behind it, to read over the venue: one of the help bar's
+         ; boxes, its middle drawn out to the row's size between its two
+         ; round ends, drawn before the rows. In a Mat of its own: the
+         ; box's picture for its shape, black, a little of the venue left
+         ; through it ([tune_bg_alpha], blended by alpha, 3), and written to
+         ; the depth buffer whatever is there (3), so a venue's focus blur
+         ; leaves the row alone. It stands a little behind the row, whose
+         ; scale is tested against it.
+         {if {! {exists gs_tune_bg.mesh}}
+            ; The middle's Mat and the ends', each the help bar's own again
+            ; and black. The box's picture is half clear, so each is drawn
+            ; three times over, a Mat's next pass being another like it.
+            {foreach $mat
+               (
+                  (gs_tune_bg.mat help_box_mid.mat)
+                  (gs_tune_bg2.mat help_box_mid.mat)
+                  (gs_tune_bg3.mat help_box_mid.mat)
+                  (gs_tune_bgc.mat help_box_corner.mat)
+                  (gs_tune_bgc2.mat help_box_corner.mat)
+                  (gs_tune_bgc3.mat help_box_corner.mat)
+               )
+               {new Mat {elem $mat 0}}
+               {{$this find {elem $mat 0}} copy {helpbar find {elem $mat 1}} 1}
+               {{$this find {elem $mat 0}} set color {pack_color 0 0 0}}
+               {{$this find {elem $mat 0}} set alpha [tune_bg_alpha]}
+               {{$this find {elem $mat 0}} set blend 3}
+               {{$this find {elem $mat 0}} set z_mode 3}
+            }
+            {foreach $mat
+               (
+                  (gs_tune_bg.mat gs_tune_bg2.mat)
+                  (gs_tune_bg2.mat gs_tune_bg3.mat)
+                  (gs_tune_bgc.mat gs_tune_bgc2.mat)
+                  (gs_tune_bgc2.mat gs_tune_bgc3.mat)
+               )
+               {{$this find {elem $mat 0}} set next_pass {$this find {elem $mat 1}}}
+            }
+            ; A part, the help bar's it is, its Mat, and its size: the
+            ; middle's is the row's, an end's [tune_bg_end]'s.
+            {foreach $part
+               (
+                  (gs_tune_bg.mesh help_box_mid.mesh gs_tune_bg.mat)
+                  (gs_tune_bgl.mesh help_box_left.mesh gs_tune_bgc.mat)
+                  (gs_tune_bgr.mesh help_box_right.mesh gs_tune_bgc.mat)
+               )
+               {do
+                  ($mid {== {elem $part 0} gs_tune_bg.mesh})
+                  {new {{helpbar find {elem $part 1}} class_name} {elem $part 0}}
+                  {{$this find {elem $part 0}} copy {helpbar find {elem $part 1}} 1}
+                  {{$this find {elem $part 0}} set_mat {$this find {elem $part 2}}}
+                  {{$this find {elem $part 0}} set trans_parent $view}
+                  {{$this find {elem $part 0}} set_local_rot 0 0 0}
+                  {{$this find {elem $part 0}} set_local_scale
+                     {if_else $mid
+                        {'-' {elem {$this look tune_bg} 2} {/ {'*' 2 {elem [tune_bg_end] 0}} [tune_bg_unit]}}
+                        ; The left end the other way round, its curve outward:
+                        ; the help bar's own is turned so in its scene.
+                        {if_else {== {elem $part 0} gs_tune_bgl.mesh} {'-' 0 {elem [tune_bg_end] 1}} {elem [tune_bg_end] 1}}
+                     }
+                     1
+                     {if_else $mid {elem {$this look tune_bg} 3} {elem [tune_bg_end] 2}}}
+                  {{$this find {elem $part 0}} set draw_order -1}
+               }
+            }
+            {{$this loaded_dir} sync_objects}
+         }
+         {{$this find [at]} get_local_pos $x $y $z}
+         ; An end at the box's left and one at its right, and the middle
+         ; between them: [tune_bg_unit] long before it is drawn out.
+         {foreach $part (gs_tune_bg.mesh gs_tune_bgl.mesh gs_tune_bgr.mesh)
+            {{$this find $part} set_local_pos
+               {'+' {'+' $x {elem {$this look tune_bg} 0}}
+                  {switch $part
+                     ; Turned round, it runs left from where it stands.
+                     (gs_tune_bgl.mesh {elem [tune_bg_end] 0})
+                     (gs_tune_bgr.mesh {'-' {'*' [tune_bg_unit] {elem {$this look tune_bg} 2}} {elem [tune_bg_end] 0}})
+                     {elem [tune_bg_end] 0}
+                  }
+               }
+               {'+' $y 2}
+               {'+' $z {elem {$this look tune_bg} 1}}}
+            {{$this find $part} set_showing $on}
+         }
+      }
+   )
+   (FOCUS_MSG
+      {set [at] {$new_focus name}}
+      {$this sync_look}
+   )
+   ; Sent by the slider each time its value moves (BandSlider::SetCurrent,
+   ; 0x296d18).
+   (slider_start_msg
+      ($component)
+      {$this keep $component {$component current}}
+      {$this sync_look}
+   )
+   (slider_select_cancel
+      ($component)
+      {$component set_current [picked_at]}
+      {$this keep $component [picked_at]}
+      {$this sync_look}
+      kDataUnhandled
+   )
+   (SELECT_START_MSG
+      ; A slider's is the panel's to take; a row's is done here.
+      {if_else {$this on_slider}
+         {do
+            {set [picked_at] {$component current}}
+            {$this sync_look}
+            kDataUnhandled
+         }
+         {do
+            {switch $component
+               ; A track is made the way its player plays (Track::Track reads
+               ; it, 0x14febc), so in a song it turns round as the box does,
+               ; where the game's own Video Settings asked for a restart.
+               (gm_p1.btn {gm_p1.chk toggle} {options set_lefty 0 {gm_p1.chk get_check}} {$this retrack})
+               (gm_p2.btn {gm_p2.chk toggle} {options set_lefty 1 {gm_p2.chk get_check}} {$this retrack})
+               (gm_lag.btn {lag_panel set from_panel $this} {ui goto_screen [lag_screen]})
+            }
+            {synth play_sequence button_toggle}
+            {$this sync_look}
+         }
+      }
+   )
+   (BUTTON_DOWN_MSG
+      {if_else {&& {== $button kPad_Circle} {$this on_slider}}
+         {do
+            ; The game's own: the length's is 110, its twelfth stop past 50.
+            {cond
+               ({== [at] "gs_band.sld"} {gs_band.sld set_current {note_speed reset easy}})
+               ({== [at] "gs_guitar.sld"} {gs_guitar.sld set_current {note_speed reset hard}})
+               (TRUE {gs_sfx.sld set_current 12} {$this keep gs_sfx.sld 12})
+            }
+            {synth play_sequence button_toggle}
+            {$this sync_look}
+         }
+         kDataUnhandled
+      }
+   )
+)
+; Made once, where this is run again.
+{if {! {exists game_settings_screen}}
+{new SliderPanel game_settings_panel
+   (file ui/game_settings.milo)
+   (shift 0)
+   (shift_gh1 -10)
+   (value_dx 147)
+   (value_dz -19)
+   (value_size 42)
+   (value_squish 0.5)
+   (value_shrink 0.72)
+   (value_dip 1)
+   (value_tilt 4)
+   (pitch 0.9)
+   (block (0.88 0 12))
+   (text_x (-124 44 122 35))
+   (box_x (16 94))
+   (text_dz 0)
+   (box_dz 0)
+   (lefty_size 21)
+   (lag_size 30)
+   (fit (0 0 0 0))
+   (gh1 ((lefty_size 30) (lag_size 44) (fit (100 24 24 250))))
+   (lag_screen lag_screen)
+   ; As the main menu has it for its two-player row (main.dta).
+   (two_players {! {game is_missing_multi_controller}})
+   GAME_SETTINGS_HANDLERS
+}
+{new GHScreen game_settings_screen
+   (panels meta game_settings_panel helpbar)
+   (focus game_settings_panel)
+   (allow_back FALSE)
+   (BUTTON_DOWN_MSG
+      {if {&& {! {game_settings_panel slider_selected}} {== $button kPad_Tri}}
+         {$this backwards_anim}
+         {synth play_sequence button_back.cue}
+         {ui goto_screen options_screen}
+      }
+      kDataUnhandled
+   )
+}
+{new SliderPanel pause_game_settings_panel
+   (file ui/pause_audio_settings.milo)
+   (shift -10)
+   (value_dx 147)
+   (value_dz -17)
+   (value_size 34)
+   (value_squish 0.5)
+   (value_shrink 0.8)
+   (value_dip 1)
+   (value_tilt 4)
+   (pitch 0.9)
+   (block (0.88 0 12))
+   (text_x (-124 44 122 35))
+   (box_x (16 94))
+   (text_dz 0)
+   (box_dz 0)
+   (lefty_size 21)
+   (lag_size 30)
+   (fit (0 0 0 0))
+   (gh1 ((block (0.88 16 -2)) (lefty_size 30) (lag_size 44) (fit (100 24 24 250)) (tune_bg (-183 -5 26.4 1.4))))
+   (lag_screen pause_lag_screen)
+   (two_players {> {game num_players} 1})
+   GAME_SETTINGS_HANDLERS
+}
+{new GHScreen pause_game_settings_screen
+   (panels GAME_PANELS pause_game_settings_panel helpbar)
+   (focus pause_game_settings_panel)
+   (in_game TRUE)
+   (allow_back FALSE)
+   (animate_transition FALSE)
+   (BUTTON_DOWN_MSG
+      {if {&& {! {pause_game_settings_panel slider_selected}} {== $button kPad_Tri}}
+         {ui goto_screen pause_settings_screen}
+      }
+      kDataUnhandled
+   )
+}
+}

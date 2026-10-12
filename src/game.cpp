@@ -1,19 +1,45 @@
 // GH2's hooks, installed once the runtime has loaded a matching executable.
 
 #include "addresses.h"
+#include "disc/ark.h"
+#include "content/band.h"
+#include "content/crowd_cards.h"
+#include "content/focus.h"
+#include "content/floor_spot.h"
+#include "content/encores.h"
+#include "content/quickplay.h"
+#include "content/games.h"
+#include "content/heaps.h"
+#include "content/hidden_guitars.h"
+#include "content/tour_or_higher.h"
+#include "content/locale.h"
+#include "content/outfits.h"
+#include "content/campaigns.h"
+#include "content/setlists.h"
+#include "content/songs.h"
+#include "content/status_line.h"
 #include "ui/fast_boot.h"
 #include "frame_step.h"
 #include "game_overrides.h"
+#include "gh1/face.h"
+#include "gh1/install.h"
+#include "gh80s/install.h"
+#include "gh2x/install.h"
+#include "ui/help_bar.h"
 #include "settings/latency.h"
 #include "ui/locale.h"
 #include "ui/menus.h"
 #include "ui/meta_music.h"
+#include "ui/slider_scale.h"
 #include "movie/movie.h"
+#include "dev/cheats.h"
+#include "note_speed.h"
 #include "dev/null_rnd.h"
 #include "host/pad.h"
 #include "render/mesh_capture.h"
 #include "render/native_cull.h"
 #include "render/native_environ.h"
+#include "render/native_mat.h"
 #include "render/native_mesh.h"
 #include "render/native_particles.h"
 #include "render/native_points.h"
@@ -36,10 +62,25 @@ namespace
 {
     void applySlus21447(PS2Runtime &runtime)
     {
+        gh2::ark::install(runtime, gh2::kSlus21447);
+        gh2::installHeaps();
+        gh2::installGuitarCopy();
+        gh2::installEighties();
+        gh2::installGh1();
+        gh2::installGh2x();
+        gh2::installHiddenGuitars();
+        gh2::installGh1Face(runtime, gh2::kSlus21447);
+        gh2::outfits::install(runtime, gh2::kSlus21447);
+        gh2::band::install(runtime, gh2::kSlus21447);
+        gh2::quickplay::install(runtime, gh2::kSlus21447);
+        gh2::crowd_cards::install(runtime, gh2::kSlus21447);
+        gh2::focus::install(runtime, gh2::kSlus21447);
+        gh2::floor_spot::install(runtime, gh2::kSlus21447);
         gh2::installNullRnd(runtime, gh2::kSlus21447);
         gh2::installNativeRnd(runtime, gh2::kSlus21447);
         gh2::installMeshCapture(runtime, gh2::kSlus21447);
         gh2::installTextureCapture(runtime, gh2::kSlus21447);
+        gh2::installNativeMat(runtime, gh2::kSlus21447);
         gh2::installNativeMesh(runtime, gh2::kSlus21447);
         gh2::installNativeEnviron(runtime, gh2::kSlus21447);
         gh2::installNativeRect(runtime, gh2::kSlus21447);
@@ -51,6 +92,9 @@ namespace
         gh2::installTrackStart(runtime, gh2::kSlus21447);
         gh2::installSustainRelease(runtime, gh2::kSlus21447);
         gh2::installWhammyHold(runtime, gh2::kSlus21447);
+        gh2::installTourOrHigher(runtime, gh2::kSlus21447);
+        gh2::installNoteSpeed(runtime, gh2::kSlus21447);
+        gh2::slider_scale::install(runtime, gh2::kSlus21447);
         gh2::installMovies(runtime, gh2::kSlus21447);
         gh2::installVideoOptions(runtime, gh2::kSlus21447);
         gh2::card::install(runtime, gh2::kSlus21447);
@@ -61,8 +105,19 @@ namespace
         gh2::installPad(runtime, gh2::kSlus21447);
         gh2::installFrameStep(runtime, gh2::kSlus21447);
         gh2::installMenus(runtime);
+        gh2::installHelpBar(runtime, gh2::kSlus21447);
+        // After the help bar, which recolours its scene's own pixels.
+        gh2::installGh2xAssets(runtime, gh2::kSlus21447);
+        gh2::setlists::install(runtime, gh2::kSlus21447);
+        gh2::encores::install(runtime, gh2::kSlus21447);
+        gh2::status_line::install(runtime, gh2::kSlus21447);
+        gh2::songs::install();
+        gh2::locale::install(runtime, gh2::kSlus21447);
+        gh2::games::install(runtime, gh2::kSlus21447);
+        gh2::campaigns::install(runtime, gh2::kSlus21447);
         gh2::scenario::install(runtime, gh2::kSlus21447);
         gh2::transplant::install(runtime, gh2::kSlus21447);
+        gh2::cheats::install(runtime, gh2::kSlus21447);
         gh2::fast_boot::install(runtime, gh2::kSlus21447);
         gh2::seed::install(runtime, gh2::kSlus21447);
     }

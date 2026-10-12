@@ -159,6 +159,36 @@ target_link_libraries(save_test PRIVATE miniz)
 add_executable(releases_test EXCLUDE_FROM_ALL tests/releases_test.cpp src/host/releases.cpp)
 target_include_directories(releases_test PRIVATE src)
 
+# Ogg Vorbis for 360 GH2's .mogg audio: libogg and libvorbis (BSD-3-Clause),
+# the decoder and vorbisfile only. Their own CMake wants an older CMake and
+# an installed Ogg, so their sources are built here (the lists in their
+# CMakeLists.txt); SOURCE_SUBDIR names no CMakeLists.txt, so MakeAvailable
+# only fetches. raylib's bundled stb_vorbis rules that one out: its symbols
+# would clash.
+FetchContent_Declare(ogg
+    GIT_REPOSITORY https://github.com/xiph/ogg.git
+    GIT_TAG e1774cd77f471443541596e09078e78fdc342e4f # v1.3.5
+    SOURCE_SUBDIR none)
+FetchContent_Declare(vorbis
+    GIT_REPOSITORY https://github.com/xiph/vorbis.git
+    GIT_TAG 0657aee69dec8508a0011f47f3b69d7538e9d262 # v1.3.7
+    SOURCE_SUBDIR none)
+FetchContent_MakeAvailable(ogg vorbis)
+file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/ogg/ogg/config_types.h"
+    CONTENT "#ifndef __CONFIG_TYPES_H__\n#define __CONFIG_TYPES_H__\n#include <stdint.h>\n\
+typedef int16_t ogg_int16_t;\ntypedef uint16_t ogg_uint16_t;\ntypedef int32_t ogg_int32_t;\n\
+typedef uint32_t ogg_uint32_t;\ntypedef int64_t ogg_int64_t;\ntypedef uint64_t ogg_uint64_t;\n#endif\n")
+add_library(vorbisfile STATIC)
+target_sources(vorbisfile PRIVATE "${ogg_SOURCE_DIR}/src/bitwise.c" "${ogg_SOURCE_DIR}/src/framing.c")
+foreach(VORBIS_SOURCE mdct smallft block envelope window lsp lpc analysis synthesis psy info floor1 floor0
+        res0 mapping0 registry codebook sharedbook lookup bitrate vorbisfile)
+    target_sources(vorbisfile PRIVATE "${vorbis_SOURCE_DIR}/lib/${VORBIS_SOURCE}.c")
+endforeach()
+target_include_directories(vorbisfile SYSTEM PUBLIC
+    "${ogg_SOURCE_DIR}/include" "${CMAKE_CURRENT_BINARY_DIR}/ogg" "${vorbis_SOURCE_DIR}/include")
+target_include_directories(vorbisfile PRIVATE "${vorbis_SOURCE_DIR}/lib")
+set_target_properties(vorbisfile PROPERTIES C_STANDARD 99)
+
 # Without a disc's generated code, everything above still builds: what CI
 # checks (tools/ghc.py ci).
 file(GLOB GHC_GENERATED_SOURCES CONFIGURE_DEPENDS
@@ -176,22 +206,89 @@ set(GHC_GAME_SOURCES
     src/build_info.cpp
     src/game.cpp
     src/frame_step.cpp
+    src/note_speed.cpp
     src/script.cpp
     src/sustain_release.cpp
     src/track_start.cpp
     src/whammy_hold.cpp
+    src/worker.cpp
+    src/content/band.cpp
+    src/content/campaigns.cpp
+    src/content/card.cpp
+    src/content/crowd_cards.cpp
+    src/content/focus.cpp
+    src/content/floor_spot.cpp
+    src/content/encores.cpp
+    src/content/quickplay.cpp
+    src/content/games.cpp
+    src/content/heaps.cpp
+    src/content/locale.cpp
+    src/content/mogg.cpp
+    src/content/hidden_guitars.cpp
+    src/content/outfits.cpp
+    src/content/payouts.cpp
+    src/content/setlists.cpp
+    src/content/songs.cpp
+    src/content/status_line.cpp
+    src/content/tour_or_higher.cpp
+    src/dev/cheats.cpp
     src/dev/draw_dump.cpp
     src/dev/mesh_packet.cpp
     src/dev/null_rnd.cpp
     src/dev/scenario.cpp
     src/dev/seed.cpp
     src/dev/transplant.cpp
+    src/disc/ark.cpp
+    src/disc/crypt.cpp
     src/disc/disc.cpp
     src/disc/sha1.cpp
+    src/disc/volume.cpp
+    src/formats/bitmap.cpp
+    src/formats/dtb.cpp
+    src/formats/dtb_text.cpp
+    src/formats/dxt.cpp
+    src/formats/midi.cpp
+    src/gh1/band.cpp
+    src/gh1/cameras.cpp
+    src/gh1/career.cpp
+    src/gh1/clip_set.cpp
+    src/gh1/clips.cpp
+    src/gh1/crowd.cpp
+    src/gh1/face.cpp
+    src/gh1/guitars.cpp
+    src/gh1/install.cpp
+    src/gh1/look.cpp
+    src/gh1/menu_scripts.cpp
+    src/gh1/menus.cpp
+    src/gh1/rig.cpp
+    src/gh1/scene.cpp
+    src/gh1/screen.cpp
+    src/gh1/screen_gh2.cpp
+    src/gh1/screen_objects.cpp
+    src/gh1/screen_pictures.cpp
+    src/gh1/screen_widgets.cpp
+    src/gh1/screens.cpp
+    src/gh1/scripts.cpp
+    src/gh1/sound.cpp
+    src/gh1/songs.cpp
+    src/gh1/venue_scene.cpp
+    src/gh1/venues.cpp
+    src/gh2x/classes.cpp
+    src/gh2x/focus.cpp
+    src/gh2x/install.cpp
+    src/gh2x/models.cpp
+    src/gh2x/scene.cpp
+    src/gh2x/shadows.cpp
+    src/gh2x/textures.cpp
+    src/gh2x/track.cpp
+    src/gh80s/install.cpp
+    src/milo/milo.cpp
+    src/milo/objects.cpp
     src/movie/movie.cpp
     src/movie/pss.cpp
     src/movie/screen.cpp
     src/save/card.cpp
+    src/save/gh1_stream.cpp
     src/save/gh2_stream.cpp
     src/save/gh2_text.cpp
     src/save/ps2_card.cpp
@@ -206,8 +303,10 @@ set(GHC_GAME_SOURCES
     src/synth/synth.cpp
     src/ui/fast_boot.cpp
     src/ui/locale.cpp
+    src/ui/help_bar.cpp
     src/ui/menus.cpp
     src/ui/meta_music.cpp
+    src/ui/slider_scale.cpp
     src/host/audio.cpp
     src/host/bind.cpp
     src/host/bindings.cpp
@@ -221,6 +320,7 @@ set(GHC_GAME_SOURCES
     src/host/scene_renderer.cpp
     src/render/camera.cpp
     src/render/frame.cpp
+    src/render/look.cpp
     src/render/mesh_capture.cpp
     src/render/native_cull.cpp
     src/render/native_environ.cpp
@@ -231,6 +331,7 @@ set(GHC_GAME_SOURCES
     src/render/native_rect.cpp
     src/render/native_rnd.cpp
     src/render/texture_capture.cpp
+    src/render/texture_store.cpp
 )
 
 add_executable(GHClassic
@@ -243,10 +344,16 @@ add_executable(GHClassic
 set(GHC_SHADER_DIR "${CMAKE_CURRENT_BINARY_DIR}/shaders")
 file(MAKE_DIRECTORY "${GHC_SHADER_DIR}")
 set(GHC_SHADER_HEADERS)
-foreach(SHADER mesh.vert mesh.frag)
+foreach(SHADER mesh.vert mesh.frag x360.vert x360.frag post.vert post.frag)
     string(REPLACE "." "_" SHADER_ID "${SHADER}")
-    string(REPLACE "mesh_vert" "kMeshVert" SHADER_VAR "${SHADER_ID}")
-    string(REPLACE "mesh_frag" "kMeshFrag" SHADER_VAR "${SHADER_VAR}")
+    string(REPLACE "." ";" SHADER_PARTS "${SHADER}")
+    set(SHADER_VAR "k")
+    foreach(PART ${SHADER_PARTS})
+        string(SUBSTRING "${PART}" 0 1 FIRST)
+        string(SUBSTRING "${PART}" 1 -1 REST)
+        string(TOUPPER "${FIRST}" FIRST)
+        string(APPEND SHADER_VAR "${FIRST}${REST}")
+    endforeach()
     set(SHADER_HEADER "${GHC_SHADER_DIR}/${SHADER_ID}.h")
     add_custom_command(
         OUTPUT "${SHADER_HEADER}"
@@ -256,6 +363,14 @@ foreach(SHADER mesh.vert mesh.frag)
         VERBATIM)
     list(APPEND GHC_SHADER_HEADERS "${SHADER_HEADER}")
 endforeach()
+# post.frag again, reading a multisampled depth buffer (kPostMsFrag).
+add_custom_command(
+    OUTPUT "${GHC_SHADER_DIR}/post_ms_frag.h"
+    COMMAND glslang-standalone -V -DMULTISAMPLED --vn kPostMsFrag -o "${GHC_SHADER_DIR}/post_ms_frag.h"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/host/shaders/post.frag"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/host/shaders/post.frag" glslang-standalone
+    VERBATIM)
+list(APPEND GHC_SHADER_HEADERS "${GHC_SHADER_DIR}/post_ms_frag.h")
 add_custom_target(GHClassic_shaders DEPENDS ${GHC_SHADER_HEADERS})
 add_dependencies(GHClassic GHClassic_shaders)
 target_include_directories(GHClassic PRIVATE "${GHC_SHADER_DIR}")
@@ -269,10 +384,29 @@ file(READ src/ui/dta/main_menu.dta GHC_MAIN_MENU_DTA)
 file(READ src/ui/dta/fast_boot.dta GHC_FAST_BOOT_DTA)
 file(READ src/ui/dta/locale.dta GHC_LOCALE_DTA)
 file(READ src/ui/dta/crowd.dta GHC_CROWD_DTA)
+file(READ src/ui/dta/sel_character.dta GHC_SEL_CHARACTER_DTA)
+file(READ src/ui/dta/quickplay.dta GHC_QUICKPLAY_DTA)
+file(READ src/ui/dta/campaigns.dta GHC_CAMPAIGNS_DTA)
+file(READ src/gh1/menus.dta GHC_GH1_MENUS_DTA)
+file(READ src/gh1/scripts.dta GHC_GH1_SCRIPTS_DTA)
+file(READ src/content/guitar_copy.dta GHC_GUITAR_COPY_DTA)
+file(READ src/ui/dta/picker.dta GHC_PICKER_DTA)
+file(READ src/ui/dta/quickplay_pickers.dta GHC_QUICKPLAY_PICKERS_DTA)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     src/ui/dta/lag_panel.dta src/ui/dta/highscore_panel.dta src/ui/dta/main_menu.dta src/ui/dta/fast_boot.dta
-    src/ui/dta/locale.dta src/ui/dta/crowd.dta)
+    src/ui/dta/locale.dta src/ui/dta/crowd.dta src/ui/dta/sel_character.dta src/ui/dta/quickplay.dta
+    src/ui/dta/campaigns.dta src/gh1/menus.dta src/gh1/scripts.dta src/ui/dta/picker.dta src/ui/dta/quickplay_pickers.dta
+    src/content/guitar_copy.dta src/ui/dta/game_settings.dta)
+file(READ src/ui/dta/game_settings.dta GHC_GAME_SETTINGS_DTA)
 configure_file(src/ui/dta/dta.h.in "${GHC_DTA_DIR}/dta.h" @ONLY)
+file(READ config/settings.template.ini GHC_SETTINGS_TEMPLATE)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS config/settings.template.ini)
+configure_file(src/settings/settings_template.h.in "${GHC_DTA_DIR}/settings_template.h" @ONLY)
+# The old Flying V layout's texel table (gh1/guitars.h), as a byte array.
+file(READ src/gh1/flyingv_old_layout.bin GHC_FLYINGV_OLD_LAYOUT HEX)
+string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_FLYINGV_OLD_LAYOUT "${GHC_FLYINGV_OLD_LAYOUT}")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS src/gh1/flyingv_old_layout.bin)
+configure_file(src/gh1/flyingv_old_layout.h.in "${GHC_DTA_DIR}/flyingv_old_layout.h" @ONLY)
 target_include_directories(GHClassic PRIVATE "${GHC_DTA_DIR}")
 
 # What the build is (src/build_info.h), from tools/ghc.py: the tag it was made
@@ -290,6 +424,38 @@ if(GHC_EXPERIMENTAL)
 endif()
 set_source_files_properties(src/build_info.cpp PROPERTIES
     COMPILE_DEFINITIONS "GHC_VERSION=\"${GHC_VERSION}\";GHC_BUILT=\"${GHC_BUILT}\";GHC_EXPERIMENTAL=${GHC_EXPERIMENTAL_VALUE}")
+
+# Every supported release in config/executables.toml (role engine or
+# content) as {game, serial} for content/games.cpp, a PS2 serial as
+# SYSTEM.CNF boots it (SLUS-21224 is SLUS_212.24); editing it reconfigures.
+file(STRINGS config/executables.toml GHC_TOML_LINES)
+set(GHC_RELEASES "")
+set(GHC_RELEASE_KIND "")
+foreach(LINE IN LISTS GHC_TOML_LINES ITEMS "[[end]]")
+    if(LINE MATCHES "^\\[\\[(.*)\\]\\]$")
+        set(GHC_NEXT_KIND "${CMAKE_MATCH_1}")
+        if(GHC_RELEASE_KIND STREQUAL "release" AND GHC_RELEASE_ROLE MATCHES "^(engine|content)$")
+            string(REGEX REPLACE "^([A-Z]+)-([0-9][0-9][0-9])([0-9][0-9])$" "\\1_\\2.\\3"
+                GHC_RELEASE_SERIAL "${GHC_RELEASE_SERIAL}")
+            string(APPEND GHC_RELEASES "    {\"${GHC_RELEASE_GAME}\", \"${GHC_RELEASE_SERIAL}\"},\n")
+        endif()
+        set(GHC_RELEASE_KIND "${GHC_NEXT_KIND}")
+        set(GHC_RELEASE_GAME "")
+        set(GHC_RELEASE_SERIAL "")
+        set(GHC_RELEASE_ROLE "")
+    elseif(LINE MATCHES "^(game|serial|role) = \"(.*)\"$")
+        string(TOUPPER "${CMAKE_MATCH_1}" GHC_FIELD)
+        if(GHC_FIELD STREQUAL "GAME")
+            set(GHC_RELEASE_GAME "${CMAKE_MATCH_2}")
+        elseif(GHC_FIELD STREQUAL "SERIAL")
+            set(GHC_RELEASE_SERIAL "${CMAKE_MATCH_2}")
+        else()
+            set(GHC_RELEASE_ROLE "${CMAKE_MATCH_2}")
+        endif()
+    endif()
+endforeach()
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS config/executables.toml)
+file(CONFIGURE OUTPUT "${GHC_DTA_DIR}/releases.inc" CONTENT "${GHC_RELEASES}")
 
 # The window icons, where SDL_GetBasePath finds them. On macOS the game is an
 # app bundle, so other apps (Finder, audio mixers) see its icon too, and the
@@ -313,14 +479,17 @@ endif()
 # Unity batches are for the generated code; game files stay separate units.
 set_source_files_properties(${GHC_GAME_SOURCES} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 
-target_include_directories(GHClassic PRIVATE "${GHC_GENERATED_DIR}" src)
+# miniz comes with libchdr; its target leaves out its own include path.
+target_include_directories(GHClassic PRIVATE "${GHC_GENERATED_DIR}" src lib/libchdr/deps/miniz-3.1.2)
 target_link_libraries(GHClassic PRIVATE
+    miniz
     ps2_runtime
     SDL3::SDL3
     volk::volk
     vk-bootstrap::vk-bootstrap
     GPUOpen::VulkanMemoryAllocator
     mpeg2
+    vorbisfile
     miniz # libchdr's, for save.bin
 )
 # Calls go through volk's pointers, never a linked loader.

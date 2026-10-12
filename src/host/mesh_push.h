@@ -25,6 +25,21 @@ namespace gh2
     constexpr uint32_t kFlagSphere = 1u << 10;   // the tex gen block is the sphere one's
     constexpr uint32_t kFlagSpread = 1u << 11;   // sampled as the mean of four, matColor.xy apart in uv
     constexpr uint32_t kFlagSetAlpha = 1u << 12; // alpha written as 1, as FBA does to an unblended pixel
+    constexpr uint32_t kFlagVertDyn = 1u << 13;  // a light's colour is scaled by the vertex colour, not the material's
+    constexpr uint32_t kFlagDecal = 1u << 14;    // GS DECAL texturing in place of modulate
+    constexpr uint32_t kFlagAdd16 = 1u << 15;    // an add as a 16-bit frame keeps it under dither
+    // x360.vert and x360.frag's, which take kFlagPrelit, kFlagAlphaCut and
+    // kFlagSetAlpha as above, and lightBase as their block.
+    constexpr uint32_t kFlagNormalMap = 1u << 16;
+    constexpr uint32_t kFlagSpecularMap = 1u << 17;
+    constexpr uint32_t kFlagGlowMap = 1u << 18;
+    constexpr uint32_t kFlagRamp = 1u << 19;      // the diffuse ramp in place of n . l
+    constexpr uint32_t kFlagCube = 1u << 20;      // a cube map in place of the lights' specular
+    constexpr uint32_t kFlagNormalize = 1u << 21; // normal, tangent and bitangent made unit length first
+    constexpr uint32_t kFlagShadow = 1u << 22;    // its first light is cut by a shadow map
+    // mesh.frag's again: the alpha cut is at a half, for a rendered
+    // texture's card in a picture larger than its machine's.
+    constexpr uint32_t kFlagCutHalf = 1u << 23;
 
     struct PushConstants
     {
@@ -36,6 +51,7 @@ namespace gh2
         int32_t lightBase; // the draw's lighting block in the frame data
         uint32_t flags;    // ColorMode in bits 0-2, then the kFlag bits and the skin bones
         int32_t envBase;   // the draw's environ, projected or sphere tex gen block in the frame data, -1 for none
+        int32_t fogBase;   // the draw's fog block in the frame data, -1 for none: (start, end), then the colour
     };
     static_assert(sizeof(PushConstants) <= 128, "past Vulkan's guaranteed push constant size");
 

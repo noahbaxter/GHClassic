@@ -3,7 +3,9 @@
 
     tools/disc.py identify [--image-hash] <image-or-elf>...
     tools/disc.py extract <image> <path-on-disc> <out>
-    tools/disc.py find <serial> <path>...    print the first image of that release
+    tools/disc.py find <serial|game> <path>...  print the first image of that
+                                             release, or of any of a game's
+                                             content releases (gh1)
     tools/disc.py boot-elf <image-or-elf> <out>  extract the boot executable (or take
                                              one already extracted, named as on the
                                              disc), refusing anything but a known
@@ -206,6 +208,21 @@ class Image:
             lba, length = self._find(lba, length, part, want_dir=i < len(parts) - 1)
         return self._read(lba, length)
 
+    def walk(self, lba=None, length=None, prefix=""):
+        """(path, lba, length) for every file, depth first."""
+        if lba is None:
+            lba, length = self._root()
+        for name, ent_lba, ent_len, is_dir in self._entries(lba, length):
+            if is_dir:
+                yield from self.walk(ent_lba, ent_len, f"{prefix}{name}/")
+            else:
+                yield f"{prefix}{name}", ent_lba, ent_len
+
+    def read_range(self, lba, offset, size):
+        """`size` bytes from `offset` into the file starting at sector `lba`."""
+        skip = offset % SECTOR
+        return self._read(lba + offset // SECTOR, skip + size)[skip:]
+
     def boot_name(self):
         for line in self.read("SYSTEM.CNF").decode("latin-1").splitlines():
             if line.strip().startswith("BOOT2"):
@@ -237,6 +254,37 @@ def identify_bytes(data):
     """An executable's SHA-1 and its known entry, or None."""
     sha1 = hashlib.sha1(data).hexdigest()
     return sha1, lookup(sha1)
+
+
+def xbox_title_id(path):
+    """An Xbox 360 disc image's title ID ("415607E7"), else None. As
+    src/disc/volume.cpp reads it: XDVDFS's root directory, then
+    default.xex's execution info."""
+    if Path(path).suffix.lower() != ".iso":
+        return None
+    with open(path, "rb") as f:
+        def read(offset, size):
+            f.seek(offset)
+            return f.read(size)
+
+        base = next((b for b in (0xFD90000, 0x2080000, 0x18300000, 0)
+                     if read(b + 32 * SECTOR, 20) == b"MICROSOFT*XBOX*MEDIA"), None)
+        if base is None:
+            return None
+        root, size = struct.unpack("<II", read(base + 32 * SECTOR + 20, 8))
+        listing = read(base + root * SECTOR, size)
+        at = listing.find(b"\x0bdefault.xex")
+        if at < 13:
+            return None
+        start, length = struct.unpack_from("<II", listing, at - 9)
+        xex = read(base + start * SECTOR, min(length, 0x10000))
+        if xex[:4] != b"XEX2":
+            return None
+        for i in range(struct.unpack_from(">I", xex, 0x14)[0]):
+            key, value = struct.unpack_from(">II", xex, 0x18 + 8 * i)
+            if key == 0x00040006:
+                return f"{struct.unpack_from('>I', xex, value + 12)[0]:08X}"
+    return None
 
 
 def release(boot_name):
@@ -299,7 +347,16 @@ def main():
         with Image(args[1]) as img:
             Path(args[3]).write_bytes(img.read(args[2]))
     elif args[:1] == ["find"] and len(args) >= 3:
+        # A game (gh1) is any of its content releases; else one serial.
+        serials = [r["serial"] for r in known("release")
+                   if r.get("game") == args[1] and r.get("role") == "content"] or [args[1]]
         for path in (p for p in args[2:] if is_image(p)):
+            title_id = xbox_title_id(path)
+            if title_id in serials:
+                print(path)
+                return
+            if title_id:
+                continue
             # One unreadable image (another layout, a damaged dump) must not
             # hide the rest.
             try:
@@ -308,7 +365,7 @@ def main():
             except (OSError, ValueError) as error:
                 print(f"skipping {error}", file=sys.stderr)
                 continue
-            if rel and rel["serial"] == args[1]:
+            if rel and rel["serial"] in serials:
                 print(path)
                 return
         sys.exit(f"no {args[1]} image among the given paths")

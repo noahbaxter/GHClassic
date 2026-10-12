@@ -172,7 +172,7 @@ namespace gh2
     {
         s_addresses = &addresses;
         script::addCommand("latency", latencyCommand);
-        script::runWhenUiReady(kLagPanelDta);
+        script::patchUi(kLagPanelDta);
         EntryHook<SetSyncOffsetTag>::install(runtime, addresses.optionsSetSyncOffset, onSetSyncOffset);
         EntryHook<BeatMatchTag>::install(runtime, addresses.beatMatchCtor, onBeatMatch);
         s_getSongMs = runtime.lookupFunction(addresses.playerMatcherGetSongMs);

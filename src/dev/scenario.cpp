@@ -1,5 +1,6 @@
 #include "dev/scenario.h"
 
+#include "content/games.h"
 #include "dev/transplant.h"
 #include "frame_step.h"
 #include "dev/draw_dump.h"
@@ -8,6 +9,7 @@
 #include "hook.h"
 #include "host/pad.h"
 #include "host/vulkan_frontend.h"
+#include "milo/layout.h"
 #include "movie/movie.h"
 #include "script.h"
 
@@ -253,6 +255,8 @@ namespace gh2::scenario
                 else if (verb == "stall")
                     // A hitch: the game thread stops while audio plays on.
                     std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(array.number(1) * 1000.0f)));
+                else if (verb == "still")
+                    freezeFrameSteps();
                 else if (verb == "freeze")
                 {
                     s_uiSeconds = array.number(1);
@@ -315,11 +319,45 @@ namespace gh2::scenario
                     std::memcpy(&f, &word, sizeof(f));
                     std::cerr << "[scenario] peek " << word << " " << f << std::endl;
                 }
+                else if (verb == "cam")
+                {
+                    // A Cam's world transform, three rows then where it is,
+                    // and its y fov. A script names its Hmx::Object, which
+                    // the RndCam's first word points to from 0x320 bytes at
+                    // most before it.
+                    const uint32_t object = array.arg(2).value;
+                    uint32_t cam = 0u;
+                    for (uint32_t back = 4u; object > 0x320u && back <= 0x320u; back += 4u)
+                        if (gh2::load<uint32_t>(rdram, object - back) == object)
+                            cam = object - back;
+                    std::cerr << "[scenario] cam " << array.symbol(1);
+                    for (uint32_t i = 0; cam != 0u && i < 16u; ++i)
+                        if (i % 4u != 3u)
+                            std::cerr << " " << gh2::load<float>(rdram, cam + milo::transformable::kWorld + i * 4u);
+                    if (cam != 0u)
+                        std::cerr << " " << gh2::load<float>(rdram, cam + milo::camera::kYFov);
+                    std::cerr << std::endl;
+                }
                 else if (verb == "dump")
                 {
-                    requestDrawDump(array.symbol(1));
+                    // A frame built whole after this, so its draws have
+                    // their names.
+                    requestDrawDump(array.symbol(1), building().serial + 1u);
                     s_shooting = true;
                     return;
+                }
+                else if (verb == "needs")
+                {
+                    std::string missing;
+                    for (int j = 1; j < array.size(); ++j)
+                        if (!games::mounted(array.symbol(j)))
+                            missing += (missing.empty() ? "" : " ") + array.symbol(j);
+                    if (!missing.empty())
+                    {
+                        std::cerr << "[scenario] SKIP: needs " << missing << std::endl;
+                        quit();
+                        return;
+                    }
                 }
                 else if (verb == "quit")
                 {

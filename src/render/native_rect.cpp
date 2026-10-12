@@ -24,18 +24,35 @@
 #include "ps2_runtime_macros.h"
 #include "render/camera.h"
 #include "render/frame.h"
+#include "render/look.h"
 #include "render/native_mat.h"
 
+#include <algorithm>
+#include <cstring>
+#include <iterator>
 #include <memory>
 
 namespace gh2
 {
     namespace
     {
+        const Addresses *s_addresses = nullptr;
+
         void readColor(uint8_t *rdram, uint32_t address, float out[4])
         {
             for (uint32_t i = 0; i < 4; ++i)
                 out[i] = load<float>(rdram, address + i * 4u);
+        }
+
+        // One of the Mats the track's far-end strip is drawn with.
+        bool stripMat(uint8_t *rdram, uint32_t mat)
+        {
+            const uint32_t name = load<uint32_t>(rdram, mat + milo::object::kName);
+            if (name == 0u)
+                return false;
+            const char *text = reinterpret_cast<const char *>(getMemPtr(rdram, name));
+            return std::any_of(std::begin(look::kStripMats), std::end(look::kStripMats),
+                               [&](const char *strip) { return std::strcmp(text, strip) == 0; });
         }
 
         void drawRect(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
@@ -54,7 +71,7 @@ namespace gh2
             const float y = load<float>(rdram, rect + 0x4u);
             const float w = load<float>(rdram, rect + 0x8u);
             const float h = load<float>(rdram, rect + 0xcu);
-            if (width <= 0.0f || height <= 0.0f)
+            if (width <= 0.0f || height <= 0.0f || (mat != 0u && look::trackFades() && stripMat(rdram, mat)))
             {
                 ctx->pc = returnTo;
                 return;
@@ -103,6 +120,7 @@ namespace gh2
             DrawCall draw;
             draw.mesh = mesh;
             draw.screen = true;
+            draw.under = load<uint32_t>(rdram, s_addresses->rndCamCurrent);
             draw.camera = internCamera(Camera{}); // the whole screen: the verts are in clip space
             draw.world = identity();
             draw.lightWorld = identity();
@@ -121,6 +139,9 @@ namespace gh2
                 draw.material.prelit = true;
                 if (draw.material.texGen != milo::mat::kTexGenXfm && draw.material.texGen != milo::mat::kTexGenXfmOrigin)
                     draw.material.texGen = milo::mat::kTexGenNone;
+                // Track::Draw adds 5 of 255 over the highway's far end, which
+                // retail's 16-bit frame mostly rounds away.
+                draw.material.add16 = draw.material.blend == milo::mat::kBlendAdd;
                 building().draws.push_back(draw);
             }
             ctx->pc = returnTo;
@@ -129,6 +150,7 @@ namespace gh2
 
     void installNativeRect(PS2Runtime &runtime, const Addresses &addresses)
     {
+        s_addresses = &addresses;
         runtime.replaceFunction(addresses.psRndDrawRect, drawRect);
     }
 }

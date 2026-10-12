@@ -54,6 +54,6 @@ namespace gh2::fast_boot
         EntryHook<GhUtlInitTag>::install(runtime, addresses.ghUtlInit, skipSpin);
         EntryHook<ScanCheckTag>::install(runtime, addresses.progressiveScanCheck, skipSpin);
         runtime.replaceFunction(addresses.splashShow, skipShow);
-        script::runWhenUiReady(kFastBootDta);
+        script::patchUi(kFastBootDta);
     }
 }

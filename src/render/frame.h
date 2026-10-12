@@ -72,7 +72,40 @@ namespace gh2
             uint32_t height = 0;
         };
         std::vector<ScreenCopy> copies;
+        // Drawn with the 360's shading and post (settings' lighting), which
+        // can change from one song to the next.
+        bool hdLighting = false;
+        // A venue drew into it. The 360's post stage is the venue's (only
+        // its venues' scenes have a PostProc): a menu with a character in
+        // it has none.
+        bool venue = false;
+        // The 360's luminance map for its post stage, null for none
+        // (render/look.h).
+        std::shared_ptr<const TextureData> luminance;
+        // The 360's depth of field for its post stage, as its shader takes it
+        // (gDepthOfField): the blur of a pixel is its depth on the 360 times
+        // [0] plus [1], either side of 0, held between [2] and [3]. [3] is 0
+        // for none. And the camera it was worked out for (Camera::id).
+        float depthOfField[4] = {};
+        uint32_t focusCamera = 0;
+        // The 360's character shadow maps, one a character: the camera each
+        // is drawn through (index into cameras), which looks from its light.
+        std::vector<uint32_t> shadows;
+        // The shadow map the game is drawing casters into now, -1 for none:
+        // nothing else drawn meanwhile belongs in the picture. And the one
+        // the meshes now drawn are lit under. Both set by whoever makes the
+        // maps (gh2x/shadows.h) and read as each mesh is drawn.
+        int32_t casting = -1;
+        int32_t lit = -1;
     };
+
+    // A shadow map's side, as the 360 has it.
+    constexpr uint32_t kShadowSize = 512u;
+    // Shadow maps a frame; a character past them goes without.
+    constexpr uint32_t kMaxShadows = 8u;
+    // What a shadow map's camera has as its target in place of a RndTex, the
+    // index added: no guest address.
+    constexpr uint32_t kShadowTex = 0x10u;
 
     // Finished frames, oldest first. The game thread publishes at EndDrawing;
     // the host thread shows each once, in order. Game frames finish at uneven

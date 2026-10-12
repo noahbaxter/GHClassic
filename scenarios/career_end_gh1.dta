@@ -1,0 +1,74 @@
+; A GH1 career on medium taken to its end, songs passed by the game's
+; cheats: four of a venue's five open the next, the map opens on each new
+; venue in turn (GameConfig's venue list is the campaign's), and the last
+; venue's fourth song won ends the career with no encore.
+(needs gh1)
+#include common/first_boot.dta
+{set $pick gh1}
+#include common/career_start.dta
+(press green)
+(wait_screen sel_venue_screen 40)
+(wait 1)
+(press green)
+(wait_screen sel_song_screen)
+(wait 1)
+(expect {game get_song} iloverockandroll)
+{foreach $s (iloverockandroll iwannabesedated thunderkiss65 smokeonthewater) {campaign cheat_beat_song $s 100000}}
+(press red)
+(wait_screen sel_venue_screen 40)
+(wait 1)
+(expect {game get_venue} small1)
+(press green)
+(wait_screen sel_song_screen)
+(wait 1)
+(expect {game get_song} ironman)
+{foreach $s (ironman morethanafeeling yougotanotherthingcomin takemeout) {campaign cheat_beat_song $s 100000}}
+(press red)
+(wait_screen sel_venue_screen 40)
+(wait 1)
+(expect {game get_venue} big)
+(press green)
+(wait_screen sel_song_screen)
+(wait 1)
+(expect {game get_song} killerqueen)
+{foreach $s (killerqueen heyyou stellar heartfullofblack) {campaign cheat_beat_song $s 100000}}
+(press red)
+(wait_screen sel_venue_screen 40)
+(wait 1)
+(expect {game get_venue} theatre)
+(press green)
+(wait_screen sel_song_screen)
+(wait 1)
+(expect {game get_song} ziggystardust)
+{foreach $s (ziggystardust fatlip cochise takeitoff) {campaign cheat_beat_song $s 100000}}
+(press red)
+(wait_screen sel_venue_screen 40)
+(wait 1)
+(expect {game get_venue} fest)
+(press green)
+(wait_screen sel_song_screen)
+(wait 1)
+(expect {game get_song} spanishcastlemagic)
+{foreach $s (spanishcastlemagic higherground nooneknows aceofspades) {campaign cheat_beat_song $s 100000}}
+(press red)
+(wait_screen sel_venue_screen 40)
+(wait 1)
+(expect {game get_venue} arena)
+(press green)
+(wait_screen sel_song_screen)
+(wait 1)
+(expect {game get_song} godzilla)
+{foreach $s (godzilla texasflood frankenstein) {campaign cheat_beat_song $s 100000}}
+{set $index 3}
+#include common/career_song.dta
+(expect {gamecfg get_song} cowboysfromhell)
+(wait 3)
+{player0 win 5}
+(wait 12)
+(press green)
+(wait 6)
+(shot won)
+(press green)
+(wait 6)
+(expect {campaigns progress gh1 0} 80)
+(quit)

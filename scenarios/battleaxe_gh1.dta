@@ -1,0 +1,70 @@
+; GH1's Battle Axe (gh1/career.cpp, gh1/menus.dta): no band's in a new
+; career, and won by beating the career on expert, on the second page of
+; its win screen with the guitar turning on it.
+(needs gh1)
+#include common/first_boot.dta
+{set $pick gh1}
+#include common/career_start.dta
+(expect {campaign is_unlocked battleaxe} 0)
+(expect {localize battleaxe} "Battle Axe")
+(expect {localize battleaxe_desc} "Judge this race not by its remains.")
+; The same band's expert career.
+{ui goto_screen sel_difficulty_screen}
+(wait_screen sel_difficulty_screen)
+(wait 1)
+(press down)
+(press down)
+(press green)
+(wait_screen sel_character_new_screen)
+(wait_until {char_single are_chars_loaded})
+(wait 1)
+(press green)
+(wait_screen sel_guitar_new_screen)
+(wait 3)
+(press green)
+(wait_screen career_screen 40)
+(wait 1)
+(expect {game get_difficulty 0} 3)
+(expect {campaign is_unlocked battleaxe} 0)
+{foreach $s
+   (iloverockandroll iwannabesedated thunderkiss65 smokeonthewater infected
+      ironman morethanafeeling yougotanotherthingcomin takemeout sharpdressedman
+      killerqueen heyyou stellar heartfullofblack symphofdestruction
+      ziggystardust fatlip cochise takeitoff unsung
+      spanishcastlemagic higherground nooneknows aceofspades crossroads
+      godzilla texasflood frankenstein cowboysfromhell)
+   {campaign cheat_beat_song $s 100000}}
+(press green)
+(wait_screen sel_venue_screen 40)
+(wait 1)
+{game set_venue arena}
+{ui goto_screen sel_song_screen}
+(wait_screen sel_song_screen)
+(wait 1)
+{set $index 4}
+#include common/career_song.dta
+(expect {gamecfg get_song} barkatthemoon)
+(wait 3)
+{player0 win 5}
+(wait_screen win_game_screen 60)
+(wait_until {win_game_screen can_continue} 30)
+(wait 1)
+(shot won)
+(expect {campaign is_unlocked battleaxe} 0)
+(press green)
+(wait 0.5)
+(shot to_white)
+(wait 6)
+(shot battleaxe)
+(expect {campaign is_unlocked battleaxe} 1)
+(wait 2)
+(press green)
+(wait 6)
+; In the band's guitars from then on.
+{ui goto_screen sel_guitar_new_screen}
+(wait_screen sel_guitar_new_screen)
+(wait 2)
+(press up)
+(wait 2)
+(shot picker)
+(quit)

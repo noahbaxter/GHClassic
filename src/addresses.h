@@ -21,10 +21,21 @@ namespace gh2
         uint32_t gamePanelExit;
         uint32_t winCampaignSong; // GameConfig::WinCampaignSong
         uint32_t psMeshSync;
-        uint32_t psMeshFixVerts;
+        uint32_t psMeshUpdateFacePacket;
+        uint32_t psMeshCopy;
         uint32_t psMeshDestroy;
+        uint32_t psRndSyncFree; // PsRnd::SyncFree(MemHandle *)
+        uint32_t thePsRnd;
+        uint32_t meshStrips; // the list of strips RndMesh::Load read, a mesh's face groups in order
+        uint32_t memFree;
+        uint32_t memOrPoolFree;
         uint32_t psMeshDrawShowing;
         uint32_t psMultiMeshDrawShowing;
+        uint32_t characterDrawShadowBuffer; // Character::DrawShadowBuffer
+        uint32_t rndSetShadowMap;           // Rnd::SetShadowMap, which PsRnd leaves as it is
+        uint32_t charTrackSurfaceSetCharTexture; // CharTrackSurface::SetCharTexture(RndMat *)
+        uint32_t playerMatcherOnStartStarpower;  // PlayerMatcher::OnStartStarpower
+        uint32_t playerMatcherOnStopStarpower;   // PlayerMatcher::OnStopStarpower
         uint32_t psParticleSysDrawShowing;
         uint32_t updateRelativeXfm; // RndParticleSys::UpdateRelativeXfm
         uint32_t psEnvironSelect;
@@ -32,8 +43,12 @@ namespace gh2
         uint32_t psTexDestroy;
         uint32_t psTexCopyFromScreen;
         uint32_t rndTextDrawShowing;
+        uint32_t camShotFrameInterp;       // CamShotFrame::Interp
+        uint32_t camShotFrameUpdateTarget; // CamShotFrame::UpdateTarget
+        uint32_t objectDirFindObject;      // ObjectDir::FindObject
         uint32_t worldXfm;       // RndTransformable::WorldXfm
         uint32_t setWorldXfm;    // RndTransformable::SetWorldXfm
+        uint32_t setDirty;       // RndTransformable::SetDirty
         uint32_t psMatUpdateSphereXfm;
         uint32_t sphereXfm;      // the four quadwords PsMat::UpdateSphereXfm fills
         uint32_t playMovie;
@@ -44,6 +59,14 @@ namespace gh2
         uint32_t checkForPitchBend; // TrackWatcherImpl::CheckForPitchBend
         uint32_t sendWhammy;        // TrackWatcherImpl::SendWhammy
         uint32_t playerSetWhammyBar; // Player::SetWhammyBar
+        uint32_t trackCtor;          // Track::Track
+        uint32_t trackSetupFade;     // Track::SetupFade
+        uint32_t trackDraw;          // Track::Draw
+        uint32_t trackSurfaceGetFadeCenter; // TrackSurface::GetFadeCenter
+        uint32_t bandSliderDrawShowing; // BandSlider::DrawShowing
+        uint32_t checkBoxDrawShowing;   // CheckBox::DrawShowing
+        uint32_t bandSliderDtor;        // BandSlider::~BandSlider
+        uint32_t checkBoxDtor;          // CheckBox::~CheckBox
         uint32_t optionsSyncVideo; // Options::SyncVideoOptions
         uint32_t optionsSetSyncOffset;
         uint32_t beatMatchCtor;
@@ -66,9 +89,11 @@ namespace gh2
         uint32_t uiManagerPoll;
         uint32_t debugModal; // DebugModal(bool &, char *)
         uint32_t abort;
+        uint32_t delayThread;
         uint32_t ctlClientPoll;
         uint32_t spuStartSend;
         uint32_t metaMusicPoll;
+        uint32_t metaMusicStop;
         uint32_t metaPanelPoll;
         uint32_t metaPanelPickLoopIndex; // (int size)
         uint32_t systemConfig3; // SystemConfig(Symbol, Symbol, Symbol)
@@ -85,6 +110,16 @@ namespace gh2
         uint32_t scePadRead;
         uint32_t scePadInfoAct;
         uint32_t charHairPoll;
+        uint32_t rndMatLoad;
+        uint32_t rndMatDtor;
+        uint32_t rndMatLoadVertDyn; // where it returns to from reading a rev under 25's vertDyn
+        uint32_t rndMatLoadMultiPass; // and from reading its multiPass
+        uint32_t binStreamRead;     // (void *, int)
+        uint32_t binStreamReadEndian; // (void *, int)
+        uint32_t rndMorphCtor;
+        uint32_t rndMorphDtor;
+        uint32_t rndMorphSetFrame; // (frame, blend)
+        uint32_t gamePanelSetExcitementLevel;
         uint32_t camShotShake;
         uint32_t rndFlareDrawFlare;
         uint32_t saveData1;     // the card write, on GHMCSaveData's worker thread
@@ -101,6 +136,75 @@ namespace gh2
         uint32_t bufStreamCtor; // BufStream::BufStream(void *, int, bool)
         uint32_t binStreamDtor; // BinStream::~BinStream
         uint32_t setupMcIcon;   // builds the card icon below from config/mc.dta and the disc
+        uint32_t highScoreDbCtor; // HighScoreDB::HighScoreDB(const SymbolVec &songs)
+        uint32_t symbolsInsertOverflow; // vector<Symbol>::_M_insert_overflow_aux
+        uint32_t archiveGetFileInfo;
+        uint32_t archiveIsValidBlock;
+        uint32_t cdRead;
+        uint32_t profileStateInitChars;
+        uint32_t charsysPanelSetTypeDef;
+        uint32_t charsysPanelPollCharLoading;
+        uint32_t charsysPanelTrySetPriority; // (Symbol outfit, int priority)
+        uint32_t charsysPanelNextCharacter;  // (int index, int direction, Symbol &outfit)
+        uint32_t charsysPanelValidChar;      // (Symbol outfit)
+        uint32_t playerConfigCharacterOfOutfit; // static (Symbol outfit, int &index)
+        uint32_t dataVariable; // DataVariable(Symbol)
+        uint32_t songProviderInitData;
+        uint32_t songProviderGapSize;
+        uint32_t songProviderIsActive;
+        uint32_t songProviderGetSongData; // (Symbol)
+        uint32_t campaignDataGetVenueForSong;
+        uint32_t addLoadChar; // (list<Character *> &, const char *object, const char *character)
+        uint32_t worldCrowdSetFullness; // (float flat, float whole)
+        uint32_t worldCrowdBuildBillboard; // (Character *, float)
+        uint32_t psRndSetDepthOfField;  // (RndCam *, float distance, float nearest, float farthest, float amount)
+        uint32_t worldDirDrawShowing;
+        uint32_t worldDirDtor;
+        uint32_t songsInsertOverflow;     // vector<DataArray *>::_M_insert_overflow
+        uint32_t headersInsertOverflow;   // vector<SongHeader>::_M_insert_overflow_aux
+        uint32_t helpBarFinishLoad;
+        uint32_t helpBarSetDisplay;
+        uint32_t helpBarAddElement;
+        uint32_t dataReadFile;     // DataReadFile(const char *)
+        uint32_t systemConfig;     // SystemConfig()
+        uint32_t dataArrayResize;  // DataArray::Resize(int)
+        uint32_t dataArrayDtor;    // DataArray::~DataArray
+        uint32_t dataArrayClone;   // DataArray::Clone(bool deep)
+        uint32_t dataArraySort;    // DataArray::Sort
+        uint32_t loadMgrPoll;
+        uint32_t dataNodeAssign;   // DataNode::operator=(const DataNode &)
+        uint32_t venueProviderInitData; // VenueProvider::InitData(RndDir *)
+        uint32_t campaignCtor;
+        uint32_t campaignDtor;
+        uint32_t campaignIsItemUnlocked;   // Campaign::IsItemUnlocked(Symbol) const
+        uint32_t campaignIsItemUnlockedOn; // Campaign::IsItemUnlocked(Symbol, Difficulty) const
+        uint32_t selectGuitarProviderInitData; // SelectGuitarProvider::InitData(RndDir *)
+        uint32_t charsysPanelShowChar;   // CharsysPanel::ShowChar(int, Symbol)
+        uint32_t cacheModelUnload;       // CharsysPanel::CacheModel::Unload()
+        uint32_t cacheModelIsLoading;    // CharsysPanel::CacheModel::IsLoading()
+        uint32_t guitarElLoadGuitar;     // GuitarDisplayPanel::GuitarEl::LoadGuitar(UIProxy *, DataArray *, RndAnimatable *, float)
+        uint32_t localeInit;       // Locale::Init
+        uint32_t localeTerminate;  // Locale::Terminate
+        uint32_t campaignStateIsEncoreSong;           // (Symbol song)
+        uint32_t campaignStateIsEncoreUnlockPossible; // (Symbol song)
+        uint32_t campaignStateCheckUnlockVenue;       // (Symbol song)
+        uint32_t campaignStateGetNumPassedSongs;      // (Symbol venue)
+        uint32_t campaignStateIsVenuePassed;          // (Symbol venue)
+        uint32_t campaignStateIsUnlocked;             // (Symbol item)
+        uint32_t campaignStateSetVenueUnlocked;       // (Symbol venue, bool)
+        uint32_t campaignDataIsStoreSong;             // (Symbol song)
+        uint32_t campaignDataGetRequiredSongs;        // (Difficulty, Symbol venue)
+        uint32_t campaignDataGetNextVenue;            // (Symbol venue, Difficulty)
+        uint32_t campaignItemsFind;                   // CampaignItemVec::Find(Symbol)
+        uint32_t campaignItemSetPassed;               // CampaignItem::SetPassed(bool)
+        uint32_t campaignGetRequiredSongs;            // Campaign's, for the venue and difficulty being played
+        uint32_t campaignGetStatusProgress;           // (Difficulty)
+        uint32_t campaignGetCampaign;                 // (Difficulty): that difficulty's CampaignState
+        uint32_t campaignStateGetSongsBeat;
+        uint32_t campaignStateGetNumSongs;
+        uint32_t campaignStateGetStatusSym;
+        uint32_t songProviderGetBlurb;                // (int row)
+        uint32_t makeStringInt;                       // MakeString(const char *, int)
         // Data
         uint32_t rndCamCurrent;  // RndCam::sCurrent
         uint32_t defaultMat;     // the RndMat a mesh without one draws with
@@ -109,8 +213,11 @@ namespace gh2
         uint32_t synthServerBuffer;  // its RPC server's receive buffer
         uint32_t theTaskMgr;
         uint32_t theOptions; // Options*
-        uint32_t theCampaign; // Campaign*
         uint32_t theGameConfig; // GameConfig*
+        uint32_t theCampaign;   // Campaign*
+        uint32_t theLocale;
+        uint32_t theLoadMgr;
+        uint32_t nullStr; // char*, the empty Symbol's text
         uint32_t mcBuffer;    // the save's bytes between the two halves of a load or save
         uint32_t mcOverwrite; // GHMCSaveData's overwrite argument: replace a save already there
         uint32_t mcBaseDir;   // char*, the save's directory on the card
@@ -119,12 +226,15 @@ namespace gh2
         uint32_t mcIconSize;
         uint32_t mcIconData;  // that file's bytes, read off the disc
         uint32_t mcIconSys;   // sceMcIconSys, written as icon.sys
+        uint32_t arkBlockSize; // kArkBlockSize
         // RndBitmap::PixelOffset's swizzle tables, by (y / 4) & 1: 64 bytes
         // each for 8bpp, 128 for 4bpp.
         uint32_t swizzle8[2];
         uint32_t swizzle4[2];
         uint32_t streamEndMs; // the float Stream::SetJump takes for a file's end
         uint32_t scriptTaskVtable;
+        uint32_t allSongsPassed;    // Campaign::AllSongsPassed(Difficulty)
+        uint32_t allSongsFiveStars; // Campaign::AllSongsFiveStars(Difficulty)
     };
 
     // Guitar Hero II (USA), SLUS-21447.
@@ -142,10 +252,21 @@ namespace gh2
         .gamePanelExit = 0x106d50u,
         .winCampaignSong = 0x126f10u,
         .psMeshSync = 0x3d4f08u,
-        .psMeshFixVerts = 0x19dbb8u,
+        .psMeshUpdateFacePacket = 0x3d47f0u,
+        .psMeshCopy = 0x19dc38u,
         .psMeshDestroy = 0x19dd88u,
+        .psRndSyncFree = 0x19b758u,
+        .thePsRnd = 0x46cb20u,
+        .meshStrips = 0x471dd8u,
+        .memFree = 0x2ceb48u,
+        .memOrPoolFree = 0x2cf210u,
         .psMeshDrawShowing = 0x3d88d8u,
         .psMultiMeshDrawShowing = 0x1a2f00u,
+        .characterDrawShadowBuffer = 0x1619c0u,
+        .rndSetShadowMap = 0x364820u,
+        .charTrackSurfaceSetCharTexture = 0x155470u,
+        .playerMatcherOnStartStarpower = 0x117018u,
+        .playerMatcherOnStopStarpower = 0x117060u,
         .psParticleSysDrawShowing = 0x1a2c28u,
         .updateRelativeXfm = 0x1cf7b0u,
         .psEnvironSelect = 0x1a2060u,
@@ -153,8 +274,12 @@ namespace gh2
         .psTexDestroy = 0x1a0f18u,
         .psTexCopyFromScreen = 0x1a0d68u,
         .rndTextDrawShowing = 0x1dc380u,
+        .camShotFrameInterp = 0x2665a0u,
+        .camShotFrameUpdateTarget = 0x266df8u,
+        .objectDirFindObject = 0x2bb4f0u,
         .worldXfm = 0x3d8ea0u,
         .setWorldXfm = 0x1dd7b8u,
+        .setDirty = 0x1dd748u,
         .psMatUpdateSphereXfm = 0x19cb78u,
         .sphereXfm = 0x46d490u,
         .playMovie = 0x21bb60u,
@@ -165,6 +290,14 @@ namespace gh2
         .checkForPitchBend = 0x248e38u,
         .sendWhammy = 0x249b98u,
         .playerSetWhammyBar = 0x111d88u,
+        .trackCtor = 0x14fa70u,
+        .trackSetupFade = 0x150908u,
+        .trackDraw = 0x151188u,
+        .trackSurfaceGetFadeCenter = 0x154fb0u,
+        .bandSliderDrawShowing = 0x296bd8u,
+        .checkBoxDrawShowing = 0x29bde8u,
+        .bandSliderDtor = 0x296528u,
+        .checkBoxDtor = 0x29b9b8u,
         .optionsSyncVideo = 0x10db80u,
         .optionsSetSyncOffset = 0x10ded8u,
         .beatMatchCtor = 0x120f48u,
@@ -187,9 +320,11 @@ namespace gh2
         .uiManagerPoll = 0x214510u,
         .debugModal = 0x105a88u,
         .abort = 0x307b80u,
+        .delayThread = 0x2f7dd8u,
         .ctlClientPoll = 0x22dc68u,
         .spuStartSend = 0x231a78u,
         .metaMusicPoll = 0x21f180u,
+        .metaMusicStop = 0x21f668u,
         .metaPanelPoll = 0x134850u,
         .metaPanelPickLoopIndex = 0x1349d8u,
         .systemConfig3 = 0x2a8700u,
@@ -206,6 +341,16 @@ namespace gh2
         .scePadRead = 0x2f2c48u,
         .scePadInfoAct = 0x2f2e58u,
         .charHairPoll = 0x176fb8u,
+        .rndMatLoad = 0x1bfc00u,
+        .rndMatDtor = 0x35bb08u,
+        .rndMatLoadVertDyn = 0x1c0038u,
+        .rndMatLoadMultiPass = 0x1c0270u,
+        .binStreamRead = 0x2c8c50u,
+        .binStreamReadEndian = 0x2c8e20u,
+        .rndMorphCtor = 0x200b98u,
+        .rndMorphDtor = 0x374f90u,
+        .rndMorphSetFrame = 0x201048u,
+        .gamePanelSetExcitementLevel = 0x108978u,
         .camShotShake = 0x262f38u,
         .rndFlareDrawFlare = 0x1f9330u,
         .saveData1 = 0x14b3e0u,
@@ -222,6 +367,75 @@ namespace gh2
         .bufStreamCtor = 0x2c9268u,
         .binStreamDtor = 0x2c8b78u,
         .setupMcIcon = 0x14b098u,
+        .highScoreDbCtor = 0x13cef0u,
+        .symbolsInsertOverflow = 0x313a40u,
+        .archiveGetFileInfo = 0x2ac618u,
+        .archiveIsValidBlock = 0x2ac9e8u,
+        .cdRead = 0x2ae9c0u,
+        .profileStateInitChars = 0x13ad80u,
+        .charsysPanelSetTypeDef = 0x141bf8u,
+        .charsysPanelPollCharLoading = 0x142ea8u,
+        .charsysPanelTrySetPriority = 0x142790u,
+        .charsysPanelNextCharacter = 0x142c70u,
+        .charsysPanelValidChar = 0x142bc0u,
+        .playerConfigCharacterOfOutfit = 0x114030u,
+        .dataVariable = 0x2b7b00u,
+        .songProviderInitData = 0x117448u,
+        .songProviderGapSize = 0x1181d8u,
+        .songProviderIsActive = 0x117a50u,
+        .songProviderGetSongData = 0x118318u,
+        .campaignDataGetVenueForSong = 0x1312a0u,
+        .addLoadChar = 0x128778u,
+        .worldCrowdSetFullness = 0x26bdf0u,
+        .worldCrowdBuildBillboard = 0x26bba0u,
+        .psRndSetDepthOfField = 0x19a798u,
+        .worldDirDrawShowing = 0x26f6b8u,
+        .worldDirDtor = 0x26ddb8u,
+        .songsInsertOverflow = 0x3177e0u,
+        .headersInsertOverflow = 0x3175d8u,
+        .helpBarFinishLoad = 0x149f40u,
+        .helpBarSetDisplay = 0x14a2f0u,
+        .helpBarAddElement = 0x14a1e0u,
+        .dataReadFile = 0x2b2928u,
+        .systemConfig = 0x2a8680u,
+        .dataArrayResize = 0x2afbd8u,
+        .dataArrayDtor = 0x2b07d0u,
+        .dataArrayClone = 0x2b0558u,
+        .dataArraySort = 0x2b08d8u,
+        .loadMgrPoll = 0x2cc218u,
+        .dataNodeAssign = 0x2b8298u,
+        .venueProviderInitData = 0x118a90u,
+        .campaignCtor = 0x12cf00u,
+        .campaignDtor = 0x12d0c0u,
+        .campaignIsItemUnlocked = 0x12d490u,
+        .campaignIsItemUnlockedOn = 0x12d5a0u,
+        .selectGuitarProviderInitData = 0x119060u,
+        .charsysPanelShowChar = 0x143120u,
+        .cacheModelUnload = 0x141250u,
+        .cacheModelIsLoading = 0x141730u,
+        .guitarElLoadGuitar = 0x1470d8u,
+        .localeInit = 0x2cb798u,
+        .localeTerminate = 0x2cba98u,
+        .campaignStateIsEncoreSong = 0x131d30u,
+        .campaignStateIsEncoreUnlockPossible = 0x132b18u,
+        .campaignStateCheckUnlockVenue = 0x1322c8u,
+        .campaignStateGetNumPassedSongs = 0x132450u,
+        .campaignStateIsVenuePassed = 0x132428u,
+        .campaignStateIsUnlocked = 0x131c70u,
+        .campaignStateSetVenueUnlocked = 0x132500u,
+        .campaignDataIsStoreSong = 0x131388u,
+        .campaignDataGetRequiredSongs = 0x1313d8u,
+        .campaignDataGetNextVenue = 0x1310c8u,
+        .campaignItemsFind = 0x140cf8u,
+        .campaignItemSetPassed = 0x140a90u,
+        .campaignGetRequiredSongs = 0x12e2d8u,
+        .campaignGetStatusProgress = 0x12f828u,
+        .campaignGetCampaign = 0x12e5e0u,
+        .campaignStateGetSongsBeat = 0x132f00u,
+        .campaignStateGetNumSongs = 0x133020u,
+        .campaignStateGetStatusSym = 0x132760u,
+        .songProviderGetBlurb = 0x117df8u,
+        .makeStringInt = 0x3147a8u,
         .rndCamCurrent = 0x3de348u,
         .defaultMat = 0x3da4f0u,
         .rndEnvironCurrent = 0x3de358u,
@@ -229,8 +443,11 @@ namespace gh2
         .synthServerBuffer = 0x484340u,
         .theTaskMgr = 0x51ee40u,
         .theOptions = 0x3da2e8u,
-        .theCampaign = 0x3da31cu,
         .theGameConfig = 0x3da308u,
+        .theCampaign = 0x3da31cu,
+        .theLocale = 0x51f1b8u,
+        .theLoadMgr = 0x51f1d8u,
+        .nullStr = 0x3de688u,
         .mcBuffer = 0x3da368u,
         .mcOverwrite = 0x3da394u,
         .mcBaseDir = 0x3da374u,
@@ -239,9 +456,12 @@ namespace gh2
         .mcIconSize = 0x3da37cu,
         .mcIconData = 0x3da380u,
         .mcIconSys = 0x46a908u,
+        .arkBlockSize = 0x45f940u,
         .swizzle8 = {0x3de1c8u, 0x3de208u},
         .swizzle4 = {0x3de248u, 0x3de2c8u},
         .streamEndMs = 0x43311cu,
         .scriptTaskVtable = 0x3f3510u, // as ScriptTask's ctor (0x2c5040) stores it
+        .allSongsPassed = 0x12d890u,
+        .allSongsFiveStars = 0x12d8d8u,
     };
 }

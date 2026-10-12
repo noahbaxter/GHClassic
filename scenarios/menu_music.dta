@@ -1,0 +1,36 @@
+; Outside a career the menu loops are menu_music's: the theme's by default,
+; one game's whatever the theme, or every game's, each loop once and all
+; streamed. Applied at the next change of menus.
+(needs gh1 gh80s)
+#include common/first_boot.dta
+(expect {quickplay menu_music} theme)
+(expect {quickplay menu_music_order} playlist)
+(expect {size {find $syscfg synth metamusic music}} 10)
+(expect {if_else {find_elem {find $syscfg synth metamusic music} metaloop_ftk} 1 0} 1)
+
+; The 80s' menus with GH1's loops.
+{quickplay menu_music gh1}
+{set $ghc_switch gh80s}
+{set $ghc_switch_next main_screen}
+{ui goto_screen ghc_switch_screen}
+(wait 3)
+(wait_screen main_screen)
+(expect {campaigns active} gh80s)
+(expect {size {find $syscfg synth metamusic music}} 7)
+(expect {if_else {find_elem {find $syscfg synth metamusic music} meta_loop1a} 1 0} 1)
+(expect {if_else {find_elem {find $syscfg synth metamusic music} metaloop_iran} 1 0} 0)
+
+; Every game's: GH2's nine, GH1's six and the 80s' seven, streamed.
+{quickplay menu_music all}
+{set $ghc_switch gh2}
+{set $ghc_switch_next main_screen}
+{ui goto_screen ghc_switch_screen}
+(wait 3)
+(wait_screen main_screen)
+(expect {size {find $syscfg synth metamusic music}} 23)
+(expect {elem {find $syscfg synth metamusic play_from_memory} 1} 0)
+(expect {if_else {find_elem {find $syscfg synth metamusic music} metaloop_iran} 1 0} 1)
+(expect {if_else {find_elem {find $syscfg synth metamusic music} meta_loop1a} 1 0} 1)
+(wait 3)
+{quickplay menu_music theme}
+(quit)

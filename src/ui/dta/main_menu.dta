@@ -8,8 +8,9 @@
 ; The lick the splash and the menu each play runs up to 6 s and nothing of
 ; the game's stops it: without a disc load after the menu it plays over the
 ; next screen. Its ten sounds get a fader of their own before either plays,
-; which leaving the menu fades out (dB, ms).
-{set $lick_fade {new Fader lick.fade}}
+; which leaving the menu fades out (dB, ms). Once: these scripts run again
+; with each change of menus.
+{if {! {exists lick.fade}} {set $lick_fade {new Fader lick.fade}}}
 {func lick_attach
    {$lick_fade set_val 0}
    {foreach_int $i 0 10 {{synth find {sprint "meta_lick" $i}} add_fader $lick_fade}}
@@ -41,6 +42,9 @@
       (enter
          {$this add_quit}
          {$this add_version}
+         ; Out of quickplay (quickplay_pickers.dta), whose venue may be another
+         ; game's: GH2's again.
+         {campaigns venues_from {campaigns live}}
          {set $main_entered TRUE}
          {$this reset_player_settings}
          {if {! [already_entered]}
@@ -107,13 +111,17 @@
                      {nameprof_screen set back_screen main_screen}
                      {nameprof_screen set is_editing FALSE}
                      {nameprof_screen set profile_slot 0}
-                     {nameprof_screen set next_screen sel_difficulty_screen}
+                     {nameprof_screen set next_screen
+                        {if_else {ghc_campaigns} ghc_campaign_screen sel_difficulty_screen}}
                      {ui goto_screen nameprof_screen}
                   }
                }
             )
+            ; Quickplay opens on the theme's setlist, whichever was picked
+            ; last time (quickplay.dta).
             (main_quickspin.btn
                {gamecfg set mode quickplay}
+               {setlist select {campaigns active}}
                {ui goto_screen qp_selsong_screen}
             )
             (main_multiplayer.btn {ui goto_screen multi_screen})
@@ -145,11 +153,11 @@
          {{game get_player_config 0} set_difficulty kDifficultyMedium}
          {game set_venue small2}
          {game set_song_index 0}
-         {game set_character punk1 TRUE}
+         {game set_character {campaigns first_character} TRUE}
          {game set_guitar_index 0}
          {do
             ($player2_config {game get_player_config 1})
-            {$player2_config set_character rockabill1 TRUE}
+            {$player2_config set_character {campaigns second_character} TRUE}
             {$player2_config set_guitar_index 0}
             {$player2_config set_difficulty kDifficultyMedium}
          }
@@ -171,22 +179,60 @@
       )
    )
 }
+; The games whose menus these can turn into: those with a campaign
+; ({campaigns}, content/campaigns.h). The 360's songs have no menus of
+; their own, so its campaign is not one of these.
+{func ghc_themes
+   {do
+      ($themes)
+      {set $themes ()}
+      {resize $themes 0}
+      {foreach $game (gh1 gh2 gh80s)
+         {if {campaigns has $game} {push_back $themes $game}}
+      }
+      $themes
+   }
+}
 ; The main screen, as the game's own but for fade_panel, which Quit fades
-; through.
+; through, and for yellow: held, it lists those games (picker.dta), and the
+; one picked becomes the theme, its menus and music, back on this screen.
 {retype main_screen
    (
-      (panels meta main_panel helpbar fade_panel)
+      (panels meta main_panel helpbar ghc_pick_panel fade_panel)
       (focus main_panel)
-      (helpbar
-         (default
-            (
-               (fret1 help_continue)
-               (strum help_updown)
-            )
-         )
-      )
       (access_all {main_panel reset_player_settings})
-      (enter {$this turn_off_ambient})
+      ; The help bar puts up a screen's (helpbar ...) after its enter, so
+      ; this one has none and sets its own.
+      (enter
+         {$this turn_off_ambient}
+         {do
+            ($array)
+            {set $array ()}
+            {resize $array 0}
+            {push_back $array (fret1 help_continue)}
+            {if {> {size {ghc_themes}} 1} {push_back $array (fret3 ghc_theme)}}
+            {push_back $array (strum help_updown)}
+            {helpbar set_display $array}
+         }
+      )
+      (BUTTON_DOWN_MSG
+         {cond
+            ({ghc_pick_button $button} TRUE)
+            ({&& {== $button kPad_Circle} {> {size {ghc_themes}} 1} {! {ui in_transition}}}
+               {ghc_pick_panel open_with {ghc_themes} {campaigns active}}
+               TRUE
+            )
+            (TRUE kDataUnhandled)
+         }
+      )
+      (ghc_picked
+         ($game)
+         {synth play_sequence button_select}
+         {set $ghc_switch $game}
+         {set $ghc_switch_next main_screen}
+         {set $ghc_switch_as menus}
+         {ui goto_screen ghc_switch_screen}
+      )
    )
 }
 ; The splash, as the game's own (splash.dta) but for lick_attach.

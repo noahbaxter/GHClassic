@@ -1,0 +1,74 @@
+; Outside a career a song's screens around it, HUD and gems are the venue's
+; game's by default (in_song_ui venue, gems auto): GH2's song in GH1's
+; basement has GH1's loading, pause, results and gems. in_song_ui gh2 keeps
+; the room GH1's and the rest GH2's; gems gh1 gives GH1's gems in GH2's room.
+(needs gh1)
+#include common/first_boot.dta
+{quickplay song_defaults 0}
+{gamecfg set mode quickplay}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_song shoutatthedevil}
+{game set_quickplay}
+{game set_venue battle}
+
+; The venue's game, GH1's, for everything.
+(expect {quickplay in_song_ui} venue)
+(expect {quickplay gems} auto)
+{campaigns venues_from gh1}
+{ui goto_screen loading_screen}
+(wait 0.5)
+(shot gh1_loading)
+(wait_screen game_screen 60)
+(wait 40)
+(shot gh1_song)
+{ui goto_screen pause_screen}
+(wait_screen pause_screen 20)
+(wait 2)
+(shot gh1_pause)
+(press green)
+(wait_screen game_screen 20)
+{player0 win 5}
+(wait_screen endgame_screen 400)
+(wait 4)
+(shot gh1_results)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+
+; GH1's room, GH2's screens around it and gems.
+{quickplay in_song_ui gh2}
+(expect {quickplay in_song_ui} gh2)
+{gamecfg set mode quickplay}
+{game set_quickplay}
+{game set_venue battle}
+{campaigns venues_from gh1}
+{ui goto_screen loading_screen}
+(wait 0.5)
+(shot gh2ui_loading)
+(wait_screen game_screen 60)
+(wait 40)
+(shot gh2ui_song)
+{ui goto_screen pause_screen}
+(wait_screen pause_screen 20)
+(wait 2)
+(shot gh2ui_pause)
+(press green)
+(wait_screen game_screen 20)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+
+; GH2's room and screens, GH1's gems.
+{quickplay in_song_ui venue}
+{quickplay gems gh1}
+{gamecfg set mode quickplay}
+{game set_quickplay}
+{game set_venue battle}
+{campaigns venues_from gh2}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 40)
+(shot gh1gems_song)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+{quickplay gems auto}
+(quit)

@@ -1,0 +1,55 @@
+; A career's outfit picker is its own game's alone, as stock, even with
+; every outfit unlocked: another game's are quickplay's (sel_character.dta's
+; may_wear, content/quickplay.h). GH2's metal has its own two, not GH1's
+; Axel or the 80s' jacket; GH1's has GH1's.
+(needs gh1 gh80s)
+#include common/first_boot.dta
+{set $cheat_enabled_unlock_all 1}
+{campaign set_all_access 1}
+{gamecfg set mode career}
+{campaign set_profile_name "The Testers" 0}
+{ui goto_screen chooseprof_screen}
+(wait_screen chooseprof_screen)
+(press green)
+(wait_screen ghc_campaign_screen)
+(wait 1)
+{set $pick gh2}
+#include common/pick_campaign.dta
+(press green)
+(wait_screen sel_difficulty_screen 40)
+(wait 1)
+(press down)
+(press green)
+(wait_screen sel_character_new_screen)
+(wait_until {char_single are_chars_loaded})
+{sel_character_panel set char_focus metal}
+{sel_character_panel find_outfits}
+(print gh2 {sel_character_panel get outfits})
+(expect {if_else {find_elem {sel_character_panel get outfits} metal1} 1 0} 1)
+(expect {if_else {find_elem {sel_character_panel get outfits} metalgh1} 1 0} 0)
+(expect {if_else {find_elem {sel_character_panel get outfits} metal3} 1 0} 0)
+; GH1's.
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+{gamecfg set mode career}
+{ui goto_screen chooseprof_screen}
+(wait_screen chooseprof_screen)
+(press green)
+(wait_screen ghc_campaign_screen)
+(wait 1)
+{set $pick gh1}
+#include common/pick_campaign.dta
+(press green)
+(wait_screen sel_difficulty_screen 40)
+(wait 1)
+(press down)
+(press green)
+(wait_screen sel_character_new_screen)
+(wait_until {char_single are_chars_loaded})
+{sel_character_panel set char_focus metal}
+{sel_character_panel find_outfits}
+(print gh1 {sel_character_panel get outfits})
+(expect {if_else {find_elem {sel_character_panel get outfits} metalgh1} 1 0} 1)
+(expect {if_else {find_elem {sel_character_panel get outfits} metal1} 1 0} 0)
+(expect {if_else {find_elem {sel_character_panel get outfits} metal3} 1 0} 0)
+(quit)

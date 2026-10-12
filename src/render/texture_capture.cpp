@@ -7,6 +7,9 @@
 // ConvertColor (0x1ae538) for the channel order. The original still runs,
 // since its VRAM bookkeeping is shared with PsTex's other paths until PsTex
 // is replaced whole.
+//
+// A bitmap that is a stand-in for a host payload (render/texture_store.h) is
+// not decoded: the payload's pixels are the texture's, from its first draw.
 
 #include "render/texture_capture.h"
 
@@ -15,8 +18,12 @@
 #include "milo/layout.h"
 #include "ps2_runtime_macros.h"
 #include "render/frame.h"
+#include "render/look.h"
+#include "render/texture_store.h"
 
 #include <algorithm>
+#include <functional>
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -26,6 +33,10 @@ namespace gh2
     {
         const Addresses *s_addresses = nullptr;
         std::unordered_map<uint32_t, std::shared_ptr<const TextureData>> s_textures;
+        // Textures whose bitmap is a stand-in, each with its host payload's
+        // id. Its pixels join s_textures at its first draw.
+        std::unordered_map<uint32_t, uint32_t> s_standIns;
+        constexpr uint32_t kNameBytes = static_cast<uint32_t>(textures::kNameBytes);
         bool s_foreign = false; // after forgetTextureAddresses
 
         struct Bitmap
@@ -262,6 +273,26 @@ namespace gh2
             return out;
         }
 
+        // A slider's scale (ui/slider.milo's slider_base.tex, 128 by 32) is
+        // white on clear: a 0, a hand-drawn track of eleven ticks, an 11.
+        // That is the volume's. A slider of anything else (ui/slider_scale.h)
+        // is drawn with the same track without the digits. Known by its
+        // name: the 360's disc has it too, in other pixels.
+        constexpr const char *kSliderScale = "slider_base.tex";
+
+        bool named(uint8_t *rdram, uint32_t object, const char *name)
+        {
+            const uint32_t at = load<uint32_t>(rdram, object + milo::object::kName);
+            return at != 0u && std::strcmp(reinterpret_cast<const char *>(getMemPtr(rdram, at)), name) == 0;
+        }
+        std::shared_ptr<const TextureData> s_volumeScale;
+        std::vector<uint32_t> s_sliderScales;
+        std::shared_ptr<const TextureData> s_scaleDrawn; // in the volume's place, or null
+        std::function<void(const float *)> s_scaleColour;
+        Off s_off = Off::kNone;
+        int s_offLeft = 0;
+        float s_offColour[3] = {};
+
         // Textures a font draws with, by RndTex: found at RndText::DrawShowing
         // (0x1dc380), through its font (+0x11c), the font's material (+0x30)
         // and that material's texture.
@@ -276,7 +307,9 @@ namespace gh2
             return out;
         }
 
-        void store(uint32_t tex, std::shared_ptr<const TextureData> data)
+        // Not `store`: guest.h's of that name takes these and writes them
+        // to guest memory.
+        void keep(uint8_t *rdram, uint32_t tex, std::shared_ptr<const TextureData> data)
         {
             if (s_textTextures.contains(tex))
                 data = asText(std::move(data));
@@ -297,7 +330,46 @@ namespace gh2
                         data = yellowed(*s_greenFretIcon);
                 }
             }
+            if (data && data->width == 128u && data->height == 32u && named(rdram, tex, kSliderScale))
+            {
+                s_volumeScale = data;
+                if (std::find(s_sliderScales.begin(), s_sliderScales.end(), tex) == s_sliderScales.end())
+                    s_sliderScales.push_back(tex);
+            }
             s_textures[tex] = std::move(data);
+        }
+
+        // The host payload a bitmap stands in for, named in its first pixel
+        // bytes (render/texture_store.h).
+        std::optional<uint32_t> standIn(uint8_t *rdram, uint32_t bitmap)
+        {
+            const uint32_t pixels = load<uint32_t>(rdram, bitmap + milo::bitmap::kPixels);
+            const uint32_t bytes = static_cast<uint32_t>(load<uint16_t>(rdram, bitmap + milo::bitmap::kRowBytes)) *
+                                   load<uint16_t>(rdram, bitmap + milo::bitmap::kHeight);
+            if (pixels == 0u || bytes < kNameBytes)
+                return std::nullopt;
+            const std::vector<uint8_t> name = copyGuest(rdram, pixels, kNameBytes);
+            return textures::named(name.data(), name.size());
+        }
+
+        // A texture's bitmap as it now is: decoded, or for a stand-in its
+        // payload noted, which is read when first drawn.
+        void capture(uint8_t *rdram, uint32_t tex)
+        {
+            const uint32_t bitmap = tex + milo::tex::kBitmap;
+            const auto id = standIn(rdram, bitmap);
+            if (!id)
+            {
+                s_standIns.erase(tex);
+                keep(rdram, tex, decodeWithMips(rdram, bitmap));
+                return;
+            }
+            // Synced again with the same payload, it keeps what it holds.
+            const auto was = s_standIns.find(tex);
+            if (was != s_standIns.end() && was->second == *id)
+                return;
+            s_standIns[tex] = *id;
+            s_textures.erase(tex);
         }
 
         struct SyncTag;
@@ -318,30 +390,36 @@ namespace gh2
             }
             const uint32_t tex = GPR_U32(ctx, 4);
             if (load<uint32_t>(rdram, tex + milo::tex::kType) & milo::tex::kTypeNoPixels)
+            {
                 s_textures.erase(tex);
+                s_standIns.erase(tex);
+            }
             else
-                store(tex, decodeWithMips(rdram, tex + milo::tex::kBitmap));
+                capture(rdram, tex);
         }
 
         void onDestroy(uint8_t *, R5900Context *ctx, PS2Runtime *)
         {
             const uint32_t tex = GPR_U32(ctx, 4);
             s_textures.erase(tex);
+            s_standIns.erase(tex);
             s_textTextures.erase(tex);
             std::erase(s_yellowFretIcons, tex);
+            std::erase(s_sliderScales, tex);
         }
 
         // PsTex::CopyFromScreen(x, y) (0x1a0d68) has the GS move the texture's
         // width by height pixels of the buffer being drawn, from x and y,
         // into its VRAM. Track::Draw (0x151290) saves the venue behind the
-        // highway's far end this way and fades the highway into it.
+        // highway's far end this way and fades the highway into it, its
+        // only caller; not when the track fades in its shader.
         struct CopyTag;
         void onCopyFromScreen(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
             const uint32_t tex = GPR_U32(ctx, 4);
             const int32_t width = load<int32_t>(rdram, tex + milo::tex::kWidth);
             const int32_t height = load<int32_t>(rdram, tex + milo::tex::kHeight);
-            if (width <= 0 || height <= 0)
+            if (width <= 0 || height <= 0 || look::trackFades())
                 return;
             Frame &frame = building();
             frame.copies.push_back({frame.draws.size(), tex, GPR_S32(ctx, 5), GPR_S32(ctx, 6),
@@ -362,27 +440,85 @@ namespace gh2
         }
     }
 
+    std::optional<uint32_t> standInPayload(uint32_t tex)
+    {
+        const auto found = s_standIns.find(tex);
+        return found != s_standIns.end() ? std::optional(found->second) : std::nullopt;
+    }
+
     std::shared_ptr<const TextureData> capturedTexture(uint8_t *rdram, uint32_t tex)
     {
-        const auto found = s_textures.find(tex);
-        if (found != s_textures.end())
+        if (s_scaleDrawn && std::find(s_sliderScales.begin(), s_sliderScales.end(), tex) != s_sliderScales.end())
+            return s_scaleDrawn;
+        if (const auto found = s_textures.find(tex); found != s_textures.end())
             return found->second;
-        if (!s_foreign || tex == 0u)
+        if (s_foreign && tex != 0u && !s_standIns.contains(tex))
+        {
+            // Memory from another run: this texture never synced here, and
+            // its bitmap is still in it.
+            if (load<uint32_t>(rdram, tex + milo::tex::kType) & milo::tex::kTypeNoPixels)
+                return s_textures[tex] = nullptr;
+            capture(rdram, tex);
+        }
+        if (const auto payload = s_standIns.find(tex); payload != s_standIns.end())
+            keep(rdram, tex, textures::get(payload->second));
+        const auto found = s_textures.find(tex);
+        return found != s_textures.end() ? found->second : nullptr;
+    }
+
+    std::shared_ptr<const TextureData> plainSliderScale()
+    {
+        // The track runs these columns, the digits either side of them.
+        constexpr uint32_t kLeft = 15u, kRight = 108u;
+        if (!s_volumeScale)
             return nullptr;
-        // Memory from another run: this texture never synced here, and its
-        // bitmap is still in it.
-        if (load<uint32_t>(rdram, tex + milo::tex::kType) & milo::tex::kTypeNoPixels)
-            s_textures[tex] = nullptr;
-        else
-            store(tex, decodeWithMips(rdram, tex + milo::tex::kBitmap));
-        return s_textures[tex];
+        auto scale = std::make_shared<TextureData>(*s_volumeScale);
+        scale->mips.clear();
+        for (uint32_t y = 0; y < scale->height; ++y)
+            for (uint32_t x = 0; x < scale->width; ++x)
+                if (x < kLeft || x > kRight)
+                    scale->rgba[(static_cast<size_t>(y) * scale->width + x) * 4u + 3u] = 0u;
+        return scale;
+    }
+
+    void drawSliderScalesAs(std::shared_ptr<const TextureData> scale, std::function<void(const float *)> drawn)
+    {
+        s_scaleDrawn = std::move(scale);
+        s_scaleColour = std::move(drawn);
+    }
+
+    void sliderScaleDrawn(uint32_t tex, const float *colour)
+    {
+        if (s_scaleColour && std::find(s_sliderScales.begin(), s_sliderScales.end(), tex) != s_sliderScales.end())
+            s_scaleColour(colour);
+    }
+
+    void drawOff(Off what, const float *rgb)
+    {
+        s_off = rgb ? what : Off::kNone;
+        if (rgb)
+            std::copy(rgb, rgb + 3, s_offColour);
+        // A slider's knob and its scale; one that draws neither is not left
+        // to colour what follows it.
+        s_offLeft = s_off == Off::kSlider ? 2 : s_off == Off::kOne ? 1 : 0;
+    }
+
+    void colourOff(uint32_t tex, float *colour)
+    {
+        if (s_offLeft <= 0)
+            return;
+        const bool scale = std::find(s_sliderScales.begin(), s_sliderScales.end(), tex) != s_sliderScales.end();
+        s_offLeft = s_off == Off::kSlider && scale ? 0 : s_offLeft - 1;
+        std::copy(s_offColour, s_offColour + 3, colour);
     }
 
     void forgetTextureAddresses()
     {
         s_textures.clear();
+        s_standIns.clear();
         s_textTextures.clear();
         s_yellowFretIcons.clear();
+        s_sliderScales.clear();
         s_foreign = true;
     }
 

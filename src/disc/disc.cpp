@@ -75,7 +75,7 @@ namespace gh2::disc
         return elf;
     }
 
-    std::filesystem::path find(std::string &why)
+    std::vector<std::filesystem::path> images()
     {
         const std::filesystem::path dir = folder();
         std::vector<std::filesystem::path> images;
@@ -97,8 +97,13 @@ namespace gh2::disc
         std::sort(images.begin(), images.end(), [&](const std::filesystem::path &a, const std::filesystem::path &b) {
             return rank(a) != rank(b) ? rank(a) < rank(b) : a < b;
         });
+        return images;
+    }
+
+    std::filesystem::path find(std::string &why)
+    {
         why.clear();
-        for (const std::filesystem::path &image : images)
+        for (const std::filesystem::path &image : images())
         {
             std::string rejected;
             if (!bootElf(image, rejected).empty())

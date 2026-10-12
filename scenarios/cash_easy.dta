@@ -1,0 +1,89 @@
+; A career's cash buys its store (content/payouts.h): every song at five
+; stars and every venue, on all four difficulties, with what the three
+; careers past Easy start on, pay what the store's prices add up to, and
+; under twenty over. And Easy, which the discs pay nothing and shut out of
+; the store, is paid, shown its cash, and let in.
+#include common/first_boot.dta
+{gamecfg set mode career}
+{campaign set_profile_name "The Testers" 0}
+{ui goto_screen chooseprof_screen}
+(wait_screen chooseprof_screen)
+(press green)
+(wait_screen ghc_campaign_screen)
+(wait 1)
+{set $pick gh2}
+#include common/pick_campaign.dta
+(press green)
+(wait_screen sel_difficulty_screen)
+(wait 1)
+(press green)
+(wait_screen sel_character_new_screen)
+(wait_until {char_single are_chars_loaded})
+(wait 1)
+(press green)
+(wait_screen sel_guitar_new_screen)
+(wait 3)
+(press green)
+(wait_until
+   {&& {! {ui in_transition}}
+      {|| {== {ui current_screen} tour_start_screen} {== {ui current_screen} career_screen}}} 40)
+(wait 1)
+{if {== {ui current_screen} tour_start_screen} {autosave_goto career_screen}}
+(wait_screen career_screen 40)
+(wait 1)
+(expect {game get_difficulty_sym 0} easy)
+(expect {campaign cash} 0)
+(shot career_easy)
+
+{set $cost 0}
+{set $store {find $syscfg store}}
+{foreach_int $s 1 {size $store}
+   {do
+      ($section {elem $store $s})
+      {foreach_int $i 1 {size $section}
+         {if {find_exists {elem $section $i} price}
+            {set $cost {+ $cost {elem {find {elem $section $i} price} 1}}}}}}}
+{set $songs 0}
+{set $order {find $syscfg campaign order}}
+{foreach_int $v 1 {size $order}
+   {set $songs {+ $songs {- {size {elem $order $v}} 1}}}}
+{set $stars {find $syscfg campaign cash star_awards}}
+{set $status {find $syscfg campaign cash status_awards}}
+{set $paid {* 3 {campaign starting_cash}}}
+{foreach_int $row 1 5
+   {do
+      {foreach_int $star 1 4
+         {set $paid {+ $paid {* $songs {elem {elem $stars $row} $star}}}}}
+      {foreach_int $level 1 {size {elem $status $row}}
+         {set $paid {+ $paid {elem {elem $status $row} $level}}}}}}
+(expect {> $cost 100000} 1)
+(expect {>= $paid $cost} 1)
+(expect {< {- $paid $cost} 20} 1)
+
+{set $e5 {+ {elem {elem $stars 1} 1} {+ {elem {elem $stars 1} 2} {elem {elem $stars 1} 3}}}}
+(expect {> $e5 0} 1)
+(press green)
+(wait_screen sel_venue_screen 40)
+(wait 1)
+(press green)
+(wait_screen sel_song_screen)
+(wait 2)
+{set $index 0}
+#include common/career_song.dta
+(wait 5)
+{player0 win 5}
+#include common/career_song_done.dta
+(expect {campaign cash} $e5)
+{ui goto_screen career_screen}
+(wait_screen career_screen 40)
+(wait 2)
+(press down)
+(press down)
+(press down)
+(wait 1)
+(shot career_easy_paid)
+(press green)
+(wait_screen store_screen)
+(wait 2)
+(shot store_from_easy)
+(quit)

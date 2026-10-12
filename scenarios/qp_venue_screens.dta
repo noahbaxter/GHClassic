@@ -1,0 +1,97 @@
+; A quickplay song in another game's venue shows that game's loading and
+; pause screens, and the menus' game's come back with the song list: GH1's
+; basement and the 80s' first venue under GH2's menus.
+#include common/first_boot.dta
+(needs gh1 gh80s)
+{quickplay song_defaults 0}
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 1)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+(press green)
+(wait_screen ghc_qp_character_screen)
+(wait_until {char_single are_chars_loaded})
+{ui goto_screen ghc_qp_guitar_screen}
+(wait_screen ghc_qp_guitar_screen)
+(wait 2)
+{ghc_qp_guitar_screen goto_career}
+(wait_screen ghc_qp_venue_screen)
+(wait 2)
+{ghc_qp_venue_screen ghc_picked gh1}
+(wait_screen ghc_qp_venue_twin_screen)
+(wait 2)
+{{game get_player_config 0} set autoplay TRUE}
+(press green)
+(wait_until {== {ui current_screen} loading_screen})
+(shot gh1_loading)
+(wait_screen game_screen 60)
+(expect {campaigns venue_game} gh1)
+(wait 5)
+{ui goto_screen pause_screen}
+(wait_screen pause_screen 20)
+(wait 2)
+(shot gh1_pause)
+(print gh1 pause {{pause_panel loaded_dir} exists video_options.btn})
+{meta_loading_nosave_goto qp_selsong_screen}
+(wait_screen qp_selsong_screen 60)
+(wait 1)
+(expect {campaigns venue_game} gh2)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+(press green)
+(wait_screen ghc_qp_character_screen)
+(wait_until {char_single are_chars_loaded})
+{ui goto_screen ghc_qp_guitar_screen}
+(wait_screen ghc_qp_guitar_screen)
+(wait 2)
+{ghc_qp_guitar_screen goto_career}
+(wait_screen ghc_qp_venue_screen)
+(wait 2)
+{ghc_qp_venue_screen ghc_picked gh80s}
+(wait_screen ghc_qp_venue_twin_screen)
+(wait 2)
+(press green)
+(wait_until {== {ui current_screen} loading_screen})
+(shot gh80s_loading)
+(wait_screen game_screen 60)
+(expect {campaigns venue_game} gh80s)
+(wait 5)
+{ui goto_screen pause_screen}
+(wait_screen pause_screen 20)
+(wait 2)
+(shot gh80s_pause)
+{meta_loading_nosave_goto qp_selsong_screen}
+(wait_screen qp_selsong_screen 60)
+(wait 1)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+(press green)
+(wait_screen ghc_qp_character_screen)
+(wait_until {char_single are_chars_loaded})
+{ui goto_screen ghc_qp_guitar_screen}
+(wait_screen ghc_qp_guitar_screen)
+(wait 2)
+{ghc_qp_guitar_screen goto_career}
+(wait_screen ghc_qp_venue_screen)
+(wait 2)
+; The map opens on the last game picked.
+{ghc_qp_venue_screen ghc_picked gh2}
+(wait_screen ghc_qp_venue_twin_screen)
+(wait 2)
+(expect $ghc_qp_venues gh2)
+(press green)
+(wait_until {== {ui current_screen} loading_screen})
+(shot gh2_loading)
+(wait_screen game_screen 60)
+(expect {campaigns venue_game} gh2)
+(wait 5)
+{ui goto_screen pause_screen}
+(wait_screen pause_screen 20)
+(wait 2)
+(shot gh2_pause)
+(quit)
