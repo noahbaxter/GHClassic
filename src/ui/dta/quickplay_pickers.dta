@@ -32,7 +32,7 @@
 {func ghc_qp_venue_has_hd
    {&& {== $ghc_qp_venues gh2} {campaigns has gh2x}}
 }
-; The guitarist's and the guitar's screens: yellow turns every guitarist
+; The guitarist's and the guitar's screens: blue turns every guitarist
 ; and the band, or every guitar, between the PS2's models and the 360's
 ; ({quickplay characters}, {quickplay guitars}), named as what shows now.
 ; It is there on one the 360 has its own of.
@@ -44,7 +44,7 @@
       {push_back $array (fret1 help_continue)}
       {push_back $array (fret2 help_back)}
       {if $has
-         {push_back $array {if_else {== {quickplay $what} hd} (fret3 ghc_hd) (fret3 ghc_sd)}}
+         {push_back $array {if_else {== {quickplay $what} hd} (fret4 ghc_hd) (fret4 ghc_sd)}}
       }
       {push_back $array (strum help_updown)}
       {helpbar set_display $array}
@@ -161,10 +161,11 @@
    (
       (done_screen ghc_qp_guitar_screen)
       (back_screen qp_diff_screen)
-      ; Yellow, then red as SEL_CHARACTER_COMMON has it.
+      ; Blue, which the UI gets as orange too (host/pad.cpp), then red as
+      ; SEL_CHARACTER_COMMON has it.
       (BUTTON_DOWN_MSG
          {cond
-            ({&& {== $button kPad_Circle} {ghc_qp_character_has_hd} {! {ui in_transition}}}
+            ({&& {== $button kPad_Square} {ghc_qp_character_has_hd} {! {ui in_transition}}}
                {quickplay characters {if_else {== {quickplay characters} hd} sd hd}}
                {synth play_sequence button_toggle}
                ; The one on show loads again, and moves once it has.
@@ -221,10 +222,10 @@
          {synth play_sequence button_back.cue}
          {ui goto_screen ghc_qp_character_screen}
       )
-      ; Yellow, then red as SEL_GUITAR_COMMON has it.
+      ; Blue, then red as SEL_GUITAR_COMMON has it.
       (BUTTON_DOWN_MSG
          {cond
-            ({&& {== $button kPad_Circle} {ghc_qp_guitar_has_hd} {! {ui in_transition}}}
+            ({&& {== $button kPad_Square} {ghc_qp_guitar_has_hd} {! {ui in_transition}}}
                {quickplay guitars {if_else {== {quickplay guitars} hd} sd hd}}
                {sel_guitar_panel update_display TRUE}
                TRUE
@@ -336,7 +337,6 @@
          {ghc_pick_panel open_with {ghc_venue_games} $ghc_qp_venues}
          TRUE
       )
-      ; Blue, which the UI gets as orange too (host/pad.cpp).
       ({&& {== $button kPad_Square} {ghc_qp_venue_has_hd} {! {ui in_transition}}}
          {quickplay venues {if_else {== {quickplay venues} hd} sd hd}}
          {synth play_sequence button_toggle}
