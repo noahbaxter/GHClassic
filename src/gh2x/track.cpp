@@ -15,7 +15,7 @@ namespace gh2::gh2x
 
         void onSetCharTexture(uint8_t *, R5900Context *ctx, PS2Runtime *)
         {
-            if (settings::hd(settings::kHighway))
+            if (settings::hd(settings::kLookHighway))
                 look::addBoard(GPR_U32(ctx, 5));
         }
 

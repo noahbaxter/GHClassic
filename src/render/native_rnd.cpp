@@ -133,7 +133,8 @@ namespace gh2
         {
             addDepthOfField(rdram, GPR_U32(ctx, 4), building());
             settings::rereadGraphics();
-            building().hdLighting = settings::hd(settings::kLighting);
+            look::setInVenue(building().venue);
+            building().hdLighting = settings::hd(settings::kLookLighting);
             building().luminance = look::luminance();
             frames().publish(building());
             building().venue = false;

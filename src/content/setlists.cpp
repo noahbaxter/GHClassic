@@ -167,6 +167,11 @@ namespace gh2::setlists
                 pushBack(rdram, ctx, runtime, headers, header, 8u, s_addresses->headersInsertOverflow, scratch);
                 for (size_t s = 0; s < tier.songs.size(); ++s)
                 {
+                    // A song not open has no row, as the game's own list
+                    // has none for a store song not bought: but an encore
+                    // still to earn, whose row is there blank.
+                    if (!open(t, s) && !(gated && tier.encore && s + 1u == tier.songs.size()))
+                        continue;
                     const uint32_t data = static_cast<uint32_t>(
                         runtime->callGuestFunction(rdram, ctx, s_addresses->songProviderGetSongData,
                                                    {provider, symbol(rdram, ctx, runtime, tier.songs[s])}));

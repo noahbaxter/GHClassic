@@ -34,6 +34,7 @@ namespace gh2::look
         // Frames a Mat's maps outlast the last draw that asked for them.
         constexpr uint64_t kHoldFrames = 600;
         uint32_t s_luminance = 0;
+        bool s_inVenue = false;
         // Game thread only.
         std::vector<uint32_t> s_boards;
         uint64_t s_boardsAt = 0;
@@ -69,10 +70,12 @@ namespace gh2::look
             const auto byMat = s_looks.find(mat);
             if (byMat == s_looks.end())
                 return nullptr;
-            // A diffuse texture with no stand-in (no picture of its own) is
-            // known by the Mat's name alone when only one scene has it.
+            // A Mat with no picture of its own is known by its name alone
+            // when only one scene has it. One the 360 gave a picture, asked
+            // for without it, is the PS2's Mat of that name: its guitar
+            // beside the 360's guitarist, drawn as the PS2 shades it.
             auto byDiffuse = byMat->second.find(diffuse);
-            if (byDiffuse == byMat->second.end() && byMat->second.size() == 1u)
+            if (byDiffuse == byMat->second.end() && byMat->second.size() == 1u && byMat->second.begin()->first == 0u)
                 byDiffuse = byMat->second.begin();
             if (byDiffuse == byMat->second.end())
                 return nullptr;
@@ -161,7 +164,7 @@ namespace gh2::look
 
     bool trackFades()
     {
-        return settings::hd(settings::kHighway) && settings::hd(settings::kLighting);
+        return settings::hd(settings::kLookHighway) && settings::hd(settings::kLookLighting);
     }
 
     void endFrame()
@@ -169,6 +172,9 @@ namespace gh2::look
         ++s_frame;
         std::erase_if(s_held, [](const auto &entry) { return entry.second.asked + kHoldFrames < s_frame; });
     }
+
+    void setInVenue(bool drawn) { s_inVenue = drawn; }
+    bool inVenue() { return s_inVenue; }
 
     void setLuminance(uint32_t id) { s_luminance = id; }
 

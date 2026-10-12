@@ -2248,7 +2248,7 @@ namespace gh2
 
     bool SceneRenderer::initialize(VkDevice device, VmaAllocator allocator, VkSampleCountFlagBits samples)
     {
-        return create(device, allocator, samples, settings::hd(settings::kLighting));
+        return create(device, allocator, samples, settings::hd(settings::kLookLighting));
     }
 
     bool SceneRenderer::create(VkDevice device, VmaAllocator allocator, VkSampleCountFlagBits samples, bool x360)

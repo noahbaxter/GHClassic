@@ -24,6 +24,14 @@
 //                                    of menus (content/campaigns.h)
 //   {quickplay menu_music_order [<playlist|loop|shuffle>]}  and how they
 //                                    follow one another (ui/meta_music.cpp)
+//   {quickplay characters [<sd|hd>]}  outside a career, the PS2's guitarists
+//                                    and band or the 360's, kept in
+//                                    settings.ini (settings::hd)
+//   {quickplay guitars [<sd|hd>]}    and its guitars
+//   {quickplay venues [<sd|hd>]}     and GH2's venues
+//   {quickplay has_hd outfit <outfit>}  TRUE if the 360 has its own of that
+//                                    outfit, by the game disc's name for it
+//   {quickplay has_hd guitar <file>}  or of that finish, by its (outfit ...)
 //
 // Outside a career (content/campaigns.h) an item is unlocked where any
 // game's career has it. The guitars are GH2's with every game's finishes of

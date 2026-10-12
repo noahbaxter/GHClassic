@@ -381,6 +381,15 @@ namespace gh2::campaigns
             return ok;
         }
 
+        // That campaign's text alone read, if nothing has read it yet: all
+        // that its names and blurbs shown outside its career take.
+        void textBuilt(const Guest &guest, size_t index)
+        {
+            ark::front(s_campaigns[index].front);
+            locale::build(s_campaigns[index].game, guest.call.rdram, guest.call.ctx, guest.call.runtime);
+            ark::front(s_campaigns[s_active].front);
+        }
+
         std::optional<size_t> indexOf(const std::string &game);
 
         // Outside a career, the game whose screens around a song and HUD it
@@ -888,6 +897,12 @@ namespace gh2::campaigns
             }
             if (op == "venue_game")
                 return {script::symbol(call.rdram, call.ctx, call.runtime, venueGame()), script::kSymbol};
+            if (op == "read_text")
+            {
+                for (size_t i = 0; i < s_campaigns.size(); ++i)
+                    textBuilt(Guest{call}, i);
+                return {};
+            }
             if (op == "venues_from")
             {
                 const auto index = indexOf(call.symbol(2));
@@ -900,8 +915,9 @@ namespace gh2::campaigns
                 const auto own = op == "text_venues" ? std::optional<std::pair<std::string, std::string>>()
                                                      : outfits::ownOf(call.symbol(2));
                 const auto index = indexOf(op == "text_venues" ? call.symbol(2) : own ? own->first : active());
-                if (!index || !built(Guest{call}, *index))
+                if (!index)
                     return {0u, script::kInt};
+                textBuilt(Guest{call}, *index);
                 locale::own(op == "text_venues" ? locale::kVenue : locale::kCharacter, s_campaigns[*index].game);
                 return {1u, script::kInt};
             }
@@ -1273,6 +1289,9 @@ namespace gh2::campaigns
                           {"ui/gen/harmonix_splash.milo_ps2", "ui/gen/activision_splash.milo_ps2",
                            "ui/gen/pub_splash.milo_ps2", "ui/gen/dialog.milo_ps2"});
         script::addCommand("campaigns", campaignsCommand);
+        // Every campaign's text read at the boot, where the pickers would
+        // stop for one the first time a name of its own is shown.
+        script::runWhenUiReady("{campaigns read_text}");
         EntryHook<PollTag>::install(runtime, addresses.uiManagerPoll, onUiPoll);
         EntryHook<GotoScreenTag>::install(runtime, addresses.uiGotoScreen, onGotoScreen);
         EntryHook<MetaMusicStopTag>::install(runtime, addresses.metaMusicStop, onMetaMusicStop);

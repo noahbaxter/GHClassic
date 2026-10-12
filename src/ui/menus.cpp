@@ -43,6 +43,8 @@ namespace gh2
         locale::add("ghc_theme", "THEME");
         locale::add("ghc_setlist", "SETLIST");
         locale::add("ghc_map", "MAP");
+        locale::add("ghc_hd", "HD");
+        locale::add("ghc_sd", "SD");
         locale::add("setlist_gh1", "GH1");
         locale::add("setlist_gh2", "GH2");
         locale::add("setlist_gh2x", "GH2X");

@@ -97,25 +97,16 @@ namespace gh2::settings
             {"menu_music_order", Type::kChoice, 0, 2, 1, kOrderLoop, "playlist loop shuffle"},
             // hd: the 360 disc's venues, characters and guitars, and its
             // track, each converted as its scene loads (gh2x/models.h).
-            {"venues", Type::kChoice, 0, 1, 1, kClassic, "classic hd"},
-            {"characters", Type::kChoice, 0, 1, 1, kClassic, "classic hd"},
-            {"highway", Type::kChoice, 0, 1, 1, kClassic, "classic hd"},
-            // hd: the 360 disc's sharper pictures on the HUD and menus, taken
-            // as each scene loads (gh2x/textures.h).
-            {"ui_art", Type::kChoice, 0, 2, 1, kUiClassic, "auto classic hd"},
-            // hd: lit meshes shaded per pixel as the 360's standard.fx does,
-            // with its maps and its light range of 0 to 4, then its bloom and
-            // luminance ramp (host/shaders/x360.frag).
-            {"lighting", Type::kChoice, 0, 1, 1, kClassic, "classic hd"},
-            {"graphics", Type::kChoice, 0, 3, 1, kLastGen, "authentic last_gen next_gen custom"},
+            {"venues", Type::kChoice, 0, 1, 1, kSd, "sd hd"},
+            {"characters", Type::kChoice, 0, 1, 1, kSd, "sd hd"},
+            {"guitars", Type::kChoice, 0, 1, 1, kSd, "sd hd"},
+            {"highway", Type::kChoice, 0, 2, 1, kHighwayClassic, "auto classic hd"},
         };
 
-        // By its name, or one it went by before.
         const Entry *entryNamed(const std::string &name)
         {
-            const std::string now = name == "quickplay_song_defaults" ? "song_defaults" : name;
             const Entry *entry = std::find_if(std::begin(kEntries), std::end(kEntries),
-                                              [&](const Entry &e) { return now == e.name; });
+                                              [&](const Entry &e) { return name == e.name; });
             return entry != std::end(kEntries) ? entry : nullptr;
         }
 
@@ -277,29 +268,36 @@ namespace gh2::settings
 
     namespace
     {
-        std::function<bool()> s_nextGenGame;
+        std::function<Playing()> s_playing;
     }
 
-    void setNextGenGame(std::function<bool()> now) { s_nextGenGame = std::move(now); }
+    void setPlaying(std::function<Playing()> now) { s_playing = std::move(now); }
 
-    bool hd(Key key)
+    bool hd(Look look)
     {
-        switch (get(kGraphics))
-        {
-        case kAuthentic:
-            // The HUD's and menus' pictures are the same ones drawn larger,
-            // so the sharper are taken for every game's.
-            return key == kUiArt || (s_nextGenGame && s_nextGenGame());
-        case kLastGen:
+        const Playing playing = s_playing ? s_playing() : Playing{};
+        if (!playing.mounted)
             return false;
-        case kNextGen:
+        if (look == kLookUiArt)
             return true;
+        if (playing.career)
+            return playing.nextGen;
+        const bool venue = playing.gh2Venue && get(kVenues) == kHd;
+        switch (look)
+        {
+        case kLookVenue:
+            return venue;
+        case kLookCharacters:
+            return get(kCharacters) == kHd;
+        case kLookGuitars:
+            return get(kGuitars) == kHd;
+        case kLookHighway:
+            return get(kHighway) == kHighwayAuto ? venue : get(kHighway) == kHighwayHd;
         default:
-            break;
+            // The 360's shading on a PS2 room gets its exposure wrong, where
+            // a PS2 model in a 360 room only looks flatter than its own.
+            return playing.inVenue ? venue : get(kCharacters) == kHd || get(kGuitars) == kHd;
         }
-        if (key == kUiArt && get(kUiArt) != kUiAuto)
-            return get(kUiArt) == kUiHd;
-        return get(key == kUiArt ? kHighway : key) == kHd;
     }
 
     bool isSet(Key key)
@@ -388,7 +386,7 @@ namespace gh2::settings
                 continue;
             const Key key = static_cast<Key>(entry - kEntries);
             int value = 0;
-            if ((key != kBand && (key < kVenues || key > kGraphics)) || !parse(*entry, pair->second, value) ||
+            if ((key != kBand && (key < kVenues || key > kHighway)) || !parse(*entry, pair->second, value) ||
                 value == state().value[key])
                 continue;
             state().value[key] = value;

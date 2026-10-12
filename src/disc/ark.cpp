@@ -23,6 +23,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -209,8 +210,13 @@ namespace gh2::ark
             return std::string(path, slash + (keep ? 1 : 0)) + "/" + (slash + 1);
         }
 
+        // Parts are added on the game thread as files are made, while
+        // another thread may be reading a disc's own (readFile).
+        std::mutex s_partsMutex;
+
         Entry addPart(Part part)
         {
+            const std::lock_guard lock(s_partsMutex);
             const Entry entry{static_cast<uint32_t>(s_parts.size()), 0u, part.size, 0u};
             s_parts.push_back(std::move(part));
             return entry;
@@ -512,7 +518,10 @@ namespace gh2::ark
             if (!entry)
                 return std::nullopt;
             std::vector<uint8_t> bytes(std::min<size_t>(entry->size, most));
-            if (s_parts[entry->part].read(entry->offset, bytes.data(), bytes.size()) != bytes.size())
+            std::unique_lock lock(s_partsMutex);
+            const auto from = s_parts[entry->part].read;
+            lock.unlock();
+            if (from(entry->offset, bytes.data(), bytes.size()) != bytes.size())
                 return std::nullopt;
             return bytes;
         }

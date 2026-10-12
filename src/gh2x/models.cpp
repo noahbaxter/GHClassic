@@ -21,11 +21,14 @@
 #include "render/look.h"
 #include "render/texture_store.h"
 #include "settings/settings.h"
+#include "worker.h"
 
 #include <algorithm>
+#include <atomic>
 #include <iostream>
 #include <map>
 #include <memory>
+#include <mutex>
 
 namespace gh2
 {
@@ -37,6 +40,7 @@ namespace gh2
                                          "female_singer"};
         constexpr const char *kFolders[] = {kVenues, "char/"};
         constexpr const char *kGuitars = "char/og/guitars/gen/";
+        constexpr const char *kCrowd = "char/crowd/";
         // The track: the PS2's scene, and the one of the 360's two that it
         // draws (its track.milo_xbox is the PS2's, object for object).
         constexpr const char *kTrack = "track/gen/track.milo_ps2";
@@ -106,9 +110,15 @@ namespace gh2
         // Each Mat's 360 shading, by name.
         using Looks = std::map<std::string, look::Look>;
 
+        // `pictures` takes each payload the scene draws.
         std::optional<milo::Dir> convert(const Discs &discs, const std::string &twin, const std::string &path,
-                                         Looks &looks)
+                                         Looks &looks, std::vector<uint32_t> &pictures)
         {
+            const auto picture = [&](const textures::Source &source)
+            {
+                pictures.push_back(textures::add(source));
+                return pictures.back();
+            };
             const auto theirs = ark::readFile(discs.xbox, twin);
             const auto other = theirs ? milo::read(*theirs) : std::nullopt;
             if (!other || other->version != 25u)
@@ -132,7 +142,7 @@ namespace gh2
                         width = std::max(width / 2u, 1u);
                         height = std::max(height / 2u, 1u);
                     }
-                    return textures::standIn(textures::add({discs.xbox, twin, tex}), std::max(width, kStandInLeast),
+                    return textures::standIn(picture({discs.xbox, twin, tex}), std::max(width, kStandInLeast),
                                              std::max(height, kStandInLeast));
                 },
                 [&](const std::string &mat, const gh2x::Mat &shading)
@@ -149,10 +159,10 @@ namespace gh2
                         const std::string &name = shading.maps[i];
                         if (name.empty())
                             return 0u;
-                        return textures::add({discs.xbox, milo::find(*other, name) ? twin : geom, name});
+                        return picture({discs.xbox, milo::find(*other, name) ? twin : geom, name});
                     };
                     look::Look &look = looks[mat];
-                    look.diffuse = shading.diffuse.empty() ? 0u : textures::add({discs.xbox, twin, shading.diffuse});
+                    look.diffuse = shading.diffuse.empty() ? 0u : picture({discs.xbox, twin, shading.diffuse});
                     look.normal = map(0u);
                     look.glow = map(1u);
                     look.specular = map(2u);
@@ -173,7 +183,7 @@ namespace gh2
         // lacks: the 360 skin's, from this file or the 360's own for it,
         // with each picture it names.
         void addSkins(const Discs &discs, const std::string &path, const std::string &twin, milo::Dir &dir,
-                      Looks &looks)
+                      Looks &looks, std::vector<uint32_t> &pictures)
         {
             const auto found = discs.skins.find(stem(path));
             if (!path.starts_with(kGuitars) || found == discs.skins.end())
@@ -187,7 +197,7 @@ namespace gh2
                 if (skin.xboxOutfit != stem(twin))
                 {
                     const std::string file = "char/ng/guitars/gen/" + skin.xboxOutfit + ".milo_xbox";
-                    own = convert(discs, file, gh2x::ps2Path(file), ownLooks);
+                    own = convert(discs, file, gh2x::ps2Path(file), ownLooks, pictures);
                 }
                 const milo::Dir &from = own ? *own : dir;
                 const Looks &fromLooks = own ? ownLooks : looks;
@@ -225,23 +235,65 @@ namespace gh2
                     if (settings::get(settings::kBand) == settings::kBandGh2)
                         return false;
                 }
-            return settings::hd(path == kTrack ? settings::kHighway
-                                : path.starts_with(kVenues) ? settings::kVenues : settings::kCharacters);
+            if (path == kTrack)
+                return settings::hd(settings::kLookHighway);
+            // The crowd is its venue's.
+            if (path.starts_with(kVenues) || path.starts_with(kCrowd))
+                return settings::hd(settings::kLookVenue);
+            return settings::hd(path.starts_with(kGuitars) ? settings::kLookGuitars : settings::kLookCharacters);
         }
 
-        std::optional<ark::Made> make(const Discs &discs, const std::string &path, const std::string &twin)
+        // The game disc's scenes the 360 has its own of, sorted.
+        std::vector<std::string> s_twinned;
+
+        // A scene converted once, by whichever thread comes to it first: the
+        // worker's, which goes through the pickers' from the boot, or the
+        // game's, when it asks for one not yet reached. Either waits while
+        // the other is at it.
+        struct Scene
         {
+            std::string path, twin;
+            std::once_flag once;
+            std::optional<std::vector<uint8_t>> bytes; // until the game takes them
+            // Its Mats' shading, known to the renderer from when the game
+            // takes the scene: two guitars' Mats can share a name, and one
+            // not on show must not answer for the one that is.
             Looks looks;
-            auto converted = convert(discs, twin, path, looks);
-            if (!converted)
+            std::vector<uint32_t> pictures;
+            std::atomic<bool> done{false};
+        };
+
+        void convertOnce(const Discs &discs, Scene &scene)
+        {
+            std::call_once(scene.once, [&]
             {
-                std::cerr << "[gh2x] " << twin << " cannot be converted; the PS2's own stays" << std::endl;
-                return std::nullopt;
-            }
-            addSkins(discs, path, twin, *converted, looks);
-            for (const auto &[mat, shading] : looks)
+                auto converted = convert(discs, scene.twin, scene.path, scene.looks, scene.pictures);
+                if (!converted)
+                {
+                    std::cerr << "[gh2x] " << scene.twin << " cannot be converted; the PS2's own stays" << std::endl;
+                    scene.looks.clear();
+                    return;
+                }
+                addSkins(discs, scene.path, scene.twin, *converted, scene.looks, scene.pictures);
+                scene.bytes = milo::write(*converted);
+            });
+            scene.done = true;
+        }
+
+        // The game asks for the scene: its pictures are read on the
+        // worker's thread while the game loads it, ahead of its first draw.
+        std::optional<ark::Made> make(const Discs &discs, Scene &scene)
+        {
+            convertOnce(discs, scene);
+            for (const auto &[mat, shading] : scene.looks)
                 look::add(mat, shading);
-            return ark::held(milo::write(*converted));
+            scene.looks.clear();
+            textures::prefetch(scene.pictures);
+            if (!scene.bytes)
+                return std::nullopt;
+            ark::Made made = ark::held(std::move(*scene.bytes));
+            scene.bytes.reset();
+            return made;
         }
     }
 
@@ -279,13 +331,46 @@ namespace gh2
                 discs->skins[ours.first].push_back({ours.second, other->second.first, other->second.second});
         }
 
+        // What the pickers show, 23 MB converted: the characters' menu
+        // scenes, then the guitars. The rest load behind a loading screen
+        // and are several times that, so they wait to be asked for.
+        std::vector<std::shared_ptr<Scene>> ahead[2];
         for (const auto &[twin, path] : scenes)
         {
-            auto made = [discs, path, twin] { return make(*discs, path, twin); };
+            auto scene = std::make_shared<Scene>();
+            scene->path = path;
+            scene->twin = twin;
+            auto made = [discs, scene] { return make(*discs, *scene); };
             if (holds(discs->ps2, path))
-                ark::addMade(0u, path, std::move(made), [path] { return wanted(path); });
+            {
+                // Served again from what was made, its pictures may have
+                // been let go since.
+                ark::addMade(0u, path, std::move(made), [scene]
+                {
+                    if (!wanted(scene->path))
+                        return false;
+                    if (scene->done)
+                        textures::prefetch(scene->pictures);
+                    return true;
+                });
+                s_twinned.push_back(path);
+            }
             else
                 ark::addMade(path, std::move(made));
+            if (path.starts_with("char/") && path.ends_with("_ui.milo_ps2"))
+                ahead[0].push_back(scene);
+            else if (path.starts_with(kGuitars))
+                ahead[1].push_back(scene);
         }
+        std::sort(s_twinned.begin(), s_twinned.end());
+        for (const auto &group : ahead)
+            for (const auto &scene : group)
+                worker::run([discs, scene] { convertOnce(*discs, *scene); });
+    }
+
+    bool gh2xHasModel(const std::string &prefix)
+    {
+        const auto at = std::lower_bound(s_twinned.begin(), s_twinned.end(), prefix);
+        return at != s_twinned.end() && at->starts_with(prefix);
     }
 }

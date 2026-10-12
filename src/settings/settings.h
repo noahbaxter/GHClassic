@@ -40,12 +40,10 @@ namespace gh2::settings
         kGems,         // outside a career, whose gems: the in-song look's, or one game's
         kMenuMusic,    // outside a career, whose menu loops: the theme's, one game's, or every game's
         kMenuMusicOrder, // the loops one after another in order, one over and over, or shuffled
-        kVenues,     // kClassic or kHd: GH2's venues as the PS2 has them, or the 360's
-        kCharacters, // its guitarists, band and guitars
-        kHighway,    // its track, gems and fretboards
-        kUiArt,      // its HUD and menu pictures: the highway's choice, or one of its own
-        kLighting,   // its shading, shadows, bloom, colour and focus blur
-        kGraphics,   // which of those five's choices are taken: each game's own machine's, one for all, or theirs
+        kVenues,     // outside a career, kSd or kHd: GH2's venues as the PS2 has them, or the 360's
+        kCharacters, // its guitarists and band
+        kGuitars,
+        kHighway,    // its track and fretboards: the venues' choice, or one of its own
         kKeyCount,
     };
 
@@ -101,43 +99,58 @@ namespace gh2::settings
         kBandGh2x, // GH2's members as the 360 has them, whatever the graphics
     };
 
-    // Which version's graphics: each game's as its PS2 drew it, or the best
-    // there is, which is the 360 disc's while it is mounted.
-    enum Graphics
+    // A pick of the pickers', kept here: the PS2's, or the 360 disc's.
+    enum Models
     {
-        kClassic,
+        kSd,
         kHd,
     };
 
-    enum GraphicsMode
+    enum Highway
     {
-        kAuthentic, // each game as its machine drew it: the 360's songs and career kHd, the rest kClassic but kUiArt
-        kLastGen,   // kClassic everywhere
-        kNextGen,   // kHd everywhere
-        kCustom,    // the five keys' own choices
+        kHighwayAuto, // as kVenues, where the venue is one of GH2's
+        kHighwayClassic,
+        kHighwayHd,
     };
 
-    enum UiArt
+    // What the 360 disc has its own of.
+    enum Look
     {
-        kUiAuto, // as kHighway
-        kUiClassic,
-        kUiHd,
+        kLookVenue,      // GH2's venues and their crowd
+        kLookCharacters, // its guitarists and band
+        kLookGuitars,
+        kLookHighway,    // its track and fretboards
+        kLookUiArt,      // its HUD and menu pictures
+        kLookLighting,   // its shading, shadows, bloom, colour and focus blur
+    };
+
+    // What is played now, for hd.
+    struct Playing
+    {
+        bool mounted = false;  // the 360 disc is
+        bool career = false;   // in a career, which is all its own game's
+        bool nextGen = false;  // that career is the 360's
+        bool gh2Venue = false; // the venue a song plays in is one of GH2's
+        bool inVenue = false;  // a venue is drawn
     };
 
     int get(Key key);
-    // Whether one of the five graphics keys comes to kHd now, by kGraphics:
-    // it can change from one song to the next.
-    bool hd(Key key);
-    // Who says whether the song or career now played is a next-gen game's
-    // (kAuthentic). Until one is given, none is.
-    void setNextGenGame(std::function<bool()> now);
+    // Whether that is the 360's now. A career is its own game's all through.
+    // Outside one the models are the pickers' three, the lighting is the
+    // venue's (the guitarist's or guitar's on a screen with no venue), and
+    // the HUD's and menus' pictures, the same ones drawn larger, are the
+    // 360's wherever its disc is mounted. It can change from one song to
+    // the next.
+    bool hd(Look look);
+    // Who says what is played. Until one is given, nothing is the 360's.
+    void setPlaying(std::function<Playing()> now);
     // Whether settings.ini holds the key, rather than it taking its default.
     bool isSet(Key key);
     // Snapped to the entry's step and range; written to settings.ini at once.
     void set(Key key, int value);
-    // The graphics keys and kBand taken again from settings.ini when it has
-    // been written since last asked: one edited while the game runs counts
-    // from the next thing loaded, and kLighting at once.
+    // The pickers' three, kHighway and kBand taken again from settings.ini
+    // when it has been written since last asked: one edited while the game
+    // runs counts from the next thing loaded.
     void rereadGraphics();
 
     // Read and write `path` in place of the user data directory's

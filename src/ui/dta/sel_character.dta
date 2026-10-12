@@ -299,6 +299,7 @@
                   {char_highlight.tnm set_frame $new_scroll_pos}
                   {$this show_portraits}
                   {$this light_portraits}
+                  {ghc_qp_character_helpbar}
                }
             }
          }
@@ -322,6 +323,7 @@
                   {set [char_outfit] {elem [outfits] $idx}}
                   {quickplay look [char_focus] [char_outfit]}
                   {$this show_portraits}
+                  {ghc_qp_character_helpbar}
                   ; The arrow's anim keys outfit1's place; from there it
                   ; moves as the buttons were placed.
                   {cs_arrow.tnm set_frame 0}

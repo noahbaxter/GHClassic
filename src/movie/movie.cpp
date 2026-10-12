@@ -49,6 +49,11 @@ namespace gh2
         std::atomic<bool> s_running{false};
         std::atomic<bool> s_playing{false};
 
+        // At half, as everything the game plays is: it holds the SPU's master
+        // volume there (synth/module.cpp), which the PS2's movie sound went
+        // through too. At full the menus after the intro sound half as loud.
+        constexpr float kMasterVolume = 0.5f;
+
         void mixSoundtrack(float *out, size_t frames)
         {
             if (!s_running.load(std::memory_order_acquire))
@@ -58,8 +63,8 @@ namespace gh2
             for (size_t i = 0; i < frames && from + i < written; ++i)
             {
                 const int16_t *frame = s_ring + ((from + i) % kRingFrames) * 2u;
-                out[i * 2u] += frame[0] * (1.0f / 32768.0f);
-                out[i * 2u + 1u] += frame[1] * (1.0f / 32768.0f);
+                out[i * 2u] += frame[0] * (kMasterVolume / 32768.0f);
+                out[i * 2u + 1u] += frame[1] * (kMasterVolume / 32768.0f);
             }
             s_played.store(from + frames, std::memory_order_release);
         }

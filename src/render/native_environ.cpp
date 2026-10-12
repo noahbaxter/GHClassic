@@ -71,7 +71,7 @@ namespace gh2
                 }
                 e.range = load<float>(rdram, point + milo::light::kRange);
                 // Up to three, for the 360's shading alone.
-                const bool all = settings::hd(settings::kLighting);
+                const bool all = settings::hd(settings::kLookLighting);
                 for (uint32_t node = all ? load<uint32_t>(rdram, env + milo::environment::kFirstLight) : 0u;
                      node != 0u && e.pointCount < 3u; node = load<uint32_t>(rdram, node + 4u))
                 {

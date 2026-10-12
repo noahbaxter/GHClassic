@@ -84,6 +84,10 @@ namespace gh2::look
     // Maps no draw has asked for in a while are let go.
     void endFrame();
 
+    // Whether the frame last finished drew a venue (render/frame.h).
+    void setInVenue(bool drawn);
+    bool inVenue();
+
     // The 360's luminance map, which its post stage scales the world's
     // colour by (render/frame.h), as a payload: 0 for none.
     void setLuminance(uint32_t id);
