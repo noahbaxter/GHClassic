@@ -12,10 +12,8 @@
 //                           scale, or a tick box, drawn in that colour, as
 //                           one that is off: neither has a look of its own
 //                           for that. {slider_scales on ...} is as it was
-//   {slider_scales clear}   every slider the volume's again: a screen that
-//                           made its sliders plain says so as it leaves,
-//                           before they go and another's take their place
-//                           in memory
+//
+// Each lasts as long as its slider or box does.
 
 #include "addresses.h"
 

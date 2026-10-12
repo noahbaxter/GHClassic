@@ -361,14 +361,17 @@
    (enter
       ; In a song it is under Settings, and named for what it holds.
       {gs_title.lbl set_localized {if_else {== {$this name} pause_game_settings_panel} "GAME" "GAME SETTINGS"}}
-      {gs_stereo.btn set_showing FALSE}
-      {gs_stereo.btn set_state kDisabled}
       {stereo.chk set_showing FALSE}
-      ; GH1's scene has two rows more, for playing left handed.
-      {foreach $o (gs_left_p1.btn gs_left_p2.btn)
+      ; The stereo row is put away, and the two more GH1's scene has for
+      ; playing left handed. Each leads to itself: up is to whatever leads
+      ; down to the focus, the first the scene lists, and from a row that
+      ; is off to what leads to that, so one left leading to the top row
+      ; stops up from there short of the bottom.
+      {foreach $o (gs_stereo.btn gs_left_p1.btn gs_left_p2.btn)
          {if {exists $o}
             {{$this find $o} set_showing FALSE}
             {{$this find $o} set_state kDisabled}
+            {{$this find $o} set nav_down {$this find $o}}
          }
       }
       {$this lay_out}
@@ -529,7 +532,6 @@
    ; Each number in the colour its track was last drawn in, whatever the
    ; scene and the state: a frame behind it.
    (poll {$this sync_numbers})
-   (exit {slider_scales clear})
    ; Each number as its slider is, and the help bar. A label given a colour
    ; goes back to its token's text, so the text is set after: as the label
    ; sets its own, which is what puts its letters off their line.

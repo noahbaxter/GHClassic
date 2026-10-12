@@ -65,6 +65,8 @@ namespace gh2
         uint32_t trackSurfaceGetFadeCenter; // TrackSurface::GetFadeCenter
         uint32_t bandSliderDrawShowing; // BandSlider::DrawShowing
         uint32_t checkBoxDrawShowing;   // CheckBox::DrawShowing
+        uint32_t bandSliderDtor;        // BandSlider::~BandSlider
+        uint32_t checkBoxDtor;          // CheckBox::~CheckBox
         uint32_t optionsSyncVideo; // Options::SyncVideoOptions
         uint32_t optionsSetSyncOffset;
         uint32_t beatMatchCtor;
@@ -294,6 +296,8 @@ namespace gh2
         .trackSurfaceGetFadeCenter = 0x154fb0u,
         .bandSliderDrawShowing = 0x296bd8u,
         .checkBoxDrawShowing = 0x29bde8u,
+        .bandSliderDtor = 0x296528u,
+        .checkBoxDtor = 0x29b9b8u,
         .optionsSyncVideo = 0x10db80u,
         .optionsSetSyncOffset = 0x10ded8u,
         .beatMatchCtor = 0x120f48u,

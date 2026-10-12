@@ -62,17 +62,19 @@ namespace gh2::slider_scale
             drawOff(Off::kOne, found != s_offBoxes.end() ? found->second.data() : nullptr);
         }
 
+        // Each is what it was told to be for as long as it is there: a
+        // screen draws its sliders while it leaves, and what takes one's
+        // place in memory is another, the volume's again. ~BandSlider
+        // (retail 0x296528) and ~CheckBox (0x29b9b8).
+        struct SliderGoneTag;
+        struct BoxGoneTag;
+        void onSliderGone(uint8_t *, R5900Context *ctx, PS2Runtime *) { s_plain.erase(GPR_U32(ctx, 4) + kObject); }
+        void onBoxGone(uint8_t *, R5900Context *ctx, PS2Runtime *) { s_offBoxes.erase(GPR_U32(ctx, 4) + kBoxObject); }
+
         script::Node command(const script::Call &call)
         {
             const std::string op = call.symbol(1);
-            if (op == "clear")
-            {
-                s_plain.clear();
-                s_offBoxes.clear();
-                drawSliderScalesAs(nullptr);
-                drawOff(Off::kNone);
-            }
-            else if (op == "plain")
+            if (op == "plain")
                 s_plain[call.object(2)];
             else if (op == "off" || op == "on")
             {
@@ -113,6 +115,8 @@ namespace gh2::slider_scale
     {
         EntryHook<DrawTag>::install(runtime, addresses.bandSliderDrawShowing, onDraw);
         EntryHook<BoxTag>::install(runtime, addresses.checkBoxDrawShowing, onBox);
+        EntryHook<SliderGoneTag>::install(runtime, addresses.bandSliderDtor, onSliderGone);
+        EntryHook<BoxGoneTag>::install(runtime, addresses.checkBoxDtor, onBoxGone);
         script::addCommand("slider_scales", command);
     }
 }
