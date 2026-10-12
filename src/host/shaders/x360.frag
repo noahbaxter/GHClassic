@@ -55,6 +55,7 @@ const uint kFlagCube = 1u << 20;
 const uint kFlagNormalize = 1u << 21;
 const uint kFlagShadow = 1u << 22;
 const uint kFlagCutHalf = 1u << 23;
+const float kShadowSlopeMost = 8.0;
 
 // shadowfactor.fx's ComputeShadowFactor: how much of the first light reaches
 // a character's pixel, from taps of its shadow map two texels about. The 360
@@ -64,7 +65,8 @@ const uint kFlagCutHalf = 1u << 23;
 // taken at each quarter turn, unturned. Each tap is point sampled from the
 // map after downsample_depth.fx has taken the farthest of each texel and its
 // eight neighbours, done here at the tap, and passes only where that is
-// farther than the pixel. No bias.
+// farther than the pixel. The 360 has no bias; here the pixel's depth
+// follows its surface to each tap.
 float shadowOf(int b)
 {
     vec4 lit = mat4(data[b + 15], data[b + 16], data[b + 17], data[b + 18]) * vec4(vWorldPos, 1.0);
@@ -75,6 +77,21 @@ float shadowOf(int b)
                                   vec2(0.440453, -0.639399), vec2(-0.757088, 0.349334), vec2(0.574619, 0.685879));
     vec2 turn = vec2(0.0, 1.0) / 256.0;
     ivec2 size = textureSize(shadowMap, 0);
+    // The surface's own depth at each tap, by its slope across the map (how
+    // the pixel's depth changes with the map's uv, from this pixel's
+    // neighbours): a tap to one side of a surface that leans from the light
+    // is nearer the light than the pixel by that much, and without it a
+    // lit, leaning surface shadows itself in stripes a texel wide. The
+    // slope is held to kShadowSlopeMost of the map's depth across its width,
+    // past which a surface is edge on to the light and unlit anyway.
+    vec2 uvAcross = dFdx(uv), uvDown = dFdy(uv);
+    float span = uvAcross.x * uvDown.y - uvAcross.y * uvDown.x;
+    vec2 slope = vec2(0.0);
+    if (abs(span) > 1e-12)
+        slope = vec2(uvDown.y * dFdx(at.z) - uvAcross.y * dFdy(at.z), uvAcross.x * dFdy(at.z) - uvDown.x * dFdx(at.z)) / span;
+    float steep = length(slope);
+    if (steep > kShadowSlopeMost)
+        slope *= kShadowSlopeMost / steep;
     float reached = 0.0;
     for (int quarter = 0; quarter < 4; ++quarter)
     {
@@ -86,7 +103,9 @@ float shadowOf(int b)
             for (int y = -1; y <= 1; ++y)
                 for (int x = -1; x <= 1; ++x)
                     farthest = min(farthest, texelFetch(shadowMap, clamp(texel + ivec2(x, y), ivec2(0), size - 1), 0).r);
-            reached += farthest < at.z ? 0.03125 : 0.0;
+            // A texel and a half more of slope for the map's own texels.
+            float here = at.z + dot(slope, tap - uv) + (abs(slope.x) + abs(slope.y)) * 1.5 / float(size.x);
+            reached += farthest < here ? 0.03125 : 0.0;
         }
         turn = vec2(-turn.y, turn.x);
     }
