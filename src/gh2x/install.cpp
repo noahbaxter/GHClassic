@@ -28,6 +28,7 @@
 #include "gh2x/textures.h"
 #include "gh2x/track.h"
 #include "ps2_runtime.h"
+#include "render/texture_store.h"
 #include "settings/settings.h"
 
 #include <algorithm>
@@ -39,6 +40,9 @@ namespace gh2
     namespace
     {
         std::string ours(const std::string &name) { return "x_" + name; }
+
+        // A side of the PS2 store's album art (its us_logo pictures).
+        constexpr uint32_t kAlbumArtSide = 256u;
 
         // Paths under songs/<name>/ moved to songs/x_<name>/, practice keys
         // dropped.
@@ -198,6 +202,7 @@ namespace gh2
         // The career's tiers, then the store's songs, as the 360 heads them.
         std::vector<setlists::Tier> tiers;
         size_t count = 0u;
+        const std::vector<std::string> logos = ark::paths(*disc, "ui/image/ng/gen/us_logo_");
         for (size_t i = 1u; i <= order->nodes.size(); ++i)
         {
             const bool isStore = i == order->nodes.size();
@@ -218,6 +223,17 @@ namespace gh2
                 }
                 tier.songs.push_back(ours(name));
                 ++count;
+                // The store's album art for it, asked for by our name: the
+                // 360's picture, at the size the PS2's are.
+                const std::string art = "ui/image/ng/gen/us_logo_" + name + "_keep.png_xbox";
+                if (isStore && std::binary_search(logos.begin(), logos.end(), art))
+                    ark::addMade("ui/image/og/gen/us_logo_" + ours(name) + "_keep.png_ps2",
+                                 [xbox = *disc, art]() -> std::optional<ark::Made>
+                                 {
+                                     std::vector<uint8_t> standIn =
+                                         textures::standIn(textures::add({xbox, art, {}}), kAlbumArtSide, kAlbumArtSide);
+                                     return standIn.empty() ? std::nullopt : std::optional(ark::held(std::move(standIn)));
+                                 });
                 // The store's name and blurb for it, and its loading tip.
                 for (const auto &[token, as] : {std::pair{name, ours(name)},
                                                 std::pair{name + "_shop_desc", ours(name) + "_shop_desc"},
