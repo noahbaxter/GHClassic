@@ -161,8 +161,7 @@ namespace gh2::look
 
     bool trackFades()
     {
-        return settings::get(settings::kModels) == settings::kX360 &&
-               settings::get(settings::kShading) == settings::kX360;
+        return settings::hd(settings::kHighway) && settings::hd(settings::kLighting);
     }
 
     void endFrame()

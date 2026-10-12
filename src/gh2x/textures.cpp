@@ -32,10 +32,15 @@ namespace gh2
 {
     namespace
     {
-        constexpr const char *kFolders[] = {"track/", "hud/", "ui/", "system/run/ui/"};
-        constexpr const char *kBoards = "track/surfaces/";
+        constexpr const char *kTrack = "track/";
+        constexpr const char *kFolders[] = {kTrack, "hud/", "ui/", "system/run/ui/"};
 
-        bool wanted() { return settings::get(settings::kTextures) == settings::kX360; }
+        // The track's pictures and fretboards go with the highway, the rest
+        // with the HUD and menus.
+        bool wanted(const std::string &path)
+        {
+            return settings::hd(path.starts_with(kTrack) ? settings::kHighway : settings::kUiArt);
+        }
 
         // A 360 bitmap that is a picture: DXT1 or DXT5, not empty.
         bool isPicture(const uint8_t *data, size_t size)
@@ -80,7 +85,7 @@ namespace gh2
         // nothing pairs.
         std::optional<ark::Made> makeScene(size_t xbox, const std::string &path, const std::string &twin)
         {
-            if (!wanted())
+            if (!wanted(path))
                 return std::nullopt;
             const auto ours = ark::readFile(0u, path), theirs = ark::readFile(xbox, twin);
             auto scene = ours ? milo::read(*ours) : std::nullopt;
@@ -123,10 +128,7 @@ namespace gh2
         // A stand-in for a bitmap file the 360 has at the same path.
         std::optional<ark::Made> makeBitmap(size_t xbox, const std::string &path, const std::string &twin)
         {
-            // A fretboard goes with the 360's track too, whose normal and
-            // specular maps are drawn for its picture.
-            const bool board = path.starts_with(kBoards) && settings::get(settings::kModels) == settings::kX360;
-            if (!wanted() && !board)
+            if (!wanted(path))
                 return std::nullopt;
             const auto ours = ark::readFile(0u, path), theirs = ark::readFile(xbox, twin);
             const auto own = ours ? bitmap::read(ours->data(), ours->size()) : std::nullopt;

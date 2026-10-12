@@ -2223,7 +2223,7 @@ namespace gh2
         if ((depthProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) == 0u)
             m_state->depthFormat = VK_FORMAT_D24_UNORM_S8_UINT;
         State &s = *m_state;
-        s.x360 = settings::get(settings::kShading) == settings::kX360;
+        s.x360 = settings::hd(settings::kLighting);
         s.colorFormat = s.x360 ? kHdrFormat : kColorFormat;
         if (!(s.createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, false, false, s.renderPass) &&
               s.createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, true, false, s.firstPass) &&

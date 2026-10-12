@@ -266,7 +266,7 @@ namespace gh2
             readEnvRows(rdram, mat, m);
         else if (m.texGen == milo::mat::kTexGenProjected)
             readProjRows(rdram, mat, m);
-        if (settings::get(settings::kShading) == settings::kX360)
+        if (settings::hd(settings::kLighting))
             m.shading = readShading(rdram, mat);
         if (m.blend >= milo::mat::kBlendCount)
             m.blend = milo::mat::kBlendSrcAlpha; // Update's default case

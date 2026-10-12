@@ -39,9 +39,11 @@ namespace gh2::settings
         kGems,         // outside a career, whose gems: the in-song look's, or one game's
         kMenuMusic,    // outside a career, whose menu loops: the theme's, one game's, or every game's
         kMenuMusicOrder, // the loops one after another in order, one over and over, or shuffled
-        kTextures,  // kPs2 or kX360: whose textures the track, HUD and menus draw
-        kModels,    // kPs2 or kX360: whose venues, characters and guitars load
-        kShading,   // kPs2 or kX360: whose shading and post the renderer draws with
+        kVenues,     // kClassic or kHd: GH2's venues as the PS2 has them, or the 360's
+        kCharacters, // its guitarists, band and guitars
+        kHighway,    // its track, gems and fretboards
+        kUiArt,      // its HUD and menu pictures: the highway's choice, or one of its own
+        kLighting,   // its shading, shadows, bloom, colour and focus blur
         kKeyCount,
     };
 
@@ -96,14 +98,24 @@ namespace gh2::settings
         kBandGh1,
     };
 
-    // Which GH2's assets are drawn.
-    enum AssetSet
+    // Which version's graphics: each game's as its PS2 drew it, or the best
+    // there is, which is the 360 disc's while it is mounted.
+    enum Graphics
     {
-        kPs2,
-        kX360, // the 360 disc's, while it is mounted
+        kClassic,
+        kHd,
+    };
+
+    enum UiArt
+    {
+        kUiAuto, // as kHighway
+        kUiClassic,
+        kUiHd,
     };
 
     int get(Key key);
+    // Whether one of the graphics keys asks for kHd, kUiArt's auto read through.
+    bool hd(Key key);
     // Whether settings.ini holds the key, rather than it taking its default.
     bool isSet(Key key);
     // Snapped to the entry's step and range; written to settings.ini at once.

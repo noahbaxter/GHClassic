@@ -32,7 +32,8 @@ namespace gh2
 {
     namespace
     {
-        constexpr const char *kFolders[] = {"world/", "char/"};
+        constexpr const char *kVenues = "world/";
+        constexpr const char *kFolders[] = {kVenues, "char/"};
         constexpr const char *kGuitars = "char/og/guitars/gen/";
         // The track: the PS2's scene, and the one of the 360's two that it
         // draws (its track.milo_xbox is the PS2's, object for object).
@@ -201,7 +202,8 @@ namespace gh2
 
         std::optional<ark::Made> make(const Discs &discs, const std::string &path, const std::string &twin)
         {
-            if (settings::get(settings::kModels) != settings::kX360)
+            if (!settings::hd(path == kTrack ? settings::kHighway
+                              : path.starts_with(kVenues) ? settings::kVenues : settings::kCharacters))
                 return std::nullopt;
             Looks looks;
             auto converted = convert(discs, twin, path, looks);
@@ -236,7 +238,7 @@ namespace gh2
                     scenes.emplace_back(twin, gh2x::ps2Path(twin));
         // Read now, as the track's file can only have one maker: with the
         // PS2's models its 360 pictures are gh2x/textures.cpp's to swap in.
-        if (settings::get(settings::kModels) == settings::kX360)
+        if (settings::hd(settings::kHighway))
             scenes.emplace_back(kTrackTwin, kTrack);
         discs->any = discs->ps2;
         for (const auto &scene : scenes)

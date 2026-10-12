@@ -95,16 +95,18 @@ namespace gh2::settings
             {"menu_music", Type::kChoice, 0, 4, 1, kMusicTheme, "theme gh1 gh2 gh80s all"},
             // Retail plays one loop over and over.
             {"menu_music_order", Type::kChoice, 0, 2, 1, kOrderLoop, "playlist loop shuffle"},
-            // x360: the 360 disc's sharper pictures on the track, HUD and
-            // menus, taken as each scene loads (gh2x/textures.h).
-            {"textures", Type::kChoice, 0, 1, 1, kPs2, "ps2 x360"},
-            // x360: the 360 disc's venues, characters and guitars, converted
-            // as each scene loads (gh2x/models.h).
-            {"models", Type::kChoice, 0, 1, 1, kPs2, "ps2 x360"},
-            // x360: lit meshes shaded per pixel as the 360's standard.fx does,
+            // hd: the 360 disc's venues, characters and guitars, and its
+            // track, each converted as its scene loads (gh2x/models.h).
+            {"venues", Type::kChoice, 0, 1, 1, kClassic, "classic hd"},
+            {"characters", Type::kChoice, 0, 1, 1, kClassic, "classic hd"},
+            {"highway", Type::kChoice, 0, 1, 1, kClassic, "classic hd"},
+            // hd: the 360 disc's sharper pictures on the HUD and menus, taken
+            // as each scene loads (gh2x/textures.h).
+            {"ui_art", Type::kChoice, 0, 2, 1, kUiClassic, "auto classic hd"},
+            // hd: lit meshes shaded per pixel as the 360's standard.fx does,
             // with its maps and its light range of 0 to 4, then its bloom and
             // luminance ramp (host/shaders/x360.frag). Read at startup.
-            {"shading", Type::kChoice, 0, 1, 1, kPs2, "ps2 x360"},
+            {"lighting", Type::kChoice, 0, 1, 1, kClassic, "classic hd"},
         };
 
         // By its name, or one it went by before.
@@ -270,6 +272,13 @@ namespace gh2::settings
     int get(Key key)
     {
         return state().value[key];
+    }
+
+    bool hd(Key key)
+    {
+        if (key == kUiArt && get(kUiArt) != kUiAuto)
+            return get(kUiArt) == kUiHd;
+        return get(key == kUiArt ? kHighway : key) == kHd;
     }
 
     bool isSet(Key key)
