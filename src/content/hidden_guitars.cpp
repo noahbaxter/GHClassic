@@ -2,6 +2,7 @@
 
 #include "content/campaigns.h"
 #include "content/locale.h"
+#include "content/tour_or_higher.h"
 #include "disc/ark.h"
 #include "dta.h"
 #include "formats/dtb.h"
@@ -31,9 +32,9 @@ namespace gh2
             {"explorer", "exp_lipstick", "xplorer", "guitar_xplorer_lipstick.mat", 550},
         };
         // The controller costs more than any guitar the disc sells (5000),
-        // and is earned as this reward guitar is.
+        // and is earned as this reward guitar is, on hard (2) or above.
         constexpr const char *kController = "guitar_red_octane", *kEarnedAs = "snaketapus_reward";
-        constexpr int32_t kControllerPrice = 6000;
+        constexpr int32_t kControllerPrice = 6000, kControllerFrom = 2;
         constexpr const char *kAir = "air_guitar", *kAirMat = "guitar_lespaul_burst.mat";
         constexpr int32_t kAirPrice = 1000;
 
@@ -190,12 +191,12 @@ namespace gh2
                 skins->nodes.push_back(skin(f.key, f.outfit, f.mat));
                 finishes->nodes.push_back(priced(f.key, f.price));
             }
-        // A guitar, in stock once its tour is passed (StoreGuitarProvider::
-        // InStock, 0x119a70).
+        // A guitar, in stock once hard's tour or expert's is passed
+        // (StoreGuitarProvider::InStock, 0x119a70).
         std::vector<dtb::Node> terms;
-        for (const char *key : {"require", "difficulty"})
-            if (const dtb::Node *term = child(*earned, key))
-                terms.push_back(*term);
+        if (const dtb::Node *term = child(*earned, "require"))
+            terms.push_back(*term);
+        terms.push_back(array({symbol("difficulty"), {dtb::kInt, kControllerFrom | kOrHigher, 0.0f, {}, {}}}));
         if (dtb::Node *type = child(*controller, "type"); type && type->nodes.size() > 1u)
             type->nodes[1] = symbol("guitar");
         controller->nodes.insert(controller->nodes.begin() + 2, terms.begin(), terms.end());

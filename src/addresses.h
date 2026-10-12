@@ -204,6 +204,8 @@ namespace gh2
         uint32_t swizzle4[2];
         uint32_t streamEndMs; // the float Stream::SetJump takes for a file's end
         uint32_t scriptTaskVtable;
+        uint32_t allSongsPassed;    // Campaign::AllSongsPassed(Difficulty)
+        uint32_t allSongsFiveStars; // Campaign::AllSongsFiveStars(Difficulty)
     };
 
     // Guitar Hero II (USA), SLUS-21447.
@@ -401,5 +403,7 @@ namespace gh2
         .swizzle4 = {0x3de248u, 0x3de2c8u},
         .streamEndMs = 0x43311cu,
         .scriptTaskVtable = 0x3f3510u, // as ScriptTask's ctor (0x2c5040) stores it
+        .allSongsPassed = 0x12d890u,
+        .allSongsFiveStars = 0x12d8d8u,
     };
 }

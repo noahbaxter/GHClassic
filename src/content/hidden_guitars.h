@@ -9,7 +9,7 @@
 //   guitar_red_octane   the controller as a guitar: a cheat's in GH1, and in
 //                       the config here as a cheat's that no cheat picks.
 //                       Earned as the reward guitars are, by passing hard's
-//                       tour, then bought
+//                       tour or expert's, then bought
 //   air_guitar          what the air guitar cheat swaps in (long_cheats.dta):
 //                       the hands' bones and no guitar
 //
