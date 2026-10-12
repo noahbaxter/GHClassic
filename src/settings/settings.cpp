@@ -368,4 +368,30 @@ namespace gh2::settings
         state().set[key] = true;
         save();
     }
+
+    void rereadGraphics()
+    {
+        std::error_code error;
+        const auto written = std::filesystem::last_write_time(path(), error);
+        static auto seen = written;
+        if (error || written == seen)
+            return;
+        seen = written;
+        std::ifstream in(path());
+        for (std::string line; std::getline(in, line);)
+        {
+            const auto pair = assignment(line);
+            const Entry *entry = pair ? entryNamed(pair->first) : nullptr;
+            if (!entry)
+                continue;
+            const Key key = static_cast<Key>(entry - kEntries);
+            int value = 0;
+            if ((key != kBand && (key < kVenues || key > kGraphics)) || !parse(*entry, pair->second, value) ||
+                value == state().value[key])
+                continue;
+            state().value[key] = value;
+            state().set[key] = true;
+            std::cerr << "[settings] " << entry->name << " now " << pair->second << std::endl;
+        }
+    }
 }

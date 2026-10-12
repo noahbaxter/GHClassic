@@ -135,6 +135,10 @@ namespace gh2::settings
     bool isSet(Key key);
     // Snapped to the entry's step and range; written to settings.ini at once.
     void set(Key key, int value);
+    // The graphics keys and kBand taken again from settings.ini when it has
+    // been written since last asked: one edited while the game runs counts
+    // from the next thing loaded, and kLighting at once.
+    void rereadGraphics();
 
     // Read and write `path` in place of the user data directory's
     // settings.ini. Before the first get or set.
