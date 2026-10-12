@@ -32,6 +32,7 @@
 (expect {campaign is_unlocked sg_white} 0)
 {campaign buy_item sg_worn 0}
 {campaign buy_item grim 0}
+{campaign buy_item guitar_red_octane 0}
 {campaign buy_item battleaxe 0}
 {set $ghc_switch gh2}
 {set $ghc_switch_next main_screen}
@@ -48,11 +49,12 @@
 (expect {campaign is_unlocked battleaxe} 0)
 (expect {campaign is_unlocked scythe_gh1} 1)
 
-; The picker on each, then a song with it.
+; The picker on each, then a song with it. A guitar on show turns once in
+; four seconds, so a shot four in sees its front.
 {game set_guitar sg sg_worn}
 {ui goto_screen ghc_qp_guitar_screen}
 (wait_screen ghc_qp_guitar_screen)
-(wait 3)
+(wait 4)
 (expect {sel_guitar_panel get_selected_guitar 0} sg)
 (expect {sel_guitar_panel get_selected_skin 0} sg_worn)
 (shot picker_sg_worn)
@@ -61,7 +63,7 @@
 {game set_guitar tobac tobac_sunburst}
 {ui goto_screen ghc_qp_guitar_screen}
 (wait_screen ghc_qp_guitar_screen)
-(wait 3)
+(wait 4)
 (expect {sel_guitar_panel get_selected_guitar 0} tobac)
 (shot picker_tobac)
 {ui goto_screen main_screen}
@@ -84,10 +86,33 @@
 (shot scythe_gh1_far)
 #include common/guitar_near.dta
 (shot scythe_gh1)
-{set $ghc_finish scythe}
-#include common/guitar_shot.dta
-#include common/guitar_near.dta
-(shot scythe)
+; A scythe and a controller are each game's own, one guitar's finishes here:
+; GH1's of each and not GH2's, whose Grim Ripper and controller no band has.
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+{game set_guitar scythe scythe_gh1}
+{ui goto_screen ghc_qp_guitar_screen}
+(wait_screen ghc_qp_guitar_screen)
+(wait 4)
+(expect {sel_guitar_panel get_selected_guitar 0} scythe)
+(expect {sel_guitar_panel get_selected_skin 0} scythe_gh1)
+(expect {if_else {find_exists $syscfg guitars scythe skins scythe_gh1} 1 0} 1)
+(expect {if_else {find_exists $syscfg guitars scythe skins scythe} 1 0} 0)
+(expect {if_else {find_exists $syscfg guitars guitar_red_octane skins guitar_red_octane} 1 0} 1)
+(expect {campaign is_unlocked guitar_red_octane} 1)
+(expect {campaign is_unlocked guitar_red_octane_gh2} 0)
+(shot picker_scythe)
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+{game set_guitar guitar_red_octane guitar_red_octane}
+{ui goto_screen ghc_qp_guitar_screen}
+(wait_screen ghc_qp_guitar_screen)
+(wait 4)
+(expect {sel_guitar_panel get_selected_guitar 0} guitar_red_octane)
+(expect {sel_guitar_panel get_selected_skin 0} guitar_red_octane)
+(shot picker_controller)
+{ui goto_screen main_screen}
+(wait_screen main_screen)
 {set $ghc_character grim}
 {set $ghc_guitar sg}
 {set $ghc_finish sg_worn}

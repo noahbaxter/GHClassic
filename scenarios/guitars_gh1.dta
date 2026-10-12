@@ -20,6 +20,12 @@
 (expect {elem {find $syscfg store skin lp_dbl_custom price} 1} 250)
 (expect {size {find $syscfg store skin}} 32)
 (expect {elem {find $syscfg store skin fv_black price} 1} 250)
+; The controller GH1 came with, black, and the air guitar: its cheats' on
+; the disc, its store's here.
+(expect {elem {find $syscfg store guitar guitar_red_octane price} 1} 6000)
+(expect {size {find $syscfg guitars guitar_red_octane skins}} 2)
+(expect {elem {elem {find $syscfg guitars guitar_red_octane skins} 1} 0} guitar_red_octane)
+(expect {elem {find $syscfg guitars air_guitar type} 1} guitar)
 ; GH1's names, for a finish of GH2's and for ones that are not.
 (expect {localize sg_cherry} "Cherry Gibson SG")
 (expect {localize sg_ebony} "Ebony Gibson SG")

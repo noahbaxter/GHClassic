@@ -122,6 +122,14 @@ namespace gh2::campaigns
     // finishes of them, and whole each guitar it has none of, each once,
     // for the pickers outside a career.
     const std::string &lendFinishes();
+    // A script for the finishes named as a guitar is (GH2's scythe, the
+    // discs' controller), which the game cannot tell from the guitar: it is
+    // unlocked whenever its guitar is. So the config has one only where it
+    // is to be picked: outside a career where its own game's career has
+    // its guitar (or the unlock-all cheat is on), in a career the active
+    // game's. That makes each game's scythe and controller its own finish
+    // of one guitar outside a career. After lendFinishes.
+    std::string ownFinishes(uint8_t *rdram);
     // `game`'s own outfits, in its config's order.
     std::vector<std::string> outfits(const std::string &game);
     // In a career, where every pick is its own game's: the game's mode is

@@ -9,7 +9,11 @@
 //   guitar_red_octane   the controller as a guitar: a cheat's in GH1, and in
 //                       the config here as a cheat's that no cheat picks.
 //                       Earned as the reward guitars are, by passing hard's
-//                       tour or expert's, then bought
+//                       tour or expert's, then bought. Each game's is the
+//                       one it came with and no other: GH1's the black one
+//                       on the discs, the others' GH2's red, painted from
+//                       it. Outside a career they are one guitar's finishes
+//                       (content/campaigns.h)
 //   air_guitar          what the air guitar cheat swaps in (long_cheats.dta):
 //                       the hands' bones and no guitar
 //
@@ -29,10 +33,11 @@ namespace gh2
     // turn. False if its mesh cannot be read.
     bool faceGuitarFront(milo::Dir &scene, const gh1::Xfm &stand);
 
-    // Those four in a game's guitars and its store's, for every game whose
-    // disc holds them: GH2's, the 360's and the 80s'. False, with nothing
+    // Those in a game's guitars and its store's, for every game whose disc
+    // holds them: all four in GH2's, the 360's and the 80s', and with `gh1`
+    // the controller and the air guitar in GH1's. False, with nothing
     // changed, if the two are not that game's config.
-    bool offerHiddenGuitars(dtb::Node &guitars, dtb::Node &store);
+    bool offerHiddenGuitars(dtb::Node &guitars, dtb::Node &store, bool gh1);
 
     // After ark::install, and before locale::install.
     void installHiddenGuitars();

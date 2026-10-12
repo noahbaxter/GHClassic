@@ -117,7 +117,8 @@ namespace gh2::quickplay
             const bool free = !campaigns::inCareer(rdram);
             script::run(rdram, ctx, runtime,
                         std::string("{if {find_exists $syscfg guitars scythe type} {set_elem {find $syscfg guitars scythe type} 1 ") +
-                            (free ? "guitar" : "grim") + "}}\n" + (free ? campaigns::lendFinishes() : std::string()));
+                            (free ? "guitar" : "grim") + "}}\n" + (free ? campaigns::lendFinishes() : std::string()) +
+                            campaigns::ownFinishes(rdram));
             const uint32_t character = load<uint32_t>(rdram, provider + kProviderCharacter);
             const bool grim = free && character != 0u &&
                               std::string(reinterpret_cast<const char *>(getMemPtr(rdram, character))) == "grim";

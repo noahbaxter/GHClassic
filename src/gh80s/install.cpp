@@ -64,7 +64,7 @@ namespace gh2
             dtb::Macros none;
             auto guitars = dtb::read("config/guitars.dta", none, theirs);
             auto store = dtb::read("config/store.dta", none, theirs);
-            if (guitars && store && offerHiddenGuitars(*guitars, *store))
+            if (guitars && store && offerHiddenGuitars(*guitars, *store, false))
             {
                 ark::addFile(layer, "config/gen/guitars.dtb", dtb::write(*guitars));
                 ark::addFile(layer, "config/gen/store.dtb", dtb::write(*store));

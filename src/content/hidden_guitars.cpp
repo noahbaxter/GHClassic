@@ -33,8 +33,8 @@ namespace gh2
             {"explorer", "exp_lipstick", "xplorer", "guitar_xplorer_lipstick.mat", 550},
         };
         // The controller costs more than any guitar the disc sells (5000),
-        // and is earned as this reward guitar is, on hard (2) or above.
-        constexpr const char *kController = "guitar_red_octane", *kEarnedAs = "snaketapus_reward";
+        // and is earned as a reward guitar is, on hard (2) or above.
+        constexpr const char *kController = "guitar_red_octane";
         constexpr int32_t kControllerPrice = 6000, kControllerFrom = 2;
         // GH2's own controller, which no disc has: the first game's with its
         // black plastic red, its white pickguard black and its neck black,
@@ -42,7 +42,6 @@ namespace gh2
         constexpr const char *kRed = "guitar_red_octane_gh2", *kRedMat = "guitar_redoctane_gh2.mat";
         constexpr const char *kRedTex = "redoctane_gh2.tex", *kControllerTex = "redoctane.tex";
         constexpr const char *kControllerMat = "guitar_redoctane.mat";
-        constexpr int32_t kRedPrice = 550;
         constexpr const char *kAir = "air_guitar", *kAirMat = "guitar_lespaul_burst.mat";
         constexpr int32_t kAirPrice = 1000;
 
@@ -257,32 +256,35 @@ namespace gh2
         return faceFront(scene, stand);
     }
 
-    bool offerHiddenGuitars(dtb::Node &guitars, dtb::Node &store)
+    bool offerHiddenGuitars(dtb::Node &guitars, dtb::Node &store, bool gh1)
     {
         dtb::Node *sold = child(store, "guitar"), *finishes = child(store, "skin");
-        dtb::Node *controller = child(guitars, kController), *earned = child(guitars, kEarnedAs);
-        if (!sold || !finishes || !controller || !earned)
+        dtb::Node *controller = child(guitars, kController);
+        if (!sold || !finishes || !controller)
             return false;
         for (const Finish &f : kFinishes)
-            if (dtb::Node *skins = child(guitars, f.guitar) ? child(*child(guitars, f.guitar), "skins") : nullptr)
+            if (dtb::Node *skins = !gh1 && child(guitars, f.guitar) ? child(*child(guitars, f.guitar), "skins") : nullptr)
             {
                 skins->nodes.push_back(skin(f.key, f.outfit, f.mat));
                 finishes->nodes.push_back(priced(f.key, f.price));
             }
-        // A guitar, in stock once hard's tour or expert's is passed
-        // (StoreGuitarProvider::InStock, 0x119a70).
-        std::vector<dtb::Node> terms;
-        if (const dtb::Node *term = child(*earned, "require"))
-            terms.push_back(*term);
-        terms.push_back(array({symbol("difficulty"), {dtb::kInt, kControllerFrom | kOrHigher, 0.0f, {}, {}}}));
+        // A guitar, in stock once hard's tour or expert's is passed, as a
+        // reward guitar is once its one is (StoreGuitarProvider::InStock,
+        // 0x119a70).
+        const std::vector<dtb::Node> terms = {
+            array({symbol("require"), symbol("tour_passed")}),
+            array({symbol("difficulty"), {dtb::kInt, kControllerFrom | kOrHigher, 0.0f, {}, {}}})};
         if (dtb::Node *type = child(*controller, "type"); type && type->nodes.size() > 1u)
             type->nodes[1] = symbol("guitar");
+        else
+            controller->nodes.insert(controller->nodes.begin() + 1, array({symbol("type"), symbol("guitar")}));
         controller->nodes.insert(controller->nodes.begin() + 2, terms.begin(), terms.end());
         sold->nodes.push_back(priced(kController, kControllerPrice));
-        if (dtb::Node *skins = child(*controller, "skins"))
+        // Each game's is the controller it came with, and that one alone.
+        if (dtb::Node *skins = child(*controller, "skins"); skins && !gh1)
         {
+            skins->nodes.resize(1u);
             skins->nodes.push_back(skin(kRed, kControllerScene, kRedMat));
-            finishes->nodes.push_back(priced(kRed, kRedPrice));
         }
         guitars.nodes.push_back(array({symbol(kAir), array({symbol("type"), symbol("guitar")}),
                                        array({symbol("skins"), skin(kAir, kAir, kAirMat)})}));
@@ -301,7 +303,7 @@ namespace gh2
         dtb::Macros none;
         auto guitars = dtb::read("config/guitars.dta", none, game);
         auto store = dtb::read("config/store.dta", none, game);
-        if (!guitars || !store || !offerHiddenGuitars(*guitars, *store))
+        if (!guitars || !store || !offerHiddenGuitars(*guitars, *store, false))
         {
             std::cerr << "[guitars] cannot read the game disc's guitars and store" << std::endl;
             return;

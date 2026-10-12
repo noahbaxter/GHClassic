@@ -148,7 +148,7 @@ namespace gh2
             if (dtb::Node *songs = child(*store, "song"))
                 rename(*songs);
             requireAs(*guitars, *theirGuitars);
-            offerHiddenGuitars(*guitars, *store);
+            offerHiddenGuitars(*guitars, *store, false);
             // loading_tip13 is about the Xbox Live leaderboards.
             for (dtb::Node &list : tips->nodes)
                 std::erase_if(list.nodes, [](const dtb::Node &n) { return keyOf(n) == "loading_tip13"; });

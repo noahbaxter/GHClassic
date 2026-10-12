@@ -25,6 +25,7 @@
 #include "gh1/career.h"
 
 #include "content/campaigns.h"
+#include "content/hidden_guitars.h"
 #include "content/locale.h"
 #include "disc/ark.h"
 #include "formats/dtb.h"
@@ -278,6 +279,9 @@ namespace gh2::gh1
                 }
         store.nodes.push_back(list);
         store.nodes.push_back(array({symbol("outfit")}));
+        // The controller and the air guitar, cheats' on GH1's disc, are its
+        // store's (content/hidden_guitars.h).
+        offerHiddenGuitars(*guitars, store, true);
 
         // Tips: GH1's are the general ones.
         if (dtb::Node *general = child(*tips, "tips_general"))

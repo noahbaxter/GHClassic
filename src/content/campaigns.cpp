@@ -1213,6 +1213,39 @@ namespace gh2::campaigns
         return text;
     }
 
+    std::string ownFinishes(uint8_t *rdram)
+    {
+        std::set<std::string> names;
+        for (const Campaign &campaign : s_campaigns)
+            for (const Guitar &guitar : usable(campaign).guitars)
+                names.insert(guitar.as.empty() ? guitar.key : guitar.as);
+        const uint32_t held = load<uint32_t>(rdram, s_addresses->theCampaign);
+        const bool career = inCareer(rdram), all = held != 0u && load<uint32_t>(rdram, held + kAllAccess) != 0u;
+        // Each such finish by its guitar and key: what it is, and whether
+        // the config is to have it.
+        std::map<std::pair<std::string, std::string>, std::pair<std::string, bool>> finishes;
+        for (size_t i = 0; i < s_campaigns.size(); ++i)
+            for (const Guitar &guitar : usable(s_campaigns[i]).guitars)
+                for (const auto &skin : guitar.skins)
+                    if (names.count(skin[0]) != 0u)
+                    {
+                        auto &finish = finishes[{guitar.as.empty() ? guitar.key : guitar.as, skin[0]}];
+                        finish.first = "(" + skin[0] + " (outfit " + skin[1] + ") (mat " + skin[2] + "))";
+                        finish.second = finish.second ||
+                                        (career ? i == s_active : all || unlockedIn(s_campaigns[i].game, guitar.key));
+                    }
+        std::string text;
+        for (const auto &[at, finish] : finishes)
+        {
+            const std::string skins = "$syscfg guitars " + at.first + " skins";
+            text += finish.second ? "{if {&& {find_exists " + skins + "} {! {find_exists " + skins + " " + at.second +
+                                        "}}} {push_back {find " + skins + "} " + finish.first + "}}\n"
+                                  : "{if {find_exists " + skins + " " + at.second + "} {remove_elem {find " + skins + "} {find " +
+                                        skins + " " + at.second + "}}}\n";
+        }
+        return text;
+    }
+
     std::vector<std::string> outfits(const std::string &game)
     {
         const auto index = indexOf(game);
