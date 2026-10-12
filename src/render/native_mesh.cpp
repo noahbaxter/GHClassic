@@ -228,8 +228,10 @@ namespace gh2
                 draw.mesh = std::move(geometry);
                 draw.environment = currentEnviron();
                 trackEnviron(rdram, ctx, runtime, mesh, draw.environment);
+                const std::string name = objectName(rdram, mesh);
+                draw.strings = name == "strings.mesh";
                 if (drawDumpPending())
-                    draw.name = objectName(rdram, mesh);
+                    draw.name = name;
                 const Frame &frame = building();
                 if (frame.casting >= 0)
                 {

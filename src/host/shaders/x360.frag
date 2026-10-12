@@ -54,6 +54,7 @@ const uint kFlagRamp = 1u << 19;
 const uint kFlagCube = 1u << 20;
 const uint kFlagNormalize = 1u << 21;
 const uint kFlagShadow = 1u << 22;
+const uint kFlagCutHalf = 1u << 23;
 
 // shadowfactor.fx's ComputeShadowFactor: how much of the first light reaches
 // a character's pixel, from taps of its shadow map two texels about. The 360
@@ -200,6 +201,19 @@ void main()
     color *= vFade.xxxy;
     color.rgb = clamp(color.rgb, 0.0, 4.0);
     color.a = min(color.a, 1.0);
+    // Unblended, its alpha is how many of the pixel's samples it covers, so
+    // a thin string still shows as part of a pixel; with one sample, cut at
+    // a half.
+    int covered = -1;
+    if ((pc.flags & kFlagCutHalf) != 0u)
+    {
+        int count = int(floor(color.a * max(data[b + 6].z, 1.0) + 0.5));
+        if (count == 0)
+            discard;
+        covered = (1 << count) - 1;
+        color.a = 1.0;
+    }
+    gl_SampleMask[0] = covered;
     if ((pc.flags & kFlagAlphaCut) != 0u && color.a < 1.0 / 128.0)
         discard;
     if ((pc.flags & kFlagSetAlpha) != 0u)

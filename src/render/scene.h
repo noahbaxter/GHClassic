@@ -182,6 +182,8 @@ namespace gh2
         // what reaches past the GS's window is left out (scene_renderer.cpp,
         // inWindow).
         bool crowd = false;
+        // A 360 guitar's strings, by their mesh's name (strings.mesh).
+        bool strings = false;
         // The mesh's name, only while a draw dump is asked for.
         std::string name;
         // The 360's character shadows (Frame::shadows). A caster is

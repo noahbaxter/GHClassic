@@ -581,7 +581,7 @@ namespace gh2
         // By blend and z mode, built on first use.
         VkPipeline pipelines[kPipelineCount]{};
 
-        // The x360 shading, from the shading setting at startup: its own
+        // The x360 shading, by the lighting setting as record last saw it: its own
         // shader pair and pipelines, a float colour target, and the post
         // stage (runPost). Its pipeline layout matches the PS2's in sets 0
         // and 1 and adds the maps as set 2 and the shadow map as set 3.
@@ -2483,6 +2483,8 @@ namespace gh2
                     shadow = viewProjection(frame.cameras[frame.shadows[static_cast<size_t>(shadowOf[i])]], frame.yRatio);
                 writeShading(frame.draws[i], camera < frame.cameras.size() ? frame.cameras[camera].eye : kNoEye,
                              shadowOf[i] >= 0 ? &shadow : nullptr, data.mapped + lightBases[i]);
+                // The pass's samples a pixel, for a card drawn by coverage.
+                data.mapped[lightBases[i] + 6].v[2] = static_cast<float>(s.samples);
             }
             else if (lightBases[i] >= 0)
                 writeLighting(frame.draws[i], data.mapped + lightBases[i]);
@@ -2644,8 +2646,19 @@ namespace gh2
             // clears the bit where retail leaves it.
             const bool noZWrite = material.zMode == milo::mat::kZDisable || material.zMode == milo::mat::kZTransparent;
             const uint32_t blend = x360Draws[i] ? fadedBlend(draw) : material.blend;
-            if (material.alphaCut || (blend == milo::mat::kBlendSrcAlpha && noZWrite))
+            // A 360 Mat that blends by alpha and writes depth (a guitar's
+            // strings, lines on a clear card over its neck) leaves no depth
+            // where it is clear: what is drawn later behind the card shows.
+            if (material.alphaCut || (blend == milo::mat::kBlendSrcAlpha && (noZWrite || x360Draws[i])))
                 push.flags |= kFlagAlphaCut;
+            // A guitar's strings are drawn straight after it, before the
+            // room behind: a texel blended there mixes with the cleared
+            // picture, black, and its depth keeps the room out. They are
+            // drawn by coverage and not blended: the strings alone, by their
+            // mesh's name, as a venue's glow card of the same Mat state is
+            // faint all over and would come out a grey block.
+            if (x360Draws[i] && blend == milo::mat::kBlendSrcAlpha && !noZWrite && draw.strings)
+                push.flags |= kFlagCutHalf;
             // A crowd card's outline, cut at the GS's 1, runs along its
             // sheet's texels; cut at a half it runs between them, straight
             // where the sheet is drawn larger than it is.
