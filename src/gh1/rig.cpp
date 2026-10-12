@@ -593,6 +593,12 @@ namespace gh2
                     for (const std::string &n : viewMeshes(gh1.bodies[i], meshes))
                         if (std::find(drawn.begin(), drawn.end(), n) == drawn.end())
                             drawn.push_back(n);
+            // The strings are a sheet seen through between them, so they are
+            // drawn over the body, as every guitar's view has them but the
+            // tobacco guitar's, which lists them first and would hide its
+            // neck behind them.
+            std::stable_partition(drawn.begin(), drawn.end(),
+                                  [](const std::string &n) { return n.find("strings") == std::string::npos && n.find("fire") == std::string::npos; });
 
             // GH2's shadow group stays, with the Mat its meshes are drawn
             // in. GH1 has no shadow mesh of a guitar: the body's own meshes
