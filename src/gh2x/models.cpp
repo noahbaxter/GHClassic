@@ -140,8 +140,18 @@ namespace gh2
                 {
                     // Normal, glow, specular, diffuse ramp and cube, as
                     // matToPs2 lists them.
+                    // A map its own scene has no Tex for is the venue's
+                    // geometry scene's, loaded into the same room (battle's
+                    // lamps in its lighting scene).
+                    const size_t part = twin.rfind('_', twin.rfind('.'));
+                    const std::string geom = part == std::string::npos ? twin : twin.substr(0u, part) + "_geom.milo_xbox";
                     const auto map = [&](size_t i)
-                    { return shading.maps[i].empty() ? 0u : textures::add({discs.xbox, twin, shading.maps[i]}); };
+                    {
+                        const std::string &name = shading.maps[i];
+                        if (name.empty())
+                            return 0u;
+                        return textures::add({discs.xbox, milo::find(*other, name) ? twin : geom, name});
+                    };
                     look::Look &look = looks[mat];
                     look.diffuse = shading.diffuse.empty() ? 0u : textures::add({discs.xbox, twin, shading.diffuse});
                     look.normal = map(0u);
