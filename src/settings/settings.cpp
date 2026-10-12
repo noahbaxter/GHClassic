@@ -115,6 +115,7 @@ namespace gh2::settings
             {"characters", Type::kChoice, 0, 1, 1, kSd, "sd hd"},
             {"guitars", Type::kChoice, 0, 1, 1, kSd, "sd hd"},
             {"highway", Type::kChoice, 0, 2, 1, kHighwayClassic, "auto classic hd"},
+            {"frame_log", Type::kBool, 0, 1, 1, 0},
         };
 
         const Entry *entryNamed(const std::string &name)
@@ -374,6 +375,11 @@ namespace gh2::settings
             return made;
         }();
         return dir + file;
+    }
+
+    std::string besideSettings(const std::string &file)
+    {
+        return (std::filesystem::path(path()).parent_path() / file).string();
     }
 
     void set(Key key, int value)

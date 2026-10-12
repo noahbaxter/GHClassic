@@ -23,6 +23,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <iostream>
 #include <mutex>
 #include <string>
@@ -169,6 +170,83 @@ namespace gh2
         }
 
         SceneRenderer scene;
+
+        // settings.ini's [dev] frame_log: a row per presented frame in
+        // frametimes.csv beside the settings, put on disk once a second, and
+        // a line in the log for any frame over kSlowMs with what it did. The
+        // GPU's times are of a frame a few before the row's.
+        struct FrameLog
+        {
+            static constexpr double kSlowMs = 20.0;
+            using Clock = std::chrono::steady_clock;
+
+            bool on = false;
+            std::ofstream out;
+            Clock::time_point start{}, lastPresent{}, lastFlush{};
+            uint64_t lastGame = 0;
+
+            static double ms(Clock::duration d)
+            {
+                return std::chrono::duration<double, std::milli>(d).count();
+            }
+
+            void open()
+            {
+                on = settings::get(settings::kFrameLog) != 0;
+                if (!on)
+                    return;
+                const std::string path = settings::besideSettings("frametimes.csv");
+                out.open(path, std::ios::trunc);
+                if (!out)
+                {
+                    std::cerr << "[frame] could not write " << path << std::endl;
+                    on = false;
+                    return;
+                }
+                out << "t_ms,dt_ms,new,game,wait_ms,acq_ms,rec_ms,mesh_new,tex_new,upload_kb,evicted,gpu_ms";
+                for (const char *span : kGpuSpans)
+                    out << ",gpu_" << span << "_ms";
+                out << "\n";
+                start = lastPresent = lastFlush = Clock::now();
+                std::cerr << "[frame] logging to " << path << std::endl;
+            }
+
+            void add(bool isNew, uint64_t game, double waitMs, double acqMs, double recMs, const SceneStats &scene)
+            {
+                const Clock::time_point now = Clock::now();
+                const double dtMs = ms(now - lastPresent);
+                lastPresent = now;
+                const uint64_t newGame = game - std::min(game, lastGame);
+                lastGame = game;
+                float gpuMs = 0.0f;
+                for (float span : scene.gpuMs)
+                    gpuMs += span;
+                char row[160];
+                std::snprintf(row, sizeof(row), "%.2f,%.2f,%d,%llu,%.2f,%.2f,%.2f,%u,%u,%llu,%u,%.2f",
+                              ms(now - start), dtMs, isNew ? 1 : 0, static_cast<unsigned long long>(newGame), waitMs,
+                              acqMs, recMs, scene.meshesCreated, scene.texturesCreated,
+                              static_cast<unsigned long long>(scene.uploadBytes >> 10), scene.evicted, gpuMs);
+                out << row;
+                for (float span : scene.gpuMs)
+                {
+                    std::snprintf(row, sizeof(row), ",%.2f", span);
+                    out << row;
+                }
+                out << "\n";
+                if (dtMs > kSlowMs)
+                    std::cerr << "[frame] " << static_cast<int>(dtMs) << " ms: wait " << static_cast<int>(waitMs)
+                              << ", acq " << static_cast<int>(acqMs) << ", rec " << static_cast<int>(recMs)
+                              << ", gpu " << static_cast<int>(gpuMs) << ", +" << scene.meshesCreated << " meshes, +"
+                              << scene.texturesCreated << " tex (" << (scene.uploadBytes >> 10) << " KB), "
+                              << scene.evicted << " evicted" << std::endl;
+                if (now - lastFlush >= std::chrono::seconds(1))
+                {
+                    out.flush();
+                    lastFlush = now;
+                }
+            }
+        };
+        FrameLog frameLog;
 
         bool createSwapchain()
         {
@@ -383,6 +461,7 @@ namespace gh2
     {
         m_state = std::make_unique<State>();
         State &s = *m_state;
+        s.frameLog.open();
         const PS2Runtime::HostOptions &options = runtime.hostOptions();
         s.hidden = options.hidden;
         s.shotDir = options.shotDir;
@@ -576,6 +655,8 @@ namespace gh2
         // Each game frame once, in order: wait up to half a display period for
         // the next, else show the last again. A game faster than the display
         // shows its newest.
+        using LogClock = State::FrameLog::Clock;
+        const LogClock::time_point waitStart = LogClock::now();
         bool isNew = false;
         if (!moviePlaying)
             isNew = s.newestOnly ? frames().latest(s.shown) : frames().next(s.shown, s.frameWait);
@@ -583,6 +664,9 @@ namespace gh2
         const Frame &frame = s.shown;
         const float displayAspect = moviePlaying ? 4.0f / 3.0f : frame.displayAspect;
 
+        // The fence wait and the acquire together: how long the GPU or the
+        // presentation queue held this frame back.
+        const LogClock::time_point acquireStart = LogClock::now();
         State::Slot &slot = s.slots[s.slot];
         vkWaitForFences(s.device.device, 1, &slot.done, VK_TRUE, UINT64_MAX);
 
@@ -629,6 +713,7 @@ namespace gh2
             width = std::max(rect.extent.width, 1u);
             height = std::max(rect.extent.height, 1u);
         }
+        const LogClock::time_point acquireEnd = LogClock::now();
         if (!s.ensureTarget(width, height))
             return false;
         vkResetFences(s.device.device, 1, &slot.done);
@@ -649,9 +734,11 @@ namespace gh2
         begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         vkBeginCommandBuffer(cmd, &begin);
 
+        const LogClock::time_point recordStart = LogClock::now();
         if (moviePlaying ? !s.recordMovie(cmd, slot)
                          : !s.scene.record(cmd, frame, s.target, s.targetWidth, s.targetHeight, s.presented))
             return false;
+        const LogClock::time_point recordEnd = LogClock::now();
 
         if (shot)
         {
@@ -691,6 +778,11 @@ namespace gh2
             if (presented == VK_ERROR_OUT_OF_DATE_KHR || presented == VK_SUBOPTIMAL_KHR)
                 s.swapchainStale = true;
         }
+        if (s.frameLog.on)
+            s.frameLog.add(isNew, frames().published(), State::FrameLog::ms(acquireStart - waitStart),
+                           State::FrameLog::ms(acquireEnd - acquireStart),
+                           State::FrameLog::ms(recordEnd - recordStart),
+                           moviePlaying ? SceneStats{} : s.scene.stats());
 
         if (shot)
         {

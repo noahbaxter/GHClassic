@@ -697,6 +697,43 @@ namespace gh2
         // Samples per pixel for every pass, from the msaa setting.
         VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
 
+        // The frame log's counts. With it on, each frame slot has a pool of
+        // the GPU's times: at record's start, then at each span's end
+        // (kGpuSpans).
+        SceneStats stats;
+        static constexpr uint32_t kTimes = 1u + std::size(kGpuSpans);
+        VkQueryPool times[kFrameSlots]{};
+        bool timed[kFrameSlots]{}; // the slot's pool has a frame's times
+        float timePeriod = 0.0f;   // nanoseconds a tick
+        uint32_t stamped = 0;      // times written this frame
+
+        // The times of the frame this slot last held, which the GPU has long
+        // finished, then the pool emptied for this one. Outside a render pass.
+        void takeTimes(VkCommandBuffer cmd, uint64_t serial)
+        {
+            const uint32_t slot = serial % kFrameSlots;
+            if (times[slot] == VK_NULL_HANDLE)
+                return;
+            uint64_t ticks[kTimes]{};
+            if (timed[slot] && vkGetQueryPoolResults(device, times[slot], 0, kTimes, sizeof(ticks), ticks,
+                                                     sizeof(uint64_t), VK_QUERY_RESULT_64_BIT) == VK_SUCCESS)
+                for (uint32_t span = 0; span + 1u < kTimes; ++span)
+                    stats.gpuMs[span] =
+                        static_cast<float>(static_cast<double>(ticks[span + 1u] - ticks[span]) * timePeriod * 1e-6);
+            vkCmdResetQueryPool(cmd, times[slot], 0, kTimes);
+            timed[slot] = true;
+            stamped = 0u;
+        }
+
+        // The next time: the frame's start, then the end of each span up to
+        // `through`, those the frame has none of ending where they begin.
+        // Outside a render pass: MoltenVK times a pass at its ends alone.
+        void stamp(VkCommandBuffer cmd, uint64_t serial, uint32_t through)
+        {
+            for (; times[serial % kFrameSlots] != VK_NULL_HANDLE && stamped <= through; ++stamped)
+                vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, times[serial % kFrameSlots], stamped);
+        }
+
         // The main pass and the target pass, alike but for the finished
         // image's layout, so every pipeline draws into either: passes are
         // only compatible when their attachments and dependencies match.
@@ -1203,6 +1240,8 @@ namespace gh2
             if (!createBuffer(staged.data(), staged.size(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, gpu.staging,
                               gpu.stagingMemory))
                 return nullptr;
+            ++stats.texturesCreated;
+            stats.uploadBytes += staged.size();
 
             VkImageCreateInfo imageInfo{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
             imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -1886,6 +1925,8 @@ namespace gh2
                                   VK_BUFFER_USAGE_INDEX_BUFFER_BIT, gpu.indices, gpu.indexMemory))
                     return nullptr;
                 gpu.indexCount = static_cast<uint32_t>(mesh->indices.size());
+                ++stats.meshesCreated;
+                stats.uploadBytes += mesh->verts.size() * sizeof(Vertex) + mesh->indices.size() * sizeof(uint16_t);
                 found = meshes.emplace(mesh.get(), std::move(gpu)).first;
             }
             found->second.lastUsed = serial;
@@ -2219,6 +2260,7 @@ namespace gh2
                 {
                     destroyMesh(it->second);
                     it = meshes.erase(it);
+                    ++stats.evicted;
                 }
                 else
                     ++it;
@@ -2230,6 +2272,7 @@ namespace gh2
                 {
                     destroyTexture(texture);
                     it = textures.erase(it);
+                    ++stats.evicted;
                     continue;
                 }
                 if (texture.staging != VK_NULL_HANDLE && texture.uploaded + kRetireAfter < serial)
@@ -2266,6 +2309,18 @@ namespace gh2
         State &s = *m_state;
         s.x360 = x360;
         s.colorFormat = s.x360 ? kHdrFormat : kColorFormat;
+        VkPhysicalDeviceProperties properties{};
+        vkGetPhysicalDeviceProperties(allocatorInfo.physicalDevice, &properties);
+        if (settings::get(settings::kFrameLog) && properties.limits.timestampComputeAndGraphics)
+        {
+            s.timePeriod = properties.limits.timestampPeriod;
+            VkQueryPoolCreateInfo timesInfo{VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO};
+            timesInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
+            timesInfo.queryCount = State::kTimes;
+            for (VkQueryPool &pool : s.times)
+                if (vkCreateQueryPool(device, &timesInfo, nullptr, &pool) != VK_SUCCESS)
+                    pool = VK_NULL_HANDLE;
+        }
         if (!(s.createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, false, false, s.renderPass) &&
               s.createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, true, false, s.firstPass) &&
               s.createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, true, true, s.resumePass) &&
@@ -2296,6 +2351,9 @@ namespace gh2
         if (!m_state)
             return;
         State &s = *m_state;
+        for (VkQueryPool pool : s.times)
+            if (pool != VK_NULL_HANDLE)
+                vkDestroyQueryPool(s.device, pool, nullptr);
         for (auto &entry : s.meshes)
             s.destroyMesh(entry.second);
         s.meshes.clear();
@@ -2382,6 +2440,10 @@ namespace gh2
         State &s = *m_state;
         if (!s.ensureAttachments(target, width, height))
             return false;
+        s.stats.meshesCreated = s.stats.texturesCreated = s.stats.evicted = 0u;
+        s.stats.uploadBytes = 0u;
+        s.takeTimes(cmd, serial);
+        s.stamp(cmd, serial, 0u);
 
         // Textures upload before the pass begins.
         std::vector<const GpuTexture *> drawTextures(frame.draws.size(), nullptr);
@@ -2844,6 +2906,7 @@ namespace gh2
             vkCmdEndRenderPass(cmd);
             boundPipeline = VK_NULL_HANDLE;
         }
+        s.stamp(cmd, serial, 1u);
 
         // Targets first, so a draw sampling one reads what this frame drew
         // into it, in order of first use.
@@ -2867,6 +2930,7 @@ namespace gh2
             vkCmdEndRenderPass(cmd);
             s.fillTargetLevels(cmd, *run.image);
         }
+        s.stamp(cmd, serial, 2u);
 
         VkClearValue clears[2]{};
         for (int i = 0; i < 4; ++i)
@@ -2897,7 +2961,9 @@ namespace gh2
                 vkCmdEndRenderPass(cmd);
                 if (post)
                 {
+                    s.stamp(cmd, serial, 3u);
                     s.runPost(cmd, frame, worldCamera, serial);
+                    s.stamp(cmd, serial, 5u);
                     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, s.layout, 1, 1, &data.set, 0,
                                             nullptr);
                     boundPipeline = VK_NULL_HANDLE;
@@ -2925,9 +2991,16 @@ namespace gh2
                 drawOne(i, static_cast<float>(width), static_cast<float>(height));
         }
         vkCmdEndRenderPass(cmd);
+        s.stamp(cmd, serial, 6u);
         if (s.x360)
             s.drawOutput(cmd, serial);
+        s.stamp(cmd, serial, 7u);
         s.retire(serial);
         return true;
+    }
+
+    SceneStats SceneRenderer::stats() const
+    {
+        return m_state ? m_state->stats : SceneStats{};
     }
 }

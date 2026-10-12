@@ -5,7 +5,7 @@
     tools/ghc.py build [disc] [--skip-recomp] [--no-lto]
     tools/ghc.py bind [--isolated] [keyboard | <n>]   set up a controller; with no device, list them
     tools/ghc.py arm [out] [--scenario <file>] [--speed <x>] [--secs 30] [--disc <image>] [--shot-every 60]
-                     [--res 1080p]
+                     [--res 1080p] [--set <name>=<value> ...]
     tools/ghc.py scenarios [-j 4] [--speed 2] [--review] [--discs gh2,gh1] [--releases] [name ...]
     tools/ghc.py release [--skip-build] [disc]  this platform's player package, into build/release
     tools/ghc.py ci                          what builds without a disc, into build/ci
@@ -379,7 +379,7 @@ def prune_runs(days=3):
 
 
 def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=None, res=None, games=None,
-        review=None, release=None):
+        review=None, release=None, settings=()):
     """One unattended run into out. Returns 'exited before Ns' or 'alive at Ns'.
     With review, its shot sheet goes to review/ under that name rather than out."""
     from PIL import Image
@@ -387,6 +387,9 @@ def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=N
     out = Path(out)
     shutil.rmtree(out, ignore_errors=True)
     (out / "frames").mkdir(parents=True)
+    # --set's lines, over the defaults.
+    if settings:
+        (out / "settings.ini").write_text("".join(f"{s.replace('=', ' = ', 1)}\n" for s in settings))
     out = out.resolve()
     if not built():
         sys.exit("no build; run tools/ghc.py build")
@@ -456,12 +459,14 @@ def cmd_arm(argv):
     parser.add_argument("--shot-every", type=int, default=60)
     parser.add_argument("--res", help="the game's own --res, the size frames and shots come out at")
     parser.add_argument("--discs", type=discs_arg, help="content discs to mount, as gh2,gh1; default every one in game/")
+    parser.add_argument("--set", action="append", default=[], metavar="NAME=VALUE", dest="settings",
+                        help="a settings.ini line over the defaults, e.g. msaa=1; may repeat")
     args = parser.parse_args(argv)
     name = Path(args.scenario).stem if args.scenario else "run"
     out = Path(args.out) if args.out else ROOT / "runs" / f"{time.strftime('%Y-%m-%d_%H%M%S')}_{name}"
     prune_runs()
     state = arm(out, args.scenario, args.speed, args.secs, args.disc, args.shot_every, res=args.res, games=args.discs,
-                review=Path(args.out).name if args.out else name)
+                review=Path(args.out).name if args.out else name, settings=args.settings)
     frames = len(list((out / "frames").iterdir()))
     print(f"{state}, {frames} frames, log {out.resolve() / 'run.log'}")
     stack = out / "stack.txt"
