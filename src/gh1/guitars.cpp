@@ -6,6 +6,7 @@
 #include "gh1/scene.h"
 #include "milo/milo.h"
 
+#include "content/hidden_guitars.h"
 #include "flyingv_old_layout.h"
 
 #include <algorithm>
@@ -130,6 +131,7 @@ namespace gh2::gh1
         // Tex ends in its bitmap.
         constexpr const char *kV = "fv_white", *kVMat = "fv_white.mat", *kVTex = "flyingv_white.tex";
         constexpr size_t kHead = 32u, kPalette = 1024u, kSide = 256u, kOldRows = 128u;
+        constexpr const char *kOldV = "ghc/demo/flyingv.milo_ps2", *kOldVTex = "flyingV_black.tex", *kOldVMat = "guitar_fv_black.mat";
 
         // The old layout's bitmap as the shipped V's: the same colours, each
         // texel the old one the table names.
@@ -245,6 +247,28 @@ namespace gh2::gh1
                 continue;
             }
             const std::string name = std::string(u.finish.key) + ".tex";
+            // With the old model there (the GH2 demo's flyingv.milo, served
+            // as kOldV by a mods folder), the finish is on it as painted:
+            // its meshes in place of the shipped V's, the texture as it is.
+            const auto demoFile = ark::readFile(kOldV);
+            const auto demo = demoFile ? milo::read(*demoFile) : std::nullopt;
+            const auto demoTex = demo ? milo::find(*demo, kOldVTex) : std::nullopt;
+            const auto demoMat = demo ? milo::find(*demo, kOldVMat) : std::nullopt;
+            const auto stood = milo::find(*scene, "guitar.mesh");
+            if (demoTex && demoMat && stood && demo->bodies[*demoTex].size() > old->size())
+            {
+                const Xfm stand = xfm(scene->bodies[*stood], 17u);
+                for (const char *mesh : {"guitar.mesh", "guitar_strings.mesh", "guitar_fire.mesh"})
+                    if (const auto from = milo::find(*demo, mesh), to = milo::find(*scene, mesh); from && to)
+                        scene->bodies[*to] = renamed(demo->bodies[*from], kOldVMat, u.finish.mat);
+                Bytes painted(demo->bodies[*demoTex].begin(), demo->bodies[*demoTex].end() - static_cast<std::ptrdiff_t>(old->size()));
+                painted.insert(painted.end(), old->begin(), old->end());
+                milo::add(*scene, "Tex", name, std::move(painted));
+                milo::add(*scene, "Mat", u.finish.mat, renamed(demo->bodies[*demoMat], kOldVTex, name));
+                faceGuitarFront(*scene, stand);
+                ark::addFile(std::string(kOurs) + u.finish.outfit + ".milo_ps2", milo::write(*scene));
+                continue;
+            }
             Bytes body(scene->bodies[*tex].begin(), scene->bodies[*tex].end() - static_cast<std::ptrdiff_t>(bitmap.size()));
             body.insert(body.end(), bitmap.begin(), bitmap.end());
             milo::add(*scene, "Tex", name, std::move(body));

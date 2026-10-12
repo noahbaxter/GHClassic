@@ -32,7 +32,7 @@ namespace gh2::milo
         const std::map<std::string, std::set<uint32_t>> kGh1Revs = {
             {"Tex", {8}}, {"Mat", {21}}, {"Mesh", {25}}, {"View", {7}}};
         const std::map<std::string, std::set<uint32_t>> kGh2Revs = {
-            {"Tex", {8, 10}}, {"Mat", {21, 27}}, {"Mesh", {25, 28}}, {"Group", {12}}, {"Trans", {9}}};
+            {"Tex", {8, 10}}, {"Mat", {21, 27}}, {"Mesh", {25, 28}}, {"Group", {11, 12}}, {"Trans", {9}}}; // Group 11: the GH2 demo's
 
         struct Reader
         {
