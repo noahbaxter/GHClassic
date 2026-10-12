@@ -36,15 +36,19 @@ namespace gh2::gh1
             {"sel_song", "sel_song_quickplay"},
             // GH2's options are six: GH1's game settings are its audio
             // settings and GH1's data settings its memory card, and its
-            // video settings and band screens have rows in their look.
+            // video settings and band screens have rows in their look, and
+            // the port's own game settings a row after them (ui/dta/
+            // game_settings.dta), the name GH1 has for its audio, which
+            // goes by GH2's: seven rows in the room of GH1's four.
             {.gh1 = "options",
              .renamed = {{"op_game.btn", "op_audio.btn"}, {"op_data.btn", "memory_card.btn"}},
-             .rows = {{"op_audio.btn", 30.0f},
-                      {"video_settings.btn", 2.0f, "op_audio.btn", "op_video_settings"},
-                      {"op_data.btn", -26.0f, "memory_card.btn", "op_data_settings"},
-                      {"memory_card.btn", -54.0f},
-                      {"op_bonus.btn", -82.0f},
-                      {"op_credit.btn", -110.0f}}},
+             .rows = {{"op_audio.btn", 30.0f, nullptr, "Audio Settings"},
+                      {"video_settings.btn", 6.0f, "op_audio.btn", "op_video_settings"},
+                      {"game_settings.btn", -18.0f, "op_audio.btn", "Game Settings"},
+                      {"op_data.btn", -42.0f, "memory_card.btn", "op_data_settings"},
+                      {"memory_card.btn", -66.0f},
+                      {"op_bonus.btn", -90.0f},
+                      {"op_credit.btn", -114.0f}}},
             {"tutorials"},
             {"bonus_material"},
             {"loading"},
@@ -92,20 +96,25 @@ namespace gh2::gh1
             {"status_5", "sponsorship5"},
             {"status_6", "sponsorship6"},
             {"status_7", "sponsorship7"},
-            // GH2's pause has a row for each of its settings screens where
-            // GH1's has one for its only: five rows in the room of four.
+            // GH1's pause has one row for its settings, as the port's has
+            // (ui/dta/game_settings.dta): its own four.
             {.gh1 = "pause",
              .renamed = {{"pause_resume.btn", "resume.btn"},
                          {"pause_restart.btn", "restart.btn"},
                          {"pause_options.btn", "audio_options.btn"},
-                         {"pause_quit.btn", "quit.btn"}},
-             .rows = {{"resume.btn", 0.0f},
-                      {"restart.btn", -14.0f},
-                      {"audio_options.btn", -28.0f},
-                      {"video_options.btn", -42.0f, "audio_options.btn", "VIDEO"},
-                      {"quit.btn", -56.0f}}},
+                         {"pause_quit.btn", "quit.btn"}}},
             {.gh1 = "pause_controller", .renamed = {{"pause_controller_resume.btn", "resume.btn"}}},
-            {"pause_settings", "pause_audio_settings"},
+            // GH1's settings in a song are GH2's audio settings there, its
+            // tick box GH2's by its row. The same frame again is GH2's video
+            // settings there, which GH1 has none of: its one row GH1's
+            // stereo row by that name, at the top (ui/dta/game_settings.dta
+            // puts the sliders away).
+            {.gh1 = "pause_settings", .gh2 = "pause_audio_settings", .placed = {{"stereo.chk", -72.0f, -15.0f, -116.0f}}},
+            {.gh1 = "pause_settings",
+             .gh2 = "pause_video_settings",
+             .renamed = {{"gs_stereo.btn", "widescreen.btn"}},
+             .rows = {{"widescreen.btn", -10.0f, nullptr, "WIDESCREEN DISPLAY"}},
+             .placed = {{"widescreen.chk", -75.0f, -15.0f, -14.0f}}},
             {.gh1 = "tut_pause",
              .renamed = {{"tut_pause_resume.btn", "resume.btn"},
                          {"tut_pause_restart.btn", "restart.btn"},

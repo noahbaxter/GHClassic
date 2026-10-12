@@ -41,7 +41,8 @@
 (shot status)
 (expect {{status_panel loaded_dir} exists status_char1.tex} 1)
 
-; In a song: pause's five rows round, the lost controller's screen, then
+; In a song: pause's settings menu and back, its four rows round, the lost
+; controller's screen, then
 ; song failed and its Quit to the main menu.
 {ui goto_screen career_screen}
 (wait_screen career_screen 40)
@@ -58,8 +59,14 @@
 (wait_screen pause_screen 20)
 (wait 2)
 (shot pause)
-(expect {{pause_panel loaded_dir} exists video_options.btn} 1)
 (press down)
+(press down)
+(press green)
+(wait_screen pause_settings_screen 20)
+(wait 1)
+(shot pause_settings)
+(press red)
+(wait_screen pause_screen 20)
 (press down)
 (press down)
 (press down)

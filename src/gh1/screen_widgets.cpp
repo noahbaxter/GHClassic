@@ -206,8 +206,12 @@ namespace gh2::gh1
                                  const Button &button)
     {
         Bytes placed = b;
-        if (const auto own = rows.find(name); own != rows.end())
+        const auto own = rows.find(name);
+        if (own != rows.end())
             place(placed, p, own->second->z);
+        // One of GH1's own rows under another name is as one made.
+        if (!row && own != rows.end() && own->second->text)
+            row = own->second;
         Bytes body;
         putU32(body, 10u);
         putU32(body, 0u);

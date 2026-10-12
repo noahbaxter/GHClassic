@@ -37,7 +37,7 @@ namespace gh2::gh1
         // Its buttons from the top down, each at that height under its
         // View and linked to the next. One with `of` is a button of
         // GH2's script that GH1's screen has no like of: `of`'s look,
-        // with that text.
+        // with that text. One of GH1's own with text reads that.
         struct Row
         {
             const char *name;
