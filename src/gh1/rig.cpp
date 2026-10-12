@@ -538,24 +538,64 @@ namespace gh2
             return out;
         }
 
-        // A GH1 Mesh 25's verts, and its Draw's sphere, moved by `by`: past
-        // its Draw are its mat, its geometry's owner, nine bytes and a
-        // count, then each vert's place and normal first of its 48 bytes.
-        void turnVerts(Bytes &mesh, const Xfm &by)
+        // Where a GH1 Mesh 25's verts start and how many: past its Draw are
+        // its mat, its geometry's owner, nine bytes and a count, then each
+        // vert's place and normal first of its 48 bytes.
+        std::optional<std::pair<size_t, size_t>> verts(const Bytes &mesh)
         {
             const auto p = parts("Mesh", mesh);
             if (!p)
-                return;
+                return std::nullopt;
             size_t o = p->rest;
             str(mesh, o);
             str(mesh, o);
             o += 9u;
             if (o + 4u > mesh.size())
-                return;
+                return std::nullopt;
             const size_t count = u32(mesh, o);
             o += 4u;
             if (o + count * 48u > mesh.size())
+                return std::nullopt;
+            return std::make_pair(o, count);
+        }
+
+        // The tobacco guitar's strings, laid on its neck. GH1 never drew
+        // this guitar and its sheet was left unfitted: it runs level from
+        // the bridge, so at the nut it floats half a unit off the fretboard
+        // (the SG's an eighth) and slides off it seen from a side, and it is
+        // a tenth to one side and nine tenths the fretboard's width. A vert
+        // is along the neck, across it and up from it (down is +z). The
+        // nut's row drops to the fretboard, every row but the tuners' ends
+        // centres on the neck, and each widens to fill it as the SG's do.
+        void fitTobaccoStrings(Bytes &mesh)
+        {
+            const float kBridge = -13.0f, kNut = 16.0f, kPastNut = 16.3f;
+            const float kBridgeWide = 1.11f, kNutWide = 1.063f, kAside = -0.09f, kNutDown = 0.42f;
+            const auto at = verts(mesh);
+            if (!at)
                 return;
+            for (size_t i = 0; i < at->second; ++i)
+            {
+                float v[3];
+                std::memcpy(v, mesh.data() + at->first + i * 48u, 12u);
+                if (v[0] < kBridge)
+                    v[1] = v[1] * kBridgeWide + kAside;
+                else if (v[0] > kNut && v[0] < kPastNut)
+                {
+                    v[1] = v[1] * kNutWide + kAside;
+                    v[2] += kNutDown;
+                }
+                std::memcpy(mesh.data() + at->first + i * 48u, v, 12u);
+            }
+        }
+
+        // A GH1 Mesh 25's verts, and its Draw's sphere, moved by `by`.
+        void turnVerts(Bytes &mesh, const Xfm &by)
+        {
+            const auto p = verts(mesh);
+            if (!p)
+                return;
+            const size_t o = p->first, count = p->second;
             const auto move = [&](size_t at, bool place)
             {
                 float v[3], r[3];
@@ -688,6 +728,8 @@ namespace gh2
                 const std::string &n = drawn[i];
                 auto [local, at] = placed(n);
                 Bytes body = gh1.bodies[theirs[n]];
+                if (n == "tobacco_strings.mesh")
+                    fitTobaccoStrings(body);
                 // A guitar shown on its own (the picker, the store) stands by
                 // its mesh's turn under the guitar spot, which GH2's guitars
                 // share and GH1's do not: half of GH1's are turned about the
