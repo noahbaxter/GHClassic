@@ -37,6 +37,9 @@ namespace gh2
     constexpr uint32_t kFlagCube = 1u << 20;      // a cube map in place of the lights' specular
     constexpr uint32_t kFlagNormalize = 1u << 21; // normal, tangent and bitangent made unit length first
     constexpr uint32_t kFlagShadow = 1u << 22;    // its first light is cut by a shadow map
+    // mesh.frag's again: the alpha cut is at a half, for a rendered
+    // texture's card in a picture larger than its machine's.
+    constexpr uint32_t kFlagCutHalf = 1u << 23;
 
     struct PushConstants
     {

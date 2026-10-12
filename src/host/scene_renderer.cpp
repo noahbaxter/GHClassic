@@ -917,6 +917,7 @@ namespace gh2
 
         // The image for a target's generation, made or remade at its size.
         // `copied` is one a screen copy fills: nothing draws into it.
+        uint32_t targetLevels = 4; // more when the targets are drawn larger than their own size
         TargetImage *targetImage(uint32_t tex, uint32_t generation, uint32_t w, uint32_t h, bool copied)
         {
             std::vector<TargetImage> &images = targets[tex];
@@ -928,7 +929,7 @@ namespace gh2
             // crowd's cards are sampled from at a distance.
             uint32_t levels = 1;
             if (!copied && settings::get(settings::kMipmaps))
-                while (levels < 4u && (std::min(w, h) >> levels) != 0u)
+                while (levels < targetLevels && (std::min(w, h) >> levels) != 0u)
                     ++levels;
             if (t.color != VK_NULL_HANDLE && t.width == w && t.height == h && t.copied == copied && t.levels == levels)
                 return &t;
@@ -2477,6 +2478,14 @@ namespace gh2
             size_t before = 0;
         };
         std::vector<TargetRun> runs;
+        // A target as many times its size each way as the picture is its
+        // machine's height, rounded up (two at 1080 lines for either, three
+        // at 2160 for the 360's): a crowd card near the camera would show
+        // its sheet's own pixels along its outline. Four at most, 16 times
+        // the memory, with a level more each doubling.
+        const uint32_t lines = s.x360 ? 720u : 480u;
+        const uint32_t finer = std::clamp((height + lines - 1u) / lines, 1u, 4u);
+        s.targetLevels = finer >= 4u ? 6u : finer >= 2u ? 5u : 4u;
         std::vector<int32_t> drawRun(frame.draws.size(), -1);
         std::vector<int32_t> sampleRun(frame.draws.size(), -1);
         std::vector<size_t> copyRuns; // in the order they are made
@@ -2542,8 +2551,8 @@ namespace gh2
                 auto found = current.find(camera.target);
                 if (found == current.end() || sampledSince[camera.target])
                 {
-                    runs.push_back({camera.target, generations[camera.target]++, camera.targetWidth,
-                                    camera.targetHeight, {}});
+                    runs.push_back({camera.target, generations[camera.target]++, camera.targetWidth * finer,
+                                    camera.targetHeight * finer, {}});
                     found = current.insert_or_assign(camera.target, static_cast<int32_t>(runs.size() - 1u)).first;
                     sampledSince[camera.target] = false;
                 }
@@ -2593,6 +2602,11 @@ namespace gh2
             const uint32_t blend = x360Draws[i] ? fadedBlend(draw) : material.blend;
             if (material.alphaCut || (blend == milo::mat::kBlendSrcAlpha && noZWrite))
                 push.flags |= kFlagAlphaCut;
+            // A crowd card's outline, cut at the GS's 1, runs along its
+            // sheet's texels; cut at a half it runs between them, straight
+            // where the sheet is drawn larger than it is.
+            if (material.renderTarget != 0u && finer > 1u)
+                push.flags |= kFlagCutHalf;
             if (blend == milo::mat::kBlendSrc && !material.alphaWrite)
                 push.flags |= kFlagSetAlpha;
             // Intensify raises a textured pass's rgb scale from 128 to 255.

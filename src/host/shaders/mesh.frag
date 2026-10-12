@@ -28,6 +28,7 @@ const uint kFlagSpread = 2048u;
 const uint kFlagSetAlpha = 4096u;
 const uint kFlagDecal = 16384u;
 const uint kFlagAdd16 = 32768u;
+const uint kFlagCutHalf = 1u << 23;
 
 // Added to a 16-bit frame under DIMX's 0 to 3 (PsMat::Update, 0x19d0a4), a
 // colour keeps its whole eights and of the rest what the dither carries
@@ -69,7 +70,7 @@ void main()
         color.rgb = mix(vFogColor, color.rgb, vFog);
     // Alpha cut is the GS alpha test GREATER against 0, where alpha 1.0 is
     // 0x80, so the smallest alpha that passes is 1/128.
-    if ((pc.flags & kFlagAlphaCut) != 0u && color.a < 1.0 / 128.0)
+    if ((pc.flags & kFlagAlphaCut) != 0u && color.a < ((pc.flags & kFlagCutHalf) != 0u ? 0.5 : 1.0 / 128.0))
         discard;
     if ((pc.flags & kFlagSetAlpha) != 0u)
         color.a = 1.0;
