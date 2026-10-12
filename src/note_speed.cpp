@@ -116,6 +116,6 @@ namespace gh2
     {
         EntryHook<TrackTag>::install(runtime, addresses.trackCtor, onTrack);
         script::addCommand("note_speed", command);
-        script::runWhenUiReady(kGameSettingsDta);
+        script::patchUi(kGameSettingsDta);
     }
 }

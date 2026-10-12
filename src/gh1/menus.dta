@@ -177,12 +177,6 @@
 
 ; In a song.
 
-; GH1's row for its settings is GH2's for its audio settings, named so: a
-; word as short as the rows around it, which the row's box fits.
-(pause_panel
-   (needs pause)
-   (enter {audio_options.btn set text_token "AUDIO"}))
-
 ; GH1's song failed screen has one list of buttons, in a career too.
 (lose_panel
    (needs lose)
@@ -193,10 +187,16 @@
 ; Settings.
 
 ; GH1's game settings have rows for playing left handed, which are GH2's
-; video settings'.
+; video settings', and are titled so, where the name is the port's own
+; screen's here (ui/dta/game_settings.dta).
 (audio_settings_panel
    (needs game_settings)
    (enter
+      {gs_title.lbl set_localized "AUDIO SETTINGS"}
+      ; GH1's sliders link to nothing: its own script moves between them.
+      {gs_band.sld set nav_down gs_guitar.sld}
+      {gs_guitar.sld set nav_down gs_sfx.sld}
+      {gs_sfx.sld set nav_down gs_stereo.btn}
       {foreach $o (gs_left_p1.btn gs_left_p2.btn)
          {{$this find $o} set_showing FALSE}
          {$this disable {$this find $o}}}))
