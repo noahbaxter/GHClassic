@@ -110,7 +110,7 @@ namespace gh2::gh2x
             ctx->pc = returnTo;
             s_made = -1;
             Frame &frame = building();
-            if (!settings::hd(settings::kLighting) || frame.casting >= 0 ||
+            if (!settings::hd(settings::kLookLighting) || frame.casting >= 0 ||
                 frame.shadows.size() >= kMaxShadows)
                 return;
             uint32_t light = 0u;

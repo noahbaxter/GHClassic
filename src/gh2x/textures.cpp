@@ -38,7 +38,7 @@ namespace gh2
         // with the HUD and menus.
         bool wanted(const std::string &path)
         {
-            return settings::hd(path.starts_with(kTrack) ? settings::kHighway : settings::kUiArt);
+            return settings::hd(path.starts_with(kTrack) ? settings::kLookHighway : settings::kLookUiArt);
         }
 
         // A 360 bitmap that is a picture: DXT1 or DXT5, not empty.

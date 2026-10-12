@@ -11,14 +11,15 @@
 ; (SEL_CHARACTER_COMMON and SEL_GUITAR_COMMON, career.dta); a handler given
 ; before them is the one found.
 
-; The games with venues of their own, the 360's being GH2's, and the one a
-; setlist's songs play in.
+; The maps: each game with venues of its own, and the 360's, which are
+; GH2's as its disc has them ({quickplay venues}). And the game whose
+; venues a map's, or a setlist's songs', are.
 {func ghc_venue_games
    {do
       ($games)
       {set $games ()}
       {resize $games 0}
-      {foreach $game (gh1 gh2 gh80s)
+      {foreach $game (gh1 gh2 gh2x gh80s)
          {if {campaigns has $game} {push_back $games $game}}
       }
       $games
@@ -26,6 +27,52 @@
 }
 {func ghc_venue_game ($game)
    {if_else {&& {campaigns has $game} {!= $game gh2x}} $game gh2}
+}
+; GH2's map or the 360's, by which of the two was played last.
+{func ghc_qp_map ($game)
+   {if_else {&& {campaigns has gh2x} {== {ghc_venue_game $game} gh2}}
+      {if_else {== {quickplay venues} hd} gh2x gh2}
+      $game
+   }
+}
+; The guitarist's and the guitar's screens: yellow turns every guitarist
+; and the band, or every guitar, between the PS2's models and the 360's
+; ({quickplay characters}, {quickplay guitars}), named as what shows now.
+; It is there on one the 360 has its own of.
+{func ghc_qp_hd_helpbar ($what $has)
+   {do
+      ($array)
+      {set $array ()}
+      {resize $array 0}
+      {push_back $array (fret1 help_continue)}
+      {push_back $array (fret2 help_back)}
+      {if $has
+         {push_back $array {if_else {== {quickplay $what} hd} (fret3 ghc_hd) (fret3 ghc_sd)}}
+      }
+      {push_back $array (strum help_updown)}
+      {helpbar set_display $array}
+   }
+}
+{func ghc_qp_character_has_hd
+   {quickplay has_hd outfit {sel_character_panel get char_outfit}}
+}
+{func ghc_qp_character_helpbar
+   {if {!= {gamecfg get mode} career}
+      {ghc_qp_hd_helpbar characters {ghc_qp_character_has_hd}}
+   }
+}
+{func ghc_qp_guitar_has_hd
+   {do
+      ($guitar {sel_guitar_panel get_selected_guitar 0})
+      ($skin {sel_guitar_panel get_selected_skin 0})
+      {&& {find_exists $syscfg guitars $guitar skins $skin outfit}
+         {quickplay has_hd guitar {elem {find $syscfg guitars $guitar skins $skin outfit} 1}}}
+   }
+}
+{func ghc_qp_guitar_helpbar
+   {if {!= {gamecfg get mode} career}
+      {ghc_qp_hd_helpbar guitars {ghc_qp_guitar_has_hd}}
+   }
 }
 ; What was last picked ({quickplay pick}, kept through a switch of menus),
 ; put back over the song's own casting, so each screen starts there and
@@ -100,6 +147,7 @@
             {guitar_display_panel set_env 0 guitar.env}
             {guitar_display_panel show_guitar 0 $guitar $skin guitar.pxy guitar_single.filt}
             {if $play_sfx {synth play_sequence button_toggle}}
+            {ghc_qp_guitar_helpbar}
          }
       )
       (choose_skins {sel_guitar.tnm animate (units kTaskUISeconds) (period 0.4) (range 0 100)})
@@ -116,6 +164,37 @@
    (
       (done_screen ghc_qp_guitar_screen)
       (back_screen qp_diff_screen)
+      ; Yellow, then red as SEL_CHARACTER_COMMON has it.
+      (BUTTON_DOWN_MSG
+         {cond
+            ({&& {== $button kPad_Circle} {ghc_qp_character_has_hd} {! {ui in_transition}}}
+               {quickplay characters {if_else {== {quickplay characters} hd} sd hd}}
+               {synth play_sequence button_toggle}
+               ; The one on show loads again, and moves once it has.
+               {char_single char_event 0 animate}
+               {ghc_qp_character_helpbar}
+               TRUE
+            )
+            ({== $button kPad_Tri}
+               {if_else {sel_character_panel get skin_select}
+                  {sel_character_panel unchoose_skins}
+                  {do
+                     {$this backwards_anim}
+                     {synth play_sequence button_back.cue}
+                     {ui goto_screen [back_screen]}
+                  }
+               }
+               kDataUnhandled
+            )
+            (TRUE kDataUnhandled)
+         }
+      )
+      ; As SEL_CHARACTER_COMMON's, then the help bar over the screen's own.
+      (TRANSITION_COMPLETE_MSG
+         {char_single set_placer 0 {sel_character_panel find char_single.placer}}
+         {char_single set_env 0 {sel_character_panel find character.env}}
+         {ghc_qp_character_helpbar}
+      )
       SEL_CHARACTER_COMMON
       (SELECT_START_MSG {ghc_sel_character $this} kDataUnhandled)
    )
@@ -132,9 +211,11 @@
          {quickplay pick guitar {sel_guitar_panel get_selected_guitar 0}}
          {quickplay pick skin {sel_guitar_panel get_selected_skin 0}}
          {set $ghc_qp_venues
-            {if_else {quickplay picked venue_game}
-               {quickplay pick venue_game}
-               {ghc_venue_game {campaigns active}}
+            {ghc_qp_map
+               {if_else {quickplay picked venue_game}
+                  {quickplay pick venue_game}
+                  {ghc_venue_game {campaigns active}}
+               }
             }
          }
          {campaigns text_venues $ghc_qp_venues}
@@ -145,6 +226,21 @@
          {synth play_sequence button_back.cue}
          {ui goto_screen ghc_qp_character_screen}
       )
+      ; Yellow, then red as SEL_GUITAR_COMMON has it.
+      (BUTTON_DOWN_MSG
+         {cond
+            ({&& {== $button kPad_Circle} {ghc_qp_guitar_has_hd} {! {ui in_transition}}}
+               {quickplay guitars {if_else {== {quickplay guitars} hd} sd hd}}
+               {sel_guitar_panel update_display TRUE}
+               TRUE
+            )
+            ({== $button kPad_Tri}
+               {if_else {sel_guitar_panel is_skin_select 0} {$this unchoose_skins} {$this go_back}}
+            )
+            (TRUE kDataUnhandled)
+         }
+      )
+      (TRANSITION_COMPLETE_MSG {ghc_qp_guitar_helpbar})
       SEL_GUITAR_COMMON
    )
 }
@@ -168,8 +264,8 @@
 {if {! {exists ghc_qp_venue_twin_panel}} {new GHPanel ghc_qp_venue_twin_panel}}
 {retype ghc_qp_venue_twin_panel $ghc_qp_venue_panel}
 {func ghc_qp_venue_open ($venue)
-   {if_else {== $ghc_qp_venues {ghc_venue_game {campaigns live}}}
-      {campaign is_unlocked $venue}
+   {if_else {== {ghc_venue_game $ghc_qp_venues} {ghc_venue_game {campaigns live}}}
+      {|| {campaign is_unlocked $venue} {&& {campaigns has gh2x} {campaigns venue_open gh2x $venue}}}
       {|| {campaign all_access} {campaigns venue_open $ghc_qp_venues $venue}}
    }
 }
@@ -223,7 +319,10 @@
 ; A venue picked: the song in its game's venues, the character's name its
 ; outfit's game's.
 {func ghc_qp_venue_select
-   {campaigns venues_from $ghc_qp_venues}
+   {campaigns venues_from {ghc_venue_game $ghc_qp_venues}}
+   {if {== {ghc_venue_game $ghc_qp_venues} gh2}
+      {quickplay venues {if_else {== $ghc_qp_venues gh2x} hd sd}}
+   }
    {quickplay pick venue {game get_venue}}
    {quickplay pick venue_game $ghc_qp_venues}
    {campaigns text_outfit {game get_character_outfit}}

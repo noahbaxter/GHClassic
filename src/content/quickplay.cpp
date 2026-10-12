@@ -5,7 +5,9 @@
 #include "content/outfits.h"
 #include "disc/ark.h"
 #include "formats/dtb.h"
+#include "gh2x/models.h"
 #include "guest.h"
+#include "hook.h"
 #include "script.h"
 #include "settings/settings.h"
 
@@ -134,6 +136,48 @@ namespace gh2::quickplay
             ctx->pc = returnTo;
         }
 
+        // A CharsysPanel keeps the models it has loaded (+0x5c, a vector of
+        // CacheModel, 0x1c each) and loads the one on show again once it is
+        // unloaded (PollCharLoading, 0x142ea8): from the other disc, where
+        // which one serves it has changed. The panels are made once, with
+        // the UI.
+        constexpr uint32_t kPanelModels = 0x5cu, kCacheModelBytes = 0x1cu;
+        std::vector<uint32_t> s_charPanels;
+        struct ShowCharTag;
+        void onShowChar(uint8_t *, R5900Context *ctx, PS2Runtime *)
+        {
+            const uint32_t panel = GPR_U32(ctx, 4);
+            if (std::find(s_charPanels.begin(), s_charPanels.end(), panel) == s_charPanels.end())
+                s_charPanels.push_back(panel);
+        }
+        void reloadCharacters(const script::Call &call)
+        {
+            for (const uint32_t panel : s_charPanels)
+            {
+                const uint32_t end = load<uint32_t>(call.rdram, panel + kPanelModels + 4u);
+                for (uint32_t model = load<uint32_t>(call.rdram, panel + kPanelModels); model < end;
+                     model += kCacheModelBytes)
+                    if (call.runtime->callGuestFunction(call.rdram, call.ctx, s_addresses->cacheModelIsLoading, {model}) == 0u)
+                        call.runtime->callGuestFunction(call.rdram, call.ctx, s_addresses->cacheModelUnload, {model});
+            }
+        }
+
+        // GuitarEl::LoadGuitar (0x1470d8) leaves alone a guitar it already
+        // shows, by its config entry (+4): forgotten once for each after a
+        // change, so the next one shown is loaded whatever it is.
+        constexpr uint32_t kGuitarElConfig = 0x4u;
+        uint32_t s_guitarsChanged = 0u;
+        std::map<uint32_t, uint32_t> s_guitarEls;
+        struct LoadGuitarTag;
+        void onLoadGuitar(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
+        {
+            uint32_t &seen = s_guitarEls[GPR_U32(ctx, 4)];
+            if (seen != s_guitarsChanged)
+                store<uint32_t>(rdram, GPR_U32(ctx, 4) + kGuitarElConfig, 0u);
+            seen = s_guitarsChanged;
+        }
+        void reloadGuitars(const script::Call &) { ++s_guitarsChanged; }
+
         script::Node quickplayCommand(const script::Call &call)
         {
             const std::string op = call.symbol(1);
@@ -161,6 +205,30 @@ namespace gh2::quickplay
                 return choice(settings::kMenuMusic, {"theme", "gh1", "gh2", "gh80s", "all"});
             if (op == "menu_music_order")
                 return choice(settings::kMenuMusicOrder, {"playlist", "loop", "shuffle"});
+            // One that says which disc's models are served: changed, what
+            // is on show is loaded again.
+            const auto models = [&](settings::Key key, void (*reload)(const script::Call &)) -> script::Node
+            {
+                const int was = settings::get(key);
+                const script::Node now = choice(key, {"sd", "hd"});
+                if (settings::get(key) != was)
+                    reload(call);
+                return now;
+            };
+            if (op == "characters")
+                return models(settings::kCharacters, reloadCharacters);
+            if (op == "guitars")
+                return models(settings::kGuitars, reloadGuitars);
+            if (op == "venues")
+                return choice(settings::kVenues, {"sd", "hd"});
+            // An outfit's scenes are a folder by its name, a finish's one
+            // file by its (outfit ...).
+            if (op == "has_hd" && call.size() > 3)
+            {
+                const std::string path = call.symbol(2) == "guitar" ? "char/og/guitars/gen/" + call.symbol(3) + ".milo_ps2"
+                                                                    : "char/" + call.symbol(3) + "/";
+                return {gh2xHasModel(path) ? 1u : 0u, script::kInt};
+            }
             if (op == "outfit" && call.size() > 2)
             {
                 // Another game's outfit is in the config under the name it was
@@ -195,7 +263,8 @@ namespace gh2::quickplay
                          "{quickplay pick|picked <what>}, {quickplay look <character> [<outfit>]}, "
                          "{quickplay in_song_ui [venue|gh1|gh2|gh80s]}, {quickplay gems [auto|gh1|gh2]}, "
                          "{quickplay menu_music [theme|gh1|gh2|gh80s|all]}, "
-                         "{quickplay menu_music_order [playlist|loop|shuffle]}"
+                         "{quickplay menu_music_order [playlist|loop|shuffle]}, "
+                         "{quickplay characters|guitars|venues [sd|hd]}, {quickplay has_hd outfit|guitar <name>}"
                       << std::endl;
             return {};
         }
@@ -211,5 +280,7 @@ namespace gh2::quickplay
         runtime.replaceFunction(addresses.campaignIsItemUnlockedOn, &isItemUnlocked<true>);
         s_guitarsInitData = runtime.lookupFunction(addresses.selectGuitarProviderInitData);
         runtime.replaceFunction(addresses.selectGuitarProviderInitData, &guitarsInitData);
+        EntryHook<ShowCharTag>::install(runtime, addresses.charsysPanelShowChar, onShowChar);
+        EntryHook<LoadGuitarTag>::install(runtime, addresses.guitarElLoadGuitar, onLoadGuitar);
     }
 }

@@ -37,6 +37,7 @@ namespace gh2
                                          "female_singer"};
         constexpr const char *kFolders[] = {kVenues, "char/"};
         constexpr const char *kGuitars = "char/og/guitars/gen/";
+        constexpr const char *kCrowd = "char/crowd/";
         // The track: the PS2's scene, and the one of the 360's two that it
         // draws (its track.milo_xbox is the PS2's, object for object).
         constexpr const char *kTrack = "track/gen/track.milo_ps2";
@@ -225,9 +226,16 @@ namespace gh2
                     if (settings::get(settings::kBand) == settings::kBandGh2)
                         return false;
                 }
-            return settings::hd(path == kTrack ? settings::kHighway
-                                : path.starts_with(kVenues) ? settings::kVenues : settings::kCharacters);
+            if (path == kTrack)
+                return settings::hd(settings::kLookHighway);
+            // The crowd is its venue's.
+            if (path.starts_with(kVenues) || path.starts_with(kCrowd))
+                return settings::hd(settings::kLookVenue);
+            return settings::hd(path.starts_with(kGuitars) ? settings::kLookGuitars : settings::kLookCharacters);
         }
+
+        // The game disc's scenes the 360 has its own of, sorted.
+        std::vector<std::string> s_twinned;
 
         std::optional<ark::Made> make(const Discs &discs, const std::string &path, const std::string &twin)
         {
@@ -283,9 +291,19 @@ namespace gh2
         {
             auto made = [discs, path, twin] { return make(*discs, path, twin); };
             if (holds(discs->ps2, path))
+            {
                 ark::addMade(0u, path, std::move(made), [path] { return wanted(path); });
+                s_twinned.push_back(path);
+            }
             else
                 ark::addMade(path, std::move(made));
         }
+        std::sort(s_twinned.begin(), s_twinned.end());
+    }
+
+    bool gh2xHasModel(const std::string &prefix)
+    {
+        const auto at = std::lower_bound(s_twinned.begin(), s_twinned.end(), prefix);
+        return at != s_twinned.end() && at->starts_with(prefix);
     }
 }

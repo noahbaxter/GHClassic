@@ -171,6 +171,10 @@ namespace gh2
         uint32_t campaignIsItemUnlocked;   // Campaign::IsItemUnlocked(Symbol) const
         uint32_t campaignIsItemUnlockedOn; // Campaign::IsItemUnlocked(Symbol, Difficulty) const
         uint32_t selectGuitarProviderInitData; // SelectGuitarProvider::InitData(RndDir *)
+        uint32_t charsysPanelShowChar;   // CharsysPanel::ShowChar(int, Symbol)
+        uint32_t cacheModelUnload;       // CharsysPanel::CacheModel::Unload()
+        uint32_t cacheModelIsLoading;    // CharsysPanel::CacheModel::IsLoading()
+        uint32_t guitarElLoadGuitar;     // GuitarDisplayPanel::GuitarEl::LoadGuitar(UIProxy *, DataArray *, RndAnimatable *, float)
         uint32_t localeInit;       // Locale::Init
         uint32_t localeTerminate;  // Locale::Terminate
         uint32_t campaignStateIsEncoreSong;           // (Symbol song)
@@ -390,6 +394,10 @@ namespace gh2
         .campaignIsItemUnlocked = 0x12d490u,
         .campaignIsItemUnlockedOn = 0x12d5a0u,
         .selectGuitarProviderInitData = 0x119060u,
+        .charsysPanelShowChar = 0x143120u,
+        .cacheModelUnload = 0x141250u,
+        .cacheModelIsLoading = 0x141730u,
+        .guitarElLoadGuitar = 0x1470d8u,
         .localeInit = 0x2cb798u,
         .localeTerminate = 0x2cba98u,
         .campaignStateIsEncoreSong = 0x131d30u,

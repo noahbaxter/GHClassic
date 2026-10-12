@@ -5,6 +5,8 @@
 #include common/first_boot.dta
 (needs gh1 gh80s)
 {quickplay song_defaults 0}
+; GH2's own map, where the 360 disc would open its own.
+{quickplay venues sd}
 ; Another game's venues, as a song left by the pause menu leaves them, are
 ; put back by the song list.
 {campaigns venues_from gh1}

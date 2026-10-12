@@ -34,6 +34,7 @@ namespace gh2::look
         // Frames a Mat's maps outlast the last draw that asked for them.
         constexpr uint64_t kHoldFrames = 600;
         uint32_t s_luminance = 0;
+        bool s_inVenue = false;
         // Game thread only.
         std::vector<uint32_t> s_boards;
         uint64_t s_boardsAt = 0;
@@ -161,7 +162,7 @@ namespace gh2::look
 
     bool trackFades()
     {
-        return settings::hd(settings::kHighway) && settings::hd(settings::kLighting);
+        return settings::hd(settings::kLookHighway) && settings::hd(settings::kLookLighting);
     }
 
     void endFrame()
@@ -169,6 +170,9 @@ namespace gh2::look
         ++s_frame;
         std::erase_if(s_held, [](const auto &entry) { return entry.second.asked + kHoldFrames < s_frame; });
     }
+
+    void setInVenue(bool drawn) { s_inVenue = drawn; }
+    bool inVenue() { return s_inVenue; }
 
     void setLuminance(uint32_t id) { s_luminance = id; }
 

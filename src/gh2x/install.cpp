@@ -29,6 +29,7 @@
 #include "gh2x/textures.h"
 #include "gh2x/track.h"
 #include "ps2_runtime.h"
+#include "render/look.h"
 #include "render/texture_store.h"
 #include "settings/settings.h"
 
@@ -334,10 +335,19 @@ namespace gh2
 
     void installGh2xAssets(PS2Runtime &runtime, const Addresses &addresses)
     {
-        // The 360's look is its own songs' and career's (settings' authentic).
+        // A career's look is its own game's; outside one, the pickers'.
         uint8_t *rdram = runtime.memory().getRDRAM();
-        settings::setNextGenGame(
-            [rdram] { return (campaigns::inCareer(rdram) ? campaigns::active() : setlists::shown()) == "gh2x"; });
+        settings::setPlaying(
+            [rdram, mounted = games::mounted("gh2x")]
+            {
+                settings::Playing playing;
+                playing.mounted = mounted;
+                playing.career = campaigns::inCareer(rdram);
+                playing.nextGen = campaigns::active() == "gh2x";
+                playing.gh2Venue = campaigns::venueGame() == "gh2";
+                playing.inVenue = look::inVenue();
+                return playing;
+            });
         installGh2xTextures();
         installGh2xModels();
         gh2x::installFocus(runtime, addresses);
