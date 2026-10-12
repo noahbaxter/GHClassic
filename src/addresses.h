@@ -60,6 +60,9 @@ namespace gh2
         uint32_t sendWhammy;        // TrackWatcherImpl::SendWhammy
         uint32_t playerSetWhammyBar; // Player::SetWhammyBar
         uint32_t trackCtor;          // Track::Track
+        uint32_t trackSetupFade;     // Track::SetupFade
+        uint32_t trackDraw;          // Track::Draw
+        uint32_t trackSurfaceGetFadeCenter; // TrackSurface::GetFadeCenter
         uint32_t bandSliderDrawShowing; // BandSlider::DrawShowing
         uint32_t checkBoxDrawShowing;   // CheckBox::DrawShowing
         uint32_t optionsSyncVideo; // Options::SyncVideoOptions
@@ -286,6 +289,9 @@ namespace gh2
         .sendWhammy = 0x249b98u,
         .playerSetWhammyBar = 0x111d88u,
         .trackCtor = 0x14fa70u,
+        .trackSetupFade = 0x150908u,
+        .trackDraw = 0x151188u,
+        .trackSurfaceGetFadeCenter = 0x154fb0u,
         .bandSliderDrawShowing = 0x296bd8u,
         .checkBoxDrawShowing = 0x29bde8u,
         .optionsSyncVideo = 0x10db80u,

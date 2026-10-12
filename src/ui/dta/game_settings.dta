@@ -10,6 +10,22 @@
    {remove_elem {find $syscfg long_cheats} {elem {find $syscfg long_cheats} 4}}
 }
 
+; The highway's length ({highway_length}, note_speed.cpp) is where a gem
+; first shows, the track's horizon_y (track_graphics.dta): its camera sees
+; that far, and its pools of gems and tails hold as many more as it is
+; longer. The board is made longer as each track is built.
+{func ghc_highway
+   {do
+      ($n {highway_length})
+      ($track {find $syscfg track_graphics})
+      {set_elem {find $track horizon_y} 1 $n}
+      {set_elem {find $track cam far_plane} 1 {if_else {> $n 110} {'+' $n 90} 200}}
+      {set_elem {find $track init_gems} 1 {int {/ {'*' 25 {max $n 110}} 110}}}
+      {set_elem {find $track init_tails} 1 {int {/ {'*' 16 {max $n 110}} 110}}}
+   }
+}
+{ghc_highway}
+
 ; The options menu, as the game's own (options.dta) with a Game Settings row
 ; under Video Settings. options.milo has six rows, each button in a group of
 ; its own that fans it about the poster's corner; the seventh is Video
@@ -363,10 +379,6 @@
          {track_panel set_showing TRUE}
          {world_panel set_showing TRUE}
       }
-      ; The third slider is the highway's length, which nothing sets yet:
-      ; shown at the game's own, 110 of 50 to 200 by fives, and passed over.
-      {gs_sfx.sld set_current 12}
-      {gs_sfx.sld set_state kDisabled}
       {gm_p1.chk set_check {options get_lefty 0}}
       {gm_p2.chk set_check {options get_lefty 1}}
       {gm_p2.btn set_state {if_else {$this two_players} kNormal kDisabled}}
@@ -377,7 +389,8 @@
       }
       ; Down the rows and round: GH1's scene links none of its own.
       {gs_band.sld set nav_down gs_guitar.sld}
-      {gs_guitar.sld set nav_down gm_p1.btn}
+      {gs_guitar.sld set nav_down gs_sfx.sld}
+      {gs_sfx.sld set nav_down gm_p1.btn}
       {if_else {$this two_players}
          {gm_p1.btn set nav_down gm_p2.btn}
          {gm_p1.btn set nav_down gm_lag.btn}
@@ -439,10 +452,10 @@
             }
          }
       }
-      ; Nor have a slider's knob and scale, once it is a plain one.
-      {slider_scales off gs_sfx.sld {{$this loaded_dir} get disabled_color}}
       {gs_band.sld set_current {note_speed stop easy}}
       {gs_guitar.sld set_current {note_speed stop hard}}
+      ; The highway's length is 50 to 200 by fives.
+      {gs_sfx.sld set_current {int {/ {'-' {highway_length} 50} 5}}}
       {set [at] "gs_band.sld"}
       {$this sync_look}
    )
@@ -521,16 +534,18 @@
    ; goes back to its token's text, so the text is set after: as the label
    ; sets its own, which is what puts its letters off their line.
    (sync_numbers
-      {foreach $row ((gs_band.sld gs_easy.lbl easy) (gs_guitar.sld gs_hard.lbl hard))
+      {foreach $row ((gs_band.sld gs_easy.lbl easy) (gs_guitar.sld gs_hard.lbl hard) (gs_sfx.sld gs_length.lbl length))
          {do
-            ($tenths {note_speed value {note_speed stop {elem $row 2}}})
+            ($tenths
+               {if_else {== {elem $row 2} length}
+                  {highway_length}
+                  {note_speed value {note_speed stop {elem $row 2}}}
+               }
+            )
             {{elem $row 1} set color {slider_scales colour {elem $row 0}}}
             {{elem $row 1} set_localized_text {sprintf "%d.%d" {int {/ $tenths 10}} {mod $tenths 10}}}
          }
       }
-      ; The length's, in the colour the scene has for what is off.
-      {gs_length.lbl set color {{$this loaded_dir} get disabled_color}}
-      {gs_length.lbl set_localized_text "11.0"}
    )
    ; GH1's scenes, known by their rows' text, which is centred.
    (gh1_scene {== {gs_stereo.btn get alignment} 34})
@@ -557,9 +572,18 @@
          }
       }
    )
-   (on_slider {|| {== [at] "gs_band.sld"} {== [at] "gs_guitar.sld"}})
-   (which {if_else {== [at] "gs_band.sld"} easy hard})
-   (slider {if_else {== [at] "gs_band.sld"} gs_band.sld gs_guitar.sld})
+   (on_slider {|| {== [at] "gs_band.sld"} {== [at] "gs_guitar.sld"} {== [at] "gs_sfx.sld"}})
+   ; That slider's setting, put to that stop.
+   (keep ($slider $stop)
+      {switch $slider
+         (gs_band.sld {note_speed set_stop easy $stop})
+         (gs_guitar.sld {note_speed set_stop hard $stop})
+         (gs_sfx.sld
+            {highway_length set {'+' 50 {'*' 5 $stop}}}
+            {ghc_highway}
+         )
+      }
+   )
    (FOCUS_MSG
       {set [at] {$new_focus name}}
       {$this sync_look}
@@ -568,15 +592,13 @@
    ; 0x296d18).
    (slider_start_msg
       ($component)
-      {if {!= $component gs_sfx.sld}
-         {note_speed set_stop {if_else {== $component gs_band.sld} easy hard} {$component current}}
-      }
+      {$this keep $component {$component current}}
       {$this sync_look}
    )
    (slider_select_cancel
       ($component)
       {$component set_current [picked_at]}
-      {note_speed set_stop {$this which} [picked_at]}
+      {$this keep $component [picked_at]}
       {$this sync_look}
       kDataUnhandled
    )
@@ -584,7 +606,7 @@
       ; A slider's is the panel's to take; a row's is done here.
       {if_else {$this on_slider}
          {do
-            {set [picked_at] {{$this slider} current}}
+            {set [picked_at] {$component current}}
             {$this sync_look}
             kDataUnhandled
          }
@@ -602,7 +624,12 @@
    (BUTTON_DOWN_MSG
       {if_else {&& {== $button kPad_Circle} {$this on_slider}}
          {do
-            {{$this slider} set_current {note_speed reset {$this which}}}
+            ; The game's own: the length's is 110, its twelfth stop past 50.
+            {cond
+               ({== [at] "gs_band.sld"} {gs_band.sld set_current {note_speed reset easy}})
+               ({== [at] "gs_guitar.sld"} {gs_guitar.sld set_current {note_speed reset hard}})
+               (TRUE {gs_sfx.sld set_current 12} {$this keep gs_sfx.sld 12})
+            }
             {synth play_sequence button_toggle}
             {$this sync_look}
          }
