@@ -1,8 +1,8 @@
 ; Quickplay's pickers with the 360 disc: yellow on the guitarist's screen
 ; turns every guitarist between the 360's models and the PS2's, on the
-; guitar's every guitar, each named as what shows, and the venue map's
-; list has the 360's map beside GH2's. The three are apart: the song
-; plays a 360 guitarist with a PS2 guitar in the PS2's room.
+; guitar's every guitar, and blue on GH2's venue map its venues, each named
+; as what shows. The three are apart: the song plays a 360 guitarist with a
+; PS2 guitar in the PS2's room.
 (needs gh2x)
 #include common/first_boot.dta
 {quickplay song_defaults 0}
@@ -46,13 +46,13 @@
 {ghc_qp_guitar_screen goto_career}
 (wait_screen ghc_qp_venue_screen)
 (wait 2)
-; The 360's map, as venues is hd.
-(expect $ghc_qp_venues gh2x)
-(shot map_360)
-{ghc_qp_venue_screen ghc_picked gh2}
-(wait_screen ghc_qp_venue_twin_screen)
-(wait 2)
 (expect $ghc_qp_venues gh2)
+(expect {ghc_qp_venue_has_hd} 1)
+(shot venue_hd)
+(press blue)
+(wait 1)
+(expect {quickplay venues} sd)
+(shot venue_sd)
 {{game get_player_config 0} set autoplay TRUE}
 (press green)
 (wait_screen game_screen 60)

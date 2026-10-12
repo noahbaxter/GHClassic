@@ -1,6 +1,6 @@
-; Quickplay under the 360's menus: its setlist first, GH2's pickers, and the
-; 360's venue map, its venues being GH2's as its disc has them; a song plays
-; there. Out at the main menu the 360's characters are its own again.
+; Quickplay under the 360's menus: its setlist first, GH2's pickers, and GH2's
+; venue map, the 360's venues being GH2's; a song plays there. Out at the
+; main menu the 360's characters are its own again.
 #include common/first_boot.dta
 (needs gh2x)
 {quickplay song_defaults 0}
@@ -32,7 +32,7 @@
 {ghc_qp_guitar_screen goto_career}
 (wait_screen ghc_qp_venue_screen)
 (wait 2)
-(expect $ghc_qp_venues gh2x)
+(expect $ghc_qp_venues gh2)
 (shot venue)
 {{game get_player_config 0} set autoplay TRUE}
 (press green)
