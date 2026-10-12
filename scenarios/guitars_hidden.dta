@@ -22,7 +22,8 @@
 (expect {elem {elem {find $syscfg guitars guitar_red_octane skins} 1} 0} guitar_red_octane_gh2)
 (expect {elem {find $syscfg guitars guitar_red_octane type} 1} guitar)
 (expect {elem {find $syscfg guitars guitar_red_octane require} 1} tour_passed)
-(expect {localize guitar_red_octane} "Guitar Hero guitar")
+(expect {localize guitar_red_octane} "Red Octane Guitar Hero Controller")
+(expect {localize guitar_red_octane_gh2} "\qRed\q Octane Guitar Hero II Controller")
 (expect {localize air_guitar} "Air Guitar")
 ; A finish GH1 shares is named as GH2 names one, GH1's disc there or not.
 (expect {localize lp_gold} "Goldtop Standard")
