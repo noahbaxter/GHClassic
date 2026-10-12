@@ -719,9 +719,12 @@ namespace gh2
         }
         else if (m_renderSize.mode == RenderSize::kWindow && present)
         {
+            // The render_scale setting draws it larger or smaller; the blit
+            // to the window brings it to size.
             const VkRect2D rect = s.pictureRect(frame.displayAspect);
-            width = std::max(rect.extent.width, 1u);
-            height = std::max(rect.extent.height, 1u);
+            const uint32_t percent = static_cast<uint32_t>(settings::get(settings::kRenderScale));
+            width = std::max(rect.extent.width * percent / 100u, 1u);
+            height = std::max(rect.extent.height * percent / 100u, 1u);
         }
         const LogClock::time_point acquireEnd = LogClock::now();
         if (!s.ensureTarget(width, height))

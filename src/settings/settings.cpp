@@ -56,6 +56,10 @@ namespace gh2::settings
             // a song), so drawn small they shimmer: the highway's far end.
             {"mipmaps", Type::kBool, 0, 1, 1, 0},
             {"msaa", Type::kInt, 1, 16, 1, 1},
+            // A percent. 200 at most: the window takes the picture through one
+            // linear blit, which is the mean of a 2x2 block at twice the size
+            // and skips pixels past it.
+            {"render_scale", Type::kInt, 50, 200, 25, 100},
             // Off: a sphere that holds only part of its mesh hides what still
             // shows (flashpot_4.mesh in battle's fail sequence).
             {"frustum_cull", Type::kBool, 0, 1, 1, 1},
