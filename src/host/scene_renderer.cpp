@@ -1514,6 +1514,17 @@ namespace gh2
             raster.cullMode = VK_CULL_MODE_NONE;
             raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
             raster.lineWidth = 1.0f;
+            // A Mat that passes at the depth already there lies on another
+            // mesh: a lamp's glow on its bulbs. The GS's integer Z has the
+            // two equal; a float's differs in its last bits by which mesh's
+            // matrices it came through, and the glow shows in patches. So it
+            // is drawn a little nearer (greater is nearer).
+            if (!shadow && (zMode == milo::mat::kZTransparent || zMode == milo::mat::kZDecal))
+            {
+                raster.depthBiasEnable = VK_TRUE;
+                raster.depthBiasConstantFactor = 16.0f;
+                raster.depthBiasSlopeFactor = 1.0f;
+            }
 
             VkPipelineMultisampleStateCreateInfo multisample{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
             multisample.rasterizationSamples = shadow ? VK_SAMPLE_COUNT_1_BIT : samples;
