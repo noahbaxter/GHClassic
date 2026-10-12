@@ -23,7 +23,6 @@
 #include "settings/settings.h"
 
 #include <algorithm>
-#include <cstring>
 #include <iostream>
 #include <map>
 #include <memory>

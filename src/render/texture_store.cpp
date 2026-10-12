@@ -236,9 +236,7 @@ namespace gh2::textures
             const milo::Bytes &body = dir.bodies[static_cast<size_t>(found - dir.entries.begin())];
             const auto tex = milo::readTex(body, dir.version);
             auto own = tex ? decode(body.data() + tex->bitmap, body.size() - tex->bitmap) : nullptr;
-            if (!tex || tex->source.empty() || dir.version != 25u)
-                return own;
-            if (!own)
+            if (!own || tex->source.empty() || dir.version != 25u)
                 return own;
             // The largest copy of its picture the disc has. The scene's own
             // is the size of the file it names, but some 50 have a larger

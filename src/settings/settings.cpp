@@ -105,7 +105,7 @@ namespace gh2::settings
             {"ui_art", Type::kChoice, 0, 2, 1, kUiClassic, "auto classic hd"},
             // hd: lit meshes shaded per pixel as the 360's standard.fx does,
             // with its maps and its light range of 0 to 4, then its bloom and
-            // luminance ramp (host/shaders/x360.frag). Read at startup.
+            // luminance ramp (host/shaders/x360.frag).
             {"lighting", Type::kChoice, 0, 1, 1, kClassic, "classic hd"},
             {"graphics", Type::kChoice, 0, 3, 1, kLastGen, "authentic last_gen next_gen custom"},
         };

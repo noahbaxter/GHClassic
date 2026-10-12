@@ -66,7 +66,6 @@ namespace milo
     {
         constexpr uint32_t kObject = 0x0u;
         constexpr uint32_t kKeyframes = 0x10u; // begin, end
-        constexpr uint32_t kKeyframeSize = 0x110u;
     }
 
     // CamShotFrame (CamShotFrame::Interp 0x2665a0).

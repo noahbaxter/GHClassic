@@ -373,12 +373,7 @@ namespace gh2::gh2x
                 continue;
             const auto found = at.find(name);
             if (found == at.end())
-            {
-                out.entries.emplace_back(className, name);
-                out.bodies.push_back(converted->bodies[i]);
-                out.tableCount += 2u;
-                out.tableSize += static_cast<uint32_t>(className.size() + name.size() + 2u);
-            }
+                milo::add(out, className, name, converted->bodies[i]);
             else if (out.entries[found->second].first == className)
             {
                 // The 360 draws a star gem's base first and untested, the
@@ -415,12 +410,7 @@ namespace gh2::gh2x
                 body.insert(list, added.begin(), added.end());
                 for (const auto &[className, name, from] :
                      {std::tuple{"TransAnim", kSwing, *swing}, std::tuple{"AnimFilter", kSwingFilter, *filter}})
-                {
-                    out.entries.emplace_back(className, name);
-                    out.bodies.push_back(converted->bodies[from]);
-                    out.tableCount += 2u;
-                    out.tableSize += static_cast<uint32_t>(std::strlen(className) + std::strlen(name) + 2u);
-                }
+                    milo::add(out, className, name, converted->bodies[from]);
             }
         }
         return out;

@@ -26,8 +26,6 @@
 #include <algorithm>
 #include <cstring>
 #include <map>
-#include <memory>
-#include <set>
 
 namespace gh2
 {
