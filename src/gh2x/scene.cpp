@@ -326,6 +326,34 @@ namespace gh2::gh2x
         constexpr const char *kSwingFilter = "wood_track_surface.filt";
         constexpr const char *kLightning = "lightning_track.view";
         constexpr const char *kLightningFirst = "lightning_1.mnm";
+        constexpr const char *kStarBase = "star_base.mat";
+
+        // Where a PS2 Mat's body has its z mode: past its revisions, type,
+        // note, blend, colour and two flags.
+        std::optional<size_t> zModeAt(const milo::Bytes &body)
+        {
+            const auto word = [&](size_t at) -> std::optional<uint32_t>
+            {
+                if (at + 4u > body.size())
+                    return std::nullopt;
+                uint32_t v;
+                std::memcpy(&v, body.data() + at, 4u);
+                return v;
+            };
+            const auto objectRevision = word(4u), typeLength = word(8u);
+            if (!objectRevision || !typeLength)
+                return std::nullopt;
+            size_t at = 12u + *typeLength + 1u;
+            if (*objectRevision >= 1u)
+            {
+                const auto noteLength = word(at);
+                if (!noteLength)
+                    return std::nullopt;
+                at += 4u + *noteLength;
+            }
+            at += 4u + 16u + 2u;
+            return at + 4u <= body.size() ? std::optional<size_t>(at) : std::nullopt;
+        }
     }
 
     std::optional<milo::Dir> convertTrack(const SceneSource &source)
@@ -352,7 +380,17 @@ namespace gh2::gh2x
                 out.tableSize += static_cast<uint32_t>(className.size() + name.size() + 2u);
             }
             else if (out.entries[found->second].first == className)
-                out.bodies[found->second] = converted->bodies[i];
+            {
+                // The 360 draws a star gem's base first and untested, the
+                // gem and its black top over it (its TrackWidgets' order).
+                // The PS2's track draws the base after them, so it keeps the
+                // PS2 Mat's z mode, which leaves it under them.
+                milo::Bytes body = converted->bodies[i];
+                const auto from = zModeAt(out.bodies[found->second]), to = zModeAt(body);
+                if (name == kStarBase && from && to)
+                    std::memcpy(body.data() + *to, out.bodies[found->second].data() + *from, 4u);
+                out.bodies[found->second] = std::move(body);
+            }
         }
         // The 360 swings the board's second light in star power
         // (wood_track_surface.filt over wood_track_surface_starpower.tnm,
