@@ -346,13 +346,11 @@
    (tuning 0)
    (tune_x 0)
    (tune_dx 250)
-   ; The black behind it: from the slider, right and up, and its size.
+   ; The black behind it, a round-ended box (box.dta): from the slider,
+   ; right and up, and its size, in the box's middle's own, 16 by 40.
    (tune_bg (-152 -5 22.2 1.4))
-   (tune_bg_unit 16.03)
-   ; A round end: how wide it comes out, and its size. As wide as it is
-   ; tall, which is how its picture is drawn: any narrower and its curve
-   ; is a sliver.
-   (tune_bg_end (56 3.51 3.51))
+   ; How wide a round end is: as wide as the box is tall.
+   (tune_bg_end 56)
    ; How much of the venue it hides: 1 is all of it.
    (tune_bg_alpha 0.85)
    (finish_load
@@ -738,89 +736,26 @@
          {$view get_local_pos $x $y $z}
          {if $on {set [tune_x] $x}}
          {$view set_local_pos {if_else $on {'+' $x [tune_dx]} [tune_x]} $y $z}
-         ; Black behind it, to read over the venue: one of the help bar's
-         ; boxes, its middle drawn out to the row's size between its two
-         ; round ends, drawn before the rows. In a Mat of its own: the
-         ; box's picture for its shape, black, a little of the venue left
-         ; through it ([tune_bg_alpha], blended by alpha, 3), and written to
-         ; the depth buffer whatever is there (3), so a venue's focus blur
-         ; leaves the row alone. It stands a little behind the row, whose
-         ; scale is tested against it.
-         {if {! {exists gs_tune_bg.mesh}}
-            ; The middle's Mat and the ends', each the help bar's own again
-            ; and black. The box's picture is half clear, so each is drawn
-            ; three times over, a Mat's next pass being another like it.
-            {foreach $mat
-               (
-                  (gs_tune_bg.mat help_box_mid.mat)
-                  (gs_tune_bg2.mat help_box_mid.mat)
-                  (gs_tune_bg3.mat help_box_mid.mat)
-                  (gs_tune_bgc.mat help_box_corner.mat)
-                  (gs_tune_bgc2.mat help_box_corner.mat)
-                  (gs_tune_bgc3.mat help_box_corner.mat)
-               )
-               {new Mat {elem $mat 0}}
-               {{$this find {elem $mat 0}} copy {helpbar find {elem $mat 1}} 1}
-               {{$this find {elem $mat 0}} set color {pack_color 0 0 0}}
-               {{$this find {elem $mat 0}} set alpha [tune_bg_alpha]}
-               {{$this find {elem $mat 0}} set blend 3}
-               {{$this find {elem $mat 0}} set z_mode 3}
-            }
-            {foreach $mat
-               (
-                  (gs_tune_bg.mat gs_tune_bg2.mat)
-                  (gs_tune_bg2.mat gs_tune_bg3.mat)
-                  (gs_tune_bgc.mat gs_tune_bgc2.mat)
-                  (gs_tune_bgc2.mat gs_tune_bgc3.mat)
-               )
-               {{$this find {elem $mat 0}} set next_pass {$this find {elem $mat 1}}}
-            }
-            ; A part, the help bar's it is, its Mat, and its size: the
-            ; middle's is the row's, an end's [tune_bg_end]'s.
-            {foreach $part
-               (
-                  (gs_tune_bg.mesh help_box_mid.mesh gs_tune_bg.mat)
-                  (gs_tune_bgl.mesh help_box_left.mesh gs_tune_bgc.mat)
-                  (gs_tune_bgr.mesh help_box_right.mesh gs_tune_bgc.mat)
-               )
-               {do
-                  ($mid {== {elem $part 0} gs_tune_bg.mesh})
-                  {new {{helpbar find {elem $part 1}} class_name} {elem $part 0}}
-                  {{$this find {elem $part 0}} copy {helpbar find {elem $part 1}} 1}
-                  {{$this find {elem $part 0}} set_mat {$this find {elem $part 2}}}
-                  {{$this find {elem $part 0}} set trans_parent $view}
-                  {{$this find {elem $part 0}} set_local_rot 0 0 0}
-                  {{$this find {elem $part 0}} set_local_scale
-                     {if_else $mid
-                        {'-' {elem {$this look tune_bg} 2} {/ {'*' 2 {elem [tune_bg_end] 0}} [tune_bg_unit]}}
-                        ; The left end the other way round, its curve outward:
-                        ; the help bar's own is turned so in its scene.
-                        {if_else {== {elem $part 0} gs_tune_bgl.mesh} {'-' 0 {elem [tune_bg_end] 1}} {elem [tune_bg_end] 1}}
-                     }
-                     1
-                     {if_else $mid {elem {$this look tune_bg} 3} {elem [tune_bg_end] 2}}}
-                  {{$this find {elem $part 0}} set draw_order -1}
-               }
-            }
+         ; Black behind it, to read over the venue, a little of the venue
+         ; left through it: a round-ended box (box.dta) drawn before the
+         ; rows. It stands a little behind the row, whose scale is tested
+         ; against it.
+         {if {! {exists gs_tune_bg.mat}}
+            {ghc_box_make $this gs_tune_bg $view -1}
+            {ghc_box_color $this gs_tune_bg 0 0 0 [tune_bg_alpha]}
             {{$this loaded_dir} sync_objects}
          }
          {{$this find [at]} get_local_pos $x $y $z}
-         ; An end at the box's left and one at its right, and the middle
-         ; between them: [tune_bg_unit] long before it is drawn out.
-         {foreach $part (gs_tune_bg.mesh gs_tune_bgl.mesh gs_tune_bgr.mesh)
-            {{$this find $part} set_local_pos
-               {'+' {'+' $x {elem {$this look tune_bg} 0}}
-                  {switch $part
-                     ; Turned round, it runs left from where it stands.
-                     (gs_tune_bgl.mesh {elem [tune_bg_end] 0})
-                     (gs_tune_bgr.mesh {'-' {'*' [tune_bg_unit] {elem {$this look tune_bg} 2}} {elem [tune_bg_end] 0}})
-                     {elem [tune_bg_end] 0}
-                  }
-               }
-               {'+' $y 2}
-               {'+' $z {elem {$this look tune_bg} 1}}}
-            {{$this find $part} set_showing $on}
+         {ghc_box_put $this gs_tune_bg
+            {'+' $x {elem {$this look tune_bg} 0}}
+            {'+' $y 2}
+            {'+' $z {elem {$this look tune_bg} 1}}
+            {'*' 16 {elem {$this look tune_bg} 2}}
+            {'*' 40 {elem {$this look tune_bg} 3}}
+            [tune_bg_end]
+            [tune_bg_end]
          }
+         {ghc_box_show $this gs_tune_bg $on}
       }
    )
    (FOCUS_MSG

@@ -1,9 +1,11 @@
 #include "ui/help_bar.h"
 
 #include "disc/ark.h"
+#include "dta.h"
 #include "guest.h"
 #include "hook.h"
 #include "milo/milo.h"
+#include "script.h"
 
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
@@ -82,6 +84,44 @@ namespace gh2
                 const auto it = std::find(dir->entries.begin(), dir->entries.end(), std::make_pair(cls, name));
                 return it == dir->entries.end() ? nullptr : &dir->bodies[static_cast<size_t>(it - dir->entries.begin())];
             };
+            // The help bar's box is black and half clear, its middle
+            // (help_box_mid) and its round end (help_box_corner). Each again
+            // in white and solid, for a box of any colour (box.dta): a Mat's
+            // colour is all its own over white.
+            for (const std::string part : {"mid", "corner"})
+            {
+                const std::string from = "help_box_" + part, to = "ghc_box_" + part;
+                const milo::Bytes *texFrom = body("Tex", from + ".tex"), *matFrom = body("Mat", from + ".mat");
+                if (!texFrom || !matFrom)
+                {
+                    std::cerr << "[help_bar] no " << from << std::endl;
+                    return;
+                }
+                // Its bitmap's palette as a fret's below, of 16 or 256.
+                milo::Bytes tex = *texFrom, mat = *matFrom;
+                const std::string png = ".png";
+                const auto at = std::search(tex.begin(), tex.end(), png.begin(), png.end());
+                const size_t palette = static_cast<size_t>(at - tex.begin()) + png.size() + 9u + 32u;
+                if (at == tex.end() || palette > tex.size() || (tex[palette - 31u] != 4u && tex[palette - 31u] != 8u) ||
+                    palette + (4u << tex[palette - 31u]) > tex.size())
+                {
+                    std::cerr << "[help_bar] " << from << ".tex is not a paletted bitmap" << std::endl;
+                    return;
+                }
+                // Alpha is the PS2's, 128 for all there.
+                for (size_t c = 0u; c < (1u << tex[palette - 31u]); ++c)
+                {
+                    uint8_t *rgba = tex.data() + palette + 4u * c;
+                    rgba[0] = rgba[1] = rgba[2] = 255u;
+                    rgba[3] = static_cast<uint8_t>(std::min(128, rgba[3] * 2));
+                }
+                rename(mat, from + ".tex", to + ".tex");
+                if (!body("Tex", to + ".tex"))
+                {
+                    milo::add(*dir, "Tex", to + ".tex", std::move(tex));
+                    milo::add(*dir, "Mat", to + ".mat", std::move(mat));
+                }
+            }
             for (const Recolor &r : kRecolors)
             {
                 const std::string from = "hb_fret" + std::to_string(r.from), to = "hb_fret" + std::to_string(r.fret);
@@ -191,6 +231,7 @@ namespace gh2
     {
         s_addresses = &addresses;
         buildIcons();
+        script::patchUi(kBoxDta);
         EntryHook<FinishLoadTag>::install(runtime, addresses.helpBarFinishLoad, onFinishLoad);
         runtime.replaceFunction(addresses.helpBarSetDisplay, &setDisplay);
     }

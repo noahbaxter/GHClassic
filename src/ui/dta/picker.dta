@@ -1,8 +1,8 @@
 ; A list to pick from while yellow is held: it opens in the middle of the
 ; screen, the strum steps through it, and letting go picks. It is the help
-; bar's own box and text (helpbar.milo, loaded here a second time): the box
-; as wide as its text and as tall as its rows, drawn three times over to be
-; dark enough to read on, and once more behind the row picked.
+; bar's own text (helpbar.milo, loaded here a second time) on a round-ended
+; box (box.dta) as wide as its text and as tall as its rows, with a lighter
+; one behind the row picked.
 ;
 ; A screen with this among its panels sends its presses here first
 ; ({ghc_pick_button}), opens it on yellow ({ghc_pick_panel open_with}), and
@@ -20,16 +20,11 @@
       ; from, and this one comes from no file.
       (file ui/helpbar.milo)
       (rows (pt0.txt pt1.txt pt2.txt pt3.txt))
-      (box (help_box_left.mesh help_box_mid.mesh help_box_right.mesh))
-      ; The box again, each with the height it draws at over the box's own.
-      (copies
-         (
-            (pb1_left.mesh pb1_mid.mesh pb1_right.mesh 0)
-            (pb2_left.mesh pb2_mid.mesh pb2_right.mesh 0)
-            (pf_left.mesh pf_mid.mesh pf_right.mesh 1)
-         )
-      )
-      (fill (pf_left.mesh pf_mid.mesh pf_right.mesh))
+      ; The list's box and the picked row's fill (box.dta), each with its
+      ; colour, how much it hides, and where it draws among the scene's.
+      (boxes ((pick_bg 0 0 0 0.875 0) (pick_fill 1 1 1 0.25 1)))
+      ; How wide the box's round ends are, outside its text's room.
+      (end 8)
       (options ())
       (picked 0)
       (first 0)
@@ -46,12 +41,15 @@
          {$this build}
          {$this shut}
       )
-      ; The rows, each the help bar's text copied, and the box's copies;
-      ; the rest of the help bar's own stays out of sight.
+      ; The rows, each the help bar's text copied, and the boxes; the help
+      ; bar's own stays out of sight.
       (build
          {if {! {exists pt0.txt}}
             {foreach $o
-               (help_bar_strum.mesh help_bar_starting.mesh help_bar_strumbar.mesh help_bar.mesh help_bar.txt)
+               (
+                  help_bar_strum.mesh help_bar_starting.mesh help_bar_strumbar.mesh help_bar.mesh help_bar.txt
+                  help_box_left.mesh help_box_mid.mesh help_box_right.mesh
+               )
                {{$this find $o} set_showing FALSE}
             }
             {foreach $row [rows]
@@ -61,42 +59,33 @@
                {{$this find $row} set draw_order 2}
                {helpbar.view insert (objects 0) {$this find $row}}
             }
-            ; Sharing the box's mesh (a copy of its own does not draw).
-            {foreach $copy [copies]
-               {foreach_int $i 0 3
-                  {new Mesh {elem $copy $i}}
-                  {{$this find {elem $copy $i}} copy {$this find {elem [box] $i}} 1}
-                  {{$this find {elem $copy $i}} set draw_order {elem $copy 3}}
-                  {helpbar.view insert (objects 0) {$this find {elem $copy $i}}}
+            ; Drawn with the help bar's own: the box, then the fill, then
+            ; the text.
+            {foreach $box [boxes]
+               {ghc_box_make $this {elem $box 0} {help_box_mid.mesh get trans_parent} {elem $box 5}}
+               {ghc_box_color $this {elem $box 0} {elem $box 1} {elem $box 2} {elem $box 3} {elem $box 4}}
+               {foreach $part ("_left.mesh" "_mid.mesh" "_right.mesh")
+                  {helpbar.view insert (objects 0) {$this find {sprint {elem $box 0} $part}}}
                }
             }
-            ; The fill is the box's shape in plain white, a quarter there.
-            {new Mat pf.mat}
-            {pf.mat copy help_box_mid.mat 0}
-            {pf.mat set diffuse_tex ''}
-            {pf.mat set alpha 0.25}
-            {foreach $o [fill] {{$this find $o} set_mat pf.mat}}
-            ; The boxes, then the fill, then the text.
             {helpbar.view sort_draws}
             {{$this loaded_dir} sync_objects}
          }
       )
-      ; A box of those three, that tall, its middle at that height. Its
-      ; ends are 40 high and its middle 16 by 40, as the help bar stretches
-      ; them (HelpBarElement, 0x1511d8).
+      ; That box, the list's width between ends $p_end wide and $p_tall
+      ; tall, its middle at height $p_z.
       (stretch
-         ($box $z $tall)
-         {do
-            ($x {/ [width] -2.0})
-            ($by {/ $tall 40.0})
-            {{$this find {elem $box 0}} set_local_pos $x 0 $z}
-            {{$this find {elem $box 0}} set_local_scale -0.5 1 {'*' -2.5 $by}}
-            {{$this find {elem $box 1}} set_local_pos $x 0 $z}
-            {{$this find {elem $box 1}} set_local_scale {/ [width] 16.0} 1 $by}
-            {{$this find {elem $box 2}} set_local_pos {'+' $x [width]} 0 $z}
-            {{$this find {elem $box 2}} set_local_scale 0.5 1 {'*' 2.5 $by}}
-            {foreach_int $i 0 3 {{$this find {elem $box $i}} set_showing TRUE}}
+         ($p_box $p_z $p_tall $p_end)
+         {ghc_box_put $this $p_box
+            {'-' {/ [width] -2.0} $p_end}
+            0
+            $p_z
+            {'+' [width] {'*' 2 $p_end}}
+            $p_tall
+            $p_end
+            $p_end
          }
+         {ghc_box_show $this $p_box TRUE}
       )
       ; That row's height on screen, the list's middle at 0.
       (row_z ($i) {'*' [height] {'-' {/ {'-' {size [options]} 1} 2.0} $i}})
@@ -126,12 +115,7 @@
             }
          }
          {set [width] {'+' [width] {'*' 2 [margin]}}}
-         {$this stretch [box] 0 {'+' {'*' [height] {size $options}} 12}}
-         {foreach $copy [copies]
-            {if {== {elem $copy 3} 0}
-               {$this stretch $copy 0 {'+' {'*' [height] {size $options}} 12}}
-            }
-         }
+         {$this stretch pick_bg 0 {'+' {'*' [height] {size $options}} 12} [end]}
          {set [open] TRUE}
          {$this paint}
       )
@@ -151,9 +135,9 @@
       (relabel {$this open_with [options] {elem [options] [picked]}})
       ; The fill has no round ends to draw.
       (paint
-         {$this stretch [fill] {$this row_z [picked]} [height]}
-         {pf_left.mesh set_showing FALSE}
-         {pf_right.mesh set_showing FALSE}
+         {$this stretch pick_fill {$this row_z [picked]} [height] 0}
+         {pick_fill_left.mesh set_showing FALSE}
+         {pick_fill_right.mesh set_showing FALSE}
       )
       ; Up or down the list, round its ends.
       (step
@@ -164,10 +148,7 @@
       )
       (shut
          {foreach $o [rows] {{$this find $o} set_showing FALSE}}
-         {foreach $o [box] {{$this find $o} set_showing FALSE}}
-         {foreach $copy [copies]
-            {foreach_int $i 0 3 {{$this find {elem $copy $i}} set_showing FALSE}}
-         }
+         {foreach $box [boxes] {ghc_box_show $this {elem $box 0} FALSE}}
          {set [open] FALSE}
          {set [sticky] FALSE}
       )

@@ -1,0 +1,79 @@
+; A box with round ends, to read text on over a venue or to mark a row: the
+; help bar's own box, its middle drawn out between its two ends, in white
+; (ghc_box_mid and ghc_box_corner, help_bar.cpp) so a colour is all its own.
+; Any panel's scene can hold as many as it names:
+;
+;   {ghc_box_make $this row_bg {title.lbl get trans_parent} -2}
+;   {ghc_box_color $this row_bg 0 0 0 0.7}
+;   {ghc_box_put $this row_bg $x $y $z 120 14 7 7}
+;   {ghc_box_show $this row_bg TRUE}
+;
+; Each is a Mat for its middle and one for its ends, <name>.mat and
+; <name>_end.mat, and three meshes, <name>_mid.mesh, <name>_left.mesh and
+; <name>_right.mesh. An argument is read after the ones before it are set,
+; so these are named apart from a caller's own.
+
+; In panel $b_dir, out of sight, moving with $b_parent and drawn at $b_order
+; among the scene's: before what is to read on it.
+{func ghc_box_make ($b_dir $b_name $b_parent $b_order)
+   {foreach $part ((".mat" ghc_box_mid.mat) ("_end.mat" ghc_box_corner.mat))
+      {do
+         ($mat {sprint $b_name {elem $part 0}})
+         {new Mat $mat}
+         {{$b_dir find $mat} copy {helpbar find {elem $part 1}} 1}
+         ; Blended by its alpha, and written to the depth buffer whatever
+         ; is there, so a venue's focus blur leaves it alone.
+         {{$b_dir find $mat} set blend 3}
+         {{$b_dir find $mat} set z_mode 3}
+      }
+   }
+   {foreach $part
+      (
+         ("_mid.mesh" help_box_mid.mesh ".mat")
+         ("_left.mesh" help_box_left.mesh "_end.mat")
+         ("_right.mesh" help_box_right.mesh "_end.mat")
+      )
+      {do
+         ($mesh {sprint $b_name {elem $part 0}})
+         {new {{helpbar find {elem $part 1}} class_name} $mesh}
+         {{$b_dir find $mesh} copy {helpbar find {elem $part 1}} 1}
+         {{$b_dir find $mesh} set_mat {$b_dir find {sprint $b_name {elem $part 2}}}}
+         {{$b_dir find $mesh} set trans_parent $b_parent}
+         {{$b_dir find $mesh} set_local_rot 0 0 0}
+         {{$b_dir find $mesh} set draw_order $b_order}
+         {{$b_dir find $mesh} set_showing FALSE}
+      }
+   }
+}
+
+; Its colour, and how much of what is behind it it hides: 1 is all of it.
+{func ghc_box_color ($b_dir $b_name $b_r $b_g $b_b $b_alpha)
+   {foreach $part (".mat" "_end.mat")
+      {{$b_dir find {sprint $b_name $part}} set color {pack_color $b_r $b_g $b_b}}
+      {{$b_dir find {sprint $b_name $part}} set alpha $b_alpha}
+   }
+}
+
+; Its left edge at $b_x and its middle at $b_z, $b_wide by $b_tall in its
+; parent's units, its round ends $b_left and $b_right wide within that: 0
+; is a flat end. The middle is 16 by 40 before it is drawn out and an end
+; 16 by 16; the left end is turned round, its curve outward, and runs left
+; from where it stands.
+{func ghc_box_put ($b_dir $b_name $b_x $b_y $b_z $b_wide $b_tall $b_left $b_right)
+   {{$b_dir find {sprint $b_name "_mid.mesh"}} set_local_pos {'+' $b_x $b_left} $b_y $b_z}
+   {{$b_dir find {sprint $b_name "_mid.mesh"}} set_local_scale
+      {/ {'-' {'-' $b_wide $b_left} $b_right} 16.0}
+      1
+      {/ $b_tall 40.0}
+   }
+   {{$b_dir find {sprint $b_name "_left.mesh"}} set_local_pos {'+' $b_x $b_left} $b_y $b_z}
+   {{$b_dir find {sprint $b_name "_left.mesh"}} set_local_scale {/ $b_left -16.0} 1 {/ $b_tall 16.0}}
+   {{$b_dir find {sprint $b_name "_right.mesh"}} set_local_pos {'-' {'+' $b_x $b_wide} $b_right} $b_y $b_z}
+   {{$b_dir find {sprint $b_name "_right.mesh"}} set_local_scale {/ $b_right 16.0} 1 {/ $b_tall 16.0}}
+}
+
+{func ghc_box_show ($b_dir $b_name $b_on)
+   {foreach $part ("_mid.mesh" "_left.mesh" "_right.mesh")
+      {{$b_dir find {sprint $b_name $part}} set_showing $b_on}
+   }
+}
