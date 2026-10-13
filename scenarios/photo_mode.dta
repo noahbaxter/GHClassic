@@ -1,0 +1,135 @@
+; Photo mode, the pause menu's fourth row: the paused song with no track or
+; HUD, the help bar at the bottom and the venue's shots listed at the right
+; while strumming steps through them, with a camera flown free. Orange puts the
+; help bar and the list away. Red leads back to the pause menu from any of
+; it, with the song's own shot back at the frame it was on, and the song
+; goes on from there.
+#include common/first_boot.dta
+{gamecfg set mode quickplay}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{game set_venue theatre}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 30)
+(press start)
+(wait_screen pause_screen 20)
+(wait 1)
+{set $shot {world current_shot}}
+{set $frame {$shot frame}}
+(press down)
+(press down)
+(press down)
+(shot pause_menu)
+(press green)
+(wait_screen photo_screen 20)
+(wait 1)
+(expect {track_panel showing} 0)
+; The list is closed until a step: the shot's own name alone, at the bottom.
+(expect {{photo_panel find photo_5.lbl} showing} 0)
+(expect {{photo_panel find photo_14.lbl} showing} 1)
+{set $at {photo_screen get at}}
+(shot closed)
+(press down)
+(wait 0.5)
+(expect {!= {world current_shot} $shot} 1)
+(expect {photo_screen get at} {'+' $at 1})
+(expect {{photo_panel find photo_5.lbl} showing} 1)
+(shot list_next)
+(press up)
+(press up)
+(wait 0.5)
+(expect {photo_screen get at} {'-' $at 1})
+(shot list_previous)
+
+; Orange puts the help bar and the list away, and brings them back. The
+; list is kept open the while: its seconds are the host's, and a loaded
+; run's pass quicker than its own.
+{photo_panel set open_for 60}
+(press down)
+(press up)
+(press orange)
+(wait 0.5)
+(expect {helpbar showing} 0)
+(expect {{photo_panel find photo_5.lbl} showing} 0)
+(shot hidden)
+(press orange)
+(wait 0.5)
+(expect {helpbar showing} 1)
+(expect {{photo_panel find photo_5.lbl} showing} 1)
+
+; Three seconds after the last step it closes.
+{photo_panel set open_for 3}
+(press down)
+(press up)
+(wait 3)
+(expect {{photo_panel find photo_5.lbl} showing} 0)
+(expect {{photo_panel find photo_14.lbl} showing} 1)
+(shot closed_after_step)
+
+; Red with them away: the pause menu, and the song's shot as it was.
+(press orange)
+(press red)
+(wait_screen pause_screen 20)
+(wait 1)
+(expect {helpbar showing} 1)
+(expect {== {world current_shot} $shot} 1)
+(expect {$shot frame} $frame 0.01)
+(expect {track_panel showing} 1)
+(shot pause_from_hidden)
+
+; Free, from where the shot has the camera: the same picture, with the
+; help bar and the list away for both.
+(press down)
+(press down)
+(press down)
+(press green)
+(wait_screen photo_screen 20)
+(press down)
+(press orange)
+(wait 0.5)
+(shot before_fly)
+(press green)
+(wait 0.5)
+(expect {world free_cam_active} 1)
+(shot fly)
+(press orange)
+(wait 0.5)
+(expect {{photo_panel find photo_14.lbl} showing} 0)
+(shot fly_help)
+
+; Back half a second with shift, a turn right and a look up, then Q held
+; half a second: 30 degrees of roll. Q and E together level it.
+(fly 0 -1 0 0 1)
+(wait 0.5)
+(fly 0 0 60 -60)
+(wait 0.3)
+(shot fly_moved)
+(fly 0 0 0 0 0 1 0)
+(wait 0.5)
+(fly 0 0 0 0)
+(wait 0.2)
+(expect {photo_mode roll} 30 6)
+(shot fly_rolled)
+(fly 0 0 0 0 0 1 1)
+(wait 0.2)
+(fly 0 0 0 0)
+(expect {photo_mode roll} 0 0.01)
+
+; Red from the free camera.
+(press red)
+(wait_screen pause_screen 20)
+(wait 1)
+(expect {world free_cam_active} 0)
+(expect {== {world current_shot} $shot} 1)
+(expect {$shot frame} $frame 0.01)
+(expect {track_panel showing} 1)
+(shot pause_from_fly)
+(press green)
+(wait_screen game_screen 20)
+(wait 1)
+(expect {'||' {!= {world current_shot} $shot} {> {$shot frame} $frame}} 1)
+(shot resumed)
+(quit)

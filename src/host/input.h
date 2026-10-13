@@ -29,4 +29,25 @@ namespace gh2
 
     // The state the last poll saw. Callable from any thread.
     HostPad hostPad();
+
+    // The free camera's controls (ui/photo_mode.h): W A S D as how far it
+    // is pushed right and forward, -1 to 1, the mouse's travel in pixels,
+    // right and down, left shift for speed, and Q and E to roll it left
+    // and right.
+    struct HostFly
+    {
+        float right = 0.0f, forward = 0.0f;
+        float mouseX = 0.0f, mouseY = 0.0f;
+        bool fast = false, rollLeft = false, rollRight = false;
+    };
+
+    // While flying the frontend keeps the mouse to its window, and each poll
+    // reads the keys and adds the mouse's travel. Callable from any thread.
+    void setFlying(bool flying);
+    bool flying();
+    // The keys as the last poll saw them, and the travel since the last take.
+    HostFly takeFly();
+    // A scripted run's: the keys held on top of the player's until the
+    // next, and travel added once.
+    void setScriptedFly(const HostFly &fly);
 }

@@ -46,6 +46,8 @@ namespace gh2
 
         std::mutex s_mutex;
         HostPad s_pad;
+        bool s_flying = false;
+        HostFly s_fly, s_scriptedFly;
 
         const std::map<Action, std::vector<Source>> *section(const std::string &name)
         {
@@ -208,8 +210,22 @@ namespace gh2
             if (held[a] > 0.5f)
                 pad.pressed |= kActions[a].button;
         pad.ly = static_cast<uint8_t>(std::lround(128.0f * (1.0f - held[kWhammy])));
+        // Read every poll, so the travel from before a flight is not its
+        // first step.
+        float mouseX = 0.0f, mouseY = 0.0f;
+        SDL_GetRelativeMouseState(&mouseX, &mouseY);
         std::lock_guard<std::mutex> lock(s_mutex);
         s_pad = pad;
+        if (s_flying)
+        {
+            s_fly.right = (keys[SDL_SCANCODE_D] ? 1.0f : 0.0f) - (keys[SDL_SCANCODE_A] ? 1.0f : 0.0f);
+            s_fly.forward = (keys[SDL_SCANCODE_W] ? 1.0f : 0.0f) - (keys[SDL_SCANCODE_S] ? 1.0f : 0.0f);
+            s_fly.fast = keys[SDL_SCANCODE_LSHIFT];
+            s_fly.rollLeft = keys[SDL_SCANCODE_Q];
+            s_fly.rollRight = keys[SDL_SCANCODE_E];
+            s_fly.mouseX += mouseX;
+            s_fly.mouseY += mouseY;
+        }
     }
 
     void closeInput()
@@ -227,5 +243,40 @@ namespace gh2
     {
         std::lock_guard<std::mutex> lock(s_mutex);
         return s_pad;
+    }
+
+    void setFlying(bool flying)
+    {
+        std::lock_guard<std::mutex> lock(s_mutex);
+        s_flying = flying;
+        s_fly = HostFly{};
+    }
+
+    bool flying()
+    {
+        std::lock_guard<std::mutex> lock(s_mutex);
+        return s_flying;
+    }
+
+    HostFly takeFly()
+    {
+        std::lock_guard<std::mutex> lock(s_mutex);
+        HostFly fly = s_fly;
+        fly.right = std::clamp(fly.right + s_scriptedFly.right, -1.0f, 1.0f);
+        fly.forward = std::clamp(fly.forward + s_scriptedFly.forward, -1.0f, 1.0f);
+        fly.mouseX += s_scriptedFly.mouseX;
+        fly.mouseY += s_scriptedFly.mouseY;
+        fly.fast |= s_scriptedFly.fast;
+        fly.rollLeft |= s_scriptedFly.rollLeft;
+        fly.rollRight |= s_scriptedFly.rollRight;
+        s_fly.mouseX = s_fly.mouseY = 0.0f;
+        s_scriptedFly.mouseX = s_scriptedFly.mouseY = 0.0f;
+        return fly;
+    }
+
+    void setScriptedFly(const HostFly &fly)
+    {
+        std::lock_guard<std::mutex> lock(s_mutex);
+        s_scriptedFly = fly;
     }
 }

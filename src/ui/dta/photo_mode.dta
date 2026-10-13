@@ -1,0 +1,375 @@
+; Photo mode, the pause menu's row under Settings (game_settings.dta): the
+; paused song with no track or HUD over it, the help bar at the bottom and
+; the venue's cameras listed at the right while they are stepped through.
+;
+; Strumming steps through the venue's own camera shots, every CamShot its
+; scene holds, each held at its first frame while the song's time stands
+; still. Green takes the camera free, flown from the host ({photo_mode fly},
+; photo_mode.cpp), and gives it back to the shots. Orange puts the help bar
+; and the list away, and brings them back. Red leads back to the pause menu
+; from any of that, with the shot the song was on put back as it was.
+;
+; A shot is forced as the song forces one, so it hides what it hides and
+; the crowd turns to it (start_shot, camshot.dta). A LOSE shot is left out:
+; starting one moves the guitarist to where he falls. Nothing of a shot is
+; written: it is only looked through.
+
+; The list: the pause menu's scene again, all of it put away, with a column
+; of labels made in it at the right, over the help bar's strum. Stepping
+; opens it: the shot shown is the bottom row, dark on a light bar, with the
+; shots before it in the list's order above it on black, and the list's
+; two ends joined. Left alone for [open_for] seconds it closes to the shot
+; shown alone, where it was, on black. The shot the song was on has a blue
+; mark at its right, to know which the song goes back to.
+{if {! {exists photo_panel}}
+   {new GHPanel photo_panel}
+}
+{retype photo_panel
+   (
+      (file ui/pause.milo)
+      (rows 15)
+      ; A row's text size and width, the gap to the next, and where the
+      ; bottom row's right end is from the scene's title: right and up.
+      (text_size 15)
+      (width 260)
+      (gap 14)
+      (from_title (206 -262))
+      ; The black behind each row, as wide as its name ({photo_mode width},
+      ; photo_mode.cpp), a box with flat ends (box.dta): how far its right
+      ; edge is past the names', how far up of a row it is, how far left of
+      ; the name it starts, and how tall. Then how wide the one round end
+      ; is that the open list's rows share, at the right where they line
+      ; up, and how wide each round end of the shot shown's is when closed.
+      (bg (4 -1 4 14.4))
+      (cap 8)
+      (pill 5)
+      ; How much of the venue it hides, open and closed: 1 is all of it.
+      (bg_alpha (0.7 0.85))
+      ; The song's shot's mark, a blue square where the other names end, its
+      ; own name moved left for it: how far, and how wide and tall it is.
+      (mark (12 7.2 7.2))
+      ; The list's order: the cameras a song cuts between, then a solo's,
+      ; then those of one moment, each group by name with [group_gap] of a
+      ; row's height between it and the next. By a shot's category: one
+      ; in neither list is a song's.
+      (solos (SOLO_FAR SOLO_NEAR))
+      (moments (INTRO INTRO_FAST INTRO_ENCORE WIN WIN_ENCORE LIGHTER))
+      (group_gap 0.5)
+      (group ($p_shot)
+         {do
+            ($in 0)
+            {foreach $c [solos] {if {== $c {$p_shot get category}} {set $in 1}}}
+            {foreach $c [moments] {if {== $c {$p_shot get category}} {set $in 2}}}
+            $in
+         }
+      )
+      ; Whether shot $p_a comes after $p_b in it.
+      (after ($p_a $p_b)
+         {do
+            ($a {$this group $p_a})
+            ($b {$this group $p_b})
+            {'||' {> $a $b} {&& {== $a $b} {photo_mode after $p_a $p_b}}}
+         }
+      )
+      ; Open, and the UI's time it closes at.
+      (open FALSE)
+      (open_for 3)
+      (until 0)
+      (stepped
+         {set [open] TRUE}
+         {set [until] {'+' {taskmgr ui_seconds} [open_for]}}
+      )
+      (close {set [open] FALSE})
+      (poll
+         {if {&& [open] {> {taskmgr ui_seconds} [until]}}
+            {set [open] FALSE}
+            {photo_screen sync}
+         }
+      )
+      ; Each time the scene loads.
+      (lay_out
+         {if {! {exists photo_0.lbl}}
+            {do
+               ($x 0) ($y 0) ($z 0)
+               ($view {pause_title.lbl get trans_parent})
+               {pause_title.lbl get_local_pos $x $y $z}
+               {foreach_int $i 0 [rows]
+                  {do
+                     ($l {sprint "photo_" $i ".lbl"})
+                     {new BandLabel $l}
+                     ; GH2's rows' font, whichever game's scene this is.
+                     {{$this find $l} set_type helveticablack}
+                     {{$this find $l} set trans_parent $view}
+                     {{$this find $l} set alignment 36}
+                     {{$this find $l} set text_size [text_size]}
+                     {{$this find $l} set width [width]}
+                     {{$this find $l} set_local_pos
+                        {'+' $x {elem [from_title] 0}}
+                        $y
+                        {'+' $z {'+' {elem [from_title] 1} {'*' [gap] {'-' {'-' [rows] 1} $i}}}}
+                     }
+                     {{$this find $l} set_showing FALSE}
+                     ; Its black, drawn before the rows.
+                     {ghc_box_make $this {sprint "photo_bg_" $i} $view -2}
+                  }
+               }
+               {ghc_box_make $this photo_cap $view -2}
+               ; The shot shown's bar, and the song's shot's mark over both.
+               {ghc_box_make $this photo_sel $view -1.5}
+               {ghc_box_color $this photo_sel 1 1 1 1}
+               {ghc_box_make $this photo_mark $view -1}
+               {ghc_box_color $this photo_mark 0.2 0.5 1 1}
+               {pause.view set_showing FALSE}
+               {{$this loaded_dir} sync_objects}
+            }
+         }
+      )
+      ; Box $p_box, $p_wide by $p_tall with round ends $p_lend and $p_end
+      ; wide at its left and right, flat where that is 0, its right edge
+      ; $p_right of the names' right end and its middle in row $p_row,
+      ; $p_back behind the rows. Named apart from the caller's own: an
+      ; argument is read after the ones before it are set.
+      (put ($p_box $p_back $p_right $p_row $p_wide $p_tall $p_lend $p_end)
+         {do
+            ($x 0) ($y 0) ($z 0)
+            {pause_title.lbl get_local_pos $x $y $z}
+            {ghc_box_put $this $p_box
+               {'-' {'+' {'+' $x {elem [from_title] 0}} $p_right} $p_wide}
+               {'+' $y $p_back}
+               {'+' {'+' {'+' $z {elem [from_title] 1}} {elem [bg] 1}}
+                  {'*' [gap] {'-' {'-' [rows] 1} $p_row}}
+               }
+               $p_wide
+               $p_tall
+               $p_lend
+               $p_end
+            }
+         }
+      )
+      ; The rows about shot $at of $shots, or its own alone, or none. $was
+      ; is the song's shot.
+      (list ($show $shots $at $was)
+         {$this lay_out}
+         {do
+            ($n {size $shots})
+            ($lit {'-' [rows] 1})
+            ($marked -1)
+            ($shown_wide 0)
+            ; How many rows' height the row in hand is moved up, and the
+            ; group of the one under it.
+            ($up 0)
+            ($under -1)
+            ($x 0) ($y 0) ($z 0)
+            {pause_title.lbl get_local_pos $x $y $z}
+            ; From the bottom row up.
+            {foreach_int $k 0 [rows]
+               {do
+                  ($i {'-' $lit $k})
+                  ($l {$this find {sprint "photo_" $i ".lbl"}})
+                  ($bg {sprint "photo_bg_" $i})
+                  ($shown {&& $show {> $n 0} {'||' [open] {== $i $lit}}})
+                  ; The shot shown has the bar for its black while open.
+                  ($bar {&& [open] {== $i $lit}})
+                  {$l set_showing $shown}
+                  {ghc_box_color $this $bg 0 0 0 {elem [bg_alpha] {if_else [open] 0 1}}}
+                  ; So has the one left when closed its pill.
+                  {ghc_box_show $this $bg {&& $shown {!= $i $lit}}}
+                  {if {> $n 0}
+                     {do
+                        ($shot {elem $shots {mod {'+' {'-' {'+' $at $i} $lit} {'*' $n [rows]}} $n}})
+                        ($group {$this group $shot})
+                        ; The song's shot's name alone stops short, for the mark.
+                        ($more {if_else {== $shot $was} {elem [mark] 0} 0})
+                        ; From a little left of the name to a little past
+                        ; where the names end.
+                        ($wide {'+' {photo_mode width $shot} {'+' {elem [bg] 2} {'+' $more {elem [bg] 0}}}})
+                        ($row 0)
+                        ; A little room between one group and the next.
+                        {if {&& {>= $under 0} {!= $group $under}} {set $up {'+' $up [group_gap]}}}
+                        {set $under $group}
+                        {set $row {'-' $i $up}}
+                        {$l set color {if_else $bar {pack_color 0 0 0} {pack_color 1 1 1}}}
+                        {$l set text_token {photo_mode name $shot}}
+                        {$l set_local_pos
+                           {'-' {'+' $x {elem [from_title] 0}} $more}
+                           $y
+                           {'+' $z {'+' {elem [from_title] 1} {'*' [gap] {'-' {'-' [rows] 1} $row}}}}
+                        }
+                        {$this put $bg 2 {elem [bg] 0} $row $wide {elem [bg] 3} 0 0}
+                        {if {== $i $lit}
+                           {set $shown_wide $wide}
+                           {$this put photo_sel 1.5 {elem [bg] 0} $row $wide {elem [bg] 3} 0 0}
+                        }
+                        {if {&& $shown {== $shot $was}}
+                           {set $marked $i}
+                           {$this put photo_mark 1 0 $row {elem [mark] 1} {elem [mark] 2} 0 0}
+                        }
+                     }
+                  }
+               }
+            }
+            ; Open, the one round end, as tall as the rows. Closed, the
+            ; shot shown's own black, round at both ends as the help bar's
+            ; boxes are.
+            {ghc_box_color $this photo_cap 0 0 0 {elem [bg_alpha] {if_else [open] 0 1}}}
+            {if_else [open]
+               {$this put photo_cap 2 {'+' {elem [bg] 0} [cap]}
+                  {/ {'-' $lit $up} 2.0}
+                  [cap]
+                  {'+' {elem [bg] 3} {'*' [gap] {'+' $lit $up}}}
+                  0
+                  [cap]
+               }
+               {$this put photo_cap 2 {'+' {elem [bg] 0} [pill]}
+                  $lit
+                  {'+' $shown_wide {'*' 2 [pill]}}
+                  {elem [bg] 3}
+                  [pill]
+                  [pill]
+               }
+            }
+            {ghc_box_show $this photo_cap {&& $show {> $n 0}}}
+            {ghc_box_show $this photo_sel {&& $show {> $n 0} [open]}}
+            {ghc_box_show $this photo_mark {>= $marked 0}}
+         }
+      )
+   )
+}
+
+{if {! {exists photo_screen}}
+   {new GHScreen photo_screen}
+}
+{retype photo_screen
+   (
+      (panels GAME_PANELS photo_panel helpbar)
+      (in_game TRUE)
+      (allow_back FALSE)
+      (animate_transition FALSE)
+      (helpbar (default ((fret1 ghc_photo_fly) (fret2 help_back) (fret5 ghc_photo_hide) (strum ghc_photo_step))))
+      ; The venue's shots and which of them is shown.
+      (shots ())
+      (at 0)
+      ; The song's own: its frame, and when it started.
+      (was 0)
+      (frame 0)
+      (start 0)
+      ; The help bar and the list put away.
+      (clean FALSE)
+      ; The panels put away, and whether each was showing. The HUD's meters
+      ; go and its panel stays: the help bar is drawn with the camera the
+      ; HUD leaves, and with none it is not seen.
+      (hud (track_panel mtv_overlay_panel))
+      (showed ())
+      (enter
+         {resize [shots] 0}
+         {resize [showed] 0}
+         {set [clean] FALSE}
+         {set [was] {world current_shot}}
+         {if [was] {set [frame] {[was] frame}}}
+         {set [start] {photo_mode shot_start world}}
+         {set [at] 0}
+         ; Not a 360 shot's second, which only holds what it focuses on
+         ; (gh2x/focus.h).
+         {world iterate CamShot $shot
+            {if {&& {!= {$shot get category} LOSE} {!= {$shot get category} x360_focus}}
+               {push_back [shots] $shot}
+            }
+         }
+         ; The scene holds them in no order: in the list's.
+         {foreach_int $i 0 {size [shots]}
+            {foreach_int $j 0 {'-' {'-' {size [shots]} 1} $i}
+               {if {photo_panel after {elem [shots] $j} {elem [shots] {'+' $j 1}}}
+                  {do
+                     ($shot {elem [shots] $j})
+                     {set_elem [shots] $j {elem [shots] {'+' $j 1}}}
+                     {set_elem [shots] {'+' $j 1} $shot}
+                  }
+               }
+            }
+         }
+         {foreach_int $i 0 {size [shots]}
+            {if {== {elem [shots] $i} [was]} {set [at] $i}}
+         }
+         {foreach $panel [hud]
+            {push_back [showed] {$panel showing}}
+            {$panel set_showing FALSE}
+         }
+         {hud set_meters_showing FALSE}
+         {photo_panel close}
+         {photo_panel list TRUE [shots] [at] [was]}
+      )
+      (exit
+         {if {world free_cam_active} {$this fly FALSE}}
+         {if [was]
+            {world force_shot [was]}
+            {[was] set_frame [frame]}
+            {photo_mode shot_start world [start]}
+         }
+         {foreach_int $i 0 {size [hud]}
+            {{elem [hud] $i} set_showing {elem [showed] $i}}
+         }
+         ; The meters slide in as the song's intro ends (hud_panel.dta).
+         {if {game get intro_complete} {hud set_meters_showing TRUE}}
+         {helpbar set_showing TRUE}
+         {photo_panel list FALSE [shots] [at] [was]}
+         {resize [shots] 0}
+         {set [was] 0}
+      )
+      ; The world is paused and its camera manager with it, so the shot is
+      ; put to its first frame here.
+      (show
+         {if {size [shots]}
+            {world force_shot {elem [shots] [at] [was]}}
+            {{elem [shots] [at] [was]} set_frame 0}
+         }
+      )
+      (step ($by)
+         {if {world free_cam_active} {$this fly FALSE}}
+         {if {size [shots]}
+            {set [at] {mod {'+' [at] $by {size [shots]}} {size [shots]}}}
+         }
+         {$this show}
+         {photo_panel stepped}
+         {$this sync}
+      )
+      ; The game's free camera (FreeCamera::AdvanceState, 0x1b9320) goes
+      ; from off to flying, to held still, and off again: two steps to leave
+      ; it. It lets go of the shot as it takes the camera, where the shot
+      ; had it, and puts the camera back as it leaves, for the shot to be
+      ; forced again.
+      (fly ($on)
+         {world toggle_free_cam 0}
+         {if {! $on}
+            {world toggle_free_cam 0}
+            {$this show}
+         }
+         {photo_mode fly $on}
+         {$this sync}
+      )
+      ; The help bar and the list as they stand: neither while they are put
+      ; away, and no list while the camera is free.
+      (sync
+         {helpbar set_showing {! [clean]}}
+         {helpbar set_display
+            {if_else {world free_cam_active}
+               ((fret1 ghc_photo_shots) (fret2 help_back) (fret5 ghc_photo_hide))
+               ((fret1 ghc_photo_fly) (fret2 help_back) (fret5 ghc_photo_hide) (strum ghc_photo_step))
+            }
+         }
+         {photo_panel list {&& {! [clean]} {! {world free_cam_active}}} [shots] [at] [was]}
+      )
+      ; The UI gets blue and orange both as kPad_Square.
+      (BUTTON_DOWN_MSG
+         {cond
+            ({== $button kPad_Tri} {ui goto_screen pause_screen})
+            ({== $button kPad_X} {$this fly {! {world free_cam_active}}})
+            ({&& {== $button kPad_Square} {pad_held orange}}
+               {set [clean] {! [clean]}}
+               {$this sync}
+            )
+            ({== $button kPad_DUp} {$this step -1})
+            ({== $button kPad_DDown} {$this step 1})
+         }
+      )
+   )
+}

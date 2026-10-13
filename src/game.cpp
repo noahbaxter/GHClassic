@@ -30,6 +30,7 @@
 #include "ui/locale.h"
 #include "ui/menus.h"
 #include "ui/meta_music.h"
+#include "ui/photo_mode.h"
 #include "ui/slider_scale.h"
 #include "movie/movie.h"
 #include "dev/cheats.h"
@@ -105,6 +106,7 @@ namespace
         gh2::installPad(runtime, gh2::kSlus21447);
         gh2::installFrameStep(runtime, gh2::kSlus21447);
         gh2::installMenus(runtime);
+        gh2::installPhotoMode(runtime, gh2::kSlus21447);
         gh2::installHelpBar(runtime, gh2::kSlus21447);
         // After the help bar, which recolours its scene's own pixels.
         gh2::installGh2xAssets(runtime, gh2::kSlus21447);

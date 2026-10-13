@@ -76,6 +76,7 @@ namespace gh2
         uint64_t presented = 0;
 
         SDL_Window *window = nullptr;
+        bool mouseKept = false;
         vkb::Instance instance;
         VkSurfaceKHR surface = VK_NULL_HANDLE;
         vkb::Device device;
@@ -558,6 +559,13 @@ namespace gh2
                     SDL_SetWindowFullscreen(s.window, !(SDL_GetWindowFlags(s.window) & SDL_WINDOW_FULLSCREEN));
                 cheats::key(event.key.key);
             }
+        }
+        // The free camera looks about with the mouse, which stays in the
+        // window, unseen, for as long as it flies.
+        if (s.window && flying() != s.mouseKept)
+        {
+            s.mouseKept = flying();
+            SDL_SetWindowRelativeMouseMode(s.window, s.mouseKept);
         }
         pollInput(devicesChanged);
 

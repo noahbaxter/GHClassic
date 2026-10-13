@@ -121,6 +121,7 @@ namespace gh2
         uint32_t rndMorphSetFrame; // (frame, blend)
         uint32_t gamePanelSetExcitementLevel;
         uint32_t camShotShake;
+        uint32_t freeCameraPoll; // FreeCamera::Poll
         uint32_t rndFlareDrawFlare;
         uint32_t saveData1;     // the card write, on GHMCSaveData's worker thread
         uint32_t loadData1;     // the card read, on GHMCLoadData's
@@ -352,6 +353,7 @@ namespace gh2
         .rndMorphSetFrame = 0x201048u,
         .gamePanelSetExcitementLevel = 0x108978u,
         .camShotShake = 0x262f38u,
+        .freeCameraPoll = 0x1b9370u,
         .rndFlareDrawFlare = 0x1f9330u,
         .saveData1 = 0x14b3e0u,
         .loadData1 = 0x14ba00u,

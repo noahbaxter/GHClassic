@@ -7,6 +7,7 @@
 #include "ps2_runtime_macros.h"
 #include "guest.h"
 #include "hook.h"
+#include "host/input.h"
 #include "host/pad.h"
 #include "host/vulkan_frontend.h"
 #include "milo/layout.h"
@@ -252,6 +253,14 @@ namespace gh2::scenario
                 else if (verb == "hold")
                     // Pad buttons held until the next (hold), libpad bits: (hold 0) lets go.
                     setScriptedPad(static_cast<uint16_t>(array.number(1)));
+                else if (verb == "fly")
+                    // The free camera's keys held until the next (fly), right and forward
+                    // from -1 to 1, and the mouse moved once, pixels right and down. Then,
+                    // where given, 1 for each of shift, Q and E held.
+                    setScriptedFly({array.number(1), array.number(2), array.number(3), array.number(4),
+                                    array.size() > 5 && array.number(5) != 0.0f,
+                                    array.size() > 6 && array.number(6) != 0.0f,
+                                    array.size() > 7 && array.number(7) != 0.0f});
                 else if (verb == "stall")
                     // A hitch: the game thread stops while audio plays on.
                     std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(array.number(1) * 1000.0f)));
