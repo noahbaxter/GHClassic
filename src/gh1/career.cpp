@@ -152,7 +152,8 @@ namespace gh2::gh1
         const dtb::Files game = [](const std::string &path) { return ark::readFile(0u, path); };
         dtb::Macros none;
         auto campaign = dtb::read("config/campaign.dta", none, theirs);
-        const auto theirStore = dtb::read("config/store.dta", none, theirs);
+        auto theirStore = dtb::read("config/store.dta", none, theirs);
+        addUnlistedSongs(nullptr, theirStore ? &*theirStore : nullptr);
         const auto theirGuitars = dtb::read("config/guitars.dta", none, theirs);
         const auto theirTips = dtb::read("config/tips.dta", none, theirs);
         const auto strings = dtb::read("ghui/eng/locale.dta", none, theirs);
@@ -340,8 +341,8 @@ namespace gh2::gh1
                 songs.insert(keyOf(sold->nodes[i]));
         // The store heads a song with the token of its name, which GH1
         // has no text for: its title is with the song.
-        if (const auto theirSongs = dtb::read("config/songs.dta", none, theirs))
-            for (const std::string &song : songs)
+        if (auto theirSongs = dtb::read("config/songs.dta", none, theirs))
+            for (addUnlistedSongs(&*theirSongs, nullptr); const std::string &song : songs)
                 if (const dtb::Node *entry = dtb::find(*theirSongs, song))
                     if (const dtb::Node *name = dtb::find(*entry, "name"); name && name->nodes.size() > 1u)
                         text[song] = name->nodes[1].text;
@@ -374,6 +375,10 @@ namespace gh2::gh1
                      kStore.count(key) != 0u)
                 text[key] = entry.nodes[1].text;
         }
+        // The disc has no blurb for a song it does not list: none, where
+        // the store would show the token.
+        for (const std::string &song : songs)
+            text.try_emplace(song + "_shop_desc", "");
         const size_t layer = ark::addLayer(std::nullopt);
         // GH1's intro movie, in its archive, where GH2 plays its own
         // (splash.dta's CUT_SCENE_VIDEO in each).

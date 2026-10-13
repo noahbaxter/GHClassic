@@ -380,14 +380,75 @@ namespace gh2::gh1
         return it != kVenues.end() ? it->second : "small1";
     }
 
+    // Each is whole on every GH1 disc, a chart of four difficulties and
+    // four channels of audio, with no entry in songs.dta, campaign.dta,
+    // store.dta or any locale. The entries are Harmonix's, from the build
+    // of 3 September 2005, whose songs.dta has both and whose store sells
+    // them: channels, levels, artists, preview and quickplay picks. The
+    // first is "Advanced Harmony: Final Project" there and Trippolette to
+    // everyone since; its band, a keyboard player in it, is not taken. The
+    // second's tempo is the retail chart's, which that build's 190 is not.
+    void addUnlistedSongs(dtb::Node *songs, dtb::Node *store)
+    {
+        static const char *const kEntries = R"(
+(advharmony
+   (name "Trippolette")
+   (artist "Andy Buch")
+   (song
+      (name songs/advharmony/advharmony)
+      (tracks 1)
+      (slip_tracks ((2 3)))
+      (pans (-1.0 1.0 -1.0 1.0))
+      (vols (0.9 0.9 0.9 0.9))
+      (cores (-1 -1 1 1))
+      (solo (riffs standard)))
+   (bank sfx/song_default)
+   (bpm 206)
+   (anim_tempo kTempoFast)
+   (preview 23700 39500)
+   (midi_file songs/advharmony/advharmony.mid)
+   (quickplay (character metal) (guitar gibson_sg) (venue big_club)))
+(graveyardshift
+   (name "Graveyard Shift")
+   (artist "Gurney")
+   (song
+      (name songs/graveyardshift/graveyardshift)
+      (tracks 1)
+      (slip_tracks ((2 3)))
+      (pans (-1.0 1.0 -1.0 1.0))
+      (vols (1.0 1.0 0.8 0.8))
+      (cores (-1 -1 1 1))
+      (solo (riffs standard)))
+   (bank sfx/song_default)
+   (bpm 240)
+   (anim_tempo kTempoFast)
+   (preview 23700 39500)
+   (midi_file songs/graveyardshift/graveyardshift.mid)
+   (quickplay (character hair_metal) (guitar gibson_flying_v) (venue big_club))))";
+        const auto entries = dtb::parse(kEntries);
+        if (!entries)
+            return;
+        for (const dtb::Node &entry : entries->nodes)
+        {
+            if (songs)
+                songs->nodes.push_back(entry);
+            // At its other bonus songs' lower price.
+            if (store)
+                for (dtb::Node &list : store->nodes)
+                    if (list.type == dtb::kArray && !list.nodes.empty() && list.nodes[0].text == "song")
+                        list.nodes.push_back(array({entry.nodes[0], array({symbol("price"), {dtb::kInt, 250, 0.0f, {}, {}}})}));
+        }
+    }
+
     void addSetlist(size_t disc, size_t gh2Disc)
     {
         const dtb::Files files = [disc](const std::string &path) { return ark::readFile(disc, path); };
         dtb::Macros macros;
-        const auto entries = dtb::read("config/songs.dta", macros, files);
+        auto entries = dtb::read("config/songs.dta", macros, files);
         const auto campaign = dtb::read("config/campaign.dta", macros, files);
-        const auto store = dtb::read("config/store.dta", macros, files);
+        auto store = dtb::read("config/store.dta", macros, files);
         const auto strings = dtb::read("ghui/eng/locale.dta", macros, files);
+        addUnlistedSongs(entries ? &*entries : nullptr, store ? &*store : nullptr);
         const dtb::Node *order = campaign ? dtb::find(*campaign, "order") : nullptr;
         const dtb::Node *bonus = store ? dtb::find(*store, "song") : nullptr;
         if (!entries || !order || !bonus || !strings)

@@ -375,6 +375,10 @@ namespace gh2::gh1
                     const std::string file = "crowd_v" + std::to_string(version) + "_" + level + ".vgs";
                     ark::lend(layer, world + "streams/" + file, disc, streams + file);
                 }
+            // And the career's last win's, which GH1's last venue alone has:
+            // GH2's is its own last venue's, so the stand-in has none, and
+            // a win with none to play stops the game.
+            ark::lend(layer, world + "streams/wingame.vgs", disc, streams + "wingame.vgs");
         }
     }
 }

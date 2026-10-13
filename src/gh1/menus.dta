@@ -119,8 +119,11 @@
       {ug_blurb1.lbl set_showing FALSE}
       {ug_blurb2.lbl set_showing FALSE}
       {ug_guitar.lbl set_showing FALSE}
-      {if {== kDifficultyExpert {game get_difficulty 0}}
-         {unlock_guitar_display_panel show_guitar 0 battleaxe '' ug_guitar.pxy ug_guitar.filt}}
+      ; Below expert there is no guitar: the scene's own stand-in for one
+      ; goes too.
+      {if_else {== kDifficultyExpert {game get_difficulty 0}}
+         {unlock_guitar_display_panel show_guitar 0 battleaxe '' ug_guitar.pxy ug_guitar.filt}
+         {ug_guitar.pxy set_showing FALSE}}
       {unlock_guitar_display_panel set_showing FALSE}))
 (win_game_screen
    (needs win_expert)
@@ -148,8 +151,8 @@
                {synth play_sequence button_select}
                {script_task (delay 1) (units kTaskUISeconds)
                   (script
-                     {ui goto_screen
-                        {if_else {post_show_screen get pfo_newly_unlocked} unlock_pfo_screen endgame_screen}})}}}}))
+                     ; GH2's letter for Pro Face-Off has no place in GH1's.
+                     {ui goto_screen endgame_screen})}}}}))
 
 ; The store.
 

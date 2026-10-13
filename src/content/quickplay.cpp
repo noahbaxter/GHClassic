@@ -99,6 +99,11 @@ namespace gh2::quickplay
                 unlocked = allAccess || *guitar ? 1u : 0u;
             else if ((unlocked & 0xffu) == 0u && anywhere(item))
                 unlocked = 1u;
+            // Pro Face-Off is there from the start, where retail keeps it
+            // for a career won (campaign.dta's unlock_game_modes): so no
+            // career's end has its letter to show either (endgame.dta).
+            if (item == "multi_fo")
+                unlocked = 1u;
             SET_GPR_U32(ctx, 2, unlocked);
             ctx->pc = returnTo;
         }
