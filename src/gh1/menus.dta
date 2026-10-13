@@ -151,8 +151,8 @@
                {synth play_sequence button_select}
                {script_task (delay 1) (units kTaskUISeconds)
                   (script
-                     {ui goto_screen
-                        {if_else {post_show_screen get pfo_newly_unlocked} unlock_pfo_screen endgame_screen}})}}}}))
+                     ; GH2's letter for Pro Face-Off has no place in GH1's.
+                     {ui goto_screen endgame_screen})}}}}))
 
 ; The store.
 
