@@ -323,6 +323,7 @@ set(GHC_GAME_SOURCES
     src/render/camera.cpp
     src/render/frame.cpp
     src/render/look.cpp
+    src/render/char_lod.cpp
     src/render/mesh_capture.cpp
     src/render/native_cull.cpp
     src/render/native_environ.cpp

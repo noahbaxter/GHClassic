@@ -50,6 +50,7 @@ namespace gh2::settings
         kGuitars,
         kHighway,    // its track and fretboards: the venues' choice, or one of its own
         kTemporalAa, // with the 360's lighting, each frame joined to the ones before it: steadier thin edges and highlights
+        kHighDetail, // every character drawn as its nearest model, however far off
         kFrameLog,   // frametimes.csv: each presented frame's times and what it did
         kKeyCount,
     };
