@@ -264,8 +264,17 @@ namespace gh2::gh1
         store.nodes.push_back(list);
         if (const dtb::Node *sold = dtb::find(*theirStore, "song"))
             store.nodes.push_back(*sold);
-        // GH1's three videos are not sold until one has been seen to play.
-        store.nodes.push_back(array({symbol("video")}));
+        // GH1's three videos, each a file in its archive (below).
+        std::vector<std::string> videos;
+        if (const dtb::Node *sold = dtb::find(*theirStore, "video"))
+        {
+            store.nodes.push_back(*sold);
+            for (size_t i = 1u; i < sold->nodes.size(); ++i)
+                if (const dtb::Node *file = dtb::find(sold->nodes[i], "file"); file && file->nodes.size() > 1u)
+                    videos.push_back(file->nodes[1].text);
+        }
+        else
+            store.nodes.push_back(array({symbol("video")}));
         list = array({symbol("character")});
         std::map<std::string, std::string> characters; // GH1's folder to GH2's character
         for (const Guitarist &g : guitarists)
@@ -369,6 +378,8 @@ namespace gh2::gh1
         // GH1's intro movie, in its archive, where GH2 plays its own
         // (splash.dta's CUT_SCENE_VIDEO in each).
         ark::lend(layer, "videos/intro.pss", disc, "videos/ghintro.pss");
+        for (const std::string &video : videos)
+            ark::lend(layer, "videos/" + video, disc, "videos/" + video);
         addSounds(layer, disc);
         addGems(layer, disc);
         const std::set<std::string> scenes = addMenus(layer, disc, text);
