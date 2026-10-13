@@ -10,7 +10,8 @@
 // Left as they are: a Tex with no pixels of its own (rendered, movie, frame
 // buffer), one with no source picture (filled at run time), one a Font in
 // its file draws unless every such Font takes the 360's glyphs with it
-// (takeFont), and one whose twin is a normal map.
+// (takeFont), one whose twin is a normal map, and one whose twin is laid
+// out for a scene the PS2's is not (kOwnLayout).
 
 #include "gh2x/textures.h"
 
@@ -33,6 +34,11 @@ namespace gh2
     {
         constexpr const char *kTrack = "track/";
         constexpr const char *kFolders[] = {kTrack, "hud/", "ui/", "system/run/ui/"};
+
+        // The 360's store has a seventh category, Downloads
+        // (st_downloads.btn), and its planks are seven where the PS2's
+        // six buttons stand on six.
+        constexpr const char *kOwnLayout[] = {"us_button_bg.tex"};
 
         // The track's pictures and fretboards go with the highway, the rest
         // with the HUD and menus.
@@ -125,7 +131,8 @@ namespace gh2
                 const auto tex = className == "Tex" ? milo::readTex(body, 24u) : std::nullopt;
                 const auto font = fonts->find(name);
                 if (!tex || tex->source.empty() || (tex->type & ::milo::tex::kTypeNoPixels) ||
-                    (font != fonts->end() && !font->second))
+                    (font != fonts->end() && !font->second) ||
+                    std::find(std::begin(kOwnLayout), std::end(kOwnLayout), name) != std::end(kOwnLayout))
                     continue;
                 const auto own = oneLevel(body.data() + tex->bitmap, body.size() - tex->bitmap);
                 // A picture with words in it has one Tex a language on the

@@ -76,15 +76,33 @@ namespace gh2::gh1
             // GH2's guitar is its display's, shown by a proxy, here in GH1's
             // case.
             {.gh1 = "sel_guitar", .without = {"guitar.grp"}, .placed = {{"guitar.pxy", 15.0f, -685.0f, -10.0f, 0.8f}}},
-            // GH2's guitar and character stand in GH1's shop window (the
-            // character's group is moved by the script, menus.dta), and its
-            // song logos, which GH1 has none of, out of sight.
+            // GH2's guitar and character stand in GH1's shop window. The
+            // guitar is where GH1's is through its own camera for it
+            // (guitar_display.gh's guitar_store.view, 1.6 times its size at
+            // (-33 0 -30), from guitar_setup.cam at (6.58 -216 0)): as much
+            // larger as the store's camera is further, then fitted to a
+            // capture, GH2's guitar not sitting on its proxy as GH1's does
+            // on its placer. GH2 turns it the same way at the same rate
+            // (guitar_single.tnm) but upright, where the keys of GH1's
+            // guitar_store.tnm lean it back 14 degrees. The character's
+            // group is moved by the script (menus.dta) and drawn first,
+            // behind the glass and the shop's front as GH1's is. Its song
+            // logos, which GH1 has none of, are out of sight.
             {.gh1 = "store",
              .with = {"char_placer.grp"},
-             .placed = {{"guitar.grp", -9.4f, -743.0f, -1.4f, 0.0f, 0.3f},
+             .placed = {{"guitar.grp", -156.7f, 477.1f, 10.0f, 5.61f},
                         {"song_logos.pic", kAway, 0.0f, 0.0f},
-                        {"st_sold.mesh", kAway, 0.0f, 0.0f}}},
-            {"store_back"},
+                        {"st_sold.mesh", kAway, 0.0f, 0.0f}},
+             .tilted = {{"guitar_single.tnm", 14.0f}},
+             .first = {"char_placer.grp"}},
+            // The street's walls run on behind the room in the window, which
+            // hides them by its depth in GH1: here they are painted first.
+            {.gh1 = "store_back", .first = {"us_wall1.mesh", "us_wall2.mesh"}},
+            // GH1 has a tape for a video and a CD for a song, each a scene
+            // of its own through the same camera: both are GH2's panel for
+            // the tape here, for the script to show one of and stand where
+            // GH1's camera for them saw it (menus.dta).
+            {.gh1 = "store_video", .also = "store_cd"},
             {"store_bought"},
             // GH1 marks a new status with a newspaper, where GH2 has a
             // sponsor's letter for the status reached (endgame.dta's

@@ -254,12 +254,44 @@
       }
    }
 }
-; The store, as the game's own (career.dta) with that on entering.
+; The guitars' price range over those in stock: the game's own counts one
+; the band has yet to earn (a reward guitar, the controller), which the
+; store names no price for.
+{func ghc_store_range
+   {if {== {store_panel get category} guitar}
+      {do
+         ($low 0)
+         ($high 0)
+         ($some FALSE)
+         {foreach_int $i 0 {store_guitar_provider list_length}
+            {if {store_guitar_provider in_stock $i}
+               {do
+                  ($price {store_panel price guitar {store_guitar_provider get_symbol $i}})
+                  {if {|| {! $some} {< $price $low}} {set $low $price}}
+                  {if {|| {! $some} {> $price $high}} {set $high $price}}
+                  {set $some TRUE}
+               }
+            }
+         }
+         {if $some
+            {{store_panel find st_costrange.lbl} set_localized_text
+               {sprintf {localize category_cost} $low $high}
+            }
+         }
+      }
+   }
+}
+; The store, as the game's own (career.dta) with those on entering.
 {retype store_screen
    (
       (panels meta store_back_panel store_guitar_display_panel store_video_panel char_store store_panel helpbar)
       (focus store_panel)
-      (enter {ghc_store_categories})
+      (enter {ghc_store_categories} {ghc_store_range})
+      ; After the panel's own, which writes the game's range.
+      (FOCUS_MSG
+         {script_task (delay 0) (units kTaskUISeconds) (script {ghc_store_range})}
+         kDataUnhandled
+      )
       (BUTTON_DOWN_MSG
          {cond
             ({&& {is_updown_button $button} {{store_panel find st_screen2.view} showing}}

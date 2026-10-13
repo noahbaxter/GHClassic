@@ -164,16 +164,57 @@
       {us_items.mat set z_mode 2}
       {us_wall_posters.mat set z_mode 2}))
 
-; GH1's SOLD is a label, and its store's poster a mesh with a material for
-; each category (gh1/menus.cpp). GH2's character stands in GH1's shop
-; window: its group is moved here, where the move reaches the placer under
-; it (one written into the scene does not).
+; GH1's SOLD tag has a label over it that reads the same, which stands off
+; the tag here and stays hidden, and its store's poster is a mesh with a
+; material for each category (gh1/menus.cpp). GH2's character stands in
+; GH1's shop window: its group is moved here, where the move reaches the
+; placer under it (one written into the scene does not).
 (store_panel
    (needs store)
-   (enter {char_placer.grp set_local_pos -28.4 -590 -37})
-   (update_store_item_sold {st_sold.lbl set_showing {campaign is_unlocked [item_name]}})
+   (enter
+      {char_placer.grp set_local_pos -26 -574 -45}
+      {st_sold.lbl set_showing FALSE})
    (update_store_category_desc
       {st_poster.pic set_mat {$this find {sprint "st_poster_" [category] ".mat"}}}))
+
+; GH1 turns a CD in the window for a song, where GH2 shows a card of the
+; band's logo, and a tape for a video as GH2 does: both are in GH2's panel
+; for the tape (gh1/screens.cpp), one shown.
+(store_panel
+   (needs store store_video)
+   ; GH1 sees the two through a camera of their own, store_cd.cam, at
+   ; (6.58 -216 0) in its world and as wide as the store's, which GH2's
+   ; panel has none of: three times the size and as much further from the
+   ; store's camera, they look the same through it.
+   (enter
+      {foreach $v (store_video.view store_cd.view)
+         {{store_video_panel find $v} set_local_scale 3 3 3}
+         {{store_video_panel find $v} set_local_pos -25.9 -109.7 -6.3}})
+   (SELECT_START_MSG
+      {if {|| {== $component st_songs.btn} {== $component st_videos.btn}}
+         {{store_video_panel find store_cd.view} set_showing {== $component st_songs.btn}}
+         {{store_video_panel find video.view} set_showing {== $component st_videos.btn}}
+         {{store_video_panel find store_video.view} set_showing TRUE}
+         {taskmgr clear_tasks}
+         {store_video_panel animate_video}}
+      kDataUnhandled))
+
+; GH1 sells three videos where GH2 sells two: its bonus screen has a row for
+; the first as well (GH1's options.dta, bonus_material).
+(bonus_material_panel
+   (needs bonus_material)
+   (= focus bm_video1.btn))
+(bonus_material_screen
+   (needs bonus_material)
+   (enter
+      {$this set_button_state bm_video1.btn}
+      {{bonus_material_panel find bm_buy.lbl} set_showing [item_locked]})
+   (= get_movie ($btn)
+      {switch $btn
+         (bm_video1.btn video1)
+         (bm_video2.btn video2)
+         (bm_video3.btn video3)
+         {fail "unknown button: " $btn}}))
 
 ; In a song.
 

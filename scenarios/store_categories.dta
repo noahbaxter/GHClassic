@@ -1,6 +1,6 @@
 ; The store lists the categories its campaign sells in. GH2's has all six;
-; GH1's has no Outfits, which it has none of, and no Videos, and down from
-; Characters wraps to Guitars.
+; GH1's has no Outfits, which it has none of, and down from Characters
+; steps over them to Videos, then wraps to Guitars.
 (needs gh1)
 #include common/first_boot.dta
 {set $pick gh2}
@@ -23,14 +23,16 @@
 (shot store)
 (expect {{store_panel find st_characters.btn} showing} 1)
 (expect {{store_panel find st_outfits.btn} showing} 0)
-(expect {{store_panel find st_videos.btn} showing} 0)
+(expect {{store_panel find st_videos.btn} showing} 1)
 (expect {store_panel get category} guitar)
 (press down)
 (press down)
 (press down)
 (expect {store_panel get category} character)
+(press down)
+(expect {store_panel get category} video)
 (press down)
 (expect {store_panel get category} guitar)
 (press up)
-(expect {store_panel get category} character)
+(expect {store_panel get category} video)
 (quit)

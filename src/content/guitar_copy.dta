@@ -50,14 +50,13 @@
 (es_ebony_shop_desc "As classy as they come, you'll definitely raise some eyebrows playing this Ebony Gibson ES-335.")
 
 ; The controller as a guitar (GH2's store, once hard's tour is passed). Its
-; name and blurb are GH1's own for it (GH1's locale.dta), where it is a
-; cheat's.
-(guitar_red_octane "Guitar Hero guitar")
+; blurb is GH1's own for it (GH1's locale.dta), where it is a cheat's.
+(guitar_red_octane "Red Octane Guitar Hero Controller")
 (guitar_red_octane_desc "The most ultimate axe ever!")
 (guitar_red_octane_shop_desc "")
 (guitar_red_octane_locked_desc "")
 ; GH2's red controller, a finish of it painted from the disc's.
-(guitar_red_octane_gh2 "")
+(guitar_red_octane_gh2 "\qRed\q Octane Guitar Hero II Controller")
 (guitar_red_octane_gh2_desc "")
 (guitar_red_octane_gh2_shop_desc "")
 
