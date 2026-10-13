@@ -77,6 +77,7 @@ namespace gh2::settings
             {"fast_boot", Type::kBool, 0, 1, 1, 0},
             {"lefty", Type::kBool, 0, 1, 1, 0},
             {"lefty_p2", Type::kBool, 0, 1, 1, 0},
+            {"true_lefty_flip", Type::kBool, 0, 1, 1, 1},
             // Off: PCSX2 holds a card it has loaded open.
             {"export_card", Type::kBool, 0, 1, 1, 0},
             {"track_on_at_start", Type::kBool, 0, 1, 1, 0},

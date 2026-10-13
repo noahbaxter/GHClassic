@@ -26,6 +26,7 @@ namespace gh2::settings
         kFastBoot,   // straight to the main menu, past the logos and splash
         kLefty,      // player 1's frets mirrored
         kLeftyP2,
+        kTrueLeftyFlip, // a lefty player's guitarist plays left-handed too
         kExportCard, // each save also written to GHClassic.ps2, a PCSX2 card
         kTrackOnAtStart, // the player's track heard before its first hit
         kSustainReleaseMs, // a sustain let go this close to its end stays heard

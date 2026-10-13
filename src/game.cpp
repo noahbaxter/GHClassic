@@ -34,6 +34,7 @@
 #include "ui/slider_scale.h"
 #include "movie/movie.h"
 #include "dev/cheats.h"
+#include "lefty_guitarist.h"
 #include "note_speed.h"
 #include "dev/null_rnd.h"
 #include "host/pad.h"
@@ -83,6 +84,9 @@ namespace
         gh2::installTextureCapture(runtime, gh2::kSlus21447);
         gh2::installNativeMat(runtime, gh2::kSlus21447);
         gh2::installNativeMesh(runtime, gh2::kSlus21447);
+        // After focus, whose hook on a shot's Interp runs inside this one's,
+        // and the native mesh, whose draw this one's hook runs before.
+        gh2::installLeftyGuitarist(runtime, gh2::kSlus21447);
         gh2::installNativeEnviron(runtime, gh2::kSlus21447);
         gh2::installNativeRect(runtime, gh2::kSlus21447);
         gh2::installNativeParticles(runtime, gh2::kSlus21447);

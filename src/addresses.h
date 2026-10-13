@@ -45,6 +45,9 @@ namespace gh2
         uint32_t rndTextDrawShowing;
         uint32_t camShotFrameInterp;       // CamShotFrame::Interp
         uint32_t camShotFrameUpdateTarget; // CamShotFrame::UpdateTarget
+        uint32_t shotTargetResolve;        // ShotTarget::Resolve
+        uint32_t guitarCharacterPoll;      // GuitarCharacter::Poll
+        uint32_t guitarCharacterDtor;
         uint32_t objectDirFindObject;      // ObjectDir::FindObject
         uint32_t worldXfm;       // RndTransformable::WorldXfm
         uint32_t setWorldXfm;    // RndTransformable::SetWorldXfm
@@ -277,6 +280,9 @@ namespace gh2
         .rndTextDrawShowing = 0x1dc380u,
         .camShotFrameInterp = 0x2665a0u,
         .camShotFrameUpdateTarget = 0x266df8u,
+        .shotTargetResolve = 0x261c10u,
+        .guitarCharacterPoll = 0x10ac90u,
+        .guitarCharacterDtor = 0x109f58u,
         .objectDirFindObject = 0x2bb4f0u,
         .worldXfm = 0x3d8ea0u,
         .setWorldXfm = 0x1dd7b8u,

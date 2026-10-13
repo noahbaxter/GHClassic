@@ -1,0 +1,24 @@
+; Lefty flip's left-handed guitarist (lefty_guitarist.cpp), for the eye: a
+; shot from a camera that stays put, where the guitarist alone plays the
+; other way round, then two that ride on the guitarist and are mirrored.
+#include common/first_boot.dta
+{options set_lefty 0 TRUE}
+{gamecfg set mode quickplay}
+{game set_song ziggystardust}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{game set_venue theatre}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 14)
+{world do_force_shot flr_far_lft01}
+(wait 0.6)
+(shot stays_put)
+{world do_force_shot SOLO_NEAR01}
+(wait 0.6)
+(shot rides_close)
+{world do_force_shot flr_near_rt03}
+(wait 0.6)
+(shot rides)
+(quit)
