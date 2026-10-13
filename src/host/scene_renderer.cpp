@@ -1272,14 +1272,19 @@ namespace gh2
             if (settings::get(settings::kMipmaps) && !data->text && !data->cube)
                 while ((std::max(data->width, data->height) >> (levels - 1u)) > 1u)
                     ++levels;
-            std::vector<uint8_t> staged = data->rgba;
+            // The levels go straight into the staging buffer, one after
+            // another, with no joined copy of them made first.
+            std::vector<std::pair<const void *, VkDeviceSize>> parts{{data->rgba.data(), data->rgba.size()}};
+            VkDeviceSize staged = data->rgba.size();
             for (const std::vector<uint8_t> &mip : data->mips)
-                staged.insert(staged.end(), mip.begin(), mip.end());
-            if (!createBuffer(staged.data(), staged.size(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, gpu.staging,
-                              gpu.stagingMemory))
+            {
+                parts.push_back({mip.data(), mip.size()});
+                staged += mip.size();
+            }
+            if (!createBuffer(parts, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, gpu.staging, gpu.stagingMemory))
                 return nullptr;
             ++stats.texturesCreated;
-            stats.uploadBytes += staged.size();
+            stats.uploadBytes += staged;
 
             VkImageCreateInfo imageInfo{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
             imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -1975,8 +1980,16 @@ namespace gh2
         bool createBuffer(const void *data, VkDeviceSize bytes, VkBufferUsageFlags usage, VkBuffer &buffer,
                           VmaAllocation &memory)
         {
+            return createBuffer({{data, bytes}}, usage, buffer, memory);
+        }
+
+        // A host-visible buffer filled from `parts`, back to back.
+        bool createBuffer(const std::vector<std::pair<const void *, VkDeviceSize>> &parts, VkBufferUsageFlags usage,
+                          VkBuffer &buffer, VmaAllocation &memory)
+        {
             VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-            info.size = bytes;
+            for (const auto &part : parts)
+                info.size += part.second;
             info.usage = usage;
             VmaAllocationCreateInfo alloc{};
             alloc.usage = VMA_MEMORY_USAGE_AUTO;
@@ -1984,7 +1997,12 @@ namespace gh2
             VmaAllocationInfo allocated{};
             if (!check(vmaCreateBuffer(allocator, &info, &alloc, &buffer, &memory, &allocated), "buffer"))
                 return false;
-            std::memcpy(allocated.pMappedData, data, bytes);
+            auto *out = static_cast<uint8_t *>(allocated.pMappedData);
+            for (const auto &part : parts)
+            {
+                std::memcpy(out, part.first, static_cast<size_t>(part.second));
+                out += part.second;
+            }
             vmaFlushAllocation(allocator, memory, 0, VK_WHOLE_SIZE);
             return true;
         }
