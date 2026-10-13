@@ -184,6 +184,7 @@ namespace gh2
             std::ofstream out;
             Clock::time_point start{}, lastPresent{}, lastFlush{};
             uint64_t lastGame = 0;
+            uint64_t lastDropped = 0;
 
             static double ms(Clock::duration d)
             {
@@ -203,7 +204,7 @@ namespace gh2
                     on = false;
                     return;
                 }
-                out << "t_ms,dt_ms,new,game,wait_ms,acq_ms,rec_ms,mesh_new,tex_new,upload_kb,evicted,gpu_ms";
+                out << "t_ms,dt_ms,new,game,wait_ms,acq_ms,rec_ms,mesh_new,tex_new,upload_kb,evicted,vbl_drop,gpu_ms";
                 for (const char *span : kGpuSpans)
                     out << ",gpu_" << span << "_ms";
                 out << "\n";
@@ -211,21 +212,25 @@ namespace gh2
                 std::cerr << "[frame] logging to " << path << std::endl;
             }
 
-            void add(bool isNew, uint64_t game, double waitMs, double acqMs, double recMs, const SceneStats &scene)
+            void add(bool isNew, uint64_t game, double waitMs, double acqMs, double recMs, const SceneStats &scene,
+                     uint64_t dropped)
             {
                 const Clock::time_point now = Clock::now();
                 const double dtMs = ms(now - lastPresent);
                 lastPresent = now;
                 const uint64_t newGame = game - std::min(game, lastGame);
                 lastGame = game;
+                const uint64_t newDropped = dropped - std::min(dropped, lastDropped);
+                lastDropped = dropped;
                 float gpuMs = 0.0f;
                 for (float span : scene.gpuMs)
                     gpuMs += span;
                 char row[160];
-                std::snprintf(row, sizeof(row), "%.2f,%.2f,%d,%llu,%.2f,%.2f,%.2f,%u,%u,%llu,%u,%.2f",
+                std::snprintf(row, sizeof(row), "%.2f,%.2f,%d,%llu,%.2f,%.2f,%.2f,%u,%u,%llu,%u,%llu,%.2f",
                               ms(now - start), dtMs, isNew ? 1 : 0, static_cast<unsigned long long>(newGame), waitMs,
                               acqMs, recMs, scene.meshesCreated, scene.texturesCreated,
-                              static_cast<unsigned long long>(scene.uploadBytes >> 10), scene.evicted, gpuMs);
+                              static_cast<unsigned long long>(scene.uploadBytes >> 10), scene.evicted,
+                              static_cast<unsigned long long>(newDropped), gpuMs);
                 out << row;
                 for (float span : scene.gpuMs)
                 {
@@ -238,7 +243,7 @@ namespace gh2
                               << ", acq " << static_cast<int>(acqMs) << ", rec " << static_cast<int>(recMs)
                               << ", gpu " << static_cast<int>(gpuMs) << ", +" << scene.meshesCreated << " meshes, +"
                               << scene.texturesCreated << " tex (" << (scene.uploadBytes >> 10) << " KB), "
-                              << scene.evicted << " evicted" << std::endl;
+                              << scene.evicted << " evicted, " << newDropped << " vblanks dropped" << std::endl;
                 if (now - lastFlush >= std::chrono::seconds(1))
                 {
                     out.flush();
@@ -782,7 +787,7 @@ namespace gh2
             s.frameLog.add(isNew, frames().published(), State::FrameLog::ms(acquireStart - waitStart),
                            State::FrameLog::ms(acquireEnd - acquireStart),
                            State::FrameLog::ms(recordEnd - recordStart),
-                           moviePlaying ? SceneStats{} : s.scene.stats());
+                           moviePlaying ? SceneStats{} : s.scene.stats(), runtime.eeScheduler().droppedVBlanks());
 
         if (shot)
         {

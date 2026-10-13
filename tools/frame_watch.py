@@ -23,6 +23,8 @@ def cause(row):
     """The likeliest reason a frame ran long, from what it recorded."""
     if int(row["mesh_new"]) + int(row["tex_new"]) >= 4 or int(row["upload_kb"]) >= 1024:
         return "uploads"
+    if int(row["vbl_drop"]) > 0:
+        return "game (EE) late"
     if float(row["acq_ms"]) >= 8.0:
         return "GPU / present queue"
     if float(row["rec_ms"]) >= 8.0:
