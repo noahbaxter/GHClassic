@@ -96,9 +96,14 @@
 ; A song is headed by its title, which GH1 keeps with the song.
 (expect {localize fireitup} "Fire It Up")
 ; Its three videos, by GH1's names, each a tape in the window and the CD
-; for a song both in GH2's panel for the tape.
-(expect {elem {find $syscfg store video video1 price} 1} 350)
-(expect {localize video1} "Songs")
+; for a song both in GH2's panel for the tape. A PAL disc asks 250 for one
+; and calls it "Making of: Songs".
+(expect
+   {||
+      {== {elem {find $syscfg store video video1 price} 1} 350}
+      {== {elem {find $syscfg store video video1 price} 1} 250}}
+   1)
+(expect {if_else {has_substr {localize video1} "Songs"} 1 0} 1)
 (expect {{store_video_panel loaded_dir} exists store_cd.view} 1)
 (expect {{store_video_panel loaded_dir} exists video.view} 1)
 (press green)

@@ -35,6 +35,7 @@ serial = "SLES-54093"
 game = "gh1"
 name = "Guitar Hero (Europe)"
 version = "1.00"
+role = "content"
 data_sha1 = "d8d3fa7615e79284119d5e8e9af623e01236d469"
 
 [[release]]
@@ -42,6 +43,7 @@ serial = "SLES-54132"
 game = "gh1"
 name = "Guitar Hero (Europe, Australia)"
 version = "1.00"
+role = "content"
 data_sha1 = "777aee9142715d1a886d89282f4c6c8be3173109"
 
 [[release]]
@@ -123,6 +125,7 @@ serial = "SLES-54859"
 game = "gh80s"
 name = "Guitar Hero: Rocks the 80s (Europe, Australia)"
 version = "1.00"
+role = "content"
 data_sha1 = "4af88d50cbbb404a9d1e33bd0a552ae05a60f501"
 
 [[release]]
@@ -130,6 +133,7 @@ serial = "SLES-54860"
 game = "gh80s"
 name = "Guitar Hero: Rocks the 80s (Europe)"
 version = "1.01"
+role = "content"
 data_sha1 = "adb7136705a9d4a991b34ebd67853e911432b104"
 
 [[executable]]
@@ -146,8 +150,8 @@ sha1 = "c30b031bfe3828b8936a1c3dd4a5f6a58e2a0db4"
 # Guitar Hero II (Xbox 360)
 # ============================================================================
 
-# World (xex version 1) and USA Rev 1 (version 2) share the title ID; only
-# USA Rev 1 has been run.
+# World (xex version 1) and USA Rev 1 (version 2) share the title ID. Both
+# run; World on three scenarios only.
 
 [[release]]
 serial = "415607E7"

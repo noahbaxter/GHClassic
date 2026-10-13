@@ -561,6 +561,28 @@ namespace gh2::ark
         return read(it != files.end() ? &it->second : nullptr);
     }
 
+    void unlocalize(size_t disc)
+    {
+        if (disc >= s_discs.size())
+            return;
+        auto &files = s_discs[disc].files;
+        std::vector<std::pair<std::string, Entry>> plain;
+        for (const auto &[path, entry] : files)
+        {
+            std::string usa = path;
+            if (const size_t eng = usa.find("/eng/"); eng != std::string::npos)
+                usa.erase(eng, 4u);
+            else if (usa.rfind("videos_pal/", 0u) == 0u)
+                usa.erase(6u, 4u);
+            else
+                continue;
+            if (files.count(usa) == 0u)
+                plain.emplace_back(std::move(usa), entry);
+        }
+        for (auto &file : plain)
+            files.insert(std::move(file));
+    }
+
     std::optional<size_t> discWithSerial(const std::string &serial)
     {
         for (size_t i = 0u; i < s_discs.size(); ++i)

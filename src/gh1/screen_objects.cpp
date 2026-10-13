@@ -48,7 +48,11 @@ namespace gh2::gh1
     bool Conversion::addTex(const std::string &n, const Bytes &b)
     {
         size_t o = 16u;
-        const std::string path = str(b, o);
+        std::string path = str(b, o);
+        // A PAL disc's scene in a language's folder (ghui/eng/options.gh)
+        // names its bitmaps from there: "../image/brick02.bmp".
+        if (path.rfind("../", 0u) == 0u)
+            path.erase(0u, 3u);
         Bytes body = b;
         if (b.size() == o + 9u)
         {
