@@ -15,6 +15,7 @@
 
 #include "input.h"
 
+#include "dev/timing.h"
 #include "host/bindings.h"
 #include "host/profiles.h"
 
@@ -48,6 +49,7 @@ namespace gh2
         HostPad s_pad;
         bool s_flying = false;
         HostFly s_fly, s_scriptedFly;
+        uint64_t s_pressEventNs = 0; // the host thread's own
 
         const std::map<Action, std::vector<Source>> *section(const std::string &name)
         {
@@ -215,6 +217,18 @@ namespace gh2
         float mouseX = 0.0f, mouseY = 0.0f;
         SDL_GetRelativeMouseState(&mouseX, &mouseY);
         std::lock_guard<std::mutex> lock(s_mutex);
+        pad.pressCount = s_pad.pressCount;
+        pad.pressEventNs = s_pad.pressEventNs;
+        pad.pressPollNs = s_pad.pressPollNs;
+        if (timing::on() && (pad.pressed & ~s_pad.pressed))
+        {
+            ++pad.pressCount;
+            pad.pressPollNs = timing::now();
+            // An event from before the last poll is another press's.
+            pad.pressEventNs = s_pressEventNs > s_pad.pressPollNs ? s_pressEventNs : 0u;
+            if (pad.pressEventNs != 0u)
+                timing::span(timing::kEventToPoll, pad.pressEventNs, pad.pressPollNs);
+        }
         s_pad = pad;
         if (s_flying)
         {
@@ -226,6 +240,11 @@ namespace gh2
             s_fly.mouseX += mouseX;
             s_fly.mouseY += mouseY;
         }
+    }
+
+    void notePressEvent(uint64_t ns)
+    {
+        s_pressEventNs = ns;
     }
 
     void closeInput()

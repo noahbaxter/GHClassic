@@ -13,6 +13,7 @@
 
 #include "synth/synth.h"
 
+#include "dev/timing.h"
 #include "guest.h"
 #include "hook.h"
 #include "host/audio.h"
@@ -228,6 +229,12 @@ namespace gh2
                     const float limit = kSlew * dtMs;
                     pull = std::clamp(error * std::min(1.0f, dtMs / (kSettleS * 1000.0f)), -limit, limit);
                 }
+            }
+            if (!first)
+            {
+                timing::sample(timing::kClockError, error);
+                timing::sample(timing::kClockAge, ageMs);
+                timing::sample(timing::kClockPull, pull);
             }
             lock->second.at = now;
             lock->second.clockMs = clockMs - pull;

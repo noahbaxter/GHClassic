@@ -4,6 +4,7 @@
 
 #include "render/native_rnd.h"
 
+#include "dev/timing.h"
 #include "guest.h"
 #include "hook.h"
 #include "milo/layout.h"
@@ -137,6 +138,12 @@ namespace gh2
             look::setInVenue(building().venue);
             building().hdLighting = settings::hd(settings::kLookLighting);
             building().luminance = look::luminance();
+            if (timing::on())
+            {
+                building().publishedNs = timing::now();
+                timing::takePress(building().pressEventNs, building().pressReadNs);
+                timing::gameFrame(building().publishedNs);
+            }
             frames().publish(building());
             building().venue = false;
             textures::endFrame();

@@ -50,6 +50,9 @@ namespace gh2
         float displayAspect = 4.0f / 3.0f;
         std::vector<Camera> cameras;
         std::vector<DrawCall> draws;
+        // --timing (dev/timing.h): when it was published, and the press its
+        // pad read saw, if one did.
+        uint64_t publishedNs = 0, pressEventNs = 0, pressReadNs = 0;
         // The points asked about while it was built (Rnd::TestPoint), each
         // for an object through a camera: render/native_points.cpp.
         struct PointTest
@@ -133,6 +136,13 @@ namespace gh2
         {
             std::lock_guard lock(m_mutex);
             return m_published;
+        }
+
+        // Frames waiting to be shown.
+        size_t waiting()
+        {
+            std::lock_guard lock(m_mutex);
+            return m_frames.size();
         }
 
         // The next frame not yet shown, waiting up to `wait` for one. False
