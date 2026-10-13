@@ -333,7 +333,7 @@ def identify(paths, image_hash=False):
         if image_hash and is_image(path):
             with Image(path) as img:
                 sha1 = img.data_sha1()
-            match = next((d["name"] for d in known("disc") if d["data_sha1"] == sha1), None)
+            match = next((r["name"] for r in known("release") if r.get("data_sha1") == sha1), None)
             verdict = f"matches {match}" if match else "matches no known dump"
             print(f"  {sha1}  data track, {verdict}")
 
