@@ -122,6 +122,7 @@ namespace gh2::settings
             {"temporal_aa", Type::kBool, 0, 1, 1, 0},
             {"high_detail", Type::kBool, 0, 1, 1, 0},
             {"frame_log", Type::kBool, 0, 1, 1, 0},
+            {"lighting", Type::kChoice, 0, 1, 1, kLastGen, "last_gen next_gen"},
         };
 
         const Entry *entryNamed(const std::string &name)
@@ -301,6 +302,8 @@ namespace gh2::settings
             return false;
         if (look == kLookUiArt)
             return true;
+        if (look == kLookLighting && get(kLighting) == kLastGen)
+            return false;
         if (playing.career)
             return playing.nextGen;
         const bool venue = playing.gh2Venue && get(kVenues) == kHd;

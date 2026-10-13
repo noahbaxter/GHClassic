@@ -52,6 +52,7 @@ namespace gh2::settings
         kTemporalAa, // with the 360's lighting, each frame joined to the ones before it: steadier thin edges and highlights
         kHighDetail, // every character drawn as its nearest model, however far off
         kFrameLog,   // frametimes.csv: each presented frame's times and what it did
+        kLighting,   // kLastGen: the PS2's lighting wherever the 360's would be
         kKeyCount,
     };
 
@@ -91,6 +92,12 @@ namespace gh2::settings
         kShadowsOff,
         kShadowsClassic,
         kShadowsGh2,
+    };
+
+    enum Lighting
+    {
+        kLastGen,
+        kNextGen,
     };
 
     enum DiscFormat
