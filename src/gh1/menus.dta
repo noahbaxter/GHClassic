@@ -119,8 +119,11 @@
       {ug_blurb1.lbl set_showing FALSE}
       {ug_blurb2.lbl set_showing FALSE}
       {ug_guitar.lbl set_showing FALSE}
-      {if {== kDifficultyExpert {game get_difficulty 0}}
-         {unlock_guitar_display_panel show_guitar 0 battleaxe '' ug_guitar.pxy ug_guitar.filt}}
+      ; Below expert there is no guitar: the scene's own stand-in for one
+      ; goes too.
+      {if_else {== kDifficultyExpert {game get_difficulty 0}}
+         {unlock_guitar_display_panel show_guitar 0 battleaxe '' ug_guitar.pxy ug_guitar.filt}
+         {ug_guitar.pxy set_showing FALSE}}
       {unlock_guitar_display_panel set_showing FALSE}))
 (win_game_screen
    (needs win_expert)
