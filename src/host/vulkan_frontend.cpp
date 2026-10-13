@@ -138,7 +138,6 @@ namespace gh2
         movie::Picture moviePicture;                 // the movie's, while one plays
         std::chrono::microseconds frameWait{8333};   // half a display period
         std::chrono::nanoseconds gamePeriod{16667000};
-        bool newestOnly = false;                     // the game outruns the display
 
         // The game's frame rate from settings, as the runtime's vblank: one
         // game frame a vblank.
@@ -157,7 +156,6 @@ namespace gh2
             runtime.eeScheduler().setVBlankPeriod(gamePeriod);
             if (displayHz > 0.0f)
                 frameWait = std::chrono::microseconds(static_cast<int64_t>(500000.0f / displayHz));
-            newestOnly = displayHz > 0.0f && hz > displayHz * 1.01f;
         }
 
         SceneRenderer scene;
@@ -774,33 +772,14 @@ namespace gh2
         // stop while PlayMovie blocks the game thread. Shown at 4:3, a TV's
         // picture for the 640x448 stream.
         const bool moviePlaying = movie::latestPicture(s.moviePicture);
-        // Each game frame once, in order: wait up to half a display period for
-        // the next, else show the last again. A game faster than the display
-        // shows its newest.
-        using LogClock = State::FrameLog::Clock;
-        const LogClock::time_point waitStart = LogClock::now();
-        bool isNew = false;
-        const uint64_t t1 = timed ? timing::now() : 0u;
-        if (!moviePlaying)
-            isNew = s.newestOnly ? frames().latest(s.shown) : frames().next(s.shown, s.frameWait);
-        const Frame &frame = s.shown;
-        const float displayAspect = moviePlaying ? 4.0f / 3.0f : frame.displayAspect;
-
         // The fence wait and the acquire together: how long the GPU or the
         // presentation queue held this frame back.
+        using LogClock = State::FrameLog::Clock;
         const LogClock::time_point acquireStart = LogClock::now();
         State::Slot &slot = s.slots[s.slot];
-        const uint64_t t2 = timed ? timing::now() : 0u;
+        const uint64_t tFence = timed ? timing::now() : 0u;
         vkWaitForFences(s.device.device, 1, &slot.done, VK_TRUE, UINT64_MAX);
         const uint64_t t3 = timed ? timing::now() : 0u;
-        if (timed)
-        {
-            timing::span(timing::kWaitFrame, t1, t2);
-            timing::span(timing::kWaitFence, t2, t3);
-            timing::sample(timing::kShownAgain, isNew ? 0.0 : 1.0);
-            if (isNew)
-                timing::sample(timing::kQueueBehind, static_cast<double>(frames().waiting()));
-        }
 
         uint32_t imageIndex = 0;
         const bool present = !s.hidden;
@@ -823,8 +802,34 @@ namespace gh2
                 return check(acquired, "acquire");
         }
         const uint64_t t4 = timed ? timing::now() : 0u;
-        if (timed && present)
-            timing::span(timing::kWaitAcquire, t3, t4);
+        const LogClock::time_point acquireEnd = LogClock::now();
+
+        // The game's frame, taken only now: the waits above are for the
+        // display, and a frame held through them is that much older when it
+        // is shown. A window takes the newest, waiting up to two game
+        // frames for one, so a present follows each publish and the game
+        // sets the pace; taking the newest without waiting showed a third
+        // of the frames twice and dropped as many. A hidden run takes each
+        // in order. With none, the last is shown again.
+        bool isNew = false;
+        if (!moviePlaying)
+            isNew = present ? frames().latest(s.shown, std::chrono::duration_cast<std::chrono::microseconds>(
+                                                           s.gamePeriod * 2))
+                            : frames().next(s.shown, s.frameWait);
+        const Frame &frame = s.shown;
+        const float displayAspect = moviePlaying ? 4.0f / 3.0f : frame.displayAspect;
+        const uint64_t tTaken = timed ? timing::now() : 0u;
+        const LogClock::time_point waitEnd = LogClock::now();
+        if (timed)
+        {
+            timing::span(timing::kWaitFence, tFence, t3);
+            if (present)
+                timing::span(timing::kWaitAcquire, t3, t4);
+            timing::span(timing::kWaitFrame, t4, tTaken);
+            timing::sample(timing::kShownAgain, isNew ? 0.0 : 1.0);
+            if (isNew)
+                timing::sample(timing::kQueueBehind, static_cast<double>(frames().waiting()));
+        }
 
         // Every draw goes through the game's cameras and nothing is tied to
         // the guest's pixels, so the scene can be drawn at any size. A hidden
@@ -851,7 +856,6 @@ namespace gh2
             width = std::max(rect.extent.width * percent / 100u, 1u);
             height = std::max(rect.extent.height * percent / 100u, 1u);
         }
-        const LogClock::time_point acquireEnd = LogClock::now();
         if (!s.ensureTarget(width, height))
             return false;
         vkResetFences(s.device.device, 1, &slot.done);
@@ -910,7 +914,7 @@ namespace gh2
         const uint64_t t5 = timed ? timing::now() : 0u;
         if (timed)
         {
-            timing::span(timing::kRecord, t4, tRecorded);
+            timing::span(timing::kRecord, tTaken, tRecorded);
             timing::span(timing::kSubmit, tRecorded, t5);
         }
 
@@ -930,11 +934,11 @@ namespace gh2
             if (presented == VK_ERROR_OUT_OF_DATE_KHR || presented == VK_SUBOPTIMAL_KHR)
                 s.swapchainStale = true;
         }
-        s.times.add(static_cast<float>(State::FrameLog::ms(acquireStart - waitStart)),
+        s.times.add(static_cast<float>(State::FrameLog::ms(waitEnd - acquireEnd)),
                     static_cast<float>(State::FrameLog::ms(recordEnd - recordStart)),
                     moviePlaying ? SceneStats{} : s.scene.stats());
         if (s.frameLog.on)
-            s.frameLog.add(isNew, frames().published(), State::FrameLog::ms(acquireStart - waitStart),
+            s.frameLog.add(isNew, frames().published(), State::FrameLog::ms(waitEnd - acquireEnd),
                            State::FrameLog::ms(acquireEnd - acquireStart),
                            State::FrameLog::ms(recordEnd - recordStart),
                            moviePlaying ? SceneStats{} : s.scene.stats(), runtime.eeScheduler().droppedVBlanks());

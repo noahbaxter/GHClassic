@@ -157,12 +157,12 @@ namespace gh2
             return true;
         }
 
-        // The newest frame, dropping any older not yet shown, for a game
-        // running faster than the display. False when none came.
-        bool latest(Frame &out)
+        // The newest frame, dropping any older not yet shown, waiting up to
+        // `wait` for one. False when none came.
+        bool latest(Frame &out, std::chrono::microseconds wait)
         {
-            std::lock_guard lock(m_mutex);
-            if (m_frames.empty())
+            std::unique_lock lock(m_mutex);
+            if (!m_ready.wait_for(lock, wait, [this] { return !m_frames.empty(); }))
                 return false;
             out = std::move(m_frames.back());
             m_frames.clear();
