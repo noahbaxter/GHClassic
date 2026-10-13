@@ -91,8 +91,12 @@ namespace gh2::script
     // patchUiAgain once they have taken another game's scripts
     // (content/campaigns.h), so it must stand being run twice. It is parsed
     // once, and each run is of a copy.
-    void patchUi(std::string text);
+    // One that changes a song's own screens (`song`) is also run again once
+    // those alone have taken another game's, by patchSongUiAgain: the rest
+    // would retype the menu a song is being started from.
+    void patchUi(std::string text, bool song = false);
     void patchUiAgain(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
+    void patchSongUiAgain(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
 
     void install(PS2Runtime &runtime, const Addresses &addresses);
 }

@@ -41,6 +41,7 @@ namespace gh2::script
         {
             std::string text;
             bool again; // after each campaign switch too
+            bool song = false; // and after a song's screens take another game's
             uint32_t root = 0u; // parsed, when run again
         };
         std::vector<UiScript> s_uiScripts;
@@ -277,15 +278,22 @@ namespace gh2::script
         return true;
     }
 
-    void patchUi(std::string text)
+    void patchUi(std::string text, bool song)
     {
-        s_uiScripts.push_back({std::move(text), true});
+        s_uiScripts.push_back({std::move(text), true, song});
     }
 
     void patchUiAgain(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
     {
         for (UiScript &script : s_uiScripts)
             if (script.again)
+                runUi(rdram, ctx, runtime, script);
+    }
+
+    void patchSongUiAgain(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        for (UiScript &script : s_uiScripts)
+            if (script.song)
                 runUi(rdram, ctx, runtime, script);
     }
 

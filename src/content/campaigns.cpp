@@ -473,6 +473,9 @@ namespace gh2::campaigns
                 }
                 retypeUi(guest, init, [&](const std::string &scene) { return was[scene]; }, &kSongPanels);
                 guest.release(init);
+                // Ours over that game's: the pause menu's rows are the same
+                // whichever game's it is.
+                script::patchSongUiAgain(call.rdram, call.ctx, call.runtime);
                 s_lookFrom = look;
             }
             if (gems != s_gemsFrom)

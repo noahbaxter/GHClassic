@@ -298,6 +298,7 @@ namespace gh2
         EntryHook<DrawTag>::install(runtime, addresses.trackDraw, onDraw);
         script::addCommand("note_speed", command);
         script::addCommand("highway_length", lengthCommand);
-        script::patchUi(kGameSettingsDta);
+        // The pause menu's among them: a song's own.
+        script::patchUi(kGameSettingsDta, true);
     }
 }
