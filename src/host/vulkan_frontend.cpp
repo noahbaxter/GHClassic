@@ -298,6 +298,14 @@ namespace gh2
                 .set_old_swapchain(swapchain);
             if (timing::swapImages > 0)
                 builder.set_desired_min_image_count(static_cast<uint32_t>(timing::swapImages));
+#ifdef __APPLE__
+            // MoltenVK frees an image only once its last present is on the
+            // display, so a full swapchain is that many refreshes from the
+            // present call to the screen: 48.7 ms with three at 60 Hz, 32.0
+            // with two.
+            else
+                builder.set_desired_min_image_count(2u);
+#endif
             auto built = builder.build();
             if (!built)
             {
