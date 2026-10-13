@@ -317,6 +317,12 @@ def executables_in(path):
 
 def identify(paths, image_hash=False):
     for path in paths:
+        # A 360 disc is another file system, with no boot executable to hash.
+        if title_id := xbox_title_id(path):
+            rel = next((r for r in known("release") if r["serial"] == title_id), None)
+            what = f"{rel['name']} v{rel['version']}, content disc" if rel else "not a known Guitar Hero release"
+            print(f"{Path(path).name}: {what} (title {title_id})")
+            continue
         if is_image(path):
             with Image(path) as img:
                 rel = release(img.boot_name())
