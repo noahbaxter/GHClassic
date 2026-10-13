@@ -6,7 +6,7 @@
     tools/ghc.py bind [--isolated] [keyboard | <n>]   set up a controller; with no device, list them
     tools/ghc.py arm [out] [--scenario <file>] [--speed <x>] [--secs 30] [--disc <image>] [--shot-every 60]
                      [--res 1080p]
-    tools/ghc.py scenarios [-j 4] [--speed 2] [--review] [name ...]
+    tools/ghc.py scenarios [-j 4] [--speed 2] [--review] [--discs gh2,gh1] [--releases] [name ...]
     tools/ghc.py release [--skip-build] [disc]  this platform's player package, into build/release
     tools/ghc.py ci                          what builds without a disc, into build/ci
 
@@ -50,12 +50,13 @@ import shutil
 import subprocess
 import sys
 import time
-import tomllib
 import urllib.request
 import venv
 import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+
+from releases import content, discs_arg, find_disc, main_checkout, releases
 
 if sys.version_info < (3, 11):
     sys.exit(f"GH Classic needs Python 3.11 or newer, not {sys.version.split()[0]}")
@@ -67,7 +68,6 @@ TOOLS = BUILD / "tools"
 RECOMP = BUILD / "recomp"
 GAME = BUILD / "game"
 ELF = RECOMP / "gh2.elf"
-SERIAL = "SLUS-21447"
 MACOS = sys.platform == "darwin"
 WINDOWS = sys.platform == "win32"
 EXE = ".exe" if WINDOWS else ""
@@ -216,73 +216,6 @@ def build_step(title, cmd, env, log):
     for warning in ours[:8]:
         print("    " + colour(33, warning), file=sys.stderr)
     return path
-
-
-def main_checkout():
-    """The repo's own checkout, which the worktrees in .worktrees/ sit inside."""
-    # A tree copied out of git (a test box's) has no checkout: it is its own.
-    common = subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], cwd=ROOT,
-                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True).stdout.strip()
-    return Path(common).parent if common else ROOT
-
-
-def discs_dir():
-    """game/, the disc images: this tree's own, else the main checkout's, so
-    every worktree plays from the one set."""
-    own = ROOT / "game"
-    return own if own.is_dir() else main_checkout() / "game"
-
-
-def find_disc(env):
-    """The GH2 image in game/, a .chd before any other. Builds libchdr on
-    first use, so callers that go parallel call this first."""
-    images = sorted((str(p) for p in discs_dir().glob("*")), key=lambda p: (not p.lower().endswith(".chd"), p))
-    result = subprocess.run([sys.executable, ROOT / "tools" / "disc.py", "find", SERIAL, *images],
-                            env=env, stdout=subprocess.PIPE, text=True)
-    if result.returncode:
-        sys.exit(f"no {SERIAL} disc image in game/; pass one")
-    return result.stdout.strip()
-
-
-def content_games():
-    """The games whose discs come along when their images are in game/, in
-    the order their archives are searched: Rocks the 80s, GH1, then 360 GH2,
-    then any other config/executables.toml gives content releases."""
-    with open(ROOT / "config" / "executables.toml", "rb") as f:
-        releases = tomllib.load(f)["release"]
-    games = list(dict.fromkeys(r["game"] for r in releases if r.get("role") == "content"))
-    order = ["gh80s", "gh1", "gh2x"]
-    return sorted(games, key=lambda g: order.index(g) if g in order else len(order))
-
-
-def discs_arg(value):
-    """--discs gh2,gh1: the content discs to mount; gh2, the game disc, is
-    always there."""
-    games = [g for g in value.split(",") if g and g != "gh2"]
-    unknown = [g for g in games if g not in content_games()]
-    if unknown:
-        raise argparse.ArgumentTypeError(f"unknown {', '.join(unknown)}; games are gh2, {', '.join(content_games())}")
-    return games
-
-
-def content(env, games=None):
-    """GHClassic's --content for each content game's disc in game/, any of
-    its releases (or only those of `games`), and --mods for mods/ when it
-    exists."""
-    images = sorted(str(p) for p in discs_dir().glob("*"))
-    args = []
-    for game in content_games():
-        if games is not None and game not in games:
-            continue
-        result = subprocess.run([sys.executable, ROOT / "tools" / "disc.py", "find", game, *images],
-                                env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
-        if not result.returncode:
-            args += ["--content", result.stdout.strip()]
-    # The same as game/: this tree's own, else the main checkout's.
-    mods = ROOT / "mods" if (ROOT / "mods").is_dir() else main_checkout() / "mods"
-    if mods.is_dir():
-        args += ["--mods", str(mods)]
-    return args
 
 
 def built():
@@ -446,7 +379,7 @@ def prune_runs(days=3):
 
 
 def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=None, res=None, games=None,
-        review=None):
+        review=None, release=None):
     """One unattended run into out. Returns 'exited before Ns' or 'alive at Ns'.
     With review, its shot sheet goes to review/ under that name rather than out."""
     from PIL import Image
@@ -461,7 +394,7 @@ def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=N
 
     # No save and default settings, so every run starts from a first boot on
     # any machine and never touches the player's.
-    cmd = [str(game_binary()), disc, *content(env or tool_env(), games)]
+    cmd = [str(game_binary()), disc, *content(env or tool_env(), games, release)]
     if scenario:
         cmd += ["--scenario", str(Path(scenario).resolve())]
     if speed:
@@ -552,6 +485,9 @@ def cmd_scenarios(argv):
     parser.add_argument("--discs", type=discs_arg,
                         help="content discs to mount, as gh2,gh1; default every one in game/. A scenario that "
                              "(needs) another skips")
+    parser.add_argument("--releases", action="store_true",
+                        help="each content disc under game/, folders in it too, in turn as its game's: the "
+                             "scenarios that (needs) that game, once per disc")
     parser.add_argument("names", nargs="*", help="files in scenarios/ without .dta; none means all")
     args = parser.parse_args(argv)
     # Not dotfiles: pathlib's glob matches them, and a tar made on macOS
@@ -560,12 +496,23 @@ def cmd_scenarios(argv):
     env = tool_env()
     disc = find_disc(env)
 
-    def one(name):
+    def needs(name):
+        found = re.search(r"\(needs ([^)]*)\)", (ROOT / "scenarios" / f"{name}.dta").read_text())
+        return found[1].split() if found else []
+
+    runs = [(name, None) for name in names]
+    if args.releases:
+        runs = [(name, release) for release in releases(env) for name in names if release[0] in needs(name)]
+
+    def one(name, release):
+        scenario = ROOT / "scenarios" / f"{name}.dta"
+        if release:
+            name = f"{name}@{release[1].stem}"
         out = ROOT / "runs" / name
         started = time.time()
         # The longest plays a career's whole first tier, five songs.
-        state = arm(out, ROOT / "scenarios" / f"{name}.dta", args.speed, 900, disc, env=env, games=args.discs,
-                    review=name if args.review else None)
+        state = arm(out, scenario, args.speed, 900, disc, env=env, games=args.discs,
+                    review=name if args.review else None, release=release)
         log = (out / "run.log").read_text(errors="replace")
         # Anywhere in a line: the watchdog's STALL lands mid-line in the game thread's output.
         failures = [m.group(1) for m in re.finditer(r"\[scenario\] ((?:FAIL|STALL).*)", log)]
@@ -583,7 +530,7 @@ def cmd_scenarios(argv):
     lines = []
     started = time.time()
     with ThreadPoolExecutor(args.jobs) as pool:
-        for future in as_completed([pool.submit(one, name) for name in names]):
+        for future in as_completed([pool.submit(one, name, release) for name, release in runs]):
             lines.append(future.result())
             print(lines[-1], flush=True)
     print(f"{len(lines)} scenarios in {round(time.time() - started)}s, {args.jobs} at a time")
