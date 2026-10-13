@@ -59,10 +59,10 @@ namespace gh2
         constexpr uint32_t kMaxShadings = 2048;
         // The post stage's passes a frame, each with its own sources: bloom
         // extract, two downsamples, two blurs, the world's last, depth of
-        // field's low picture and its two blurs, the scene joined to the
-        // frames before it, the scene's samples into one, and the finished
-        // frame's gamma ramp.
-        constexpr uint32_t kPostPasses = 12u;
+        // field's low picture, its two blurs and its mix, the scene joined
+        // to the frames before it, the scene's samples into one, and the
+        // finished frame's gamma ramp.
+        constexpr uint32_t kPostPasses = 13u;
 
         // By blend, z mode, alpha write and dest alpha test.
         constexpr uint32_t kPipelineCount =
@@ -720,6 +720,10 @@ namespace gh2
         // The last part, which nothing takes up again: its samples are not
         // kept, which at 2160 lines and four a pixel is 430 MB a frame.
         VkRenderPass lastPass = VK_NULL_HANDLE;
+        // The part after the post stage, last or not, which the post stage's
+        // own last draw opens over the whole picture: the colour before it
+        // is not loaded, a second 265 MB at that size.
+        VkRenderPass overPasses[2]{};
         VkPipelineLayout layout = VK_NULL_HANDLE;
         VkShaderModule vertexShader = VK_NULL_HANDLE;
         VkShaderModule fragmentShader = VK_NULL_HANDLE;
@@ -749,14 +753,14 @@ namespace gh2
 
         // The post stage: the world copied out of the frame, the bloom at
         // full, half and quarter size (two at quarter for the blur's two
-        // passes), a pass into those, one back into the frame and one into
-        // the given target.
+        // passes), a pass into those and one into the given target. Its
+        // last draw goes back into the frame inside the main pass.
         enum class PostInto
         {
             kBloom,
             kFrame,
             kOutput,
-            kScene, // the frame's one-sample image, which the main pass resolves into
+            kScene, // an image of the frame's format at one sample
         };
         struct PostImage
         {
@@ -772,6 +776,9 @@ namespace gh2
         // passes, at the 360's 640x320 of its 1280x720. It blends by the
         // main pass's depth, read through a view of the depth alone.
         PostImage focusA, focusB;
+        // The scene mixed with it, for the last draw: the mix reads the
+        // depth buffer, which the pass that draw is in draws into.
+        PostImage focused;
         VkImageView depthOnlyView = VK_NULL_HANDLE;
         // The temporal_aa setting: the world as the frames before this one
         // left it, in two images the frames take turns drawing into and
@@ -798,9 +805,7 @@ namespace gh2
         VkRenderPass shadowPass = VK_NULL_HANDLE;
         VkPipeline shadowPipeline = VK_NULL_HANDLE;
         VkShaderModule postWorldFragment = VK_NULL_HANDLE; // post.frag for the depth buffer's samples
-        VkFramebuffer postFramebuffer = VK_NULL_HANDLE; // the main colour attachment
         VkRenderPass bloomPass = VK_NULL_HANDLE;
-        VkRenderPass postPass = VK_NULL_HANDLE;
         VkRenderPass outputPass = VK_NULL_HANDLE;
         // The multisampled scene into the post stage's source in place of
         // the main pass's own resolve (post.frag's 7), and the scene into a
@@ -902,8 +907,9 @@ namespace gh2
         // after: blit and readback for the main pass, samplers for a target.
         //
         // A pass stopped for a screen copy and taken up again is two: `keep`
-        // stores what the next needs, `resume` loads it in place of clearing.
-        bool createPass(VkImageLayout finished, bool keep, bool resume, VkRenderPass &out)
+        // stores what the next needs, `resume` loads it in place of clearing,
+        // the colour too unless the pass draws `over` all of it first.
+        bool createPass(VkImageLayout finished, bool keep, bool resume, VkRenderPass &out, bool over = false)
         {
             const bool resolve = samples != VK_SAMPLE_COUNT_1_BIT;
             VkAttachmentDescription attachments[3]{};
@@ -928,6 +934,8 @@ namespace gh2
             attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
             attachments[2].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             attachments[2].finalLayout = finished;
+            if (over)
+                attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 
             VkAttachmentReference colorRef{0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
             VkAttachmentReference depthRef{1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
@@ -1827,25 +1835,21 @@ namespace gh2
         }
 
         // A pass for the post stage: into a bloom image, which it leaves for
-        // the next to sample, into the frame's colour attachment, which it
-        // leaves as the main pass's taking up again expects it, or into the
-        // given target, which it leaves as the PS2 shading's main pass does.
-        // The last has a bloom image's format, so the bloom pipeline draws
-        // into it too.
+        // the next to sample, into an image of the frame's format, or into
+        // the given target, which it leaves as the PS2 shading's main pass
+        // does. The last has a bloom image's format, so the bloom pipeline
+        // draws into it too.
         bool createPostPass(PostInto into, VkRenderPass &out)
         {
-            const bool resolve = samples != VK_SAMPLE_COUNT_1_BIT;
-            const bool frame = into == PostInto::kFrame;
             VkAttachmentDescription attachment{};
-            attachment.format = frame || into == PostInto::kScene ? colorFormat : kColorFormat;
-            attachment.samples = frame ? samples : VK_SAMPLE_COUNT_1_BIT;
+            attachment.format = into == PostInto::kScene ? colorFormat : kColorFormat;
+            attachment.samples = VK_SAMPLE_COUNT_1_BIT;
             attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
             attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
             attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
             attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
             attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             attachment.finalLayout = into == PostInto::kBloom ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-                                     : frame && resolve       ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
                                                               : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
             VkAttachmentReference colorRef{0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
             VkSubpassDescription subpass{};
@@ -1881,8 +1885,9 @@ namespace gh2
             return check(vkCreateRenderPass(device, &info, nullptr, &out), "post pass");
         }
 
-        // The post stage's pipeline for its bloom passes, its last, or the
-        // scene's samples into one.
+        // The post stage's pipeline for its bloom passes, its last draw,
+        // which goes into the main pass and leaves its depth alone, or a
+        // pass that reads the scene's samples or depth.
         VkPipeline createPostPipeline(PostInto into)
         {
             const bool bloom = into == PostInto::kBloom;
@@ -1894,8 +1899,9 @@ namespace gh2
             stages[0].pName = "main";
             stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
             stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-            stages[1].module = bloom ? postFragment : postWorldFragment;
+            stages[1].module = scene ? postWorldFragment : postFragment;
             stages[1].pName = "main";
+            VkPipelineDepthStencilStateCreateInfo depthStencil{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
             VkPipelineVertexInputStateCreateInfo vertexInput{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
             VkPipelineInputAssemblyStateCreateInfo assembly{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
             assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
@@ -1926,10 +1932,11 @@ namespace gh2
             info.pViewportState = &viewport;
             info.pRasterizationState = &raster;
             info.pMultisampleState = &multisample;
+            info.pDepthStencilState = &depthStencil;
             info.pColorBlendState = &colorBlend;
             info.pDynamicState = &dynamic;
             info.layout = postLayout;
-            info.renderPass = bloom ? bloomPass : scene ? scenePass : postPass;
+            info.renderPass = bloom ? bloomPass : scene ? scenePass : renderPass;
             VkPipeline out = VK_NULL_HANDLE;
             check(vkCreateGraphicsPipelines(device, pipelineCache, 1, &info, nullptr, &out), "post pipeline");
             return out;
@@ -1956,7 +1963,8 @@ namespace gh2
             depthOnlyView = VK_NULL_HANDLE;
             historySerial = 0u;
             for (PostImage *post :
-                 {&postSource, &bloomFull, &bloomHalf, &bloomA, &bloomB, &focusA, &focusB, &history[0], &history[1]})
+                 {&postSource, &bloomFull, &bloomHalf, &bloomA, &bloomB, &focusA, &focusB, &focused, &history[0],
+                  &history[1]})
             {
                 if (post->framebuffer != VK_NULL_HANDLE)
                     vkDestroyFramebuffer(device, post->framebuffer, nullptr);
@@ -1966,9 +1974,6 @@ namespace gh2
                     vmaDestroyImage(allocator, post->image, post->memory);
                 *post = PostImage{};
             }
-            if (postFramebuffer != VK_NULL_HANDLE)
-                vkDestroyFramebuffer(device, postFramebuffer, nullptr);
-            postFramebuffer = VK_NULL_HANDLE;
             if (outputFramebuffer != VK_NULL_HANDLE)
                 vkDestroyFramebuffer(device, outputFramebuffer, nullptr);
             outputFramebuffer = VK_NULL_HANDLE;
@@ -2108,16 +2113,14 @@ namespace gh2
 
             // The bloom at the 360's sizes over its 1280x720: extracted at
             // full size, then halved twice.
-            fb.renderPass = postPass;
-            fb.pAttachments = resolve ? &msaaView : &targetView;
             for (PostImage &held : history)
                 if (temporal && !createPostImage(kHdrFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, w, h, held, scenePass))
                     return false;
-            return check(vkCreateFramebuffer(device, &fb, nullptr, &postFramebuffer), "post framebuffer") &&
-                   // Drawn into from the scene's samples, or copied into.
-                   createPostImage(kHdrFormat,
+            // Drawn into from the scene's samples, or copied into.
+            return createPostImage(kHdrFormat,
                                    resolve ? VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT : VK_IMAGE_USAGE_TRANSFER_DST_BIT, w, h,
                                    postSource, scenePass) &&
+                   createPostImage(kHdrFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, w, h, focused, scenePass) &&
                    createPostImage(kColorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, w, h, bloomFull) &&
                    createPostImage(kColorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, w / 2u, h / 2u, bloomHalf) &&
                    createPostImage(kColorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, w / 4u, h / 4u, bloomA) &&
@@ -2417,6 +2420,20 @@ namespace gh2
             vkCmdPipelineBarrier(cmd, before, after, 0, 0, nullptr, 0, nullptr, 1, &barrier);
         }
 
+        // post.frag over the whole of the pass that is open.
+        void postFill(VkCommandBuffer cmd, uint32_t w, uint32_t h, VkPipeline pipeline, VkDescriptorSet set,
+                      const PostPush &push)
+        {
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+            const VkViewport viewport{0.0f, 0.0f, static_cast<float>(w), static_cast<float>(h), 0.0f, 1.0f};
+            const VkRect2D scissor{{0, 0}, {w, h}};
+            vkCmdSetViewport(cmd, 0, 1, &viewport);
+            vkCmdSetScissor(cmd, 0, 1, &scissor);
+            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, postLayout, 0, 1, &set, 0, nullptr);
+            vkCmdPushConstants(cmd, postLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PostPush), &push);
+            vkCmdDraw(cmd, 3, 1, 0, 0);
+        }
+
         // One full-target pass of post.frag.
         void postDraw(VkCommandBuffer cmd, VkRenderPass pass, VkFramebuffer into, uint32_t w, uint32_t h,
                       VkPipeline pipeline, VkDescriptorSet set, const PostPush &push)
@@ -2426,14 +2443,7 @@ namespace gh2
             begin.framebuffer = into;
             begin.renderArea = {{0, 0}, {w, h}};
             vkCmdBeginRenderPass(cmd, &begin, VK_SUBPASS_CONTENTS_INLINE);
-            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-            const VkViewport viewport{0.0f, 0.0f, static_cast<float>(w), static_cast<float>(h), 0.0f, 1.0f};
-            const VkRect2D scissor{{0, 0}, {w, h}};
-            vkCmdSetViewport(cmd, 0, 1, &viewport);
-            vkCmdSetScissor(cmd, 0, 1, &scissor);
-            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, postLayout, 0, 1, &set, 0, nullptr);
-            vkCmdPushConstants(cmd, postLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PostPush), &push);
-            vkCmdDraw(cmd, 3, 1, 0, 0);
+            postFill(cmd, w, h, pipeline, set, push);
             vkCmdEndRenderPass(cmd);
         }
 
@@ -2466,12 +2476,15 @@ namespace gh2
         // pass, just ended, left in the frame (TRANSFER_SRC_OPTIMAL): depth
         // of field's low picture and its blurs where the frame has any, bloom
         // taken from it at full size, halved twice and blurred, added back,
-        // then the luminance map. The result goes into the frame's colour
-        // attachment for the main pass to take up again. `steadied`: the
-        // world was drawn a part of a pixel off (record's jitter) and is
-        // first joined to the frames before it. Called outside a render
-        // pass.
-        void runPost(VkCommandBuffer cmd, const Frame &frame, const Camera *world, uint64_t serial, bool steadied)
+        // then the luminance map. All but the last of it: `last` is left for
+        // postFill to draw with postPipeline and the frame slot's set 5 as
+        // the main pass is taken up again (overPasses), which saves the
+        // frame's samples a store and a load. `steadied`: the world was
+        // drawn a part of a pixel off (record's jitter) and is first joined
+        // to the frames before it. Called outside a render pass. False with
+        // nothing for the last draw to read.
+        bool runPost(VkCommandBuffer cmd, const Frame &frame, const Camera *world, uint64_t serial, bool steadied,
+                     PostPush &last)
         {
             const GpuTexture *white1 = samples != VK_SAMPLE_COUNT_1_BIT ? gpuTexture(cmd, white, serial) : nullptr;
             if (white1)
@@ -2518,9 +2531,8 @@ namespace gh2
             const GpuTexture *blank = gpuTexture(cmd, white, serial);
             const GpuTexture *luminance = frame.luminance ? gpuTexture(cmd, frame.luminance, serial) : nullptr;
             if (!blank)
-                return;
-            // The world's last pass reads the main pass's depth, which it does
-            // not draw into.
+                return false;
+            // Depth of field and the joining read the main pass's depth.
             const VkImageAspectFlags depthAspect = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
             imageBarrier(cmd, depth, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
                          VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
@@ -2562,8 +2574,6 @@ namespace gh2
             writePostSet(sets[2], bloomHalf.view, blank->view);
             writePostSet(sets[3], bloomA.view, blank->view);
             writePostSet(sets[4], bloomB.view, blank->view);
-            writePostSet(sets[5], scene, blank->view, bloomA.view, luminance ? luminance->view : VK_NULL_HANDLE,
-                         focusA.view, depthOnlyView);
             writePostSet(sets[6], scene, blank->view);
             writePostSet(sets[7], focusA.view, blank->view);
             writePostSet(sets[8], focusB.view, blank->view);
@@ -2598,14 +2608,29 @@ namespace gh2
             postDraw(cmd, bloomPass, bloomA.framebuffer, bloomA.width, bloomA.height, bloomPipeline, sets[4],
                      PostPush{{across, 0.0f}, {}, 2u});
             // gBloomIntensity as a Xenia frame of battle had it.
-            PostPush last{{0.0f, 0.0f, 1.0f, luminance ? 1.0f : 0.0f}, {}, 3u, steadied ? kSteadiedSharpen : 0.0f};
-            focusOf(frame, world, last.focus);
-            postDraw(cmd, postPass, postFramebuffer, width, height, postPipeline, sets[5], last);
+            last = PostPush{{0.0f, 0.0f, 1.0f, luminance ? 1.0f : 0.0f}, {}, 3u, steadied ? kSteadiedSharpen : 0.0f};
+            PostPush mix{{}, {}, 3u, last.sharpen};
+            focusOf(frame, world, mix.focus);
+            if (mix.focus[3] > 0.0f)
+            {
+                // Depth of field's mix, and the sharpening before it, ahead
+                // of the last draw.
+                writePostSet(sets[9], scene, blank->view, VK_NULL_HANDLE, VK_NULL_HANDLE, focusA.view, depthOnlyView);
+                postDraw(cmd, scenePass, focused.framebuffer, width, height, scenePipeline, sets[9], mix);
+                imageBarrier(cmd, focused.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                             VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+                scene = focused.view;
+                last.sharpen = 0.0f;
+            }
+            writePostSet(sets[5], scene, blank->view, bloomA.view, luminance ? luminance->view : VK_NULL_HANDLE);
             imageBarrier(cmd, depth, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
                          VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_ACCESS_SHADER_READ_BIT,
                          VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
                          depthAspect);
+            return true;
         }
 
         // The finished frame into the given target through the 360's gamma
@@ -2732,6 +2757,8 @@ namespace gh2
               s.createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, true, false, s.firstPass) &&
               s.createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, true, true, s.resumePass) &&
               s.createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, false, true, s.lastPass) &&
+              s.createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, false, true, s.overPasses[0], true) &&
+              s.createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, true, true, s.overPasses[1], true) &&
               s.createPass(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, false, false, s.targetPass) &&
               s.createDescriptorState() && s.createLayout()))
             return false;
@@ -2742,7 +2769,6 @@ namespace gh2
             return true;
         }
         if (!s.createPostPass(State::PostInto::kBloom, s.bloomPass) ||
-            !s.createPostPass(State::PostInto::kFrame, s.postPass) ||
             !s.createPostPass(State::PostInto::kOutput, s.outputPass))
             return false;
         s.bloomPipeline = s.createPostPipeline(State::PostInto::kBloom);
@@ -2830,8 +2856,8 @@ namespace gh2
             if (layout != VK_NULL_HANDLE)
                 vkDestroyDescriptorSetLayout(s.device, layout, nullptr);
         for (VkRenderPass pass :
-             {s.renderPass, s.firstPass, s.resumePass, s.lastPass, s.bloomPass, s.postPass, s.outputPass, s.scenePass,
-              s.shadowPass})
+             {s.renderPass, s.firstPass, s.resumePass, s.lastPass, s.overPasses[0], s.overPasses[1], s.bloomPass,
+              s.outputPass, s.scenePass, s.shadowPass})
             if (pass != VK_NULL_HANDLE)
                 vkDestroyRenderPass(s.device, pass, nullptr);
         if (s.targetPass != VK_NULL_HANDLE)
@@ -3393,21 +3419,31 @@ namespace gh2
                 // copied from or post processed, and goes on from what it
                 // kept.
                 vkCmdEndRenderPass(cmd);
-                if (post)
-                {
-                    s.stamp(cmd, serial, 3u);
-                    s.runPost(cmd, frame, worldCamera, serial, steadied);
-                    s.stamp(cmd, serial, 5u);
+                // The post stage's last draw opens the pass that follows it.
+                PostPush last;
+                bool over = false;
+                const auto open = [&](bool more) {
+                    begin.renderPass = over ? s.overPasses[more ? 1 : 0] : more ? s.resumePass : s.lastPass;
+                    vkCmdBeginRenderPass(cmd, &begin, VK_SUBPASS_CONTENTS_INLINE);
+                    boundCamera = UINT32_MAX;
+                    if (over)
+                        s.postFill(cmd, width, height, s.postPipeline, s.postSets[serial % kFrameSlots][5], last);
+                    over = false;
                     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, s.layout, 1, 1, &data.set, 0,
                                             nullptr);
                     boundPipeline = VK_NULL_HANDLE;
+                };
+                if (post)
+                {
+                    s.stamp(cmd, serial, 3u);
+                    over = s.runPost(cmd, frame, worldCamera, serial, steadied, last);
+                    s.stamp(cmd, serial, 5u);
                     // What draws next copies the picture as the post stage
                     // left it (the track's far end, drawn back over itself):
-                    // a pass with nothing in it puts that in the target.
+                    // a pass with no more in it puts that in the target.
                     if (copy)
                     {
-                        begin.renderPass = s.resumePass;
-                        vkCmdBeginRenderPass(cmd, &begin, VK_SUBPASS_CONTENTS_INLINE);
+                        open(true);
                         vkCmdEndRenderPass(cmd);
                     }
                 }
@@ -3417,10 +3453,7 @@ namespace gh2
                     if (run.image)
                         s.copyFromTarget(cmd, *run.image, run.x, run.y);
                 }
-                const bool more = nextCopy < copyRuns.size() || (postBefore != SIZE_MAX && i < postBefore);
-                begin.renderPass = more ? s.resumePass : s.lastPass;
-                vkCmdBeginRenderPass(cmd, &begin, VK_SUBPASS_CONTENTS_INLINE);
-                boundCamera = UINT32_MAX;
+                open(nextCopy < copyRuns.size() || (postBefore != SIZE_MAX && i < postBefore));
             }
             if (drawn)
                 drawOne(i, static_cast<float>(width), static_cast<float>(height), steadied && i < postBefore);

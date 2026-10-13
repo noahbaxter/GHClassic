@@ -14,8 +14,9 @@ namespace gh2
 {
     // What the GPU's time on a frame is split into, in the order it is
     // spent: the shadow maps, the rendered textures, the world up to the
-    // post stage, its samples made one a pixel, the rest of the post stage,
-    // what is drawn over it (the track and HUD), and the gamma ramp.
+    // post stage, its samples made one a pixel, the rest of the post stage
+    // but its last draw, that and what is drawn over it (the track and HUD),
+    // and the gamma ramp.
     constexpr const char *kGpuSpans[] = {"shadows", "targets", "world", "resolve", "post", "hud", "output"};
 
     // What the last record did, for the frame log.
