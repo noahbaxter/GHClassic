@@ -83,6 +83,7 @@ namespace gh2
             frame.copies.push_back({frame.draws.size(), kScreenCopyTex, 0, 0, frame.width, frame.height});
 
             auto mesh = std::make_shared<MeshData>();
+            mesh->transient = true; // rebuilt every draw
             const float corner[4][2] = {{0.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}};
             for (const auto &c : corner)
             {

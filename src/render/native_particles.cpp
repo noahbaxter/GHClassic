@@ -116,6 +116,7 @@ namespace gh2
             };
 
             auto mesh = std::make_shared<MeshData>();
+            mesh->transient = true; // rebuilt every draw
             const auto addSprite = [&](uint32_t colorAt, uint32_t posAt, float half) {
                 if (mesh->verts.size() + 4u > 0x10000u)
                     return;

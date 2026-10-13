@@ -171,6 +171,33 @@ namespace gh2
             VmaAllocation tangentMemory = VK_NULL_HANDLE;
         };
 
+        // A frame's transient meshes, back to back, in a buffer that frame
+        // slot keeps: reused once the slot's frame has retired, grown (never
+        // shrunk) before anything binds it.
+        struct TransientSlot
+        {
+            VkBuffer buffer = VK_NULL_HANDLE;
+            VmaAllocation memory = VK_NULL_HANDLE;
+            uint8_t *mapped = nullptr;
+            VkDeviceSize capacity = 0;
+        };
+        constexpr VkDeviceSize kMinTransientBytes = 4ull << 20;
+
+        // Where a draw's geometry is bound from, whichever kind its mesh is.
+        // Without a normal map the tangent stream is never read, so the
+        // verts stand in for it.
+        struct MeshBinding
+        {
+            VkBuffer vertices = VK_NULL_HANDLE;
+            VkDeviceSize vertexOffset = 0;
+            VkBuffer indices = VK_NULL_HANDLE;
+            VkDeviceSize indexOffset = 0;
+            uint32_t indexCount = 0;
+            VkBuffer tangents = VK_NULL_HANDLE;
+            VkDeviceSize tangentOffset = 0;
+            bool mapped = false; // a transient mesh's: some draw of it has a normal map
+        };
+
         // An x360 material's maps as x360.frag's set 2 takes them.
         struct GpuShading
         {
@@ -687,6 +714,8 @@ namespace gh2
 
         VkDescriptorSetLayout frameDataSetLayout = VK_NULL_HANDLE;
         FrameDataSlot frameData[kFrameSlots];
+        TransientSlot transientData[kFrameSlots];
+        std::unordered_map<const MeshData *, MeshBinding> transientBindings; // this frame's
 
         // Rendered textures by RndTex, one image per generation within a
         // frame, kept for the run. Their pass has the main pass's formats, so
@@ -1910,6 +1939,103 @@ namespace gh2
             return true;
         }
 
+        // Every transient mesh of the frame into this slot's ring, before any
+        // draw binds it: their sizes first, so the ring grows (if it must)
+        // once and before use, then one copy each and one flush. A mesh some
+        // normal-mapped x360 draw takes has its tangents built and put there
+        // too, every frame, as its verts are new every frame.
+        bool streamTransients(const Frame &frame, const std::vector<char> &x360Draws,
+                              const std::vector<PushConstants> &pushes, uint64_t serial)
+        {
+            transientBindings.clear();
+            VkDeviceSize bytes = 0;
+            for (size_t i = 0; i < frame.draws.size(); ++i)
+            {
+                const MeshData *mesh = frame.draws[i].mesh.get();
+                if (!mesh || !mesh->transient || mesh->verts.empty() || mesh->indices.empty())
+                    continue;
+                const auto added = transientBindings.try_emplace(mesh);
+                // With room for each part to start on a multiple of its size.
+                if (added.second)
+                    bytes += mesh->verts.size() * sizeof(Vertex) + mesh->indices.size() * sizeof(uint16_t) + 64u;
+                if (x360Draws[i] && (pushes[i].flags & kFlagNormalMap) != 0u && !added.first->second.mapped)
+                {
+                    added.first->second.mapped = true;
+                    bytes += mesh->verts.size() * 4u * sizeof(float) + 16u;
+                }
+            }
+            if (bytes == 0u)
+                return true;
+
+            TransientSlot &slot = transientData[serial % kFrameSlots];
+            if (bytes > slot.capacity)
+            {
+                // This slot's last frame has retired, so the old buffer can go.
+                if (slot.buffer != VK_NULL_HANDLE)
+                    vmaDestroyBuffer(allocator, slot.buffer, slot.memory);
+                slot = {};
+                VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+                info.size = std::max(kMinTransientBytes, bytes * 2u);
+                info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+                VmaAllocationCreateInfo alloc{};
+                alloc.usage = VMA_MEMORY_USAGE_AUTO;
+                alloc.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+                VmaAllocationInfo allocated{};
+                if (!check(vmaCreateBuffer(allocator, &info, &alloc, &slot.buffer, &slot.memory, &allocated),
+                           "transient meshes"))
+                {
+                    slot = {};
+                    return false;
+                }
+                slot.mapped = static_cast<uint8_t *>(allocated.pMappedData);
+                slot.capacity = info.size;
+            }
+
+            VkDeviceSize at = 0;
+            const auto put = [&](const void *data, VkDeviceSize size, VkDeviceSize multiple) {
+                at = (at + multiple - 1u) / multiple * multiple;
+                std::memcpy(slot.mapped + at, data, static_cast<size_t>(size));
+                at += size;
+                return at - size;
+            };
+            for (auto &entry : transientBindings)
+            {
+                const MeshData &mesh = *entry.first;
+                MeshBinding &binding = entry.second;
+                binding.vertices = binding.indices = binding.tangents = slot.buffer;
+                binding.vertexOffset = put(mesh.verts.data(), mesh.verts.size() * sizeof(Vertex), sizeof(Vertex));
+                binding.indexOffset = put(mesh.indices.data(), mesh.indices.size() * sizeof(uint16_t), 4u);
+                binding.indexCount = static_cast<uint32_t>(mesh.indices.size());
+                binding.tangentOffset = binding.vertexOffset;
+                if (binding.mapped)
+                {
+                    const std::vector<float> built = buildTangents(mesh);
+                    binding.tangentOffset = put(built.data(), built.size() * sizeof(float), 16u);
+                }
+            }
+            vmaFlushAllocation(allocator, slot.memory, 0, at);
+            return true;
+        }
+
+        // Where `mesh` is bound from: this frame's ring for a transient one,
+        // else buffers of its own, made the first time. `mapped`: the draw
+        // reads tangents. Nothing to draw leaves it without vertices.
+        MeshBinding bindingOf(const std::shared_ptr<const MeshData> &mesh, bool mapped, uint64_t serial)
+        {
+            if (mesh->transient)
+            {
+                const auto found = transientBindings.find(mesh.get());
+                return found != transientBindings.end() ? found->second : MeshBinding{};
+            }
+            GpuMesh *gpu = gpuMesh(mesh, serial);
+            if (!gpu)
+                return {};
+            MeshBinding binding{gpu->vertices, 0, gpu->indices, 0, gpu->indexCount, gpu->vertices, 0};
+            if (mapped)
+                binding.tangents = tangents(*gpu);
+            return binding.tangents != VK_NULL_HANDLE ? binding : MeshBinding{};
+        }
+
         GpuMesh *gpuMesh(const std::shared_ptr<const MeshData> &mesh, uint64_t serial)
         {
             auto found = meshes.find(mesh.get());
@@ -2370,6 +2496,9 @@ namespace gh2
         for (FrameDataSlot &slot : s.frameData)
             if (slot.buffer != VK_NULL_HANDLE)
                 vmaDestroyBuffer(s.allocator, slot.buffer, slot.memory);
+        for (TransientSlot &slot : s.transientData)
+            if (slot.buffer != VK_NULL_HANDLE)
+                vmaDestroyBuffer(s.allocator, slot.buffer, slot.memory);
         if (s.pool != VK_NULL_HANDLE)
             vkDestroyDescriptorPool(s.device, s.pool, nullptr);
         if (s.setLayout != VK_NULL_HANDLE)
@@ -2761,6 +2890,9 @@ namespace gh2
                 push.flags |= kFlagShadow;
         }
         writeDrawDump(frame, pushes.data(), data.mapped, x360Draws.data(), kShadingVec4s);
+        // Transient meshes into this frame's ring, before anything binds it.
+        if (!s.streamTransients(frame, x360Draws, pushes, serial))
+            return false;
 
         // The post stage runs once the world is drawn, before what is drawn
         // over it: after the last draw through the camera the first x360
@@ -2809,8 +2941,10 @@ namespace gh2
                 draw.crowd ? s.inWindow(draw, pushes[i].mvp, frame) : draw.mesh;
             if (!shown)
                 return;
-            GpuMesh *mesh = s.gpuMesh(shown, serial);
-            if (!mesh)
+            const bool x360Family = x360Draws[i] != 0;
+            const MeshBinding mesh =
+                s.bindingOf(shown, x360Family && (pushes[i].flags & kFlagNormalMap) != 0u, serial);
+            if (mesh.vertices == VK_NULL_HANDLE)
                 return;
             if (draw.camera != boundCamera)
             {
@@ -2829,17 +2963,9 @@ namespace gh2
                 boundCamera = draw.camera;
             }
             const Material &material = draw.material;
-            const bool x360Family = x360Draws[i] != 0;
             const VkPipeline pipeline = s.pipeline(x360Family ? fadedBlend(draw) : material.blend, material.zMode,
                                                    material.alphaWrite, material.destAlphaTest, x360Family);
             if (pipeline == VK_NULL_HANDLE)
-                return;
-            // Without a normal map the tangent stream is never read, so the
-            // verts stand in for it.
-            VkBuffer tangents = mesh->vertices;
-            if (x360Family && (pushes[i].flags & kFlagNormalMap) != 0u)
-                tangents = s.tangents(*mesh);
-            if (tangents == VK_NULL_HANDLE)
                 return;
             if (pipeline != boundPipeline)
             {
@@ -2859,12 +2985,11 @@ namespace gh2
                 };
                 vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 2, 2, maps, 0, nullptr);
             }
-            const VkDeviceSize offset = 0;
             if (x360Family)
-                vkCmdBindVertexBuffers(cmd, 1, 1, &tangents, &offset);
-            vkCmdBindVertexBuffers(cmd, 0, 1, &mesh->vertices, &offset);
-            vkCmdBindIndexBuffer(cmd, mesh->indices, 0, VK_INDEX_TYPE_UINT16);
-            vkCmdDrawIndexed(cmd, mesh->indexCount, 1, 0, 0, 0);
+                vkCmdBindVertexBuffers(cmd, 1, 1, &mesh.tangents, &mesh.tangentOffset);
+            vkCmdBindVertexBuffers(cmd, 0, 1, &mesh.vertices, &mesh.vertexOffset);
+            vkCmdBindIndexBuffer(cmd, mesh.indices, mesh.indexOffset, VK_INDEX_TYPE_UINT16);
+            vkCmdDrawIndexed(cmd, mesh.indexCount, 1, 0, 0, 0);
         };
 
         // Each shadow map's casters, through its light's camera: depth alone,
@@ -2892,16 +3017,15 @@ namespace gh2
                 const DrawCall &draw = frame.draws[i];
                 if (!draw.shadowCaster || draw.camera != frame.shadows[map] || !draw.mesh)
                     continue;
-                GpuMesh *mesh = s.gpuMesh(draw.mesh, serial);
-                if (!mesh)
+                const MeshBinding mesh = s.bindingOf(draw.mesh, false, serial);
+                if (mesh.vertices == VK_NULL_HANDLE)
                     continue;
                 vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
                 vkCmdPushConstants(cmd, s.layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                                    sizeof(PushConstants), &pushes[i]);
-                const VkDeviceSize offset = 0;
-                vkCmdBindVertexBuffers(cmd, 0, 1, &mesh->vertices, &offset);
-                vkCmdBindIndexBuffer(cmd, mesh->indices, 0, VK_INDEX_TYPE_UINT16);
-                vkCmdDrawIndexed(cmd, mesh->indexCount, 1, 0, 0, 0);
+                vkCmdBindVertexBuffers(cmd, 0, 1, &mesh.vertices, &mesh.vertexOffset);
+                vkCmdBindIndexBuffer(cmd, mesh.indices, mesh.indexOffset, VK_INDEX_TYPE_UINT16);
+                vkCmdDrawIndexed(cmd, mesh.indexCount, 1, 0, 0, 0);
             }
             vkCmdEndRenderPass(cmd);
             boundPipeline = VK_NULL_HANDLE;
