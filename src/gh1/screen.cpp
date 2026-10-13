@@ -28,6 +28,8 @@ namespace gh2::gh1
         addRows();
         fill();
         reach(top);
+        const std::string alsoTop = screen.also ? std::string(screen.also) + ".view" : std::string();
+        reach(alsoTop);
         for (const Row &row : screen.rows)
             if (row.of && drawn.count(row.of))
                 drawn.insert(row.name);
@@ -36,6 +38,8 @@ namespace gh2::gh1
         for (const auto &[n, c] : cls)
             if (c == "View" && part.count(n))
                 lists[n] = listed(n);
+        if (lists.count(top) && lists.count(alsoTop))
+            lists[top].push_back(alsoTop);
         drawRest();
         out = gh2;
         out.entries.clear();
@@ -278,6 +282,11 @@ namespace gh2::gh1
             for (const auto &[c, n] : gh2.entries)
                 if (kDrawn.count(c) && filled.count(n) && !held.count(n))
                     lists[top].push_back(n);
+        if (const auto list = lists.find(top); list != lists.end())
+            for (auto n = screen.first.rbegin(); n != screen.first.rend(); ++n)
+                if (const auto at = std::find(list->second.begin(), list->second.end(), std::string(*n));
+                    at != list->second.end())
+                    std::rotate(list->second.begin(), at, at + 1);
     }
 
     // That object of GH1's as GH2's. False if it cannot be made.

@@ -101,6 +101,12 @@ namespace gh2::gh1
             const std::string name = screen.ours(), theirName = screen.gh1;
             auto gh1 = loadScene(disc, kFolder + theirName + ".gh");
             const auto gh2 = loadScene(0u, "ui/gen/" + name + ".milo_ps2");
+            if (const auto also = gh1 && screen.also ? loadScene(disc, kFolder + std::string(screen.also) + ".gh")
+                                                     : std::nullopt)
+            {
+                gh1->entries.insert(gh1->entries.end(), also->entries.begin(), also->entries.end());
+                gh1->bodies.insert(gh1->bodies.end(), also->bodies.begin(), also->bodies.end());
+            }
             // A name that starts with one renamed, as milo::replacePrefix
             // has it in the bodies.
             const auto as = [&](const std::string &n)

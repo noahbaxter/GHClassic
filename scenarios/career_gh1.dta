@@ -93,6 +93,8 @@
 (expect {elem {find $syscfg store character grim price} 1} 8000)
 (expect {elem {find $syscfg store guitar explorer price} 1} 600)
 (expect {elem {find $syscfg store song fireitup price} 1} 300)
+; A song is headed by its title, which GH1 keeps with the song.
+(expect {localize fireitup} "Fire It Up")
 (press green)
 (wait 2)
 (shot store_guitars)

@@ -54,6 +54,17 @@ namespace gh2::gh1
             float x, y, z, scale = 0.0f, grown = 0.0f;
         };
         std::vector<Place> placed = {};
+        // GH2's anims that turn a thing upright, each for what it turns
+        // to lean back that many degrees as it turns.
+        std::vector<std::pair<const char *, float>> tilted = {};
+        // What its top View draws before the rest, in this order: GH1
+        // hides one thing behind another by depth, and a scene drawn
+        // here with none written (menus.dta's backdrops) is painted in
+        // the order listed.
+        std::vector<const char *> first = {};
+        // Another GH1 scene shown through this one's camera: its objects
+        // join this scene, the View of its name drawn after this one's.
+        const char *also = nullptr;
 
         const char *ours() const { return gh2 ? gh2 : gh1; }
     };

@@ -329,6 +329,13 @@ namespace gh2::gh1
         if (const dtb::Node *sold = dtb::find(*theirStore, "song"))
             for (size_t i = 1u; i < sold->nodes.size(); ++i)
                 songs.insert(keyOf(sold->nodes[i]));
+        // The store heads a song with the token of its name, which GH1
+        // has no text for: its title is with the song.
+        if (const auto theirSongs = dtb::read("config/songs.dta", none, theirs))
+            for (const std::string &song : songs)
+                if (const dtb::Node *entry = dtb::find(*theirSongs, song))
+                    if (const dtb::Node *name = dtb::find(*entry, "name"); name && name->nodes.size() > 1u)
+                        text[song] = name->nodes[1].text;
         for (const dtb::Node &entry : strings->nodes)
         {
             if (entry.type != dtb::kArray || entry.nodes.size() < 2u)
