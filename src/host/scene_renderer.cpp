@@ -10,6 +10,8 @@
 
 #include "mesh_frag.h"
 #include "mesh_vert.h"
+#include "motion_frag.h"
+#include "motion_vert.h"
 #include "post_frag.h"
 #include "post_ms_frag.h"
 #include "post_vert.h"
@@ -789,6 +791,31 @@ namespace gh2
         uint64_t historySerial = 0; // the frame the other image holds, 0 for none
         Camera historyCamera;
         Matrix historyViewProjection{};
+        // What moves on its own is not where the camera's move alone would
+        // have had it: each mesh the world's camera drew, as it stood this
+        // frame and last. One that moved between is drawn again by
+        // motion.vert into `motion`, each pixel's step back to where it
+        // was, which the joining reads in place of the camera's.
+        struct Stood
+        {
+            Matrix world;
+            std::array<Matrix, 4> bones;
+            Matrix mvp;
+            bool many = false; // drawn more than once a frame, each time elsewhere: which is which is not known
+        };
+        std::unordered_map<const MeshData *, Stood> stoodNow, stoodLast;
+        uint64_t stoodSerial = 0;
+        VkRenderPass motionPass = VK_NULL_HANDLE;
+        VkPipeline motionPipeline = VK_NULL_HANDLE;
+        VkShaderModule motionVertex = VK_NULL_HANDLE;
+        VkShaderModule motionFragment = VK_NULL_HANDLE;
+        VkImage motion = VK_NULL_HANDLE;
+        VmaAllocation motionMemory = VK_NULL_HANDLE;
+        VkImageView motionView = VK_NULL_HANDLE;
+        VkImage motionDepth = VK_NULL_HANDLE;
+        VmaAllocation motionDepthMemory = VK_NULL_HANDLE;
+        VkImageView motionDepthView = VK_NULL_HANDLE;
+        VkFramebuffer motionFramebuffer = VK_NULL_HANDLE;
 
         // The 360's character shadow maps (Frame::shadows): each a depth
         // image its casters are drawn into before any other pass, which
@@ -977,12 +1004,12 @@ namespace gh2
             return check(vkCreateRenderPass(device, &info, nullptr, &out), "render pass");
         }
 
-        // A colour or depth attachment at `samples` that no one samples:
+        // A colour or depth attachment at `samples`, or at one with `single`:
         // depth, and colour that resolves into another image. `transient`
         // when nothing outlives its pass, which the main pass's must to be
         // taken up again after a screen copy.
         bool createAttachment(VkFormat format, VkImageUsageFlags usage, bool transient, uint32_t w, uint32_t h,
-                              VkImage &image, VmaAllocation &memory, VkImageView &view)
+                              VkImage &image, VmaAllocation &memory, VkImageView &view, bool single = false)
         {
             VkImageCreateInfo imageInfo{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
             imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -990,7 +1017,7 @@ namespace gh2
             imageInfo.extent = {w, h, 1};
             imageInfo.mipLevels = 1;
             imageInfo.arrayLayers = 1;
-            imageInfo.samples = samples;
+            imageInfo.samples = single ? VK_SAMPLE_COUNT_1_BIT : samples;
             imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
             imageInfo.usage = usage | (transient ? VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT : 0u);
             VmaAllocationCreateInfo alloc{};
@@ -1596,26 +1623,29 @@ namespace gh2
         // `x360Family` draws with x360.vert and x360.frag, whose verts take
         // their tangents from a second stream.
         // `shadow` is the one pipeline casters are drawn into a shadow map
-        // with: the PS2 family's vertex stage alone, depth only.
+        // with: the PS2 family's vertex stage alone, depth only. `motion`
+        // is the one moving meshes are drawn into the motion picture with,
+        // at one sample.
         VkPipeline pipeline(uint32_t blend, uint32_t zMode, bool alphaWrite, bool destAlphaTest, bool x360Family,
-                            bool shadow = false)
+                            bool shadow = false, bool motion = false)
         {
             VkPipeline &slot =
-                shadow ? shadowPipeline
-                       : (x360Family ? x360Pipelines : pipelines)[((blend * milo::mat::kZModeCount + zMode) * 2u +
-                                                                   (alphaWrite ? 1u : 0u)) * 2u +
-                                                                  (destAlphaTest ? 1u : 0u)];
+                motion   ? motionPipeline
+                : shadow ? shadowPipeline
+                         : (x360Family ? x360Pipelines : pipelines)[((blend * milo::mat::kZModeCount + zMode) * 2u +
+                                                                     (alphaWrite ? 1u : 0u)) * 2u +
+                                                                    (destAlphaTest ? 1u : 0u)];
             if (slot != VK_NULL_HANDLE)
                 return slot;
 
             VkPipelineShaderStageCreateInfo stages[2]{};
             stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
             stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-            stages[0].module = x360Family ? x360Vertex : vertexShader;
+            stages[0].module = motion ? motionVertex : x360Family ? x360Vertex : vertexShader;
             stages[0].pName = "main";
             stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
             stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-            stages[1].module = x360Family ? x360Fragment : fragmentShader;
+            stages[1].module = motion ? motionFragment : x360Family ? x360Fragment : fragmentShader;
             stages[1].pName = "main";
 
             // Captured vertices upload as they are.
@@ -1653,7 +1683,7 @@ namespace gh2
             // two equal; a float's differs in its last bits by which mesh's
             // matrices it came through, and the glow shows in patches. So it
             // is drawn a little nearer (greater is nearer).
-            if (!shadow && (zMode == milo::mat::kZTransparent || zMode == milo::mat::kZDecal))
+            if (!shadow && !motion && (zMode == milo::mat::kZTransparent || zMode == milo::mat::kZDecal))
             {
                 raster.depthBiasEnable = VK_TRUE;
                 raster.depthBiasConstantFactor = 16.0f;
@@ -1661,12 +1691,12 @@ namespace gh2
             }
 
             VkPipelineMultisampleStateCreateInfo multisample{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
-            multisample.rasterizationSamples = shadow ? VK_SAMPLE_COUNT_1_BIT : samples;
+            multisample.rasterizationSamples = shadow || motion ? VK_SAMPLE_COUNT_1_BIT : samples;
             // A 360 surface is shaded at each sample, not once a pixel: its
             // bump map puts a highlight on one pixel and not the next, a
             // different one each frame, and resolving the samples only
             // smooths a mesh's edges. The chains and chrome sparkle without.
-            if (x360Family && !shadow && everySample && samples != VK_SAMPLE_COUNT_1_BIT)
+            if (x360Family && !shadow && !motion && everySample && samples != VK_SAMPLE_COUNT_1_BIT)
             {
                 multisample.sampleShadingEnable = VK_TRUE;
                 multisample.minSampleShading = 1.0f;
@@ -1696,7 +1726,7 @@ namespace gh2
             info.pColorBlendState = &colorBlend;
             info.pDynamicState = &dynamic;
             info.layout = x360Family ? x360Layout : layout;
-            info.renderPass = shadow ? shadowPass : renderPass;
+            info.renderPass = motion ? motionPass : shadow ? shadowPass : renderPass;
             check(vkCreateGraphicsPipelines(device, pipelineCache, 1, &info, nullptr, &slot), "pipeline");
             return slot;
         }
@@ -1729,6 +1759,8 @@ namespace gh2
                                 pipeline(blend, zMode, alphaWrite != 0, destAlphaTest != 0, family != 0);
             if (x360)
                 pipeline(milo::mat::kBlendSrc, milo::mat::kZNormal, false, false, false, true);
+            if (temporal)
+                pipeline(milo::mat::kBlendSrc, milo::mat::kZNormal, false, false, false, false, true);
             std::cerr << "[scene] pipelines in "
                       << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start)
                              .count()
@@ -1740,6 +1772,60 @@ namespace gh2
                 return;
             std::ofstream out(settings::besideSettings("pipelines.bin"), std::ios::binary | std::ios::trunc);
             out.write(data.data(), static_cast<std::streamsize>(size));
+        }
+
+        // The pass moving meshes are drawn again in (Stood), at one sample:
+        // into `motion`, left for post.frag's joining to read, over a depth
+        // buffer of its own that keeps the nearest of them.
+        bool createMotionPass()
+        {
+            VkAttachmentDescription attachments[2]{};
+            attachments[0].format = kHdrFormat;
+            attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+            attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            attachments[1] = attachments[0];
+            attachments[1].format = depthFormat;
+            attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            VkAttachmentReference colorRef{0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
+            VkAttachmentReference depthRef{1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
+            VkSubpassDescription subpass{};
+            subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+            subpass.colorAttachmentCount = 1;
+            subpass.pColorAttachments = &colorRef;
+            subpass.pDepthStencilAttachment = &depthRef;
+            VkSubpassDependency before{};
+            before.srcSubpass = VK_SUBPASS_EXTERNAL;
+            before.dstSubpass = 0;
+            before.srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+            before.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                                  VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+            before.srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            before.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            VkSubpassDependency after{};
+            after.srcSubpass = 0;
+            after.dstSubpass = VK_SUBPASS_EXTERNAL;
+            after.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            after.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            after.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            after.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            const VkSubpassDependency dependencies[] = {before, after};
+            VkRenderPassCreateInfo info{VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};
+            info.attachmentCount = 2;
+            info.pAttachments = attachments;
+            info.subpassCount = 1;
+            info.pSubpasses = &subpass;
+            info.dependencyCount = 2;
+            info.pDependencies = dependencies;
+            motionVertex = shader(kMotionVert, sizeof(kMotionVert));
+            motionFragment = shader(kMotionFrag, sizeof(kMotionFrag));
+            return motionVertex != VK_NULL_HANDLE && motionFragment != VK_NULL_HANDLE &&
+                   check(vkCreateRenderPass(device, &info, nullptr, &motionPass), "motion pass");
         }
 
         // The shadow maps and the pass that draws into one, which leaves it
@@ -1961,6 +2047,20 @@ namespace gh2
             if (depthOnlyView != VK_NULL_HANDLE)
                 vkDestroyImageView(device, depthOnlyView, nullptr);
             depthOnlyView = VK_NULL_HANDLE;
+            if (motionFramebuffer != VK_NULL_HANDLE)
+                vkDestroyFramebuffer(device, motionFramebuffer, nullptr);
+            motionFramebuffer = VK_NULL_HANDLE;
+            for (VkImageView *view : {&motionView, &motionDepthView})
+            {
+                if (*view != VK_NULL_HANDLE)
+                    vkDestroyImageView(device, *view, nullptr);
+                *view = VK_NULL_HANDLE;
+            }
+            if (motion != VK_NULL_HANDLE)
+                vmaDestroyImage(allocator, motion, motionMemory);
+            if (motionDepth != VK_NULL_HANDLE)
+                vmaDestroyImage(allocator, motionDepth, motionDepthMemory);
+            motion = motionDepth = VK_NULL_HANDLE;
             historySerial = 0u;
             for (PostImage *post :
                  {&postSource, &bloomFull, &bloomHalf, &bloomA, &bloomB, &focusA, &focusB, &focused, &history[0],
@@ -2116,6 +2216,20 @@ namespace gh2
             for (PostImage &held : history)
                 if (temporal && !createPostImage(kHdrFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, w, h, held, scenePass))
                     return false;
+            if (temporal)
+            {
+                if (!createAttachment(kHdrFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, false,
+                                      w, h, motion, motionMemory, motionView, true) ||
+                    !createAttachment(depthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, true, w, h, motionDepth,
+                                      motionDepthMemory, motionDepthView, true))
+                    return false;
+                const VkImageView views[] = {motionView, motionDepthView};
+                fb.renderPass = motionPass;
+                fb.attachmentCount = 2;
+                fb.pAttachments = views;
+                if (!check(vkCreateFramebuffer(device, &fb, nullptr, &motionFramebuffer), "motion framebuffer"))
+                    return false;
+            }
             // Drawn into from the scene's samples, or copied into.
             return createPostImage(kHdrFormat,
                                    resolve ? VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT : VK_IMAGE_USAGE_TRANSFER_DST_BIT, w, h,
@@ -2553,10 +2667,9 @@ namespace gh2
                 const bool follows = historySerial != 0u && historySerial + 1u == serial &&
                                      historyCamera.id == world->id && !cutBetween(historyCamera, *world) &&
                                      undoneThen(now, historyViewProjection, join.reproject);
-                join.params[2] = follows ? 1.0f : 0.0f;
-                PostImage &into = history[historyInto];
+                join.params[2] = follows ? 1.0f : 0.0f;                PostImage &into = history[historyInto];
                 writePostSet(sets[kPostPasses - 3u], postSource.view, blank->view,
-                             follows ? history[historyInto ^ 1u].view : VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE,
+                             follows ? history[historyInto ^ 1u].view : VK_NULL_HANDLE, VK_NULL_HANDLE, motionView,
                              depthOnlyView);
                 postDraw(cmd, scenePass, into.framebuffer, width, height, scenePipeline, sets[kPostPasses - 3u], join);
                 imageBarrier(cmd, into.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -2774,7 +2887,7 @@ namespace gh2
         s.bloomPipeline = s.createPostPipeline(State::PostInto::kBloom);
         s.postPipeline = s.createPostPipeline(State::PostInto::kFrame);
         s.temporal = settings::get(settings::kTemporalAa) != 0;
-        if (!s.createPostPass(State::PostInto::kScene, s.scenePass))
+        if (!s.createPostPass(State::PostInto::kScene, s.scenePass) || (s.temporal && !s.createMotionPass()))
             return false;
         s.scenePipeline = s.createPostPipeline(State::PostInto::kScene);
         if (s.scenePipeline == VK_NULL_HANDLE)
@@ -2833,7 +2946,8 @@ namespace gh2
         for (VkPipeline pipeline : s.x360Pipelines)
             if (pipeline != VK_NULL_HANDLE)
                 vkDestroyPipeline(s.device, pipeline, nullptr);
-        for (VkPipeline pipeline : {s.bloomPipeline, s.postPipeline, s.scenePipeline, s.shadowPipeline})
+        for (VkPipeline pipeline :
+             {s.bloomPipeline, s.postPipeline, s.scenePipeline, s.shadowPipeline, s.motionPipeline})
             if (pipeline != VK_NULL_HANDLE)
                 vkDestroyPipeline(s.device, pipeline, nullptr);
         for (State::ShadowMap &map : s.shadowMaps)
@@ -2846,7 +2960,8 @@ namespace gh2
                 vmaDestroyImage(s.allocator, map.image, map.memory);
         }
         for (VkShaderModule module :
-             {s.x360Vertex, s.x360Fragment, s.postVertex, s.postFragment, s.postWorldFragment})
+             {s.x360Vertex, s.x360Fragment, s.postVertex, s.postFragment, s.postWorldFragment, s.motionVertex,
+              s.motionFragment})
             if (module != VK_NULL_HANDLE)
                 vkDestroyShaderModule(s.device, module, nullptr);
         for (VkPipelineLayout layout : {s.x360Layout, s.postLayout})
@@ -2857,7 +2972,7 @@ namespace gh2
                 vkDestroyDescriptorSetLayout(s.device, layout, nullptr);
         for (VkRenderPass pass :
              {s.renderPass, s.firstPass, s.resumePass, s.lastPass, s.overPasses[0], s.overPasses[1], s.bloomPass,
-              s.outputPass, s.scenePass, s.shadowPass})
+              s.outputPass, s.scenePass, s.shadowPass, s.motionPass})
             if (pass != VK_NULL_HANDLE)
                 vkDestroyRenderPass(s.device, pass, nullptr);
         if (s.targetPass != VK_NULL_HANDLE)
@@ -2923,14 +3038,35 @@ namespace gh2
             }
         }
 
+        std::vector<Matrix> viewProjections;
+        viewProjections.reserve(frame.cameras.size());
+        for (const Camera &camera : frame.cameras)
+            viewProjections.push_back(viewProjection(camera, frame.yRatio));
+        // The world's camera: the one the first x360 draw into the picture
+        // took.
+        const Camera *worldCamera = nullptr;
+        for (size_t i = 0; frame.venue && i < frame.draws.size() && !worldCamera; ++i)
+            if (x360Draws[i] && frame.draws[i].camera < frame.cameras.size() &&
+                frame.cameras[frame.draws[i].camera].target == 0u)
+                worldCamera = &frame.cameras[frame.draws[i].camera];
+
         // Every skinned draw's four bones, every lit draw's lighting block
-        // (or x360 block) and every environ tex gen's block, in draw order.
+        // (or x360 block) and every environ tex gen's block, in draw order,
+        // and for a mesh that moved since the last frame the matrix and
+        // bones it had then (Stood).
         FrameDataSlot &data = s.frameData[serial % kFrameSlots];
         std::vector<int32_t> boneBases(frame.draws.size(), -1);
         std::vector<int32_t> lightBases(frame.draws.size(), -1);
         std::vector<int32_t> envBases(frame.draws.size(), -1);
         std::vector<int32_t> fogBases(frame.draws.size(), -1);
+        std::vector<int32_t> stoodBases(frame.draws.size(), -1);
+        std::vector<const State::Stood *> stood(frame.draws.size(), nullptr);
         std::vector<uint32_t> colorModes(frame.draws.size(), kColorVertex);
+        s.stoodLast.swap(s.stoodNow);
+        s.stoodNow.clear();
+        if (s.stoodSerial + 1u != serial)
+            s.stoodLast.clear();
+        s.stoodSerial = serial;
         uint32_t used = 0;
         for (size_t i = 0; i < frame.draws.size(); ++i)
         {
@@ -2939,6 +3075,24 @@ namespace gh2
             {
                 boneBases[i] = static_cast<int32_t>(used);
                 used += milo::mesh::kBoneCount * 4u;
+            }
+            if (s.temporal && worldCamera && draw.mesh && !draw.mesh->transient && !draw.screen && !draw.crowd &&
+                !draw.shadowCaster && draw.camera < frame.cameras.size() &&
+                frame.cameras[draw.camera].id == worldCamera->id && frame.cameras[draw.camera].target == 0u)
+            {
+                const auto same = [](const State::Stood &a, const State::Stood &b)
+                { return a.world == b.world && a.bones == b.bones; };
+                const State::Stood stands{draw.world, draw.bones, multiply(draw.world, viewProjections[draw.camera])};
+                const auto added = s.stoodNow.try_emplace(draw.mesh.get(), stands);
+                if (!added.second && !same(added.first->second, stands))
+                    added.first->second.many = true;
+                const auto last = s.stoodLast.find(draw.mesh.get());
+                if (last != s.stoodLast.end() && !last->second.many && !same(last->second, stands))
+                {
+                    stood[i] = &last->second;
+                    stoodBases[i] = static_cast<int32_t>(used);
+                    used += 4u + (draw.skinned ? milo::mesh::kBoneCount * 4u : 0u);
+                }
             }
             colorModes[i] = colorMode(draw);
             if (x360Draws[i])
@@ -2981,6 +3135,12 @@ namespace gh2
             }
             if (boneBases[i] >= 0)
                 std::memcpy(data.mapped + boneBases[i], frame.draws[i].bones.data(), sizeof(frame.draws[i].bones));
+            if (stoodBases[i] >= 0)
+            {
+                std::memcpy(data.mapped + stoodBases[i], stood[i]->mvp.data(), sizeof(Matrix));
+                if (frame.draws[i].skinned)
+                    std::memcpy(data.mapped + stoodBases[i] + 4, stood[i]->bones.data(), sizeof(stood[i]->bones));
+            }
             if (lightBases[i] >= 0 && x360Draws[i])
             {
                 static const float kNoEye[3] = {};
@@ -3124,11 +3284,6 @@ namespace gh2
         for (TargetRun &run : runs)
             run.image = s.targetImage(run.tex, run.generation, run.width, run.height, run.copied);
 
-        std::vector<Matrix> viewProjections;
-        viewProjections.reserve(frame.cameras.size());
-        for (const Camera &camera : frame.cameras)
-            viewProjections.push_back(viewProjection(camera, frame.yRatio));
-
         std::vector<PushConstants> pushes(frame.draws.size());
         for (size_t i = 0; i < frame.draws.size(); ++i)
         {
@@ -3211,29 +3366,17 @@ namespace gh2
             return false;
 
         // The post stage runs once the world is drawn, before what is drawn
-        // over it: after the last draw through the camera the first x360
-        // draw took (the track and HUD come later, through their own), a
-        // screen rect drawn while it was current being one of them: the
-        // world's flares and fades, which the 360 also draws before its post
-        // stage. The 360 tells them apart by depth instead
-        // (gUIPlaneDistance).
+        // over it: after the last draw through the world's camera (the
+        // track and HUD come later, through their own), a screen rect drawn
+        // while it was current being one of them: the world's flares and
+        // fades, which the 360 also draws before its post stage. The 360
+        // tells them apart by depth instead (gUIPlaneDistance).
         size_t postBefore = SIZE_MAX;
-        const Camera *worldCamera = nullptr;
-        {
-            uint32_t world = 0u;
-            bool any = false;
-            for (size_t i = 0; frame.venue && i < frame.draws.size() && !any; ++i)
-                if (x360Draws[i] && drawRun[i] < 0 && frame.draws[i].camera < frame.cameras.size())
-                {
-                    worldCamera = &frame.cameras[frame.draws[i].camera];
-                    world = worldCamera->id;
-                    any = true;
-                }
-            for (size_t i = 0; any && i < frame.draws.size(); ++i)
-                if (drawRun[i] < 0 && frame.draws[i].camera < frame.cameras.size() &&
-                    (frame.draws[i].screen ? frame.draws[i].under : frame.cameras[frame.draws[i].camera].id) == world)
-                    postBefore = i + 1u;
-        }
+        for (size_t i = 0; worldCamera && i < frame.draws.size(); ++i)
+            if (drawRun[i] < 0 && frame.draws[i].camera < frame.cameras.size() &&
+                (frame.draws[i].screen ? frame.draws[i].under : frame.cameras[frame.draws[i].camera].id) ==
+                    worldCamera->id)
+                postBefore = i + 1u;
 
         // The temporal_aa setting: the world is drawn a part of a pixel off
         // its place, a different part each frame of eight, and the post
@@ -3241,7 +3384,7 @@ namespace gh2
         // lies all across it. Only where the world's camera has the whole
         // picture, which the joining takes it to.
         bool steadied = false;
-        if (s.temporal && postBefore != SIZE_MAX)
+        if (s.motionPipeline != VK_NULL_HANDLE && postBefore != SIZE_MAX)
         {
             const float *rect = worldCamera->rect;
             steadied = rect[0] == 0.0f && rect[1] == 0.0f && rect[2] == 1.0f && rect[3] == 1.0f;
@@ -3389,6 +3532,43 @@ namespace gh2
                 drawOne(i, static_cast<float>(run.width), static_cast<float>(run.height), false);
             vkCmdEndRenderPass(cmd);
             s.fillTargetLevels(cmd, *run.image);
+        }
+        if (steadied)
+        {
+            // The world's meshes that moved, drawn again as steps back to
+            // where they were (Stood): those that leave their depth in the
+            // scene all over, which is what the joining knows a mesh by.
+            VkClearValue cleared[2]{};
+            VkRenderPassBeginInfo begin{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
+            begin.renderPass = s.motionPass;
+            begin.framebuffer = s.motionFramebuffer;
+            begin.renderArea = {{0, 0}, {width, height}};
+            begin.clearValueCount = 2;
+            begin.pClearValues = cleared;
+            vkCmdBeginRenderPass(cmd, &begin, VK_SUBPASS_CONTENTS_INLINE);
+            const VkViewport viewport{0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f};
+            vkCmdSetViewport(cmd, 0, 1, &viewport);
+            vkCmdSetScissor(cmd, 0, 1, &begin.renderArea);
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, s.motionPipeline);
+            for (size_t i = 0; i < postBefore; ++i)
+            {
+                const DrawCall &draw = frame.draws[i];
+                if (stoodBases[i] < 0 || draw.material.zMode == milo::mat::kZDisable ||
+                    draw.material.zMode == milo::mat::kZTransparent)
+                    continue;
+                const MeshBinding mesh = s.bindingOf(draw.mesh, false, serial);
+                if (mesh.vertices == VK_NULL_HANDLE)
+                    continue;
+                PushConstants push = pushes[i];
+                push.envBase = stoodBases[i]; // motion.vert's wasBase
+                vkCmdPushConstants(cmd, s.layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                                   sizeof(PushConstants), &push);
+                vkCmdBindVertexBuffers(cmd, 0, 1, &mesh.vertices, &mesh.vertexOffset);
+                vkCmdBindIndexBuffer(cmd, mesh.indices, mesh.indexOffset, VK_INDEX_TYPE_UINT16);
+                vkCmdDrawIndexed(cmd, mesh.indexCount, 1, 0, 0, 0);
+            }
+            vkCmdEndRenderPass(cmd);
+            boundPipeline = VK_NULL_HANDLE;
         }
         s.stamp(cmd, serial, 2u);
 

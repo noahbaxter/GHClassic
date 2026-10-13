@@ -347,7 +347,7 @@ add_executable(GHClassic
 set(GHC_SHADER_DIR "${CMAKE_CURRENT_BINARY_DIR}/shaders")
 file(MAKE_DIRECTORY "${GHC_SHADER_DIR}")
 set(GHC_SHADER_HEADERS)
-foreach(SHADER mesh.vert mesh.frag x360.vert x360.frag post.vert post.frag)
+foreach(SHADER mesh.vert mesh.frag x360.vert x360.frag post.vert post.frag motion.vert motion.frag)
     string(REPLACE "." "_" SHADER_ID "${SHADER}")
     string(REPLACE "." ";" SHADER_PARTS "${SHADER}")
     set(SHADER_VAR "k")

@@ -48,6 +48,8 @@ layout(push_constant) uniform Push
 layout(location = 0) out vec4 outColor;
 
 const vec3 kLuminance = vec3(0.2125, 0.7154, 0.0721);
+// 8: two depths this near, as a part of the depth, are one surface's.
+const float kSameDepth = 0.01;
 // gBloomThresholds, the same in every PostProc of the disc.
 const vec4 kThresholds = vec4(3.9, 3.9, 3.9, 1.0);
 const float kWeights[8] = float[8](0.33245, 0.31449, 0.26621, 0.20164, 0.13668, 0.08290, 0.04499, 0.02185);
@@ -122,10 +124,12 @@ void main()
     if (pc.mode == 8u)
     {
         // `bloom` is the frames before this one. Where this pixel's surface
-        // was in them comes from its depth and the two cameras, so what
-        // moves on its own (a player, a light's beam) is found in the wrong
-        // place: what is found is held to the colours around the pixel now,
-        // which keeps a wrong find from showing as a trail.
+        // was in them comes from its depth and the two cameras, or for a
+        // mesh that moved on its own from `blurred`, motion.frag's picture
+        // of those. What neither finds rightly (a light's beam, a mesh the
+        // game rewrote) is found in the wrong place: what is found is held
+        // to the colours around the pixel now, which keeps a wrong find
+        // from showing as a trail.
         ivec2 at = ivec2(gl_FragCoord.xy);
         ivec2 size = textureSize(source, 0);
         vec4 now = texelFetch(source, at, 0);
@@ -135,21 +139,36 @@ void main()
         // The nearest depth of the nine (greater is nearer), so an edge
         // moves with what is in front.
         float z = 0.0;
+        ivec2 nearest = at;
         vec3 sum = vec3(0.0), squares = vec3(0.0);
         for (int y = -1; y <= 1; ++y)
             for (int x = -1; x <= 1; ++x)
             {
                 ivec2 tap = clamp(at + ivec2(x, y), ivec2(0), size - 1);
-                z = max(z, texelFetch(depth, tap, 0).r);
+                float d = texelFetch(depth, tap, 0).r;
+                if (d > z)
+                {
+                    z = d;
+                    nearest = tap;
+                }
                 vec3 colour = held(texelFetch(source, tap, 0).rgb);
                 sum += colour;
                 squares += colour * colour;
             }
         // From the pixel's middle, not from where this frame's shift put
         // what it shows: a still camera then finds each pixel in itself.
-        vec4 was = pc.reproject * vec4(gl_FragCoord.xy / vec2(size) * 2.0 - 1.0, z, 1.0);
+        vec2 here = gl_FragCoord.xy / vec2(size);
+        vec4 was = pc.reproject * vec4(here * 2.0 - 1.0, z, 1.0);
         vec2 uv = was.xy / was.w * 0.5 + 0.5;
-        if (was.w <= 0.0 || any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))))
+        // A moving mesh's step counts where the scene shows that mesh: its
+        // depth there is the scene's, to the little the frame's shift and
+        // the sample's place in the pixel put between them.
+        vec4 moved = texelFetch(blurred, nearest, 0);
+        if (moved.a > 0.0 && abs(moved.z - z) < kSameDepth * z)
+            uv = here + moved.xy;
+        else if (was.w <= 0.0)
+            return;
+        if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))))
             return;
         vec3 mean = sum / 9.0;
         vec3 reach = sqrt(max(squares / 9.0 - mean * mean, vec3(0.0))) + 1.0e-5;
