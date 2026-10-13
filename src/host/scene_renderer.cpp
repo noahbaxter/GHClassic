@@ -59,9 +59,10 @@ namespace gh2
         constexpr uint32_t kMaxShadings = 2048;
         // The post stage's passes a frame, each with its own sources: bloom
         // extract, two downsamples, two blurs, the world's last, depth of
-        // field's low picture and its two blurs, the scene's samples into one,
-        // and the finished frame's gamma ramp.
-        constexpr uint32_t kPostPasses = 11u;
+        // field's low picture and its two blurs, the scene joined to the
+        // frames before it, the scene's samples into one, and the finished
+        // frame's gamma ramp.
+        constexpr uint32_t kPostPasses = 12u;
 
         // By blend, z mode, alpha write and dest alpha test.
         constexpr uint32_t kPipelineCount =
@@ -587,7 +588,113 @@ namespace gh2
             float params[4];
             float focus[4];
             uint32_t mode;
+            float sharpen; // 3: how much of its edge a pixel is given back, 0 for none
+            uint32_t pad[2];
+            float reproject[16]; // 8: this frame's clip space to the last frame's
         };
+        // Joining frames softens the picture: all of AMD's contrast adaptive
+        // sharpening, 0.2, puts most of its edges back. On the drum kit in
+        // battle's balcony shot the mean step between neighbouring pixels is
+        // 5.63 of 255 unjoined, 4.59 joined and 5.11 joined and sharpened.
+        constexpr float kSteadiedSharpen = 0.2f;
+
+        // Past either between two frames, a camera has cut to another shot.
+        // Over 45 s of Shout at the Devil at 60 frames a second a shot's own
+        // move was never past half a degree or 2 units a frame, and the
+        // cuts that kept their camera were each past 24 degrees and 100.
+        constexpr double kCutDegrees = 5.0;
+        constexpr double kCutMove = 50.0;
+
+        // The `index`th of the Halton sequence in `base`, from 1: points
+        // that fill 0 to 1 evenly however many are taken.
+        float halton(uint32_t index, uint32_t base)
+        {
+            float at = 0.0f, part = 1.0f;
+            for (; index != 0u; index /= base)
+            {
+                part /= static_cast<float>(base);
+                at += part * static_cast<float>(index % base);
+            }
+            return at;
+        }
+
+        // `a` undone, then `b`, for row-vector matrices. In doubles: a view
+        // and projection's inverse is past a float's digits. False where `a`
+        // has no inverse.
+        bool undoneThen(const Matrix &a, const Matrix &b, float out[16])
+        {
+            double m[16], inv[16];
+            for (int i = 0; i < 16; ++i)
+                m[i] = a[static_cast<size_t>(i)];
+            inv[0] = m[5] * m[10] * m[15] - m[5] * m[11] * m[14] - m[9] * m[6] * m[15] + m[9] * m[7] * m[14] +
+                     m[13] * m[6] * m[11] - m[13] * m[7] * m[10];
+            inv[4] = -m[4] * m[10] * m[15] + m[4] * m[11] * m[14] + m[8] * m[6] * m[15] - m[8] * m[7] * m[14] -
+                     m[12] * m[6] * m[11] + m[12] * m[7] * m[10];
+            inv[8] = m[4] * m[9] * m[15] - m[4] * m[11] * m[13] - m[8] * m[5] * m[15] + m[8] * m[7] * m[13] +
+                     m[12] * m[5] * m[11] - m[12] * m[7] * m[9];
+            inv[12] = -m[4] * m[9] * m[14] + m[4] * m[10] * m[13] + m[8] * m[5] * m[14] - m[8] * m[6] * m[13] -
+                      m[12] * m[5] * m[10] + m[12] * m[6] * m[9];
+            inv[1] = -m[1] * m[10] * m[15] + m[1] * m[11] * m[14] + m[9] * m[2] * m[15] - m[9] * m[3] * m[14] -
+                     m[13] * m[2] * m[11] + m[13] * m[3] * m[10];
+            inv[5] = m[0] * m[10] * m[15] - m[0] * m[11] * m[14] - m[8] * m[2] * m[15] + m[8] * m[3] * m[14] +
+                     m[12] * m[2] * m[11] - m[12] * m[3] * m[10];
+            inv[9] = -m[0] * m[9] * m[15] + m[0] * m[11] * m[13] + m[8] * m[1] * m[15] - m[8] * m[3] * m[13] -
+                     m[12] * m[1] * m[11] + m[12] * m[3] * m[9];
+            inv[13] = m[0] * m[9] * m[14] - m[0] * m[10] * m[13] - m[8] * m[1] * m[14] + m[8] * m[2] * m[13] +
+                      m[12] * m[1] * m[10] - m[12] * m[2] * m[9];
+            inv[2] = m[1] * m[6] * m[15] - m[1] * m[7] * m[14] - m[5] * m[2] * m[15] + m[5] * m[3] * m[14] +
+                     m[13] * m[2] * m[7] - m[13] * m[3] * m[6];
+            inv[6] = -m[0] * m[6] * m[15] + m[0] * m[7] * m[14] + m[4] * m[2] * m[15] - m[4] * m[3] * m[14] -
+                     m[12] * m[2] * m[7] + m[12] * m[3] * m[6];
+            inv[10] = m[0] * m[5] * m[15] - m[0] * m[7] * m[13] - m[4] * m[1] * m[15] + m[4] * m[3] * m[13] +
+                      m[12] * m[1] * m[7] - m[12] * m[3] * m[5];
+            inv[14] = -m[0] * m[5] * m[14] + m[0] * m[6] * m[13] + m[4] * m[1] * m[14] - m[4] * m[2] * m[13] -
+                      m[12] * m[1] * m[6] + m[12] * m[2] * m[5];
+            inv[3] = -m[1] * m[6] * m[11] + m[1] * m[7] * m[10] + m[5] * m[2] * m[11] - m[5] * m[3] * m[10] -
+                     m[9] * m[2] * m[7] + m[9] * m[3] * m[6];
+            inv[7] = m[0] * m[6] * m[11] - m[0] * m[7] * m[10] - m[4] * m[2] * m[11] + m[4] * m[3] * m[10] +
+                     m[8] * m[2] * m[7] - m[8] * m[3] * m[6];
+            inv[11] = -m[0] * m[5] * m[11] + m[0] * m[7] * m[9] + m[4] * m[1] * m[11] - m[4] * m[3] * m[9] -
+                      m[8] * m[1] * m[7] + m[8] * m[3] * m[5];
+            inv[15] = m[0] * m[5] * m[10] - m[0] * m[6] * m[9] - m[4] * m[1] * m[10] + m[4] * m[2] * m[9] +
+                      m[8] * m[1] * m[6] - m[8] * m[2] * m[5];
+            const double det = m[0] * inv[0] + m[1] * inv[4] + m[2] * inv[8] + m[3] * inv[12];
+            if (det == 0.0)
+                return false;
+            for (int row = 0; row < 4; ++row)
+                for (int col = 0; col < 4; ++col)
+                {
+                    double sum = 0.0;
+                    for (int k = 0; k < 4; ++k)
+                        sum += inv[row * 4 + k] / det * static_cast<double>(b[static_cast<size_t>(k * 4 + col)]);
+                    out[row * 4 + col] = static_cast<float>(sum);
+                }
+            return true;
+        }
+
+        // Whether a camera went to another shot between two frames, where
+        // moving through one shot it turns and travels a little each frame.
+        bool cutBetween(const Camera &was, const Camera &is)
+        {
+            // The two views' rotations, one against the other: their trace
+            // is 1 + 2 cos of the turn. Over their sizes, since a view is a
+            // hair off a pure rotation and a small turn is lost in that.
+            double trace = 0.0, moved = 0.0, wasSize = 0.0, isSize = 0.0;
+            for (size_t row = 0; row < 3u; ++row)
+            {
+                for (size_t col = 0; col < 3u; ++col)
+                {
+                    const double a = was.view[row * 4u + col], b = is.view[row * 4u + col];
+                    trace += a * b;
+                    wasSize += a * a;
+                    isSize += b * b;
+                }
+                moved += std::pow(static_cast<double>(is.eye[row]) - static_cast<double>(was.eye[row]), 2.0);
+            }
+            trace *= 3.0 / std::max(std::sqrt(wasSize * isSize), 1e-12);
+            const double turned = std::acos(std::clamp((trace - 1.0) * 0.5, -1.0, 1.0)) * 57.29577951308232;
+            return turned > kCutDegrees || std::sqrt(moved) > kCutMove;
+        }
 
         bool check(VkResult result, const char *what)
         {
@@ -663,6 +770,15 @@ namespace gh2
         // main pass's depth, read through a view of the depth alone.
         PostImage focusA, focusB;
         VkImageView depthOnlyView = VK_NULL_HANDLE;
+        // The temporal_aa setting: the world as the frames before this one
+        // left it, in two images the frames take turns drawing into and
+        // reading, and what the last frame's was drawn through.
+        bool temporal = false;
+        PostImage history[2];
+        uint32_t historyInto = 0;
+        uint64_t historySerial = 0; // the frame the other image holds, 0 for none
+        Camera historyCamera;
+        Matrix historyViewProjection{};
 
         // The 360's character shadow maps (Frame::shadows): each a depth
         // image its casters are drawn into before any other pass, which
@@ -684,7 +800,9 @@ namespace gh2
         VkRenderPass postPass = VK_NULL_HANDLE;
         VkRenderPass outputPass = VK_NULL_HANDLE;
         // The multisampled scene into the frame's one-sample image in place
-        // of the main pass's own resolve (post.frag's 7); none at one sample.
+        // of the main pass's own resolve (post.frag's 7), with no
+        // framebuffer at one sample, and the scene into a history image
+        // (its 8).
         VkRenderPass scenePass = VK_NULL_HANDLE;
         VkFramebuffer sceneFramebuffer = VK_NULL_HANDLE;
         VkPipeline scenePipeline = VK_NULL_HANDLE;
@@ -1835,7 +1953,9 @@ namespace gh2
             if (depthOnlyView != VK_NULL_HANDLE)
                 vkDestroyImageView(device, depthOnlyView, nullptr);
             depthOnlyView = VK_NULL_HANDLE;
-            for (PostImage *post : {&postSource, &bloomFull, &bloomHalf, &bloomA, &bloomB, &focusA, &focusB})
+            historySerial = 0u;
+            for (PostImage *post :
+                 {&postSource, &bloomFull, &bloomHalf, &bloomA, &bloomB, &focusA, &focusB, &history[0], &history[1]})
             {
                 if (post->framebuffer != VK_NULL_HANDLE)
                     vkDestroyFramebuffer(device, post->framebuffer, nullptr);
@@ -1868,8 +1988,10 @@ namespace gh2
             hdrMemory = VK_NULL_HANDLE;
         }
 
-        // An image the post stage draws into or samples, at one sample.
-        bool createPostImage(VkFormat format, VkImageUsageFlags usage, uint32_t w, uint32_t h, PostImage &out)
+        // An image the post stage draws into or samples, at one sample. One
+        // drawn into is through `pass`, a bloom pass unless given.
+        bool createPostImage(VkFormat format, VkImageUsageFlags usage, uint32_t w, uint32_t h, PostImage &out,
+                             VkRenderPass pass = VK_NULL_HANDLE)
         {
             out.width = std::max(w, 1u);
             out.height = std::max(h, 1u);
@@ -1896,7 +2018,7 @@ namespace gh2
             if ((usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) == 0u)
                 return true;
             VkFramebufferCreateInfo fb{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
-            fb.renderPass = bloomPass;
+            fb.renderPass = pass != VK_NULL_HANDLE ? pass : bloomPass;
             fb.attachmentCount = 1;
             fb.pAttachments = &out.view;
             fb.width = out.width;
@@ -1994,6 +2116,9 @@ namespace gh2
             // full size, then halved twice.
             fb.renderPass = postPass;
             fb.pAttachments = resolve ? &msaaView : &targetView;
+            for (PostImage &held : history)
+                if (temporal && !createPostImage(kHdrFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, w, h, held, scenePass))
+                    return false;
             return check(vkCreateFramebuffer(device, &fb, nullptr, &postFramebuffer), "post framebuffer") &&
                    createPostImage(kHdrFormat, VK_IMAGE_USAGE_TRANSFER_DST_BIT, w, h, postSource) &&
                    createPostImage(kColorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, w, h, bloomFull) &&
@@ -2345,9 +2470,11 @@ namespace gh2
         // of field's low picture and its blurs where the frame has any, bloom
         // taken from it at full size, halved twice and blurred, added back,
         // then the luminance map. The result goes into the frame's colour
-        // attachment for the main pass to take up again. Called outside a
-        // render pass.
-        void runPost(VkCommandBuffer cmd, const Frame &frame, const Camera *world, uint64_t serial)
+        // attachment for the main pass to take up again. `steadied`: the
+        // world was drawn a part of a pixel off (record's jitter) and is
+        // first joined to the frames before it. Called outside a render
+        // pass.
+        void runPost(VkCommandBuffer cmd, const Frame &frame, const Camera *world, uint64_t serial, bool steadied)
         {
             const GpuTexture *white1 = sceneFramebuffer != VK_NULL_HANDLE ? gpuTexture(cmd, white, serial) : nullptr;
             if (white1)
@@ -2394,14 +2521,43 @@ namespace gh2
                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, depthAspect);
 
             VkDescriptorSet(&sets)[kPostPasses] = postSets[serial % kFrameSlots];
-            writePostSet(sets[0], postSource.view, blank->view);
+            // What the passes below take as the scene.
+            VkImageView scene = postSource.view;
+            if (steadied)
+            {
+                // The frames before count where the last frame was the one
+                // before this, through the same camera, and the camera has
+                // not cut to another shot since: a cut leaves its history
+                // somewhere else in the room.
+                const Matrix now = viewProjection(*world, frame.yRatio);
+                PostPush join{{}, {}, 8u};
+                const bool follows = historySerial != 0u && historySerial + 1u == serial &&
+                                     historyCamera.id == world->id && !cutBetween(historyCamera, *world) &&
+                                     undoneThen(now, historyViewProjection, join.reproject);
+                join.params[2] = follows ? 1.0f : 0.0f;
+                PostImage &into = history[historyInto];
+                writePostSet(sets[kPostPasses - 3u], postSource.view, blank->view,
+                             follows ? history[historyInto ^ 1u].view : VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE,
+                             depthOnlyView);
+                postDraw(cmd, scenePass, into.framebuffer, width, height, scenePipeline, sets[kPostPasses - 3u], join);
+                imageBarrier(cmd, into.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                             VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+                scene = into.view;
+                historyInto ^= 1u;
+                historySerial = serial;
+                historyCamera = *world;
+                historyViewProjection = now;
+            }
+            writePostSet(sets[0], scene, blank->view);
             writePostSet(sets[1], bloomFull.view, blank->view);
             writePostSet(sets[2], bloomHalf.view, blank->view);
             writePostSet(sets[3], bloomA.view, blank->view);
             writePostSet(sets[4], bloomB.view, blank->view);
-            writePostSet(sets[5], postSource.view, blank->view, bloomA.view,
-                         luminance ? luminance->view : VK_NULL_HANDLE, focusA.view, depthOnlyView);
-            writePostSet(sets[6], postSource.view, blank->view);
+            writePostSet(sets[5], scene, blank->view, bloomA.view, luminance ? luminance->view : VK_NULL_HANDLE,
+                         focusA.view, depthOnlyView);
+            writePostSet(sets[6], scene, blank->view);
             writePostSet(sets[7], focusA.view, blank->view);
             writePostSet(sets[8], focusB.view, blank->view);
 
@@ -2435,7 +2591,7 @@ namespace gh2
             postDraw(cmd, bloomPass, bloomA.framebuffer, bloomA.width, bloomA.height, bloomPipeline, sets[4],
                      PostPush{{across, 0.0f}, {}, 2u});
             // gBloomIntensity as a Xenia frame of battle had it.
-            PostPush last{{0.0f, 0.0f, 1.0f, luminance ? 1.0f : 0.0f}, {}, 3u};
+            PostPush last{{0.0f, 0.0f, 1.0f, luminance ? 1.0f : 0.0f}, {}, 3u, steadied ? kSteadiedSharpen : 0.0f};
             focusOf(frame, world, last.focus);
             postDraw(cmd, postPass, postFramebuffer, width, height, postPipeline, sets[5], last);
             imageBarrier(cmd, depth, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
@@ -2583,14 +2739,12 @@ namespace gh2
             return false;
         s.bloomPipeline = s.createPostPipeline(State::PostInto::kBloom);
         s.postPipeline = s.createPostPipeline(State::PostInto::kFrame);
-        if (samples != VK_SAMPLE_COUNT_1_BIT)
-        {
-            if (!s.createPostPass(State::PostInto::kScene, s.scenePass))
-                return false;
-            s.scenePipeline = s.createPostPipeline(State::PostInto::kScene);
-            if (s.scenePipeline == VK_NULL_HANDLE)
-                return false;
-        }
+        s.temporal = settings::get(settings::kTemporalAa) != 0;
+        if (!s.createPostPass(State::PostInto::kScene, s.scenePass))
+            return false;
+        s.scenePipeline = s.createPostPipeline(State::PostInto::kScene);
+        if (s.scenePipeline == VK_NULL_HANDLE)
+            return false;
         if (s.bloomPipeline == VK_NULL_HANDLE || s.postPipeline == VK_NULL_HANDLE || !s.createShadowMaps())
             return false;
         s.createPipelines();
@@ -3047,12 +3201,29 @@ namespace gh2
                     postBefore = i + 1u;
         }
 
+        // The temporal_aa setting: the world is drawn a part of a pixel off
+        // its place, a different part each frame of eight, and the post
+        // stage joins the frames (runPost), so each pixel comes to hold what
+        // lies all across it. Only where the world's camera has the whole
+        // picture, which the joining takes it to.
+        bool steadied = false;
+        if (s.temporal && postBefore != SIZE_MAX)
+        {
+            const float *rect = worldCamera->rect;
+            steadied = rect[0] == 0.0f && rect[1] == 0.0f && rect[2] == 1.0f && rect[3] == 1.0f;
+        }
+        const uint32_t turn = static_cast<uint32_t>(serial % 8u) + 1u;
+        const float jitter[2] = {halton(turn, 2u) - 0.5f, halton(turn, 3u) - 0.5f};
+
         // Bound state outlives a render pass, so the frame data is bound once.
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, s.layout, 1, 1, &data.set, 0, nullptr);
         uint32_t boundCamera = UINT32_MAX;
+        bool boundShifted = false;
         VkPipeline boundPipeline = VK_NULL_HANDLE;
-        // One draw into whichever pass is open, `w` by `h`.
-        const auto drawOne = [&](size_t i, float w, float h) {
+        // One draw into whichever pass is open, `w` by `h`, `jittered` when
+        // it is the world's. A rect in screen space stays put: shifted, one
+        // over the whole picture leaves a column at its edge half covered.
+        const auto drawOne = [&](size_t i, float w, float h, bool jittered) {
             const DrawCall &draw = frame.draws[i];
             const VkDescriptorSet *sets = drawTextures[i] ? drawTextures[i]->sets : nullptr;
             if (draw.material.renderTarget != 0u)
@@ -3074,12 +3245,14 @@ namespace gh2
                 s.bindingOf(shown, x360Family && (pushes[i].flags & kFlagNormalMap) != 0u, serial);
             if (mesh.vertices == VK_NULL_HANDLE)
                 return;
-            if (draw.camera != boundCamera)
+            const bool shifted = jittered && !draw.screen;
+            if (draw.camera != boundCamera || shifted != boundShifted)
             {
                 // The camera's rect, as PsCam::Select sets its viewport and
                 // scissor (0x19c504).
                 const float *rect = frame.cameras[draw.camera].rect;
-                VkViewport viewport{rect[0] * w, rect[1] * h, rect[2] * w, rect[3] * h, 0.0f, 1.0f};
+                VkViewport viewport{rect[0] * w + (shifted ? jitter[0] : 0.0f),
+                                    rect[1] * h + (shifted ? jitter[1] : 0.0f), rect[2] * w, rect[3] * h, 0.0f, 1.0f};
                 const int32_t x0 = static_cast<int32_t>(std::clamp(rect[0], 0.0f, 1.0f) * w);
                 const int32_t y0 = static_cast<int32_t>(std::clamp(rect[1], 0.0f, 1.0f) * h);
                 const int32_t x1 = static_cast<int32_t>(std::clamp(rect[0] + rect[2], 0.0f, 1.0f) * w);
@@ -3089,6 +3262,7 @@ namespace gh2
                 vkCmdSetViewport(cmd, 0, 1, &viewport);
                 vkCmdSetScissor(cmd, 0, 1, &scissor);
                 boundCamera = draw.camera;
+                boundShifted = shifted;
             }
             const Material &material = draw.material;
             const VkPipeline pipeline = s.pipeline(x360Family ? fadedBlend(draw) : material.blend, material.zMode,
@@ -3178,7 +3352,7 @@ namespace gh2
             vkCmdBeginRenderPass(cmd, &begin, VK_SUBPASS_CONTENTS_INLINE);
             boundCamera = UINT32_MAX;
             for (size_t i : run.draws)
-                drawOne(i, static_cast<float>(run.width), static_cast<float>(run.height));
+                drawOne(i, static_cast<float>(run.width), static_cast<float>(run.height), false);
             vkCmdEndRenderPass(cmd);
             s.fillTargetLevels(cmd, *run.image);
         }
@@ -3214,7 +3388,7 @@ namespace gh2
                 if (post)
                 {
                     s.stamp(cmd, serial, 3u);
-                    s.runPost(cmd, frame, worldCamera, serial);
+                    s.runPost(cmd, frame, worldCamera, serial, steadied);
                     s.stamp(cmd, serial, 5u);
                     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, s.layout, 1, 1, &data.set, 0,
                                             nullptr);
@@ -3240,7 +3414,7 @@ namespace gh2
                 boundCamera = UINT32_MAX;
             }
             if (drawn)
-                drawOne(i, static_cast<float>(width), static_cast<float>(height));
+                drawOne(i, static_cast<float>(width), static_cast<float>(height), steadied && i < postBefore);
         }
         vkCmdEndRenderPass(cmd);
         s.stamp(cmd, serial, 6u);

@@ -119,6 +119,7 @@ namespace gh2::settings
             {"characters", Type::kChoice, 0, 1, 1, kSd, "sd hd"},
             {"guitars", Type::kChoice, 0, 1, 1, kSd, "sd hd"},
             {"highway", Type::kChoice, 0, 2, 1, kHighwayClassic, "auto classic hd"},
+            {"temporal_aa", Type::kBool, 0, 1, 1, 0},
             {"frame_log", Type::kBool, 0, 1, 1, 0},
         };
 
