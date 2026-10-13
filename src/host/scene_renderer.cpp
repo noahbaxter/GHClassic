@@ -29,6 +29,11 @@ namespace gh2
         constexpr VkFormat kColorFormat = VK_FORMAT_R8G8B8A8_UNORM;
         // Frames a GPU resource must outlive its last use by.
         constexpr uint64_t kRetireAfter = 3;
+        // Frames a mesh or texture stays on the GPU unused: a camera cut takes
+        // the crowd and set out of view and back within seconds, and each
+        // return would otherwise allocate and upload all of it mid-frame.
+        constexpr uint64_t kEvictAfter = 1800; // 30 s
+        constexpr uint64_t kScanEvery = 8;     // frames between walks of the caches
 
         // Each frame writes its bones and lighting to its own slot's buffer,
         // so a slot is reused only after its frame has retired.
@@ -2368,6 +2373,19 @@ namespace gh2
             postDraw(cmd, outputPass, outputFramebuffer, width, height, bloomPipeline, set, PostPush{{}, {}, 4u});
         }
 
+        // The descriptor pool holds kMaxTextures; keep a quarter spare.
+        static constexpr size_t kTextureLimit = kMaxTextures - kMaxTextures / 4u;
+
+        // Whether a mesh or texture goes: unused for `keep` frames, or with
+        // nothing but this cache holding its source, when no capture can
+        // hand that pointer over again and it is garbage once no frame in
+        // flight reads it.
+        template <typename Gpu>
+        static bool spent(const Gpu &gpu, uint64_t keep, uint64_t serial)
+        {
+            return gpu.lastUsed + keep < serial || (gpu.source.use_count() == 1 && gpu.lastUsed + kRetireAfter < serial);
+        }
+
         void retire(uint64_t serial)
         {
             for (auto it = shadings.begin(); it != shadings.end();)
@@ -2380,9 +2398,16 @@ namespace gh2
                 else
                     ++it;
             }
+            // The tables are walked every kScanEvery frames, not every frame:
+            // nothing in them is urgent within that.
+            if (serial % kScanEvery != 0u)
+                return;
+            // Near the descriptor pool's end, nothing is kept past its frames
+            // in flight.
+            const uint64_t keep = textures.size() > kTextureLimit ? kRetireAfter : kEvictAfter;
             for (auto it = meshes.begin(); it != meshes.end();)
             {
-                if (it->second.lastUsed + kRetireAfter < serial)
+                if (spent(it->second, keep, serial))
                 {
                     destroyMesh(it->second);
                     it = meshes.erase(it);
@@ -2394,7 +2419,7 @@ namespace gh2
             for (auto it = textures.begin(); it != textures.end();)
             {
                 GpuTexture &texture = it->second;
-                if (texture.lastUsed + kRetireAfter < serial)
+                if (spent(texture, keep, serial))
                 {
                     destroyTexture(texture);
                     it = textures.erase(it);
