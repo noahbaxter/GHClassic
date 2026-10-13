@@ -717,6 +717,9 @@ namespace gh2
         // from each on. Same attachments, so its framebuffer and pipelines.
         VkRenderPass firstPass = VK_NULL_HANDLE;
         VkRenderPass resumePass = VK_NULL_HANDLE;
+        // The last part, which nothing takes up again: its samples are not
+        // kept, which at 2160 lines and four a pixel is 430 MB a frame.
+        VkRenderPass lastPass = VK_NULL_HANDLE;
         VkPipelineLayout layout = VK_NULL_HANDLE;
         VkShaderModule vertexShader = VK_NULL_HANDLE;
         VkShaderModule fragmentShader = VK_NULL_HANDLE;
@@ -799,12 +802,10 @@ namespace gh2
         VkRenderPass bloomPass = VK_NULL_HANDLE;
         VkRenderPass postPass = VK_NULL_HANDLE;
         VkRenderPass outputPass = VK_NULL_HANDLE;
-        // The multisampled scene into the frame's one-sample image in place
-        // of the main pass's own resolve (post.frag's 7), with no
-        // framebuffer at one sample, and the scene into a history image
-        // (its 8).
+        // The multisampled scene into the post stage's source in place of
+        // the main pass's own resolve (post.frag's 7), and the scene into a
+        // history image (its 8).
         VkRenderPass scenePass = VK_NULL_HANDLE;
-        VkFramebuffer sceneFramebuffer = VK_NULL_HANDLE;
         VkPipeline scenePipeline = VK_NULL_HANDLE;
         VkDescriptorSetLayout postSetLayout = VK_NULL_HANDLE;
         VkPipelineLayout postLayout = VK_NULL_HANDLE;
@@ -1971,9 +1972,6 @@ namespace gh2
             if (outputFramebuffer != VK_NULL_HANDLE)
                 vkDestroyFramebuffer(device, outputFramebuffer, nullptr);
             outputFramebuffer = VK_NULL_HANDLE;
-            if (sceneFramebuffer != VK_NULL_HANDLE)
-                vkDestroyFramebuffer(device, sceneFramebuffer, nullptr);
-            sceneFramebuffer = VK_NULL_HANDLE;
             if (outputView != VK_NULL_HANDLE)
                 vkDestroyImageView(device, outputView, nullptr);
             outputView = VK_NULL_HANDLE;
@@ -2102,10 +2100,6 @@ namespace gh2
             fb.pAttachments = &outputView;
             if (!check(vkCreateFramebuffer(device, &fb, nullptr, &outputFramebuffer), "output framebuffer"))
                 return false;
-            fb.renderPass = scenePass;
-            fb.pAttachments = &targetView;
-            if (resolve && !check(vkCreateFramebuffer(device, &fb, nullptr, &sceneFramebuffer), "scene framebuffer"))
-                return false;
             view.image = depth;
             view.format = depthFormat;
             view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -2120,7 +2114,10 @@ namespace gh2
                 if (temporal && !createPostImage(kHdrFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, w, h, held, scenePass))
                     return false;
             return check(vkCreateFramebuffer(device, &fb, nullptr, &postFramebuffer), "post framebuffer") &&
-                   createPostImage(kHdrFormat, VK_IMAGE_USAGE_TRANSFER_DST_BIT, w, h, postSource) &&
+                   // Drawn into from the scene's samples, or copied into.
+                   createPostImage(kHdrFormat,
+                                   resolve ? VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT : VK_IMAGE_USAGE_TRANSFER_DST_BIT, w, h,
+                                   postSource, scenePass) &&
                    createPostImage(kColorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, w, h, bloomFull) &&
                    createPostImage(kColorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, w / 2u, h / 2u, bloomHalf) &&
                    createPostImage(kColorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, w / 4u, h / 4u, bloomA) &&
@@ -2476,11 +2473,12 @@ namespace gh2
         // pass.
         void runPost(VkCommandBuffer cmd, const Frame &frame, const Camera *world, uint64_t serial, bool steadied)
         {
-            const GpuTexture *white1 = sceneFramebuffer != VK_NULL_HANDLE ? gpuTexture(cmd, white, serial) : nullptr;
+            const GpuTexture *white1 = samples != VK_SAMPLE_COUNT_1_BIT ? gpuTexture(cmd, white, serial) : nullptr;
             if (white1)
             {
-                // The frame's one-sample image made again from the samples,
-                // over what the main pass resolved into it.
+                // The scene's samples made one a pixel, straight into the
+                // post stage's source, in place of what the main pass
+                // resolved into the frame.
                 imageBarrier(cmd, msaa, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
                              VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -2488,25 +2486,34 @@ namespace gh2
                 const VkDescriptorSet set = postSets[serial % kFrameSlots][kPostPasses - 2u];
                 writePostSet(set, white1->view, white1->view, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, msaaView,
                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                postDraw(cmd, scenePass, sceneFramebuffer, width, height, scenePipeline, set, PostPush{{}, {}, 7u});
+                postDraw(cmd, scenePass, postSource.framebuffer, width, height, scenePipeline, set,
+                         PostPush{{}, {}, 7u});
                 imageBarrier(cmd, msaa, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                              VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_ACCESS_SHADER_READ_BIT,
                              VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+                imageBarrier(cmd, postSource.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                             VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
             }
-            imageBarrier(cmd, postSource.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0,
-                         VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                         VK_PIPELINE_STAGE_TRANSFER_BIT);
-            VkImageCopy region{};
-            region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-            region.dstSubresource = region.srcSubresource;
-            region.extent = {width, height, 1};
-            vkCmdCopyImage(cmd, target, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, postSource.image,
-                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-            imageBarrier(cmd, postSource.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_TRANSFER_WRITE_BIT,
-                         VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+            else
+            {
+                imageBarrier(cmd, postSource.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0,
+                             VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT);
+                VkImageCopy region{};
+                region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+                region.dstSubresource = region.srcSubresource;
+                region.extent = {width, height, 1};
+                vkCmdCopyImage(cmd, target, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, postSource.image,
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+                imageBarrier(cmd, postSource.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_TRANSFER_WRITE_BIT,
+                             VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+            }
+            stamp(cmd, serial, 4u);
 
             const GpuTexture *blank = gpuTexture(cmd, white, serial);
             const GpuTexture *luminance = frame.luminance ? gpuTexture(cmd, frame.luminance, serial) : nullptr;
@@ -2724,6 +2731,7 @@ namespace gh2
         if (!(s.createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, false, false, s.renderPass) &&
               s.createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, true, false, s.firstPass) &&
               s.createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, true, true, s.resumePass) &&
+              s.createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, false, true, s.lastPass) &&
               s.createPass(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, false, false, s.targetPass) &&
               s.createDescriptorState() && s.createLayout()))
             return false;
@@ -2822,7 +2830,7 @@ namespace gh2
             if (layout != VK_NULL_HANDLE)
                 vkDestroyDescriptorSetLayout(s.device, layout, nullptr);
         for (VkRenderPass pass :
-             {s.renderPass, s.firstPass, s.resumePass, s.bloomPass, s.postPass, s.outputPass, s.scenePass,
+             {s.renderPass, s.firstPass, s.resumePass, s.lastPass, s.bloomPass, s.postPass, s.outputPass, s.scenePass,
               s.shadowPass})
             if (pass != VK_NULL_HANDLE)
                 vkDestroyRenderPass(s.device, pass, nullptr);
@@ -3409,7 +3417,8 @@ namespace gh2
                     if (run.image)
                         s.copyFromTarget(cmd, *run.image, run.x, run.y);
                 }
-                begin.renderPass = s.resumePass;
+                const bool more = nextCopy < copyRuns.size() || (postBefore != SIZE_MAX && i < postBefore);
+                begin.renderPass = more ? s.resumePass : s.lastPass;
                 vkCmdBeginRenderPass(cmd, &begin, VK_SUBPASS_CONTENTS_INLINE);
                 boundCamera = UINT32_MAX;
             }
