@@ -17,9 +17,12 @@
 #include "x360_vert.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstring>
+#include <fstream>
 #include <iostream>
+#include <iterator>
 #include <unordered_map>
 
 namespace gh2
@@ -624,6 +627,7 @@ namespace gh2
         VkShaderModule x360Vertex = VK_NULL_HANDLE;
         VkShaderModule x360Fragment = VK_NULL_HANDLE;
         VkPipeline x360Pipelines[kPipelineCount]{};
+        VkPipelineCache pipelineCache = VK_NULL_HANDLE;
         std::unordered_map<const Shading *, GpuShading> shadings;
         std::shared_ptr<const TextureData> whiteCube;
         // The frame the main pass draws into at kHdrFormat, which the post
@@ -1534,8 +1538,49 @@ namespace gh2
             info.pDynamicState = &dynamic;
             info.layout = x360Family ? x360Layout : layout;
             info.renderPass = shadow ? shadowPass : renderPass;
-            check(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &info, nullptr, &slot), "pipeline");
+            check(vkCreateGraphicsPipelines(device, pipelineCache, 1, &info, nullptr, &slot), "pipeline");
             return slot;
+        }
+
+        // The cache every pipeline is made through, from pipelines.bin
+        // beside the settings where a run before this one left it. One from
+        // another driver or GPU reads as empty.
+        void openPipelineCache()
+        {
+            std::ifstream in(settings::besideSettings("pipelines.bin"), std::ios::binary);
+            const std::vector<char> data(std::istreambuf_iterator<char>(in), {});
+            VkPipelineCacheCreateInfo info{VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO};
+            info.initialDataSize = data.size();
+            info.pInitialData = data.data();
+            check(vkCreatePipelineCache(device, &info, nullptr, &pipelineCache), "pipeline cache");
+        }
+
+        // Every pipeline made up front, so none is compiled mid-song the
+        // first time its material shows: the 360's first few cost up to 8 ms
+        // of a frame each on an M4 Pro, and 10 to 50 on AMD's Windows driver.
+        // The cache is then left for the next run.
+        void createPipelines()
+        {
+            const auto start = std::chrono::steady_clock::now();
+            for (uint32_t blend = 0; blend < milo::mat::kBlendCount; ++blend)
+                for (uint32_t zMode = 0; zMode < milo::mat::kZModeCount; ++zMode)
+                    for (int alphaWrite = 0; alphaWrite < 2; ++alphaWrite)
+                        for (int destAlphaTest = 0; destAlphaTest < 2; ++destAlphaTest)
+                            for (int family = 0; family < (x360 ? 2 : 1); ++family)
+                                pipeline(blend, zMode, alphaWrite != 0, destAlphaTest != 0, family != 0);
+            if (x360)
+                pipeline(milo::mat::kBlendSrc, milo::mat::kZNormal, false, false, false, true);
+            std::cerr << "[scene] pipelines in "
+                      << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start)
+                             .count()
+                      << " ms" << std::endl;
+            size_t size = 0;
+            vkGetPipelineCacheData(device, pipelineCache, &size, nullptr);
+            std::vector<char> data(size);
+            if (size == 0 || vkGetPipelineCacheData(device, pipelineCache, &size, data.data()) != VK_SUCCESS)
+                return;
+            std::ofstream out(settings::besideSettings("pipelines.bin"), std::ios::binary | std::ios::trunc);
+            out.write(data.data(), static_cast<std::streamsize>(size));
         }
 
         // The shadow maps and the pass that draws into one, which leaves it
@@ -1735,7 +1780,7 @@ namespace gh2
             info.layout = postLayout;
             info.renderPass = bloom ? bloomPass : scene ? scenePass : postPass;
             VkPipeline out = VK_NULL_HANDLE;
-            check(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &info, nullptr, &out), "post pipeline");
+            check(vkCreateGraphicsPipelines(device, pipelineCache, 1, &info, nullptr, &out), "post pipeline");
             return out;
         }
 
@@ -2478,8 +2523,12 @@ namespace gh2
               s.createPass(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, false, false, s.targetPass) &&
               s.createDescriptorState() && s.createLayout()))
             return false;
+        s.openPipelineCache();
         if (!s.x360)
+        {
+            s.createPipelines();
             return true;
+        }
         if (!s.createPostPass(State::PostInto::kBloom, s.bloomPass) ||
             !s.createPostPass(State::PostInto::kFrame, s.postPass) ||
             !s.createPostPass(State::PostInto::kOutput, s.outputPass))
@@ -2494,7 +2543,10 @@ namespace gh2
             if (s.scenePipeline == VK_NULL_HANDLE)
                 return false;
         }
-        return s.bloomPipeline != VK_NULL_HANDLE && s.postPipeline != VK_NULL_HANDLE && s.createShadowMaps();
+        if (s.bloomPipeline == VK_NULL_HANDLE || s.postPipeline == VK_NULL_HANDLE || !s.createShadowMaps())
+            return false;
+        s.createPipelines();
+        return true;
     }
 
     void SceneRenderer::shutdown()
@@ -2534,6 +2586,8 @@ namespace gh2
         for (VkPipeline pipeline : s.pipelines)
             if (pipeline != VK_NULL_HANDLE)
                 vkDestroyPipeline(s.device, pipeline, nullptr);
+        if (s.pipelineCache != VK_NULL_HANDLE)
+            vkDestroyPipelineCache(s.device, s.pipelineCache, nullptr);
         if (s.vertexShader != VK_NULL_HANDLE)
             vkDestroyShaderModule(s.device, s.vertexShader, nullptr);
         if (s.fragmentShader != VK_NULL_HANDLE)
