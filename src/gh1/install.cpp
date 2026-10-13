@@ -82,6 +82,7 @@ namespace gh2
         if (!gh1Disc || !gh2Disc)
             return;
         const auto start = std::chrono::steady_clock::now();
+        ark::unlocalize(*gh1Disc);
         gh1::addSetlist(*gh1Disc, *gh2Disc);
         // GH1's own save (save/gh1_stream.h): title 0x309cf8, broken after 6
         // characters (SetupMCIcon 0x14a500).

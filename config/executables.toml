@@ -1,70 +1,25 @@
-# Known GH executables and discs, identified by SHA-1.
+# Known GH releases and executables, a chunk for each game.
 #
-# executable.sha1 is the boot ELF, which is what the recompile depends on.
-# disc.data_sha1 hashes the data track's 2048-byte sectors
-# (`tools/disc.py identify --image-hash`), which is exactly Redump's SHA-1.
-# The three retail discs match Redump's published values.
-
-[[disc]]
-name = "Guitar Hero (USA)"
-data_sha1 = "4caacaea582c79605f8c3582dd4b90abdec699f5"
-redump = "http://redump.org/disc/699/"
-
-[[disc]]
-name = "Guitar Hero II (USA)"
-data_sha1 = "e1a3a81827aa4264984b4f3678de58ca3d881528"
-redump = "http://redump.org/disc/627/"
-
-[[disc]]
-name = "Guitar Hero Encore - Rocks the 80s (USA)"
-data_sha1 = "184f2dc9993d9b1e6edf0125f68e1ce07742567a"
-redump = "http://forum.redump.org/post/131232/"
-
-[[disc]]
-name = "Guitar Hero II Deluxe 2.0"
-data_sha1 = "8ef0d0a6e90d46c64a553590ffc27c6e2a2bc447"
-
-# The other releases, from Redump's PS2 DAT (2026-06-15).
-
-[[disc]]
-name = "Guitar Hero (Europe)"
-data_sha1 = "d8d3fa7615e79284119d5e8e9af623e01236d469"
-
-[[disc]]
-name = "Guitar Hero (Europe, Australia) (En,Fr,De,Es,It)"
-data_sha1 = "777aee9142715d1a886d89282f4c6c8be3173109"
-
-[[disc]]
-name = "Guitar Hero (USA) (Demo)"
-data_sha1 = "f257572adebbf98231d4bbc9f508bf7dee7c0b7c"
-
-[[disc]]
-name = "Guitar Hero II (Europe, Australia) (En,Fr,De,Es,It)"
-data_sha1 = "c18c69fdae10b6c329f38245a7ea93a7e6088197"
-
-[[disc]]
-name = "Guitar Hero II (USA) (Demo)"
-data_sha1 = "b2ec787a595bbe72495b5f9307586aaf060aaba5"
-
-[[disc]]
-name = "Guitar Hero II (Europe) (En,Fr,De,Es,It) (Demo)"
-data_sha1 = "bc2ddeb9a392352986c50cfaf60e440d25e21616"
-
-[[disc]]
-name = "Guitar Hero - Rocks the 80s (Europe, Australia)"
-data_sha1 = "4af88d50cbbb404a9d1e33bd0a552ae05a60f501"
-
-[[disc]]
-name = "Guitar Hero - Rocks the 80s (Europe) (Fr,De,Es,It)"
-data_sha1 = "adb7136705a9d4a991b34ebd67853e911432b104"
-
-# Every Milo-engine release Redump lists (GH1, GH2, 80s; GH3 onward is a
-# different engine), and 360 GH2. Recognised by the serial in the boot
+# release: every Milo-engine release Redump lists (GH1, GH2, 80s; GH3 onward
+# is a different engine), and 360 GH2. Recognised by the serial in the boot
 # executable's name (a 360's title ID), so a disc we cannot use still gets
 # named. game: the name src/content/games.h and ghc.py --discs give it.
 # role: "engine" is recompiled (required), "content" adds its songs and
 # outfits when mounted, any of a game's content releases doing; a release
 # with no role is not supported (not yet checked to work).
+#
+# data_sha1 is the whole disc's: the data track's 2048-byte sectors hashed
+# (`tools/disc.py identify --image-hash`), which is exactly Redump's SHA-1.
+# It only tells a clean dump from a changed one; nothing is refused by it.
+# The three USA retail discs match Redump's published values; the rest are
+# from Redump's PS2 DAT (2026-06-15).
+#
+# executable: sha1 is the boot ELF, which is what the recompile depends on.
+# The debug builds are from Project Deluge (2021), on no retail disc.
+
+# ============================================================================
+# Guitar Hero
+# ============================================================================
 
 [[release]]
 serial = "SLUS-21224"
@@ -72,79 +27,31 @@ game = "gh1"
 name = "Guitar Hero (USA)"
 version = "1.00"
 role = "content"
+data_sha1 = "4caacaea582c79605f8c3582dd4b90abdec699f5"
+redump = "http://redump.org/disc/699/"
 
 [[release]]
 serial = "SLES-54093"
 game = "gh1"
 name = "Guitar Hero (Europe)"
 version = "1.00"
+role = "content"
+data_sha1 = "d8d3fa7615e79284119d5e8e9af623e01236d469"
 
 [[release]]
 serial = "SLES-54132"
 game = "gh1"
 name = "Guitar Hero (Europe, Australia)"
 version = "1.00"
+role = "content"
+data_sha1 = "777aee9142715d1a886d89282f4c6c8be3173109"
 
 [[release]]
 serial = "SLUS-29177"
 game = "gh1"
 name = "Guitar Hero (USA) (Demo)"
 version = "1.00"
-
-[[release]]
-serial = "SLUS-21447"
-game = "gh2"
-name = "Guitar Hero II (USA)"
-version = "1.00"
-role = "engine"
-
-[[release]]
-serial = "SLES-54442"
-game = "gh2"
-name = "Guitar Hero II (Europe, Australia)"
-version = "1.01"
-
-[[release]]
-serial = "SLUS-29198"
-game = "gh2"
-name = "Guitar Hero II (USA) (Demo)"
-version = "1.01"
-
-[[release]]
-serial = "SLED-54509"
-game = "gh2"
-name = "Guitar Hero II (Europe) (Demo)"
-version = "1.00"
-
-[[release]]
-serial = "SLUS-21586"
-game = "gh80s"
-name = "Guitar Hero Encore: Rocks the 80s (USA)"
-version = "1.00"
-role = "content"
-
-[[release]]
-serial = "SLES-54859"
-game = "gh80s"
-name = "Guitar Hero: Rocks the 80s (Europe, Australia)"
-version = "1.00"
-
-[[release]]
-serial = "SLES-54860"
-game = "gh80s"
-name = "Guitar Hero: Rocks the 80s (Europe)"
-version = "1.01"
-
-# 360 GH2: World (xex version 1) and USA Rev 1 (version 2) share the title
-# ID; only USA Rev 1 has been run.
-[[release]]
-serial = "415607E7"
-game = "gh2x"
-name = "Guitar Hero II (Xbox 360)"
-version = "1, 2"
-role = "content"
-
-# Retail, from the discs above.
+data_sha1 = "f257572adebbf98231d4bbc9f508bf7dee7c0b7c"
 
 [[executable]]
 name = "GH1 retail"
@@ -152,33 +59,119 @@ file = "SLUS_212.24"
 sha1 = "8f1e036852e466b0a6614d633c9c3beab4d060ce"
 
 [[executable]]
-name = "GH2 retail"
-file = "SLUS_214.47"
-sha1 = "aea7bbb01eb6e56056c3a33771ed046090d39168"
-
-[[executable]]
-name = "80s retail"
-file = "SLUS_215.86"
-sha1 = "3b53114bc65731b96e4a123c2c15496eec8eaca8"
-
-# Debug builds from Project Deluge (2021). Not on any retail disc.
-
-[[executable]]
 name = "GH1 debug"
 file = "SLUS_212.24"
 sha1 = "edd9f972f355e1a6b4ed003cac4ecbf6a5f81e60"
+
+# ============================================================================
+# Guitar Hero II
+# ============================================================================
+
+[[release]]
+serial = "SLUS-21447"
+game = "gh2"
+name = "Guitar Hero II (USA)"
+version = "1.00"
+role = "engine"
+data_sha1 = "e1a3a81827aa4264984b4f3678de58ca3d881528"
+redump = "http://redump.org/disc/627/"
+
+[[release]]
+serial = "SLES-54442"
+game = "gh2"
+name = "Guitar Hero II (Europe, Australia)"
+version = "1.01"
+data_sha1 = "c18c69fdae10b6c329f38245a7ea93a7e6088197"
+
+[[release]]
+serial = "SLUS-29198"
+game = "gh2"
+name = "Guitar Hero II (USA) (Demo)"
+version = "1.01"
+data_sha1 = "b2ec787a595bbe72495b5f9307586aaf060aaba5"
+
+[[release]]
+serial = "SLED-54509"
+game = "gh2"
+name = "Guitar Hero II (Europe) (Demo)"
+version = "1.00"
+data_sha1 = "bc2ddeb9a392352986c50cfaf60e440d25e21616"
+
+[[executable]]
+name = "GH2 retail"
+file = "SLUS_214.47"
+sha1 = "aea7bbb01eb6e56056c3a33771ed046090d39168"
 
 [[executable]]
 name = "GH2 debug"
 file = "SLUS_214.47"
 sha1 = "29624b902a43aac5afcfcc5fa44675aafb0a10ab"
 
+# ============================================================================
+# Guitar Hero Encore: Rocks the 80s
+# ============================================================================
+
+[[release]]
+serial = "SLUS-21586"
+game = "gh80s"
+name = "Guitar Hero Encore: Rocks the 80s (USA)"
+version = "1.00"
+role = "content"
+data_sha1 = "184f2dc9993d9b1e6edf0125f68e1ce07742567a"
+redump = "http://forum.redump.org/post/131232/"
+
+[[release]]
+serial = "SLES-54859"
+game = "gh80s"
+name = "Guitar Hero: Rocks the 80s (Europe, Australia)"
+version = "1.00"
+role = "content"
+data_sha1 = "4af88d50cbbb404a9d1e33bd0a552ae05a60f501"
+
+[[release]]
+serial = "SLES-54860"
+game = "gh80s"
+name = "Guitar Hero: Rocks the 80s (Europe)"
+version = "1.01"
+role = "content"
+data_sha1 = "adb7136705a9d4a991b34ebd67853e911432b104"
+
+[[executable]]
+name = "80s retail"
+file = "SLUS_215.86"
+sha1 = "3b53114bc65731b96e4a123c2c15496eec8eaca8"
+
 [[executable]]
 name = "80s debug"
 file = "SLUS_215.86"
 sha1 = "c30b031bfe3828b8936a1c3dd4a5f6a58e2a0db4"
 
-# Guitar Hero II Deluxe 2.0, all on the one disc.
+# ============================================================================
+# Guitar Hero II (Xbox 360)
+# ============================================================================
+
+# World (xex version 1) and USA Rev 1 (version 2) share the title ID. Both
+# run; World on three scenarios only.
+
+[[release]]
+serial = "415607E7"
+game = "gh2x"
+name = "Guitar Hero II (Xbox 360)"
+version = "1, 2"
+role = "content"
+
+# ============================================================================
+# Guitar Hero II Deluxe 2.0
+# ============================================================================
+
+# A mod of GH2, its executables all on the one disc. Not supported.
+
+[[release]]
+serial = "GHCE-00001"
+game = "gh2dx"
+name = "Guitar Hero II Deluxe 2.0"
+version = "2.0"
+data_sha1 = "8ef0d0a6e90d46c64a553590ffc27c6e2a2bc447"
 
 [[executable]]
 name = "DX loader"

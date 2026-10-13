@@ -200,7 +200,8 @@
       kDataUnhandled))
 
 ; GH1 sells three videos where GH2 sells two: its bonus screen has a row for
-; the first as well (GH1's options.dta, bonus_material).
+; the first as well (GH1's options.dta, bonus_material). A PAL disc sells a
+; fourth, with a row of its own in its scene.
 (bonus_material_panel
    (needs bonus_material)
    (= focus bm_video1.btn))
@@ -208,12 +209,15 @@
    (needs bonus_material)
    (enter
       {$this set_button_state bm_video1.btn}
+      {if {{bonus_material_panel loaded_dir} exists bm_video4.btn}
+         {$this set_button_state bm_video4.btn}}
       {{bonus_material_panel find bm_buy.lbl} set_showing [item_locked]})
    (= get_movie ($btn)
       {switch $btn
          (bm_video1.btn video1)
          (bm_video2.btn video2)
          (bm_video3.btn video3)
+         (bm_video4.btn video4)
          {fail "unknown button: " $btn}}))
 
 ; In a song.

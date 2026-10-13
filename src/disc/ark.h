@@ -61,6 +61,12 @@ namespace gh2::ark
     // A file's bytes from that disc's archive alone.
     std::optional<std::vector<uint8_t>> readFile(size_t disc, const std::string &path);
 
+    // A PAL release keeps a folder for each language where the USA one has
+    // one file, and its videos in videos_pal: that disc's English files and
+    // those videos answer to the USA paths too, where it has nothing there
+    // ("ghui/eng/options.gh" as "ghui/options.gh").
+    void unlocalize(size_t disc);
+
     // Which indexed disc boots that executable ("SLUS_215.86", or a 360
     // title ID, "415607E7"), once install has run.
     std::optional<size_t> discWithSerial(const std::string &serial);
