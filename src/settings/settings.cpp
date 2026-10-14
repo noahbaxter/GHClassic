@@ -123,6 +123,7 @@ namespace gh2::settings
             {"high_detail", Type::kBool, 0, 1, 1, 0},
             {"frame_log", Type::kBool, 0, 1, 1, 0},
             {"lighting", Type::kChoice, 0, 1, 1, kLastGen, "last_gen next_gen"},
+            {"perf_overlay", Type::kChoice, 0, 3, 1, 0, "off fps graph full"},
         };
 
         const Entry *entryNamed(const std::string &name)

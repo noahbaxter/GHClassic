@@ -19,7 +19,7 @@ namespace gh2
     // and the gamma ramp.
     constexpr const char *kGpuSpans[] = {"shadows", "targets", "world", "resolve", "post", "hud", "output"};
 
-    // What the last record did, for the frame log.
+    // What the last record did, for the frame log and the overlay.
     struct SceneStats
     {
         uint32_t meshesCreated = 0;
@@ -27,8 +27,8 @@ namespace gh2
         uint64_t uploadBytes = 0;
         uint32_t evicted = 0;
         // The GPU's milliseconds a span on the newest frame it has finished,
-        // a few behind the one recorded. Zero where the frame log is off or
-        // the device keeps no times.
+        // a few behind the one recorded. Zero where the device keeps no
+        // times.
         float gpuMs[std::size(kGpuSpans)]{};
     };
 

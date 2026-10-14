@@ -53,6 +53,7 @@ namespace gh2::settings
         kHighDetail, // every character drawn as its nearest model, however far off
         kFrameLog,   // frametimes.csv: each presented frame's times and what it did
         kLighting,   // kLastGen: the PS2's lighting wherever the 360's would be
+        kPerfOverlay, // host/perf.h's Level: frame times in the picture's corner
         kKeyCount,
     };
 

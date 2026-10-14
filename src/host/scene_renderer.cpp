@@ -888,9 +888,9 @@ namespace gh2
         // The device shades each sample apart when a pipeline asks.
         bool everySample = false;
 
-        // The frame log's counts. With it on, each frame slot has a pool of
-        // the GPU's times: at record's start, then at each span's end
-        // (kGpuSpans).
+        // The frame log's and the overlay's counts. Each frame slot has a
+        // pool of the GPU's times: at record's start, then at each span's
+        // end (kGpuSpans).
         SceneStats stats;
         static constexpr uint32_t kTimes = 1u + std::size(kGpuSpans);
         VkQueryPool times[kFrameSlots]{};
@@ -2856,7 +2856,7 @@ namespace gh2
         s.colorFormat = s.x360 ? kHdrFormat : kColorFormat;
         VkPhysicalDeviceProperties properties{};
         vkGetPhysicalDeviceProperties(allocatorInfo.physicalDevice, &properties);
-        if (settings::get(settings::kFrameLog) && properties.limits.timestampComputeAndGraphics)
+        if (properties.limits.timestampComputeAndGraphics)
         {
             s.timePeriod = properties.limits.timestampPeriod;
             VkQueryPoolCreateInfo timesInfo{VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO};

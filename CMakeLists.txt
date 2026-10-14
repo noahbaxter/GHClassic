@@ -314,6 +314,7 @@ set(GHC_GAME_SOURCES
     src/host/bindings.cpp
     src/host/input.cpp
     src/host/pad.cpp
+    src/host/perf.cpp
     src/host/profiles.cpp
     src/host/releases.cpp
     src/host/update.cpp
