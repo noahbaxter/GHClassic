@@ -94,6 +94,7 @@ namespace gh2::gh1
                         {"song_logos.pic", kAway, 0.0f, 0.0f},
                         {"st_sold.mesh", kAway, 0.0f, 0.0f}},
              .tilted = {{"guitar_single.tnm", 14.0f}},
+             .turned = {{"guitar_single.tnm", 180.0f}},
              .first = {"char_placer.grp"}},
             // The street's walls run on behind the room in the window, which
             // hides them by its depth in GH1: here they are painted first.

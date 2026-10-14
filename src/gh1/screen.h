@@ -57,6 +57,8 @@ namespace gh2::gh1
         // GH2's anims that turn a thing upright, each for what it turns
         // to lean back that many degrees as it turns.
         std::vector<std::pair<const char *, float>> tilted = {};
+        // Likewise, each started that many degrees round the way it spins.
+        std::vector<std::pair<const char *, float>> turned = {};
         // What its top View draws before the rest, in this order: GH1
         // hides one thing behind another by depth, and a scene drawn
         // here with none written (menus.dta's backdrops) is painted in
