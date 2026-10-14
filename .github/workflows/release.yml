@@ -126,17 +126,25 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: CHANGELOG.md
+          sparse-checkout-cone-mode: false
       - uses: actions/download-artifact@v8
         with:
           path: packages
           merge-multiple: true
+      # The notes are CHANGELOG.md's section headed by the tag (## v0.7), up to
+      # the next; a tag with none fails here.
+      - run: |
+          awk -v head="## $GITHUB_REF_NAME" '$0 == head { on = 1; next } /^## / { on = 0 } on' CHANGELOG.md > notes.md
+          if ! grep -q '[^[:space:]]' notes.md; then echo "CHANGELOG.md has no ## $GITHUB_REF_NAME section"; exit 1; fi
       # A pre-release on either track while the game is unfinished; a tag with
       # -exp (v0.6-exp.1) is the experimental track's.
       - run: |
           title="GH Classic"
           case "$GITHUB_REF_NAME" in *-exp*) title="GH Classic Experimental" ;; esac
           gh release create "$GITHUB_REF_NAME" packages/* --repo "$GITHUB_REPOSITORY" --draft --prerelease \
-            --title "$title ${GITHUB_REF_NAME#v} (work in progress)" --generate-notes \
-            --notes "Work in progress: unfinished, and it will change."
+            --title "$title ${GITHUB_REF_NAME#v} (work in progress)" --notes-file notes.md
         env:
           GH_TOKEN: ${{ github.token }}
