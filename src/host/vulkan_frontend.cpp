@@ -124,33 +124,6 @@ namespace gh2
         std::chrono::nanoseconds gamePeriod{16667000};
         bool newestOnly = false;                     // the game outruns the display
 
-        // Frame rates in the window title, every half second: new game
-        // frames shown, and frames the game finished.
-        std::string title;
-        std::chrono::steady_clock::time_point rateSince{};
-        uint64_t shownCount = 0;
-        uint64_t publishedSince = 0;
-
-        void countFrame(bool isNew)
-        {
-            shownCount += isNew ? 1u : 0u;
-            const auto now = std::chrono::steady_clock::now();
-            const double elapsed = std::chrono::duration<double>(now - rateSince).count();
-            if (elapsed < 0.5)
-                return;
-            const uint64_t published = frames().published();
-            if (window && rateSince != std::chrono::steady_clock::time_point{})
-            {
-                char text[160];
-                std::snprintf(text, sizeof(text), "%s - %.0f fps (game %.0f)", title.c_str(),
-                              shownCount / elapsed, (published - publishedSince) / elapsed);
-                SDL_SetWindowTitle(window, text);
-            }
-            rateSince = now;
-            shownCount = 0;
-            publishedSince = published;
-        }
-
         // The game's frame rate from settings, as the runtime's vblank: one
         // game frame a vblank.
         void applyFrameRate(PS2Runtime &runtime)
@@ -527,7 +500,6 @@ namespace gh2
         s.shotDir = options.shotDir;
         setDrawDumpDir(options.shotDir);
         s.shotEvery = options.shotEvery;
-        s.title = title;
 
         // MoltenVK is in the app bundle, where SDL's own search does not look.
         // A path also keeps SDL from taking volk's vkGetInstanceProcAddr
@@ -727,7 +699,6 @@ namespace gh2
         bool isNew = false;
         if (!moviePlaying)
             isNew = s.newestOnly ? frames().latest(s.shown) : frames().next(s.shown, s.frameWait);
-        s.countFrame(isNew);
         const Frame &frame = s.shown;
         const float displayAspect = moviePlaying ? 4.0f / 3.0f : frame.displayAspect;
 

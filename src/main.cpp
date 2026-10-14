@@ -258,7 +258,7 @@ int main(int argc, char *argv[])
     PS2Runtime runtime;
     runtime.setHostOptions(hostOptions);
     runtime.setHostFrontend(std::make_unique<gh2::VulkanFrontend>(renderSize));
-    if (!runtime.initialize("GH Classic"))
+    if (!runtime.initialize("Guitar Hero Classic"))
         return fail(hostOptions, "GH Classic could not open its window. It needs a GPU with Vulkan 1.2 or newer.");
 
     // The disc serves cdrom0: in place of the ELF's directory.
