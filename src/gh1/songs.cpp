@@ -21,6 +21,7 @@
 #include "formats/dtb.h"
 #include "gh1/face.h"
 #include "gh1/guitarist.h"
+#include "gh1/guitars.h"
 #include "formats/midi.h"
 
 #include <algorithm>
@@ -356,9 +357,7 @@ namespace gh2::gh1
             for (const Guitarist &g : kGuitarists)
                 if (character && character->text == g.folder)
                     outfit = g.name();
-            std::string axe = guitar ? guitar->text : "lespaul";
-            if (axe.rfind("gibson_", 0) == 0)
-                axe = axe.substr(7);
+            const std::string axe = body(guitar ? guitar->text : "lespaul");
 
             dtb::Node out = array({gh1.nodes[0]});
             for (const char *key : {"name", "artist"})
