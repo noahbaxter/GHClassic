@@ -89,6 +89,7 @@ namespace gh2::gh1
             // behind the glass and the shop's front as GH1's is. Its song
             // logos, which GH1 has none of, are out of sight.
             {.gh1 = "store",
+             .without = {"us_gate.tnm", "us_gate.trans", "UITrigger.trg"},
              .with = {"char_placer.grp"},
              .placed = {{"guitar.grp", -156.7f, 477.1f, 10.0f, 5.61f},
                         {"song_logos.pic", kAway, 0.0f, 0.0f},
