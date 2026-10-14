@@ -5,30 +5,42 @@
 GH Classic is a recompilation of the PS2 version of Guitar Hero II that runs natively on macOS, Windows and Linux. Much of the code was written using AI ([more on that below](#how-was-ai-used)). While you can play through the entire campaign, know that it's still experimental so expect (and please report any) bugs and glitches.
 
 To run this you need:
-- **Your own disc image** of Guitar Hero II (USA), SLUS-21447, as `.chd`, `.iso` or `.bin`
+- **Your own disc image** of Guitar Hero II (SLUS-21447 only... for now) as `.chd`, `.iso` or `.bin`
+- (Optional) **Your own disc images** of Guitar Hero, Guitar Hero Encore: Rocks the 80s, and/or Guitar Hero 2 for the Xbox 360.
 - A GPU with Vulkan support
 
-## Quickstart
+## Install
 
 Grab the latest [Releases](https://github.com/noahbaxter/GHClassic/releases).
 
-- **Windows and Linux:** unzip anywhere and put your disc image in the `PUT_DISC_HERE` folder beside the game. Settings and saves stay in that folder too. Windows will show a SmartScreen prompt the first time since the exe is unsigned: More info, then Run anyway.
-- **macOS:** open the disk image and drag GH Classic to Applications. Run it once and it opens the folder your disc image goes in (`~/Library/Application Support/GHClassic/PUT_DISC_HERE`).
+- **Windows and Linux:** unzip the portable folder install anywhere and put your disc images in the `PUT_DISC_HERE` folder beside the game. Windows will show a SmartScreen prompt the first time since the exe is unsigned: More info, then Run anyway.
+- **macOS:** open the disk image and drag GH Classic to Applications. Run it once and it opens the folder your disc images go in (`~/Library/Application Support/GHClassic/PUT_DISC_HERE`).
 
-## Status
+### Game files
 
-Nearly feature complete with all of single player working including: career, quickplay, training, the store, encores, options, movies.
+Everything GHC needs is stored in one folder. Windows and Linux are portable installs, so just place the extracted zip anywhere you want. On macOS it's at `~/Library/Application Support/GHClassic`.
 
-Additional features:
+| Item | Description |
+|---|---|
+| `PUT_DISC_HERE/` | Your disc images |
+| `settings.ini` | Every setting, includes some not in menus |
+| `input.ini` | Controller bindings |
+| `save.bin` | All bands progress |
+| `GHClassic.log` | The last session's log, for bug reports |
+
+## Features
+
+- Custom native Vulkan renderering engine
+- GH1, GH2, GH2X and GH80s as their own campaigns and quickplay setlists
+- Xbox 360 models, lighting and rendering
 - Autodetects keyboard, gamepad and guitar input with the ability to remap
 - Independent audio and video latency controls
 - Any resolution, uncapped frame rate, MSAA and mipmaps
+- Photo mode
 
 Still to come:
 - Multiplayer (not wired up yet)
-- Some rendering effects
 - Easier controller mapping (atm it's just an ini)
-- GH1, Rocks the 80s and Xbox 360 content
 
 ## Controls
 

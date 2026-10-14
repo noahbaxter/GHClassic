@@ -2,6 +2,8 @@
 
 ## v0.7
 
+**THIS IS UNFINISHED.** Expect bugs, missing features and things changing between releases.
+
 ### Imports
 - GH1, GH80s and Xbox 360 GH2 roms load and play inside PS2 GH2 as their own campaigns and quickplay setlists; includes all original UIs, songs, career, store, venues, characters and guitars
 - the primary game still requires a base SLUS-21447 GH2 rom, but additional content roms can be added from any region at any time and just bring their content with them
