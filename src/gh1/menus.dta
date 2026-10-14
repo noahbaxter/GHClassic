@@ -172,9 +172,21 @@
 ; material for each category (gh1/menus.cpp). GH2's character stands in
 ; GH1's shop window: its group is moved here, where the move reaches the
 ; placer under it (one written into the scene does not).
+;
+; GH2's entry is kept but for the grate's sound (store_grate.cue), which is
+; GH2's and GH80s' shop gate opening: GH1's shop has no gate.
 (store_panel
    (needs store)
-   (enter
+   (= enter
+      {$this set_store_mode TRUE}
+      {$this show_store_screen_1}
+      {$this update_store_category_desc}
+      {$this update_total_cash_display}
+      {$this hide_models}
+      {cash.view set_showing FALSE}
+      {set [item_provider] store_item_provider}
+      {[item_provider] set_category character}
+      {char_store show_char 0 {[item_provider] get_symbol 0}}
       {char_placer.grp set_local_pos -26 -574 -45}
       {st_sold.lbl set_showing FALSE})
    (update_store_category_desc
