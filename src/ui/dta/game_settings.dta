@@ -187,7 +187,9 @@
       (enter
          {$this four_rows}
          ; Three of the four: the last put away, and the rest half a row
-         ; lower. Red leads back, as the help bar says.
+         ; lower. Red leads back, as the help bar says. Up goes to the row
+         ; whose down leads here, which in GH1's scene is still the last
+         ; one's too: it leads nowhere now.
          {if {quit.btn showing}
             {do
                ($x 0) ($y 0) ($z 0) ($row 0)
@@ -196,6 +198,7 @@
                {set $row {'-' $row $z}}
                {quit.btn set_showing FALSE}
                {quit.btn set_state kDisabled}
+               {quit.btn set nav_down quit.btn}
                {audio_options.btn set nav_down resume.btn}
                {foreach $btn (resume.btn restart.btn audio_options.btn)
                   {$btn get_local_pos $x $y $z}
