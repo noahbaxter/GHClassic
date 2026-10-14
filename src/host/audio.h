@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 namespace gh2
 {
@@ -15,6 +16,9 @@ namespace gh2
 
     // The frontend's side: the default output device, or muted, a thread
     // pulling at the same rate and discarding it, so the synth still runs.
+    // --audio-device: the playback device whose name has this in it, in
+    // place of the default one.
+    void setAudioDevice(const std::string &name);
     void openAudio(bool mute);
     void closeAudio();
 

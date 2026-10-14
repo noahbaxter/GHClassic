@@ -12,6 +12,7 @@ namespace gh2
         uint32_t psRndFlushPacket;
         uint32_t psRndBeginDrawing;
         uint32_t psRndEndDrawing;
+        uint32_t frameLoopPolled; // where the frame loop's call of SystemPoll returns
         uint32_t psRndDrawRect;
         uint32_t psRndDoPointTests;
         uint32_t rndTestPoint; // Rnd::TestPoint
@@ -249,6 +250,7 @@ namespace gh2
         .psRndFlushPacket = 0x3d7d58u,
         .psRndBeginDrawing = 0x19af38u,
         .psRndEndDrawing = 0x19b018u,
+        .frameLoopPolled = 0x100b78u,
         .psRndDrawRect = 0x19b050u,
         .psRndDoPointTests = 0x19a7f0u,
         .rndTestPoint = 0x1d55b8u,

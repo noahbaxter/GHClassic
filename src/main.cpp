@@ -5,6 +5,7 @@
 //            [--fast-boot] [--seed <n>] [--cheats] [--save <file>] [--import-card <ps2>] [--export-card <ps2>]
 //            [--settings <file>] [--shots <dir>] [--shot-every <n>]
 //            [--res window|native|480p|720p|1080p|1440p|2160p]
+//            [--timing] [--present-mode fifo|relaxed|mailbox|immediate] [--swap-images <n>] [--audio-device <name>]
 //   GHClassic --bind [keyboard | <n>]
 //
 // Without a disc, the first image in PUT_DISC_HERE (disc/disc.h) with this
@@ -25,7 +26,11 @@
 // game's own (512x448), or that height at the picture's aspect. --settings
 // and --save read and write that file in place of the user data directory's.
 // --import-card loads the save off a PCSX2 card and makes it the save file;
-// --export-card writes it to one (save/save.h). --bind
+// --export-card writes it to one (save/save.h). --timing prints each
+// stage's delay between a press, the sound and the picture
+// (dev/timing.h); --present-mode and --swap-images change how the
+// swapchain presents, and --audio-device plays through the device with
+// that in its name, all to measure with. --bind
 // sets up a controller or the keyboard in input.ini; with no device it
 // lists them.
 
@@ -41,6 +46,8 @@
 #include "dev/cheats.h"
 #include "dev/scenario.h"
 #include "dev/seed.h"
+#include "dev/timing.h"
+#include "host/audio.h"
 #include "settings/settings.h"
 #include "ps2_runtime.h"
 #include "runtime/host_clock.h"
@@ -130,6 +137,20 @@ int main(int argc, char *argv[])
             hostOptions.hidden = true;
         else if (arg == "--mute")
             hostOptions.mute = true;
+        else if (arg == "--timing")
+            gh2::timing::enable();
+        else if (arg == "--present-mode" && hasValue)
+        {
+            // VkPresentModeKHR's own numbers.
+            const std::string mode = argv[++i];
+            gh2::timing::presentMode = mode == "immediate" ? 0 : mode == "mailbox" ? 1 : mode == "relaxed" ? 3 : 2;
+        }
+        else if (arg == "--fullscreen")
+            gh2::timing::fullscreen = true;
+        else if (arg == "--swap-images" && hasValue)
+            gh2::timing::swapImages = std::atoi(argv[++i]);
+        else if (arg == "--audio-device" && hasValue)
+            gh2::setAudioDevice(argv[++i]);
         else if (arg == "--speed" && hasValue)
             speed = std::strtod(argv[++i], nullptr);
         else if (arg == "--fast-boot")

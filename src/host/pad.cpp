@@ -13,6 +13,7 @@
 #include "host/pad.h"
 #include "script.h"
 
+#include "dev/timing.h"
 #include "host/bindings.h"
 #include "host/input.h"
 #include "ps2_runtime.h"
@@ -31,6 +32,28 @@ namespace gh2
     namespace
     {
         std::atomic<uint16_t> s_scripted{0};
+        std::atomic<uint64_t> s_scriptedAt{0}; // --timing: when a scripted press was set
+
+        // --timing: a press this read is the first to see, the player's or
+        // a script's.
+        void timePress(const HostPad &pad)
+        {
+            static uint32_t seenCount = 0;
+            static uint64_t seenScripted = 0;
+            timing::padRead();
+            const uint64_t now = timing::now(), scriptedAt = s_scriptedAt.load(std::memory_order_relaxed);
+            if (pad.pressCount != seenCount)
+            {
+                timing::span(timing::kPollToRead, pad.pressPollNs, now);
+                timing::pressRead(pad.pressEventNs, now);
+            }
+            else if (scriptedAt != seenScripted)
+            {
+                timing::pressRead(scriptedAt, now);
+            }
+            seenCount = pad.pressCount;
+            seenScripted = scriptedAt;
+        }
 
         void padRead(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
@@ -38,6 +61,8 @@ namespace gh2
             if (getRegU32(ctx, 4) == 0u)
             {
                 const HostPad pad = hostPad();
+                if (timing::on())
+                    timePress(pad);
                 const uint16_t pressed = pad.pressed | s_scripted.load(std::memory_order_relaxed) | pad::kLeft;
                 // The stub wants buttons active low.
                 ps2_stubs::setPadOverrideState(static_cast<uint16_t>(~pressed), pad.lx, pad.ly, pad.rx, pad.ry);
@@ -92,6 +117,8 @@ namespace gh2
 
     void setScriptedPad(uint16_t pressed)
     {
+        if (timing::on() && (pressed & ~s_scripted.load(std::memory_order_relaxed)))
+            s_scriptedAt.store(timing::now(), std::memory_order_relaxed);
         s_scripted.store(pressed, std::memory_order_relaxed);
     }
 }

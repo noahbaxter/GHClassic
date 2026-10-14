@@ -238,6 +238,7 @@ set(GHC_GAME_SOURCES
     src/dev/null_rnd.cpp
     src/dev/scenario.cpp
     src/dev/seed.cpp
+    src/dev/timing.cpp
     src/dev/transplant.cpp
     src/disc/ark.cpp
     src/disc/crypt.cpp

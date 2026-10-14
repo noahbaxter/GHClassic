@@ -4,6 +4,7 @@
 
 #include "render/native_rnd.h"
 
+#include "dev/timing.h"
 #include "guest.h"
 #include "hook.h"
 #include "milo/layout.h"
@@ -14,6 +15,7 @@
 #include "render/texture_store.h"
 #include "settings/settings.h"
 
+#include <iterator>
 #include <memory>
 
 namespace gh2
@@ -25,10 +27,63 @@ namespace gh2
 
         struct BeginTag;
         struct EndTag;
+        struct PollTag;
+        uint32_t s_systemPoll = 0;
+        uint32_t s_frameLoopPolled = 0;
+
+        // The frame loop (0x100b40) polls (SystemPoll, UIManager::Poll),
+        // then BeginDrawing waits a vblank in PsRnd::VSync (0x19a950)
+        // before anything is drawn, so retail's picture is a frame behind
+        // the pad and song clock it was polled with. Here the wait is taken
+        // at the top of the loop, once the frame is published.
+        //
+        // VSync waits on any of three fields: +0x508 and +0x510 through
+        // sceGsSyncV, else +0xc8 by spinning on the vblank count (0x19ab38)
+        // or, when that has passed, on the GS's CSR (0x19ab90): a vblank
+        // each way. They are held at zero from BeginDrawing to EndDrawing.
+        constexpr uint32_t kWaitFields[] = {milo::rnd::kSync, milo::rnd::kNoDepthOfField, milo::rnd::kFocusZ};
+        uint32_t s_rnd = 0;
+        uint32_t s_held[std::size(kWaitFields)] = {};
+        bool s_holding = false;
+        bool s_waits = false;
+        bool s_waited = false;
+
+        void releaseWaits(uint8_t *rdram)
+        {
+            if (!s_holding)
+                return;
+            for (size_t i = 0; i < std::size(kWaitFields); ++i)
+                store<uint32_t>(rdram, s_rnd + kWaitFields[i], s_held[i]);
+            s_holding = false;
+        }
+
+        void onSystemPoll(uint8_t *, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            if (GPR_U32(ctx, 31) != s_frameLoopPolled)
+                return;
+            if (s_waits && !s_waited)
+            {
+                // Resumes here, at SystemPoll's entry.
+                s_waited = true;
+                runtime->eeWaitVSyncTicks(1u, s_systemPoll);
+            }
+            s_waited = false;
+        }
 
         void onBeginDrawing(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
             const uint32_t rnd = GPR_U32(ctx, 4);
+            // PsRnd::Reset begins a frame it never ends (0x19a0f0).
+            releaseWaits(rdram);
+            s_rnd = rnd;
+            s_waits = false;
+            for (size_t i = 0; i < std::size(kWaitFields); ++i)
+            {
+                s_held[i] = load<uint32_t>(rdram, rnd + kWaitFields[i]);
+                s_waits = s_waits || s_held[i] != 0u;
+                store<uint32_t>(rdram, rnd + kWaitFields[i], 0u);
+            }
+            s_holding = true;
             Frame &frame = building();
             const uint64_t serial = frame.serial + 1u;
             previous() = std::move(frame);
@@ -132,11 +187,18 @@ namespace gh2
         // starts.
         void onEndDrawing(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
+            releaseWaits(rdram);
             addDepthOfField(rdram, GPR_U32(ctx, 4), building());
             settings::rereadGraphics();
             look::setInVenue(building().venue);
             building().hdLighting = settings::hd(settings::kLookLighting);
             building().luminance = look::luminance();
+            if (timing::on())
+            {
+                building().publishedNs = timing::now();
+                timing::takePress(building().pressEventNs, building().pressReadNs);
+                timing::gameFrame(building().publishedNs);
+            }
             frames().publish(building());
             building().venue = false;
             textures::endFrame();
@@ -148,5 +210,8 @@ namespace gh2
     {
         EntryHook<BeginTag>::install(runtime, addresses.psRndBeginDrawing, onBeginDrawing);
         EntryHook<EndTag>::install(runtime, addresses.psRndEndDrawing, onEndDrawing);
+        s_systemPoll = addresses.systemPoll;
+        s_frameLoopPolled = addresses.frameLoopPolled;
+        EntryHook<PollTag>::install(runtime, addresses.systemPoll, onSystemPoll);
     }
 }

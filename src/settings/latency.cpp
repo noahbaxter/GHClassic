@@ -30,6 +30,7 @@
 
 #include "settings/latency.h"
 
+#include "dev/timing.h"
 #include "dta.h"
 #include "guest.h"
 #include "hook.h"
@@ -75,6 +76,7 @@ namespace gh2
         void getSongMs(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
             const uint32_t returnTo = GPR_U32(ctx, 31);
+            timing::clockRead();
             runtime->callGuestFunction(rdram, ctx, s_addresses->playerMatcherGetSongMs, {GPR_U32(ctx, 4)},
                                        s_getSongMs);
             ctx->f[0] += static_cast<float>(settings::get(settings::kVideoLagMs) -

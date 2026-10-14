@@ -15,6 +15,7 @@ namespace milo
         constexpr uint32_t kClearColor = 0x30u; // Hmx::Color, 4 floats
         constexpr uint32_t kWidth = 0x40u;      // the frame's width in pixels
         constexpr uint32_t kHeight = 0x44u;     // and height
+        constexpr uint32_t kSync = 0xc8u;       // nonzero: VSync waits for the vblank (0x19a9a8, 0x19ab0c)
         constexpr uint32_t kAspect = 0xd4u;     // index
         // PsRnd's own, read by VSync (0x19a970, 0x19a9a0).
         constexpr uint32_t kNoDepthOfField = 0x508u; // nonzero: VSync only waits on sceGsSyncV; its meaning is not known

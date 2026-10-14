@@ -3,6 +3,7 @@
 #include "dev/cheats.h"
 #include "host/audio.h"
 #include "dev/draw_dump.h"
+#include "dev/timing.h"
 #include "host/input.h"
 #include "host/perf.h"
 #include "host/scene_renderer.h"
@@ -25,6 +26,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <fstream>
 #include <iostream>
 #include <mutex>
@@ -113,6 +115,20 @@ namespace gh2
         std::array<Slot, kFramesInFlight> slots{};
         uint32_t slot = 0;
 
+        // --timing: when each present reached the display, where the driver
+        // says (VK_GOOGLE_display_timing), on its clock, which runs
+        // driverClockAhead of timing::now().
+        PFN_vkGetPastPresentationTimingGOOGLE pastTiming = nullptr;
+        uint64_t driverClockAhead = 0;
+        uint32_t presentId = 0;
+        struct Present
+        {
+            uint32_t id = 0;
+            uint64_t calledNs = 0, publishedNs = 0;
+        };
+        static constexpr uint32_t kPresentsKept = 64;
+        std::array<Present, kPresentsKept> presents{};
+
         VkBuffer readback = VK_NULL_HANDLE;
         VmaAllocation readbackMemory = VK_NULL_HANDLE;
         VkDeviceSize readbackSize = 0;
@@ -122,7 +138,6 @@ namespace gh2
         movie::Picture moviePicture;                 // the movie's, while one plays
         std::chrono::microseconds frameWait{8333};   // half a display period
         std::chrono::nanoseconds gamePeriod{16667000};
-        bool newestOnly = false;                     // the game outruns the display
 
         // The game's frame rate from settings, as the runtime's vblank: one
         // game frame a vblank.
@@ -141,7 +156,6 @@ namespace gh2
             runtime.eeScheduler().setVBlankPeriod(gamePeriod);
             if (displayHz > 0.0f)
                 frameWait = std::chrono::microseconds(static_cast<int64_t>(500000.0f / displayHz));
-            newestOnly = displayHz > 0.0f && hz > displayHz * 1.01f;
         }
 
         SceneRenderer scene;
@@ -277,10 +291,21 @@ namespace gh2
             vkb::SwapchainBuilder builder(device);
             // UNORM, so the guest's display-referred colours pass through as is.
             builder.set_desired_format({VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
-                .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
+                .set_desired_present_mode(timing::presentMode >= 0 ? static_cast<VkPresentModeKHR>(timing::presentMode)
+                                                                   : VK_PRESENT_MODE_FIFO_KHR)
                 .set_desired_extent(static_cast<uint32_t>(width), static_cast<uint32_t>(height))
                 .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT)
                 .set_old_swapchain(swapchain);
+            if (timing::swapImages > 0)
+                builder.set_desired_min_image_count(static_cast<uint32_t>(timing::swapImages));
+#ifdef __APPLE__
+            // MoltenVK frees an image only once its last present is on the
+            // display, so a full swapchain is that many refreshes from the
+            // present call to the screen: 48.7 ms with three at 60 Hz, 32.0
+            // with two.
+            else
+                builder.set_desired_min_image_count(2u);
+#endif
             auto built = builder.build();
             if (!built)
             {
@@ -298,6 +323,32 @@ namespace gh2
                     return false;
             }
             swapchainStale = false;
+            if (timing::on())
+            {
+                VkSurfaceCapabilitiesKHR caps{};
+                vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device.physical_device.physical_device, surface, &caps);
+                uint32_t count = 0;
+                vkEnumerateDeviceExtensionProperties(device.physical_device.physical_device, nullptr, &count, nullptr);
+                std::vector<VkExtensionProperties> extensions(count);
+                vkEnumerateDeviceExtensionProperties(device.physical_device.physical_device, nullptr, &count,
+                                                     extensions.data());
+                std::string timingExtensions;
+                for (const VkExtensionProperties &e : extensions)
+                    for (const char *wanted : {"VK_GOOGLE_display_timing", "VK_KHR_present_wait", "VK_KHR_present_id",
+                                               "VK_EXT_present_timing", "VK_EXT_swapchain_maintenance1",
+                                               "VK_NV_low_latency2", "VK_AMD_anti_lag"})
+                        if (std::strcmp(e.extensionName, wanted) == 0)
+                            timingExtensions += std::string(" ") + wanted;
+                const SDL_DisplayMode *mode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(window));
+                timing::note("swapchain " + std::to_string(swapchainImages.size()) + " images (surface min " +
+                             std::to_string(caps.minImageCount) + ", max " + std::to_string(caps.maxImageCount) +
+                             "), present mode " + std::to_string(swapchain.present_mode) + " (2 is FIFO), " +
+                             std::to_string(swapchain.extent.width) + "x" + std::to_string(swapchain.extent.height) +
+                             ", display " + std::to_string(mode ? mode->refresh_rate : 0.0f) + " Hz, video driver " +
+                             SDL_GetCurrentVideoDriver() + ", fullscreen " +
+                             ((SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN) ? "yes" : "no") +
+                             ", timing extensions:" + (timingExtensions.empty() ? " none" : timingExtensions));
+            }
             return true;
         }
 
@@ -528,6 +579,11 @@ namespace gh2
             std::cerr << "[sdl] window: " << SDL_GetError() << std::endl;
             return false;
         }
+        if (timing::fullscreen)
+        {
+            SDL_SetWindowFullscreen(s.window, true);
+            SDL_SyncWindow(s.window);
+        }
         // Also the Dock icon on macOS, which shows it as given, so it gets the
         // version already shaped like a macOS icon (tools/make_icons.sh). A
         // missing one leaves SDL's default.
@@ -581,6 +637,7 @@ namespace gh2
         VkPhysicalDeviceFeatures wanted{};
         wanted.sampleRateShading = VK_TRUE;
         const bool everySample = physical.value().enable_features_if_present(wanted);
+        const bool displayTiming = timing::on() && physical.value().enable_extension_if_present("VK_GOOGLE_display_timing");
         auto device = vkb::DeviceBuilder(physical.value()).build();
         if (!device)
         {
@@ -588,6 +645,22 @@ namespace gh2
             return false;
         }
         s.device = device.value();
+#if defined(__APPLE__) || defined(__linux__)
+        if (displayTiming)
+        {
+            s.pastTiming = reinterpret_cast<PFN_vkGetPastPresentationTimingGOOGLE>(
+                vkGetDeviceProcAddr(s.device.device, "vkGetPastPresentationTimingGOOGLE"));
+#ifdef __APPLE__
+            s.driverClockAhead = clock_gettime_nsec_np(CLOCK_UPTIME_RAW) - timing::now();
+#else
+            timespec ts{};
+            clock_gettime(CLOCK_MONOTONIC, &ts);
+            s.driverClockAhead = static_cast<uint64_t>(ts.tv_sec) * 1000000000ull + static_cast<uint64_t>(ts.tv_nsec) - timing::now();
+#endif
+        }
+#else
+        (void)displayTiming;
+#endif
         volkLoadDevice(s.device.device);
         s.queue = s.device.get_queue(vkb::QueueType::graphics).value();
         s.queueFamily = s.device.get_queue_index(vkb::QueueType::graphics).value();
@@ -652,10 +725,26 @@ namespace gh2
     bool VulkanFrontend::frame(PS2Runtime &runtime)
     {
         State &s = *m_state;
+        const bool timed = timing::on();
+        static uint64_t lastLoop = 0;
+        uint64_t t0 = 0;
+        if (timed)
+        {
+            t0 = timing::now();
+            if (lastLoop != 0u)
+                timing::span(timing::kHostLoop, lastLoop, t0);
+            lastLoop = t0;
+            timing::report();
+        }
         SDL_Event event;
         bool devicesChanged = false;
         while (SDL_PollEvent(&event))
         {
+            if (timed && ((event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) ||
+                          event.type == SDL_EVENT_JOYSTICK_BUTTON_DOWN || event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN ||
+                          event.type == SDL_EVENT_JOYSTICK_HAT_MOTION || event.type == SDL_EVENT_JOYSTICK_AXIS_MOTION ||
+                          event.type == SDL_EVENT_GAMEPAD_AXIS_MOTION))
+                notePressEvent(event.common.timestamp);
             if (event.type == SDL_EVENT_QUIT)
                 return false;
             if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED)
@@ -691,22 +780,14 @@ namespace gh2
         // stop while PlayMovie blocks the game thread. Shown at 4:3, a TV's
         // picture for the 640x448 stream.
         const bool moviePlaying = movie::latestPicture(s.moviePicture);
-        // Each game frame once, in order: wait up to half a display period for
-        // the next, else show the last again. A game faster than the display
-        // shows its newest.
-        using LogClock = State::FrameLog::Clock;
-        const LogClock::time_point waitStart = LogClock::now();
-        bool isNew = false;
-        if (!moviePlaying)
-            isNew = s.newestOnly ? frames().latest(s.shown) : frames().next(s.shown, s.frameWait);
-        const Frame &frame = s.shown;
-        const float displayAspect = moviePlaying ? 4.0f / 3.0f : frame.displayAspect;
-
         // The fence wait and the acquire together: how long the GPU or the
         // presentation queue held this frame back.
+        using LogClock = State::FrameLog::Clock;
         const LogClock::time_point acquireStart = LogClock::now();
         State::Slot &slot = s.slots[s.slot];
+        const uint64_t tFence = timed ? timing::now() : 0u;
         vkWaitForFences(s.device.device, 1, &slot.done, VK_TRUE, UINT64_MAX);
+        const uint64_t t3 = timed ? timing::now() : 0u;
 
         uint32_t imageIndex = 0;
         const bool present = !s.hidden;
@@ -727,6 +808,35 @@ namespace gh2
             }
             if (acquired != VK_SUCCESS && acquired != VK_SUBOPTIMAL_KHR)
                 return check(acquired, "acquire");
+        }
+        const uint64_t t4 = timed ? timing::now() : 0u;
+        const LogClock::time_point acquireEnd = LogClock::now();
+
+        // The game's frame, taken only now: the waits above are for the
+        // display, and a frame held through them is that much older when it
+        // is shown. A window takes the newest, waiting up to two game
+        // frames for one, so a present follows each publish and the game
+        // sets the pace; taking the newest without waiting showed a third
+        // of the frames twice and dropped as many. A hidden run takes each
+        // in order. With none, the last is shown again.
+        bool isNew = false;
+        if (!moviePlaying)
+            isNew = present ? frames().latest(s.shown, std::chrono::duration_cast<std::chrono::microseconds>(
+                                                           s.gamePeriod * 2))
+                            : frames().next(s.shown, s.frameWait);
+        const Frame &frame = s.shown;
+        const float displayAspect = moviePlaying ? 4.0f / 3.0f : frame.displayAspect;
+        const uint64_t tTaken = timed ? timing::now() : 0u;
+        const LogClock::time_point waitEnd = LogClock::now();
+        if (timed)
+        {
+            timing::span(timing::kWaitFence, tFence, t3);
+            if (present)
+                timing::span(timing::kWaitAcquire, t3, t4);
+            timing::span(timing::kWaitFrame, t4, tTaken);
+            timing::sample(timing::kShownAgain, isNew ? 0.0 : 1.0);
+            if (isNew)
+                timing::sample(timing::kQueueBehind, static_cast<double>(frames().waiting()));
         }
 
         // Every draw goes through the game's cameras and nothing is tied to
@@ -754,7 +864,6 @@ namespace gh2
             width = std::max(rect.extent.width * percent / 100u, 1u);
             height = std::max(rect.extent.height * percent / 100u, 1u);
         }
-        const LogClock::time_point acquireEnd = LogClock::now();
         if (!s.ensureTarget(width, height))
             return false;
         vkResetFences(s.device.device, 1, &slot.done);
@@ -794,6 +903,7 @@ namespace gh2
         if (present && !s.blitToSwapchain(cmd, slot, s.swapchainImages[imageIndex], displayAspect, !moviePlaying))
             return false;
         vkEndCommandBuffer(cmd);
+        const uint64_t tRecorded = timed ? timing::now() : 0u;
 
         const VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
         VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
@@ -809,10 +919,20 @@ namespace gh2
         }
         if (!check(vkQueueSubmit(s.queue, 1, &submit, slot.done), "submit"))
             return false;
+        const uint64_t t5 = timed ? timing::now() : 0u;
+        if (timed)
+        {
+            timing::span(timing::kRecord, tTaken, tRecorded);
+            timing::span(timing::kSubmit, tRecorded, t5);
+        }
 
         if (present)
         {
             VkPresentInfoKHR info{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
+            VkPresentTimeGOOGLE presentTime{++s.presentId, 0u};
+            VkPresentTimesInfoGOOGLE presentTimes{VK_STRUCTURE_TYPE_PRESENT_TIMES_INFO_GOOGLE, nullptr, 1u, &presentTime};
+            if (s.pastTiming)
+                info.pNext = &presentTimes;
             info.waitSemaphoreCount = 1;
             info.pWaitSemaphores = &s.renderFinished[imageIndex];
             info.swapchainCount = 1;
@@ -822,14 +942,49 @@ namespace gh2
             if (presented == VK_ERROR_OUT_OF_DATE_KHR || presented == VK_SUBOPTIMAL_KHR)
                 s.swapchainStale = true;
         }
-        s.times.add(static_cast<float>(State::FrameLog::ms(acquireStart - waitStart)),
+        s.times.add(static_cast<float>(State::FrameLog::ms(waitEnd - acquireEnd)),
                     static_cast<float>(State::FrameLog::ms(recordEnd - recordStart)),
                     moviePlaying ? SceneStats{} : s.scene.stats());
         if (s.frameLog.on)
-            s.frameLog.add(isNew, frames().published(), State::FrameLog::ms(acquireStart - waitStart),
+            s.frameLog.add(isNew, frames().published(), State::FrameLog::ms(waitEnd - acquireEnd),
                            State::FrameLog::ms(acquireEnd - acquireStart),
                            State::FrameLog::ms(recordEnd - recordStart),
                            moviePlaying ? SceneStats{} : s.scene.stats(), runtime.eeScheduler().droppedVBlanks());
+        if (timed)
+        {
+            const uint64_t t6 = timing::now();
+            if (present)
+                timing::span(timing::kPresentCall, t5, t6);
+            if (isNew && frame.publishedNs != 0u)
+                timing::span(timing::kFrameAge, frame.publishedNs, t6);
+            if (s.pastTiming && present)
+            {
+                // What the driver says of presents now shown, each against
+                // when its present call returned and its frame was published.
+                s.presents[s.presentId % State::kPresentsKept] = {s.presentId, t6, isNew ? frame.publishedNs : 0u};
+                uint32_t count = 0;
+                s.pastTiming(s.device.device, s.swapchain.swapchain, &count, nullptr);
+                std::vector<VkPastPresentationTimingGOOGLE> past(count);
+                if (count != 0u)
+                    s.pastTiming(s.device.device, s.swapchain.swapchain, &count, past.data());
+                for (const VkPastPresentationTimingGOOGLE &p : past)
+                {
+                    const State::Present &sent = s.presents[p.presentID % State::kPresentsKept];
+                    if (sent.id != p.presentID || p.actualPresentTime == 0u)
+                        continue;
+                    const uint64_t shown = p.actualPresentTime - s.driverClockAhead;
+                    timing::span(timing::kPresentToScreen, sent.calledNs, shown);
+                    if (sent.publishedNs != 0u)
+                        timing::span(timing::kPublishToScreen, sent.publishedNs, shown);
+                }
+            }
+            if (isNew && frame.pressReadNs != 0u)
+            {
+                timing::span(timing::kReadToPresent, frame.pressReadNs, t6);
+                if (frame.pressEventNs != 0u)
+                    timing::span(timing::kEventToPresent, frame.pressEventNs, t6);
+            }
+        }
 
         if (shot)
         {

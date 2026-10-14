@@ -10,7 +10,15 @@ namespace gh2
     {
         uint16_t pressed = 0;
         uint8_t lx = 0x80, ly = 0x80, rx = 0x80, ry = 0x80;
+        // --timing: the last poll that saw a button go down, counted, with
+        // the OS's time for the press (0 if it gave none) and the poll's.
+        uint32_t pressCount = 0;
+        uint64_t pressEventNs = 0, pressPollNs = 0;
     };
+
+    // --timing: the OS's time on a button, key, hat or axis event, for the
+    // next poll that sees a press.
+    void notePressEvent(uint64_t ns);
 
     // libpad's button bits.
     namespace pad

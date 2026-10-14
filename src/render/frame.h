@@ -50,6 +50,9 @@ namespace gh2
         float displayAspect = 4.0f / 3.0f;
         std::vector<Camera> cameras;
         std::vector<DrawCall> draws;
+        // --timing (dev/timing.h): when it was published, and the press its
+        // pad read saw, if one did.
+        uint64_t publishedNs = 0, pressEventNs = 0, pressReadNs = 0;
         // The points asked about while it was built (Rnd::TestPoint), each
         // for an object through a camera: render/native_points.cpp.
         struct PointTest
@@ -135,6 +138,13 @@ namespace gh2
             return m_published;
         }
 
+        // Frames waiting to be shown.
+        size_t waiting()
+        {
+            std::lock_guard lock(m_mutex);
+            return m_frames.size();
+        }
+
         // The next frame not yet shown, waiting up to `wait` for one. False
         // when none came: the host shows its last again.
         bool next(Frame &out, std::chrono::microseconds wait)
@@ -147,12 +157,12 @@ namespace gh2
             return true;
         }
 
-        // The newest frame, dropping any older not yet shown, for a game
-        // running faster than the display. False when none came.
-        bool latest(Frame &out)
+        // The newest frame, dropping any older not yet shown, waiting up to
+        // `wait` for one. False when none came.
+        bool latest(Frame &out, std::chrono::microseconds wait)
         {
-            std::lock_guard lock(m_mutex);
-            if (m_frames.empty())
+            std::unique_lock lock(m_mutex);
+            if (!m_ready.wait_for(lock, wait, [this] { return !m_frames.empty(); }))
                 return false;
             out = std::move(m_frames.back());
             m_frames.clear();

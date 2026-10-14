@@ -1,8 +1,11 @@
 #include "host/audio.h"
+
+#include "dev/timing.h"
 #include "runtime/host_clock.h"
 
 #include <SDL3/SDL.h>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <iostream>
@@ -18,6 +21,7 @@ namespace gh2
         SDL_AudioStream *s_stream = nullptr;
         std::thread s_timer;
         std::atomic<bool> s_timerRunning{false};
+        std::string s_deviceName;
 
         void render(std::vector<float> &buffer, size_t frames)
         {
@@ -35,6 +39,16 @@ namespace gh2
             const size_t frames = static_cast<size_t>(additional) / (2u * sizeof(float));
             if (frames == 0u)
                 return;
+            if (timing::on())
+            {
+                static uint64_t last = 0;
+                const uint64_t now = timing::now();
+                if (last != 0u)
+                    timing::span(timing::kPullInterval, last, now);
+                last = now;
+                timing::sample(timing::kPullFrames, static_cast<double>(frames));
+                timing::sample(timing::kPullQueued, SDL_GetAudioStreamQueued(stream) / (2.0 * sizeof(float)) * 1000.0 / kAudioRate);
+            }
             render(buffer, frames);
             SDL_PutAudioStreamData(stream, buffer.data(), static_cast<int>(frames * 2u * sizeof(float)));
         }
@@ -54,6 +68,8 @@ namespace gh2
         }
     }
 
+    void setAudioDevice(const std::string &name) { s_deviceName = name; }
+
     void openAudio(bool mute)
     {
         if (mute)
@@ -70,7 +86,22 @@ namespace gh2
             return;
         }
         const SDL_AudioSpec spec{SDL_AUDIO_F32, 2, static_cast<int>(kAudioRate)};
-        s_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, pull, nullptr);
+        SDL_AudioDeviceID wanted = SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK;
+        if (!s_deviceName.empty())
+        {
+            int count = 0;
+            SDL_AudioDeviceID *devices = SDL_GetAudioPlaybackDevices(&count);
+            for (int i = 0; devices && i < count; ++i)
+            {
+                const char *name = SDL_GetAudioDeviceName(devices[i]);
+                if (name && std::string(name).find(s_deviceName) != std::string::npos)
+                    wanted = devices[i];
+            }
+            SDL_free(devices);
+            if (wanted == SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK)
+                std::cerr << "[audio] no playback device named " << s_deviceName << ", using the default" << std::endl;
+        }
+        s_stream = SDL_OpenAudioDeviceStream(wanted, &spec, pull, nullptr);
         if (!s_stream)
         {
             std::cerr << "[audio] open: " << SDL_GetError() << std::endl;
@@ -78,6 +109,18 @@ namespace gh2
             return;
         }
         SDL_ResumeAudioStreamDevice(s_stream);
+        if (timing::on())
+        {
+            SDL_AudioSpec got{};
+            int frames = 0;
+            const SDL_AudioDeviceID device = SDL_GetAudioStreamDevice(s_stream);
+            SDL_GetAudioDeviceFormat(device, &got, &frames);
+            const char *name = SDL_GetAudioDeviceName(device);
+            timing::note(std::string("audio driver ") + SDL_GetCurrentAudioDriver() + ", device \"" + (name ? name : "?") +
+                         "\", " + std::to_string(got.freq) + " Hz, " + std::to_string(got.channels) + " ch, format 0x" +
+                         std::to_string(got.format) + ", buffer " + std::to_string(frames) + " frames (" +
+                         std::to_string(frames * 1000.0 / std::max(got.freq, 1)) + " ms)");
+        }
     }
 
     void closeAudio()
