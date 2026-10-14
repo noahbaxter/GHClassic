@@ -11,6 +11,7 @@
 #include "runtime/ee_scheduler.h"
 #include "runtime/host_clock.h"
 #include "settings/settings.h"
+#include "settings/video_options.h"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
@@ -657,9 +658,11 @@ namespace gh2
         vkGetPhysicalDeviceProperties(s.device.physical_device.physical_device, &properties);
         const VkSampleCountFlags supported =
             properties.limits.framebufferColorSampleCounts & properties.limits.framebufferDepthSampleCounts;
-        uint32_t samples = 1;
-        while (samples * 2u <= static_cast<uint32_t>(settings::get(settings::kMsaa)) && (supported & (samples * 2u)))
-            samples *= 2u;
+        uint32_t most = 1;
+        while (most < 16u && (supported & (most * 2u)))
+            most *= 2u;
+        setMostMsaa(static_cast<int>(most));
+        const uint32_t samples = static_cast<uint32_t>(msaaSamples());
         std::cerr << "[video] msaa " << samples << "x" << std::endl;
         if (!s.scene.initialize(s.device.device, s.allocator, static_cast<VkSampleCountFlagBits>(samples), everySample))
             return false;

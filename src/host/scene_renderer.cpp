@@ -5,6 +5,7 @@
 #include "milo/layout.h"
 #include "render/camera.h"
 #include "settings/settings.h"
+#include "settings/video_options.h"
 
 #include <vk_mem_alloc.h>
 
@@ -786,6 +787,8 @@ namespace gh2
         // left it, in two images the frames take turns drawing into and
         // reading, and what the last frame's was drawn through.
         bool temporal = false;
+        // The setting as this was made, with either lighting.
+        bool temporalAsked = false;
         PostImage history[2];
         uint32_t historyInto = 0;
         uint64_t historySerial = 0; // the frame the other image holds, 0 for none
@@ -2845,6 +2848,7 @@ namespace gh2
         m_state->allocator = allocator;
         m_state->samples = samples;
         m_state->everySample = everySample;
+        m_state->temporalAsked = settings::get(settings::kTemporalAa) != 0;
         VmaAllocatorInfo allocatorInfo{};
         vmaGetAllocatorInfo(allocator, &allocatorInfo);
         VkFormatProperties depthProperties{};
@@ -2983,14 +2987,16 @@ namespace gh2
     bool SceneRenderer::record(VkCommandBuffer cmd, const Frame &frame, VkImage target, uint32_t width,
                                uint32_t height, uint64_t serial)
     {
-        if (frame.hdLighting != m_state->x360)
+        const VkSampleCountFlagBits samples = static_cast<VkSampleCountFlagBits>(msaaSamples());
+        if (frame.hdLighting != m_state->x360 || samples != m_state->samples ||
+            (settings::get(settings::kTemporalAa) != 0) != m_state->temporalAsked)
         {
-            // The lighting changed, as it does between two games' songs: the
-            // passes, pipelines and targets are all of one colour format, so
-            // everything is made again for the other.
+            // The lighting changed, as it does between two games' songs, or
+            // Video Settings changed msaa or temporal_aa: the passes,
+            // pipelines and targets are all of one colour format and one
+            // count of samples, so everything is made again for the other.
             const VkDevice device = m_state->device;
             const VmaAllocator allocator = m_state->allocator;
-            const VkSampleCountFlagBits samples = m_state->samples;
             const bool everySample = m_state->everySample;
             vkDeviceWaitIdle(device);
             shutdown();
