@@ -260,7 +260,9 @@
       (allow_back FALSE)
       (animate_transition FALSE)
       (BUTTON_DOWN_MSG
-         {if {== $button kPad_Tri} {ui goto_screen pause_settings_screen}}
+         {if {&& {== $button kPad_Tri} {== {pause_video_settings_panel get picking} none}}
+            {ui goto_screen pause_settings_screen}
+         }
          kDataUnhandled
       )
    )
@@ -270,8 +272,9 @@
       (panels meta video_settings_panel helpbar)
       (focus video_settings_panel)
       (allow_back FALSE)
+      ; Red on a picked row is the row's (VIDEO_ROW_HANDLERS).
       (BUTTON_DOWN_MSG
-         {if {== $button kPad_Tri}
+         {if {&& {== $button kPad_Tri} {== {video_settings_panel get picking} none}}
             {$this backwards_anim}
             {synth play_sequence button_back.cue}
             {autosave_goto options_screen}
@@ -281,12 +284,175 @@
    )
 }
 
-; Video Settings keeps its widescreen row alone, in its top row's place.
-; Playing left handed and the lag screen are Game Settings' now, and
-; progressive scan is gone: it changes nothing a window shows.
+; Video Settings keeps its widescreen row, in its top row's place. Playing
+; left handed and the lag screen are Game Settings' now, and progressive scan
+; is gone: it changes nothing a window shows. Under it are the port's own
+; rows ({video ...}, settings/video_options.cpp), each the widescreen row's
+; button and box again a row further down.
 #define VIDEO_ROW_HANDLERS (
    (focus widescreen.btn)
+   ; The pause menu loads the scene again each time, and a row made here is
+   ; not yet there to take the focus it was left with.
+   (reset_focus TRUE)
+   (at "widescreen.btn")
+   ; A row's button, its box or none, its setting, and its value's text or
+   ; none: a row has a box or a value. The longest first, where the poster's
+   ; art leaves most room.
+   (rows
+      (
+         (vs_light.btn none lighting vs_light.val)
+         (vs_detail.btn none high_detail vs_detail.val)
+         (vs_msaa.btn none msaa vs_msaa.val)
+         (vs_scale.btn none render_scale vs_scale.val)
+         (vs_taa.btn vs_taa.chk temporal_aa none)
+         (vs_perf.btn none perf_overlay vs_perf.val)
+      )
+   )
+   ; From one row to the next, as the scene's own first two stand, and how
+   ; much of that seven rows keep.
+   (gap 0)
+   (tight 0.86)
+   (drawn_in 0.47)
+   ; The values stand in a column this many rows' distance right of the
+   ; names.
+   (column 3.5)
+   (lay_out
+      {if {! {exists vs_msaa.btn}}
+         {do
+            ($x 0) ($y 0) ($z 0) ($cx 0) ($cy 0) ($cz 0) ($i 1) ($col 0) ($bx 0) ($half 0)
+            {widescreen.btn get_local_pos $x $y $z}
+            {widescreen.chk get_local_pos $cx $cy $cz}
+            ; The names start about where the scene's box did, clear of the
+            ; poster's art, and the boxes stand in the values' column, each
+            ; by its left edge: a box is placed by its middle, about this far
+            ; from its edge.
+            {set $half {'*' 0.65 {'-' $x $cx}}}
+            {set $x {'+' $cx {'*' 0.25 $half}}}
+            {widescreen.btn set_local_pos $x $y $z}
+            ; To the names' side of the box, by the rows' own measure.
+            {set $col {'*' [column] {if_else {< [gap] 0} {'-' 0 [gap]} [gap]}}}
+            {set $col {'+' $x {if_else {< $half 0} {'-' 0 $col} $col}}}
+            {set $bx {'+' $col $half}}
+            {widescreen.chk set_local_pos $bx $cy $cz}
+            {foreach $row [rows]
+               {new {widescreen.btn class_name} {elem $row 0}}
+               {{$this find {elem $row 0}} copy widescreen.btn 0}
+               {{$this find {elem $row 0}} set trans_parent {widescreen.btn get trans_parent}}
+               {{$this find {elem $row 0}} set_local_pos $x $y {'+' $z {'*' $i {'*' [tight] [gap]}}}}
+               ; The widescreen row's text is drawn in to its width; a short
+               ; name would stand larger, so each is that much smaller
+               ; whatever its length.
+               {{$this find {elem $row 0}} set fit_text 0}
+               {{$this find {elem $row 0}} set text_size {'*' [drawn_in] {widescreen.btn get text_size}}}
+               {{$this find {elem $row 0}} set_showing TRUE}
+               {{$this find {elem $row 0}} set_state kNormal}
+               {{$this find {elem $row 0}} set draw_order 1}
+               {if {!= {elem $row 1} none}
+                  {new {widescreen.chk class_name} {elem $row 1}}
+                  {{$this find {elem $row 1}} copy widescreen.chk 0}
+                  {{$this find {elem $row 1}} set trans_parent {widescreen.chk get trans_parent}}
+                  {{$this find {elem $row 1}} set_local_pos $bx $cy {'+' $cz {'*' $i {'*' [tight] [gap]}}}}
+                  {{$this find {elem $row 1}} set_showing TRUE}
+                  {{$this find {elem $row 1}} set draw_order 1}
+               }
+               ; The value is the button again, with no way to it.
+               {if {!= {elem $row 3} none}
+                  {new {widescreen.btn class_name} {elem $row 3}}
+                  {{$this find {elem $row 3}} copy {$this find {elem $row 0}} 0}
+                  {{$this find {elem $row 3}} set trans_parent {widescreen.btn get trans_parent}}
+                  {{$this find {elem $row 3}} set_local_pos $col $y {'+' $z {'*' $i {'*' [tight] [gap]}}}}
+                  {{$this find {elem $row 3}} set_showing TRUE}
+                  {{$this find {elem $row 3}} set draw_order 1}
+               }
+               {set $i {'+' $i 1}}
+            }
+            ; And the widescreen row's own, its name now shorter than its width.
+            {widescreen.btn set text_size {'*' [drawn_in] {widescreen.btn get text_size}}}
+            {widescreen.btn set fit_text 0}
+            {widescreen.btn set nav_down vs_light.btn}
+            {vs_light.btn set nav_down vs_detail.btn}
+            {vs_detail.btn set nav_down vs_msaa.btn}
+            {vs_msaa.btn set nav_down vs_scale.btn}
+            {vs_scale.btn set nav_down vs_taa.btn}
+            {vs_taa.btn set nav_down vs_perf.btn}
+            {vs_perf.btn set nav_down widescreen.btn}
+            {{$this loaded_dir} sync_objects}
+         }
+      }
+   )
+   ; Each row as its setting is, and the help bar for the one lit. A token
+   ; with no string reads as itself.
+   (sync_rows
+      {widescreen.chk set_check {options get_widescreen}}
+      {widescreen.btn set text_token {symbol "WIDESCREEN"}}
+      ; Not before lay_out has made them: the focus is given first.
+      {foreach $row {if_else {exists vs_msaa.btn} [rows] ()}
+         {if {!= {elem $row 1} none}
+            {{$this find {elem $row 1}} set_check {video {elem $row 2}}}
+         }
+         {{$this find {elem $row 0}} set text_token
+            {symbol
+               {switch {elem $row 2}
+                  (msaa "MSAA")
+                  (render_scale "SCALE")
+                  (temporal_aa "TAA")
+                  (perf_overlay "PERF")
+                  (high_detail "LOD")
+                  (lighting "LIGHTING")
+               }
+            }
+         }
+         ; Marked and lit while it is picked, and not while its row is only
+         ; the one the strum is on.
+         {if {!= {elem $row 3} none}
+            {{$this find {elem $row 3}} set text_token
+               {symbol
+                  {sprintf {if_else {== [picking] {elem $row 2}} "< %s >" "%s"}
+                     {switch {elem $row 2}
+                        (msaa {if_else {== {video msaa} 1} "OFF" {sprintf "%dX" {video msaa}}})
+                        (render_scale {sprintf "%d%%" {video render_scale}})
+                        (perf_overlay {elem ("OFF" "FPS" "GRAPH" "FULL") {video perf_overlay}})
+                        (high_detail {if_else {video high_detail} "FORCE HIGH" "AUTO"})
+                        (lighting {if_else {video lighting} "NEXT GEN" "LAST GEN"})
+                     }
+                  }
+               }
+            }
+            {{$this find {elem $row 3}} set_state
+               {if_else {== [picking] {elem $row 2}} kFocused kNormal}}
+         }
+      }
+      {helpbar set_display
+         {cond
+            ({!= [picking] none} ((fret1 help_confirm) (fret2 help_cancel) (strum help_updown)))
+            ({$this lists [at]} ((fret1 help_select) (fret2 help_back) (strum help_updown)))
+            (TRUE ((fret1 help_onoff) (fret2 help_back) (strum help_updown)))
+         }
+      }
+   )
+   ; A row with a list of values for a box: green picks it, the strum goes
+   ; through its values, each kept as it shows, and green keeps the one it is
+   ; left on where red puts back what it was picked at.
+   (picking none)
+   (picked_at 0)
+   (lists ($button)
+      {|| {== $button "vs_msaa.btn"} {== $button "vs_scale.btn"} {== $button "vs_detail.btn"}
+         {== $button "vs_light.btn"} {== $button "vs_perf.btn"}}
+   )
+   (FOCUS_MSG
+      {set [at] {$new_focus name}}
+      {$this sync_rows}
+   )
    (enter
+      ; Before the top row's place is taken: its gap to the row under it.
+      {if {gs_left_p1.btn showing}
+         {do
+            ($x 0) ($y 0) ($top 0) ($under 0)
+            {gs_left_p1.btn get_local_pos $x $y $top}
+            {gs_left_p2.btn get_local_pos $x $y $under}
+            {set [gap] {'-' $under $top}}
+         }
+      }
       ; Into the top row's place while that row still shows: once for each
       ; time the scene loads, and not in a scene that is not the game's own
       ; (GH1's, where the row is placed as it is made).
@@ -315,16 +481,58 @@
          }
       }
       {if {== {$this name} pause_video_settings_panel} {gs_title.lbl set_localized "VIDEO"}}
-      {widescreen.btn set nav_down widescreen.btn}
-      {widescreen.chk set_check {options get_widescreen}}
-      {helpbar set_display ((fret1 help_onoff) (fret2 help_back))}
+      {$this lay_out}
+      {set [at] "widescreen.btn"}
+      {set [picking] none}
+      {$this sync_rows}
    )
    (SELECT_START_MSG
-      {if {== $component widescreen.btn}
-         {widescreen.chk toggle}
-         {options set_widescreen {widescreen.chk get_check}}
+      {switch $component
+         (widescreen.btn {widescreen.chk toggle} {options set_widescreen {widescreen.chk get_check}})
+         (vs_msaa.btn {$this pick msaa})
+         (vs_scale.btn {$this pick render_scale})
+         (vs_taa.btn {video temporal_aa next})
+         (vs_perf.btn {$this pick perf_overlay})
+         (vs_detail.btn {$this pick high_detail})
+         (vs_light.btn {$this pick lighting})
       }
+      {$this sync_rows}
       kDataUnhandled
+   )
+   (pick ($key)
+      {if_else {== [picking] none}
+         {do
+            {set [picking] $key}
+            {set [picked_at] {video $key}}
+         }
+         {set [picking] none}
+      }
+   )
+   ; While a row is picked the strum is its values' and red is its way out:
+   ; neither is the menu's.
+   (BUTTON_DOWN_MSG
+      {if_else {== [picking] none}
+         kDataUnhandled
+         {cond
+            ({== $button kPad_DDown}
+               {video [picking] next}
+               {synth play_sequence button_toggle}
+               {$this sync_rows}
+            )
+            ({== $button kPad_DUp}
+               {video [picking] prev}
+               {synth play_sequence button_toggle}
+               {$this sync_rows}
+            )
+            ({== $button kPad_Tri}
+               {synth play_sequence button_back.cue}
+               {video [picking] set [picked_at]}
+               {set [picking] none}
+               {$this sync_rows}
+            )
+            (TRUE kDataUnhandled)
+         }
+      }
    )
 )
 {retype video_settings_panel ((file ui/video_settings.milo) VIDEO_ROW_HANDLERS)}

@@ -379,7 +379,7 @@ def prune_runs(days=3):
 
 
 def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=None, res=None, games=None,
-        review=None, release=None, settings=()):
+        review=None, release=None, settings=(), perf=False):
     """One unattended run into out. Returns 'exited before Ns' or 'alive at Ns'.
     With review, its shot sheet goes to review/ under that name rather than out."""
     from PIL import Image
@@ -404,6 +404,8 @@ def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=N
         cmd += ["--speed", str(speed)]
     if res:
         cmd += ["--res", res]
+    if perf:
+        cmd += ["--profiler"]
     cmd += ["--fast-boot", "--seed", "1", "--hidden", "--mute", "--save", str(out / "save.bin"),
             "--settings", str(out / "settings.ini"), "--shots", str(out / "frames"), "--shot-every", str(shot_every)]
 
@@ -461,14 +463,19 @@ def cmd_arm(argv):
     parser.add_argument("--discs", type=discs_arg, help="content discs to mount, as gh2,gh1; default every one in game/")
     parser.add_argument("--set", action="append", default=[], metavar="NAME=VALUE", dest="settings",
                         help="a settings.ini line over the defaults, e.g. msaa=1; may repeat")
+    parser.add_argument("--profiler", action="store_true", dest="perf",
+                        help="the game's --profiler: frametimes.csv in the run, and its summary printed here")
     args = parser.parse_args(argv)
     name = Path(args.scenario).stem if args.scenario else "run"
     out = Path(args.out) if args.out else ROOT / "runs" / f"{time.strftime('%Y-%m-%d_%H%M%S')}_{name}"
     prune_runs()
     state = arm(out, args.scenario, args.speed, args.secs, args.disc, args.shot_every, res=args.res, games=args.discs,
-                review=Path(args.out).name if args.out else name, settings=args.settings)
+                review=Path(args.out).name if args.out else name, settings=args.settings, perf=args.perf)
     frames = len(list((out / "frames").iterdir()))
     print(f"{state}, {frames} frames, log {out.resolve() / 'run.log'}")
+    for line in (out / "run.log").read_text(errors="replace").splitlines():
+        if line.startswith("[perf]"):
+            print(line)
     stack = out / "stack.txt"
     if stack.exists():
         # Samples per recompiled function, callers counting their callees' time.

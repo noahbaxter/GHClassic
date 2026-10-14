@@ -34,6 +34,7 @@
 #include "disc/disc.h"
 #include "ui/fast_boot.h"
 #include "host/bind.h"
+#include "host/perf.h"
 #include "host/update.h"
 #include "host/vulkan_frontend.h"
 #include "save/save.h"
@@ -164,6 +165,8 @@ int main(int argc, char *argv[])
             gh2::save::importCard(argv[++i]);
         else if (arg == "--export-card" && hasValue)
             gh2::save::exportCard(argv[++i]);
+        else if (arg == "--profiler")
+            gh2::perf::logThisRun();
         else if (arg == "--shots" && hasValue)
             hostOptions.shotDir = argv[++i];
         else if (arg == "--shot-every" && hasValue)

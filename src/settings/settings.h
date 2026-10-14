@@ -16,6 +16,7 @@ namespace gh2::settings
         kFrameRateCap, // game frames per second, 0 for the display's rate
         kMipmaps,   // smaller copies for textures the game shipped without
         kMsaa,      // samples per pixel
+        kRenderScale, // drawn at this percent of the window's size each way, then brought to it
         kFrustumCull, // nothing drawn for what its sphere puts off the picture
         kVideoLagMs, // how late the picture reaches the player
         kAudioLagMs, // how late the sound does
@@ -48,7 +49,11 @@ namespace gh2::settings
         kCharacters, // its guitarists and band
         kGuitars,
         kHighway,    // its track and fretboards: the venues' choice, or one of its own
+        kTemporalAa, // with the 360's lighting, each frame joined to the ones before it: steadier thin edges and highlights
+        kHighDetail, // every character drawn as its nearest model, however far off
         kFrameLog,   // frametimes.csv: each presented frame's times and what it did
+        kLighting,   // kLastGen: the PS2's lighting wherever the 360's would be
+        kPerfOverlay, // host/perf.h's Level: frame times in the picture's corner
         kKeyCount,
     };
 
@@ -88,6 +93,12 @@ namespace gh2::settings
         kShadowsOff,
         kShadowsClassic,
         kShadowsGh2,
+    };
+
+    enum Lighting
+    {
+        kLastGen,
+        kNextGen,
     };
 
     enum DiscFormat

@@ -4,12 +4,14 @@
 #include "host/audio.h"
 #include "dev/draw_dump.h"
 #include "host/input.h"
+#include "host/perf.h"
 #include "host/scene_renderer.h"
 #include "movie/screen.h"
 #include "render/frame.h"
 #include "runtime/ee_scheduler.h"
 #include "runtime/host_clock.h"
 #include "settings/settings.h"
+#include "settings/video_options.h"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
@@ -102,7 +104,7 @@ namespace gh2
             VkCommandBuffer cmd = VK_NULL_HANDLE;
             VkFence done = VK_NULL_HANDLE;
             VkSemaphore imageAvailable = VK_NULL_HANDLE;
-            // A movie picture on its way into the target.
+            // A movie picture or the overlay on its way into the target.
             VkBuffer upload = VK_NULL_HANDLE;
             VmaAllocation uploadMemory = VK_NULL_HANDLE;
             void *uploadMapped = nullptr;
@@ -193,7 +195,7 @@ namespace gh2
 
             void open()
             {
-                on = settings::get(settings::kFrameLog) != 0;
+                on = settings::get(settings::kFrameLog) != 0 || perf::logging();
                 if (!on)
                     return;
                 const std::string path = settings::besideSettings("frametimes.csv");
@@ -252,6 +254,48 @@ namespace gh2
             }
         };
         FrameLog frameLog;
+        perf::Times times;
+
+        // The perf_overlay setting's panel into the top left corner of the
+        // picture at `picture` in `image`: the window's, over the scene once
+        // it is there, so render_scale leaves the panel its size, or a hidden
+        // run's target, where its shots show it. As large to the eye at any
+        // size the picture is.
+        bool recordOverlay(VkCommandBuffer cmd, Slot &into, VkImage image, const VkRect2D &picture, bool windows)
+        {
+            uint32_t width = 0, height = 0;
+            const uint32_t scale = std::max(1u, (picture.extent.height + 240u) / 480u);
+            const std::vector<uint8_t> &pixels =
+                times.draw(settings::get(settings::kPerfOverlay), scale, width, height);
+            const uint32_t edge = 8u * scale;
+            if (pixels.empty() || width + edge > picture.extent.width || height + edge > picture.extent.height)
+                return true;
+            if (!roomToUpload(into, pixels.size()))
+                return false;
+            uint8_t *mapped = static_cast<uint8_t *>(into.uploadMapped);
+            std::memcpy(mapped, pixels.data(), pixels.size());
+            // The window's is blue first.
+            if (windows)
+                for (size_t i = 0; i < pixels.size(); i += 4)
+                    std::swap(mapped[i], mapped[i + 2]);
+            vmaFlushAllocation(allocator, into.uploadMemory, 0, pixels.size());
+            // The window's image is being written already.
+            if (!windows)
+                imageBarrier(cmd, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                             VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+            VkBufferImageCopy copy{};
+            copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+            copy.imageOffset = {picture.offset.x + static_cast<int32_t>(edge),
+                                picture.offset.y + static_cast<int32_t>(edge), 0};
+            copy.imageExtent = {width, height, 1};
+            vkCmdCopyBufferToImage(cmd, into.upload, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+            if (!windows)
+                imageBarrier(cmd, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                             VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+            return true;
+        }
 
         bool createSwapchain()
         {
@@ -347,24 +391,8 @@ namespace gh2
         bool recordMovie(VkCommandBuffer cmd, Slot &into)
         {
             const VkDeviceSize size = moviePicture.rgba.size();
-            if (into.uploadSize < size)
-            {
-                if (into.upload != VK_NULL_HANDLE)
-                    vmaDestroyBuffer(allocator, into.upload, into.uploadMemory);
-                into.upload = VK_NULL_HANDLE;
-                VkBufferCreateInfo buffer{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-                buffer.size = size;
-                buffer.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-                VmaAllocationCreateInfo alloc{};
-                alloc.usage = VMA_MEMORY_USAGE_AUTO;
-                alloc.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-                VmaAllocationInfo info{};
-                if (!check(vmaCreateBuffer(allocator, &buffer, &alloc, &into.upload, &into.uploadMemory, &info),
-                           "movie upload buffer"))
-                    return false;
-                into.uploadMapped = info.pMappedData;
-                into.uploadSize = size;
-            }
+            if (!roomToUpload(into, size))
+                return false;
             std::memcpy(into.uploadMapped, moviePicture.rgba.data(), size);
             vmaFlushAllocation(allocator, into.uploadMemory, 0, size);
 
@@ -378,6 +406,30 @@ namespace gh2
             imageBarrier(cmd, target, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                          VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
                          VK_PIPELINE_STAGE_TRANSFER_BIT);
+            return true;
+        }
+
+        // The slot's upload buffer, with room for `size`.
+        bool roomToUpload(Slot &into, VkDeviceSize size)
+        {
+            if (into.uploadSize < size)
+            {
+                if (into.upload != VK_NULL_HANDLE)
+                    vmaDestroyBuffer(allocator, into.upload, into.uploadMemory);
+                into.upload = VK_NULL_HANDLE;
+                VkBufferCreateInfo buffer{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+                buffer.size = size;
+                buffer.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+                VmaAllocationCreateInfo alloc{};
+                alloc.usage = VMA_MEMORY_USAGE_AUTO;
+                alloc.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+                VmaAllocationInfo info{};
+                if (!check(vmaCreateBuffer(allocator, &buffer, &alloc, &into.upload, &into.uploadMemory, &info),
+                           "upload buffer"))
+                    return false;
+                into.uploadMapped = info.pMappedData;
+                into.uploadSize = size;
+            }
             return true;
         }
 
@@ -398,8 +450,8 @@ namespace gh2
             return {{x, y}, {static_cast<uint32_t>(width), static_cast<uint32_t>(height)}};
         }
 
-        // The picture into the window at pictureRect.
-        void blitToSwapchain(VkCommandBuffer cmd, VkImage image, float displayAspect)
+        // The picture into the window at pictureRect, and the overlay over it.
+        bool blitToSwapchain(VkCommandBuffer cmd, Slot &slot, VkImage image, float displayAspect, bool overlay)
         {
             imageBarrier(cmd, image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0,
                          VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -418,10 +470,13 @@ namespace gh2
                                   rect.offset.y + static_cast<int32_t>(rect.extent.height), 1};
             vkCmdBlitImage(cmd, target, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image,
                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
+            if (overlay && !recordOverlay(cmd, slot, image, rect, true))
+                return false;
 
             imageBarrier(cmd, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
                          VK_ACCESS_TRANSFER_WRITE_BIT, 0, VK_PIPELINE_STAGE_TRANSFER_BIT,
                          VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+            return true;
         }
 
         // Harness screenshots, as binary PPM; scripts/arm.sh converts them.
@@ -549,6 +604,11 @@ namespace gh2
             std::cerr << "[vulkan] device: " << physical.error().message() << std::endl;
             return false;
         }
+        // Shading at every sample of a pixel, where the GPU has it: the 360's
+        // highlights need it (SceneRenderer::initialize).
+        VkPhysicalDeviceFeatures wanted{};
+        wanted.sampleRateShading = VK_TRUE;
+        const bool everySample = physical.value().enable_features_if_present(wanted);
         auto device = vkb::DeviceBuilder(physical.value()).build();
         if (!device)
         {
@@ -598,11 +658,13 @@ namespace gh2
         vkGetPhysicalDeviceProperties(s.device.physical_device.physical_device, &properties);
         const VkSampleCountFlags supported =
             properties.limits.framebufferColorSampleCounts & properties.limits.framebufferDepthSampleCounts;
-        uint32_t samples = 1;
-        while (samples * 2u <= static_cast<uint32_t>(settings::get(settings::kMsaa)) && (supported & (samples * 2u)))
-            samples *= 2u;
+        uint32_t most = 1;
+        while (most < 16u && (supported & (most * 2u)))
+            most *= 2u;
+        setMostMsaa(static_cast<int>(most));
+        const uint32_t samples = static_cast<uint32_t>(msaaSamples());
         std::cerr << "[video] msaa " << samples << "x" << std::endl;
-        if (!s.scene.initialize(s.device.device, s.allocator, static_cast<VkSampleCountFlagBits>(samples)))
+        if (!s.scene.initialize(s.device.device, s.allocator, static_cast<VkSampleCountFlagBits>(samples), everySample))
             return false;
         if (!s.hidden && !s.createSwapchain())
             return false;
@@ -714,9 +776,12 @@ namespace gh2
         }
         else if (m_renderSize.mode == RenderSize::kWindow && present)
         {
+            // The render_scale setting draws it larger or smaller; the blit
+            // to the window brings it to size.
             const VkRect2D rect = s.pictureRect(frame.displayAspect);
-            width = std::max(rect.extent.width, 1u);
-            height = std::max(rect.extent.height, 1u);
+            const uint32_t percent = static_cast<uint32_t>(settings::get(settings::kRenderScale));
+            width = std::max(rect.extent.width * percent / 100u, 1u);
+            height = std::max(rect.extent.height * percent / 100u, 1u);
         }
         const LogClock::time_point acquireEnd = LogClock::now();
         if (!s.ensureTarget(width, height))
@@ -744,6 +809,9 @@ namespace gh2
                          : !s.scene.record(cmd, frame, s.target, s.targetWidth, s.targetHeight, s.presented))
             return false;
         const LogClock::time_point recordEnd = LogClock::now();
+        if (!moviePlaying && !present &&
+            !s.recordOverlay(cmd, slot, s.target, {{0, 0}, {s.targetWidth, s.targetHeight}}, false))
+            return false;
 
         if (shot)
         {
@@ -752,8 +820,8 @@ namespace gh2
             copy.imageExtent = {s.targetWidth, s.targetHeight, 1};
             vkCmdCopyImageToBuffer(cmd, s.target, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, s.readback, 1, &copy);
         }
-        if (present)
-            s.blitToSwapchain(cmd, s.swapchainImages[imageIndex], displayAspect);
+        if (present && !s.blitToSwapchain(cmd, slot, s.swapchainImages[imageIndex], displayAspect, !moviePlaying))
+            return false;
         vkEndCommandBuffer(cmd);
 
         const VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
@@ -783,6 +851,9 @@ namespace gh2
             if (presented == VK_ERROR_OUT_OF_DATE_KHR || presented == VK_SUBOPTIMAL_KHR)
                 s.swapchainStale = true;
         }
+        s.times.add(static_cast<float>(State::FrameLog::ms(acquireStart - waitStart)),
+                    static_cast<float>(State::FrameLog::ms(recordEnd - recordStart)),
+                    moviePlaying ? SceneStats{} : s.scene.stats());
         if (s.frameLog.on)
             s.frameLog.add(isNew, frames().published(), State::FrameLog::ms(acquireStart - waitStart),
                            State::FrameLog::ms(acquireEnd - acquireStart),
@@ -819,6 +890,8 @@ namespace gh2
         if (!m_state)
             return;
         State &s = *m_state;
+        if (perf::logging())
+            std::cerr << s.times.summary();
         if (s.device.device != VK_NULL_HANDLE)
         {
             vkDeviceWaitIdle(s.device.device);

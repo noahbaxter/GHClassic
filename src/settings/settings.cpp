@@ -56,6 +56,10 @@ namespace gh2::settings
             // a song), so drawn small they shimmer: the highway's far end.
             {"mipmaps", Type::kBool, 0, 1, 1, 0},
             {"msaa", Type::kInt, 1, 16, 1, 1},
+            // A percent. 200 at most: the window takes the picture through one
+            // linear blit, which is the mean of a 2x2 block at twice the size
+            // and skips pixels past it.
+            {"render_scale", Type::kInt, 50, 200, 25, 100},
             // Off: a sphere that holds only part of its mesh hides what still
             // shows (flashpot_4.mesh in battle's fail sequence).
             {"frustum_cull", Type::kBool, 0, 1, 1, 1},
@@ -115,7 +119,11 @@ namespace gh2::settings
             {"characters", Type::kChoice, 0, 1, 1, kSd, "sd hd"},
             {"guitars", Type::kChoice, 0, 1, 1, kSd, "sd hd"},
             {"highway", Type::kChoice, 0, 2, 1, kHighwayClassic, "auto classic hd"},
+            {"temporal_aa", Type::kBool, 0, 1, 1, 0},
+            {"high_detail", Type::kBool, 0, 1, 1, 0},
             {"frame_log", Type::kBool, 0, 1, 1, 0},
+            {"lighting", Type::kChoice, 0, 1, 1, kLastGen, "last_gen next_gen"},
+            {"perf_overlay", Type::kChoice, 0, 3, 1, 0, "off fps graph full"},
         };
 
         const Entry *entryNamed(const std::string &name)
@@ -295,6 +303,8 @@ namespace gh2::settings
             return false;
         if (look == kLookUiArt)
             return true;
+        if (look == kLookLighting && get(kLighting) == kLastGen)
+            return false;
         if (playing.career)
             return playing.nextGen;
         const bool venue = playing.gh2Venue && get(kVenues) == kHd;

@@ -32,6 +32,8 @@ namespace gh2
         uint32_t psMeshDrawShowing;
         uint32_t psMultiMeshDrawShowing;
         uint32_t characterDrawShadowBuffer; // Character::DrawShadowBuffer
+        uint32_t characterDrawShowing;      // Character::DrawShowing
+        uint32_t characterComputeScreenSize; // Character::ComputeScreenSize(RndCam *)
         uint32_t rndSetShadowMap;           // Rnd::SetShadowMap, which PsRnd leaves as it is
         uint32_t charTrackSurfaceSetCharTexture; // CharTrackSurface::SetCharTexture(RndMat *)
         uint32_t playerMatcherOnStartStarpower;  // PlayerMatcher::OnStartStarpower
@@ -267,6 +269,8 @@ namespace gh2
         .psMeshDrawShowing = 0x3d88d8u,
         .psMultiMeshDrawShowing = 0x1a2f00u,
         .characterDrawShadowBuffer = 0x1619c0u,
+        .characterDrawShowing = 0x161c68u,
+        .characterComputeScreenSize = 0x162c78u,
         .rndSetShadowMap = 0x364820u,
         .charTrackSurfaceSetCharTexture = 0x155470u,
         .playerMatcherOnStartStarpower = 0x117018u,
