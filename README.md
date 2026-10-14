@@ -72,6 +72,7 @@ The game is recompiled with my [fork](https://github.com/noahbaxter/PS2Recomp/tr
 This project is built on top of a lot of excellent work by others. Please give most of the credit to these fine folk.
 
 - [PS2Recomp](https://github.com/ran-j/PS2Recomp) ([fork](https://github.com/noahbaxter/PS2Recomp/tree/ghrecomp))
+- FelipeLuis: [performance patches](https://github.com/noahbaxter/GHClassic/compare/a04cdbfc...d3485bef) for steady frame pacing
 - Project Deluge: debug builds of GH1, GH2 and Rocks the 80s that the function names come from, matched onto the retail executable
 - [MiloHax](https://github.com/hmxmilohax): those builds collected ([milo-executable-library](https://github.com/hmxmilohax/milo-executable-library)), menu script references ([milo-script-library](https://github.com/hmxmilohax/milo-script-library)), and [gh2-calibration-fix](https://github.com/hmxmilohax/gh2-calibration-fix)
 - [PCSX2](https://github.com/PCSX2/pcsx2) and [psx-spx](https://psx-spx.consoledev.net/): SPU2 reference code/reverb coefficients

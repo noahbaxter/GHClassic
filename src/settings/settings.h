@@ -48,6 +48,7 @@ namespace gh2::settings
         kCharacters, // its guitarists and band
         kGuitars,
         kHighway,    // its track and fretboards: the venues' choice, or one of its own
+        kFrameLog,   // frametimes.csv: each presented frame's times and what it did
         kKeyCount,
     };
 
@@ -169,4 +170,7 @@ namespace gh2::settings
 
     // `file` in the user data directory, which is made if missing.
     std::string userDataPath(const std::string &file);
+
+    // `file` beside settings.ini, wherever usePath put that.
+    std::string besideSettings(const std::string &file);
 }

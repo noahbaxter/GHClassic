@@ -40,6 +40,10 @@ namespace gh2
     {
         std::vector<Vertex> verts;
         std::vector<uint16_t> indices; // triangle list
+        // Built for one frame and never asked for again (particles, rects,
+        // a mesh the game rewrites every frame): the renderer streams it
+        // through that frame's ring in place of giving it buffers of its own.
+        bool transient = false;
     };
 
     using Matrix = std::array<float, 16>; // row-major, row vectors

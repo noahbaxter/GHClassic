@@ -17,9 +17,12 @@
 #include "x360_vert.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstring>
+#include <fstream>
 #include <iostream>
+#include <iterator>
 #include <unordered_map>
 
 namespace gh2
@@ -29,6 +32,11 @@ namespace gh2
         constexpr VkFormat kColorFormat = VK_FORMAT_R8G8B8A8_UNORM;
         // Frames a GPU resource must outlive its last use by.
         constexpr uint64_t kRetireAfter = 3;
+        // Frames a mesh or texture stays on the GPU unused: a camera cut takes
+        // the crowd and set out of view and back within seconds, and each
+        // return would otherwise allocate and upload all of it mid-frame.
+        constexpr uint64_t kEvictAfter = 1800; // 30 s
+        constexpr uint64_t kScanEvery = 8;     // frames between walks of the caches
 
         // Each frame writes its bones and lighting to its own slot's buffer,
         // so a slot is reused only after its frame has retired.
@@ -169,6 +177,33 @@ namespace gh2
             // x360 draw first takes the mesh.
             VkBuffer tangents = VK_NULL_HANDLE;
             VmaAllocation tangentMemory = VK_NULL_HANDLE;
+        };
+
+        // A frame's transient meshes, back to back, in a buffer that frame
+        // slot keeps: reused once the slot's frame has retired, grown (never
+        // shrunk) before anything binds it.
+        struct TransientSlot
+        {
+            VkBuffer buffer = VK_NULL_HANDLE;
+            VmaAllocation memory = VK_NULL_HANDLE;
+            uint8_t *mapped = nullptr;
+            VkDeviceSize capacity = 0;
+        };
+        constexpr VkDeviceSize kMinTransientBytes = 4ull << 20;
+
+        // Where a draw's geometry is bound from, whichever kind its mesh is.
+        // Without a normal map the tangent stream is never read, so the
+        // verts stand in for it.
+        struct MeshBinding
+        {
+            VkBuffer vertices = VK_NULL_HANDLE;
+            VkDeviceSize vertexOffset = 0;
+            VkBuffer indices = VK_NULL_HANDLE;
+            VkDeviceSize indexOffset = 0;
+            uint32_t indexCount = 0;
+            VkBuffer tangents = VK_NULL_HANDLE;
+            VkDeviceSize tangentOffset = 0;
+            bool mapped = false; // a transient mesh's: some draw of it has a normal map
         };
 
         // An x360 material's maps as x360.frag's set 2 takes them.
@@ -592,6 +627,7 @@ namespace gh2
         VkShaderModule x360Vertex = VK_NULL_HANDLE;
         VkShaderModule x360Fragment = VK_NULL_HANDLE;
         VkPipeline x360Pipelines[kPipelineCount]{};
+        VkPipelineCache pipelineCache = VK_NULL_HANDLE;
         std::unordered_map<const Shading *, GpuShading> shadings;
         std::shared_ptr<const TextureData> whiteCube;
         // The frame the main pass draws into at kHdrFormat, which the post
@@ -687,6 +723,8 @@ namespace gh2
 
         VkDescriptorSetLayout frameDataSetLayout = VK_NULL_HANDLE;
         FrameDataSlot frameData[kFrameSlots];
+        TransientSlot transientData[kFrameSlots];
+        std::unordered_map<const MeshData *, MeshBinding> transientBindings; // this frame's
 
         // Rendered textures by RndTex, one image per generation within a
         // frame, kept for the run. Their pass has the main pass's formats, so
@@ -696,6 +734,43 @@ namespace gh2
 
         // Samples per pixel for every pass, from the msaa setting.
         VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
+
+        // The frame log's counts. With it on, each frame slot has a pool of
+        // the GPU's times: at record's start, then at each span's end
+        // (kGpuSpans).
+        SceneStats stats;
+        static constexpr uint32_t kTimes = 1u + std::size(kGpuSpans);
+        VkQueryPool times[kFrameSlots]{};
+        bool timed[kFrameSlots]{}; // the slot's pool has a frame's times
+        float timePeriod = 0.0f;   // nanoseconds a tick
+        uint32_t stamped = 0;      // times written this frame
+
+        // The times of the frame this slot last held, which the GPU has long
+        // finished, then the pool emptied for this one. Outside a render pass.
+        void takeTimes(VkCommandBuffer cmd, uint64_t serial)
+        {
+            const uint32_t slot = serial % kFrameSlots;
+            if (times[slot] == VK_NULL_HANDLE)
+                return;
+            uint64_t ticks[kTimes]{};
+            if (timed[slot] && vkGetQueryPoolResults(device, times[slot], 0, kTimes, sizeof(ticks), ticks,
+                                                     sizeof(uint64_t), VK_QUERY_RESULT_64_BIT) == VK_SUCCESS)
+                for (uint32_t span = 0; span + 1u < kTimes; ++span)
+                    stats.gpuMs[span] =
+                        static_cast<float>(static_cast<double>(ticks[span + 1u] - ticks[span]) * timePeriod * 1e-6);
+            vkCmdResetQueryPool(cmd, times[slot], 0, kTimes);
+            timed[slot] = true;
+            stamped = 0u;
+        }
+
+        // The next time: the frame's start, then the end of each span up to
+        // `through`, those the frame has none of ending where they begin.
+        // Outside a render pass: MoltenVK times a pass at its ends alone.
+        void stamp(VkCommandBuffer cmd, uint64_t serial, uint32_t through)
+        {
+            for (; times[serial % kFrameSlots] != VK_NULL_HANDLE && stamped <= through; ++stamped)
+                vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, times[serial % kFrameSlots], stamped);
+        }
 
         // The main pass and the target pass, alike but for the finished
         // image's layout, so every pipeline draws into either: passes are
@@ -1197,12 +1272,19 @@ namespace gh2
             if (settings::get(settings::kMipmaps) && !data->text && !data->cube)
                 while ((std::max(data->width, data->height) >> (levels - 1u)) > 1u)
                     ++levels;
-            std::vector<uint8_t> staged = data->rgba;
+            // The levels go straight into the staging buffer, one after
+            // another, with no joined copy of them made first.
+            std::vector<std::pair<const void *, VkDeviceSize>> parts{{data->rgba.data(), data->rgba.size()}};
+            VkDeviceSize staged = data->rgba.size();
             for (const std::vector<uint8_t> &mip : data->mips)
-                staged.insert(staged.end(), mip.begin(), mip.end());
-            if (!createBuffer(staged.data(), staged.size(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, gpu.staging,
-                              gpu.stagingMemory))
+            {
+                parts.push_back({mip.data(), mip.size()});
+                staged += mip.size();
+            }
+            if (!createBuffer(parts, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, gpu.staging, gpu.stagingMemory))
                 return nullptr;
+            ++stats.texturesCreated;
+            stats.uploadBytes += staged;
 
             VkImageCreateInfo imageInfo{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
             imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -1461,8 +1543,49 @@ namespace gh2
             info.pDynamicState = &dynamic;
             info.layout = x360Family ? x360Layout : layout;
             info.renderPass = shadow ? shadowPass : renderPass;
-            check(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &info, nullptr, &slot), "pipeline");
+            check(vkCreateGraphicsPipelines(device, pipelineCache, 1, &info, nullptr, &slot), "pipeline");
             return slot;
+        }
+
+        // The cache every pipeline is made through, from pipelines.bin
+        // beside the settings where a run before this one left it. One from
+        // another driver or GPU reads as empty.
+        void openPipelineCache()
+        {
+            std::ifstream in(settings::besideSettings("pipelines.bin"), std::ios::binary);
+            const std::vector<char> data(std::istreambuf_iterator<char>(in), {});
+            VkPipelineCacheCreateInfo info{VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO};
+            info.initialDataSize = data.size();
+            info.pInitialData = data.data();
+            check(vkCreatePipelineCache(device, &info, nullptr, &pipelineCache), "pipeline cache");
+        }
+
+        // Every pipeline made up front, so none is compiled mid-song the
+        // first time its material shows: the 360's first few cost up to 8 ms
+        // of a frame each on an M4 Pro, and 10 to 50 on AMD's Windows driver.
+        // The cache is then left for the next run.
+        void createPipelines()
+        {
+            const auto start = std::chrono::steady_clock::now();
+            for (uint32_t blend = 0; blend < milo::mat::kBlendCount; ++blend)
+                for (uint32_t zMode = 0; zMode < milo::mat::kZModeCount; ++zMode)
+                    for (int alphaWrite = 0; alphaWrite < 2; ++alphaWrite)
+                        for (int destAlphaTest = 0; destAlphaTest < 2; ++destAlphaTest)
+                            for (int family = 0; family < (x360 ? 2 : 1); ++family)
+                                pipeline(blend, zMode, alphaWrite != 0, destAlphaTest != 0, family != 0);
+            if (x360)
+                pipeline(milo::mat::kBlendSrc, milo::mat::kZNormal, false, false, false, true);
+            std::cerr << "[scene] pipelines in "
+                      << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start)
+                             .count()
+                      << " ms" << std::endl;
+            size_t size = 0;
+            vkGetPipelineCacheData(device, pipelineCache, &size, nullptr);
+            std::vector<char> data(size);
+            if (size == 0 || vkGetPipelineCacheData(device, pipelineCache, &size, data.data()) != VK_SUCCESS)
+                return;
+            std::ofstream out(settings::besideSettings("pipelines.bin"), std::ios::binary | std::ios::trunc);
+            out.write(data.data(), static_cast<std::streamsize>(size));
         }
 
         // The shadow maps and the pass that draws into one, which leaves it
@@ -1662,7 +1785,7 @@ namespace gh2
             info.layout = postLayout;
             info.renderPass = bloom ? bloomPass : scene ? scenePass : postPass;
             VkPipeline out = VK_NULL_HANDLE;
-            check(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &info, nullptr, &out), "post pipeline");
+            check(vkCreateGraphicsPipelines(device, pipelineCache, 1, &info, nullptr, &out), "post pipeline");
             return out;
         }
 
@@ -1857,8 +1980,16 @@ namespace gh2
         bool createBuffer(const void *data, VkDeviceSize bytes, VkBufferUsageFlags usage, VkBuffer &buffer,
                           VmaAllocation &memory)
         {
+            return createBuffer({{data, bytes}}, usage, buffer, memory);
+        }
+
+        // A host-visible buffer filled from `parts`, back to back.
+        bool createBuffer(const std::vector<std::pair<const void *, VkDeviceSize>> &parts, VkBufferUsageFlags usage,
+                          VkBuffer &buffer, VmaAllocation &memory)
+        {
             VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-            info.size = bytes;
+            for (const auto &part : parts)
+                info.size += part.second;
             info.usage = usage;
             VmaAllocationCreateInfo alloc{};
             alloc.usage = VMA_MEMORY_USAGE_AUTO;
@@ -1866,9 +1997,111 @@ namespace gh2
             VmaAllocationInfo allocated{};
             if (!check(vmaCreateBuffer(allocator, &info, &alloc, &buffer, &memory, &allocated), "buffer"))
                 return false;
-            std::memcpy(allocated.pMappedData, data, bytes);
+            auto *out = static_cast<uint8_t *>(allocated.pMappedData);
+            for (const auto &part : parts)
+            {
+                std::memcpy(out, part.first, static_cast<size_t>(part.second));
+                out += part.second;
+            }
             vmaFlushAllocation(allocator, memory, 0, VK_WHOLE_SIZE);
             return true;
+        }
+
+        // Every transient mesh of the frame into this slot's ring, before any
+        // draw binds it: their sizes first, so the ring grows (if it must)
+        // once and before use, then one copy each and one flush. A mesh some
+        // normal-mapped x360 draw takes has its tangents built and put there
+        // too, every frame, as its verts are new every frame.
+        bool streamTransients(const Frame &frame, const std::vector<char> &x360Draws,
+                              const std::vector<PushConstants> &pushes, uint64_t serial)
+        {
+            transientBindings.clear();
+            VkDeviceSize bytes = 0;
+            for (size_t i = 0; i < frame.draws.size(); ++i)
+            {
+                const MeshData *mesh = frame.draws[i].mesh.get();
+                if (!mesh || !mesh->transient || mesh->verts.empty() || mesh->indices.empty())
+                    continue;
+                const auto added = transientBindings.try_emplace(mesh);
+                // With room for each part to start on a multiple of its size.
+                if (added.second)
+                    bytes += mesh->verts.size() * sizeof(Vertex) + mesh->indices.size() * sizeof(uint16_t) + 64u;
+                if (x360Draws[i] && (pushes[i].flags & kFlagNormalMap) != 0u && !added.first->second.mapped)
+                {
+                    added.first->second.mapped = true;
+                    bytes += mesh->verts.size() * 4u * sizeof(float) + 16u;
+                }
+            }
+            if (bytes == 0u)
+                return true;
+
+            TransientSlot &slot = transientData[serial % kFrameSlots];
+            if (bytes > slot.capacity)
+            {
+                // This slot's last frame has retired, so the old buffer can go.
+                if (slot.buffer != VK_NULL_HANDLE)
+                    vmaDestroyBuffer(allocator, slot.buffer, slot.memory);
+                slot = {};
+                VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+                info.size = std::max(kMinTransientBytes, bytes * 2u);
+                info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+                VmaAllocationCreateInfo alloc{};
+                alloc.usage = VMA_MEMORY_USAGE_AUTO;
+                alloc.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+                VmaAllocationInfo allocated{};
+                if (!check(vmaCreateBuffer(allocator, &info, &alloc, &slot.buffer, &slot.memory, &allocated),
+                           "transient meshes"))
+                {
+                    slot = {};
+                    return false;
+                }
+                slot.mapped = static_cast<uint8_t *>(allocated.pMappedData);
+                slot.capacity = info.size;
+            }
+
+            VkDeviceSize at = 0;
+            const auto put = [&](const void *data, VkDeviceSize size, VkDeviceSize multiple) {
+                at = (at + multiple - 1u) / multiple * multiple;
+                std::memcpy(slot.mapped + at, data, static_cast<size_t>(size));
+                at += size;
+                return at - size;
+            };
+            for (auto &entry : transientBindings)
+            {
+                const MeshData &mesh = *entry.first;
+                MeshBinding &binding = entry.second;
+                binding.vertices = binding.indices = binding.tangents = slot.buffer;
+                binding.vertexOffset = put(mesh.verts.data(), mesh.verts.size() * sizeof(Vertex), sizeof(Vertex));
+                binding.indexOffset = put(mesh.indices.data(), mesh.indices.size() * sizeof(uint16_t), 4u);
+                binding.indexCount = static_cast<uint32_t>(mesh.indices.size());
+                binding.tangentOffset = binding.vertexOffset;
+                if (binding.mapped)
+                {
+                    const std::vector<float> built = buildTangents(mesh);
+                    binding.tangentOffset = put(built.data(), built.size() * sizeof(float), 16u);
+                }
+            }
+            vmaFlushAllocation(allocator, slot.memory, 0, at);
+            return true;
+        }
+
+        // Where `mesh` is bound from: this frame's ring for a transient one,
+        // else buffers of its own, made the first time. `mapped`: the draw
+        // reads tangents. Nothing to draw leaves it without vertices.
+        MeshBinding bindingOf(const std::shared_ptr<const MeshData> &mesh, bool mapped, uint64_t serial)
+        {
+            if (mesh->transient)
+            {
+                const auto found = transientBindings.find(mesh.get());
+                return found != transientBindings.end() ? found->second : MeshBinding{};
+            }
+            GpuMesh *gpu = gpuMesh(mesh, serial);
+            if (!gpu)
+                return {};
+            MeshBinding binding{gpu->vertices, 0, gpu->indices, 0, gpu->indexCount, gpu->vertices, 0};
+            if (mapped)
+                binding.tangents = tangents(*gpu);
+            return binding.tangents != VK_NULL_HANDLE ? binding : MeshBinding{};
         }
 
         GpuMesh *gpuMesh(const std::shared_ptr<const MeshData> &mesh, uint64_t serial)
@@ -1886,6 +2119,8 @@ namespace gh2
                                   VK_BUFFER_USAGE_INDEX_BUFFER_BIT, gpu.indices, gpu.indexMemory))
                     return nullptr;
                 gpu.indexCount = static_cast<uint32_t>(mesh->indices.size());
+                ++stats.meshesCreated;
+                stats.uploadBytes += mesh->verts.size() * sizeof(Vertex) + mesh->indices.size() * sizeof(uint16_t);
                 found = meshes.emplace(mesh.get(), std::move(gpu)).first;
             }
             found->second.lastUsed = serial;
@@ -2201,6 +2436,19 @@ namespace gh2
             postDraw(cmd, outputPass, outputFramebuffer, width, height, bloomPipeline, set, PostPush{{}, {}, 4u});
         }
 
+        // The descriptor pool holds kMaxTextures; keep a quarter spare.
+        static constexpr size_t kTextureLimit = kMaxTextures - kMaxTextures / 4u;
+
+        // Whether a mesh or texture goes: unused for `keep` frames, or with
+        // nothing but this cache holding its source, when no capture can
+        // hand that pointer over again and it is garbage once no frame in
+        // flight reads it.
+        template <typename Gpu>
+        static bool spent(const Gpu &gpu, uint64_t keep, uint64_t serial)
+        {
+            return gpu.lastUsed + keep < serial || (gpu.source.use_count() == 1 && gpu.lastUsed + kRetireAfter < serial);
+        }
+
         void retire(uint64_t serial)
         {
             for (auto it = shadings.begin(); it != shadings.end();)
@@ -2213,12 +2461,20 @@ namespace gh2
                 else
                     ++it;
             }
+            // The tables are walked every kScanEvery frames, not every frame:
+            // nothing in them is urgent within that.
+            if (serial % kScanEvery != 0u)
+                return;
+            // Near the descriptor pool's end, nothing is kept past its frames
+            // in flight.
+            const uint64_t keep = textures.size() > kTextureLimit ? kRetireAfter : kEvictAfter;
             for (auto it = meshes.begin(); it != meshes.end();)
             {
-                if (it->second.lastUsed + kRetireAfter < serial)
+                if (spent(it->second, keep, serial))
                 {
                     destroyMesh(it->second);
                     it = meshes.erase(it);
+                    ++stats.evicted;
                 }
                 else
                     ++it;
@@ -2226,10 +2482,11 @@ namespace gh2
             for (auto it = textures.begin(); it != textures.end();)
             {
                 GpuTexture &texture = it->second;
-                if (texture.lastUsed + kRetireAfter < serial)
+                if (spent(texture, keep, serial))
                 {
                     destroyTexture(texture);
                     it = textures.erase(it);
+                    ++stats.evicted;
                     continue;
                 }
                 if (texture.staging != VK_NULL_HANDLE && texture.uploaded + kRetireAfter < serial)
@@ -2266,14 +2523,30 @@ namespace gh2
         State &s = *m_state;
         s.x360 = x360;
         s.colorFormat = s.x360 ? kHdrFormat : kColorFormat;
+        VkPhysicalDeviceProperties properties{};
+        vkGetPhysicalDeviceProperties(allocatorInfo.physicalDevice, &properties);
+        if (settings::get(settings::kFrameLog) && properties.limits.timestampComputeAndGraphics)
+        {
+            s.timePeriod = properties.limits.timestampPeriod;
+            VkQueryPoolCreateInfo timesInfo{VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO};
+            timesInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
+            timesInfo.queryCount = State::kTimes;
+            for (VkQueryPool &pool : s.times)
+                if (vkCreateQueryPool(device, &timesInfo, nullptr, &pool) != VK_SUCCESS)
+                    pool = VK_NULL_HANDLE;
+        }
         if (!(s.createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, false, false, s.renderPass) &&
               s.createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, true, false, s.firstPass) &&
               s.createPass(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, true, true, s.resumePass) &&
               s.createPass(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, false, false, s.targetPass) &&
               s.createDescriptorState() && s.createLayout()))
             return false;
+        s.openPipelineCache();
         if (!s.x360)
+        {
+            s.createPipelines();
             return true;
+        }
         if (!s.createPostPass(State::PostInto::kBloom, s.bloomPass) ||
             !s.createPostPass(State::PostInto::kFrame, s.postPass) ||
             !s.createPostPass(State::PostInto::kOutput, s.outputPass))
@@ -2288,7 +2561,10 @@ namespace gh2
             if (s.scenePipeline == VK_NULL_HANDLE)
                 return false;
         }
-        return s.bloomPipeline != VK_NULL_HANDLE && s.postPipeline != VK_NULL_HANDLE && s.createShadowMaps();
+        if (s.bloomPipeline == VK_NULL_HANDLE || s.postPipeline == VK_NULL_HANDLE || !s.createShadowMaps())
+            return false;
+        s.createPipelines();
+        return true;
     }
 
     void SceneRenderer::shutdown()
@@ -2296,6 +2572,9 @@ namespace gh2
         if (!m_state)
             return;
         State &s = *m_state;
+        for (VkQueryPool pool : s.times)
+            if (pool != VK_NULL_HANDLE)
+                vkDestroyQueryPool(s.device, pool, nullptr);
         for (auto &entry : s.meshes)
             s.destroyMesh(entry.second);
         s.meshes.clear();
@@ -2312,6 +2591,9 @@ namespace gh2
         for (FrameDataSlot &slot : s.frameData)
             if (slot.buffer != VK_NULL_HANDLE)
                 vmaDestroyBuffer(s.allocator, slot.buffer, slot.memory);
+        for (TransientSlot &slot : s.transientData)
+            if (slot.buffer != VK_NULL_HANDLE)
+                vmaDestroyBuffer(s.allocator, slot.buffer, slot.memory);
         if (s.pool != VK_NULL_HANDLE)
             vkDestroyDescriptorPool(s.device, s.pool, nullptr);
         if (s.setLayout != VK_NULL_HANDLE)
@@ -2322,6 +2604,8 @@ namespace gh2
         for (VkPipeline pipeline : s.pipelines)
             if (pipeline != VK_NULL_HANDLE)
                 vkDestroyPipeline(s.device, pipeline, nullptr);
+        if (s.pipelineCache != VK_NULL_HANDLE)
+            vkDestroyPipelineCache(s.device, s.pipelineCache, nullptr);
         if (s.vertexShader != VK_NULL_HANDLE)
             vkDestroyShaderModule(s.device, s.vertexShader, nullptr);
         if (s.fragmentShader != VK_NULL_HANDLE)
@@ -2382,6 +2666,10 @@ namespace gh2
         State &s = *m_state;
         if (!s.ensureAttachments(target, width, height))
             return false;
+        s.stats.meshesCreated = s.stats.texturesCreated = s.stats.evicted = 0u;
+        s.stats.uploadBytes = 0u;
+        s.takeTimes(cmd, serial);
+        s.stamp(cmd, serial, 0u);
 
         // Textures upload before the pass begins.
         std::vector<const GpuTexture *> drawTextures(frame.draws.size(), nullptr);
@@ -2699,6 +2987,9 @@ namespace gh2
                 push.flags |= kFlagShadow;
         }
         writeDrawDump(frame, pushes.data(), data.mapped, x360Draws.data(), kShadingVec4s);
+        // Transient meshes into this frame's ring, before anything binds it.
+        if (!s.streamTransients(frame, x360Draws, pushes, serial))
+            return false;
 
         // The post stage runs once the world is drawn, before what is drawn
         // over it: after the last draw through the camera the first x360
@@ -2747,8 +3038,10 @@ namespace gh2
                 draw.crowd ? s.inWindow(draw, pushes[i].mvp, frame) : draw.mesh;
             if (!shown)
                 return;
-            GpuMesh *mesh = s.gpuMesh(shown, serial);
-            if (!mesh)
+            const bool x360Family = x360Draws[i] != 0;
+            const MeshBinding mesh =
+                s.bindingOf(shown, x360Family && (pushes[i].flags & kFlagNormalMap) != 0u, serial);
+            if (mesh.vertices == VK_NULL_HANDLE)
                 return;
             if (draw.camera != boundCamera)
             {
@@ -2767,17 +3060,9 @@ namespace gh2
                 boundCamera = draw.camera;
             }
             const Material &material = draw.material;
-            const bool x360Family = x360Draws[i] != 0;
             const VkPipeline pipeline = s.pipeline(x360Family ? fadedBlend(draw) : material.blend, material.zMode,
                                                    material.alphaWrite, material.destAlphaTest, x360Family);
             if (pipeline == VK_NULL_HANDLE)
-                return;
-            // Without a normal map the tangent stream is never read, so the
-            // verts stand in for it.
-            VkBuffer tangents = mesh->vertices;
-            if (x360Family && (pushes[i].flags & kFlagNormalMap) != 0u)
-                tangents = s.tangents(*mesh);
-            if (tangents == VK_NULL_HANDLE)
                 return;
             if (pipeline != boundPipeline)
             {
@@ -2797,12 +3082,11 @@ namespace gh2
                 };
                 vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 2, 2, maps, 0, nullptr);
             }
-            const VkDeviceSize offset = 0;
             if (x360Family)
-                vkCmdBindVertexBuffers(cmd, 1, 1, &tangents, &offset);
-            vkCmdBindVertexBuffers(cmd, 0, 1, &mesh->vertices, &offset);
-            vkCmdBindIndexBuffer(cmd, mesh->indices, 0, VK_INDEX_TYPE_UINT16);
-            vkCmdDrawIndexed(cmd, mesh->indexCount, 1, 0, 0, 0);
+                vkCmdBindVertexBuffers(cmd, 1, 1, &mesh.tangents, &mesh.tangentOffset);
+            vkCmdBindVertexBuffers(cmd, 0, 1, &mesh.vertices, &mesh.vertexOffset);
+            vkCmdBindIndexBuffer(cmd, mesh.indices, mesh.indexOffset, VK_INDEX_TYPE_UINT16);
+            vkCmdDrawIndexed(cmd, mesh.indexCount, 1, 0, 0, 0);
         };
 
         // Each shadow map's casters, through its light's camera: depth alone,
@@ -2830,20 +3114,20 @@ namespace gh2
                 const DrawCall &draw = frame.draws[i];
                 if (!draw.shadowCaster || draw.camera != frame.shadows[map] || !draw.mesh)
                     continue;
-                GpuMesh *mesh = s.gpuMesh(draw.mesh, serial);
-                if (!mesh)
+                const MeshBinding mesh = s.bindingOf(draw.mesh, false, serial);
+                if (mesh.vertices == VK_NULL_HANDLE)
                     continue;
                 vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
                 vkCmdPushConstants(cmd, s.layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                                    sizeof(PushConstants), &pushes[i]);
-                const VkDeviceSize offset = 0;
-                vkCmdBindVertexBuffers(cmd, 0, 1, &mesh->vertices, &offset);
-                vkCmdBindIndexBuffer(cmd, mesh->indices, 0, VK_INDEX_TYPE_UINT16);
-                vkCmdDrawIndexed(cmd, mesh->indexCount, 1, 0, 0, 0);
+                vkCmdBindVertexBuffers(cmd, 0, 1, &mesh.vertices, &mesh.vertexOffset);
+                vkCmdBindIndexBuffer(cmd, mesh.indices, mesh.indexOffset, VK_INDEX_TYPE_UINT16);
+                vkCmdDrawIndexed(cmd, mesh.indexCount, 1, 0, 0, 0);
             }
             vkCmdEndRenderPass(cmd);
             boundPipeline = VK_NULL_HANDLE;
         }
+        s.stamp(cmd, serial, 1u);
 
         // Targets first, so a draw sampling one reads what this frame drew
         // into it, in order of first use.
@@ -2867,6 +3151,7 @@ namespace gh2
             vkCmdEndRenderPass(cmd);
             s.fillTargetLevels(cmd, *run.image);
         }
+        s.stamp(cmd, serial, 2u);
 
         VkClearValue clears[2]{};
         for (int i = 0; i < 4; ++i)
@@ -2897,7 +3182,9 @@ namespace gh2
                 vkCmdEndRenderPass(cmd);
                 if (post)
                 {
+                    s.stamp(cmd, serial, 3u);
                     s.runPost(cmd, frame, worldCamera, serial);
+                    s.stamp(cmd, serial, 5u);
                     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, s.layout, 1, 1, &data.set, 0,
                                             nullptr);
                     boundPipeline = VK_NULL_HANDLE;
@@ -2925,9 +3212,16 @@ namespace gh2
                 drawOne(i, static_cast<float>(width), static_cast<float>(height));
         }
         vkCmdEndRenderPass(cmd);
+        s.stamp(cmd, serial, 6u);
         if (s.x360)
             s.drawOutput(cmd, serial);
+        s.stamp(cmd, serial, 7u);
         s.retire(serial);
         return true;
+    }
+
+    SceneStats SceneRenderer::stats() const
+    {
+        return m_state ? m_state->stats : SceneStats{};
     }
 }

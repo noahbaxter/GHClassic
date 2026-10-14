@@ -100,6 +100,7 @@ namespace gh2
             }
 
             auto mesh = std::make_shared<MeshData>();
+            mesh->transient = true; // rebuilt every draw
             const float px[4] = {x, x, x + w, x + w};
             const float py[4] = {y, y + h, y, y + h};
             const float uv[4][2] = {{0.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}};

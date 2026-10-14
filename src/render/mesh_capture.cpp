@@ -13,6 +13,8 @@
 #include "ps2_runtime_macros.h"
 #include "dev/mesh_packet.h"
 
+#include <chrono>
+#include <cstring>
 #include <unordered_map>
 
 namespace gh2
@@ -24,6 +26,38 @@ namespace gh2
         const Addresses *s_addresses = nullptr;
         PS2Runtime::RecompiledFunction s_updateFacePacket = nullptr;
         PS2Runtime::RecompiledFunction s_copy = nullptr;
+
+        // A mesh whose verts the game rewrites again within kDynamicWithin of
+        // the last time (vertex animation, one every frame) is dynamic from
+        // then on, until destroyed: its copies go out transient, streamed
+        // through the frame's ring, in place of each new one getting GPU
+        // buffers of its own for a frame. A mesh synced once, as most are on
+        // load, stays an ordinary cached one.
+        constexpr auto kDynamicWithin = std::chrono::seconds(1);
+        struct SyncHistory
+        {
+            std::chrono::steady_clock::time_point lastVerts{};
+            bool dynamic = false;
+        };
+        std::unordered_map<uint32_t, SyncHistory> s_history;
+
+        bool markDynamic(uint32_t mesh)
+        {
+            SyncHistory &history = s_history[mesh];
+            const auto now = std::chrono::steady_clock::now();
+            if (history.lastVerts != std::chrono::steady_clock::time_point{} && now - history.lastVerts < kDynamicWithin)
+                history.dynamic = true;
+            history.lastVerts = now;
+            return history.dynamic;
+        }
+
+        bool same(const MeshData &a, const MeshData &b)
+        {
+            return a.verts.size() == b.verts.size() && a.indices.size() == b.indices.size() &&
+                   (a.verts.empty() || std::memcmp(a.verts.data(), b.verts.data(), a.verts.size() * sizeof(Vertex)) == 0) &&
+                   (a.indices.empty() ||
+                    std::memcmp(a.indices.data(), b.indices.data(), a.indices.size() * sizeof(uint16_t)) == 0);
+        }
 
         void readVerts(uint8_t *rdram, uint32_t mesh, MeshData &out)
         {
@@ -72,6 +106,12 @@ namespace gh2
                 readVerts(rdram, mesh, *next);
             if (flags & milo::mesh::kSyncFaces)
                 readFaces(rdram, mesh, *next);
+            // A sync that changed nothing keeps the copy already held: the
+            // renderer keys its GPU buffers by it, and a new one would be
+            // uploaded again mid-frame.
+            if (slot && same(*slot, *next))
+                return;
+            next->transient = (flags & milo::mesh::kSyncVerts) ? markDynamic(mesh) : s_history[mesh].dynamic;
             slot = std::move(next);
         }
 
@@ -139,6 +179,7 @@ namespace gh2
         void onDestroy(uint8_t *, R5900Context *ctx, PS2Runtime *)
         {
             s_meshes.erase(GPR_U32(ctx, 4));
+            s_history.erase(GPR_U32(ctx, 4));
         }
     }
 
