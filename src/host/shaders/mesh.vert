@@ -198,6 +198,8 @@ void main()
         mat3 wm = mat3(data[e].xyz, data[e + 1].xyz, data[e + 2].xyz); // rows, so wm * x is x . rows
         vec3 v = data[e + 3].xyz - wm * litPos;
         vec3 n = wm * litNormal;
+        if (data[e + 3].w > 0.0)
+            n *= data[e + 3].w;
         vec3 r = 2.0 * n * dot(n, v) - v;
         vUv = r.xy * (0.5 * inversesqrt(dot(v, v))) + vec2(0.5);
     }
