@@ -151,16 +151,19 @@ namespace gh2
             ark::addFile("char/" + name + "/anims/gen/" + name + "_main.milo_ps2", songs->main);
             ark::addFile("char/" + name + "/anims/gen/" + name + "_fret.milo_ps2", songs->fret);
             ark::addFile("char/" + name + "/anims/gen/" + name + "_strum.milo_ps2", songs->strum);
-            // _horse and anything else beside it is GH2's base outfit's, and
-            // so are the photos. The highway (track/surfaces/%s_keep.bmp) is
-            // GH1's, which GH2's loader reads as its own: the folder's, or
-            // its prefix's (hair.bmp, but nu_metal.bmp).
+            // _horse and anything else beside it is GH2's base outfit's. The
+            // highway (track/surfaces/%s_keep.bmp) and the photos (the
+            // results' four, photo_%s%i_keep.bmp) are GH1's, which GH2's loader
+            // reads as its own: the highway the folder's, or its prefix's
+            // (hair.bmp, but nu_metal.bmp).
             const std::string surfaces = "track/surfaces/gen/";
             const std::string highway =
                 ark::readFile(*gh1Disc, surfaces + folder + ".bmp_ps2") ? folder : guitarist.prefix();
             ark::rename("char/" + name + "/og/gen/" + name, *gh2Disc, "char/" + base + "/og/gen/" + base);
             ark::rename(surfaces + name + "_keep", *gh1Disc, surfaces + highway);
-            outfits::photosFrom(name, *gh2Disc, base);
+            for (int i = 0; i < 4; ++i)
+                ark::rename("ui/image/og/gen/photo_" + name + std::to_string(i) + "_keep", *gh1Disc,
+                            "ghui/image/gen/photo_" + folder + std::to_string(i));
             // GH1's store sells the character, by GH2's name here (gh1/career.cpp).
             outfits::add("gh1", guitarist.character, guitarist.character, name, base, guitarist.label);
             // GH1's hero screen portrait, unframed: GH2's highlight frames it.
