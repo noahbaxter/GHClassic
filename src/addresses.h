@@ -65,6 +65,34 @@ namespace gh2
         uint32_t checkForPitchBend; // TrackWatcherImpl::CheckForPitchBend
         uint32_t sendWhammy;        // TrackWatcherImpl::SendWhammy
         uint32_t playerSetWhammyBar; // Player::SetWhammyBar
+        uint32_t willBeNoStrum;      // GameGemList::WillBeNoStrum
+        uint32_t beatMatcherSwing;   // BeatMatcher::Swing
+        uint32_t trackWatcherPoll;   // TrackWatcherImpl::Poll
+        uint32_t trackWatcherOnMiss; // TrackWatcherImpl::OnMiss
+        uint32_t trackWatcherSendMiss;
+        uint32_t guitarWatcherVtable;
+        uint32_t guitarWatcherCtor;  // GuitarTrackWatcherImpl::GuitarTrackWatcherImpl
+        uint32_t guitarWatcherSwing; // GuitarTrackWatcherImpl::Swing
+        uint32_t guitarWatcherFretButtonUp;
+        uint32_t guitarWatcherGemCanBePassed;
+        uint32_t guitarWatcherSlop;
+        uint32_t guitarWatcherTryToHopo;
+        uint32_t guitarWatcherCheckForFretTimeout;
+        uint32_t guitarWatcherCanHopo;
+        uint32_t theSongDb;              // SongDB *
+        uint32_t songDbGetGems;          // SongDB::GetGems(track)
+        uint32_t songDbSetupStarPhrases; // SongDB::SetupStarPhrasesForTrack
+        uint32_t songDbIsStarPhraseStart;
+        uint32_t songDbIsInStarPhrase;
+        uint32_t penalizeAsksStarPhraseStart; // where Player::Penalize's IsStarPhraseStart returns to
+        uint32_t passAsksStarPhraseStart;     // and Player::Pass's
+        uint32_t starPowerHitAsksStarPhraseStart; // and StarPower::Hit's
+        uint32_t playerHit;              // Player::Hit
+        uint32_t playerPoll;             // Player::Poll
+        uint32_t performerGetMultiplier; // Performer::GetMultiplier
+        uint32_t starPowerHit;           // StarPower::Hit
+        uint32_t starPowerMissOrPass;    // StarPower::MissOrPass
+        uint32_t crowdRatingConfigure; // CrowdRating::Configure(Difficulty), as each song's players are made
         uint32_t trackCtor;          // Track::Track
         uint32_t trackSetupFade;     // Track::SetupFade
         uint32_t trackDraw;          // Track::Draw
@@ -303,6 +331,34 @@ namespace gh2
         .checkForPitchBend = 0x248e38u,
         .sendWhammy = 0x249b98u,
         .playerSetWhammyBar = 0x111d88u,
+        .willBeNoStrum = 0x24d360u,
+        .beatMatcherSwing = 0x2356b8u,
+        .trackWatcherPoll = 0x2484e0u,
+        .trackWatcherOnMiss = 0x249338u,
+        .trackWatcherSendMiss = 0x249598u,
+        .guitarWatcherVtable = 0x3efb10u,
+        .guitarWatcherCtor = 0x24d400u,
+        .guitarWatcherSwing = 0x24d518u,
+        .guitarWatcherFretButtonUp = 0x24d938u,
+        .guitarWatcherGemCanBePassed = 0x24da40u,
+        .guitarWatcherSlop = 0x24da50u,
+        .guitarWatcherTryToHopo = 0x24dc20u,
+        .guitarWatcherCheckForFretTimeout = 0x24de48u,
+        .guitarWatcherCanHopo = 0x24df30u,
+        .theSongDb = 0x3da2f8u,
+        .songDbGetGems = 0x11cf58u,
+        .songDbSetupStarPhrases = 0x11d850u,
+        .songDbIsStarPhraseStart = 0x11da68u,
+        .songDbIsInStarPhrase = 0x11da90u,
+        .penalizeAsksStarPhraseStart = 0x1117d0u,
+        .passAsksStarPhraseStart = 0x111410u,
+        .starPowerHitAsksStarPhraseStart = 0x11e468u,
+        .playerHit = 0x1111d0u,
+        .playerPoll = 0x1110d8u,
+        .performerGetMultiplier = 0x10f1a0u,
+        .starPowerHit = 0x11e2b8u,
+        .starPowerMissOrPass = 0x11e6a8u,
+        .crowdRatingConfigure = 0x124988u,
         .trackCtor = 0x14fa70u,
         .trackSetupFade = 0x150908u,
         .trackDraw = 0x151188u,

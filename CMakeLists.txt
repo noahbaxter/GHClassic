@@ -207,6 +207,7 @@ set(GHC_GAME_SOURCES
     src/game.cpp
     src/frame_step.cpp
     src/lefty_guitarist.cpp
+    src/note_engine.cpp
     src/note_speed.cpp
     src/script.cpp
     src/sustain_release.cpp

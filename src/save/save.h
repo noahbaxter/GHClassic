@@ -53,11 +53,22 @@ namespace gh2::save
     // and the songs any band has unlocked there on any. A song is passed
     // once it has stars, and unlocked only as progress: a fresh campaign's
     // own open songs are in neither.
-    std::array<std::set<std::string>, 4> passedSongs(const std::string &game, int slot);
+    // With an engine, its career alone (note_engine.h), else every engine's.
+    std::array<std::set<std::string>, 4> passedSongs(const std::string &game, int slot,
+                                                     const std::string &engine = "");
     std::set<std::string> unlockedSongs(const std::string &game);
     // Whether any band has unlocked that item, of any kind, in `game`'s
-    // career: an outfit or guitar bought.
+    // career under any engine: an outfit or guitar bought.
     bool unlockedItem(const std::string &game, const std::string &item);
+
+    // The note engine quickplay and the menus outside a career play under:
+    // state.ini's, else gh2. Kept there as it changes.
+    std::string quickplayEngine();
+    void keepQuickplayEngine(const std::string &engine);
+    // The career loaded now goes into the save's sections under the engine
+    // judging now, and the same game's comes out of `engine`'s, which
+    // judges from then on.
+    void switchEngine(const std::string &engine, uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
 
     // A campaign switch (content/campaigns.h), either side of the Campaign
     // being rebuilt. leaveGame puts the career as it stands into the save's

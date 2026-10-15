@@ -43,21 +43,24 @@
 //   {campaigns live}           the active campaign's game: GH2 outside a career
 //   {campaigns count}          how many there are
 //   {campaigns has <game>}     TRUE if that game has a campaign
-//   {campaigns switch <game> [<screen> [career]]}  to that game's menus
-//                              outside a career, or with career into its
-//                              career, at the next UI poll once no script is
-//                              running, then to that screen; TRUE unless there
-//                              is nothing to change or no such game. Either
-//                              way that game becomes the theme. A career left
-//                              for main_screen goes back to its menus outside
-//                              it on its own.
+//   {campaigns switch <game> [<screen> [career [<engine>]]]}  to that game's
+//                              menus outside a career, or with career into its
+//                              career under that note engine (note_engine.h;
+//                              the one now by default), at the next UI poll
+//                              once no script is running, then to that
+//                              screen; TRUE unless there is nothing to change
+//                              or no such game. Either way that game becomes
+//                              the theme. Outside a career the engine is
+//                              quickplay's. A career left for main_screen goes
+//                              back to its menus outside it on its own.
 //   {campaigns first_character}   the first player's default outfit there
 //   {campaigns second_character}  the second player's default outfit there
 //   {campaigns owns <game> <item>}  TRUE if that game's item is there to use
 //                              outside its own career: one its store does not
 //                              sell, or one some band has bought in its career
-//   {campaigns progress <game> <band>}  how far that band (from 0) is through
-//                              that game's career, 0 to 100: the career songs
+//   {campaigns progress <game> <band> [<engine>]}  how far that band (from 0)
+//                              is through that game's career under that
+//                              engine, or any, 0 to 100: the career songs
 //                              passed on the difficulty it has passed most on
 //   {campaigns venues <game>}  that game's venues, as its config lists them
 //   {campaigns venue_open <game> <venue>}  TRUE if a song may play there
@@ -99,6 +102,8 @@ namespace gh2::campaigns
 
     // The active campaign's game: the career's in one, else gh2.
     const std::string &active();
+    // Whether a career is being played.
+    bool career();
     // Every campaign's game, gh2 first.
     std::vector<std::string> games();
     // That game's venues, the active game's by default, in its config's

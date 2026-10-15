@@ -27,6 +27,7 @@
 
 #include "guest.h"
 #include "hook.h"
+#include "note_engine.h"
 #include "save/gh1_stream.h"
 #include "save/gh2_text.h"
 #include "save/ps2_card.h"
@@ -94,16 +95,17 @@ namespace gh2::save
         }
 
         // state.ini, beside save.bin, or beside --save's file so a run keeps
-        // its own: [game] last, the game last entered. Written at every
-        // switch, where the save holds it only once the game saves again,
-        // and read before the boot loads the save.
+        // its own: [game] last, the game last entered, and engine, the note
+        // engine quickplay was last played under. Written at every switch,
+        // where the save holds it only once the game saves again, and read
+        // before the boot loads the save.
         std::string statePath()
         {
             return s_path.empty() ? settings::userDataPath("state.ini")
                                   : (std::filesystem::path(s_path).parent_path() / "state.ini").string();
         }
 
-        std::string readLastGame()
+        std::string readState(const std::string &key)
         {
             std::ifstream in(statePath());
             std::string line, section;
@@ -115,21 +117,53 @@ namespace gh2::save
                 if (const auto name = ini::sectionName(line))
                     section = *name;
                 else if (const size_t eq = line.find('='); section == "game" && eq != std::string::npos &&
-                                                           ini::trim(line.substr(0, eq)) == "last")
+                                                           ini::trim(line.substr(0, eq)) == key)
                     return ini::trim(line.substr(eq + 1));
             }
             return "";
         }
 
+        std::string s_lastGame, s_quickplayEngine; // as state.ini has them, once read
+
+        void writeState()
+        {
+            if (s_inMemory)
+                return;
+            if (ini::writeReplacing(statePath(), [&](std::ofstream &out) {
+                    out << "[game]\nlast = " << s_lastGame << "\n";
+                    if (!s_quickplayEngine.empty())
+                        out << "engine = " << s_quickplayEngine << "\n";
+                }))
+                std::cerr << "[save] could not write " << statePath() << std::endl;
+        }
+
+        // A game's sections under a note engine: its own name under GH2's,
+        // which every save before engines holds, else "gh1@gh1".
+        std::string sectionGame(const std::string &game, const std::string &engine = noteEngine())
+        {
+            return engine == "gh2" ? game : game + "@" + engine;
+        }
+
+        // A PS2 card holds careers played under GH2's engine alone.
+        bool cardsPlayed()
+        {
+            return noteEngine() == "gh2";
+        }
+
         gh2::Games games()
         {
-            return {s_game, s_songGames};
+            gh2::Games out{sectionGame(s_game), {}};
+            for (const auto &[song, game] : s_songGames)
+                out.songs[song] = sectionGame(game);
+            return out;
         }
 
         // --export-card's, else settings.ini's export_card puts GHClassic.ps2
         // beside save.bin. Empty when there is none.
         std::string exportPath()
         {
+            if (!cardsPlayed())
+                return {};
             if (!s_exportCard.empty() || !settings::get(settings::kExportCard))
                 return s_exportCard;
             return (std::filesystem::path(path()).parent_path() / "GHClassic.ps2").string();
@@ -508,6 +542,11 @@ namespace gh2::save
         void loadData1(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
             s_loaded = Loaded::kNothing;
+            if (!s_importCard.empty() && !cardsPlayed())
+            {
+                std::cerr << "[save] " << s_importCard << " not imported: its careers are GH2's engine's" << std::endl;
+                s_importCard.clear();
+            }
             Store store;
             const ReadResult read = readFile(path(), store);
             if (read == ReadResult::kOk)
@@ -656,34 +695,42 @@ namespace gh2::save
         }
     }
 
-    std::array<std::set<std::string>, 4> passedSongs(const std::string &game, int slot)
+    std::array<std::set<std::string>, 4> passedSongs(const std::string &game, int slot, const std::string &engine)
     {
         std::array<std::set<std::string>, 4> passed;
-        for (int d = 0; d < gh2::kDifficulties; ++d)
-            if (const Section *section = s_store.find("band " + std::to_string(slot + 1) + " " + game + " " + kDifficulties[d]))
-                songsWith(*section, "stars=", passed[static_cast<size_t>(d)]);
+        for (const std::string &e : noteEngines())
+            if (engine.empty() || e == engine)
+                for (int d = 0; d < gh2::kDifficulties; ++d)
+                    if (const Section *section = s_store.find("band " + std::to_string(slot + 1) + " " + sectionGame(game, e) + " " + kDifficulties[d]))
+                        songsWith(*section, "stars=", passed[static_cast<size_t>(d)]);
         return passed;
     }
 
     std::set<std::string> unlockedSongs(const std::string &game)
     {
         std::set<std::string> unlocked;
-        for (int slot = 0; slot < gh2::kProfiles; ++slot)
-            for (const char *difficulty : kDifficulties)
-                if (const Section *section = s_store.find("band " + std::to_string(slot + 1) + " " + game + " " + difficulty))
-                    songsWith(*section, "unlocked", unlocked);
+        for (const std::string &engine : noteEngines())
+            for (int slot = 0; slot < gh2::kProfiles; ++slot)
+                for (const char *difficulty : kDifficulties)
+                    if (const Section *section = s_store.find("band " + std::to_string(slot + 1) + " " + sectionGame(game, engine) + " " + difficulty))
+                        songsWith(*section, "unlocked", unlocked);
         return unlocked;
     }
 
     bool unlockedItem(const std::string &game, const std::string &item)
     {
-        const std::string own = " " + game;
+        std::set<std::string> owns;
+        for (const std::string &engine : noteEngines())
+            owns.insert(" " + sectionGame(game, engine));
         for (const Section &section : s_store.sections)
         {
-            // [band N <game>] and [band N <game> <difficulty>].
-            const size_t at = section.name.find(own);
-            if (section.name.rfind("band ", 0) != 0 || at == std::string::npos ||
-                (at + own.size() != section.name.size() && section.name[at + own.size()] != ' '))
+            // [band N <game>] and [band N <game> <difficulty>], under any engine.
+            if (section.name.rfind("band ", 0) != 0 ||
+                std::none_of(owns.begin(), owns.end(), [&](const std::string &own) {
+                    const size_t at = section.name.find(own);
+                    return at != std::string::npos &&
+                           (at + own.size() == section.name.size() || section.name[at + own.size()] == ' ');
+                }))
                 continue;
             for (const auto &[key, value] : section.values)
             {
@@ -714,7 +761,7 @@ namespace gh2::save
 
     std::string lastGame()
     {
-        if (std::string game = readLastGame(); !game.empty())
+        if (std::string game = readState("last"); !game.empty())
             return game;
         // Before the boot's load, the save as it is on disk.
         Store disk;
@@ -727,9 +774,42 @@ namespace gh2::save
     void keepLastGame(const std::string &game)
     {
         s_store.section(kOwnSection).set("campaign", game);
-        if (!s_inMemory)
-            if (ini::writeReplacing(statePath(), [&](std::ofstream &out) { out << "[game]\nlast = " << game << "\n"; }))
-                std::cerr << "[save] could not write " << statePath() << std::endl;
+        s_lastGame = game;
+        quickplayEngine();
+        writeState();
+    }
+
+    std::string quickplayEngine()
+    {
+        if (s_quickplayEngine.empty())
+            s_quickplayEngine = readState("engine");
+        return s_quickplayEngine.empty() ? "gh2" : s_quickplayEngine;
+    }
+
+    void keepQuickplayEngine(const std::string &engine)
+    {
+        s_quickplayEngine = engine;
+        if (s_lastGame.empty())
+            s_lastGame = lastGame();
+        writeState();
+    }
+
+    void switchEngine(const std::string &engine, uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        if (engine == noteEngine())
+            return;
+        // Nothing to carry before the boot's load, which loads under the engine set.
+        if (!s_fresh)
+            return setNoteEngine(engine);
+        if (const std::optional<gh2::Save> save = saveCampaign(rdram, ctx, runtime))
+        {
+            keepOptions(save->options);
+            gh2::toStore(*save, *s_fresh, s_store, games());
+        }
+        setNoteEngine(engine);
+        gh2::Save save = gh2::fromStore(s_store, *s_fresh, games());
+        applyOptions(save.options);
+        loadCampaign(rdram, ctx, runtime, save);
     }
 
     void enterGame(const std::string &game, uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
