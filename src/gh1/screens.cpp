@@ -57,8 +57,12 @@ namespace gh2::gh1
             // going on and for its breakdown by section (endgame.dta's
             // me_morestats.btn) show in GH2's look, beside GH1's paper.
             {.gh1 = "endgame",
-             .with = {"me_continue.btn", "me_morestats.btn"},
-             .placed = {{"me_continue.btn", 305.0f, 0.0f, -100.0f}, {"me_morestats.btn", 305.0f, 0.0f, -120.0f}}},
+             .with = {"me_continue.btn", "me_morestats.btn", "newspaper_buttons.mesh", "newspaper_buttons.mat",
+                      "newspaper_buttons.tex", "me_maskingtape3.mesh", "me_maskingtape1.mat", "me_maskingtape1.tex"},
+             .placed = {{"newspaper_buttons.mesh", 257.0f, 5.0f, -92.0f},
+                        {"me_continue.btn", 257.0f, 0.0f, -82.0f},
+                        {"me_morestats.btn", 257.0f, 0.0f, -102.0f},
+                        {"me_maskingtape3.mesh", 300.0f, 4.0f, -92.0f}}},
             {"cashaward"},
             {"complete"},
             {"highscore"},
