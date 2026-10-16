@@ -32,6 +32,7 @@ namespace gh2
     namespace
     {
         std::atomic<uint16_t> s_scripted{0};
+        std::atomic<int> s_pads{1}; // ports with a guitar in: a scenario's (pads 2)
         std::atomic<uint64_t> s_scriptedAt{0}; // --timing: when a scripted press was set
 
         // --timing: a press this read is the first to see, the player's or
@@ -66,6 +67,12 @@ namespace gh2
                 const uint16_t pressed = pad.pressed | s_scripted.load(std::memory_order_relaxed) | pad::kLeft;
                 // The stub wants buttons active low.
                 ps2_stubs::setPadOverrideState(static_cast<uint16_t>(~pressed), pad.lx, pad.ly, pad.rx, pad.ry);
+                ps2_stubs::scePadRead(rdram, ctx, runtime);
+            }
+            else if (getRegU32(ctx, 4) < static_cast<uint32_t>(s_pads.load(std::memory_order_relaxed)))
+            {
+                // Another guitar for a two-player run, plugged in and idle.
+                ps2_stubs::setPadOverrideState(static_cast<uint16_t>(~pad::kLeft), 128, 128, 128, 128);
                 ps2_stubs::scePadRead(rdram, ctx, runtime);
             }
             else
@@ -114,6 +121,8 @@ namespace gh2
         runtime.replaceFunction(addresses.scePadRead, padRead);
         runtime.replaceFunction(addresses.scePadInfoAct, padInfoAct);
     }
+
+    void setPads(int count) { s_pads.store(count, std::memory_order_relaxed); }
 
     void setScriptedPad(uint16_t pressed)
     {

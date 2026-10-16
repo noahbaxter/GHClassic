@@ -295,6 +295,8 @@ namespace gh2::scenario
                     s_shooting = true;
                     return;
                 }
+                else if (verb == "pads")
+                    setPads(static_cast<int>(array.number(1)));
                 else if (verb == "record")
                     record::hold(array.symbol(1) != "on");
                 else if (verb == "poke")
@@ -543,6 +545,9 @@ namespace gh2::scenario
         // One that marks where --record starts records only from there.
         if (s_text.find("(record on)") != std::string::npos)
             record::hold(true);
+        // Its guitars are in from the start, as the game looks for them at boot.
+        if (s_text.find("(pads 2)") != std::string::npos)
+            setPads(2);
         return true;
     }
 

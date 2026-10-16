@@ -12,7 +12,9 @@
 //   (expect {taskmgr seconds} 33.47 0.1)  or, numbers, is within the third
 //   (press green)                      a fret's colour, up, down, left or right,
 //                                      pressed and let go as a player would
-//   (clock 100)                        the UI clock runs from there, 1/64 s a poll
+//   (pads 2)                           a second guitar plugged in, idle, for two
+//                                      players (each on autoplay)
+//   (clock 100)                      the UI clock runs from there, 1/64 s a poll
 //   (freeze 103 2.5 3.9)               holds TaskMgr's UI seconds (once a clock
 //                                      reaches them), seconds and beat there,
 //                                      with no camera shake and no hair
