@@ -210,23 +210,6 @@ namespace gh2::vector_fonts
                 return std::nullopt;
             const bool isPacked = load<uint32_t>(rdram, owner + milo::font::kPacked) != 0u;
 
-            // A grid font's cells go in its characters' order, each where
-            // the last ended or, when it would pass the bitmap's width, at
-            // the next row's start (UpdateChars 0x1fa068). In uv: the cell
-            // in pixels is not the one the CharInfo was laid out by once the
-            // 360's glyphs have been taken (gh2x/textures.cpp takeFont).
-            std::unordered_map<uint8_t, std::pair<float, float>> origin;
-            if (!isPacked)
-            {
-                const uint32_t chars = load<uint32_t>(rdram, owner + milo::font::kChars);
-                if (chars == 0u)
-                    return std::nullopt;
-                const int columns = static_cast<int>(1.0f / cellUv[0] + 1e-3f);
-                int i = 0;
-                for (const uint8_t *c = getMemPtr(rdram, chars); *c != 0u; ++c, ++i)
-                    origin.try_emplace(*c, static_cast<float>(i % columns) * cellUv[0],
-                                       static_cast<float>(i / columns) * cellUv[1]);
-            }
 
             std::vector<uint32_t> t = {0u, static_cast<uint32_t>(packed.colors.size()),
                                        bits(packed.cell[0] / cellUv[0]), bits(packed.cell[1] / cellUv[1]),
@@ -244,14 +227,16 @@ namespace gh2::vector_fonts
                 float ox = u, oy = v;
                 if (!isPacked)
                 {
-                    const auto at = origin.find(code);
-                    if (at == origin.end())
-                        continue;
-                    ox = at->second.first;
-                    oy = at->second.second;
-                    // The row is the game's own v: a cell elsewhere means a
-                    // layout this does not know, so the texture draws it.
-                    if (std::abs(oy - v) > 1e-3f || u < ox - 1e-3f || u > ox + cellUv[0] + 1e-3f)
+                    // A grid font's cell is the one its u falls in, u its
+                    // ink's left edge (UpdateChars 0x1fa068 measured it, its
+                    // tool before it), v the row's top. In uv: the cell in
+                    // pixels is not the one the CharInfo was laid out by
+                    // once the 360's glyphs have been taken (gh2x/textures.cpp).
+                    ox = std::floor(u / cellUv[0] + 1e-3f) * cellUv[0];
+                    oy = std::floor(v / cellUv[1] + 1e-3f) * cellUv[1];
+                    // A v off its row's top is a layout this does not know,
+                    // so the texture draws it.
+                    if (std::abs(oy - v) > 1e-3f)
                         continue;
                 }
                 t.insert(t.end(), {bits(u), bits(v), bits(u + w * cellUv[0]), bits(v + cellUv[1]), bits(ox), bits(oy),
@@ -309,6 +294,79 @@ namespace gh2::vector_fonts
     const std::vector<uint32_t> &glyphs()
     {
         return pack().glyphs;
+    }
+
+    std::vector<std::string> names()
+    {
+        std::vector<std::string> out;
+        for (const auto &[name, font] : pack().byName)
+            out.push_back(name);
+        return out;
+    }
+
+    std::optional<Glyph> glyph(std::string name, uint8_t code)
+    {
+        if (name.ends_with(".font"))
+            name.resize(name.size() - 5u);
+        const Pack &p = pack();
+        const auto found = p.byName.find(name);
+        if (found == p.byName.end())
+            return std::nullopt;
+        const Font &font = p.fonts[found->second];
+        const auto at = font.glyphs.find(code);
+        if (at == font.glyphs.end() || at->second.empty() || at->second[0] == kNone)
+            return std::nullopt;
+        Glyph g{at->second[0], {font.cell[0], font.cell[1]}};
+        std::memcpy(g.bounds, &p.glyphs[p.glyphs[0] + g.layer * 8u], sizeof(g.bounds));
+        return g;
+    }
+
+    std::vector<float> coverage(uint32_t layer, int x0, int y0, int x1, int y1, float ox, float oy, float sx, float sy)
+    {
+        constexpr int kSamples = 4; // a pixel's coverage from kSamples by kSamples points
+        std::vector<float> out;
+        out.reserve(static_cast<size_t>(std::max(x1 - x0, 0) * std::max(y1 - y0, 0)));
+        for (int y = y0; y < y1; ++y)
+            for (int x = x0; x < x1; ++x)
+            {
+                int hits = 0;
+                for (int j = 0; j < kSamples; ++j)
+                    for (int i = 0; i < kSamples; ++i)
+                        hits += inside(layer, (x - ox + (i + 0.5f) / kSamples) * sx - 0.5f, (y - oy + (j + 0.5f) / kSamples) * sy - 0.5f);
+                out.push_back(static_cast<float>(hits) / (kSamples * kSamples));
+            }
+        return out;
+    }
+
+    bool inside(uint32_t layer, float x, float y)
+    {
+        const std::vector<uint32_t> &vf = pack().glyphs;
+        const auto f = [&vf](uint32_t i)
+        {
+            float v;
+            std::memcpy(&v, &vf[i], 4u);
+            return v;
+        };
+        const uint32_t at = vf[0] + layer * 8u;
+        if (x < f(at) || y < f(at + 1u) || x > f(at + 2u) || y > f(at + 3u))
+            return false;
+        const int bands = static_cast<int>(vf[at + 7u]);
+        const int b = std::clamp(static_cast<int>(std::floor((y - f(at + 4u)) / f(at + 5u))), 0, bands - 1);
+        const uint32_t band = vf[at + 6u] + static_cast<uint32_t>(b);
+        const uint32_t first = vf[vf[1] + band * 2u], count = vf[vf[1] + band * 2u + 1u];
+        bool in = false;
+        for (uint32_t i = 0; i < count; ++i)
+        {
+            // Two words, each two i16 coordinates in 1/32 pixels (mesh.frag's vectorLine).
+            const uint32_t a = vf[vf[2] + (first + i) * 2u], c = vf[vf[2] + (first + i) * 2u + 1u];
+            const float x0 = static_cast<float>(static_cast<int16_t>(a & 0xffffu)) / 32.0f;
+            const float y0 = static_cast<float>(static_cast<int16_t>(a >> 16)) / 32.0f;
+            const float x1 = static_cast<float>(static_cast<int16_t>(c & 0xffffu)) / 32.0f;
+            const float y1 = static_cast<float>(static_cast<int16_t>(c >> 16)) / 32.0f;
+            if ((y0 > y) != (y1 > y) && x < x0 + (y - y0) * (x1 - x0) / (y1 - y0))
+                in = !in;
+        }
+        return in;
     }
 
     void tablesSince(size_t known, std::vector<std::vector<uint32_t>> &out)

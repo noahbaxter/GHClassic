@@ -10,6 +10,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -29,6 +30,10 @@ namespace gh2::textures
     // Its payload's id, the same for the same source, in any run that
     // mounts the same discs. Nothing is read. Any thread.
     uint32_t add(const Source &source);
+
+    // That payload's pixels changed by `edit` each time they are read: a
+    // font sheet given glyphs its disc lacks (gh2x/textures.cpp). Any thread.
+    void addEdit(uint32_t id, std::function<void(TextureData &)> edit);
 
     // Those payloads read on the worker's thread, ahead of the draw that
     // will first ask for them, and held for it a while: a scene's, as the

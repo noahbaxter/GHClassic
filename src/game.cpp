@@ -42,6 +42,7 @@
 #include "dev/null_rnd.h"
 #include "host/pad.h"
 #include "render/char_lod.h"
+#include "render/font_bake.h"
 #include "render/mesh_capture.h"
 #include "render/native_cull.h"
 #include "render/native_environ.h"
@@ -109,6 +110,7 @@ namespace
             gh2::installNoteStreak(runtime, gh2::kSlus21447);
             gh2::installStreakCounter(runtime, gh2::kSlus21447);
         }
+        gh2::installFontBake();
         gh2::installTourOrHigher(runtime, gh2::kSlus21447);
         gh2::installNoteSpeed(runtime, gh2::kSlus21447);
         gh2::slider_scale::install(runtime, gh2::kSlus21447);
