@@ -2,11 +2,13 @@
 
 #include "guest.h"
 #include "milo/layout.h"
+#include "render/texture_capture.h"
 #include "vector_fonts_pack.h"
 
 #include <miniz.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
 #include <iostream>
@@ -192,7 +194,160 @@ namespace gh2::vector_fonts
         // then per character its quad's uv rectangle, its cell's uv origin
         // and its glyph layer per layer (two words, kNone past the font's
         // layers).
-        std::optional<std::vector<uint32_t>> makeTable(uint8_t *rdram, uint32_t font, uint32_t tex, const Font &packed)
+        constexpr size_t kFitChars = 5u; // letters and digits with ink a sheet's fit needs
+        constexpr float kNudge = 1.5f;   // sheet pixels a character may move onto its own ink past the fit
+
+        // A character's quad in a sheet and its cell's corner, both in uv,
+        // and the pack's glyph layers it draws.
+        struct Quad
+        {
+            uint8_t code = 0;
+            float u0 = 0.0f, v0 = 0.0f, u1 = 0.0f, v1 = 0.0f, ox = 0.0f, oy = 0.0f;
+            std::vector<uint32_t> layers; // kNone past the font's own
+        };
+
+        // Where a profile of coverage first and last reaches half, to a
+        // fraction of a pixel, a pixel's centre on its index
+        // (tools/fontstrip.py ink_left).
+        bool halfEdges(const std::vector<float> &p, float &lo, float &hi)
+        {
+            const auto first = std::find_if(p.begin(), p.end(), [](float a) { return a >= 0.5f; });
+            if (first == p.end())
+                return false;
+            const auto last = std::find_if(p.rbegin(), p.rend(), [](float a) { return a >= 0.5f; });
+            const size_t i = static_cast<size_t>(first - p.begin()), j = p.size() - 1u - static_cast<size_t>(last - p.rbegin());
+            lo = i == 0u ? -0.5f : static_cast<float>(i - 1u) + (0.5f - p[i - 1u]) / std::max(p[i] - p[i - 1u], 1e-3f);
+            hi = j + 1u == p.size() ? static_cast<float>(j) + 0.5f
+                                    : static_cast<float>(j) + (p[j] - 0.5f) / std::max(p[j] - p[j + 1u], 1e-3f);
+            return true;
+        }
+
+        // How a font's glyphs sit in the sheet the game draws it from: a
+        // point q in a character's cell, in the sheet's pixels with a pixel's
+        // centre on its index, is the pack's (s * q + d), per axis. Fitted
+        // from the sheet's own ink, each letter's and digit's inked box
+        // against its glyph's bounds, least squares with outliers dropped once,
+        // so a disc whose sheet frames its glyphs otherwise than the one
+        // traced (GH1's rokk sits lower in its cells, the PS2's dyingmarker
+        // is drawn larger) has them over its own art. Then each measured
+        // character nudged onto its own ink, by what the fit leaves its box
+        // off by, up to kNudge of the sheet's pixels: a sheet drawn by hand
+        // apart from the one traced (the PS2's dyingmarker) has a one-pixel
+        // I that the font's fit alone misses. None when too few have ink.
+        struct Fit
+        {
+            float s[2] = {}, d[2] = {};
+            std::map<uint8_t, std::array<float, 2>> nudge; // pack pixels, per character
+        };
+        std::optional<Fit> fitSheet(const TextureData &sheet, const std::vector<Quad> &quads)
+        {
+            const std::vector<uint32_t> &vf = pack().glyphs;
+            const float W = static_cast<float>(sheet.width), H = static_cast<float>(sheet.height);
+            std::vector<std::pair<float, float>> pairs[2]; // (sheet, pack) edges, per axis
+            std::vector<std::pair<uint8_t, std::array<float, 8>>> boxes; // each one's sheet x0 x1 y0 y1, pack x0 x1 y0 y1
+            size_t inked = 0u;
+            for (const Quad &q : quads)
+            {
+                // Letters and digits fit the font; every character with ink is nudged.
+                const bool alnum = (q.code >= '0' && q.code <= '9') || (q.code >= 'A' && q.code <= 'Z') || (q.code >= 'a' && q.code <= 'z');
+                if (q.layers.empty())
+                    continue;
+                float bounds[4] = {1e9f, 1e9f, -1e9f, -1e9f};
+                for (const uint32_t layer : q.layers)
+                {
+                    if (layer == kNone)
+                        continue;
+                    float b[4];
+                    std::memcpy(b, &vf[vf[0] + layer * 8u], sizeof(b));
+                    bounds[0] = std::min(bounds[0], b[0]);
+                    bounds[1] = std::min(bounds[1], b[1]);
+                    bounds[2] = std::max(bounds[2], b[2]);
+                    bounds[3] = std::max(bounds[3], b[3]);
+                }
+                if (bounds[0] > bounds[2])
+                    continue;
+                const int x0 = std::max(static_cast<int>(std::floor(q.u0 * W)), 0), y0 = std::max(static_cast<int>(std::floor(q.v0 * H)), 0);
+                const int x1 = std::min(static_cast<int>(std::ceil(q.u1 * W)), static_cast<int>(sheet.width));
+                const int y1 = std::min(static_cast<int>(std::ceil(q.v1 * H)), static_cast<int>(sheet.height));
+                if (x1 <= x0 || y1 <= y0)
+                    continue;
+                std::vector<float> across(static_cast<size_t>(x1 - x0), 0.0f), down(static_cast<size_t>(y1 - y0), 0.0f);
+                for (int y = y0; y < y1; ++y)
+                    for (int x = x0; x < x1; ++x)
+                    {
+                        const float a = sheet.rgba[(static_cast<size_t>(y) * sheet.width + static_cast<size_t>(x)) * 4u + 3u] / 255.0f;
+                        across[static_cast<size_t>(x - x0)] = std::max(across[static_cast<size_t>(x - x0)], a);
+                        down[static_cast<size_t>(y - y0)] = std::max(down[static_cast<size_t>(y - y0)], a);
+                    }
+                float l, r, t, b;
+                if (!halfEdges(across, l, r) || !halfEdges(down, t, b))
+                    continue;
+                // In the cell: its first pixel's centre is 0.
+                const float cx = static_cast<float>(x0) - q.ox * W, cy = static_cast<float>(y0) - q.oy * H;
+                boxes.push_back({q.code, {cx + l, cx + r, cy + t, cy + b, bounds[0], bounds[2], bounds[1], bounds[3]}});
+                if (!alnum)
+                    continue;
+                pairs[0].insert(pairs[0].end(), {{cx + l, bounds[0]}, {cx + r, bounds[2]}});
+                pairs[1].insert(pairs[1].end(), {{cy + t, bounds[1]}, {cy + b, bounds[3]}});
+                ++inked;
+            }
+            if (inked < kFitChars)
+                return std::nullopt;
+            Fit fit;
+            for (int axis = 0; axis < 2; ++axis)
+            {
+                std::vector<std::pair<float, float>> &p = pairs[axis];
+                for (int pass = 0; pass < 2; ++pass)
+                {
+                    float mq = 0.0f, mp = 0.0f;
+                    for (const auto &[q, k] : p)
+                        mq += q, mp += k;
+                    mq /= static_cast<float>(p.size());
+                    mp /= static_cast<float>(p.size());
+                    float cov = 0.0f, var = 0.0f;
+                    for (const auto &[q, k] : p)
+                        cov += (q - mq) * (k - mp), var += (q - mq) * (q - mq);
+                    if (!(var > 1e-6f))
+                        return std::nullopt;
+                    fit.s[axis] = cov / var;
+                    fit.d[axis] = mp - fit.s[axis] * mq;
+                    if (pass == 1)
+                        break;
+                    // Once: edges more than three times the median miss off, at least a pack pixel.
+                    std::vector<float> miss;
+                    for (const auto &[q, k] : p)
+                        miss.push_back(std::abs(fit.s[axis] * q + fit.d[axis] - k));
+                    std::vector<float> sorted = miss;
+                    std::nth_element(sorted.begin(), sorted.begin() + sorted.size() / 2u, sorted.end());
+                    const float cut = std::max(3.0f * sorted[sorted.size() / 2u], 1.0f);
+                    std::vector<std::pair<float, float>> kept;
+                    for (size_t i = 0; i < p.size(); ++i)
+                        if (miss[i] <= cut)
+                            kept.push_back(p[i]);
+                    if (kept.size() < 2u * kFitChars)
+                        break;
+                    p = std::move(kept);
+                }
+                if (!(fit.s[axis] > 0.0f))
+                    return std::nullopt;
+            }
+            for (const auto &[code, e] : boxes)
+            {
+                std::array<float, 2> &n = fit.nudge[code];
+                for (int axis = 0; axis < 2; ++axis)
+                {
+                    const float *sheetEdges = &e[static_cast<size_t>(axis) * 2u], *packEdges = &e[4u + static_cast<size_t>(axis) * 2u];
+                    const float off = 0.5f * (packEdges[0] + packEdges[1]) -
+                                      (fit.s[axis] * 0.5f * (sheetEdges[0] + sheetEdges[1]) + fit.d[axis]);
+                    const float most = kNudge * fit.s[axis];
+                    n[static_cast<size_t>(axis)] = std::clamp(off, -most, most);
+                }
+            }
+            return fit;
+        }
+
+        std::optional<std::vector<uint32_t>> makeTable(uint8_t *rdram, uint32_t font, uint32_t tex, const Font &packed,
+                                                        const TextureData *sheet)
         {
             // RndFont::GetTexCoords (0x1f9c00) reads the texture owner's
             // character info.
@@ -210,13 +365,7 @@ namespace gh2::vector_fonts
                 return std::nullopt;
             const bool isPacked = load<uint32_t>(rdram, owner + milo::font::kPacked) != 0u;
 
-
-            std::vector<uint32_t> t = {0u, static_cast<uint32_t>(packed.colors.size()),
-                                       bits(packed.cell[0] / cellUv[0]), bits(packed.cell[1] / cellUv[1]),
-                                       packed.colors.empty() ? 0u : packed.colors[0],
-                                       packed.colors.size() > 1u ? packed.colors[1] : 0u,
-                                       packed.flags | quarters(packed.edge) << 8u | quarters(packed.feather) << 16u,
-                                       bits(packed.tone)};
+            std::vector<Quad> quads;
             for (const auto &[code, layers] : packed.glyphs)
             {
                 const uint32_t info = owner + milo::font::kCharInfo + code * 16u;
@@ -239,12 +388,43 @@ namespace gh2::vector_fonts
                     if (std::abs(oy - v) > 1e-3f)
                         continue;
                 }
-                t.insert(t.end(), {bits(u), bits(v), bits(u + w * cellUv[0]), bits(v + cellUv[1]), bits(ox), bits(oy),
-                                   layers.empty() ? kNone : layers[0], layers.size() > 1u ? layers[1] : kNone});
+                quads.push_back({code, u, v, u + w * cellUv[0], v + cellUv[1], ox, oy, layers});
+            }
+            if (quads.empty())
+                return std::nullopt;
+
+            // The pack's pixels a uv spans, and where in them a cell's corner
+            // falls: the master's cell stretched over the sheet's, unless the
+            // sheet's own ink says where its glyphs sit. mesh.frag takes
+            // p = (uv - origin) * scale - 0.5, so a fit's s and d go into the
+            // scale and each origin (Fit).
+            float scale[2] = {packed.cell[0] / cellUv[0], packed.cell[1] / cellUv[1]};
+            const auto fit = sheet ? fitSheet(*sheet, quads) : std::nullopt;
+            if (fit)
+            {
+                const float size[2] = {static_cast<float>(sheet->width), static_cast<float>(sheet->height)};
+                for (int axis = 0; axis < 2; ++axis)
+                    scale[axis] = fit->s[axis] * size[axis];
+            }
+            std::vector<uint32_t> t = {0u, static_cast<uint32_t>(packed.colors.size()), bits(scale[0]), bits(scale[1]),
+                                       packed.colors.empty() ? 0u : packed.colors[0],
+                                       packed.colors.size() > 1u ? packed.colors[1] : 0u,
+                                       packed.flags | quarters(packed.edge) << 8u | quarters(packed.feather) << 16u,
+                                       bits(packed.tone)};
+            for (const Quad &q : quads)
+            {
+                float shift[2] = {0.0f, 0.0f};
+                if (fit)
+                {
+                    const auto nudge = fit->nudge.find(q.code);
+                    for (int axis = 0; axis < 2; ++axis)
+                        shift[axis] = (fit->d[axis] + (nudge != fit->nudge.end() ? nudge->second[static_cast<size_t>(axis)] : 0.0f) +
+                                       0.5f - 0.5f * fit->s[axis]) / scale[axis];
+                }
+                t.insert(t.end(), {bits(q.u0), bits(q.v0), bits(q.u1), bits(q.v1), bits(q.ox - shift[0]), bits(q.oy - shift[1]),
+                                   q.layers.empty() ? kNone : q.layers[0], q.layers.size() > 1u ? q.layers[1] : kNone});
                 ++t[0];
             }
-            if (t[0] == 0u)
-                return std::nullopt;
             return t;
         }
     }
@@ -259,7 +439,7 @@ namespace gh2::vector_fonts
         const std::string name = fontName(rdram, font);
         const auto found = p.byName.find(name);
         if (found != p.byName.end())
-            if (auto table = makeTable(rdram, font, tex, p.fonts[found->second]))
+            if (auto table = makeTable(rdram, font, tex, p.fonts[found->second], capturedTexture(rdram, tex).get()))
             {
                 std::lock_guard lock(s_tablesLock);
                 id = static_cast<uint32_t>(s_tables.size());
