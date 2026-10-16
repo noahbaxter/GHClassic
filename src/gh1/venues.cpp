@@ -321,8 +321,13 @@ namespace gh2::gh1
             }
             Drivers drivers;
             std::set<std::string> unreached;
-            auto madeGeom =
-                geom(*gh2Geom, {&*gh2Chars, &*gh2Lights}, *room, *lighting, scripted(disc, name), drivers, unreached);
+            // A section's "<name>_rt.view" is unhooked from the View that
+            // drives it (VenueSection::IsLoaded, GH1 0x178db8), for the
+            // script's glue to run in milliseconds.
+            std::set<std::string> apart = scripted(disc, name);
+            for (const char *view : {kRoomView, kLightingView})
+                apart.insert(rtOf(view));
+            auto madeGeom = geom(*gh2Geom, {&*gh2Chars, &*gh2Lights}, *room, *lighting, apart, drivers, unreached);
             const Spots at = spots({&*lighting, &*room});
             Stage stage;
             auto madeChars = chars(*gh2Chars, at, setting(name, "allow_walks", 0.0f) != 0.0f,

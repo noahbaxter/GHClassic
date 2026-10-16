@@ -177,6 +177,12 @@ namespace gh2::gh1
             return out;
         }
 
+        // Whether animate() holds each anim at the frame it starts from. GH1's
+        // clocks (GameTime::Update, GH1 0x106a70) never go back, so with the
+        // song's position under 0 before the music they stand at 0, and an
+        // anim set going there stays on the frame it starts from.
+        bool s_hold = false;
+
         // {arena switch_anim <anim> (loop a b) (scale s) (blend t)}, or
         // switch_anim_rt in milliseconds, as {<anim> animate ...}: a range
         // from one frame to another, played once or looped, at the anim's
@@ -197,10 +203,12 @@ namespace gh2::gh1
             const float scale = number("scale", 1.0f), blend = number("blend", 0.0f);
             const float unit = realTime ? 1000.0f : kTicks;
             const auto from = dtb::number(span->nodes[1]), to = dtb::number(span->nodes[2]);
-            const bool still = from && to && *from == *to;
+            const bool still = s_hold || (from && to && *from == *to);
             std::vector<Node> ends = translated(span->nodes, 1u, venue);
             if (ends.size() != 2u)
                 return out;
+            if (s_hold)
+                ends[1] = ends[0];
             for (const Node &target : targets(cmd.nodes[2], venue))
             {
                 Node made = command({target, symbol("animate")});
@@ -486,6 +494,35 @@ namespace gh2::gh1
             return out;
         }
 
+        // Each section's Views on GH1's clocks (VenueSection::Poll, GH1
+        // 0x178ce8) from where the song is: its View on the song's ticks,
+        // its "<name>_rt.view" on its milliseconds, both under 0 before the
+        // music, as retail's lighting.view reads through the intro.
+        std::vector<Node> clocks(const Drivers &drivers)
+        {
+            const auto times = [](const char *clock, float by)
+            { return command({symbol("*"), command({symbol("taskmgr"), symbol(clock)}), real(by)}); };
+            std::vector<Node> out;
+            for (const char *top : {kRoomView, kLightingView})
+                for (const std::string &view : {std::string(top), rtOf(top)})
+                    if (const auto it = drivers.find(view); it != drivers.end())
+                        for (const std::string &driver : it->second)
+                        {
+                            const bool ms = view != top;
+                            const float unit = ms ? 1000.0f : kTicks;
+                            const Node from = times(ms ? "seconds" : "beat", unit);
+                            Node made = command({symbol(driver), symbol("animate"),
+                                                 array({symbol("range"), from, real(1.0e7f)})});
+                            if (ms)
+                                made.nodes.push_back(array({symbol("units"), integer(0)}));
+                            made.nodes.push_back(array(
+                                {symbol("period"),
+                                 command({symbol("/"), command({symbol("-"), real(1.0e7f), from}), real(unit)})}));
+                            out.push_back(std::move(made));
+                        }
+            return out;
+        }
+
         // What gh1_scene does as the intro starts. GH1 draws each section's
         // View, the crowd, the band, then each section's transparent View
         // (ArenaPanel::Draw, GH1 0x10d488), the guitarist's pool of light
@@ -510,11 +547,8 @@ namespace gh2::gh1
                                                 inRoom("spotlight01.lit"), symbol("guitarist0")})}));
             if (objects.count(kit))
                 out.push_back(command({symbol(kit), symbol("set_showing"), command({symbol("band"), symbol("room_kit")})}));
-            for (const char *top : {kRoomView, kLightingView})
-                if (const auto it = drivers.find(top); it != drivers.end())
-                    for (const std::string &driver : it->second)
-                        out.push_back(command({symbol(driver), symbol("animate"),
-                                               array({symbol("range"), real(0.0f), real(1.0e7f)})}));
+            for (Node &made : clocks(drivers))
+                out.push_back(std::move(made));
             for (const auto &[who, by] : {std::pair{"guitarist0", "singer0.env"}, std::pair{"guitarist1", "singer1.env"}})
                 if (objects.count(by))
                     for (Node &made : lit({who}, by))
@@ -633,6 +667,15 @@ namespace gh2::gh1
                     to.nodes.push_back(f.nodes[1]);
                 std::vector<Node> does = translated(f.nodes, body, venue);
                 to.nodes.insert(to.nodes.end(), does.begin(), does.end());
+                // The dim lights as they stand before the music (gh1/scripts.dta).
+                if (f.nodes[0].text == "set_lights_bad")
+                {
+                    s_hold = true;
+                    std::vector<Node> held = translated(f.nodes, body, venue);
+                    s_hold = false;
+                    Node &hold = handler("gh1_lights_hold");
+                    hold.nodes.insert(hold.nodes.end(), std::make_move_iterator(held.begin()), std::make_move_iterator(held.end()));
+                }
             }
             for (const Node &h : theirs.handlers)
             {
@@ -651,13 +694,20 @@ namespace gh2::gh1
                     does = {command(std::move(does))};
                 }
                 to.nodes.insert(to.nodes.end(), does.begin(), does.end());
+                // What it sets going starts from its first frame when the
+                // clocks start, at the music (gh1_begin, gh1/scripts.dta).
+                if (name == "intro_start")
+                {
+                    Node &again = handler("gh1_intro_again");
+                    again.nodes.insert(again.nodes.end(), does.begin(), does.end());
+                }
             }
             // The scene's frame is the song's tick from its start, as far as a
             // song goes; the functions the glue calls are there for it to call.
             Node &gh1Scene = handler("gh1_scene");
             for (Node &does : scene(venue.drivers, venue.objects, kit))
                 gh1Scene.nodes.push_back(std::move(does));
-            for (const char *name : {"gh1_music_start", "hit_gem", "set_lights_bad", "set_lights_okay_verse",
+            for (const char *name : {"gh1_music_start", "gh1_intro_again", "hit_gem", "gh1_lights_hold", "set_lights_bad", "set_lights_okay_verse",
                                      "set_lights_okay_chorus", "set_lights_okay_solo", "set_lights_great_verse",
                                      "set_lights_great_chorus", "set_lights_great_solo"})
                 handler(name);
