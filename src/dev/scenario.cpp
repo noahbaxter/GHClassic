@@ -30,6 +30,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 
 namespace gh2::scenario
 {
@@ -296,7 +297,19 @@ namespace gh2::scenario
                     return;
                 }
                 else if (verb == "record")
-                    record::hold(array.symbol(1) != "on");
+                {
+                    const std::string state = array.symbol(1);
+                    if (state == "on")
+                        record::start(array.size() > 2 ? array.symbol(2) : "");
+                    else if (state == "off")
+                        record::stop();
+                    else
+                    {
+                        std::cerr << "[scenario] FAIL: (record " << state << "), not on or off" << std::endl;
+                        quit();
+                        return;
+                    }
+                }
                 else if (verb == "poke")
                 {
                     // A word of the object the first argument evaluates to: an int or a float's bits.
@@ -540,9 +553,16 @@ namespace gh2::scenario
         s_text.clear();
         if (!read(path, s_text))
             return false;
-        // One that marks where --record starts records only from there.
-        if (s_text.find("(record on)") != std::string::npos)
-            record::hold(true);
+        // One with (record) steps records only their clips: none until the
+        // first. Its steps are parsed later, by the game, so it is found here
+        // by the text, outside ; comments.
+        std::istringstream lines(s_text);
+        for (std::string line; std::getline(lines, line);)
+            if (line.substr(0, line.find(';')).find("(record ") != std::string::npos)
+            {
+                record::stop();
+                break;
+            }
         return true;
     }
 

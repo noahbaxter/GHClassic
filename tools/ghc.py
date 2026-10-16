@@ -38,11 +38,12 @@ through arm side by side, the sheets staying in each run as shots.png unless
 --review: a run passes when it reaches its last step and quits with no FAIL
 or STALL in its log. Both clear runs/ of runs older than three days.
 
-record runs a scenario as arm does and makes it a video, picture and sound,
+record runs a scenario as arm does and makes it videos, picture and sound,
 in review/ as <date>_<time>_<scenario's name>.mp4: the game pipes each frame
 to ffmpeg as it draws and writes its mixed sound beside it, both on the
-game's clock, so it can run faster than real time. A scenario's (record on)
-and (record off) steps clip it; without them the whole run is recorded.
+game's clock, so it can run faster than real time. Without (record) steps the
+whole run is one video; with them, each (record on name) to (record off) is
+its own, <scenario's name>_<name>.mp4.
 
 release packages a build for players, who bring their own disc: a zip of
 the game beside PUT_DISC_HERE on Windows and Linux, a disk image on macOS.
@@ -389,7 +390,7 @@ def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=N
         review=None, release=None, settings=(), perf=False, record=None):
     """One unattended run into out. Returns 'exited before Ns' or 'alive at Ns'.
     With review, its shot sheet goes to review/ under that name rather than out.
-    With record, the run is also that .mp4 (the game's --record)."""
+    With record, the run's clips also go in that folder (the game's --record)."""
     from PIL import Image
 
     out = Path(out)
@@ -415,6 +416,7 @@ def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=N
     if perf:
         cmd += ["--profiler"]
     if record:
+        Path(record).mkdir(parents=True, exist_ok=True)
         cmd += ["--record", str(Path(record).resolve())]
     cmd += ["--fast-boot", "--seed", "1", "--hidden", "--mute", "--save", str(out / "save.bin"),
             "--settings", str(out / "settings.ini"), "--shots", str(out / "frames"), "--shot-every", str(shot_every)]
@@ -509,18 +511,35 @@ def cmd_record(argv):
     parser.add_argument("--set", action="append", default=[], metavar="NAME=VALUE", dest="settings",
                         help="a settings.ini line over the defaults, e.g. msaa=1; may repeat")
     args = parser.parse_args(argv)
+    if not shutil.which("ffmpeg"):
+        sys.exit("record needs ffmpeg")
     name = Path(args.scenario).stem
-    video = review_path(name, ".mp4")
     out = ROOT / "runs" / f"{time.strftime('%Y-%m-%d_%H%M%S')}_{name}"
+    clips = out / "clips"
     prune_runs()
     # No periodic frames: (shot) steps still come out as a sheet.
     state = arm(out, args.scenario, args.speed, args.secs, args.disc, 1 << 30, res=args.res, games=args.discs,
-                review=name, settings=args.settings, record=video)
+                review=name, settings=args.settings, record=clips)
     print(f"{state}, log {out / 'run.log'}")
     for line in (out / "run.log").read_text(errors="replace").splitlines():
         if line.startswith("[record]") or "FAIL" in line or "STALL" in line:
             print(line)
-    if not video.exists():
+    # Each clip's picture and sound as one .mp4, in the order they were made.
+    videos = sorted(clips.glob("*.ts"), key=lambda p: p.stat().st_mtime)
+    made = 0
+    for video in videos:
+        # A run's one unnamed clip is the scenario's name alone.
+        mp4 = review_path(name if len(videos) == 1 and video.stem.isdigit() else f"{name}_{video.stem}", ".mp4")
+        cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", video]
+        sound = video.with_suffix(".f32")
+        if sound.exists() and sound.stat().st_size:
+            # At the game's kAudioRate (host/audio.h).
+            cmd += ["-f", "f32le", "-ar", "48000", "-ac", "2", "-i", sound, "-c:a", "aac", "-b:a", "192k",
+                    "-shortest"]
+        if subprocess.run([*cmd, "-c:v", "copy", mp4]).returncode == 0:
+            print(mp4)
+            made += 1
+    if not made:
         return 1
 
 

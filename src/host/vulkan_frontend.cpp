@@ -905,7 +905,7 @@ namespace gh2
             !s.recordOverlay(cmd, slot, s.target, {{0, 0}, {s.targetWidth, s.targetHeight}}, false))
             return false;
 
-        const bool recording = record::on() && !moviePlaying;
+        const bool recording = record::wanted() && !moviePlaying;
         // A hidden frame's own slot on the game's clock, which a late wake
         // does not move; a shown one's, when it is drawn.
         const auto drawnAt = present ? ps2x::host_clock::now() : s.nextHiddenFrame;

@@ -1,11 +1,10 @@
 #include "host/record.h"
 
-#include "host/audio.h"
-
+#include <atomic>
 #include <condition_variable>
+#include <csignal>
 #include <cstdio>
 #include <deque>
-#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <mutex>
@@ -17,27 +16,35 @@ namespace gh2::record
     namespace
     {
         using Picture = std::shared_ptr<const std::vector<uint8_t>>;
+        // A picture for a clip's ffmpeg, or with none, the clip's end: its pipe closed.
+        struct Item
+        {
+            Picture picture;
+            FILE *video;
+        };
 
         std::mutex s_mutex;
         std::condition_variable s_changed;
-        std::string s_path;
-        FILE *s_video = nullptr; // ffmpeg's stdin
-        FILE *s_sound = nullptr; // raw f32le beside the .mp4
+        std::string s_dir;
+        std::atomic<bool> s_wanted{true};
+        std::string s_next; // the next clip's name, if given
+        int s_clips = 0;
+        bool s_finished = false;
+
+        // The clip on: ffmpeg's stdin, its sound, its first frame on the
+        // game's clock and its counts.
+        std::string s_clip;
+        FILE *s_video = nullptr;
+        FILE *s_sound = nullptr;
         std::chrono::steady_clock::time_point s_start{};
         uint64_t s_written = 0, s_repeated = 0, s_dropped = 0;
-        bool s_started = false, s_finished = false;
-        // Held, and held since the last frame: the next one carries on.
-        bool s_held = false, s_resumed = false;
 
         // Frames on their way to ffmpeg, so the game never waits on it: its
         // encoder takes a moment to start, and runs beside the game after.
         // A second's worth at most; past that the game waits.
         constexpr size_t kQueued = 60u;
-        std::deque<Picture> s_queue;
+        std::deque<Item> s_queue;
         std::thread s_writer;
-
-        std::string videoPath() { return s_path + ".video.mp4"; }
-        std::string soundPath() { return s_path + ".sound.f32"; }
 
         void write()
         {
@@ -47,60 +54,106 @@ namespace gh2::record
                 s_changed.wait(lock, [] { return !s_queue.empty() || s_finished; });
                 if (s_queue.empty())
                     return;
-                const Picture picture = std::move(s_queue.front());
+                const Item item = std::move(s_queue.front());
                 s_queue.pop_front();
                 s_changed.notify_all();
                 lock.unlock();
-                std::fwrite(picture->data(), 1, picture->size(), s_video);
+                if (item.picture)
+                    std::fwrite(item.picture->data(), 1, item.picture->size(), item.video);
+                else
+                    pclose(item.video);
                 lock.lock();
             }
         }
-    }
 
-    void setPath(const std::string &path) { s_path = path; }
-
-    bool on() { return !s_path.empty(); }
-
-    void hold(bool held)
-    {
-        std::lock_guard<std::mutex> lock(s_mutex);
-        s_resumed = s_resumed || (s_held && !held);
-        s_held = held;
-    }
-
-    void frame(const uint8_t *rgba, uint32_t width, uint32_t height, std::chrono::steady_clock::time_point at,
-               std::chrono::nanoseconds period)
-    {
-        std::unique_lock<std::mutex> lock(s_mutex);
-        if (s_path.empty() || s_finished || s_held)
-            return;
-        // Back from a hold: this frame is the next in the video.
-        if (s_resumed && s_started)
-            s_start = at - period * static_cast<int64_t>(s_written);
-        s_resumed = false;
-        if (!s_started)
+        // Under s_mutex: the clip on, ended. Its pipe closes behind the
+        // frames still queued for it.
+        void end()
         {
+            if (!s_video)
+                return;
+            s_queue.push_back({nullptr, s_video});
+            s_changed.notify_all();
+            std::fclose(s_sound);
+            s_video = s_sound = nullptr;
+            std::cerr << "[record] " << s_clip << ": " << s_written << " frames, " << s_repeated << " repeated and "
+                      << s_dropped << " dropped (any repeated: the game fell behind its clock, so a lower --speed)"
+                      << std::endl;
+        }
+
+        // Under s_mutex: a clip from this frame.
+        bool begin(uint32_t width, uint32_t height, std::chrono::steady_clock::time_point at,
+                   std::chrono::nanoseconds period)
+        {
+            char number[16];
+            std::snprintf(number, sizeof(number), "%02d", ++s_clips);
+            s_clip = s_next.empty() ? number : s_next;
+            s_next.clear();
+            const std::string path = s_dir + "/" + s_clip;
             // VideoToolbox: the Mac's own encoder, far faster than the game.
             // At the game's own rate, so the picture keeps time with the sound.
             char rate[32];
             std::snprintf(rate, sizeof(rate), "%.6f", 1e9 / static_cast<double>(period.count()));
             const std::string command = "ffmpeg -hide_banner -loglevel error -y -f rawvideo -pix_fmt rgba -s " +
                                         std::to_string(width) + "x" + std::to_string(height) + " -r " + rate +
-                                        " -i - -c:v h264_videotoolbox -b:v 30M -pix_fmt yuv420p \"" + videoPath() +
-                                        "\"";
+                                        " -i - -c:v h264_videotoolbox -b:v 30M -pix_fmt yuv420p \"" + path +
+                                        ".ts\"";
             s_video = popen(command.c_str(), "w");
-            s_sound = std::fopen(soundPath().c_str(), "wb");
+            s_sound = std::fopen((path + ".f32").c_str(), "wb");
             if (!s_video || !s_sound)
             {
-                std::cerr << "[record] cannot start ffmpeg or " << soundPath() << std::endl;
-                s_path.clear();
-                return;
+                std::cerr << "[record] cannot start ffmpeg or " << path << ".f32" << std::endl;
+                if (s_video)
+                    pclose(s_video);
+                if (s_sound)
+                    std::fclose(s_sound);
+                s_video = s_sound = nullptr;
+                s_dir.clear();
+                return false;
             }
             s_start = at;
-            s_started = true;
-            s_writer = std::thread(write);
+            s_written = s_repeated = s_dropped = 0u;
+            if (!s_writer.joinable())
+                s_writer = std::thread(write);
+            return true;
         }
-        // Its place in the video, by the game's clock.
+    }
+
+    void setPath(const std::string &dir)
+    {
+        s_dir = dir;
+#ifdef SIGPIPE
+        // An ffmpeg that dies fails its writes rather than ending the game.
+        std::signal(SIGPIPE, SIG_IGN);
+#endif
+    }
+
+    void start(const std::string &name)
+    {
+        std::lock_guard<std::mutex> lock(s_mutex);
+        end();
+        s_next = name;
+        s_wanted = true;
+    }
+
+    void stop()
+    {
+        std::lock_guard<std::mutex> lock(s_mutex);
+        end();
+        s_wanted = false;
+    }
+
+    bool wanted() { return s_wanted.load(std::memory_order_relaxed) && !s_dir.empty(); }
+
+    void frame(const uint8_t *rgba, uint32_t width, uint32_t height, std::chrono::steady_clock::time_point at,
+               std::chrono::nanoseconds period)
+    {
+        std::unique_lock<std::mutex> lock(s_mutex);
+        if (s_dir.empty() || s_finished || !s_wanted)
+            return;
+        if (!s_video && !begin(width, height, at, period))
+            return;
+        // Its place in the clip, by the game's clock.
         const auto place = static_cast<uint64_t>((at - s_start + period / 2) / period);
         if (place < s_written)
         {
@@ -109,10 +162,14 @@ namespace gh2::record
         }
         const auto picture =
             std::make_shared<const std::vector<uint8_t>>(rgba, rgba + size_t(width) * height * 4u);
+        FILE *const video = s_video;
         while (s_written <= place)
         {
             s_changed.wait(lock, [] { return s_queue.size() < kQueued; });
-            s_queue.push_back(picture);
+            // Ended while it waited: its pipe is closing.
+            if (s_video != video)
+                return;
+            s_queue.push_back({picture, video});
             s_changed.notify_all();
             s_repeated += s_written < place;
             ++s_written;
@@ -122,7 +179,7 @@ namespace gh2::record
     void audio(const float *stereo, size_t frames)
     {
         std::lock_guard<std::mutex> lock(s_mutex);
-        if (s_started && !s_finished && !s_held && !s_resumed)
+        if (s_sound)
             std::fwrite(stereo, sizeof(float), frames * 2u, s_sound);
     }
 
@@ -130,22 +187,13 @@ namespace gh2::record
     {
         {
             std::lock_guard<std::mutex> lock(s_mutex);
-            if (!s_started || s_finished)
+            if (s_finished)
                 return;
+            end();
             s_finished = true;
         }
         s_changed.notify_all();
-        s_writer.join();
-        pclose(s_video);
-        std::fclose(s_sound);
-        const std::string command = "ffmpeg -hide_banner -loglevel error -y -i \"" + videoPath() +
-                                    "\" -f f32le -ar " + std::to_string(kAudioRate) + " -ac 2 -i \"" + soundPath() +
-                                    "\" -c:v copy -c:a aac -b:a 192k -shortest \"" + s_path + "\"";
-        const int status = std::system(command.c_str());
-        std::filesystem::remove(videoPath());
-        std::filesystem::remove(soundPath());
-        std::cerr << "[record] " << s_path << (status == 0 ? "" : " failed") << ": " << s_written << " frames, "
-                  << s_repeated << " repeated and " << s_dropped
-                  << " dropped (any repeated: the game fell behind its clock, so a lower --speed)" << std::endl;
+        if (s_writer.joinable())
+            s_writer.join();
     }
 }
