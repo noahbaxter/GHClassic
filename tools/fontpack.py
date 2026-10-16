@@ -5,9 +5,12 @@
 
 Every fonts/<name>/trace*.json with "ship" goes in; unfinished traces wait in
 fonts/wip/<name>/, which git and this leave out. "ship" is true, or
-{"font": name, "layer": n, "color": [r, g, b], "aliases": [...]} for a layer
-of a font drawn in more than one (cutout's shadow under its face). A font is
-found in the game by its Font object's name less ".font", or an alias.
+{"font": name, "layer": n, "color": [r, g, b], "aliases": [...], "masked": true}
+for a layer of a font drawn in more than one (cutout's shadow under its face).
+A font is found in the game by its Font object's name less ".font", or an
+alias. A masked font's look is its texture's (chalk, grime, grain): the outline
+only cuts the texture's own pixels to a sharp edge, and where the texture fades
+toward that edge its glyphs' usual inside opacity, its tone, stands in.
 
 Each glyph's outline is read from the OTF, flattened to lines within FLAT of
 the curves, and placed in its game cell (the master source's pixels, a
@@ -18,8 +21,9 @@ only tests the lines near it.
 Layout, little-endian, zlib-compressed after an 8-byte "GHVZ" + raw size:
     "GHVF" u32 version u32 fonts
     per font: u8 len, name; u8 aliases, each u8 len + name; f32 cell w, h;
-              u8 layers, each r g b a; u16 glyphs, each u16 code + u32 per
-              layer (a glyph layer index, 0xffffffff for none)
+              u8 layers, each r g b a; u8 flags (1 masked), f32 tone; u16
+              glyphs, each u16 code + u32 per layer (a glyph layer index,
+              0xffffffff for none)
     u32 glyph layers, each f32 x0 y0 x1 y1 (bounds), f32 band y0, band h,
         u32 first band, band count
     u32 bands, each u32 first line, line count
@@ -45,7 +49,7 @@ LINE_UNIT = 32    # line coordinates are in 1/LINE_UNIT pixels
 BAND = 6.0        # master pixels a band spans at most
 BAND_PAD = 3.0    # lines this near a band count in it, for the edge distance
 MAX_BANDS = 16
-VERSION = 1
+VERSION = 2
 
 
 class Flatten(BasePen):
@@ -137,7 +141,16 @@ def ship_of(cfg, config):
         return None
     s = {} if s is True else dict(s)
     return {"font": s.get("font", config.parent.name), "layer": s.get("layer", 0),
-            "color": s.get("color", [255, 255, 255]), "aliases": s.get("aliases", [])}
+            "color": s.get("color", [255, 255, 255]), "aliases": s.get("aliases", []),
+            "masked": bool(s.get("masked"))}
+
+
+def tone_of(picked):
+    """The median opacity inside a font's glyphs, two pixels in from their edges."""
+    from scipy import ndimage
+    inner = [a[ndimage.binary_erosion(a > 0.5, iterations=2)] for a, _ in picked.values()]
+    inner = np.concatenate([v for v in inner if v.size]) if any(v.size for v in inner) else np.ones(1)
+    return float(np.median(inner))
 
 
 def main():
@@ -150,19 +163,22 @@ def main():
         cfg = json.loads(config.read_text())
         ship = ship_of(cfg, config)
         if ship:
-            f = fonts.setdefault(ship["font"], {"layers": {}, "aliases": set()})
+            f = fonts.setdefault(ship["font"], {"layers": {}, "aliases": set(), "masked": False})
             f["aliases"].update(ship["aliases"])
+            f["masked"] |= ship["masked"]
             f["layers"][ship["layer"]] = (config, cfg, ship["color"])
 
     glyph_layers, bands_out, lines_out = [], [], []
     body = bytearray(b"GHVF" + struct.pack("<II", VERSION, len(fonts)))
     for name, f in fonts.items():
         layers = [f["layers"][k] for k in sorted(f["layers"])]
-        per_layer, cell = [], None
+        per_layer, cell, tone = [], None, 1.0
         for config, cfg, color in layers:
             otf = config.parent / f"{cfg['name'].replace(' ', '')}.otf"
             picked, shape = fonttrace.pick(cfg, args.src / "tex")
-            cell = cell or (shape[1], shape[0])
+            if cell is None:
+                cell = (shape[1], shape[0])
+                tone = tone_of(picked)
             place = placement(cfg, picked, otf, fontstrip.glyph_xmin(otf))
             glyphs = {}
             for c, lines in glyph_lines(otf).items():
@@ -190,6 +206,7 @@ def main():
         body += struct.pack("<ffB", cell[0], cell[1], len(layers))
         for _, _, color in layers:
             body += bytes(list(color) + [255])
+        body += struct.pack("<Bf", 1 if f["masked"] else 0, tone)
         body += struct.pack("<H", len(codes))
         for c in codes:
             body += struct.pack("<H", ord(c))

@@ -1416,7 +1416,7 @@ namespace gh2
             return true;
         }
 
-        // Words past the pack's glyphs for font tables: a font's is 6 plus 8
+        // Words past the pack's glyphs for font tables: a font's is 8 plus 8
         // a character, so a thousand fonts' fit.
         static constexpr uint32_t kVectorTableWords = 1u << 18;
 

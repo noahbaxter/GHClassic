@@ -24,6 +24,8 @@ namespace gh2::vector_fonts
         {
             float cell[2] = {};
             std::vector<uint32_t> colors;                    // a layer's rgba8, bottom first
+            uint32_t flags = 0;                              // 1: masked, the outline cutting the texture's own pixels
+            float tone = 1.0f;                               // its glyphs' usual inside opacity
             std::map<uint8_t, std::vector<uint32_t>> glyphs; // a code's glyph layer per layer
         };
 
@@ -96,7 +98,7 @@ namespace gh2::vector_fonts
             }
             Reader r{body};
             const uint32_t magic = r.get<uint32_t>(), version = r.get<uint32_t>(), count = r.get<uint32_t>();
-            if (std::memcmp(&magic, "GHVF", 4u) != 0 || version != 1u)
+            if (std::memcmp(&magic, "GHVF", 4u) != 0 || version != 2u)
                 return pack;
             std::vector<Font> fonts(count);
             for (Font &font : fonts)
@@ -111,6 +113,8 @@ namespace gh2::vector_fonts
                 const uint8_t layers = r.get<uint8_t>();
                 for (uint8_t i = 0; i < layers; ++i)
                     font.colors.push_back(r.get<uint32_t>());
+                font.flags = r.get<uint8_t>();
+                font.tone = r.get<float>();
                 const uint16_t glyphs = r.get<uint16_t>();
                 for (uint16_t g = 0; g < glyphs; ++g)
                 {
@@ -171,9 +175,10 @@ namespace gh2::vector_fonts
         }
 
         // The table: its entry count, layer count, the scale from a cell's
-        // uv to the pack's pixels, each layer's colour, then per character
-        // its quad's uv rectangle, its cell's uv origin and its glyph layer
-        // per layer (two words, kNone past the font's layers).
+        // uv to the pack's pixels, each layer's colour, its flags and tone,
+        // then per character its quad's uv rectangle, its cell's uv origin
+        // and its glyph layer per layer (two words, kNone past the font's
+        // layers).
         std::optional<std::vector<uint32_t>> makeTable(uint8_t *rdram, uint32_t font, uint32_t tex, const Font &packed)
         {
             // RndFont::GetTexCoords (0x1f9c00) reads the texture owner's
@@ -213,7 +218,8 @@ namespace gh2::vector_fonts
             std::vector<uint32_t> t = {0u, static_cast<uint32_t>(packed.colors.size()),
                                        bits(packed.cell[0] / cellUv[0]), bits(packed.cell[1] / cellUv[1]),
                                        packed.colors.empty() ? 0u : packed.colors[0],
-                                       packed.colors.size() > 1u ? packed.colors[1] : 0u};
+                                       packed.colors.size() > 1u ? packed.colors[1] : 0u, packed.flags,
+                                       bits(packed.tone)};
             for (const auto &[code, layers] : packed.glyphs)
             {
                 const uint32_t info = owner + milo::font::kCharInfo + code * 16u;
