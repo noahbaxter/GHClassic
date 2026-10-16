@@ -1,0 +1,71 @@
+; The streak counter: player 0's note streak on a small odometer framed in
+; the score shell's metal (streak_counter.cpp adds it to the HUD's scene as
+; streak_counter), a drawer in the score meter: its top is the shell's
+; bottom edge. From a streak of $streak_counter_from it pulls down out from
+; behind the shell; a miss slides it back in. The score meter and the rock
+; meter sit $streak_counter_lift higher all song, the room under the score
+; meter its, the rock meter raised to keep the two level.
+;
+; streak_counter.cpp calls streak_counter_enter as each song's HUD enters.
+
+; With the first streak popup (note_streak.dta), so the two share its slide.
+{set $streak_counter_from 50}
+; Its place in the score meter's space, z up the screen, y away from it:
+; its wheels' middle (24.6, 42 in its own space, times its scale) under the
+; multiplier (x 0), its top just under the shell's bottom edge, behind the
+; shell, which hides it $streak_counter_drop above that (a negative drop).
+{set $streak_counter_pos (-22 3 -146)}
+{set $streak_counter_drop -60}
+{set $streak_counter_scale 0.9}
+{set $streak_counter_lift 20}
+{set $streak_counter_display 0}
+
+{func streak_counter ($count)
+   {if $streak_counter_display
+      {ghc_streak_counter $streak_counter_display $count {>= $count $streak_counter_from}}
+   }
+}
+
+{new Object streak_counter_p0
+   (gem_hit_callback ($slot $hopoable $hopoed) {streak_counter {player0 current_streak}})
+   (gem_miss_callback ($slot_hit $real_slot $timing_error) {streak_counter 0})
+   (gem_pass_callback {streak_counter 0})
+}
+
+{func streak_counter_enter
+   {set $streak_counter_display {hud find streak_counter}}
+   {if $streak_counter_display
+      {do
+         {$streak_counter_display set_local_scale
+            $streak_counter_scale $streak_counter_scale $streak_counter_scale
+         }
+         {ghc_streak_counter_place $streak_counter_display
+            {elem $streak_counter_pos 0}
+            {elem $streak_counter_pos 1}
+            {elem $streak_counter_pos 2}
+            $streak_counter_drop
+            $streak_counter_lift
+            {hud find hud1_score_meter0.view}
+            {hud find hud1_rock_meter.view}
+         }
+         {ghc_streak_counter_mats $streak_counter_display
+            {$streak_counter_display find score_0.mat}
+            {$streak_counter_display find score_ones_0.mat}
+            {$streak_counter_display find score_ones_1.mat}
+            {$streak_counter_display find score_ones_2.mat}
+            {$streak_counter_display find score_ones_3.mat}
+            {$streak_counter_display find score_ones_4.mat}
+            {$streak_counter_display find score_ones_5.mat}
+            {$streak_counter_display find score_ones_6.mat}
+            {$streak_counter_display find score_ones_7.mat}
+            {$streak_counter_display find score_ones_8.mat}
+            {$streak_counter_display find score_ones_9.mat}
+            {$streak_counter_display find streak_icon.mat}
+         }
+         {streak_counter 0}
+         {if {&& {!= tutorial {gamecfg get mode}} {exists player_matcher0}}
+            {player_matcher0 add_sink streak_counter_p0}
+         }
+      }
+   }
+}

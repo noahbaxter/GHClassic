@@ -299,6 +299,9 @@ set(GHC_GAME_SOURCES
     src/settings/latency.cpp
     src/settings/settings.cpp
     src/settings/video_options.cpp
+    src/streak/counter.cpp
+    src/streak/counter_motion.cpp
+    src/streak/counter_scene.cpp
     src/streak/note_streak.cpp
     src/synth/module.cpp
     src/synth/reverb.cpp
@@ -405,9 +408,10 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     src/ui/dta/locale.dta src/ui/dta/crowd.dta src/ui/dta/sel_character.dta src/ui/dta/quickplay.dta
     src/ui/dta/campaigns.dta src/gh1/menus.dta src/gh1/scripts.dta src/ui/dta/picker.dta src/ui/dta/quickplay_pickers.dta
     src/content/guitar_copy.dta src/ui/dta/game_settings.dta src/ui/dta/photo_mode.dta src/ui/dta/box.dta
-    src/ui/dta/note_streak.dta)
+    src/ui/dta/note_streak.dta src/ui/dta/streak_counter.dta)
 file(READ src/ui/dta/box.dta GHC_BOX_DTA)
 file(READ src/ui/dta/note_streak.dta GHC_NOTE_STREAK_DTA)
+file(READ src/ui/dta/streak_counter.dta GHC_STREAK_COUNTER_DTA)
 file(READ src/ui/dta/game_settings.dta GHC_GAME_SETTINGS_DTA)
 file(READ src/ui/dta/photo_mode.dta GHC_PHOTO_MODE_DTA)
 configure_file(src/ui/dta/dta.h.in "${GHC_DTA_DIR}/dta.h" @ONLY)
