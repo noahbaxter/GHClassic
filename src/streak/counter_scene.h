@@ -24,8 +24,10 @@ namespace gh2::streak_counter
     // score_display.milo as the counter, at kScenePath.
     std::optional<ark::Made> makeScene();
 
-    // A copy of the score display that draws the counter's scene, in the
-    // score meter's Group after the score's. False when the scene has no
-    // score display there.
+    // For each meter <n> a HUD scene has, its score display and the streak
+    // display that is its shell: a copy of the score display that draws the
+    // counter's scene, streak_counter<n>, in the Group that draws the shell,
+    // after it. One for single player and co-op, two for face-off. False when
+    // the scene has none.
     bool addCounter(milo::Dir &scene);
 }

@@ -21,7 +21,7 @@ namespace gh2::streak_counter
     namespace
     {
         constexpr const char *kScore = "hud/gen/score_display.milo_ps2";
-        constexpr const char *kScoreDisplay = "BandScoreDisplay1", *kScoreView = "hud1_score_meter0.view";
+        // streak_counter<n>, for each meter <n>.
         constexpr const char *kCounterDisplay = "streak_counter";
 
         milo::Bytes lengthPrefixed(const std::string &s)
@@ -477,14 +477,31 @@ namespace gh2::streak_counter
 
     bool addCounter(milo::Dir &scene)
     {
-        const auto score = milo::find(scene, kScoreDisplay), view = milo::find(scene, kScoreView);
-        if (!score || !view || milo::find(scene, kCounterDisplay))
-            return false;
-        milo::Bytes body = scene.bodies[*score];
-        if (!replaceStr(body, "../score_display.milo", "../streak_counter.milo") ||
-            !addAfter(scene.bodies[*view], kScoreDisplay, kCounterDisplay))
-            return false;
-        milo::add(scene, "BandScoreDisplay", kCounterDisplay, std::move(body));
-        return true;
+        bool added = false;
+        for (int n = 1; n <= 2; ++n)
+        {
+            const std::string score = "BandScoreDisplay" + std::to_string(n);
+            const std::string shell = "BandStreakDisplay" + std::to_string(n);
+            const std::string counter = kCounterDisplay + std::to_string(n);
+            const auto from = milo::find(scene, score);
+            if (!from || !milo::find(scene, shell) || milo::find(scene, counter))
+                continue;
+            // The Group that draws the shell, whose space script puts the
+            // counter in (streak_counter.dta).
+            std::optional<size_t> group;
+            for (size_t i = 0; i < scene.entries.size() && !group; ++i)
+                if (scene.entries[i].first == "Group" && listHolding(scene.bodies[i], shell))
+                    group = i;
+            milo::Bytes body = scene.bodies[*from];
+            // Its own scene: the score's, or co-op's band score.
+            if (!group || !(replaceStr(body, "../score_display.milo", "../streak_counter.milo") ||
+                            replaceStr(body, "../coop_score.milo", "../streak_counter.milo")))
+                continue;
+            if (!addAfter(scene.bodies[*group], shell, counter))
+                continue;
+            milo::add(scene, "BandScoreDisplay", counter, std::move(body));
+            added = true;
+        }
+        return added;
     }
 }
