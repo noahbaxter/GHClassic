@@ -87,22 +87,22 @@ namespace gh2
             return {};
         }
 
-        // {ghc_streak_counter_mats <display> <score_0.mat> <score_ones_0.mat> ... <score_ones_9.mat> <streak_icon.mat>}:
-        // script finds a Mat as its Hmx::Object, the display keeps its
-        // RndMat, and the two are as far apart for every Mat.
-        script::Node streakCounterMats(const script::Call &call)
+        // {ghc_streak_counter_icon <display> <streak_icon.mat>}. A Mat as
+        // script finds it is the RndMat a display keeps.
+        script::Node streakCounterIcon(const script::Call &call)
         {
-            const uint32_t display = displayOf(call), zero = call.object(2);
-            if (!display || !zero || call.size() < 14)
-                return {};
-            const uint32_t digits = load<uint32_t>(call.rdram, display + kDigitMats);
-            const uint32_t delta = zero - load<uint32_t>(call.rdram, digits + 8u);
-            Counter &counter = s_counters[display];
-            for (int n = 0; n <= 9; ++n)
-                if (const uint32_t mat = call.object(3 + n))
-                    counter.ones[static_cast<size_t>(n)] = mat - delta;
-            if (const uint32_t icon = call.object(13))
-                counter.icon = icon - delta;
+            if (const uint32_t display = displayOf(call))
+                s_counters[display].icon = call.object(2);
+            return {};
+        }
+
+        // {ghc_streak_counter_digit <display> <wheel> <digit> <streak_w<wheel>_<digit>.mat>}
+        script::Node streakCounterDigit(const script::Call &call)
+        {
+            const uint32_t display = displayOf(call);
+            const auto wheel = static_cast<size_t>(call.number(2)), digit = static_cast<size_t>(call.number(3));
+            if (display && wheel < streak_counter::kWheels && digit <= 9u)
+                s_counters[display].digits[wheel][digit] = call.object(4);
             return {};
         }
 
@@ -121,31 +121,34 @@ namespace gh2
         }
 
         // A counter's wheel (SyncScore sets them from the right, the ones
-        // at count - 1, then the blank Mat on the rest): its ones with its
-        // own Mats, the blanks after the first zeros, and its first the
-        // icon, until a streak of 1000 puts a digit there.
+        // at count - 1, then the blank Mat on the rest): each wheel with its
+        // own digit Mats, the blanks as zeros, and the first the icon until a
+        // streak of 1000 puts a digit there. A new digit turns in.
         struct SetDigitMatTag;
         void onSetDigitMat(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
             const uint32_t display = GPR_U32(ctx, 4);
             const auto it = s_counters.find(display);
-            if (it == s_counters.end() || !it->second.icon)
-                return;
-            const Counter &counter = it->second;
-            const uint32_t wheels = (load<uint32_t>(rdram, display + kMeshes + 4u) - load<uint32_t>(rdram, display + kMeshes)) / 12u;
             const uint32_t which = GPR_U32(ctx, 5), mat = GPR_U32(ctx, 6);
+            if (it == s_counters.end() || !it->second.icon || which >= streak_counter::kWheels)
+                return;
+            Counter &counter = it->second;
             const uint32_t digits = load<uint32_t>(rdram, display + kDigitMats);
             int digit = -1;
             for (int n = 0; n <= 9; ++n)
                 if (load<uint32_t>(rdram, digits + 12u * static_cast<uint32_t>(n) + 8u) == mat)
                     digit = n;
-            uint32_t now = mat;
-            if (which + 1u == wheels)
-                now = counter.ones[static_cast<size_t>(std::max(digit, 0))];
-            else if (digit < 0)
-                now = which == 0u ? counter.icon : load<uint32_t>(rdram, digits + 8u);
-            if (now)
-                SET_GPR_U32(ctx, 6, now);
+            const uint32_t now = digit < 0 && which == 0u ? counter.icon
+                                                          : counter.digits[which][static_cast<size_t>(std::max(digit, 0))];
+            if (!now)
+                return;
+            SET_GPR_U32(ctx, 6, now);
+            if (now == counter.wheels[which].mat)
+                return;
+            // The first it shows, and the icon, are there at once.
+            const bool atOnce = counter.wheels[which].mat == 0u || now == counter.icon;
+            const uint32_t mesh = load<uint32_t>(rdram, load<uint32_t>(rdram, display + kMeshes) + 12u * which + 8u);
+            streak_counter::turnTo(rdram, counter.wheels[which], now, mesh, atOnce);
         }
 
         struct HudEnterTag;
@@ -164,7 +167,8 @@ namespace gh2
         script::runWhenUiReady(kStreakCounterDta);
         script::addCommand("ghc_streak_counter", streakCounter);
         script::addCommand("ghc_streak_counter_place", streakCounterPlace);
-        script::addCommand("ghc_streak_counter_mats", streakCounterMats);
+        script::addCommand("ghc_streak_counter_icon", streakCounterIcon);
+        script::addCommand("ghc_streak_counter_digit", streakCounterDigit);
         EntryHook<HudEnterTag>::install(runtime, addresses.hudPanelEnter, onHudEnter);
         EntryHook<SetScoreTag>::install(runtime, addresses.bandScoreDisplaySetScore, onSetScore);
         EntryHook<SetDigitMatTag>::install(runtime, addresses.bandScoreDisplaySetDigitMat, onSetDigitMat);

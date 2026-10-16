@@ -365,9 +365,9 @@ namespace gh2::streak_counter
         }
 
         // The score display's scene as the counter: four wheels, black with
-        // white digits and lines, the last with Mats of its own
-        // (score_ones_<n>), the first the icon (streak_icon), the rest of the
-        // score's six gone, and the shell's metal around it
+        // white digits and lines, each with digit Mats of its own
+        // (streak_w<wheel>_<digit>), the first the icon (streak_icon), the
+        // rest of the score's six gone, and the shell's metal around it
         // (streak_frame_<n>).
         std::optional<ark::Made> makeCounterScene()
         {
@@ -396,13 +396,15 @@ namespace gh2::streak_counter
 
             for (int n = 0; n <= 9; ++n)
             {
-                const std::string digit = "score_" + std::to_string(n), own = "score_ones_" + std::to_string(n);
-                const auto mat = milo::find(*scene, digit + ".mat");
+                const auto mat = milo::find(*scene, "score_" + std::to_string(n) + ".mat");
                 if (!mat)
                     return std::nullopt;
-                milo::Bytes m = scene->bodies[*mat];
-                whiten(m);
-                added.emplace_back(own + ".mat", std::move(m));
+                for (size_t w = 0; w < kWheels; ++w)
+                {
+                    milo::Bytes copy = scene->bodies[*mat];
+                    whiten(copy);
+                    added.emplace_back(wheelMat(w, n), std::move(copy));
+                }
             }
             added.emplace_back(kMetal, shell->bodies[*metal]);
             added.emplace_back("streak_frame.mat", shell->bodies[*metalMat]);
@@ -464,6 +466,11 @@ namespace gh2::streak_counter
                 milo::add(*scene, "Mesh", "streak_frame_" + std::to_string(s) + ".mesh", std::move(pieces[s]));
             return ark::held(milo::write(*scene));
         }
+    }
+
+    std::string wheelMat(size_t wheel, int digit)
+    {
+        return "streak_w" + std::to_string(wheel) + "_" + std::to_string(digit) + ".mat";
     }
 
     std::optional<ark::Made> makeScene() { return makeCounterScene(); }

@@ -48,19 +48,14 @@
             {hud find hud1_score_meter0.view}
             {hud find hud1_rock_meter.view}
          }
-         {ghc_streak_counter_mats $streak_counter_display
-            {$streak_counter_display find score_0.mat}
-            {$streak_counter_display find score_ones_0.mat}
-            {$streak_counter_display find score_ones_1.mat}
-            {$streak_counter_display find score_ones_2.mat}
-            {$streak_counter_display find score_ones_3.mat}
-            {$streak_counter_display find score_ones_4.mat}
-            {$streak_counter_display find score_ones_5.mat}
-            {$streak_counter_display find score_ones_6.mat}
-            {$streak_counter_display find score_ones_7.mat}
-            {$streak_counter_display find score_ones_8.mat}
-            {$streak_counter_display find score_ones_9.mat}
-            {$streak_counter_display find streak_icon.mat}
+         {ghc_streak_counter_icon $streak_counter_display {$streak_counter_display find streak_icon.mat}}
+         ; Each wheel's own digits, so one turns alone.
+         {foreach_int $w 0 4
+            {foreach_int $d 0 10
+               {ghc_streak_counter_digit $streak_counter_display $w $d
+                  {$streak_counter_display find {sprint "streak_w" $w "_" $d ".mat"}}
+               }
+            }
          }
          {streak_counter 0}
          {if {&& {!= tutorial {gamecfg get mode}} {exists player_matcher0}}
