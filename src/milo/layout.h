@@ -205,9 +205,16 @@ namespace milo
     }
 
     // RndFont: glyphs are its material's texture (ValidTexture 0x22e4f8).
+    // GetTexCoords (0x1f9c00) reads its texture owner's CharInfo: a quad from
+    // (u, v) to (u + width * tex cell x, v + tex cell y).
     namespace font
     {
-        constexpr uint32_t kMat = 0x30u; // RndMat*
+        constexpr uint32_t kMat = 0x30u;       // RndMat*
+        constexpr uint32_t kTexOwner = 0x3cu;  // RndFont*, itself when it owns its texture
+        constexpr uint32_t kCharInfo = 0x40u;  // 256 of {u, v, width, advance}, in uv but width in cells
+        constexpr uint32_t kChars = 0x1064u;   // its characters' String's char*
+        constexpr uint32_t kTexCell = 0x106cu; // cell width and height in uv
+        constexpr uint32_t kPacked = 0x1074u;  // bool word: CharInfo from the file, not a grid
     }
 
     // RndMesh, 0x180 bytes; PsMesh adds its packet at +0x150.

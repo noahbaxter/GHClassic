@@ -106,6 +106,7 @@ namespace gh2
         bool spread = false;
         std::shared_ptr<const TextureData> texture; // null for none
         uint32_t renderTarget = 0; // the rendered RndTex sampled in place of texture, 0 for none
+        int32_t vectorTable = -1;  // the vector font table its text is drawn from (render/vector_fonts.h), -1 for none
         uint32_t texGen = 0; // milo::mat::TexGen
         // uv' = u * uvXfm[0..1] + v * uvXfm[2..3] + uvXfm[4..5]
         float uvXfm[6] = {1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f};
