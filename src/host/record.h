@@ -27,11 +27,12 @@ namespace gh2::record
     // A clip is on, so frames are wanted.
     bool wanted();
 
-    // A drawn frame, RGBA, at that time on the game's clock. A frame late for
-    // its place in the clip repeats the one before, so the picture keeps time
-    // with the sound.
-    void frame(const uint8_t *rgba, uint32_t width, uint32_t height, std::chrono::steady_clock::time_point at,
-               std::chrono::nanoseconds period);
+    // A drawn frame, RGBA and shown at that aspect, at that time on the
+    // game's clock. One not the clip's size (a movie's, at its own) is fitted
+    // into it. A frame late for its place in the clip repeats the one before,
+    // so the picture keeps time with the sound.
+    void frame(const uint8_t *rgba, uint32_t width, uint32_t height, float aspect,
+               std::chrono::steady_clock::time_point at, std::chrono::nanoseconds period);
 
     // Interleaved stereo at kAudioRate, as mixed, into the clip on at its
     // place on the game's clock.

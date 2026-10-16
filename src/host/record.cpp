@@ -4,9 +4,11 @@
 #include "runtime/host_clock.h"
 
 #include <atomic>
+#include <cmath>
 #include <condition_variable>
 #include <csignal>
 #include <cstdio>
+#include <cstring>
 #include <deque>
 #include <iostream>
 #include <memory>
@@ -40,6 +42,7 @@ namespace gh2::record
         FILE *s_video = nullptr;
         FILE *s_sound = nullptr;
         std::chrono::steady_clock::time_point s_start{};
+        uint32_t s_width = 0, s_height = 0;
         std::chrono::nanoseconds s_period{};
         uint64_t s_written = 0, s_repeated = 0, s_dropped = 0, s_samples = 0;
 
@@ -87,10 +90,34 @@ namespace gh2::record
                       << std::endl;
         }
 
-        // Under s_mutex: a clip from this frame.
-        bool begin(uint32_t width, uint32_t height, std::chrono::steady_clock::time_point at,
-                   std::chrono::nanoseconds period)
+        // A picture not the clip's size, at its aspect in the middle of it,
+        // nearest pixel, with black either side.
+        Picture fit(const uint8_t *rgba, uint32_t width, uint32_t height, float aspect)
         {
+            auto out = std::make_shared<std::vector<uint8_t>>(size_t(s_width) * s_height * 4u, uint8_t{0});
+            uint32_t boxW = static_cast<uint32_t>(std::lround(s_height * aspect)), boxH = s_height;
+            if (boxW > s_width)
+            {
+                boxW = s_width;
+                boxH = static_cast<uint32_t>(std::lround(s_width / aspect));
+            }
+            const uint32_t left = (s_width - boxW) / 2u, top = (s_height - boxH) / 2u;
+            for (uint32_t y = 0; y < boxH; ++y)
+            {
+                const uint8_t *row = rgba + size_t(y * height / boxH) * width * 4u;
+                uint8_t *to = out->data() + (size_t(top + y) * s_width + left) * 4u;
+                for (uint32_t x = 0; x < boxW; ++x)
+                    std::memcpy(to + x * 4u, row + size_t(x * width / boxW) * 4u, 4u);
+            }
+            return out;
+        }
+
+        // Under s_mutex: a clip from this frame, as tall and 16:9, the widest
+        // the game is shown, so its 4:3 frames (boot's, a movie's) sit in it.
+        bool begin(uint32_t height, std::chrono::steady_clock::time_point at, std::chrono::nanoseconds period)
+        {
+            s_height = height;
+            s_width = (height * 16u / 9u + 1u) & ~1u;
             char number[16];
             std::snprintf(number, sizeof(number), "%02d", ++s_clips);
             s_clip = s_next.empty() ? number : s_next;
@@ -101,7 +128,7 @@ namespace gh2::record
             char rate[32];
             std::snprintf(rate, sizeof(rate), "%.6f", 1e9 / static_cast<double>(period.count()));
             const std::string command = "ffmpeg -hide_banner -loglevel error -y -f rawvideo -pix_fmt rgba -s " +
-                                        std::to_string(width) + "x" + std::to_string(height) + " -r " + rate +
+                                        std::to_string(s_width) + "x" + std::to_string(s_height) + " -r " + rate +
                                         " -i - -c:v h264_videotoolbox -b:v 30M -pix_fmt yuv420p \"" + path +
                                         ".ts\"";
             s_video = popen(command.c_str(), "w");
@@ -152,13 +179,13 @@ namespace gh2::record
 
     bool wanted() { return s_wanted.load(std::memory_order_relaxed) && !s_dir.empty(); }
 
-    void frame(const uint8_t *rgba, uint32_t width, uint32_t height, std::chrono::steady_clock::time_point at,
-               std::chrono::nanoseconds period)
+    void frame(const uint8_t *rgba, uint32_t width, uint32_t height, float aspect,
+               std::chrono::steady_clock::time_point at, std::chrono::nanoseconds period)
     {
         std::unique_lock<std::mutex> lock(s_mutex);
         if (s_dir.empty() || s_finished || !s_wanted)
             return;
-        if (!s_video && !begin(width, height, at, period))
+        if (!s_video && !begin(height, at, period))
             return;
         // Its place in the clip, by the game's clock.
         const auto place = static_cast<uint64_t>((at - s_start + period / 2) / period);
@@ -167,8 +194,10 @@ namespace gh2::record
             ++s_dropped;
             return;
         }
-        const auto picture =
-            std::make_shared<const std::vector<uint8_t>>(rgba, rgba + size_t(width) * height * 4u);
+        const Picture picture =
+            width == s_width && height == s_height
+                ? std::make_shared<const std::vector<uint8_t>>(rgba, rgba + size_t(width) * height * 4u)
+                : fit(rgba, width, height, aspect);
         FILE *const video = s_video;
         while (s_written <= place)
         {
