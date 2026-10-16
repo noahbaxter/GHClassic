@@ -59,6 +59,7 @@ Config keys:
                    small_fit / hole_fit: {size, fit overrides} for outer loops / counters
                      no bigger than size px, like accents or a small font's slit counters}
     glyph_fit     {chars: {fit overrides}}, e.g. less blur where a counter is a thin slit
+    svg           {char: file beside the config}: that glyph drawn, not traced (svg_loops)
     compose       {chars: base}: these accented letters take the base letter's trace for
                   every loop the two share, moved onto it, so a letter and its accented
                   forms match; compose_tol [box px, area fraction] is how alike a loop must be
@@ -67,6 +68,7 @@ Config keys:
 """
 import argparse
 import json
+import re
 from pathlib import Path
 
 import numpy as np
@@ -1106,7 +1108,38 @@ def trace(a, cfg):
         r = cfg["dots"]
         segs = dot_union(dot_lattice(a, r, cfg["dot_pitch"]) if cfg.get("dot_pitch") else dot_centers(a, r), r)
         return [(edge if i == 0 else np.empty((0, 2)), s) for i, s in enumerate(segs)]
+    if cfg.get("dot_rect"):
+        loops = rect_dots(loops, cfg["dot_rect"])
     return loops
+
+
+def rect_dots(loops, most):
+    """Each loop of at most `most` square pixels that sits inside no other (a
+    dot, a tick, a comma's head) as an upright rectangle of its area, centroid
+    and spread each way: a small font's dots then all come out alike, not each
+    a blob of its own anti-aliasing."""
+    polys = [flatten(s, 8) for _, s in loops]
+    out = []
+    for i, (pts, segs) in enumerate(loops):
+        p = polys[i]
+        x, y = p[:, 0], p[:, 1]
+        x1, y1 = np.roll(x, -1), np.roll(y, -1)
+        cross = x * y1 - x1 * y
+        area = cross.sum() / 2
+        nested = any(inside(p[0], polys[j]) for j in range(len(loops)) if j != i)
+        if abs(area) > most or abs(area) < 1e-6 or nested:
+            out.append((pts, segs))
+            continue
+        cx = ((x + x1) * cross).sum() / (6 * area)
+        cy = ((y + y1) * cross).sum() / (6 * area)
+        var_x = max(((x * x + x * x1 + x1 * x1) * cross).sum() / (12 * area) - cx * cx, 1e-6)
+        var_y = max(((y * y + y * y1 + y1 * y1) * cross).sum() / (12 * area) - cy * cy, 1e-6)
+        w, h = np.sqrt(12 * var_x), np.sqrt(12 * var_y)
+        k = np.sqrt(abs(area) / (w * h))
+        w, h = w * k / 2, h * k / 2
+        c = [np.array(v) for v in ((cx - w, cy - h), (cx + w, cy - h), (cx + w, cy + h), (cx - w, cy + h))]
+        out.append((pts, [("L", c[j], c[(j + 1) % 4]) for j in range(4)]))
+    return out
 
 
 def flatten(segs, per=24):
@@ -1351,6 +1384,23 @@ def composed(own, base, tol=(0.3, 0.03)):
     return out
 
 
+def svg_loops(path, shape):
+    """A drawn glyph's outline from an SVG of straight paths (absolute M, L, Z),
+    its viewBox the cell in pixels, as trace's loops: the master's pixels put a
+    pixel's center on its index, so half a pixel less."""
+    text = Path(path).read_text()
+    view = [float(v) for v in re.search(r'viewBox="([^"]+)"', text).group(1).split()]
+    k = (shape[1] / view[2], shape[0] / view[3])
+    loops = []
+    for d in re.findall(r'\sd="([^"]+)"', text):
+        for part in re.findall(r"M[^M]*", d):
+            nums = [float(v) for v in re.findall(r"-?\d+(?:\.\d+)?", part)]
+            pts = np.array(nums).reshape(-1, 2) * k - 0.5
+            segs = [("L", pts[i], pts[(i + 1) % len(pts)]) for i in range(len(pts))]
+            loops.append((np.vstack([pts, pts[:1]]), segs))
+    return loops
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("config", type=Path)
@@ -1381,7 +1431,10 @@ def main():
             continue
         a, tag = picked[c]
         gfit = fit_of(cfg, c)
-        loops = trace(a, gfit)
+        if c in cfg.get("svg", {}):
+            loops = svg_loops(args.config.parent / cfg["svg"][c], a.shape)
+        else:
+            loops = trace(a, gfit)
         if base_of.get(c) in picked and loops:
             comp = composed(loops, trace(picked[base_of[c]][0], fit_of(cfg, base_of[c])),
                             cfg.get("compose_tol", (0.3, 0.03)))

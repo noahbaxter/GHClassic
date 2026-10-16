@@ -1,0 +1,13 @@
+{
+ "name": "Stars",
+ "ship": true,
+ "copyright": "Copyright 2026 Noah Baxter",
+ "sources": [
+  {"tag": "360", "tex": "d3a7bea742ccd47d", "cell": [32, 32], "chars": "*_"}
+ ],
+ "svg": {"*": "star.svg", "_": "star_outline.svg"},
+ "baseline": 32,
+ "space": 32,
+ "sidebearing": 0,
+ "sample": "*_*"
+}
