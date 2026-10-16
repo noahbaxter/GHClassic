@@ -545,6 +545,10 @@ def cmd_record(argv):
     for video in videos:
         # A run's one unnamed clip is the scenario's name alone.
         mp4 = review_path(name if len(videos) == 1 and video.stem.isdigit() else f"{name}_{video.stem}", ".mp4")
+        # Another run's in the same minute stays.
+        stem, again = mp4.stem, 2
+        while mp4.exists():
+            mp4, again = mp4.with_stem(f"{stem}_{again}"), again + 1
         cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", video]
         sound = video.with_suffix(".f32")
         if sound.exists() and sound.stat().st_size:
