@@ -21,6 +21,7 @@
 #include "milo/layout.h"
 #include "milo/milo.h"
 #include "milo/objects.h"
+#include "render/font_bake.h"
 #include "render/texture_store.h"
 #include "render/vector_fonts.h"
 #include "settings/settings.h"
@@ -189,6 +190,48 @@ namespace gh2
             return out;
         }
 
+        // A packed 360 Font's characters whose box is narrower than their
+        // traced glyph (the 360's helveticablack & is as thin as the PS2's)
+        // moved to boxes their glyphs' width where the sheet has room, their
+        // info pointing there, the glyphs drawn in with the rest (drawAdded).
+        void moveNarrow(milo::Bytes &theirs, const std::string &name, Widened &out)
+        {
+            const auto their = milo::readFont(theirs, 25u);
+            if (!their || !their->infoAt || !their->packed)
+                return;
+            uint32_t size[2];
+            float cellUv[2];
+            std::memcpy(size, theirs.data() + their->bitmapAt, 8u);
+            std::memcpy(cellUv, theirs.data() + their->bitmapAt + 8u, 8u);
+            const float W = static_cast<float>(size[0]), H = static_cast<float>(size[1]);
+            const float cellW = cellUv[0] * W, cellH = cellUv[1] * H;
+            if (!(cellW > 0.0f) || !(cellH > 0.0f))
+                return;
+            out.width = W;
+            out.height = H;
+            for (const char c : their->chars)
+            {
+                const uint8_t code = static_cast<uint8_t>(c);
+                const auto glyph = vector_fonts::glyph(name, code);
+                float info[4];
+                std::memcpy(info, theirs.data() + their->infoAt + code * 16u, 16u);
+                if (!glyph || !(info[2] > 0.0f))
+                    continue;
+                const float sx = glyph->cell[0] / cellW, sy = glyph->cell[1] / cellH;
+                if ((glyph->bounds[2] - glyph->bounds[0]) / sx <= info[2] * cellW + 2.0f)
+                    continue;
+                const int w = static_cast<int>(std::ceil((glyph->bounds[2] + 0.5f) / sx)) + 1, h = static_cast<int>(std::lround(cellH));
+                const auto at = freeBox(theirs, *their, static_cast<int>(size[0]), static_cast<int>(size[1]), w, h);
+                if (!at)
+                    continue;
+                const float width = static_cast<float>(w) / cellW;
+                const float moved[4] = {static_cast<float>(at->first) / W, static_cast<float>(at->second) / H, width, width};
+                std::memcpy(theirs.data() + their->infoAt + code * 16u, moved, 16u);
+                out.cells.push_back({static_cast<float>(at->first), static_cast<float>(at->second), static_cast<float>(w),
+                                     static_cast<float>(h), glyph->layer, sx, sy});
+            }
+        }
+
         // A sheet's decoded pixels grown for what its Font gained, and the
         // traced glyphs drawn into the new cells at its own size, in the
         // colour of its ink. No smaller levels: they no longer match.
@@ -327,7 +370,10 @@ namespace gh2
                         milo::Bytes theirs = other->bodies[their];
                         // A sheet of one Font only: two would share its new rows.
                         if (font->second->size() == 1u)
+                        {
                             widened = widen(scene->bodies[mine], theirs, scene->entries[mine].second);
+                            moveNarrow(theirs, scene->entries[mine].second, widened);
+                        }
                         made.push_back(scene->bodies[mine]);
                         taken = taken && takeFont(made.back(), theirs, across, down);
                     }
@@ -341,7 +387,7 @@ namespace gh2
                 {
                     textures::addEdit(id, [widened](TextureData &data) { drawAdded(data, widened); });
                     std::cerr << "[gh2x textures] " << twin << " " << name << ": " << widened.cells.size()
-                              << " characters added from the traced font" << std::endl;
+                              << " characters added or moved, drawn from the traced font" << std::endl;
                 }
                 const std::vector<uint8_t> standIn =
                     textures::standIn(id, own->width * widened.larger, own->height * widened.larger);

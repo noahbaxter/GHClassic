@@ -160,6 +160,37 @@ namespace gh2
             return either ? static_cast<float>(both) / static_cast<float>(either) : 1.0f;
         }
 
+        // A packed font's character moved to a box its glyph's width where
+        // the sheet has room, its info pointing there (width and advance
+        // alike, as SetCharInfo 0x1f9c88 measures), its glyph drawn in.
+        bool moveWide(Sheet &sheet, milo::Bytes &body, const milo::Font &font, const Cell &cell, const vector_fonts::Glyph &glyph,
+                      const float ink[3])
+        {
+            const int W = sheet.header.width, H = sheet.header.height;
+            const int w = static_cast<int>(std::ceil((glyph.bounds[2] + 0.5f) / cell.sx)) + 1, h = cell.y1 - cell.y0;
+            const auto at = freeBox(body, font, W, H, w, h, [&sheet](int x, int y) { return sheet.alpha(sheet.index(x, y)) > 0.1f; });
+            if (!at)
+                return false;
+            Cell moved = cell;
+            moved.ox = static_cast<float>(at->first);
+            moved.oy = static_cast<float>(at->second);
+            moved.x0 = at->first;
+            moved.y0 = at->second;
+            moved.x1 = at->first + w;
+            moved.y1 = at->second + h;
+            const auto cover = coverage(moved, cell.layer);
+            for (int y = moved.y0; y < moved.y1; ++y)
+                for (int x = moved.x0; x < moved.x1; ++x)
+                    sheet.set(x, y, nearest(sheet, ink, cover[static_cast<size_t>((y - moved.y0) * w + (x - moved.x0))]));
+            float cellUv[2];
+            std::memcpy(cellUv, body.data() + font.bitmapAt + 8u, 8u);
+            const float width = static_cast<float>(w) / (cellUv[0] * static_cast<float>(W));
+            const float info[4] = {static_cast<float>(at->first) / static_cast<float>(W), static_cast<float>(at->second) / static_cast<float>(H),
+                                   width, width};
+            std::memcpy(body.data() + font.infoAt + static_cast<size_t>(cell.code) * 16u, info, 16u);
+            return true;
+        }
+
         // Each character of a Font whose cell in its sheet draws something
         // other than its traced glyph, drawn over with that glyph. The ones
         // drawn, for the log.
@@ -177,7 +208,7 @@ namespace gh2
             if (!sheet)
                 return {};
 
-            const milo::Bytes &body = scene.bodies[index];
+            milo::Bytes &body = scene.bodies[index];
             const std::string &chars = font->chars;
             const bool packed = font->packed;
             const size_t info = font->infoAt;
@@ -243,12 +274,19 @@ namespace gh2
                     size_t ink2 = 0u;
                     other = glyph && overlap(*sheet, cell, coverage(cell, glyph->layer), ink2) > cell.own + kBetter;
                 }
-                // Drawn only where it fits: a box narrower than its glyph
-                // (GH2's PS2 helveticablack & is 11 pixels) needs the Font's
-                // own metrics changed.
+                // Drawn in its box where it fits. A packed font's box
+                // narrower than its glyph (GH2's helveticablack & is 11
+                // pixels of a stray underscore) moves to where the sheet has
+                // room for it.
                 const auto glyph = vector_fonts::glyph(name, static_cast<uint8_t>(cell.code));
                 const float gx0 = (glyph->bounds[0] + 0.5f) / cell.sx + cell.ox, gx1 = (glyph->bounds[2] + 0.5f) / cell.sx + cell.ox;
                 const float gy0 = (glyph->bounds[1] + 0.5f) / cell.sy + cell.oy, gy1 = (glyph->bounds[3] + 0.5f) / cell.sy + cell.oy;
+                if (packed && gx1 - gx0 > static_cast<float>(cell.x1 - cell.x0) + 2.0f * kSpill)
+                {
+                    if (moveWide(*sheet, body, *font, cell, *glyph, ink))
+                        drawn += static_cast<char>(cell.code);
+                    continue;
+                }
                 const bool fits = gx0 > cell.x0 - kSpill && gx1 < cell.x1 + kSpill && gy0 > cell.y0 - kSpill && gy1 < cell.y1 + kSpill;
                 if (!other || !fits)
                     continue;
@@ -259,6 +297,53 @@ namespace gh2
             }
             return drawn;
         }
+    }
+
+    std::optional<std::pair<int, int>> freeBox(const milo::Bytes &body, const milo::Font &font, int W, int H, int w, int h,
+                                               const std::function<bool(int, int)> &inked)
+    {
+        if (!font.infoAt || W <= 0 || H <= 0)
+            return std::nullopt;
+        float cellUv[2];
+        std::memcpy(cellUv, body.data() + font.bitmapAt + 8u, 8u);
+        // Every character's box, a pixel apart from its neighbours'.
+        struct Box
+        {
+            int x0, y0, x1, y1;
+        };
+        std::vector<Box> boxes;
+        std::vector<int> xs = {0}, ys = {0};
+        for (size_t code = 0; code < 256u; ++code)
+        {
+            float info[3];
+            std::memcpy(info, body.data() + font.infoAt + code * 16u, 12u);
+            if (!(info[2] > 0.0f))
+                continue;
+            const Box b{static_cast<int>(std::floor(info[0] * W)) - 1, static_cast<int>(std::floor(info[1] * H)) - 1,
+                        static_cast<int>(std::ceil((info[0] + info[2] * cellUv[0]) * W)) + 1,
+                        static_cast<int>(std::ceil((info[1] + cellUv[1]) * H)) + 1};
+            boxes.push_back(b);
+            xs.push_back(b.x1);
+            ys.push_back(b.y0 + 1);
+            ys.push_back(b.y1);
+        }
+        std::sort(ys.begin(), ys.end());
+        std::sort(xs.begin(), xs.end());
+        for (const int y : ys)
+            for (const int x : xs)
+            {
+                if (x < 0 || y < 0 || x + w > W || y + h > H)
+                    continue;
+                const bool clear = std::none_of(boxes.begin(), boxes.end(), [&](const Box &b)
+                                                { return x < b.x1 && b.x0 < x + w && y < b.y1 && b.y0 < y + h; });
+                bool empty = clear;
+                for (int yy = y; empty && inked && yy < y + h; ++yy)
+                    for (int xx = x; empty && xx < x + w; ++xx)
+                        empty = !inked(xx, yy);
+                if (empty)
+                    return std::pair(x, y);
+            }
+        return std::nullopt;
     }
 
     void installFontBake()
