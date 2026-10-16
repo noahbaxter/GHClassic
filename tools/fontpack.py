@@ -3,7 +3,8 @@
 
     tools/fontpack.py [--src .planning/fonts/src] [--out fonts/vector_fonts.bin]
 
-Every fonts/<name>/trace*.json with "ship" goes in. "ship" is true, or
+Every fonts/<name>/trace*.json with "ship" goes in; unfinished traces wait in
+fonts/wip/<name>/, which git and this leave out. "ship" is true, or
 {"font": name, "layer": n, "color": [r, g, b], "aliases": [...]} for a layer
 of a font drawn in more than one (cutout's shadow under its face). A font is
 found in the game by its Font object's name less ".font", or an alias.
