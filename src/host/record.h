@@ -33,7 +33,8 @@ namespace gh2::record
     void frame(const uint8_t *rgba, uint32_t width, uint32_t height, std::chrono::steady_clock::time_point at,
                std::chrono::nanoseconds period);
 
-    // Interleaved stereo at kAudioRate, as mixed, into the clip on.
+    // Interleaved stereo at kAudioRate, as mixed, into the clip on at its
+    // place on the game's clock.
     void audio(const float *stereo, size_t frames);
 
     // The last clip ended and every frame written, once the game stops.

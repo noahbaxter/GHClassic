@@ -1,5 +1,8 @@
 #include "host/record.h"
 
+#include "host/audio.h"
+#include "runtime/host_clock.h"
+
 #include <atomic>
 #include <condition_variable>
 #include <csignal>
@@ -37,7 +40,8 @@ namespace gh2::record
         FILE *s_video = nullptr;
         FILE *s_sound = nullptr;
         std::chrono::steady_clock::time_point s_start{};
-        uint64_t s_written = 0, s_repeated = 0, s_dropped = 0;
+        std::chrono::nanoseconds s_period{};
+        uint64_t s_written = 0, s_repeated = 0, s_dropped = 0, s_samples = 0;
 
         // Frames on their way to ffmpeg, so the game never waits on it: its
         // encoder takes a moment to start, and runs beside the game after.
@@ -76,7 +80,9 @@ namespace gh2::record
             s_changed.notify_all();
             std::fclose(s_sound);
             s_video = s_sound = nullptr;
-            std::cerr << "[record] " << s_clip << ": " << s_written << " frames, " << s_repeated << " repeated and "
+            std::cerr << "[record] " << s_clip << ": " << s_written << " frames ("
+                      << std::chrono::duration<double>(s_period * s_written).count() << " s, sound "
+                      << static_cast<double>(s_samples) / kAudioRate << " s), " << s_repeated << " repeated and "
                       << s_dropped << " dropped (any repeated: the game fell behind its clock, so a lower --speed)"
                       << std::endl;
         }
@@ -112,7 +118,8 @@ namespace gh2::record
                 return false;
             }
             s_start = at;
-            s_written = s_repeated = s_dropped = 0u;
+            s_period = period;
+            s_written = s_repeated = s_dropped = s_samples = 0u;
             if (!s_writer.joinable())
                 s_writer = std::thread(write);
             return true;
@@ -179,8 +186,25 @@ namespace gh2::record
     void audio(const float *stereo, size_t frames)
     {
         std::lock_guard<std::mutex> lock(s_mutex);
-        if (s_sound)
-            std::fwrite(stereo, sizeof(float), frames * 2u, s_sound);
+        if (!s_sound)
+            return;
+        // Its place in the clip, by the game's clock, as the frames have
+        // theirs. Time the mixer missed (its thread held up, as at boot) is
+        // silence, and sound past its place is dropped, so the sound keeps
+        // time with the picture.
+        const double at = std::chrono::duration<double>(ps2x::host_clock::now() - s_start).count();
+        const int64_t late = static_cast<int64_t>(at * kAudioRate) - static_cast<int64_t>(frames + s_samples);
+        constexpr int64_t kSlack = kAudioRate / 10u;
+        if (late < -kSlack)
+            return;
+        if (late > kSlack)
+        {
+            const std::vector<float> silence(static_cast<size_t>(late) * 2u, 0.0f);
+            std::fwrite(silence.data(), sizeof(float), silence.size(), s_sound);
+            s_samples += static_cast<uint64_t>(late);
+        }
+        std::fwrite(stereo, sizeof(float), frames * 2u, s_sound);
+        s_samples += frames;
     }
 
     void finish()
