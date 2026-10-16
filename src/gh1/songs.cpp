@@ -512,6 +512,7 @@ namespace gh2::gh1
                       setlists::required(*campaign));
         // Its campaign.dta asks a venue only for a count of songs.
         encores::none("gh1");
+        setlists::zeroScores("gh1");
         std::cerr << "[gh1] " << count << " songs converted" << std::endl;
     }
 }

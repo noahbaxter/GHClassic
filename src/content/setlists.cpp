@@ -49,6 +49,7 @@ namespace gh2::setlists
             return s_selected;
         }
         std::map<std::string, uint32_t> s_symbols;
+        std::set<std::string> s_zeroScores;
 
         // What the song list shows, when it is ours: each row's tier, and
         // whether it can be picked.
@@ -60,6 +61,7 @@ namespace gh2::setlists
         PS2Runtime::RecompiledFunction s_gapSize = nullptr;
         PS2Runtime::RecompiledFunction s_isActive = nullptr;
         PS2Runtime::RecompiledFunction s_venueForSong = nullptr;
+        PS2Runtime::RecompiledFunction s_getHighScore = nullptr;
 
         uint32_t symbol(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &text)
         {
@@ -69,6 +71,14 @@ namespace gh2::setlists
             return s_symbols[text] = script::symbol(rdram, ctx, runtime, text);
         }
 
+        // GameConfig's mode Symbol, +0x3c (SongProvider::GetHighScore, 0x117b38).
+        bool modeIs(uint8_t *rdram, const char *name)
+        {
+            const uint32_t config = load<uint32_t>(rdram, s_addresses->theGameConfig);
+            const uint32_t mode = config ? load<uint32_t>(rdram, config + 0x3cu) : 0u;
+            return mode != 0u && std::strcmp(reinterpret_cast<const char *>(getMemPtr(rdram, mode)), name) == 0;
+        }
+
         // The selected setlist when the provider fills quickplay's list
         // (its +0x30, set_quickplay, is also set for practice and
         // multiplayer) and it is not GH2's.
@@ -76,10 +86,7 @@ namespace gh2::setlists
         {
             if (selected() == campaigns::active() || load<uint32_t>(rdram, provider + 0x30u) == 0u)
                 return nullptr;
-            // GameConfig's mode Symbol, +0x3c (SongProvider::GetHighScore, 0x117b38).
-            const uint32_t config = load<uint32_t>(rdram, s_addresses->theGameConfig);
-            const uint32_t mode = config ? load<uint32_t>(rdram, config + 0x3cu) : 0u;
-            if (mode == 0u || std::strcmp(reinterpret_cast<const char *>(getMemPtr(rdram, mode)), "quickplay") != 0)
+            if (!modeIs(rdram, "quickplay"))
                 return nullptr;
             const auto it = s_setlists.find(selected());
             return it == s_setlists.end() ? nullptr : &it->second;
@@ -241,6 +248,23 @@ namespace gh2::setlists
             ctx->pc = returnTo;
         }
 
+        // SongProvider::GetHighScore(int row) (0x117b38): the row's score,
+        // blank where it has none or in quickplay but for co-op. A career
+        // that shows none as a 0 has it so.
+        void getHighScore(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t returnTo = GPR_U32(ctx, 31);
+            const uint32_t provider = GPR_U32(ctx, 4);
+            uint32_t score = static_cast<uint32_t>(runtime->callGuestFunction(
+                rdram, ctx, s_addresses->songProviderGetHighScore, {provider, GPR_U32(ctx, 5)}, s_getHighScore));
+            const bool career = load<uint32_t>(rdram, provider + 0x30u) == 0u || modeIs(rdram, "multi_coop");
+            if (load<uint8_t>(rdram, score) == 0u && career && s_zeroScores.count(campaigns::active()) != 0u)
+                score = static_cast<uint32_t>(
+                    runtime->callGuestFunction(rdram, ctx, s_addresses->makeStringInt, {s_addresses->scoreFormat, 0u}));
+            SET_GPR_U32(ctx, 2, score);
+            ctx->pc = returnTo;
+        }
+
         script::Node setlistCommand(const script::Call &call)
         {
             const std::string op = call.symbol(1);
@@ -293,6 +317,11 @@ namespace gh2::setlists
                 if (counts->nodes[d].nodes.size() > 1u)
                     out.push_back({counts->nodes[d].nodes[1].integer, counts->nodes[d].nodes.back().integer});
         return out;
+    }
+
+    void zeroScores(const std::string &game)
+    {
+        s_zeroScores.insert(game);
     }
 
     std::vector<std::string> careerSongs(const std::string &name)
@@ -382,5 +411,7 @@ namespace gh2::setlists
         runtime.replaceFunction(addresses.songProviderIsActive, &isActive);
         s_venueForSong = runtime.lookupFunction(addresses.campaignDataGetVenueForSong);
         runtime.replaceFunction(addresses.campaignDataGetVenueForSong, &venueForSong);
+        s_getHighScore = runtime.lookupFunction(addresses.songProviderGetHighScore);
+        runtime.replaceFunction(addresses.songProviderGetHighScore, &getHighScore);
     }
 }
