@@ -24,6 +24,9 @@ namespace gh2::locale
 {
     // `token` localizes to `text`.
     void add(const std::string &token, const std::string &text);
+    // `token` localizes to what the DTA `expression` evaluates to each time
+    // (Locale::Localize reads its entry by DataNode::Str, which evaluates).
+    void addExpression(const std::string &token, const std::string &expression);
 
     // The Locale's table (its first word, 0x51f1b8) becomes `game`'s: the
     // locale's files as the archive gives them then, read the first time

@@ -1,0 +1,36 @@
+; Note streak messages: autoplay hits every note, and the HUD shows one at a
+; streak of 50 and at 100, with the count in it. The milestones past those,
+; each side of each step, by note_streak_due itself.
+#include common/first_boot.dta
+{gamecfg set mode quickplay}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(expect {note_streak_due 40} 0)
+(expect {note_streak_due 150} 0)
+(expect {note_streak_due 500} 1)
+(expect {note_streak_due 600} 0)
+(expect {note_streak_due 700} 0)
+(expect {note_streak_due 750} 1)
+(expect {note_streak_due 800} 0)
+(expect {note_streak_due 1000} 1)
+(expect {note_streak_due 1100} 0)
+(expect {note_streak_due 1500} 1)
+(expect {note_streak_due 2000} 1)
+(expect {note_streak_due 2500} 0)
+(expect {note_streak_due 3000} 1)
+(expect {note_streak_due 7000} 1)
+(wait_until {>= {player0 current_streak} 50} 120)
+(expect $note_streak_0 50)
+(expect {localize note_streak_0} "50 NOTE STREAK!")
+(wait 0.5)
+(shot streak_50)
+(wait_until {>= {player0 current_streak} 100} 120)
+(expect $note_streak_0 100)
+(expect {localize note_streak_0} "100 NOTE STREAK!")
+(wait 0.5)
+(shot streak_100)
+(quit)

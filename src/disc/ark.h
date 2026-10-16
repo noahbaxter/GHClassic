@@ -45,6 +45,13 @@ namespace gh2::ark
     void addMade(size_t disc, const std::string &path, std::function<std::optional<Made>()> make,
                  std::function<bool()> when = {});
 
+    // That disc's own `path` changed by `fix` the first time it is read,
+    // after any fix added before it, wherever it is: as the game gets it when
+    // nothing is made in its place, and through readFile(disc, path), so
+    // what is made in its place starts from the changed bytes. Once install
+    // has run.
+    void addFix(size_t disc, const std::string &path, std::function<void(std::vector<uint8_t> &)> fix);
+
     // That disc's archive paths starting `prefix`, in order, once install
     // has run.
     std::vector<std::string> paths(size_t disc, const std::string &prefix);

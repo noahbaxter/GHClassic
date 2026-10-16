@@ -1,0 +1,17 @@
+; The streak counter: in the HUD's scene, tucked in at a streak of 40 and
+; out at 60, autoplay hitting every note.
+#include common/first_boot.dta
+{gamecfg set mode quickplay}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(expect {!= $streak_counter_display1 0} 1)
+(wait_until {>= {player0 current_streak} 40} 120)
+(shot streak_40_in)
+(wait_until {>= {player0 current_streak} 60} 120)
+(wait 1)
+(shot streak_60_out)
+(quit)

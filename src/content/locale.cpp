@@ -20,7 +20,7 @@ namespace gh2::locale
         constexpr uint32_t kString = 0x12u;
 
         const Addresses *s_addresses = nullptr;
-        std::string s_added; // (token "text") for each
+        std::string s_added; // (token "text") or (token {expression}) for each
         std::string s_game = "gh2";
         std::map<std::string, uint32_t> s_tables; // each game's, once built
         // Each other game's text where it differs from GH2's, by token: a
@@ -112,6 +112,11 @@ namespace gh2::locale
     void add(const std::string &token, const std::string &text)
     {
         s_added += "(" + token + " " + dtb::text({dtb::kString, 0, 0.0f, text}) + ")\n";
+    }
+
+    void addExpression(const std::string &token, const std::string &expression)
+    {
+        s_added += "(" + token + " " + expression + ")\n";
     }
 
     namespace

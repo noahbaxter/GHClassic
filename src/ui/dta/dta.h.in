@@ -19,3 +19,5 @@ inline constexpr const char kQuickplayPickersDta[] = R"dta(@GHC_QUICKPLAY_PICKER
 inline constexpr const char kGameSettingsDta[] = R"dta(@GHC_GAME_SETTINGS_DTA@)dta";
 inline constexpr const char kBoxDta[] = R"dta(@GHC_BOX_DTA@)dta";
 inline constexpr const char kPhotoModeDta[] = R"dta(@GHC_PHOTO_MODE_DTA@)dta";
+inline constexpr const char kNoteStreakDta[] = R"dta(@GHC_NOTE_STREAK_DTA@)dta";
+inline constexpr const char kStreakCounterDta[] = R"dta(@GHC_STREAK_COUNTER_DTA@)dta";
