@@ -213,6 +213,7 @@ namespace gh2
         uint32_t songProviderGetBlurb;                // (int row)
         uint32_t songProviderGetHighScore;            // (int row)
         uint32_t makeStringInt;                       // MakeString(const char *, int)
+        uint32_t playerSetMercurySwitch;              // (bool): the guitar tilted, star power deployed if ready
         // Data
         uint32_t rndCamCurrent;  // RndCam::sCurrent
         uint32_t defaultMat;     // the RndMat a mesh without one draws with
@@ -453,6 +454,7 @@ namespace gh2
         .songProviderGetBlurb = 0x117df8u,
         .songProviderGetHighScore = 0x117b38u,
         .makeStringInt = 0x3147a8u,
+        .playerSetMercurySwitch = 0x111940u,
         .rndCamCurrent = 0x3de348u,
         .defaultMat = 0x3da4f0u,
         .rndEnvironCurrent = 0x3de358u,

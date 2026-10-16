@@ -12,6 +12,9 @@
 //   (expect {taskmgr seconds} 33.47 0.1)  or, numbers, is within the third
 //   (press green)                      a fret's colour, up, down, left or right,
 //                                      pressed and let go as a player would
+//   (star_power player0 {player0 star_power_ready})  from here on, that player's
+//                                      guitar tilted each poll the condition holds,
+//                                      deploying star power when ready; (star_power) stops
 //   (clock 100)                        the UI clock runs from there, 1/64 s a poll
 //   (freeze 103 2.5 3.9)               holds TaskMgr's UI seconds (once a clock
 //                                      reaches them), seconds and beat there,
@@ -34,7 +37,8 @@
 // given after its screen or condition, fails the run and quits, as does the
 // UI going 8 s without a poll, after naming what each thread waits on and,
 // for one still running, the code and scripts on its stack.
-// {ghc_log ...} prints values and their types from any script.
+// {ghc_log ...} prints values and their types from any script, and
+// {ghc_star_power player0} tilts that player's guitar once.
 
 #include "addresses.h"
 

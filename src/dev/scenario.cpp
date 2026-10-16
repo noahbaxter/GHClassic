@@ -48,6 +48,7 @@ namespace gh2::scenario
         Clock::time_point s_release;  // and when it lets go
         std::string s_screen;         // a wait_screen's screen
         uint32_t s_condition = 0u;    // a wait_until's step array
+        uint32_t s_starPower = 0u;    // a star_power's step array, checked each poll
         bool s_shooting = false;      // a shot's frame not yet written
         Clock::time_point s_deadline; // and when either fails
         int s_timeout = kTimeout;     // that deadline's seconds, to report
@@ -143,10 +144,31 @@ namespace gh2::scenario
             return text(rdram, call.arg(0));
         }
 
+        // That Player's guitar tilted up and back, as its mercury switch
+        // reads it: star power deploys if it is ready and not in use
+        // (Player::SetMercurySwitch, 0x111940). Script finds a Player by its
+        // Hmx::Object, a virtual base 0x120 in, which the Player's first word
+        // points to (Player's constructor, debug 0x1125e8).
+        void tilt(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t object)
+        {
+            const uint32_t player = object - 0x120u;
+            if (object < 0x120u || gh2::load<uint32_t>(rdram, player) != object)
+                return;
+            runtime->callGuestFunction(rdram, ctx, s_addresses->playerSetMercurySwitch, {player, 1u});
+            runtime->callGuestFunction(rdram, ctx, s_addresses->playerSetMercurySwitch, {player, 0u});
+        }
+
         // Runs steps until one waits.
         void step(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
             const script::Call steps{rdram, ctx, runtime, s_steps};
+            if (s_starPower != 0u)
+            {
+                const script::Call armed{rdram, ctx, runtime, s_starPower};
+                const script::Node when = armed.arg(2);
+                if (when.type != script::kInt || when.value != 0u)
+                    tilt(rdram, ctx, runtime, armed.object(1));
+            }
             if (s_shooting)
             {
                 if (shotPending() || drawDumpPending())
@@ -226,7 +248,9 @@ namespace gh2::scenario
                     s_deadline = Clock::now() + std::chrono::seconds(s_timeout);
                     return;
                 }
-                if (verb == "print")
+                if (verb == "star_power")
+                    s_starPower = array.size() > 2 ? node.value : 0u;
+                else if (verb == "print")
                 {
                     std::string line;
                     for (int j = 1; j < array.size(); ++j)
@@ -550,6 +574,12 @@ namespace gh2::scenario
                 line += (i > 1 ? " " : "") + text(call.rdram, node) + ":" + std::to_string(node.type);
             }
             std::cerr << "[script] " << line << std::endl;
+            return {};
+        });
+        // {ghc_star_power player0}: that player's guitar tilted, star power
+        // deployed if ready.
+        script::addCommand("ghc_star_power", [](const script::Call &call) -> script::Node {
+            tilt(call.rdram, call.ctx, call.runtime, call.object(1));
             return {};
         });
         s_addresses = &addresses;
