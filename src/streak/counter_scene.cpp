@@ -166,18 +166,16 @@ namespace gh2::streak_counter
         // The wheels the counter keeps, of the score's six (score_num_1 on
         // the left): an icon, then three digits, the last its ones. Its
         // frame (score_num_frame.tex, 256 wide, the full width of its quad)
-        // is cut at the line left of the third wheel, and its ones wheel's
-        // face (the sixth's, past the line at 206) stays white.
+        // is cut at the line left of the third wheel.
         constexpr const char *kDropped[] = {"score_num_1.mesh", "score_num_2.mesh"};
         constexpr float kFrameFrom = 81.0f / 256.0f;
-        constexpr size_t kOnesFrom = 210u, kOnesTo = 243u;
         // Its black edge, which stays black: above row 37 and from row 98,
         // the line it is cut at (81 to 84) and its right end (from 243), and
         // the gap after the icon's wheel (118 to 136).
         bool frameKeeps(size_t x, size_t y, bool light)
         {
             if (light)
-                return x >= kOnesFrom && x < kOnesTo;
+                return false;
             return y < 37u || y >= 98u || x < 85u || x >= 243u || (x >= 118u && x < 136u);
         }
 
@@ -367,10 +365,10 @@ namespace gh2::streak_counter
         }
 
         // The score display's scene as the counter: four wheels, black with
-        // white digits and lines, the last white with black digits
-        // (score_ones_<n>, the score's own digits), the first the icon
-        // (streak_icon), the rest of the score's six gone, and the shell's
-        // metal around it (streak_frame_<n>).
+        // white digits and lines, the last with Mats of its own
+        // (score_ones_<n>), the first the icon (streak_icon), the rest of the
+        // score's six gone, and the shell's metal around it
+        // (streak_frame_<n>).
         std::optional<ark::Made> makeCounterScene()
         {
             const auto file = ark::readFile(0u, kScore), shellFile = ark::readFile(0u, kShell);
@@ -399,14 +397,11 @@ namespace gh2::streak_counter
             for (int n = 0; n <= 9; ++n)
             {
                 const std::string digit = "score_" + std::to_string(n), own = "score_ones_" + std::to_string(n);
-                const auto tex = milo::find(*scene, digit + ".tex"), mat = milo::find(*scene, digit + ".mat");
-                if (!tex || !mat)
+                const auto mat = milo::find(*scene, digit + ".mat");
+                if (!mat)
                     return std::nullopt;
                 milo::Bytes m = scene->bodies[*mat];
-                if (!replaceStr(m, digit + ".tex", own + ".tex"))
-                    return std::nullopt;
                 whiten(m);
-                added.emplace_back(own + ".tex", scene->bodies[*tex]);
                 added.emplace_back(own + ".mat", std::move(m));
             }
             added.emplace_back(kMetal, shell->bodies[*metal]);
