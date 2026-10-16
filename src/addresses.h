@@ -65,6 +65,7 @@ namespace gh2
         uint32_t checkForPitchBend; // TrackWatcherImpl::CheckForPitchBend
         uint32_t sendWhammy;        // TrackWatcherImpl::SendWhammy
         uint32_t playerSetWhammyBar; // Player::SetWhammyBar
+        uint32_t hudPanelEnter;      // HudPanel::Enter
         uint32_t trackCtor;          // Track::Track
         uint32_t trackSetupFade;     // Track::SetupFade
         uint32_t trackDraw;          // Track::Draw
@@ -303,6 +304,7 @@ namespace gh2
         .checkForPitchBend = 0x248e38u,
         .sendWhammy = 0x249b98u,
         .playerSetWhammyBar = 0x111d88u,
+        .hudPanelEnter = 0x12ba00u,
         .trackCtor = 0x14fa70u,
         .trackSetupFade = 0x150908u,
         .trackDraw = 0x151188u,

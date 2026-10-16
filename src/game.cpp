@@ -36,6 +36,7 @@
 #include "dev/cheats.h"
 #include "lefty_guitarist.h"
 #include "note_speed.h"
+#include "streak/note_streak.h"
 #include "dev/null_rnd.h"
 #include "host/pad.h"
 #include "render/char_lod.h"
@@ -99,6 +100,7 @@ namespace
         gh2::installTrackStart(runtime, gh2::kSlus21447);
         gh2::installSustainRelease(runtime, gh2::kSlus21447);
         gh2::installWhammyHold(runtime, gh2::kSlus21447);
+        gh2::installNoteStreak(runtime, gh2::kSlus21447);
         gh2::installTourOrHigher(runtime, gh2::kSlus21447);
         gh2::installNoteSpeed(runtime, gh2::kSlus21447);
         gh2::slider_scale::install(runtime, gh2::kSlus21447);
