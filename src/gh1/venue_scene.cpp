@@ -40,7 +40,7 @@ namespace gh2::gh1
             std::map<std::string, Trans> trans;
             std::map<std::string, std::vector<std::string>> draws; // by Mesh, View or Environ, its Draw 1's children
             std::set<std::string> meshes, environs;
-            std::set<std::string> moved; // what a TransAnim moves
+            std::map<std::string, std::string> moves; // by TransAnim, the Trans it moves
             std::set<std::string> hung;  // what the top View's Trans reach
         };
 
@@ -75,7 +75,7 @@ namespace gh2::gh1
                         size_t o = p.rest + 5u;
                         names(b, o);
                         o += 16u;
-                        s.moved.insert(str(b, o));
+                        s.moves[n] = str(b, o);
                     }
                 }
                 else if (c != "Mesh" && c != "Light" && c != "Flare")
@@ -123,7 +123,8 @@ namespace gh2::gh1
         // Trans its children's (VenueSection::Poll, GH1 0x178ce8;
         // RndTransformable::UpdateWorldXfm, GH1 0x1da570): what that
         // never reaches keeps the world it loads with, here its local
-        // with no parent. One a TransAnim moves is left as it is.
+        // with no parent, even as a TransAnim moves its local: the arena's
+        // orange_spot05.mesh holds at its first key while its anim runs.
         void hang(Scan &s, const std::string &n)
         {
             const auto it = s.trans.find(n);
@@ -135,15 +136,25 @@ namespace gh2::gh1
 
         bool held(const Scan &s, const std::string &n)
         {
-            return !s.hung.count(n) && !s.moved.count(n);
+            return !s.hung.count(n);
         }
 
-        // The anims an anim drives that are here, less those a script drives.
+        // Whether that anim moves a Trans held where it loads. GH2 works a
+        // world out from the local a TransAnim sets, so it is not driven.
+        bool movesHeld(const Scan &s, const std::string &n)
+        {
+            const auto it = s.moves.find(n);
+            return it != s.moves.end() && s.trans.count(it->second) && held(s, it->second);
+        }
+
+        // The anims an anim drives that are here, less those a script drives
+        // and those that would move what is held.
         std::vector<std::string> driven(const Scan &s, const Anim &of)
         {
             std::vector<std::string> out;
             for (const std::string &child : of.children)
-                if (const auto it = s.pieces.find(child); it != s.pieces.end() && it->second.anim && !s.scripted.count(child))
+                if (const auto it = s.pieces.find(child);
+                    it != s.pieces.end() && it->second.anim && !s.scripted.count(child) && !movesHeld(s, child))
                     out.push_back(child);
             return out;
         }
