@@ -317,6 +317,7 @@ set(GHC_GAME_SOURCES
     src/host/pad.cpp
     src/host/perf.cpp
     src/host/profiles.cpp
+    src/host/record.cpp
     src/host/releases.cpp
     src/host/update.cpp
     src/host/vulkan_frontend.cpp

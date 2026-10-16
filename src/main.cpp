@@ -3,7 +3,7 @@
 //
 //   GHClassic [disc] [--content <disc>]... [--mods <dir>] [--scenario <file>] [--hidden] [--mute] [--speed <x>]
 //            [--fast-boot] [--seed <n>] [--cheats] [--save <file>] [--import-card <ps2>] [--export-card <ps2>]
-//            [--settings <file>] [--shots <dir>] [--shot-every <n>]
+//            [--settings <file>] [--shots <dir>] [--shot-every <n>] [--record <mp4>]
 //            [--res window|native|480p|720p|1080p|1440p|2160p]
 //            [--timing] [--present-mode fifo|relaxed|mailbox|immediate] [--swap-images <n>] [--audio-device <name>]
 //   GHClassic --bind [keyboard | <n>]
@@ -30,7 +30,8 @@
 // stage's delay between a press, the sound and the picture
 // (dev/timing.h); --present-mode and --swap-images change how the
 // swapchain presents, and --audio-device plays through the device with
-// that in its name, all to measure with. --bind
+// that in its name, all to measure with. --record writes the run as a video,
+// picture and sound, through ffmpeg (host/record.h). --bind
 // sets up a controller or the keyboard in input.ini; with no device it
 // lists them.
 
@@ -40,6 +41,7 @@
 #include "ui/fast_boot.h"
 #include "host/bind.h"
 #include "host/perf.h"
+#include "host/record.h"
 #include "host/update.h"
 #include "host/vulkan_frontend.h"
 #include "save/save.h"
@@ -151,6 +153,8 @@ int main(int argc, char *argv[])
             gh2::timing::swapImages = std::atoi(argv[++i]);
         else if (arg == "--audio-device" && hasValue)
             gh2::setAudioDevice(argv[++i]);
+        else if (arg == "--record" && hasValue)
+            gh2::record::setPath(argv[++i]);
         else if (arg == "--speed" && hasValue)
             speed = std::strtod(argv[++i], nullptr);
         else if (arg == "--fast-boot")

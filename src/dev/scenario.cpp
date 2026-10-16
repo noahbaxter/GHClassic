@@ -9,6 +9,7 @@
 #include "hook.h"
 #include "host/input.h"
 #include "host/pad.h"
+#include "host/record.h"
 #include "host/vulkan_frontend.h"
 #include "milo/layout.h"
 #include "movie/movie.h"
@@ -294,6 +295,8 @@ namespace gh2::scenario
                     s_shooting = true;
                     return;
                 }
+                else if (verb == "record")
+                    record::hold(array.symbol(1) != "on");
                 else if (verb == "poke")
                 {
                     // A word of the object the first argument evaluates to: an int or a float's bits.
@@ -535,7 +538,12 @@ namespace gh2::scenario
     bool load(const std::string &path)
     {
         s_text.clear();
-        return read(path, s_text);
+        if (!read(path, s_text))
+            return false;
+        // One that marks where --record starts records only from there.
+        if (s_text.find("(record on)") != std::string::npos)
+            record::hold(true);
+        return true;
     }
 
     void install(PS2Runtime &runtime, const Addresses &addresses)

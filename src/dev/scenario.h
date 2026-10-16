@@ -23,6 +23,8 @@
 //   (peek {dir find a.btn} 364)        prints that word, as an int and as a float
 //   (cam balcony {world find a.cam})   prints that Cam's world transform and y fov under that name
 //   (dump menu)                      the next frame's draws, as draws_menu.json (--shots)
+//   (record on) (record off)           --record from here, and held from here; with
+//                                      an (record on), nothing before it is recorded
 //   (transplant "../x/frame.ram" frame)  the retail game's memory in place of this one's
 //                                      (dev/transplant.h), then its frame as a shot and a dump
 //   (needs gh1 gh2x)                   skips the run unless those games' discs

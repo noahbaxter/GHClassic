@@ -6,6 +6,7 @@
     tools/ghc.py bind [--isolated] [keyboard | <n>]   set up a controller; with no device, list them
     tools/ghc.py arm [out] [--scenario <file>] [--speed <x>] [--secs 30] [--disc <image>] [--shot-every 60]
                      [--res 1080p] [--set <name>=<value> ...]
+    tools/ghc.py record <scenario> [--speed 2.5] [--res 1080p] [--secs 900] [--set <name>=<value> ...]
     tools/ghc.py scenarios [-j 4] [--speed 2] [--review] [--discs gh2,gh1] [--releases] [name ...]
     tools/ghc.py release [--skip-build] [disc]  this platform's player package, into build/release
     tools/ghc.py ci                          what builds without a disc, into build/ci
@@ -36,6 +37,12 @@ where everything to look at goes. scenarios runs the files in scenarios/
 through arm side by side, the sheets staying in each run as shots.png unless
 --review: a run passes when it reaches its last step and quits with no FAIL
 or STALL in its log. Both clear runs/ of runs older than three days.
+
+record runs a scenario as arm does and makes it a video, picture and sound,
+in review/ as <date>_<time>_<scenario's name>.mp4: the game pipes each frame
+to ffmpeg as it draws and writes its mixed sound beside it, both on the
+game's clock, so it can run faster than real time. A scenario's (record on)
+and (record off) steps clip it; without them the whole run is recorded.
 
 release packages a build for players, who bring their own disc: a zip of
 the game beside PUT_DISC_HERE on Windows and Linux, a disk image on macOS.
@@ -379,9 +386,10 @@ def prune_runs(days=3):
 
 
 def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=None, res=None, games=None,
-        review=None, release=None, settings=(), perf=False):
+        review=None, release=None, settings=(), perf=False, record=None):
     """One unattended run into out. Returns 'exited before Ns' or 'alive at Ns'.
-    With review, its shot sheet goes to review/ under that name rather than out."""
+    With review, its shot sheet goes to review/ under that name rather than out.
+    With record, the run is also that .mp4 (the game's --record)."""
     from PIL import Image
 
     out = Path(out)
@@ -406,6 +414,8 @@ def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=N
         cmd += ["--res", res]
     if perf:
         cmd += ["--profiler"]
+    if record:
+        cmd += ["--record", str(Path(record).resolve())]
     cmd += ["--fast-boot", "--seed", "1", "--hidden", "--mute", "--save", str(out / "save.bin"),
             "--settings", str(out / "settings.ini"), "--shots", str(out / "frames"), "--shot-every", str(shot_every)]
 
@@ -485,6 +495,33 @@ def cmd_arm(argv):
         print("game functions by samples:")
         for fn, n in sorted(counts.items(), key=lambda kv: -kv[1])[:8]:
             print(f"{n:7d}  {fn}")
+
+
+def cmd_record(argv):
+    parser = argparse.ArgumentParser(prog="ghc.py record")
+    parser.add_argument("scenario")
+    parser.add_argument("--speed", type=float, default=2.5,
+                        help="game seconds a real one; too high and frames repeat, which the log counts")
+    parser.add_argument("--res", default="1080p")
+    parser.add_argument("--secs", type=int, default=900, help="real seconds before it is stopped")
+    parser.add_argument("--disc")
+    parser.add_argument("--discs", type=discs_arg, help="content discs to mount, as gh2,gh1; default every one in game/")
+    parser.add_argument("--set", action="append", default=[], metavar="NAME=VALUE", dest="settings",
+                        help="a settings.ini line over the defaults, e.g. msaa=1; may repeat")
+    args = parser.parse_args(argv)
+    name = Path(args.scenario).stem
+    video = review_path(name, ".mp4")
+    out = ROOT / "runs" / f"{time.strftime('%Y-%m-%d_%H%M%S')}_{name}"
+    prune_runs()
+    # No periodic frames: (shot) steps still come out as a sheet.
+    state = arm(out, args.scenario, args.speed, args.secs, args.disc, 1 << 30, res=args.res, games=args.discs,
+                review=name, settings=args.settings, record=video)
+    print(f"{state}, log {out / 'run.log'}")
+    for line in (out / "run.log").read_text(errors="replace").splitlines():
+        if line.startswith("[record]") or "FAIL" in line or "STALL" in line:
+            print(line)
+    if not video.exists():
+        return 1
 
 
 def cmd_scenarios(argv):
@@ -702,8 +739,8 @@ def cmd_release(argv):
     print(f"made {archive}")
 
 
-COMMANDS = {"play": cmd_play, "build": cmd_build, "bind": cmd_bind, "arm": cmd_arm, "scenarios": cmd_scenarios,
-            "release": cmd_release, "ci": cmd_ci}
+COMMANDS = {"play": cmd_play, "build": cmd_build, "bind": cmd_bind, "arm": cmd_arm, "record": cmd_record,
+            "scenarios": cmd_scenarios, "release": cmd_release, "ci": cmd_ci}
 
 
 def main():
