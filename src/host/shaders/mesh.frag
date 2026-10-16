@@ -64,13 +64,14 @@ vec4 vectorLine(uint i)
 // How much of a pixel at p, in the pack's pixels, glyph layer g covers, the
 // pixel spanning `size` of them: inside by the crossings of a ray to +x, the
 // edge softened over the pixel by the distance to the nearest line. And that
-// distance, signed, positive inside.
-vec2 vectorCoverage(uint g, vec2 p, float size)
+// distance, signed, positive inside, measured out to `reach` past the edge.
+vec2 vectorCoverage(uint g, vec2 p, float size, float reach)
 {
     uint at = vf[0] + g * 8u;
     vec4 bounds = vec4(vff(at), vff(at + 1u), vff(at + 2u), vff(at + 3u));
-    if (any(lessThan(p, bounds.xy - size)) || any(greaterThan(p, bounds.zw + size)))
-        return vec2(0.0, -size);
+    reach = max(reach, size);
+    if (any(lessThan(p, bounds.xy - reach)) || any(greaterThan(p, bounds.zw + reach)))
+        return vec2(0.0, -reach);
     float bandH = vff(at + 5u);
     uint bands = vf[at + 7u];
     uint band = vf[at + 6u] + uint(clamp(int(floor((p.y - vff(at + 4u)) / bandH)), 0, int(bands) - 1));
@@ -94,8 +95,9 @@ vec2 vectorCoverage(uint g, vec2 p, float size)
 // The texel a vector font's glyph gives at uv: its layers over each other in
 // their colours, coverage as alpha. A masked font's is the texture's own,
 // cut to the outline, with the font's tone standing in for the texture's
-// fade over the last texels inside the edge. The texture's own where the
-// font's table has no glyph for the quad.
+// fade over its edge's width of texels inside the outline (none at 0), and
+// the texture's own fade kept past it, dying out over its feather's texels.
+// The texture's own where the font's table has no glyph for the quad.
 vec4 vectorTexel(vec2 uv, vec2 dx, vec2 dy)
 {
     uint base = uint(pc.textBase);
@@ -112,12 +114,16 @@ vec4 vectorTexel(vec2 uv, vec2 dx, vec2 dy)
         float size = max(0.5 * (length(dx * scale) + length(dy * scale)), 1e-3);
         if ((vf[base + 6u] & 1u) != 0u && vf[e + 6u] != 0xffffffffu)
         {
-            vec2 cover = vectorCoverage(vf[e + 6u], p, size);
+            // The pack's pixels to the texture's texels.
+            float perTexel = float(textureSize(tex, 0).x) / scale.x;
+            float edge = float((vf[base + 6u] >> 8u) & 0xffu) * 0.25;
+            float feather = float((vf[base + 6u] >> 16u) & 0xffu) * 0.25;
+            vec2 cover = vectorCoverage(vf[e + 6u], p, size, feather / perTexel);
             vec4 texel = textureGrad(tex, uv, dx, dy);
-            // The distance in the texture's texels: the pack's pixels to its.
-            float texels = cover.y * float(textureSize(tex, 0).x) / scale.x;
-            float body = mix(vff(base + 7u), texel.a, smoothstep(0.5, 2.0, texels));
-            return vec4(texel.rgb, cover.x * body);
+            float texels = cover.y * perTexel;
+            float body = edge > 0.0 ? mix(vff(base + 7u), texel.a, smoothstep(0.25 * edge, edge, texels)) : texel.a;
+            float alpha = feather > 0.0 ? max(cover.x, clamp(1.0 + texels / feather, 0.0, 1.0)) : cover.x;
+            return vec4(texel.rgb, alpha * body);
         }
         vec4 color = vec4(0.0);
         for (uint l = 0u; l < layers; ++l)
@@ -125,7 +131,7 @@ vec4 vectorTexel(vec2 uv, vec2 dx, vec2 dy)
             uint g = vf[e + 6u + l];
             if (g == 0xffffffffu)
                 continue;
-            float a = vectorCoverage(g, p, size).x;
+            float a = vectorCoverage(g, p, size, size).x;
             vec3 rgb = unpackUnorm4x8(vf[base + 4u + l]).rgb;
             float over = a + color.a * (1.0 - a);
             color.rgb = over > 0.0 ? (rgb * a + color.rgb * color.a * (1.0 - a)) / over : rgb;

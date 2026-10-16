@@ -91,17 +91,50 @@ def difference(a, o):
     return (rgb.clip(0, 1) * 255).astype(np.uint8)
 
 
+def tone_of(picked):
+    """The median opacity inside a font's glyphs, two pixels in from their edges."""
+    inner = [a[ndimage.binary_erosion(a > 0.5, iterations=2)] for a, _ in picked.values()]
+    inner = np.concatenate([v for v in inner if v.size]) if any(v.size for v in inner) else np.ones(1)
+    return float(np.median(inner))
+
+
+def masked(a, o, tone, edge=2.0, feather=0.0):
+    """What mesh.frag draws for a masked font: the game's own pixels cut to the
+    outline's coverage o, the font's tone standing in for them over the last
+    edge texels inside it, and kept past it dying out over feather texels."""
+    body = a
+    if edge > 0:
+        inside = ndimage.distance_transform_edt(o > 0.5) - 0.5
+        t = np.clip((inside - 0.25 * edge) / (0.75 * edge), 0, 1)
+        body = tone + (a - tone) * t * t * (3 - 2 * t)
+    if feather > 0:
+        o = np.maximum(o, np.clip(1 - ndimage.distance_transform_edt(o < 0.5) / feather, 0, 1))
+    return o * body
+
+
+def masked_edge(cfg):
+    """A masked font's (edge, feather) in texels, None when it isn't masked."""
+    s = cfg.get("ship")
+    if not (isinstance(s, dict) and s.get("masked")):
+        return None
+    return float(s.get("edge", 2.0)), float(s.get("feather", 0.0))
+
+
 def tiles(cfg, picked, otf, shape):
     """(char, game tile, difference tile, mismatch) per glyph, at screen size."""
     z = CELL_PX / shape[0]
     xmin = glyph_xmin(otf)
     ft = ImageFont.truetype(str(otf), round(1000 / fonttrace.UNITS * SS))
+    edge = masked_edge(cfg)
+    tone = tone_of(picked) if edge is not None else None
     out = []
     for c in cfg.get("order") or "".join(picked):
         if c not in picked or c not in xmin:
             continue
         a = picked[c][0].astype(np.float32)
         o = registered(ft, c, a, xmin[c], cfg["baseline"])
+        if tone is not None:
+            o = masked(a, o, tone, *edge)
         cols = np.nonzero(((a > 0.1) | (o > 0.1)).any(0))[0]
         x0, x1 = (max(0, cols[0] - PAD), min(a.shape[1], cols[-1] + 1 + PAD)) if len(cols) else (0, a.shape[1])
         size = (max(1, round((x1 - x0) * z)), round(a.shape[0] * z))
