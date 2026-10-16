@@ -157,16 +157,20 @@ def compose(sections, out):
     small = ImageFont.truetype(fonttrace.LABEL, 18)
     tiny = ImageFont.truetype(fonttrace.LABEL, 13)
     row_h = lambda line: line[0][1].shape[0]
-    W = max(LABEL_W + sum(t[1].shape[1] + 2 for t in line) for _, ls in sections for line in ls) + 20
+    heads = []
+    for title, ls in sections:
+        sc = card(title, ls)
+        heads.append(f"{title}   shape off by {sc['shape_mismatch'] * 100:.1f}%   texture {sc['texture'] * 100:.0f}%   "
+                     f"RED = in the game, missing from the font   CYAN = in the font, not in the game   "
+                     f"number = % of the glyph that's off")
+    W = max(max(LABEL_W + sum(t[1].shape[1] + 2 for t in line) for _, ls in sections for line in ls),
+            max(int(lab.getlength(h)) for h in heads)) + 20
     H = sum(40 + sum(2 * (row_h(line) + 4) + 34 for line in ls) for _, ls in sections) + 20
     img = Image.new("RGB", (W, H), (BG, BG, BG + 4))
     d = ImageDraw.Draw(img)
     y = 10
-    for title, ls in sections:
-        sc = card(title, ls)
-        d.text((10, y + 6), f"{title}   shape off by {sc['shape_mismatch'] * 100:.1f}%   texture {sc['texture'] * 100:.0f}%   "
-                            f"RED = in the game, missing from the font   CYAN = in the font, not in the game   "
-                            f"number = % of the glyph that's off", font=lab, fill=(255, 220, 120))
+    for head, (title, ls) in zip(heads, sections):
+        d.text((10, y + 6), head, font=lab, fill=(255, 220, 120))
         y += 40
         for line in ls:
             h = row_h(line)
