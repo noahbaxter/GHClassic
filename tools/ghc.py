@@ -43,7 +43,8 @@ in review/ as <date>_<time>_<scenario's name>.mp4: the game pipes each frame
 to ffmpeg as it draws and writes its mixed sound beside it, both on the
 game's clock, so it can run faster than real time. Without (record) steps the
 whole run is one video; with them, each (record on name) to (record off) is
-its own, <scenario's name>_<name>.mp4.
+its own, <scenario's name>_<name>.mp4. A run stopped at --secs keeps what it
+drew.
 
 release packages a build for players, who bring their own disc: a zip of
 the game beside PUT_DISC_HERE on Windows and Linux, a disk image on macOS.
@@ -55,6 +56,7 @@ import hashlib
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -424,7 +426,9 @@ def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=N
     # Frames are named by seconds since here, on the clock their mtimes use.
     start = time.time()
     with open(out / "run.log", "wb") as log:
-        proc = subprocess.Popen(cmd, cwd=out, stdout=log, stderr=subprocess.STDOUT)
+        # Recording, in a group of its own with its ffmpegs.
+        proc = subprocess.Popen(cmd, cwd=out, stdout=log, stderr=subprocess.STDOUT,
+                                start_new_session=bool(record) and not WINDOWS)
     try:
         proc.wait(timeout=secs)
         state = f"exited before {secs}s"
@@ -437,6 +441,17 @@ def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=N
         if proc.poll() is None:
             proc.kill()
             proc.wait()
+        if record and not WINDOWS:
+            # A killed game's ffmpeg sees its pipe close and ends the clip
+            # with what it was sent. Given 30 s to, then killed too.
+            for _ in range(300):
+                try:
+                    os.killpg(proc.pid, 0)
+                except ProcessLookupError:
+                    break
+                time.sleep(0.1)
+            else:
+                os.killpg(proc.pid, signal.SIGKILL)
 
     for ppm in sorted((out / "frames").glob("frame_" + "[0-9]" * 6 + ".ppm")):
         Image.open(ppm).save(out / "frames" / f"frame_{ppm.stat().st_mtime - start:07.2f}s.png")
