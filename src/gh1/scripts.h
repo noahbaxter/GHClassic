@@ -21,6 +21,12 @@ namespace gh2::gh1
     // The anims that GH1 venue's script drives itself.
     std::set<std::string> scripted(size_t disc, const std::string &gh1);
 
+    // Those it sets going by switch_anim or switch_anim_rt, which take the
+    // script's frame past their own filters (VenueAnim::Poll, GH1
+    // 0x17cff0, sets their filtered frame). An anim_task's goes through
+    // them, as any frame set (RndAnimatable::SetFrame, GH1 0x1b3d00).
+    std::set<std::string> switched(size_t disc, const std::string &gh1);
+
     // Writes that GH1 venue's script into `layer` as handlers on the type
     // of the GH2 venue standing in for it, over the `objects` its dir holds.
     // `kit` is the room's drum kit, shown only for GH1's drummer

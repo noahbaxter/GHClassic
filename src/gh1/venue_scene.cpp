@@ -28,8 +28,9 @@ namespace gh2::gh1
         struct Scan
         {
             const milo::Dir &scene;
-            // The anims a script drives itself.
+            // The anims a script drives itself, and those it switches.
             const std::set<std::string> &scripted;
+            const std::set<std::string> &switched;
             struct Piece
             {
                 std::optional<Anim> anim;
@@ -45,9 +46,9 @@ namespace gh2::gh1
         };
 
         Scan scan(const milo::Dir &scene, const std::set<std::string> &classes, const std::set<std::string> &without,
-                  const std::set<std::string> &scripted)
+                  const std::set<std::string> &scripted, const std::set<std::string> &switched)
         {
-            Scan s{scene, scripted};
+            Scan s{scene, scripted, switched};
             std::map<std::string, std::string> owners; // by View, its children's owner
             for (size_t i = 0; i < scene.entries.size(); ++i)
             {
@@ -187,12 +188,15 @@ namespace gh2::gh1
             else
             {
                 // A ParticleSys is drawn by whatever Group it is in, so
-                // its filter stands for it filtered or not.
-                as.push_back(a.filtered() || c == "ParticleSys" ? filterOf(n) : n);
+                // its filter stands for it filtered or not. One a script
+                // switches takes the script's frame past its own filters
+                // (gh1/scripts.h).
+                const bool filtered = a.filtered() && !s.switched.count(n);
+                as.push_back(filtered || c == "ParticleSys" ? filterOf(n) : n);
                 const Stages st = c == "MatAnim" ? stages(s.scene.bodies[i], it->second.rest) : Stages();
                 for (size_t k = 1u; k < st.keyed.size(); ++k)
                     if (st.keyed[k])
-                        as.push_back(a.filtered() ? filterOf(stageOf(n, k)) : stageOf(n, k));
+                        as.push_back(filtered ? filterOf(stageOf(n, k)) : stageOf(n, k));
             }
             drivers[n] = std::move(as);
         }
@@ -471,9 +475,10 @@ namespace gh2::gh1
 
     std::vector<Object> objects(const milo::Dir &scene, const std::set<std::string> &classes, const std::string &top,
                                 const std::set<std::string> &without, const std::set<std::string> &hidden,
-                                const std::set<std::string> &scripted, Drivers &drivers)
+                                const std::set<std::string> &scripted, const std::set<std::string> &switched,
+                                Drivers &drivers)
     {
-        Scan s = scan(scene, classes, without, scripted);
+        Scan s = scan(scene, classes, without, scripted, switched);
         hang(s, top);
         for (const auto &e : scene.entries)
             stand(s, drivers, e.second, 0);

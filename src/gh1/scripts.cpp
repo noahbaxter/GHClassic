@@ -93,22 +93,25 @@ namespace gh2::gh1
             return out;
         }
 
-        void collect(const Node &node, std::set<std::string> &out)
+        // With `switchedOnly`, the anims a switch_anim or switch_anim_rt sets
+        // going alone.
+        void collect(const Node &node, std::set<std::string> &out, bool switchedOnly)
         {
             if (node.type == dtb::kCommand && node.nodes.size() > 2u)
             {
                 const Node &head = node.nodes[0], &what = node.nodes[1];
-                if ((is(head, "arena") || is(head, "game")) &&
-                    (is(what, "switch_anim") || is(what, "switch_anim_rt") || is(what, "anim_task")) &&
+                const bool switched = is(what, "switch_anim") || is(what, "switch_anim_rt");
+                if ((is(head, "arena") || is(head, "game")) && (switched || (!switchedOnly && is(what, "anim_task"))) &&
                     node.nodes[2].type == dtb::kSymbol)
                     out.insert(node.nodes[2].text);
-                if (is(what, "remove_anim") && node.nodes[2].type == dtb::kSymbol)
+                if (!switchedOnly && is(what, "remove_anim") && node.nodes[2].type == dtb::kSymbol)
                     out.insert(node.nodes[2].text);
             }
-            if (node.type == dtb::kCommand && node.nodes.size() == 2u && is(node.nodes[1], "unhook_anim_parents"))
+            if (!switchedOnly && node.type == dtb::kCommand && node.nodes.size() == 2u &&
+                is(node.nodes[1], "unhook_anim_parents"))
                 out.insert(node.nodes[0].text);
             for (const Node &child : node.nodes)
-                collect(child, out);
+                collect(child, out, switchedOnly);
         }
 
         struct Venue
@@ -743,7 +746,15 @@ namespace gh2::gh1
     {
         std::set<std::string> out;
         if (const auto &script = read(disc, gh1))
-            collect(*script, out);
+            collect(*script, out, false);
+        return out;
+    }
+
+    std::set<std::string> switched(size_t disc, const std::string &gh1)
+    {
+        std::set<std::string> out;
+        if (const auto &script = read(disc, gh1))
+            collect(*script, out, true);
         return out;
     }
 
