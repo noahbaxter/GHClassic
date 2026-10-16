@@ -24,6 +24,8 @@ layout(push_constant) uniform Push
     int fogBase; // (start, end), then the colour, in the frame data; -1 for no fog
 } pc;
 
+out float gl_ClipDistance[1];
+
 layout(set = 1, binding = 0, std430) readonly buffer FrameData
 {
     vec4 data[];
@@ -103,6 +105,9 @@ void main()
         }
     }
     gl_Position = pc.mvp * pos;
+    // Nearer than the camera's near plane is clipped, as VU1 clips it: the
+    // flags' top byte is its z_range start in 200ths (mesh_push.h).
+    gl_ClipDistance[0] = (1.0 - float(pc.flags >> 24u) / 200.0) * gl_Position.w - gl_Position.z;
     // VU1's fog scale and offset make F = 255 * (w - end) / (start - end),
     // clamped to 0..255 (PsEnviron::Select, GH1 0x1a2528).
     vFog = 1.0;

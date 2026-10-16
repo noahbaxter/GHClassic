@@ -3353,6 +3353,10 @@ namespace gh2
             push.lightBase = lightBases[i];
             push.envBase = envBases[i];
             push.fogBase = fogBases[i];
+            // A draw on the screen has no camera and nothing to clip.
+            if (!draw.screen)
+                push.flags |= static_cast<uint32_t>(std::clamp(frame.cameras[draw.camera].zRange[0], 0.0f, 1.0f) * 200.0f + 0.5f)
+                              << kZStartShift;
             if (material.sphere)
                 push.flags |= kFlagSphere;
             if (material.spread)

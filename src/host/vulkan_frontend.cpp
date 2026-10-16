@@ -637,6 +637,10 @@ namespace gh2
         VkPhysicalDeviceFeatures wanted{};
         wanted.sampleRateShading = VK_TRUE;
         const bool everySample = physical.value().enable_features_if_present(wanted);
+        // The near plane's clip in mesh.vert and x360.vert.
+        VkPhysicalDeviceFeatures clip{};
+        clip.shaderClipDistance = VK_TRUE;
+        physical.value().enable_features_if_present(clip);
         const bool displayTiming = timing::on() && physical.value().enable_extension_if_present("VK_GOOGLE_display_timing");
         auto device = vkb::DeviceBuilder(physical.value()).build();
         if (!device)
