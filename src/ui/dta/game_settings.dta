@@ -303,6 +303,7 @@
    ; art leaves most room.
    (rows
       (
+         (vs_vfont.btn vs_vfont.chk vector_fonts none)
          (vs_light.btn none lighting vs_light.val)
          (vs_detail.btn none high_detail vs_detail.val)
          (vs_msaa.btn none msaa vs_msaa.val)
@@ -372,7 +373,8 @@
             ; And the widescreen row's own, its name now shorter than its width.
             {widescreen.btn set text_size {'*' [drawn_in] {widescreen.btn get text_size}}}
             {widescreen.btn set fit_text 0}
-            {widescreen.btn set nav_down vs_light.btn}
+            {widescreen.btn set nav_down vs_vfont.btn}
+            {vs_vfont.btn set nav_down vs_light.btn}
             {vs_light.btn set nav_down vs_detail.btn}
             {vs_detail.btn set nav_down vs_msaa.btn}
             {vs_msaa.btn set nav_down vs_scale.btn}
@@ -399,6 +401,7 @@
                   (msaa "MSAA")
                   (render_scale "SCALE")
                   (temporal_aa "TAA")
+                  (vector_fonts "HD FONTS")
                   (perf_overlay "PERF")
                   (high_detail "LOD")
                   (lighting "LIGHTING")
@@ -495,6 +498,7 @@
          (vs_msaa.btn {$this pick msaa})
          (vs_scale.btn {$this pick render_scale})
          (vs_taa.btn {video temporal_aa next})
+         (vs_vfont.btn {video vector_fonts next})
          (vs_perf.btn {$this pick perf_overlay})
          (vs_detail.btn {$this pick high_detail})
          (vs_light.btn {$this pick lighting})

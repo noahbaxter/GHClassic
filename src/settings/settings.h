@@ -54,6 +54,7 @@ namespace gh2::settings
         kFrameLog,   // frametimes.csv: each presented frame's times and what it did
         kLighting,   // kLastGen: the PS2's lighting wherever the 360's would be
         kPerfOverlay, // host/perf.h's Level: frame times in the picture's corner
+        kVectorFonts, // text in the traced fonts drawn from their outlines (render/vector_fonts.h)
         kKeyCount,
     };
 

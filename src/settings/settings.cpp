@@ -124,6 +124,7 @@ namespace gh2::settings
             {"frame_log", Type::kBool, 0, 1, 1, 0},
             {"lighting", Type::kChoice, 0, 1, 1, kLastGen, "last_gen next_gen"},
             {"perf_overlay", Type::kChoice, 0, 3, 1, 0, "off fps graph full"},
+            {"vector_fonts", Type::kBool, 0, 1, 1, 0},
         };
 
         const Entry *entryNamed(const std::string &name)

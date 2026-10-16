@@ -77,9 +77,10 @@ namespace gh2
                     settings::set(settings::kPerfOverlay, static_cast<int>(call.number(3)));
                 return {static_cast<uint32_t>(settings::get(settings::kPerfOverlay)), script::kInt};
             }
-            const settings::Key key = row == "temporal_aa" ? settings::kTemporalAa
-                                      : row == "lighting"  ? settings::kLighting
-                                                           : settings::kHighDetail;
+            const settings::Key key = row == "temporal_aa"    ? settings::kTemporalAa
+                                      : row == "lighting"     ? settings::kLighting
+                                      : row == "vector_fonts" ? settings::kVectorFonts
+                                                              : settings::kHighDetail;
             if (step != 0)
                 settings::set(key, !settings::get(key));
             if (does == "set")
