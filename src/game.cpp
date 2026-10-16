@@ -27,6 +27,7 @@
 #include "gh2x/install.h"
 #include "ui/help_bar.h"
 #include "settings/latency.h"
+#include "settings/settings.h"
 #include "ui/locale.h"
 #include "ui/menus.h"
 #include "ui/meta_music.h"
@@ -101,8 +102,13 @@ namespace
         gh2::installTrackStart(runtime, gh2::kSlus21447);
         gh2::installSustainRelease(runtime, gh2::kSlus21447);
         gh2::installWhammyHold(runtime, gh2::kSlus21447);
-        gh2::installNoteStreak(runtime, gh2::kSlus21447);
-        gh2::installStreakCounter(runtime, gh2::kSlus21447);
+        // Off, neither is installed: the score and rock meters stay where
+        // retail has them.
+        if (gh2::settings::get(gh2::settings::kNoteStreak))
+        {
+            gh2::installNoteStreak(runtime, gh2::kSlus21447);
+            gh2::installStreakCounter(runtime, gh2::kSlus21447);
+        }
         gh2::installTourOrHigher(runtime, gh2::kSlus21447);
         gh2::installNoteSpeed(runtime, gh2::kSlus21447);
         gh2::slider_scale::install(runtime, gh2::kSlus21447);
