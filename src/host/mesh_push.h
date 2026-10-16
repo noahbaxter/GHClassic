@@ -52,6 +52,7 @@ namespace gh2
         uint32_t flags;    // ColorMode in bits 0-2, then the kFlag bits and the skin bones
         int32_t envBase;   // the draw's environ, projected or sphere tex gen block in the frame data, -1 for none
         int32_t fogBase;   // the draw's fog block in the frame data, -1 for none: (start, end), then the colour
+        int32_t textBase;  // mesh.frag's vector font table, in the vector buffer's words, -1 to sample the texture
     };
     static_assert(sizeof(PushConstants) <= 128, "past Vulkan's guaranteed push constant size");
 

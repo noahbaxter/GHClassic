@@ -1,0 +1,19 @@
+{
+ "name": "Rokk",
+ "copyright": "Copyright 2026 Noah Baxter",
+ "ship": true,
+ "sources": [
+  {"tag": "360", "tex": "478754da02c5bd22", "cell": [56, 102],
+   "chars": " 1':,.Ü¡ÓÍÇABCDEFGHIJKLMNOPQRSTUVWXYZ!-ÄÉÑÁÈÊ"},
+  {"tag": "GH1", "tex": "62337cf6c147bbb1", "cell": [28, 51],
+   "chars": " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ!-"}
+ ],
+ "order": "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!¡-'.,:ÄÁÈÉÊÍÑÓÜÇ",
+ "baseline": 95,
+ "space": 22,
+ "sidebearing": 2,
+ "fit": {"smooth": 0.6, "corner_angle": 35, "line_tol": 0.15, "line_min": 4, "curve_tol": 0.35},
+ "glyph_fit": {"023456789.,:'": {"smooth": 0, "blur": 0.7, "upsample": 1, "step": 0.5, "corner_angle": 15,
+                                 "line_tol": 0.5, "curve_tol": 0.4, "min_area": 3, "max_dev": null}},
+ "sample": "ABCDEFGHIJKLM NOPQRSTUVWXYZ\n0123456789 !¡-'.,: ÄÁÈÉÊÍÑÓÜÇ\nGUITAR HERO: ROKK ON!"
+}

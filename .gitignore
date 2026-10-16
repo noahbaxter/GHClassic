@@ -8,3 +8,5 @@ runs/
 .planning/
 review/
 mods/
+fonts/**/*.png
+fonts/*/ofl/

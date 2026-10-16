@@ -1,0 +1,17 @@
+{
+ "name": "Cutout Shadow",
+ "ship": {"font": "cutout", "layer": 0, "color": [0, 0, 0]},
+ "copyright": "Copyright 2026 Noah Baxter",
+ "sources": [
+  {"tag": "360", "tex": "32522143b737abc0", "cell": [84, 56], "channel": "alpha",
+   "chars": " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~¡©®¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞß"},
+  {"tag": "PS2", "tex": "be498d5b329e85d4", "cell": [42, 28], "channel": "alpha",
+   "chars": " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~¡©®¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞß",
+   "take": "04689BDOPQR#%&ÐÒÓÔÕÖØ", "map": [1.98, 1.99, 0.8, 1.0]}
+ ],
+ "baseline": 46,
+ "space": 24,
+ "sidebearing": 2,
+ "fit": {"poly": 0.4, "poly_min": 1.5, "snap": 1.5, "blur": 0, "upsample": 4, "min_area": 1},
+ "sample": "ABCDEFGHIJKLMNOPQRSTUVWXYZ\n0123456789 !?&@#$%*+-=/\nGUITAR HERO: CUT IT OUT!"
+}

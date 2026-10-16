@@ -1,0 +1,18 @@
+; Text drawn from vector fonts: the main menu's (impact, the help bar's
+; helveticablackcondensed) with the setting on, its default, then off and
+; on again by Video Settings' row.
+#include common/first_boot.dta
+(expect {video vector_fonts} 1)
+(wait 1)
+(shot main_vector)
+{video vector_fonts next}
+(expect {video vector_fonts} 0)
+(wait 0.5)
+(shot main_texture)
+{video vector_fonts next}
+(expect {video vector_fonts} 1)
+{ui goto_screen video_settings_screen}
+(wait_screen video_settings_screen)
+(wait 1)
+(shot video_settings)
+(quit)

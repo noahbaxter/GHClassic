@@ -20,6 +20,7 @@
 #include "render/frame.h"
 #include "render/look.h"
 #include "render/texture_store.h"
+#include "render/vector_fonts.h"
 
 #include <algorithm>
 #include <functional>
@@ -404,6 +405,7 @@ namespace gh2
             s_textures.erase(tex);
             s_standIns.erase(tex);
             s_textTextures.erase(tex);
+            vector_fonts::forget(tex);
             std::erase(s_yellowFretIcons, tex);
             std::erase(s_sliderScales, tex);
         }
@@ -432,6 +434,8 @@ namespace gh2
             const uint32_t font = load<uint32_t>(rdram, GPR_U32(ctx, 4) + milo::text::kFont);
             const uint32_t mat = font != 0u ? load<uint32_t>(rdram, font + milo::font::kMat) : 0u;
             const uint32_t tex = mat != 0u ? load<uint32_t>(rdram, mat + milo::mat::kDiffuseTex) : 0u;
+            if (tex != 0u)
+                vector_fonts::noteText(rdram, font, tex);
             if (tex == 0u || !s_textTextures.insert(tex).second)
                 return;
             const auto found = s_textures.find(tex);
@@ -517,6 +521,7 @@ namespace gh2
         s_textures.clear();
         s_standIns.clear();
         s_textTextures.clear();
+        vector_fonts::forgetAll();
         s_yellowFretIcons.clear();
         s_sliderScales.clear();
         s_foreign = true;

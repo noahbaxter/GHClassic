@@ -338,6 +338,7 @@ set(GHC_GAME_SOURCES
     src/render/native_rnd.cpp
     src/render/texture_capture.cpp
     src/render/texture_store.cpp
+    src/render/vector_fonts.cpp
 )
 
 add_executable(GHClassic
@@ -415,6 +416,11 @@ file(READ src/gh1/flyingv_old_layout.bin GHC_FLYINGV_OLD_LAYOUT HEX)
 string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_FLYINGV_OLD_LAYOUT "${GHC_FLYINGV_OLD_LAYOUT}")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS src/gh1/flyingv_old_layout.bin)
 configure_file(src/gh1/flyingv_old_layout.h.in "${GHC_DTA_DIR}/flyingv_old_layout.h" @ONLY)
+# The vector fonts text is drawn from (render/vector_fonts.h), tools/fontpack.py's pack.
+file(READ fonts/vector_fonts.bin GHC_VECTOR_FONTS_PACK HEX)
+string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_VECTOR_FONTS_PACK "${GHC_VECTOR_FONTS_PACK}")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS fonts/vector_fonts.bin)
+configure_file(src/render/vector_fonts_pack.h.in "${GHC_DTA_DIR}/vector_fonts_pack.h" @ONLY)
 target_include_directories(GHClassic PRIVATE "${GHC_DTA_DIR}")
 
 # What the build is (src/build_info.h), from tools/ghc.py: the tag it was made

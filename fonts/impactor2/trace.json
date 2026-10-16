@@ -1,0 +1,17 @@
+{
+ "name": "Impactor2",
+ "ship": {"aliases": ["impactor_mtv"]},
+ "copyright": "Copyright 2026 Noah Baxter",
+ "sources": [
+  {"tag": "360", "tex": "9ae997db039cfbe7", "cell": [42, 28], "channel": "alpha",
+   "chars": " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~¡©®¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞß"}
+ ],
+ "baseline": 23,
+ "space": 9,
+ "sidebearing": 1,
+ "compose": {"ÀÁÂÃÄÅ": "A", "ÈÉÊË": "E", "ÌÍÎÏ": "I", "Ñ": "N", "ÒÓÔÕÖ": "O", "ÙÚÛÜ": "U", "Ý": "Y"},
+ "fit": {"smooth": 0.3, "split": 3, "line_tol": 0.2, "axis_snap": 2, "curve_tol": 0.25, "extrema": 1, "free_line": 4,
+         "corner_scale": 0.75, "corner_angle": 40, "min_seg": 1, "snap": 1, "max_dev": 1,
+         "hole_fit": {"size": 14, "corner_angle": 100, "split": 2, "line_tol": 0.15, "free_line": 2}},
+ "sample": "ABCDEFGHIJKLM\nNOPQRSTUVWXYZ\n0123456789 !?&@#$%*+-=/\nGUITAR HERO"
+}
