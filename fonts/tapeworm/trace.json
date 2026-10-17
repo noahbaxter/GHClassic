@@ -127,7 +127,8 @@
   "curve_tol": 0.25,
   "line_tol": 0.15,
   "line_min": 3,
-  "max_dev": 0.6
+  "max_dev": 0.6,
+  "refine": {"split": 2, "iters": 200, "reach": 0.8}
  },
  "glyph_fit": {"S>ÁÍ": {"max_dev": 0.8}}
 }

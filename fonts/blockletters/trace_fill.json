@@ -7,7 +7,7 @@
    "chars": " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~¡©®¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞß"}
  ],
  "metrics_from": "trace.json",
- "fit": {"smooth": 0.4, "tidy": true, "curve_tol": 0.3, "corner_snap": 0.4},
+ "fit": {"refine": {}, "smooth": 0.4, "tidy": true, "curve_tol": 0.3, "corner_snap": 0.4},
  "baseline": 65,
  "space": 18,
  "sidebearing": 2,

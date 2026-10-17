@@ -8,9 +8,6 @@
   {"tag": "GH1-EUAU", "tex": "ad100778386f7ee3", "cell": [25, 28], "map": [1, 1, 0, 0],
    "chars": " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~¡©®¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿº"}
  ],
- "compose": {"ÀÁÂÃÄÅ": "A", "ÈÉÊË": "E", "ÌÍÎÏ": "I", "Ñ": "N", "ÒÓÔÕÖ": "O", "ÙÚÛÜ": "U", "Ý": "Y",
-             "àáâãäå": "a", "èéêë": "e", "ìíîï": "i", "ñ": "n", "òóôõö": "o", "ùúûü": "u", "ýÿ": "y"},
- "compose_tol": [1.5, 0.25],
  "baseline": 21.5,
  "space": 6,
  "sidebearing": 1,
@@ -18,7 +15,7 @@
  "fit": {"smooth": 0.4, "corner_scale": 0.5, "corner_angle": 40, "line_tol": 0.15, "curve_tol": 0.4, "level": 0.5,
          "straights": {"min": 1.8, "min_diag": 4, "diag_tol": 0.5, "sag": 0.15, "reach": 1.5, "bend": 0.15, "flank": 1,
                        "flank_angle": 25, "diag_flank": 25, "axis": 8, "snap": 0.7},
-         "refine": {}},
+         "refine": {"split": 2, "iters": 200, "reach": 0.8}},
  "glyph_fit": {"Q6ßø": {"straights": {"min": 2.5, "min_diag": 99, "diag_tol": 0.45, "sag": 0.12, "reach": 1.5, "bend": 0.15,
                                       "flank": 1, "flank_angle": 25, "diag_flank": 25, "axis": 6, "snap": 0.5}},
                "9": {"straights": {"min": 99, "min_diag": 99}},

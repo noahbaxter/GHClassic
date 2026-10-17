@@ -13,7 +13,7 @@
  "sidebearing": 1,
  "compose": {"ÀÁÂÃÄÅ": "A", "ÈÉÊË": "E", "ÌÍÎÏ": "I", "Ñ": "N", "ÒÓÔÕÖ": "O", "ÙÚÛÜ": "U", "Ý": "Y",
              "àáâãäå": "a", "èéêë": "e", "ñ": "n", "òóôõö": "o", "ùúûü": "u", "ýÿ": "y"},
- "fit": {"smooth": 0.3, "split": 3, "line_tol": 0.2, "axis_snap": 2, "curve_tol": 0.25, "extrema": 1, "free_line": 4,
+ "fit": {"refine": {}, "smooth": 0.3, "split": 3, "line_tol": 0.2, "axis_snap": 2, "curve_tol": 0.25, "extrema": 1, "free_line": 4,
          "corner_scale": 0.75, "corner_angle": 40, "min_seg": 1, "snap": 1, "max_dev": 1,
          "hole_fit": {"size": 14, "corner_angle": 100, "split": 2, "line_tol": 0.15, "free_line": 2}},
  "sample": "ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n0123456789 !?&@#$%*+-=/°\nGUITAR HERO: IMPACTOR"

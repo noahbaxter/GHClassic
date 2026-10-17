@@ -9,7 +9,7 @@
  "baseline": 60,
  "space": 20,
  "sidebearing": 3,
- "fit": {"smooth": 0.4, "tidy": true, "curve_tol": 0.2, "level": 0.525, "corner_ratio": 1.4},
+ "fit": {"refine": {}, "smooth": 0.4, "tidy": true, "curve_tol": 0.2, "level": 0.525, "corner_ratio": 1.4},
  "iou_min": 0.88,
  "sample": "ABCDEFGHIJKLMNOPQRSTUVWXYZ\n0123456789 !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~\n¡©®¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßÿ\nGUITAR HERO II: ROCK ON!"
 }

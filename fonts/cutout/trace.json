@@ -13,6 +13,6 @@
  "baseline": 46,
  "space": 24,
  "sidebearing": 2,
- "fit": {"poly": 0.4, "poly_min": 1.5, "snap": 1.5, "blur": 0, "upsample": 4, "min_area": 1},
+ "fit": {"refine": {}, "poly": 0.4, "poly_min": 1.5, "snap": 1.5, "blur": 0, "upsample": 4, "min_area": 1},
  "sample": "ABCDEFGHIJKLMNOPQRSTUVWXYZ\n0123456789 !?&@#$%*+-=/\nGUITAR HERO: CUT IT OUT!"
 }

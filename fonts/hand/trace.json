@@ -11,5 +11,5 @@
  "baseline": 23,
  "space": 7,
  "sidebearing": 1,
- "fit": {"smooth": 0.4, "corner_angle": 90}
+ "fit": {"smooth": 0.4, "corner_angle": 90, "refine": {"split": 2, "iters": 200, "reach": 0.8}}
 }

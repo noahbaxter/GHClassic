@@ -20,7 +20,7 @@
  "sidebearing": 0.5,
  "compose": {"ÀÁÂÃÄÅ": "A", "ÈÉÊË": "E", "ÌÍÎÏ": "I", "Ñ": "N", "ÒÓÔÕÖ": "O", "ÙÚÛÜ": "U", "Ý": "Y",
              "àáâãäå": "a", "èéêë": "e", "ñ": "n", "òóôõö": "o", "ùúûü": "u", "ýÿ": "y"},
- "fit": {"blur": 0.3, "snap": 1.5, "smooth": 0.6, "split": 10, "line_tol": 0.25, "axis_snap": 1.5, "curve_tol": 0.35, "extrema": 1, "free_line": 15,
+ "fit": {"refine": {}, "blur": 0.3, "snap": 1.5, "smooth": 0.6, "split": 10, "line_tol": 0.25, "axis_snap": 1.5, "curve_tol": 0.35, "extrema": 1, "free_line": 15,
          "corner_merge": 2, "min_seg": 2.5, "max_dev": 2,
          "small_fit": {"size": 26, "corner_scale": 0.75, "smooth": 0.3, "split": 4, "line_tol": 0.3}},
  "sample": "ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n0123456789 !?&@#$%*+-=/\nGUITAR HERO: Helvetica Black Condensed"
