@@ -232,7 +232,10 @@
       )
       (BUTTON_DOWN_MSG
          {if {== $button kPad_Start} {$this resume}}
-         {if {== $button kPad_Tri} {ui goto_screen pause_screen}}
+         {if {== $button kPad_Tri}
+            {synth play_sequence button_back.cue}
+            {ui goto_screen pause_screen}
+         }
          kDataUnhandled
       )
    )
@@ -251,6 +254,7 @@
       (BUTTON_DOWN_MSG
          {if {&& {! {pause_audio_settings_panel slider_selected}} {== $button kPad_Tri}}
             {$this set_volumes}
+            {synth play_sequence button_back.cue}
             {ui goto_screen pause_settings_screen}
          }
          kDataUnhandled
@@ -266,6 +270,7 @@
       (animate_transition FALSE)
       (BUTTON_DOWN_MSG
          {if {&& {== $button kPad_Tri} {== {pause_video_settings_panel get picking} none}}
+            {synth play_sequence button_back.cue}
             {ui goto_screen pause_settings_screen}
          }
          kDataUnhandled
@@ -1145,6 +1150,7 @@
    (animate_transition FALSE)
    (BUTTON_DOWN_MSG
       {if {&& {! {pause_game_settings_panel slider_selected}} {== $button kPad_Tri}}
+         {synth play_sequence button_back.cue}
          {ui goto_screen pause_settings_screen}
       }
       kDataUnhandled

@@ -145,9 +145,12 @@
       (BUTTON_DOWN_MSG
          {if_else {== [state] browse}
             {if_else {== $button kPad_Tri}
-               {if_else {== [from_panel] game_settings_panel}
-                  {ui goto_screen game_settings_screen}
-                  {ui goto_screen pause_game_settings_screen}
+               {do
+                  {synth play_sequence button_back.cue}
+                  {if_else {== [from_panel] game_settings_panel}
+                     {ui goto_screen game_settings_screen}
+                     {ui goto_screen pause_game_settings_screen}
+                  }
                }
                kDataUnhandled
             }
@@ -155,7 +158,7 @@
                ({== $button kPad_DUp} {$this strum_step up 5})
                ({== $button kPad_DDown} {$this strum_step down -5})
                ({== $button kPad_Circle} {$this reset_value})
-               ({== $button kPad_Tri} {$this set_state browse})
+               ({== $button kPad_Tri} {synth play_sequence button_back.cue} {$this set_state browse})
                (TRUE kDataUnhandled)
             }
          }
