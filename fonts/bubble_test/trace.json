@@ -1,0 +1,15 @@
+{
+ "name": "Bubbletest",
+ "ship": {"masked": true, "edge": 0, "feather": 2},
+ "copyright": "Copyright 2026 Noah Baxter",
+ "sources": [
+  {"tag": "360", "tex": "63d9d07a84705e6d", "cell": [92, 128], "channel": "alpha",
+   "chars": " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ!.'"}
+ ],
+ "baseline": 123,
+ "space": 40,
+ "sidebearing": 3,
+ "sample": "ABCDEFGHIJKLM\nNOPQRSTUVWXYZ\n0123456789 !.'\nTHE TESTERS",
+ "fit": {"smooth": 1.0, "blur": 1.1, "level": 0.4, "local": 3, "corner_scale": 2, "curve_tol": 0.4, "max_dev": 2,
+         "split_depth": 14, "min_area": 4}
+}

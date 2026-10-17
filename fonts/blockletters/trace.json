@@ -1,0 +1,15 @@
+{
+ "name": "Blockletters",
+ "ship": true,
+ "copyright": "Copyright 2026 Noah Baxter",
+ "fit": {"smooth": 0.4, "tidy": true, "curve_tol": 0.2, "corner_snap": 0.4},
+ "sources": [
+  {"tag": "360", "tex": "503b7a09112d0231", "cell": [56, 84], "channel": "alpha",
+   "chars": " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~¡©®¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞß"}
+ ],
+ "baseline": 65,
+ "space": 18,
+ "sidebearing": 2,
+ "iou_min": 0.85,
+ "sample": "ABCDEFGHIJKLMNOPQRSTUVWXYZ\n0123456789 !?&@#$%*+-=/\nGUITAR HERO II: ROCK ON!"
+}
