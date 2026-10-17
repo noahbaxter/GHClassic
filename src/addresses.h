@@ -113,6 +113,7 @@ namespace gh2
         uint32_t systemPoll;  // SystemPoll(bool): pads, files, the loader
         uint32_t synthPoll;   // Synth::Poll
         uint32_t synthEEPoll; // SynthEE::Poll
+        uint32_t sequencePlay; // Sequence::Play(float, float, float)
         uint32_t streamEEPoll;
         uint32_t streamSampleFreq; // StreamEE::GetSampleFreq(int channel)
         uint32_t varTimerMs;
@@ -357,6 +358,7 @@ namespace gh2
         .systemPoll = 0x2a85d0u,
         .synthPoll = 0x225cc8u,
         .synthEEPoll = 0x22cc80u,
+        .sequencePlay = 0x21fa68u,
         .streamEEPoll = 0x2308a0u,
         .streamSampleFreq = 0x2314e8u,
         .varTimerMs = 0x2d4018u,
