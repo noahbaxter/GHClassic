@@ -26,6 +26,28 @@
 }
 {ghc_highway}
 
+; Audio Settings in GH1's scenes (gh1/menus.dta), out of a song and in one:
+; GH1's sliders link to nothing, its own script moved between them, so they
+; are linked down and round. Its rows for playing left handed go, each
+; leading to itself: up is to whatever leads down to the focus, the first
+; the scene lists, and one left leading to the top row stops up there.
+{func ghc_gh1_audio_rows ($panel)
+   {do
+      ($dir {$panel loaded_dir})
+      {{$dir find gs_band.sld} set nav_down {$dir find gs_guitar.sld}}
+      {{$dir find gs_guitar.sld} set nav_down {$dir find gs_sfx.sld}}
+      {{$dir find gs_sfx.sld} set nav_down {$dir find gs_stereo.btn}}
+      {{$dir find gs_stereo.btn} set nav_down {$dir find gs_band.sld}}
+      {foreach $o (gs_left_p1.btn gs_left_p2.btn)
+         {if {$dir exists $o}
+            {{$dir find $o} set_showing FALSE}
+            {$panel disable {$dir find $o}}
+            {{$dir find $o} set nav_down {$dir find $o}}
+         }
+      }
+   }
+}
+
 ; The options menu, as the game's own (options.dta) with a Game Settings row
 ; under Video Settings. options.milo has six rows, each button in a group of
 ; its own that fans it about the poster's corner; the seventh is Video
@@ -378,6 +400,9 @@
                   {{$this find {elem $row 3}} set_local_pos $col $y {'+' $z {'*' $i {'*' [tight] [gap]}}}}
                   {{$this find {elem $row 3}} set_showing TRUE}
                   {{$this find {elem $row 3}} set draw_order 1}
+                  ; Up goes to what leads down to the focus: its row's own
+                  ; link, copied, would lead there from here.
+                  {{$this find {elem $row 3}} set nav_down {$this find {elem $row 3}}}
                }
                {set $i {'+' $i 1}}
             }
@@ -489,9 +514,13 @@
             {widescreen.chk set_local_pos $x $y {'+' $z {'-' $top $from}}}
          }
       }
+      ; Each leads to itself: up is to whatever leads down to the focus, the
+      ; first the scene lists, so one left leading to the top row stops up
+      ; from there.
       {foreach $o (gs_left_p1.btn gs_left_p2.btn p_scan.btn calibrate_lag.btn)
          {{$this find $o} set_showing FALSE}
          {{$this find $o} set_state kDisabled}
+         {{$this find $o} set nav_down {$this find $o}}
       }
       {foreach $o (lefty1.chk lefty2.chk p_scan.chk)
          {{$this find $o} set_showing FALSE}
@@ -501,6 +530,7 @@
          {if {exists $o}
             {{$this find $o} set_showing FALSE}
             {{$this find $o} set_state kDisabled}
+            {{$this find $o} set nav_down {$this find $o}}
          }
       }
       {if {== {$this name} pause_video_settings_panel} {gs_title.lbl set_localized "VIDEO"}}
@@ -661,7 +691,8 @@
          {gm_p1.btn set nav_down gm_p2.btn}
          {gm_p1.btn set nav_down gm_lag.btn}
       }
-      {gm_p2.btn set nav_down gm_lag.btn}
+      ; P2 off leads to itself, so up from the lag row finds P1.
+      {gm_p2.btn set nav_down {if_else {$this two_players} gm_lag.btn gm_p2.btn}}
       {gm_lag.btn set nav_down gs_band.sld}
       {foreach $row
          (
