@@ -36,6 +36,15 @@ namespace gh2::encores
             ctx->pc = GPR_U32(ctx, 31);
         }
 
+        // Whether `line` is `format` filled in: its text before the first %i
+        // and after the last.
+        bool filledFrom(const std::string &line, const std::string &format)
+        {
+            const size_t first = format.find("%i"), last = format.rfind("%i");
+            return first != std::string::npos && line.starts_with(format.substr(0u, first)) &&
+                   line.ends_with(format.substr(last + 2u));
+        }
+
         // CampaignState::IsEncoreSong(Symbol) (0x131d30).
         void isEncoreSong(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
@@ -112,11 +121,21 @@ namespace gh2::encores
                 return call(s_addresses->localeLocalize,
                             {s_addresses->theLocale, script::symbol(rdram, ctx, runtime, token), 1u});
             };
+            const auto string = [&](uint32_t at)
+            { return std::string(reinterpret_cast<const char *>(getMemPtr(rdram, at))); };
             uint32_t blurb = static_cast<uint32_t>(runtime->callGuestFunction(
                 rdram, ctx, s_addresses->songProviderGetBlurb, {GPR_U32(ctx, 4), GPR_U32(ctx, 5)}, s_getBlurb));
             if (blurb == text("song_current_venue_encore"))
                 blurb = call(s_addresses->makeStringInt,
                              {text("song_current_venue_" + campaigns::active()),
+                              call(s_addresses->campaignGetRequiredSongs,
+                                   {load<uint32_t>(rdram, s_addresses->theCampaign)})});
+            // The last venue's: GH2's win lines are for its encore (the one
+            // for easy counts the songs of its own, the other names Free
+            // Bird), where here the same required songs win it.
+            else if (blurb == text("song_win_other") || filledFrom(string(blurb), string(text("song_win_easy"))))
+                blurb = call(s_addresses->makeStringInt,
+                             {text("song_win_" + campaigns::active()),
                               call(s_addresses->campaignGetRequiredSongs,
                                    {load<uint32_t>(rdram, s_addresses->theCampaign)})});
             SET_GPR_U32(ctx, 2, blurb);

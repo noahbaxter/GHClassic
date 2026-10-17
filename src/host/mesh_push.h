@@ -40,6 +40,11 @@ namespace gh2
     // mesh.frag's again: the alpha cut is at a half, for a rendered
     // texture's card in a picture larger than its machine's.
     constexpr uint32_t kFlagCutHalf = 1u << 23;
+    // Both shaders': the draw's camera's z_range start in 200ths, exact for
+    // the games' 0, 0.02, 0.1 and 0.9. The near plane falls at depth 1 less
+    // that, as a fraction of w (render/camera.cpp), and VU1 clips what is
+    // nearer, which would otherwise reach the slice a later camera draws in.
+    constexpr uint32_t kZStartShift = 24;
 
     struct PushConstants
     {

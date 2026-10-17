@@ -70,8 +70,8 @@ namespace gh2::gh1
         // script shows solo_beam01.mesh, and GH2's dir would draw it.
         std::optional<milo::Dir> geom(const milo::Dir &gh2, const std::vector<const milo::Dir *> &above,
                                       const milo::Dir &room, const milo::Dir &lighting,
-                                      const std::set<std::string> &scripted, Drivers &drivers,
-                                      std::set<std::string> &unreached)
+                                      const std::set<std::string> &scripted, const std::set<std::string> &switched,
+                                      Drivers &drivers, std::set<std::string> &unreached)
         {
             const auto root = withoutObjects(gh2.root);
             if (!root)
@@ -110,7 +110,7 @@ namespace gh2::gh1
                 "LightAnim", "EnvAnim", "MeshAnim", "Flare", "ParticleSys", "ParticleSysAnim",
             };
             for (const auto &[scene, top] : {std::pair{&room, kRoomView}, std::pair{&lighting, kLightingView}})
-                for (Object &o : objects(*scene, kClasses, top, taken, {}, scripted, drivers))
+                for (Object &o : objects(*scene, kClasses, top, taken, {}, scripted, switched, drivers))
                     if (taken.insert(o.name).second)
                     {
                         if (o.unreached)
@@ -321,8 +321,14 @@ namespace gh2::gh1
             }
             Drivers drivers;
             std::set<std::string> unreached;
-            auto madeGeom =
-                geom(*gh2Geom, {&*gh2Chars, &*gh2Lights}, *room, *lighting, scripted(disc, name), drivers, unreached);
+            // A section's "<name>_rt.view" is unhooked from the View that
+            // drives it (VenueSection::IsLoaded, GH1 0x178db8), for the
+            // script's glue to run in milliseconds.
+            std::set<std::string> apart = scripted(disc, name);
+            for (const char *view : {kRoomView, kLightingView})
+                apart.insert(rtOf(view));
+            auto madeGeom = geom(*gh2Geom, {&*gh2Chars, &*gh2Lights}, *room, *lighting, apart, switched(disc, name),
+                                 drivers, unreached);
             const Spots at = spots({&*lighting, &*room});
             Stage stage;
             auto madeChars = chars(*gh2Chars, at, setting(name, "allow_walks", 0.0f) != 0.0f,

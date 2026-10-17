@@ -15,6 +15,13 @@ namespace gh2::gh1
     inline constexpr const char *kRoomView = "venue.view";
     inline constexpr const char *kLightingView = "lighting.view";
 
+    // The View of a section's that GH1 runs in milliseconds, "<name>_rt.view"
+    // (VenueSection::Poll, GH1 0x178ce8), by the section's View.
+    inline std::string rtOf(const std::string &view)
+    {
+        return view.substr(0u, view.rfind('.')) + "_rt.view";
+    }
+
     // A crowd region (gh1/crowd.cpp): the members drawn whole in it, each as
     // its archetype and which of that archetype's places, and the sphere
     // around them.

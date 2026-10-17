@@ -123,6 +123,25 @@ namespace gh2::gh1
         // A TransAnim 6 is Hmx::Object's header, an Anim 4, what it
         // turns, then its turning keys, each a quaternion and a frame:
         // each leans back about x before its own turn.
+        // Turned first, about the z it spins on, so it starts that far round.
+        for (const auto &[anim, degrees] : screen.turned)
+            if (c == "TransAnim" && name == anim)
+            {
+                size_t o = 8u;
+                str(body, o);
+                o += 13u;
+                str(body, o);
+                const float half = degrees * 3.14159265f / 360.0f;
+                const float s = std::sin(half), w = std::cos(half);
+                const size_t end = o + 4u + 20u * u32(body, o);
+                for (size_t key = o + 4u; key < end && end <= body.size(); key += 20u)
+                {
+                    const float a[4] = {f32(body, key), f32(body, key + 4u), f32(body, key + 8u), f32(body, key + 12u)};
+                    const float turned[4] = {w * a[0] - s * a[1], w * a[1] + s * a[0], w * a[2] + s * a[3],
+                                             w * a[3] - s * a[2]};
+                    std::memcpy(body.data() + key, turned, 16u);
+                }
+            }
         for (const auto &[anim, degrees] : screen.tilted)
             if (c == "TransAnim" && name == anim)
             {

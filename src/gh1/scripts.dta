@@ -1,9 +1,11 @@
 ; The handlers a GH1 venue's world type has ahead of GH1's own functions
 ; and handlers (gh1/scripts.cpp): arena/venue.dta's. Where the song is and
 ; how it goes pick the lights, on the downbeat after either changes (GH2 has
-; no event for one: the next beat that is a multiple of four), the intro has
-; the bad ones and the first shot after it the music's start, which GH2 has
-; no event for.
+; no event for one: the next beat that is a multiple of four). The intro has
+; the bad ones, which run from beat 0, where GH1's clocks start and GH2 has
+; no event for it, until music_start, at the third measure (gh1/songs.cpp),
+; lights the verse. A level or section GH2 sends before then, or that is
+; the one lit, is not a change.
 
 ; GH2's own beat (world_objects_worldbase.dta), which cuts from a shot its
 ; check fails (CheckShot, 0x11f628), and GH1's cut that check leaves out:
@@ -28,7 +30,17 @@
 (excitement_bad {$this gh1_lights_soon})
 (excitement_okay {$this gh1_lights_soon})
 (excitement_great {$this gh1_lights_soon})
+(gh1_music FALSE)
+(gh1_lit_level -1)
+(gh1_lit_section verse)
 (gh1_lights
+   {if_else {! [gh1_started]}
+      {$this gh1_lights_hold}
+      {if {&& [gh1_music] {|| {!= [gh1_lit_level] [excitement_level]} {!= [gh1_lit_section] [gh1_section]}}}
+         {set [gh1_lit_level] [excitement_level]}
+         {set [gh1_lit_section] [gh1_section]}
+         {$this gh1_lights_now}}})
+(gh1_lights_now
    {if_else {game multiplayer}
       {$this gh1_lights_great}
       {switch [excitement_level]
@@ -51,16 +63,27 @@
 (solo {set [gh1_section] solo} {$this gh1_lights_soon})
 (intro_start
    {set [gh1_started] FALSE}
+   {set [gh1_music] FALSE}
    {set [gh1_lights_due] FALSE}
    {set [gh1_section] verse}
    {$this gh1_scene}
-   {$this set_lights_bad})
-(post_switch_cam
-   {if {&& {! [gh1_started]} {world current_shot}}
-      {if {!= {{world current_shot} get category} INTRO}
-         {set [gh1_started] TRUE}
-         {$this set_lights_okay_verse}
-         {$this gh1_music_start}}})
+   {$this gh1_lights_hold}
+   {if {< {taskmgr beat} 0}
+      {script_task (units kTaskBeats)
+         (delay {- 0 {taskmgr beat}})
+         (script {world gh1_begin})}})
+(gh1_begin
+   {if {! [gh1_started]}
+      {set [gh1_started] TRUE}
+      {$this gh1_intro_again}
+      {$this set_lights_bad}})
+(music_start
+   {if {&& [gh1_started] {! [gh1_music]}}
+      {set [gh1_music] TRUE}
+      {set [gh1_lit_level] [excitement_level]}
+      {set [gh1_lit_section] [gh1_section]}
+      {$this gh1_music_start}
+      {$this set_lights_okay_verse}})
 (game_won {$this set_lights_great_verse})
 (hit_p0_fret1 {$this hit_gem 0})
 (hit_p0_fret2 {$this hit_gem 1})

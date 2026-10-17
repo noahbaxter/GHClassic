@@ -50,6 +50,11 @@ namespace gh2::setlists
     // and turning with the menus as the game's own does.
     void addLook(const std::string &game, milo::Dir scene);
 
+    // That game's career list shows a song's score where it has none, as
+    // a 0, as GH1's does (SongProvider::GetTextSlot, GH1 0x11a7d8, prints
+    // any). GH2's leaves it blank.
+    void zeroScores(const std::string &game);
+
     // A game's career songs: its tiers' own, without the store's.
     std::vector<std::string> careerSongs(const std::string &name);
 

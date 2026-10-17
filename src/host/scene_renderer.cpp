@@ -353,6 +353,11 @@ namespace gh2
             for (uint32_t c = 0; c < 3; ++c)
                 for (uint32_t k = 0; k < 3; ++k)
                     out[3].v[c] += (eye[k] - w[12 + k]) * m[k][c];
+            // w: what the normal is scaled back by, the matrix's own scale,
+            // where the position keeps it (a guitar drawn at 5 times its
+            // size reflects wildly otherwise, gh1/screens.cpp's store).
+            const float length = std::sqrt(w[0] * w[0] + w[1] * w[1] + w[2] * w[2]);
+            out[3].v[3] = length > 1e-6f ? 1.0f / length : 1.0f;
         }
 
         // Program 0x410, the projected tex gen (0x2080..0x21b0), takes the
@@ -3430,6 +3435,10 @@ namespace gh2
             push.lightBase = lightBases[i];
             push.envBase = envBases[i];
             push.fogBase = fogBases[i];
+            // A draw on the screen has no camera and nothing to clip.
+            if (!draw.screen)
+                push.flags |= static_cast<uint32_t>(std::clamp(frame.cameras[draw.camera].zRange[0], 0.0f, 1.0f) * 200.0f + 0.5f)
+                              << kZStartShift;
             if (material.sphere)
                 push.flags |= kFlagSphere;
             if (material.spread)

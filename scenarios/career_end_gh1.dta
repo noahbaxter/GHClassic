@@ -59,6 +59,18 @@
 (wait 1)
 (expect {game get_song} godzilla)
 {foreach $s (godzilla texasflood frankenstein) {campaign cheat_beat_song $s 100000}}
+; The last venue's line under its songs asks for the songs medium needs,
+; "Beat 4/5 songs to win", where GH2's names Free Bird (content/encores.cpp).
+{sel_song_panel refresh}
+(wait 1)
+(press down)
+(press down)
+(press down)
+(press down)
+(press down)
+(press down)
+(wait 1)
+(shot last_venue)
 {set $index 3}
 #include common/career_song.dta
 (expect {gamecfg get_song} cowboysfromhell)

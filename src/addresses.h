@@ -214,7 +214,9 @@ namespace gh2
         uint32_t campaignStateGetNumSongs;
         uint32_t campaignStateGetStatusSym;
         uint32_t songProviderGetBlurb;                // (int row)
+        uint32_t songProviderGetHighScore;            // (int row)
         uint32_t makeStringInt;                       // MakeString(const char *, int)
+        uint32_t playerSetMercurySwitch;              // (bool): the guitar tilted, star power deployed if ready
         // Data
         uint32_t rndCamCurrent;  // RndCam::sCurrent
         uint32_t defaultMat;     // the RndMat a mesh without one draws with
@@ -228,6 +230,7 @@ namespace gh2
         uint32_t theLocale;
         uint32_t theLoadMgr;
         uint32_t nullStr; // char*, the empty Symbol's text
+        uint32_t scoreFormat; // "%i", a song list row's score (SongProvider::GetHighScore)
         uint32_t mcBuffer;    // the save's bytes between the two halves of a load or save
         uint32_t mcOverwrite; // GHMCSaveData's overwrite argument: replace a save already there
         uint32_t mcBaseDir;   // char*, the save's directory on the card
@@ -455,7 +458,9 @@ namespace gh2
         .campaignStateGetNumSongs = 0x133020u,
         .campaignStateGetStatusSym = 0x132760u,
         .songProviderGetBlurb = 0x117df8u,
+        .songProviderGetHighScore = 0x117b38u,
         .makeStringInt = 0x3147a8u,
+        .playerSetMercurySwitch = 0x111940u,
         .rndCamCurrent = 0x3de348u,
         .defaultMat = 0x3da4f0u,
         .rndEnvironCurrent = 0x3de358u,
@@ -468,6 +473,7 @@ namespace gh2
         .theLocale = 0x51f1b8u,
         .theLoadMgr = 0x51f1d8u,
         .nullStr = 0x3de688u,
+        .scoreFormat = 0x3f8408u,
         .mcBuffer = 0x3da368u,
         .mcOverwrite = 0x3da394u,
         .mcBaseDir = 0x3da374u,
