@@ -42,7 +42,7 @@
  "space": 17,
  "sidebearing": 1,
  "sample": "ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n0123456789 !\"#$%&'()*+,-./:;<=>?@\nGuitar Hero: Clarendon Rocks!",
- "fit": {"smooth": 0.3, "corner_scale": 0.75, "corner_angle": 40, "line_tol": 0.2, "level": 0.52,
+ "fit": {"refine": {}, "smooth": 0.3, "corner_scale": 0.75, "corner_angle": 40, "line_tol": 0.2, "level": 0.52,
          "straights": {"min": 3, "min_diag": 10, "diag_tol": 0.35, "sag": 0.15, "reach": 3, "bend": 0.3, "flank": 2, "flank_angle": 35,
                        "diag_flank": 22, "axis": 6, "snap": 0.6}},
  "glyph_fit": {"#": {"straights": {"min": 3, "min_diag": 6, "diag_tol": 0.5, "sag": 0.2, "reach": 3, "bend": 0.3,

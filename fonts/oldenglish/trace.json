@@ -1,0 +1,26 @@
+{
+ "name": "Oldenglish",
+ "ship": {"masked": true, "edge": 0},
+ "copyright": "Copyright 2026 Noah Baxter",
+ "sources": [
+  {"tag": "360", "tex": "5243d79504496e49", "cell": [25, 28],
+   "chars": " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~¡©®¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ"}
+ ],
+ "compose": {"ÀÁÂÃÄÅ": "A", "ÈÉÊË": "E", "ÌÍÎÏ": "I", "Ñ": "N", "ÒÓÔÕÖ": "O", "ÙÚÛÜ": "U", "Ý": "Y",
+             "àáâãäå": "a", "èéêë": "e", "ìíîï": "i", "ñ": "n", "òóôõö": "o", "ùúûü": "u", "ýÿ": "y"},
+ "compose_tol": [1.0, 0.15],
+ "baseline": 22,
+ "space": 6,
+ "sidebearing": 1,
+ "sample": "ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n0123456789 !\"#$%&'()*+,-./:;<=>?@\nGuitar Hero: Oldenglish Rocks",
+ "fit": {"smooth": 0.3, "corner_scale": 0.5, "corner_angle": 30, "line_tol": 0.15, "curve_tol": 0.4, "level": 0.5, "hairline": 0.12,
+         "straights": {"min": 1.2, "min_diag": 1.2, "diag_tol": 0.3, "sag": 0.2, "reach": 1, "bend": 0, "flank": 0.75,
+                       "flank_angle": 0, "diag_flank": 0, "axis": 8, "snap": 0.8}},
+ "glyph_fit": {"ABCDEFGHIJKLMNOPQRSTUVWXYZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞ": {
+                 "smooth": 0.45, "curve_tol": 0.45, "corner_angle": 45,
+                 "straights": {"min": 2, "min_diag": 3, "diag_tol": 0.35, "sag": 0.12, "reach": 1, "bend": 0.15,
+                               "flank": 0.75, "flank_angle": 25, "diag_flank": 20, "axis": 6, "snap": 0.6}},
+               "0123456789&@©®$%?¿()~*": {"smooth": 0.4, "curve_tol": 0.4, "corner_angle": 45,
+                 "straights": {"min": 2, "min_diag": 6, "diag_tol": 0.4, "sag": 0.12, "reach": 1.5, "bend": 0.15,
+                               "flank": 1, "flank_angle": 25, "diag_flank": 25, "axis": 6, "snap": 0.6}}}
+}

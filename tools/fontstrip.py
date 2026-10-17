@@ -3,9 +3,10 @@
 
     tools/fontstrip.py fonts/<name>/trace.json [...] [--overview fonts/compare.png]
 
-Each glyph of the OTF, as FreeType draws it, is boxed down into the game
-cell's own pixels (the coverage each texture pixel would hold) and lined up
-with the game's by the best sub-pixel shift, so the two are compared like
+Each glyph of the OTF, drawn from its own outline as the game draws it, is
+boxed down into the game cell's own pixels, the coverage each texture pixel
+would hold (a cell warped in from a source at another scale goes down to that
+source's pixels and back up, as its game pixels did), and lined up with the game's by the best sub-pixel shift, so the two are compared like
 for like. Two rows per line: the game's pixels, and the difference (ink
 both have dim gray, ink only the game has red, only the OTF cyan; under
 NOISE coverage left dark as anti-aliasing), with each glyph's shape
@@ -16,21 +17,24 @@ font's first line.
 """
 import argparse
 import json
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
 from fontTools.pens.boundsPen import BoundsPen
+from fontTools.pens.recordingPen import RecordingPen
 from fontTools.ttLib import TTFont
 from PIL import Image, ImageDraw, ImageFont
 from scipy import ndimage
 
+import fontrefine
 import fonttrace
 
 ROOT = fonttrace.ROOT
 CELL_PX = 72   # screen height of a master cell
 WIDTH = 2000   # line wrap
 LABEL_W = 110
-SS = 8         # FreeType draws at SS times the cell, boxed down to it
+SS = 8         # glyphs drawn at SS times the cell, boxed down to it
 SHIFT = 1.0    # master pixels the registration searches each way
 NOISE = 0.15   # coverage difference left dark as anti-aliasing
 GAIN = 2.5
@@ -61,18 +65,52 @@ def ink_left(a):
     return i - 1 + (0.5 - prof[i - 1]) / max(prof[i] - prof[i - 1], 1e-6)
 
 
-def registered(ft, c, a, xmin, baseline, offsets=False):
-    """The OTF glyph as coverage of a's pixels, at the shift that matches a best;
-    with offsets, also that shift in 1/SS pixels (dx, dy)."""
+@lru_cache(None)
+def glyph_set(otf):
+    f = TTFont(otf)
+    return f.getGlyphSet(), f.getBestCmap()
+
+
+def polygons(otf, c):
+    """c's contours in font units, curves flattened, as fontpack reads them."""
+    gs, cmap = glyph_set(str(otf))
+    pen = RecordingPen()
+    gs[cmap[ord(c)]].draw(pen)
+    out, cur = [], []
+    for op, args in pen.value:
+        if op == "moveTo":
+            cur = [args[0]]
+        elif op == "lineTo":
+            cur.append(args[0])
+        elif op == "curveTo":
+            p0, (c1, c2, p3) = np.array(cur[-1]), map(np.array, args)
+            for t in np.linspace(0, 1, 25)[1:]:
+                cur.append(tuple((1 - t) ** 3 * p0 + 3 * (1 - t) ** 2 * t * c1 + 3 * (1 - t) * t ** 2 * c2 + t ** 3 * p3))
+        elif op in ("closePath", "endPath"):
+            out.append(np.array(cur, float))
+            cur = []
+    return out
+
+
+def registered(otf, c, a, xmin, baseline, offsets=False):
+    """The OTF glyph, drawn from its own outline as the game draws it, as coverage of
+    a's pixels at the shift that matches a best; with offsets, also that shift in 1/SS
+    pixels (dx, dy)."""
     h, w = a.shape
     m = round(SHIFT * SS)
-    canvas = Image.new("L", (int((w + 2 * SHIFT) * SS), int((h + 2 * SHIFT) * SS)), 0)
+    W, H = int((w + 2 * SHIFT) * SS), int((h + 2 * SHIFT) * SS)
+    acc = np.zeros((H, W), bool)
     # pixel i's center is master x = i, so its left edge is canvas (i + SHIFT) * SS
-    pen = (ink_left(a) - xmin / fonttrace.UNITS + 0.5 + SHIFT) * SS
-    ImageDraw.Draw(canvas).text((pen, (baseline + 0.5 + SHIFT) * SS), c, font=ft, fill=255, anchor="ls")
-    big = np.asarray(canvas, dtype=np.float32) / 255.0
+    pen = ink_left(a) - xmin / fonttrace.UNITS + 0.5 + SHIFT
+    for q in polygons(otf, c):
+        x = (q[:, 0] / fonttrace.UNITS + pen) * SS
+        y = (baseline + 0.5 + SHIFT - q[:, 1] / fonttrace.UNITS) * SS
+        im = Image.new("1", (W, H), 0)
+        ImageDraw.Draw(im).polygon(list(zip(x - 0.5, y - 0.5)), fill=1)
+        acc ^= np.asarray(im)
+    big = acc.astype(np.float32)
     best = None
-    for dy in range(-m, m + 1, 2):
+    for dy in range(-m, m + 1):
         for dx in range(-m, m + 1):
             win = big[m + dy:m + dy + h * SS, m + dx:m + dx + w * SS]
             o = win.reshape(h, SS, w, SS).mean((1, 3))
@@ -93,7 +131,7 @@ def difference(a, o):
 
 def tone_of(picked):
     """The median opacity inside a font's glyphs, two pixels in from their edges."""
-    inner = [a[ndimage.binary_erosion(a > 0.5, iterations=2)] for a, _ in picked.values()]
+    inner = [a[ndimage.binary_erosion(a > 0.5, iterations=2)] for a, *_ in picked.values()]
     inner = np.concatenate([v for v in inner if v.size]) if any(v.size for v in inner) else np.ones(1)
     return float(np.median(inner))
 
@@ -124,7 +162,6 @@ def tiles(cfg, picked, otf, shape):
     """(char, game tile, difference tile, mismatch) per glyph, at screen size."""
     z = CELL_PX / shape[0]
     xmin = glyph_xmin(otf)
-    ft = ImageFont.truetype(str(otf), round(1000 / fonttrace.UNITS * SS))
     edge = masked_edge(cfg)
     tone = tone_of(picked) if edge is not None else None
     out = []
@@ -132,7 +169,10 @@ def tiles(cfg, picked, otf, shape):
         if c not in picked or c not in xmin:
             continue
         a = picked[c][0].astype(np.float32)
-        o = registered(ft, c, a, xmin[c], cfg["baseline"])
+        o = registered(otf, c, a, xmin[c], cfg["baseline"])
+        if len(picked[c]) > 2:  # warped in from another scale: the font goes the same way
+            n, p = picked[c][2]
+            o = fonttrace.warp(fontrefine.to_native(o, n.shape, *p), a.shape, *p).astype(np.float32)
         if tone is not None:
             o = masked(a, o, tone, *edge)
         cols = np.nonzero(((a > 0.1) | (o > 0.1)).any(0))[0]

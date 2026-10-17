@@ -44,6 +44,8 @@ Config keys:
                      fewest within curve_tol (tangent_span, corner_snap px; fit_tidy),
                    local: px sigma; coverage is divided by the nearby ink's mean (never
                      below local_floor, default 0.3) before level applies, scored the same,
+                   hairline: coverage floor; faint ink enclosed by the silhouette counts as
+                     solid, so a masked font's interior hairlines stay inside its outline,
                    dots: radius, for a dot-matrix font drawn as true circles,
                    dot_pitch: [x, y] px of the dot grid; centers snap to it (dot_lattice),
                    poly: px tolerance; every loop a polygon of refitted straight sides
@@ -65,10 +67,14 @@ Config keys:
                   forms match; compose_tol [box px, area fraction] is how alike a loop must be
     fit straights {min, min_diag, diag_tol, sag, reach, bend, flank, flank_angle, diag_flank,
                    axis, snap}: smooth mode with straight stems inside curved runs (fit_straights)
+    fit refine    {} or {pull, turn, grow, reach, iters, eps, smooth_deg}: every fitted node and
+                  handle then moved to cover the game's pixels best (tools/fontrefine.py), for a
+                  small cell whose fit lands a fraction of a pixel off
 """
 import argparse
 import json
 import re
+from multiprocessing import Pool
 from pathlib import Path
 
 import numpy as np
@@ -77,6 +83,8 @@ from fontTools.pens.t2CharStringPen import T2CharStringPen
 from PIL import Image, ImageDraw, ImageFont
 from scipy import ndimage
 from skimage import feature, filters, measure, transform
+
+import fontrefine
 
 ROOT = Path(__file__).resolve().parent.parent
 UNITS = 10  # font units per master pixel
@@ -1054,7 +1062,14 @@ def fits(segs, pts, tol):
 def tone(a, cfg):
     """Coverage over the mean coverage of the ink around it when "local" (a gaussian
     sigma in px) is set, so a faint dry-marker stroke is cut at the same fraction
-    of its own body as a solid one."""
+    of its own body as a solid one. With "hairline" (a coverage floor), faint ink
+    inside the silhouette (enclosed by coverage over level) counts as solid, so a
+    textured font's interior hairlines stay inside its outline while counters
+    under the floor stay cut, and its outer edge still sits at level."""
+    f = cfg.get("hairline")
+    if f:
+        inner = ndimage.binary_fill_holes(a > cfg.get("level", 0.5)) & (a >= f)
+        a = np.where(inner, 1.0, a)
     r = cfg.get("local")
     if not r:
         return a
@@ -1063,7 +1078,7 @@ def tone(a, cfg):
     return a / np.maximum(m, cfg.get("local_floor", 0.3))
 
 
-def trace(a, cfg):
+def trace(a, cfg, native=None):
     pad = 4
     s = np.pad(tone(a, cfg), pad)
     if cfg["blur"] > 0:
@@ -1110,7 +1125,15 @@ def trace(a, cfg):
         return [(edge if i == 0 else np.empty((0, 2)), s) for i, s in enumerate(segs)]
     if cfg.get("dot_rect"):
         loops = rect_dots(loops, cfg["dot_rect"])
+    if "refine" in cfg and loops:
+        # a cell warped in from another scale is matched against that source's own pixels
+        target = (tone(native[0], cfg), native[1]) if native else None
+        loops = fontrefine.refine(tone(a, cfg), loops, cfg["refine"], target)
     return loops
+
+
+def trace_job(job):
+    return trace(*job)
 
 
 def rect_dots(loops, most):
@@ -1235,7 +1258,8 @@ def oriented(loops):
 
 
 def charstring(loops, base, shift, width):
-    pen = T2CharStringPen(width, None)
+    # keep fractional units: whole ones are 0.1 master px, enough to undo the refine pass
+    pen = T2CharStringPen(width, None, roundTolerance=0)
     to = lambda q: (round((q[0] - shift) * UNITS, 1), round((base - q[1]) * UNITS, 1))
     for _, segs in loops:
         pen.moveTo(to(segs[0][1] if segs[0][0] == "L" else segs[0][1][0]))
@@ -1332,7 +1356,8 @@ def sheet(cfg, cell, items, otf, out):
 
 
 def pick(cfg, tex):
-    """Each character's cell in master pixels, with the tag of the source it came from."""
+    """Each character's cell in master pixels, with the tag of the source it came from; a cell
+    warped in from a source at another scale also carries that source's own cell and mapping."""
     master = load(cfg["sources"][0], tex)
     shape = next(iter(master.values())).shape
     tag0 = cfg["sources"][0].get("tag", "0")
@@ -1347,7 +1372,7 @@ def pick(cfg, tex):
                  f"IoU {s:.3f} over {len(shared)}" if s is not None else "cell ratio, too few shared letters"))
         for c, a in other.items():
             if c not in picked or c in src.get("take", ""):
-                picked[c] = (warp(a, shape, *p), tag)
+                picked[c] = (warp(a, shape, *p), tag) + (((a, p),) if p[:2] != (1, 1) else ())
     return picked, shape
 
 
@@ -1415,7 +1440,7 @@ def main():
     bounds = {}
     if "metrics_from" in cfg:
         partner = json.loads((args.config.parent / cfg["metrics_from"]).read_text())
-        for c, (a, _) in pick(partner, tex)[0].items():
+        for c, (a, *_) in pick(partner, tex)[0].items():
             loops = trace(a, fit_of(partner, c))
             if loops:
                 pts = np.concatenate([flatten(s, 8) for _, s in loops])
@@ -1426,18 +1451,22 @@ def main():
         print("no source has:", "".join(missing))
     glyphs, items, scores = {}, [], {}
     base_of = {c: b for chars, b in cfg.get("compose", {}).items() for c in chars}
+    # each glyph and compose base traced once, in parallel (a refined fit takes seconds a glyph)
+    todo = sorted({c for c in order if c in picked and c not in cfg.get("svg", {})} |
+                  {b for b in base_of.values() if b in picked})
+    with Pool() as pool:
+        traced = dict(zip(todo, pool.map(trace_job, [(picked[c][0], fit_of(cfg, c), *picked[c][2:]) for c in todo])))
     for c in order:
         if c not in picked:
             continue
-        a, tag = picked[c]
+        a, tag = picked[c][:2]
         gfit = fit_of(cfg, c)
         if c in cfg.get("svg", {}):
             loops = svg_loops(args.config.parent / cfg["svg"][c], a.shape)
         else:
-            loops = trace(a, gfit)
+            loops = traced[c]
         if base_of.get(c) in picked and loops:
-            comp = composed(loops, trace(picked[base_of[c]][0], fit_of(cfg, base_of[c])),
-                            cfg.get("compose_tol", (0.3, 0.03)))
+            comp = composed(loops, traced[base_of[c]], cfg.get("compose_tol", (0.3, 0.03)))
             lv = gfit.get("level", 0.5)
             # the base's letter only where it still sits on this cell's own edge
             if score(tone(a, gfit), comp, lv)[1]["edge_max_px"] <= score(tone(a, gfit), loops, lv)[1]["edge_max_px"] + 0.25:

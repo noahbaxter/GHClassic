@@ -7,7 +7,7 @@
    "chars": " ABCDEFGHIJKLMNOPQRSTUVWXYZ-."}
  ],
  "order": "ABCDEFGHIJKLMNOPQRSTUVWXYZ-.",
- "fit": {"smooth": 0.4, "tidy": true, "curve_tol": 0.2},
+ "fit": {"refine": {}, "smooth": 0.4, "tidy": true, "curve_tol": 0.2},
  "baseline": 89,
  "space": 24,
  "sidebearing": 3,
