@@ -136,6 +136,8 @@
                {quit.btn get_local_pos $x $y $z}
                {set $row {'-' $z $above}}
                {video_options.btn copy quit.btn 0}
+               ; Not drawn in to QUIT's width: its own, as the other rows.
+               {video_options.btn set fit_text 0}
                {video_options.btn set trans_parent {quit.btn get trans_parent}}
                {video_options.btn set_showing TRUE}
                {video_options.btn set_state kNormal}
@@ -320,6 +322,10 @@
    ; The values stand in a column this many rows' distance right of the
    ; names.
    (column 3.5)
+   ; A scene whose rows were centred (GH1's in a song) has its box this much
+   ; further along, measured from a text's middle.
+   (centred FALSE)
+   (centred_box_dx -60)
    (lay_out
       {if {! {exists vs_msaa.btn}}
          {do
@@ -336,7 +342,7 @@
             ; To the names' side of the box, by the rows' own measure.
             {set $col {'*' [column] {if_else {< [gap] 0} {'-' 0 [gap]} [gap]}}}
             {set $col {'+' $x {if_else {< $half 0} {'-' 0 $col} $col}}}
-            {set $bx {'+' $col $half}}
+            {set $bx {'+' {'+' $col $half} {if_else [centred] [centred_box_dx] 0}}}
             {widescreen.chk set_local_pos $bx $cy $cz}
             {foreach $row [rows]
                {new {widescreen.btn class_name} {elem $row 0}}
@@ -450,8 +456,9 @@
       {$this sync_rows}
    )
    (enter
-      ; Before the top row's place is taken: its gap to the row under it.
-      {if {gs_left_p1.btn showing}
+      ; The top row's gap to the row under it, which neither leaves: shown
+      ; or not, as GH1's frame in a song has them, from GH2's scene.
+      {if {{$this loaded_dir} exists gs_left_p2.btn}
          {do
             ($x 0) ($y 0) ($top 0) ($under 0)
             {gs_left_p1.btn get_local_pos $x $y $top}
@@ -459,10 +466,15 @@
             {set [gap] {'-' $under $top}}
          }
       }
-      ; Into the top row's place while that row still shows: once for each
-      ; time the scene loads, and not in a scene that is not the game's own
-      ; (GH1's, where the row is placed as it is made).
-      {if {gs_left_p1.btn showing}
+      ; Into the top row's place, the box by as much: again on each entry
+      ; changes nothing. GH1's frame in a song has the row from GH2's scene,
+      ; and its own rows' text is centred, where these are drawn from the
+      ; left as a column.
+      {if {== {widescreen.btn get alignment} 34}
+         {set [centred] TRUE}
+         {widescreen.btn set alignment 33}
+      }
+      {if {{$this loaded_dir} exists gs_left_p1.btn}
          {do
             ($x 0) ($y 0) ($z 0) ($top 0) ($from 0)
             {gs_left_p1.btn get_local_pos $x $y $top}
@@ -1075,14 +1087,14 @@
    (value_tilt 4)
    (pitch 0.9)
    (block (0.88 0 12))
-   (text_x (-124 44 122 35))
-   (box_x (16 94))
+   (text_x (-124 54 132 35))
+   (box_x (26 104))
    (text_dz 0)
    (box_dz 0)
    (lefty_size 21)
    (lag_size 30)
    (fit (0 0 0 0))
-   (gh1 ((lefty_size 30) (lag_size 44) (fit (100 24 24 250))))
+   (gh1 ((lefty_size 29) (lag_size 44) (fit (0 24 24 250)) (text_x (-132 74 142 35)) (box_x (52 120))))
    (lag_screen lag_screen)
    ; As the main menu has it for its two-player row (main.dta).
    (two_players {! {game is_missing_multi_controller}})
@@ -1113,14 +1125,14 @@
    (value_tilt 4)
    (pitch 0.9)
    (block (0.88 0 12))
-   (text_x (-124 44 122 35))
-   (box_x (16 94))
+   (text_x (-124 54 132 35))
+   (box_x (26 104))
    (text_dz 0)
    (box_dz 0)
    (lefty_size 21)
    (lag_size 30)
    (fit (0 0 0 0))
-   (gh1 ((block (0.88 16 -2)) (lefty_size 30) (lag_size 44) (fit (100 24 24 250)) (tune_bg (-183 -5 26.4 1.4))))
+   (gh1 ((block (0.88 16 -2)) (lefty_size 29) (lag_size 44) (fit (0 24 24 250)) (text_x (-132 74 148 35)) (box_x (52 126)) (tune_bg (-183 -5 26.4 1.4))))
    (lag_screen pause_lag_screen)
    (two_players {> {game num_players} 1})
    GAME_SETTINGS_HANDLERS
