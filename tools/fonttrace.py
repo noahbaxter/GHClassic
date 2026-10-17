@@ -1078,7 +1078,7 @@ def tone(a, cfg):
     return a / np.maximum(m, cfg.get("local_floor", 0.3))
 
 
-def trace(a, cfg):
+def trace(a, cfg, native=None):
     pad = 4
     s = np.pad(tone(a, cfg), pad)
     if cfg["blur"] > 0:
@@ -1126,7 +1126,9 @@ def trace(a, cfg):
     if cfg.get("dot_rect"):
         loops = rect_dots(loops, cfg["dot_rect"])
     if "refine" in cfg and loops:
-        loops = fontrefine.refine(tone(a, cfg), loops, cfg["refine"])
+        # a cell warped in from another scale is matched against that source's own pixels
+        target = (tone(native[0], cfg), native[1]) if native else None
+        loops = fontrefine.refine(tone(a, cfg), loops, cfg["refine"], target)
     return loops
 
 
@@ -1256,7 +1258,8 @@ def oriented(loops):
 
 
 def charstring(loops, base, shift, width):
-    pen = T2CharStringPen(width, None)
+    # keep fractional units: whole ones are 0.1 master px, enough to undo the refine pass
+    pen = T2CharStringPen(width, None, roundTolerance=0)
     to = lambda q: (round((q[0] - shift) * UNITS, 1), round((base - q[1]) * UNITS, 1))
     for _, segs in loops:
         pen.moveTo(to(segs[0][1] if segs[0][0] == "L" else segs[0][1][0]))
@@ -1353,7 +1356,8 @@ def sheet(cfg, cell, items, otf, out):
 
 
 def pick(cfg, tex):
-    """Each character's cell in master pixels, with the tag of the source it came from."""
+    """Each character's cell in master pixels, with the tag of the source it came from; a cell
+    warped in from a source at another scale also carries that source's own cell and mapping."""
     master = load(cfg["sources"][0], tex)
     shape = next(iter(master.values())).shape
     tag0 = cfg["sources"][0].get("tag", "0")
@@ -1368,7 +1372,7 @@ def pick(cfg, tex):
                  f"IoU {s:.3f} over {len(shared)}" if s is not None else "cell ratio, too few shared letters"))
         for c, a in other.items():
             if c not in picked or c in src.get("take", ""):
-                picked[c] = (warp(a, shape, *p), tag)
+                picked[c] = (warp(a, shape, *p), tag) + (((a, p),) if p[:2] != (1, 1) else ())
     return picked, shape
 
 
@@ -1436,7 +1440,7 @@ def main():
     bounds = {}
     if "metrics_from" in cfg:
         partner = json.loads((args.config.parent / cfg["metrics_from"]).read_text())
-        for c, (a, _) in pick(partner, tex)[0].items():
+        for c, (a, *_) in pick(partner, tex)[0].items():
             loops = trace(a, fit_of(partner, c))
             if loops:
                 pts = np.concatenate([flatten(s, 8) for _, s in loops])
@@ -1451,11 +1455,11 @@ def main():
     todo = sorted({c for c in order if c in picked and c not in cfg.get("svg", {})} |
                   {b for b in base_of.values() if b in picked})
     with Pool() as pool:
-        traced = dict(zip(todo, pool.map(trace_job, [(picked[c][0], fit_of(cfg, c)) for c in todo])))
+        traced = dict(zip(todo, pool.map(trace_job, [(picked[c][0], fit_of(cfg, c), *picked[c][2:]) for c in todo])))
     for c in order:
         if c not in picked:
             continue
-        a, tag = picked[c]
+        a, tag = picked[c][:2]
         gfit = fit_of(cfg, c)
         if c in cfg.get("svg", {}):
             loops = svg_loops(args.config.parent / cfg["svg"][c], a.shape)

@@ -42,7 +42,6 @@ from pathlib import Path
 import numpy as np
 from fontTools.pens.basePen import BasePen
 from fontTools.ttLib import TTFont
-from PIL import ImageFont
 
 import fontstrip
 import fonttrace
@@ -96,13 +95,12 @@ class Flatten(BasePen):
 def placement(cfg, picked, otf, xmin):
     """char -> (x shift, y) taking a font-unit point to master pixels:
     x = x_u / UNITS + shift, y = baseline - y_u / UNITS + dy."""
-    ft = ImageFont.truetype(str(otf), round(1000 / fonttrace.UNITS * fontstrip.SS))
     out = {}
     for c, xm in xmin.items():
         if c not in picked:
             continue
         a = picked[c][0].astype(np.float32)
-        _, dx, dy = fontstrip.registered(ft, c, a, xm, cfg["baseline"], offsets=True)
+        _, dx, dy = fontstrip.registered(otf, c, a, xm, cfg["baseline"], offsets=True)
         out[c] = (fontstrip.ink_left(a) - xm / fonttrace.UNITS - dx / fontstrip.SS,
                   cfg["baseline"] - dy / fontstrip.SS)
     return out

@@ -124,7 +124,7 @@ def flatten(segs, per=16):
     return np.concatenate(out)
 
 
-def raster(seg_loops, shape):
+def raster(seg_loops, shape, SS=SS):
     acc = np.zeros((shape[0] * SS, shape[1] * SS), bool)
     for segs in seg_loops:
         im = Image.new("1", (shape[1] * SS, shape[0] * SS), 0)
@@ -133,11 +133,39 @@ def raster(seg_loops, shape):
     return acc.reshape(shape[0], SS, shape[1], SS).mean((1, 3))
 
 
-def refine(a, loops, cfg):
-    """loops ((pts, segs) from fonttrace.trace) moved to cover a's coverage best."""
+def to_native(o, shape, sx, sy, dx, dy):
+    """Master coverage o area-averaged into a source's own cells (shape), fonttrace.warp's mapping
+    undone: native pixel j spans master [sx * (j - 0.5) + dx, sx * (j + 0.5) + dx]."""
+    def weights(n, m, s, d):
+        lo = s * (np.arange(n) - 0.5) + d
+        mi = np.arange(m) - 0.5
+        return np.clip(np.minimum(lo[:, None] + s, mi[None] + 1) - np.maximum(lo[:, None], mi[None]), 0, None) / s
+    return weights(shape[0], o.shape[0], sy, dy) @ o @ weights(shape[1], o.shape[1], sx, dx).T
+
+
+def split(segs, longer):
+    """Each curve longer than longer px halved at t=0.5, so the refine has a node mid-bowl."""
+    out = []
+    for s in segs:
+        c = np.asarray(s[1], float) if s[0] == "C" else None
+        if c is None or np.hypot(*np.diff(flatten([s], 8), axis=0).T).sum() <= longer:
+            out.append(s)
+            continue
+        ab, bc, cd = (c[0] + c[1]) / 2, (c[1] + c[2]) / 2, (c[2] + c[3]) / 2
+        abc, bcd = (ab + bc) / 2, (bc + cd) / 2
+        m = (abc + bcd) / 2
+        out += [("C", np.array([c[0], ab, abc, m])), ("C", np.array([m, bcd, cd, c[3]]))]
+    return out
+
+
+def refine(a, loops, cfg, native=None):
+    """loops ((pts, segs) from fonttrace.trace) moved to cover a's coverage best; with native
+    (a source's own cell, its mapping onto a), the coverage is matched there instead."""
     cfg = {} if cfg is True else cfg
     pull, turn, grow = cfg.get("pull", 0.05), cfg.get("turn", 0.5), cfg.get("grow", 0.2)
     reach = cfg.get("reach", 0.6)
+    if cfg.get("split"):
+        loops = [(p, split(s, cfg["split"])) for p, s in loops]
     ls = [Loop(s, cfg.get("smooth_deg", 8)) for _, s in loops]
     offs = np.cumsum([0] + [l.size for l in ls])
     kinds = []
@@ -154,7 +182,11 @@ def refine(a, loops, cfg):
         return [l.build(x[offs[i]:offs[i + 1]]) for i, l in enumerate(ls)]
 
     def loss(x):
-        return float(((raster(segs_of(x), a.shape) - a) ** 2).sum() + (w * x * x).sum())
+        r = raster(segs_of(x), a.shape, cfg.get("ss", SS))
+        if native is None:
+            return float(((r - a) ** 2).sum() + (w * x * x).sum())
+        n, p = native  # a native pixel covers p[0] x p[1] master pixels
+        return float(((to_native(r, n.shape, *p) - n) ** 2).sum() * p[0] * p[1] + (w * x * x).sum())
 
     x0 = np.zeros(offs[-1])
     res = optimize.minimize(loss, x0, method="L-BFGS-B", bounds=bounds,
