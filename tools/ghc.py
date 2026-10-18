@@ -2,7 +2,7 @@
 """Build GH Classic from a disc, play it, and run scenarios, on macOS, Linux and Windows.
 
     tools/ghc.py play [--no-build] [--isolated] [disc] [GHClassic options, e.g. --res native]
-    tools/ghc.py build [disc] [--skip-recomp] [--no-lto]
+    tools/ghc.py build [disc] [--skip-recomp] [--lto]
     tools/ghc.py bind [--isolated] [keyboard | <n>]   set up a controller; with no device, list them
     tools/ghc.py arm [out] [--scenario <file>] [--speed <x>] [--secs 30] [--disc <image>] [--shot-every 60]
                      [--res 1080p] [--set <name>=<value> ...]
@@ -253,7 +253,7 @@ def experimental(tag):
     return "-exp" in tag
 
 
-def build(disc=None, recomp=True, lto=True):
+def build(disc=None, recomp=True, lto=False):
     env = tool_env()
     jobs = str(os.cpu_count() or 4)
     if recomp:
@@ -300,9 +300,10 @@ def cmd_build(argv):
     parser = argparse.ArgumentParser(prog="ghc.py build")
     parser.add_argument("disc", nargs="?")
     parser.add_argument("--skip-recomp", action="store_true", help="rebuild from the existing generated code")
-    parser.add_argument("--no-lto", action="store_true", help="skip link-time optimisation, for iterating")
+    parser.add_argument("--lto", action="store_true",
+                        help="link-time optimisation, as releases have; a minute and a half on every link")
     args = parser.parse_args(argv)
-    build(args.disc, recomp=not args.skip_recomp, lto=not args.no_lto)
+    build(args.disc, recomp=not args.skip_recomp, lto=args.lto)
     print("run: scripts/play.sh" + (f' "{args.disc}"' if args.disc else ""))
 
 
@@ -364,8 +365,7 @@ def cmd_play(argv):
             sys.exit("no build; run tools/ghc.py build")
         build(disc)
     elif rebuild:
-        # The C++ brought up to date: a no-op when nothing changed. A relink
-        # with LTO takes a minute or two.
+        # The C++ brought up to date: a no-op when nothing changed.
         build_step("building game", ["cmake", "--build", GAME, "--target", "GHClassic"], tool_env(), "game.log")
     disc = disc or find_disc(tool_env())
     args = [*content(tool_env(), games), *data_dir(isolated)]
@@ -766,7 +766,7 @@ def cmd_release(argv):
     parser.add_argument("disc", nargs="?")
     args = parser.parse_args(argv)
     if not args.skip_build:
-        build(args.disc, recomp=not (RECOMP / "output").is_dir())
+        build(args.disc, recomp=not (RECOMP / "output").is_dir(), lto=True)
     if not game_binary().exists():
         sys.exit("no build; run tools/ghc.py build")
     version = tree_version()
