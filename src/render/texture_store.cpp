@@ -14,6 +14,7 @@
 #include <cstring>
 #include <iostream>
 #include <mutex>
+#include <tuple>
 #include <unordered_map>
 
 namespace gh2::textures
@@ -34,6 +35,7 @@ namespace gh2::textures
             std::weak_ptr<const TextureData> data;
         };
         std::unordered_map<uint32_t, Payload> s_payloads;
+        std::unordered_map<uint32_t, std::function<void(TextureData &)>> s_edits; // under s_mutex
         // Over the payloads and the fetches: a scene is made, and its
         // pictures read ahead, on the worker's thread too.
         std::mutex s_mutex;
@@ -274,6 +276,27 @@ namespace gh2::textures
             }
             return best;
         }
+
+        // read, then the payload's edit if it has one.
+        std::shared_ptr<TextureData> readEdited(uint32_t id, const Source &source, std::optional<Open> &open)
+        {
+            auto data = read(source, open);
+            std::function<void(TextureData &)> edit;
+            {
+                const std::lock_guard lock(s_mutex);
+                if (const auto found = s_edits.find(id); found != s_edits.end())
+                    edit = found->second;
+            }
+            if (data && edit)
+                edit(*data);
+            return data;
+        }
+    }
+
+    void addEdit(uint32_t id, std::function<void(TextureData &)> edit)
+    {
+        const std::lock_guard lock(s_mutex);
+        s_edits[id] = std::move(edit);
     }
 
     uint32_t add(const Source &source)
@@ -340,11 +363,11 @@ namespace gh2::textures
         std::shared_ptr<const TextureData> data;
         if (fetch)
         {
-            std::call_once(fetch->once, [&] { fetch->data = read(source, s_open); });
+            std::call_once(fetch->once, [&] { fetch->data = readEdited(id, source, s_open); });
             data = fetch->data;
         }
         else
-            data = read(source, s_open);
+            data = readEdited(id, source, s_open);
         if (!data)
             std::cerr << "[textures] cannot read " << source.path << " " << source.tex << std::endl;
         const std::lock_guard lock(s_mutex);
@@ -354,7 +377,7 @@ namespace gh2::textures
 
     void prefetch(const std::vector<uint32_t> &ids)
     {
-        std::vector<std::pair<Source, std::shared_ptr<Fetch>>> wanted;
+        std::vector<std::tuple<uint32_t, Source, std::shared_ptr<Fetch>>> wanted;
         {
             const std::lock_guard lock(s_mutex);
             for (const uint32_t id : ids)
@@ -365,7 +388,7 @@ namespace gh2::textures
                 auto fetch = std::make_shared<Fetch>();
                 fetch->asked = s_frame;
                 s_fetches[id] = fetch;
-                wanted.emplace_back(found->second.source, std::move(fetch));
+                wanted.emplace_back(id, found->second.source, std::move(fetch));
             }
         }
         if (wanted.empty())
@@ -373,8 +396,8 @@ namespace gh2::textures
         worker::run([wanted = std::move(wanted)]
         {
             std::optional<Open> open;
-            for (const auto &[source, fetch] : wanted)
-                std::call_once(fetch->once, [&] { fetch->data = read(source, open); });
+            for (const auto &[id, source, fetch] : wanted)
+                std::call_once(fetch->once, [&] { fetch->data = readEdited(id, source, open); });
         });
     }
 

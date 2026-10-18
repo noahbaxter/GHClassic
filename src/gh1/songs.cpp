@@ -21,6 +21,7 @@
 #include "formats/dtb.h"
 #include "gh1/face.h"
 #include "gh1/guitarist.h"
+#include "gh1/guitars.h"
 #include "formats/midi.h"
 
 #include <algorithm>
@@ -35,6 +36,11 @@ namespace gh2::gh1
 {
     namespace
     {
+        // A chart's track of the drums' cues a beat ahead, note 60 drum_on
+        // and 61 drum_off, which a parser of its own sends the world as
+        // GH1 sends its venue (addSetlist).
+        constexpr const char *kUpcoming = "GH1 UPCOMING";
+
         // GH2's venues standing in for GH1's, by tier: each the one that
         // plays GH1's crowd for it (crowd_v1 to v6, world/<venue>/streams).
         const std::map<std::string, std::string> kVenues = {
@@ -191,7 +197,8 @@ namespace gh2::gh1
                 return s;
             };
 
-            const char *const order[] = {"PART GUITAR", "EVENTS", "BAND BASS", "BAND DRUMS", "BAND SINGER", "BAND KEYS"};
+            const char *const order[] = {"PART GUITAR", "EVENTS",     "BAND BASS", "BAND DRUMS",
+                                         "BAND SINGER", "BAND KEYS", kUpcoming};
             std::map<std::string, midi::Track> made;
             made["PART GUITAR"].events = gems->events;
             made["EVENTS"];
@@ -216,6 +223,17 @@ namespace gh2::gh1
                         made[track].events.push_back(midi::text(e.tick, text));
                     if (*s == "verse" || *s == "chorus" || *s == "solo" || *s == "bridge")
                         marks.emplace_back(e.tick, *s);
+                    // GH1 sends the venue each text a beat ahead as
+                    // upcoming_<text> (BeatMaster::CheckUpcomingTextEvents,
+                    // GH1 0x274460); its venues' drum kit cymbals stop and
+                    // start by the drums' (kUpcoming, addSetlist).
+                    if (*s == "drum_on" || *s == "drum_off")
+                    {
+                        const uint32_t at = e.tick > in->division ? e.tick - in->division : 0u;
+                        const uint8_t note = *s == "drum_on" ? 60u : 61u;
+                        made[kUpcoming].events.push_back({at, 0x90u, 0u, {note, 100u}});
+                        made[kUpcoming].events.push_back({at + 1u, 0x80u, 0u, {note, 0u}});
+                    }
                 }
             // GH1's gems are notes 60 to 100 of T1 GEMS, easy's to expert's.
             uint32_t firstGem = UINT32_MAX;
@@ -339,9 +357,7 @@ namespace gh2::gh1
             for (const Guitarist &g : kGuitarists)
                 if (character && character->text == g.folder)
                     outfit = g.name();
-            std::string axe = guitar ? guitar->text : "lespaul";
-            if (axe.rfind("gibson_", 0) == 0)
-                axe = axe.substr(7);
+            const std::string axe = body(guitar ? guitar->text : "lespaul");
 
             dtb::Node out = array({gh1.nodes[0]});
             for (const char *key : {"name", "artist"})
@@ -457,6 +473,21 @@ namespace gh2::gh1
             return;
         }
 
+        // The drums' cues a beat ahead to the world, as upcoming_drum_on and
+        // upcoming_drum_off, which GH1's venue scripts take (gh1/scripts.cpp).
+        // GH2's songs have no such track, so nothing of theirs reaches it.
+        constexpr const char *kParsers = "config/gen/midi_parsers.dtb";
+        const auto parsers = ark::readFile(0u, kParsers);
+        auto parserRoot = parsers ? dtb::raw(*parsers) : std::nullopt;
+        const auto upcoming = dtb::parse(std::string("(gh1_upcoming (type midi) (eval 1) (track_name '") + kUpcoming +
+                                         "') (mappings (default (events (60 ({handle (world upcoming_drum_on)})) "
+                                         "(61 ({handle (world upcoming_drum_off)}))))))");
+        if (parserRoot && upcoming)
+        {
+            parserRoot->nodes.insert(parserRoot->nodes.end(), upcoming->nodes.begin(), upcoming->nodes.end());
+            ark::addFile(kParsers, dtb::write(*parserRoot));
+        }
+
         // The basement's results headlines, by stars (gh1/menus.dta).
         for (int stars = 3; stars <= 5; ++stars)
             if (const dtb::Node *line = value(*strings, "headline_basement_star" + std::to_string(stars)))
@@ -512,6 +543,7 @@ namespace gh2::gh1
                       setlists::required(*campaign));
         // Its campaign.dta asks a venue only for a count of songs.
         encores::none("gh1");
+        setlists::zeroScores("gh1");
         std::cerr << "[gh1] " << count << " songs converted" << std::endl;
     }
 }

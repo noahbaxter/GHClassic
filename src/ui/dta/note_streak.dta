@@ -1,0 +1,74 @@
+; Note streak messages: a popup at each milestone streak (note_streak_due),
+; as Guitar Hero III on have them, in Deluxe 2.0's way of adding them to
+; GH2 (its ui/hud_panel.dta). A player's streak is the game's own; co-op's
+; is the band's, a note either player hits, broken by a miss or a pass from
+; either. No popups in the tutorial.
+;
+; note_streak.cpp calls note_streak_enter as each song's HUD enters, when
+; its player matchers are there to take the sinks, and gives the messages'
+; tokens their text: note_streak_0, note_streak_1 and note_streak_band, each
+; the count in its variable of that name.
+
+; 50, every 100 to 500, 750, 1000, 1500, then every 1000.
+{func note_streak_due ($streak)
+   {cond
+      ({< $streak 50} FALSE)
+      ({<= $streak 500} {|| {== $streak 50} {== {mod $streak 100} 0}})
+      ({< $streak 2000} {|| {== $streak 750} {== $streak 1000} {== $streak 1500}})
+      (TRUE {== {mod $streak 1000} 0})
+   }
+}
+
+{func note_streak_show ($player $token)
+   {hud show_message $player $token}
+   {play_game_sfx_player meter_slide meter_slide {if_else {== $player kPlayerShared} 0 $player}}
+}
+
+{func note_streak_hit ($player)
+   {if_else {== {gamecfg get mode} multi_coop}
+      {do
+         {set $note_streak_band {+ $note_streak_band 1}}
+         {if {note_streak_due $note_streak_band}
+            {note_streak_show kPlayerShared note_streak_band}
+         }
+      }
+      {if_else {== $player 0}
+         {do
+            {set $note_streak_0 {player0 current_streak}}
+            {if {note_streak_due $note_streak_0} {note_streak_show 0 note_streak_0}}
+         }
+         {do
+            {set $note_streak_1 {player1 current_streak}}
+            {if {note_streak_due $note_streak_1} {note_streak_show 1 note_streak_1}}
+         }
+      }
+   }
+}
+
+{func note_streak_break
+   {set $note_streak_band 0}
+}
+
+{new Object note_streak_p0
+   (gem_hit_callback ($slot $hopoable $hopoed) {note_streak_hit 0})
+   (gem_miss_callback ($slot_hit $real_slot $timing_error) {note_streak_break})
+   (gem_pass_callback {note_streak_break})
+}
+
+{new Object note_streak_p1
+   (gem_hit_callback ($slot $hopoable $hopoed) {note_streak_hit 1})
+   (gem_miss_callback ($slot_hit $real_slot $timing_error) {note_streak_break})
+   (gem_pass_callback {note_streak_break})
+}
+
+{func note_streak_enter
+   {set $note_streak_band 0}
+   {set $note_streak_0 0}
+   {set $note_streak_1 0}
+   {if {!= tutorial {gamecfg get mode}}
+      {do
+         {if {exists player_matcher0} {player_matcher0 add_sink note_streak_p0}}
+         {if {exists player_matcher1} {player_matcher1 add_sink note_streak_p1}}
+      }
+   }
+}

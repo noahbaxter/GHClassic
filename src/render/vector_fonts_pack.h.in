@@ -1,0 +1,5 @@
+#pragma once
+
+// fonts/vector_fonts.bin (render/vector_fonts.h), tools/fontpack.py's pack of
+// the shipped fonts' outlines.
+inline constexpr unsigned char kVectorFontsPack[] = {@GHC_VECTOR_FONTS_PACK@};

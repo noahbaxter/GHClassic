@@ -61,6 +61,27 @@ namespace gh2::milo
         std::memcpy(&font.cellWidth, body.data() + o, 4u);
         std::memcpy(&font.cellHeight, body.data() + o + 4u, 4u);
         font.rest.assign(body.begin() + static_cast<std::ptrdiff_t>(o + 8u), body.end());
+        const auto u32 = [&body](size_t at)
+        {
+            uint32_t v = 0;
+            if (at + 4u <= body.size())
+                std::memcpy(&v, body.data() + at, 4u);
+            return v;
+        };
+        size_t at = o + 16u;
+        const uint32_t n = u32(at);
+        if (at + 4u + n >= body.size())
+            return font;
+        font.charsAt = at;
+        font.chars.assign(reinterpret_cast<const char *>(body.data() + at + 4u), n);
+        at += 4u + n;
+        at = body[at] ? at + 5u + 8u * u32(at + 1u) : at + 1u;
+        at += 4u + u32(at);
+        if (at + 18u + 256u * 16u != body.size())
+            return font;
+        font.packed = body[at + 1u] != 0u;
+        font.bitmapAt = at + 2u;
+        font.infoAt = at + 18u;
         return font;
     }
 

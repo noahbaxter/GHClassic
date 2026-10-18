@@ -299,6 +299,10 @@ set(GHC_GAME_SOURCES
     src/settings/latency.cpp
     src/settings/settings.cpp
     src/settings/video_options.cpp
+    src/streak/counter.cpp
+    src/streak/counter_motion.cpp
+    src/streak/counter_scene.cpp
+    src/streak/note_streak.cpp
     src/synth/module.cpp
     src/synth/reverb.cpp
     src/synth/spu.cpp
@@ -317,6 +321,7 @@ set(GHC_GAME_SOURCES
     src/host/pad.cpp
     src/host/perf.cpp
     src/host/profiles.cpp
+    src/host/record.cpp
     src/host/releases.cpp
     src/host/update.cpp
     src/host/vulkan_frontend.cpp
@@ -326,6 +331,7 @@ set(GHC_GAME_SOURCES
     src/render/frame.cpp
     src/render/look.cpp
     src/render/char_lod.cpp
+    src/render/font_bake.cpp
     src/render/mesh_capture.cpp
     src/render/native_cull.cpp
     src/render/native_environ.cpp
@@ -337,6 +343,7 @@ set(GHC_GAME_SOURCES
     src/render/native_rnd.cpp
     src/render/texture_capture.cpp
     src/render/texture_store.cpp
+    src/render/vector_fonts.cpp
 )
 
 add_executable(GHClassic
@@ -401,8 +408,11 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     src/ui/dta/lag_panel.dta src/ui/dta/highscore_panel.dta src/ui/dta/main_menu.dta src/ui/dta/fast_boot.dta
     src/ui/dta/locale.dta src/ui/dta/crowd.dta src/ui/dta/sel_character.dta src/ui/dta/quickplay.dta
     src/ui/dta/campaigns.dta src/gh1/menus.dta src/gh1/scripts.dta src/ui/dta/picker.dta src/ui/dta/quickplay_pickers.dta
-    src/content/guitar_copy.dta src/ui/dta/game_settings.dta src/ui/dta/photo_mode.dta src/ui/dta/box.dta)
+    src/content/guitar_copy.dta src/ui/dta/game_settings.dta src/ui/dta/photo_mode.dta src/ui/dta/box.dta
+    src/ui/dta/note_streak.dta src/ui/dta/streak_counter.dta)
 file(READ src/ui/dta/box.dta GHC_BOX_DTA)
+file(READ src/ui/dta/note_streak.dta GHC_NOTE_STREAK_DTA)
+file(READ src/ui/dta/streak_counter.dta GHC_STREAK_COUNTER_DTA)
 file(READ src/ui/dta/game_settings.dta GHC_GAME_SETTINGS_DTA)
 file(READ src/ui/dta/photo_mode.dta GHC_PHOTO_MODE_DTA)
 configure_file(src/ui/dta/dta.h.in "${GHC_DTA_DIR}/dta.h" @ONLY)
@@ -414,6 +424,11 @@ file(READ src/gh1/flyingv_old_layout.bin GHC_FLYINGV_OLD_LAYOUT HEX)
 string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_FLYINGV_OLD_LAYOUT "${GHC_FLYINGV_OLD_LAYOUT}")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS src/gh1/flyingv_old_layout.bin)
 configure_file(src/gh1/flyingv_old_layout.h.in "${GHC_DTA_DIR}/flyingv_old_layout.h" @ONLY)
+# The vector fonts text is drawn from (render/vector_fonts.h), tools/fontpack.py's pack.
+file(READ fonts/vector_fonts.bin GHC_VECTOR_FONTS_PACK HEX)
+string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_VECTOR_FONTS_PACK "${GHC_VECTOR_FONTS_PACK}")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS fonts/vector_fonts.bin)
+configure_file(src/render/vector_fonts_pack.h.in "${GHC_DTA_DIR}/vector_fonts_pack.h" @ONLY)
 target_include_directories(GHClassic PRIVATE "${GHC_DTA_DIR}")
 
 # What the build is (src/build_info.h), from tools/ghc.py: the tag it was made

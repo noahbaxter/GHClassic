@@ -57,8 +57,16 @@ namespace gh2::gh1
             // going on and for its breakdown by section (endgame.dta's
             // me_morestats.btn) show in GH2's look, beside GH1's paper.
             {.gh1 = "endgame",
-             .with = {"me_continue.btn", "me_morestats.btn"},
-             .placed = {{"me_continue.btn", 305.0f, 0.0f, -100.0f}, {"me_morestats.btn", 305.0f, 0.0f, -120.0f}}},
+             .with = {"me_continue.btn", "me_morestats.btn", "newspaper_buttons.mesh", "newspaper_buttons.mat",
+                      "newspaper_buttons.tex", "me_maskingtape1.mesh", "me_maskingtape2.mesh", "me_maskingtape3.mesh",
+                      "me_maskingtape4.mesh", "me_maskingtape1.mat", "me_maskingtape2.mat", "me_maskingtape1.tex"},
+             .placed = {{"newspaper_buttons.mesh", 198.0f, 5.0f, -75.0f},
+                        {"me_continue.btn", 198.0f, 0.0f, -63.0f},
+                        {"me_morestats.btn", 198.0f, 0.0f, -88.0f},
+                        {"me_maskingtape1.mesh", kAway, 0.0f, 0.0f},
+                        {"me_maskingtape2.mesh", 183.0f, 4.0f, -37.0f, 0.75f},
+                        {"me_maskingtape3.mesh", kAway, 0.0f, 0.0f},
+                        {"me_maskingtape4.mesh", kAway, 0.0f, 0.0f}}},
             {"cashaward"},
             {"complete"},
             {"highscore"},
@@ -89,11 +97,13 @@ namespace gh2::gh1
             // behind the glass and the shop's front as GH1's is. Its song
             // logos, which GH1 has none of, are out of sight.
             {.gh1 = "store",
+             .without = {"us_gate.tnm", "us_gate.trans", "UITrigger.trg"},
              .with = {"char_placer.grp"},
              .placed = {{"guitar.grp", -156.7f, 477.1f, 10.0f, 5.61f},
                         {"song_logos.pic", kAway, 0.0f, 0.0f},
                         {"st_sold.mesh", kAway, 0.0f, 0.0f}},
              .tilted = {{"guitar_single.tnm", 14.0f}},
+             .turned = {{"guitar_single.tnm", 180.0f}},
              .first = {"char_placer.grp"}},
             // The street's walls run on behind the room in the window, which
             // hides them by its depth in GH1: here they are painted first.

@@ -1,0 +1,20 @@
+; Co-op's streak: one drawer, the band's, under the middle meter, and the
+; band's popups, counting a note either player hits. Both on autoplay.
+#include common/first_boot.dta
+(pads 2)
+{gamecfg set mode multi_coop}
+{game set_num_players 2}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 1} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{{game get_player_config 1} set autoplay TRUE}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait_until {!= $streak_counter_display1 0} 30)
+(expect $streak_counter_display2 0)
+(wait_until {>= $streak_counter_band 60} 120)
+(expect {>= $note_streak_band 60} 1)
+(wait 0.5)
+(shot band_out)
+(quit)

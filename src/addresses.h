@@ -65,6 +65,9 @@ namespace gh2
         uint32_t checkForPitchBend; // TrackWatcherImpl::CheckForPitchBend
         uint32_t sendWhammy;        // TrackWatcherImpl::SendWhammy
         uint32_t playerSetWhammyBar; // Player::SetWhammyBar
+        uint32_t hudPanelEnter;      // HudPanel::Enter
+        uint32_t bandScoreDisplaySetScore; // BandScoreDisplay::SetScore(int)
+        uint32_t bandScoreDisplaySetDigitMat; // BandScoreDisplay::SetDigitMat(int, RndMat *)
         uint32_t trackCtor;          // Track::Track
         uint32_t trackSetupFade;     // Track::SetupFade
         uint32_t trackDraw;          // Track::Draw
@@ -110,6 +113,7 @@ namespace gh2
         uint32_t systemPoll;  // SystemPoll(bool): pads, files, the loader
         uint32_t synthPoll;   // Synth::Poll
         uint32_t synthEEPoll; // SynthEE::Poll
+        uint32_t sequencePlay; // Sequence::Play(float, float, float)
         uint32_t streamEEPoll;
         uint32_t streamSampleFreq; // StreamEE::GetSampleFreq(int channel)
         uint32_t varTimerMs;
@@ -211,7 +215,9 @@ namespace gh2
         uint32_t campaignStateGetNumSongs;
         uint32_t campaignStateGetStatusSym;
         uint32_t songProviderGetBlurb;                // (int row)
+        uint32_t songProviderGetHighScore;            // (int row)
         uint32_t makeStringInt;                       // MakeString(const char *, int)
+        uint32_t playerSetMercurySwitch;              // (bool): the guitar tilted, star power deployed if ready
         // Data
         uint32_t rndCamCurrent;  // RndCam::sCurrent
         uint32_t defaultMat;     // the RndMat a mesh without one draws with
@@ -225,6 +231,7 @@ namespace gh2
         uint32_t theLocale;
         uint32_t theLoadMgr;
         uint32_t nullStr; // char*, the empty Symbol's text
+        uint32_t scoreFormat; // "%i", a song list row's score (SongProvider::GetHighScore)
         uint32_t mcBuffer;    // the save's bytes between the two halves of a load or save
         uint32_t mcOverwrite; // GHMCSaveData's overwrite argument: replace a save already there
         uint32_t mcBaseDir;   // char*, the save's directory on the card
@@ -303,6 +310,9 @@ namespace gh2
         .checkForPitchBend = 0x248e38u,
         .sendWhammy = 0x249b98u,
         .playerSetWhammyBar = 0x111d88u,
+        .hudPanelEnter = 0x12ba00u,
+        .bandScoreDisplaySetScore = 0x291af8u,
+        .bandScoreDisplaySetDigitMat = 0x291c48u,
         .trackCtor = 0x14fa70u,
         .trackSetupFade = 0x150908u,
         .trackDraw = 0x151188u,
@@ -348,6 +358,7 @@ namespace gh2
         .systemPoll = 0x2a85d0u,
         .synthPoll = 0x225cc8u,
         .synthEEPoll = 0x22cc80u,
+        .sequencePlay = 0x21fa68u,
         .streamEEPoll = 0x2308a0u,
         .streamSampleFreq = 0x2314e8u,
         .varTimerMs = 0x2d4018u,
@@ -449,7 +460,9 @@ namespace gh2
         .campaignStateGetNumSongs = 0x133020u,
         .campaignStateGetStatusSym = 0x132760u,
         .songProviderGetBlurb = 0x117df8u,
+        .songProviderGetHighScore = 0x117b38u,
         .makeStringInt = 0x3147a8u,
+        .playerSetMercurySwitch = 0x111940u,
         .rndCamCurrent = 0x3de348u,
         .defaultMat = 0x3da4f0u,
         .rndEnvironCurrent = 0x3de358u,
@@ -462,6 +475,7 @@ namespace gh2
         .theLocale = 0x51f1b8u,
         .theLoadMgr = 0x51f1d8u,
         .nullStr = 0x3de688u,
+        .scoreFormat = 0x3f8408u,
         .mcBuffer = 0x3da368u,
         .mcOverwrite = 0x3da394u,
         .mcBaseDir = 0x3da374u,

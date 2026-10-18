@@ -6,6 +6,7 @@
 #include "dev/timing.h"
 #include "host/input.h"
 #include "host/perf.h"
+#include "host/record.h"
 #include "host/scene_renderer.h"
 #include "movie/screen.h"
 #include "render/frame.h"
@@ -524,6 +525,18 @@ namespace gh2
             }
             vmaUnmapMemory(allocator, readbackMemory);
         }
+
+        // --record's frame (host/record.h), shown at that aspect and drawn at
+        // `at` on the game's clock.
+        void writeRecord(float aspect, std::chrono::steady_clock::time_point at)
+        {
+            void *mapped = nullptr;
+            if (vmaMapMemory(allocator, readbackMemory, &mapped) != VK_SUCCESS)
+                return;
+            vmaInvalidateAllocation(allocator, readbackMemory, 0, VK_WHOLE_SIZE);
+            record::frame(static_cast<const uint8_t *>(mapped), targetWidth, targetHeight, aspect, at, gamePeriod);
+            vmaUnmapMemory(allocator, readbackMemory);
+        }
     };
 
     void requestShot(const std::string &name)
@@ -637,6 +650,10 @@ namespace gh2
         VkPhysicalDeviceFeatures wanted{};
         wanted.sampleRateShading = VK_TRUE;
         const bool everySample = physical.value().enable_features_if_present(wanted);
+        // The near plane's clip in mesh.vert and x360.vert.
+        VkPhysicalDeviceFeatures clip{};
+        clip.shaderClipDistance = VK_TRUE;
+        physical.value().enable_features_if_present(clip);
         const bool displayTiming = timing::on() && physical.value().enable_extension_if_present("VK_GOOGLE_display_timing");
         auto device = vkb::DeviceBuilder(physical.value()).build();
         if (!device)
@@ -893,7 +910,11 @@ namespace gh2
             !s.recordOverlay(cmd, slot, s.target, {{0, 0}, {s.targetWidth, s.targetHeight}}, false))
             return false;
 
-        if (shot)
+        const bool recording = record::wanted();
+        // A hidden frame's own slot on the game's clock, which a late wake
+        // does not move; a shown one's, when it is drawn.
+        const auto drawnAt = present ? ps2x::host_clock::now() : s.nextHiddenFrame;
+        if (shot || recording)
         {
             VkBufferImageCopy copy{};
             copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
@@ -986,11 +1007,12 @@ namespace gh2
             }
         }
 
-        if (shot)
-        {
+        if (shot || recording)
             vkWaitForFences(s.device.device, 1, &slot.done, VK_TRUE, UINT64_MAX);
+        if (shot)
             s.writeShot(requested);
-        }
+        if (recording)
+            s.writeRecord(displayAspect, drawnAt);
         if (!requested.empty())
         {
             std::lock_guard<std::mutex> lock(s_shotMutex);
@@ -1016,6 +1038,7 @@ namespace gh2
         if (!m_state)
             return;
         State &s = *m_state;
+        record::finish();
         if (perf::logging())
             std::cerr << s.times.summary();
         if (s.device.device != VK_NULL_HANDLE)

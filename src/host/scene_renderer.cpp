@@ -4,6 +4,7 @@
 #include "host/mesh_push.h"
 #include "milo/layout.h"
 #include "render/camera.h"
+#include "render/vector_fonts.h"
 #include "settings/settings.h"
 #include "settings/video_options.h"
 
@@ -352,6 +353,11 @@ namespace gh2
             for (uint32_t c = 0; c < 3; ++c)
                 for (uint32_t k = 0; k < 3; ++k)
                     out[3].v[c] += (eye[k] - w[12 + k]) * m[k][c];
+            // w: what the normal is scaled back by, the matrix's own scale,
+            // where the position keeps it (a guitar drawn at 5 times its
+            // size reflects wildly otherwise, gh1/screens.cpp's store).
+            const float length = std::sqrt(w[0] * w[0] + w[1] * w[1] + w[2] * w[2]);
+            out[3].v[3] = length > 1e-6f ? 1.0f / length : 1.0f;
         }
 
         // Program 0x410, the projected tex gen (0x2080..0x21b0), takes the
@@ -877,6 +883,15 @@ namespace gh2
 
         VkDescriptorSetLayout frameDataSetLayout = VK_NULL_HANDLE;
         FrameDataSlot frameData[kFrameSlots];
+        // mesh.frag's vector fonts (render/vector_fonts.h), the frame data
+        // set's second binding: the pack's glyphs, then each font table as
+        // it is made, written past what any frame in flight reads.
+        VkBuffer vectorBuffer = VK_NULL_HANDLE;
+        VmaAllocation vectorMemory = VK_NULL_HANDLE;
+        uint32_t *vectorMapped = nullptr;
+        uint32_t vectorCapacity = 0; // words
+        uint32_t vectorUsed = 0;
+        std::vector<int32_t> vectorTables; // each table's first word, -1 for one there was no room for
         TransientSlot transientData[kFrameSlots];
         std::unordered_map<const MeshData *, MeshBinding> transientBindings; // this frame's
 
@@ -1270,11 +1285,14 @@ namespace gh2
             layoutInfo.pBindings = &binding;
             if (!check(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &setLayout), "set layout"))
                 return false;
-            // The fragment stage reads it too, for x360.frag's block.
-            VkDescriptorSetLayoutBinding frameDataBinding{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
-                                                          VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                                                          nullptr};
-            layoutInfo.pBindings = &frameDataBinding;
+            // The fragment stage reads it too, for x360.frag's block; and
+            // mesh.frag the vector fonts, its second binding.
+            const VkDescriptorSetLayoutBinding frameDataBindings[2] = {
+                {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                 nullptr},
+                {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
+            layoutInfo.bindingCount = 2;
+            layoutInfo.pBindings = frameDataBindings;
             if (!check(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &frameDataSetLayout),
                        "frame data set layout"))
                 return false;
@@ -1294,7 +1312,7 @@ namespace gh2
             const VkDescriptorPoolSize sizes[] = {
                 {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                  kMaxTextures * 2u + kMaxShadings * 5u + kFrameSlots * kPostPasses * 5u + kMaxShadows},
-                {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kFrameSlots},
+                {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kFrameSlots * 2u},
             };
             VkDescriptorPoolCreateInfo poolInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
             poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
@@ -1315,6 +1333,8 @@ namespace gh2
                     !growFrameData(slot, kMinFrameData))
                     return false;
             }
+            if (!createVectorBuffer())
+                return false;
             if (x360)
                 for (VkDescriptorSet(&sets)[kPostPasses] : postSets)
                 {
@@ -1399,6 +1419,67 @@ namespace gh2
             write.pBufferInfo = &buffer;
             vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
             return true;
+        }
+
+        // Words past the pack's glyphs for font tables: a font's is 8 plus 8
+        // a character, so a thousand fonts' fit.
+        static constexpr uint32_t kVectorTableWords = 1u << 18;
+
+        // The vector font buffer with the pack's glyphs in, bound as every
+        // frame data set's second binding.
+        bool createVectorBuffer()
+        {
+            const std::vector<uint32_t> &glyphs = vector_fonts::glyphs();
+            vectorCapacity = static_cast<uint32_t>(std::max<size_t>(glyphs.size(), 1u)) + kVectorTableWords;
+            VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+            info.size = static_cast<VkDeviceSize>(vectorCapacity) * 4u;
+            info.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+            VmaAllocationCreateInfo alloc{};
+            alloc.usage = VMA_MEMORY_USAGE_AUTO;
+            alloc.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+            VmaAllocationInfo allocated{};
+            if (!check(vmaCreateBuffer(allocator, &info, &alloc, &vectorBuffer, &vectorMemory, &allocated),
+                       "vector fonts"))
+                return false;
+            vectorMapped = static_cast<uint32_t *>(allocated.pMappedData);
+            std::memcpy(vectorMapped, glyphs.data(), glyphs.size() * 4u);
+            vectorUsed = std::max<uint32_t>(static_cast<uint32_t>(glyphs.size()), 1u);
+            vmaFlushAllocation(allocator, vectorMemory, 0, static_cast<VkDeviceSize>(vectorUsed) * 4u);
+            vectorTables.clear();
+
+            VkDescriptorBufferInfo buffer{vectorBuffer, 0, VK_WHOLE_SIZE};
+            for (FrameDataSlot &slot : frameData)
+            {
+                VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+                write.dstSet = slot.set;
+                write.dstBinding = 1;
+                write.descriptorCount = 1;
+                write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                write.pBufferInfo = &buffer;
+                vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
+            }
+            return true;
+        }
+
+        // Font tables made since the last frame, put after the ones before.
+        void addVectorTables()
+        {
+            std::vector<std::vector<uint32_t>> fresh;
+            vector_fonts::tablesSince(vectorTables.size(), fresh);
+            for (const std::vector<uint32_t> &table : fresh)
+            {
+                const uint32_t words = static_cast<uint32_t>(table.size());
+                if (vectorUsed + words > vectorCapacity)
+                {
+                    vectorTables.push_back(-1);
+                    continue;
+                }
+                std::memcpy(vectorMapped + vectorUsed, table.data(), words * 4u);
+                vmaFlushAllocation(allocator, vectorMemory, static_cast<VkDeviceSize>(vectorUsed) * 4u,
+                                   static_cast<VkDeviceSize>(words) * 4u);
+                vectorTables.push_back(static_cast<int32_t>(vectorUsed));
+                vectorUsed += words;
+            }
         }
 
         void destroyTexture(GpuTexture &texture)
@@ -2926,6 +3007,8 @@ namespace gh2
         for (FrameDataSlot &slot : s.frameData)
             if (slot.buffer != VK_NULL_HANDLE)
                 vmaDestroyBuffer(s.allocator, slot.buffer, slot.memory);
+        if (s.vectorBuffer != VK_NULL_HANDLE)
+            vmaDestroyBuffer(s.allocator, s.vectorBuffer, s.vectorMemory);
         for (TransientSlot &slot : s.transientData)
             if (slot.buffer != VK_NULL_HANDLE)
                 vmaDestroyBuffer(s.allocator, slot.buffer, slot.memory);
@@ -3290,6 +3373,7 @@ namespace gh2
         for (TargetRun &run : runs)
             run.image = s.targetImage(run.tex, run.generation, run.width, run.height, run.copied);
 
+        s.addVectorTables();
         std::vector<PushConstants> pushes(frame.draws.size());
         for (size_t i = 0; i < frame.draws.size(); ++i)
         {
@@ -3298,6 +3382,9 @@ namespace gh2
                 continue;
             const Material &material = draw.material;
             PushConstants &push = pushes[i];
+            push.textBase = material.vectorTable >= 0 && static_cast<size_t>(material.vectorTable) < s.vectorTables.size()
+                                ? s.vectorTables[static_cast<size_t>(material.vectorTable)]
+                                : -1;
             const Matrix mvp = draw.screen ? draw.world : multiply(draw.world, viewProjections[draw.camera]);
             std::memcpy(push.mvp, mvp.data(), sizeof(push.mvp));
             std::memcpy(push.matColor, material.color, sizeof(push.matColor));
@@ -3348,6 +3435,10 @@ namespace gh2
             push.lightBase = lightBases[i];
             push.envBase = envBases[i];
             push.fogBase = fogBases[i];
+            // A draw on the screen has no camera and nothing to clip.
+            if (!draw.screen)
+                push.flags |= static_cast<uint32_t>(std::clamp(frame.cameras[draw.camera].zRange[0], 0.0f, 1.0f) * 200.0f + 0.5f)
+                              << kZStartShift;
             if (material.sphere)
                 push.flags |= kFlagSphere;
             if (material.spread)

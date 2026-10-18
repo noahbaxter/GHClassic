@@ -1,0 +1,126 @@
+; The streak counter: a note streak on a small odometer framed in the score
+; shell's metal, a drawer under a meter: its top is the shell's bottom edge.
+; streak_counter.cpp adds one to the HUD's scene for each meter, as
+; streak_counter<n> beside BandStreakDisplay<n>, its shell. From a streak of
+; $streak_counter_from it pulls down out from behind the shell; a miss slides
+; it back in.
+;
+; Single player: player 0's, under the score meter, which with the rock meter
+; sits $streak_counter_lift higher all song to make room, the two kept level.
+; Face-off: each player's under their own meter. Co-op: the band's under the
+; middle meter, a note either player hits, broken by a miss or a pass from
+; either, as its popups count it (note_streak.dta).
+;
+; streak_counter.cpp calls streak_counter_enter as each song's HUD enters.
+
+; With the first streak popup (note_streak.dta), so the two share its slide.
+{set $streak_counter_from 50}
+; Its place in its shell's parent's space, z up the screen, y away from it:
+; its wheels' middle (24.6, 42 in its own space, times its scale) under the
+; multiplier (x 0), its top just under the shell's bottom edge, behind the
+; shell, which hides it $streak_counter_drop above that (a negative drop).
+; Single player's and face-off's shell is the same. Co-op's middle meter is
+; its own, in a larger space: the drawer smaller in it, a shorter way in,
+; and further back, behind the meter.
+{set $streak_counter_pos (-22 3 -146)}
+{set $streak_counter_drop -60}
+{set $streak_counter_scale 0.9}
+{set $streak_counter_coop_pos (-13 20 -186)}
+{set $streak_counter_coop_drop -30}
+{set $streak_counter_coop_scale 0.6}
+{set $streak_counter_lift 20}
+{set $streak_counter_display1 0}
+{set $streak_counter_display2 0}
+{set $streak_counter_band 0}
+
+; Counter <n>'s streak as `count`.
+{func streak_counter ($n $count)
+   {do
+      ($display {if_else {== $n 1} $streak_counter_display1 $streak_counter_display2})
+      {if $display
+         {ghc_streak_counter $display $count {>= $count $streak_counter_from}}
+      }
+   }
+}
+
+{func streak_counter_coop {== {gamecfg get mode} multi_coop}}
+
+{func streak_counter_hit ($player)
+   {if_else {streak_counter_coop}
+      {do
+         {set $streak_counter_band {+ $streak_counter_band 1}}
+         {streak_counter 1 $streak_counter_band}
+      }
+      {streak_counter {+ $player 1} {if_else {== $player 0} {player0 current_streak} {player1 current_streak}}}
+   }
+}
+
+{func streak_counter_break ($player)
+   {if_else {streak_counter_coop}
+      {do
+         {set $streak_counter_band 0}
+         {streak_counter 1 0}
+      }
+      {streak_counter {+ $player 1} 0}
+   }
+}
+
+{new Object streak_counter_p0
+   (gem_hit_callback ($slot $hopoable $hopoed) {streak_counter_hit 0})
+   (gem_miss_callback ($slot_hit $real_slot $timing_error) {streak_counter_break 0})
+   (gem_pass_callback {streak_counter_break 0})
+}
+{new Object streak_counter_p1
+   (gem_hit_callback ($slot $hopoable $hopoed) {streak_counter_hit 1})
+   (gem_miss_callback ($slot_hit $real_slot $timing_error) {streak_counter_break 1})
+   (gem_pass_callback {streak_counter_break 1})
+}
+
+; Counter <n> set up as its meter's drawer: in its shell's parent, placed,
+; and given its Mats.
+{func streak_counter_setup ($n $display)
+   {do
+      ($shell {hud find {sprint "BandStreakDisplay" $n}})
+      ($pos {if_else {streak_counter_coop} $streak_counter_coop_pos $streak_counter_pos})
+      ($scale {if_else {streak_counter_coop} $streak_counter_coop_scale $streak_counter_scale})
+      ($drop {if_else {streak_counter_coop} $streak_counter_coop_drop $streak_counter_drop})
+      ; Co-op's is the band score's copy, which hangs from the score at the
+      ; top; the others are there already.
+      {$display set trans_parent {$shell get trans_parent}}
+      ; Flat in co-op, where the copy came turned as the band score is.
+      {if {streak_counter_coop} {$display set_local_rot 0 0 0}}
+      {$display set_local_scale $scale $scale $scale}
+      ; Only single player's score and rock meters are raised: the others'
+      ; meters have the room.
+      {ghc_streak_counter_place $display
+         {elem $pos 0}
+         {elem $pos 1}
+         {elem $pos 2}
+         $drop
+         $streak_counter_lift
+         {hud find hud1_score_meter0.view}
+         {hud find hud1_rock_meter.view}
+      }
+      {ghc_streak_counter_icon $display {$display find streak_icon.mat}}
+      ; Each wheel's own digits, so one turns alone.
+      {foreach_int $w 0 4
+         {foreach_int $d 0 10
+            {ghc_streak_counter_digit $display $w $d {$display find {sprint "streak_w" $w "_" $d ".mat"}}}
+         }
+      }
+      {streak_counter $n 0}
+   }
+}
+
+{func streak_counter_enter
+   {set $streak_counter_band 0}
+   {set $streak_counter_display1 {hud find streak_counter1}}
+   ; A second only in face-off, whatever else the HUD holds.
+   {set $streak_counter_display2 {if_else {== {gamecfg get mode} multi_fo} {hud find streak_counter2} 0}}
+   {if $streak_counter_display1 {streak_counter_setup 1 $streak_counter_display1}}
+   {if $streak_counter_display2 {streak_counter_setup 2 $streak_counter_display2}}
+   {if {&& $streak_counter_display1 {!= tutorial {gamecfg get mode}}}
+      {if {exists player_matcher0} {player_matcher0 add_sink streak_counter_p0}}
+      {if {exists player_matcher1} {player_matcher1 add_sink streak_counter_p1}}
+   }
+}

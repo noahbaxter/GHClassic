@@ -32,6 +32,7 @@ namespace gh2::settings
         kTrackOnAtStart, // the player's track heard before its first hit
         kSustainReleaseMs, // a sustain let go this close to its end stays heard
         kWhammyHold, // a whammy bar held down bends every sustain
+        kNoteStreak, // the streak counter under the score meter and its popups
         kNoteSpeedEasy, // Clone Hero's note speed in tenths, on easy and medium
         kNoteSpeedHard, // and on hard and expert
         kHighwayLength, // how far up the track a gem first shows: the game's 110
@@ -54,6 +55,7 @@ namespace gh2::settings
         kFrameLog,   // frametimes.csv: each presented frame's times and what it did
         kLighting,   // kLastGen: the PS2's lighting wherever the 360's would be
         kPerfOverlay, // host/perf.h's Level: frame times in the picture's corner
+        kVectorFonts, // text in the traced fonts drawn from their outlines (render/vector_fonts.h)
         kKeyCount,
     };
 

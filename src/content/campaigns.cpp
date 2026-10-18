@@ -326,9 +326,8 @@ namespace gh2::campaigns
                 const uint32_t command = guest.value(init, i);
                 // {foreach $p (pause_panel ... helpbar) {$p load}}: the panels
                 // kept loaded from boot. Each whose scene is another file
-                // now is let go, and the command run again loads it. The
-                // help bar's, which is built at boot (ui/help_bar.cpp), is
-                // the same one, and stays.
+                // now is let go and loaded again. The help bar's, which is
+                // built at boot (ui/help_bar.cpp), is the same one, and stays.
                 if (guest.key(command) == "foreach" && guest.size(command) == 4 && guest.type(command, 2) == script::kArray &&
                     guest.type(command, 3) == script::kCommand && guest.size(guest.value(command, 3)) == 2 &&
                     guest.type(guest.value(command, 3), 1) == script::kSymbol &&
@@ -345,10 +344,11 @@ namespace gh2::campaigns
                         const std::string name = reinterpret_cast<const char *>(getMemPtr(guest.call.rdram, guest.value(panels, p)));
                         const std::string scene = sceneOf(guest, init, name);
                         if (!scene.empty() && (!only || only->count(name) != 0u) && was(scene) != ark::origin(scene))
-                            unload += "{" + name + " unload}\n";
+                            unload += "{" + name + " unload}\n{" + name + " load}\n";
                     }
+                    // Only those: a panel loaded again as it stands is
+                    // loaded once more, and one unload later leaves it up.
                     script::run(guest.call.rdram, guest.call.ctx, guest.call.runtime, unload);
-                    guest.run(s_addresses->dataNodeEvaluate, {guest.node(init, i)});
                     continue;
                 }
                 // {new Class name (...)...}, the arrays its type definition.

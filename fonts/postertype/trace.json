@@ -1,0 +1,18 @@
+{
+ "name": "Postertype",
+ "ship": true,
+ "copyright": "Copyright 2026 Noah Baxter",
+ "sources": [
+  {"tag": "360", "tex": "fcb7f661f2ebea69", "cell": [14, 21], "channel": "alpha",
+   "chars": " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ!\"#$%&'()*+-./:;<=>?@[\\]^_`{|}~¡©®¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞß,"}
+ ],
+ "baseline": 17,
+ "space": 4,
+ "sidebearing": 1,
+ "compose": {"ÀÁÂÃÄÅ": "A", "ÈÉÊË": "E", "ÌÍÎÏ": "I", "Ñ": "N", "ÒÓÔÕÖ": "O", "ÙÚÛÜ": "U", "Ý": "Y"},
+ "fit": {"refine": {"split": 2, "iters": 200, "reach": 0.8}, "smooth": 0.25, "split": 2.5, "line_tol": 0.15, "axis_snap": 2, "curve_tol": 0.2, "extrema": 1, "free_line": 3,
+         "corner_scale": 0.75, "corner_angle": 35, "split_caps": 100, "min_seg": 0.8, "snap": 0.8, "max_dev": 1.2,
+         "dot_rect": 5.5},
+ "glyph_fit": {"=": {"split_caps": 0}, "T<>2": {"corner_scale": 1.25}},
+ "sample": "ABCDEFGHIJKLMNOPQRSTUVWXYZ\n0123456789 !?&@#$%*+-=/\nGUITAR HERO: POSTERTYPE"
+}

@@ -1,6 +1,7 @@
 #include "host/audio.h"
 
 #include "dev/timing.h"
+#include "host/record.h"
 #include "runtime/host_clock.h"
 
 #include <SDL3/SDL.h>
@@ -50,6 +51,7 @@ namespace gh2
                 timing::sample(timing::kPullQueued, SDL_GetAudioStreamQueued(stream) / (2.0 * sizeof(float)) * 1000.0 / kAudioRate);
             }
             render(buffer, frames);
+            record::audio(buffer.data(), frames);
             SDL_PutAudioStreamData(stream, buffer.data(), static_cast<int>(frames * 2u * sizeof(float)));
         }
 
@@ -64,6 +66,7 @@ namespace gh2
                 next += std::chrono::milliseconds(10);
                 std::this_thread::sleep_until(ps2x::host_clock::real(next));
                 render(buffer, kFrames);
+                record::audio(buffer.data(), kFrames);
             }
         }
     }

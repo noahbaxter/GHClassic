@@ -18,7 +18,15 @@ layout(push_constant) uniform Push
     uint flags;
     int envBase;
     int fogBase;
+    int textBase;
 } pc;
+
+// The vector fonts (render/vector_fonts.h): where the pack's glyph layers,
+// bands and lines start, then those, then a table per font a text draws with.
+layout(set = 1, binding = 1, std430) readonly buffer VectorFonts
+{
+    uint vf[];
+};
 
 layout(location = 0) out vec4 outColor;
 
@@ -41,10 +49,106 @@ vec3 added16(vec3 rgb)
     return (whole + max(c - whole - 4.0, vec3(0.0)) * 2.0) / 255.0;
 }
 
+float vff(uint i)
+{
+    return uintBitsToFloat(vf[i]);
+}
+
+// A line's two ends, packed as int16 pairs in 1/32 pixels (fontpack.py).
+vec4 vectorLine(uint i)
+{
+    uint a = vf[i], b = vf[i + 1u];
+    return vec4(ivec4(int(a << 16) >> 16, int(a) >> 16, int(b << 16) >> 16, int(b) >> 16)) / 32.0;
+}
+
+// How much of a pixel at p, in the pack's pixels, glyph layer g covers, the
+// pixel spanning `size` of them: inside by the crossings of a ray to +x, the
+// edge softened over the pixel by the distance to the nearest line. And that
+// distance, signed, positive inside, measured out to `reach` past the edge.
+vec2 vectorCoverage(uint g, vec2 p, float size, float reach)
+{
+    uint at = vf[0] + g * 8u;
+    vec4 bounds = vec4(vff(at), vff(at + 1u), vff(at + 2u), vff(at + 3u));
+    reach = max(reach, size);
+    if (any(lessThan(p, bounds.xy - reach)) || any(greaterThan(p, bounds.zw + reach)))
+        return vec2(0.0, -reach);
+    float bandH = vff(at + 5u);
+    uint bands = vf[at + 7u];
+    uint band = vf[at + 6u] + uint(clamp(int(floor((p.y - vff(at + 4u)) / bandH)), 0, int(bands) - 1));
+    uint first = vf[vf[1] + band * 2u], count = vf[vf[1] + band * 2u + 1u];
+    bool inside = false;
+    float nearest = 1e9;
+    for (uint i = 0u; i < count; ++i)
+    {
+        vec4 l = vectorLine(vf[2] + (first + i) * 2u);
+        vec2 a = l.xy, b = l.zw, ab = b - a;
+        if ((a.y > p.y) != (b.y > p.y) && p.x < a.x + (p.y - a.y) * ab.x / ab.y)
+            inside = !inside;
+        float t = clamp(dot(p - a, ab) / max(dot(ab, ab), 1e-8), 0.0, 1.0);
+        vec2 d = p - (a + t * ab);
+        nearest = min(nearest, dot(d, d));
+    }
+    float distance = sqrt(nearest) * (inside ? 1.0 : -1.0);
+    return vec2(clamp(distance / size + 0.5, 0.0, 1.0), distance);
+}
+
+// The texel a vector font's glyph gives at uv: its layers over each other in
+// their colours, coverage as alpha. A masked font's is the texture's own,
+// cut to the outline, with the font's tone standing in for the texture's
+// fade over its edge's width of texels inside the outline (none at 0), and
+// the texture's own fade kept past it, dying out over its feather's texels.
+// The texture's own where the font's table has no glyph for the quad.
+vec4 vectorTexel(vec2 uv, vec2 dx, vec2 dy)
+{
+    uint base = uint(pc.textBase);
+    uint count = vf[base], layers = vf[base + 1u];
+    vec2 scale = vec2(vff(base + 2u), vff(base + 3u));
+    for (uint i = 0u; i < count; ++i)
+    {
+        uint e = base + 8u + i * 8u;
+        vec4 rect = vec4(vff(e), vff(e + 1u), vff(e + 2u), vff(e + 3u));
+        if (uv.x < rect.x || uv.y < rect.y || uv.x > rect.z || uv.y > rect.w)
+            continue;
+        // The pack's pixels put a pixel's center on its index.
+        vec2 p = (uv - vec2(vff(e + 4u), vff(e + 5u))) * scale - 0.5;
+        float size = max(0.5 * (length(dx * scale) + length(dy * scale)), 1e-3);
+        if ((vf[base + 6u] & 1u) != 0u && vf[e + 6u] != 0xffffffffu)
+        {
+            // The pack's pixels to the texture's texels.
+            float perTexel = float(textureSize(tex, 0).x) / scale.x;
+            float edge = float((vf[base + 6u] >> 8u) & 0xffu) * 0.25;
+            float feather = float((vf[base + 6u] >> 16u) & 0xffu) * 0.25;
+            vec2 cover = vectorCoverage(vf[e + 6u], p, size, feather / perTexel);
+            vec4 texel = textureGrad(tex, uv, dx, dy);
+            float texels = cover.y * perTexel;
+            float body = edge > 0.0 ? mix(vff(base + 7u), texel.a, smoothstep(0.25 * edge, edge, texels)) : texel.a;
+            float alpha = feather > 0.0 ? max(cover.x, clamp(1.0 + texels / feather, 0.0, 1.0)) : cover.x;
+            return vec4(texel.rgb, alpha * body);
+        }
+        vec4 color = vec4(0.0);
+        for (uint l = 0u; l < layers; ++l)
+        {
+            uint g = vf[e + 6u + l];
+            if (g == 0xffffffffu)
+                continue;
+            float a = vectorCoverage(g, p, size, size).x;
+            vec3 rgb = unpackUnorm4x8(vf[base + 4u + l]).rgb;
+            float over = a + color.a * (1.0 - a);
+            color.rgb = over > 0.0 ? (rgb * a + color.rgb * color.a * (1.0 - a)) / over : rgb;
+            color.a = over;
+        }
+        return color;
+    }
+    return textureGrad(tex, uv, dx, dy);
+}
+
 void main()
 {
+    // Taken here, where every pixel of the quad runs it: a vector glyph's
+    // texel is found in a loop, where derivatives are undefined.
+    vec2 dx = dFdx(vUv), dy = dFdy(vUv);
     // The GS's modulate, clamped as COLCLAMP does.
-    vec4 texel = texture(tex, vUv);
+    vec4 texel = pc.textBase >= 0 ? vectorTexel(vUv, dx, dy) : texture(tex, vUv);
     if ((pc.flags & kFlagSpread) != 0u)
     {
         vec2 h = 0.5 * pc.matColor.xy;

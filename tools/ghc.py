@@ -2,10 +2,11 @@
 """Build GH Classic from a disc, play it, and run scenarios, on macOS, Linux and Windows.
 
     tools/ghc.py play [--no-build] [--isolated] [disc] [GHClassic options, e.g. --res native]
-    tools/ghc.py build [disc] [--skip-recomp] [--no-lto]
+    tools/ghc.py build [disc] [--skip-recomp] [--lto]
     tools/ghc.py bind [--isolated] [keyboard | <n>]   set up a controller; with no device, list them
     tools/ghc.py arm [out] [--scenario <file>] [--speed <x>] [--secs 30] [--disc <image>] [--shot-every 60]
                      [--res 1080p] [--set <name>=<value> ...]
+    tools/ghc.py record <scenario> [--speed 2.5] [--res 1080p] [--secs 900] [--set <name>=<value> ...]
     tools/ghc.py scenarios [-j 4] [--speed 2] [--review] [--discs gh2,gh1] [--releases] [name ...]
     tools/ghc.py release [--skip-build] [disc]  this platform's player package, into build/release
     tools/ghc.py ci                          what builds without a disc, into build/ci
@@ -23,7 +24,9 @@ recompile reads.
 From the system: Python 3.11+, git, and a C++ compiler (Xcode's on macOS, gcc
 or clang on Linux, nothing on Windows, where llvm-mingw is fetched into
 build/). CMake, Ninja and Pillow come from build/venv, made from
-requirements.txt; CMake fetches the game's libraries at pinned versions.
+requirements.txt; CMake fetches the game's libraries at pinned versions, once
+for every checkout, into the user's cache (~/Library/Caches/GHClassic on
+macOS, ~/.cache on Linux, %LOCALAPPDATA% on Windows).
 
 arm runs the game once, hidden and muted, with --fast-boot --seed 1, no
 save and default settings: a first boot. out (default
@@ -37,6 +40,14 @@ through arm side by side, the sheets staying in each run as shots.png unless
 --review: a run passes when it reaches its last step and quits with no FAIL
 or STALL in its log. Both clear runs/ of runs older than three days.
 
+record runs a scenario as arm does and makes it videos, picture and sound,
+in review/ as <date>_<time>_<scenario's name>.mp4: the game pipes each frame
+to ffmpeg as it draws and writes its mixed sound beside it, both on the
+game's clock, so it can run faster than real time. Without (record) steps the
+whole run is one video; with them, each (record on name) to (record off) is
+its own, <scenario's name>_<name>.mp4. A run stopped at --secs keeps what it
+drew.
+
 release packages a build for players, who bring their own disc: a zip of
 the game beside PUT_DISC_HERE on Windows and Linux, a disk image on macOS.
 It only writes build/release, named for the tag it is built at (v0.5);
@@ -47,6 +58,7 @@ import hashlib
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -73,6 +85,18 @@ WINDOWS = sys.platform == "win32"
 EXE = ".exe" if WINDOWS else ""
 VENV_BIN = VENV / ("Scripts" if WINDOWS else "bin")
 VENV_PYTHON = VENV_BIN / f"python{EXE}"
+
+# Every checkout's CMake fetches its libraries into the user's cache, once for
+# all of them (cmake/dep_cache.cmake). Outside build/, so deleting one tree's
+# build/ leaves the others' sources alone.
+if MACOS:
+    DEPS = Path.home() / "Library" / "Caches" / "GHClassic" / "deps"
+elif WINDOWS:
+    DEPS = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "GHClassic" / "deps"
+else:
+    DEPS = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "GHClassic" / "deps"
+DEP_CACHE = [f"-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES={(ROOT / 'cmake' / 'dep_cache.cmake').as_posix()}",
+             f"-DGHC_DEP_CACHE={DEPS.as_posix()}"]
 
 LLVM_MINGW = "llvm-mingw-20260922-ucrt-x86_64"
 LLVM_MINGW_URL = f"https://github.com/mstorsjo/llvm-mingw/releases/download/20260922/{LLVM_MINGW}.zip"
@@ -166,7 +190,7 @@ def colour(code, text):
 def theirs(warning):
     """Whether a warning is third-party code's (a fetched dependency's, or
     libchdr's), which we report but do not fix here."""
-    return "_deps/" in warning or "/lib/libchdr/" in warning
+    return "_deps/" in warning or f"{DEPS.as_posix()}/" in warning.replace("\\", "/") or "/lib/libchdr/" in warning
 
 
 def build_step(title, cmd, env, log):
@@ -225,7 +249,7 @@ def built():
 def build_tools(env, jobs):
     """The analyzer and recompiler, a top-level build of lib/PS2Recomp."""
     configure = ["cmake", "-S", ROOT / "lib" / "PS2Recomp", "-B", TOOLS, "-DCMAKE_BUILD_TYPE=Release",
-                 "-DPS2X_BUILD_RUNTIME=OFF", "-DPS2X_BUILD_TEST=OFF", "-DPS2X_BUILD_STUDIO=OFF"]
+                 "-DPS2X_BUILD_RUNTIME=OFF", "-DPS2X_BUILD_TEST=OFF", "-DPS2X_BUILD_STUDIO=OFF", *DEP_CACHE]
     build_step("configuring recompiler", configure, env, "tools-configure.log")
     targets = ["--target", "ps2_analyzer", "ps2_recomp", "-j", jobs]
     build_step("building recompiler", ["cmake", "--build", TOOLS, *targets], env, "tools.log")
@@ -243,7 +267,7 @@ def experimental(tag):
     return "-exp" in tag
 
 
-def build(disc=None, recomp=True, lto=True):
+def build(disc=None, recomp=True, lto=False):
     env = tool_env()
     jobs = str(os.cpu_count() or 4)
     if recomp:
@@ -281,7 +305,7 @@ def build(disc=None, recomp=True, lto=True):
     tag = tree_version()
     configure = ["cmake", "-S", ROOT, "-B", GAME, "-DCMAKE_BUILD_TYPE=Release",
                  f"-DGHC_GENERATED_DIR={RECOMP / 'output'}", f"-DGHC_ENABLE_LTO={'ON' if lto else 'OFF'}",
-                 f"-DGHC_VERSION={tag}", f"-DGHC_EXPERIMENTAL={'ON' if experimental(tag) else 'OFF'}"]
+                 f"-DGHC_VERSION={tag}", f"-DGHC_EXPERIMENTAL={'ON' if experimental(tag) else 'OFF'}", *DEP_CACHE]
     build_step("configuring game", configure, env, "game-configure.log")
     build_step("building game", ["cmake", "--build", GAME, "--target", "GHClassic", "-j", jobs], env, "game.log")
 
@@ -290,9 +314,10 @@ def cmd_build(argv):
     parser = argparse.ArgumentParser(prog="ghc.py build")
     parser.add_argument("disc", nargs="?")
     parser.add_argument("--skip-recomp", action="store_true", help="rebuild from the existing generated code")
-    parser.add_argument("--no-lto", action="store_true", help="skip link-time optimisation, for iterating")
+    parser.add_argument("--lto", action="store_true",
+                        help="link-time optimisation, as releases have; a minute and a half on every link")
     args = parser.parse_args(argv)
-    build(args.disc, recomp=not args.skip_recomp, lto=not args.no_lto)
+    build(args.disc, recomp=not args.skip_recomp, lto=args.lto)
     print("run: scripts/play.sh" + (f' "{args.disc}"' if args.disc else ""))
 
 
@@ -354,8 +379,7 @@ def cmd_play(argv):
             sys.exit("no build; run tools/ghc.py build")
         build(disc)
     elif rebuild:
-        # The C++ brought up to date: a no-op when nothing changed. A relink
-        # with LTO takes a minute or two.
+        # The C++ brought up to date: a no-op when nothing changed.
         build_step("building game", ["cmake", "--build", GAME, "--target", "GHClassic"], tool_env(), "game.log")
     disc = disc or find_disc(tool_env())
     args = [*content(tool_env(), games), *data_dir(isolated)]
@@ -379,9 +403,10 @@ def prune_runs(days=3):
 
 
 def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=None, res=None, games=None,
-        review=None, release=None, settings=(), perf=False):
+        review=None, release=None, settings=(), perf=False, record=None):
     """One unattended run into out. Returns 'exited before Ns' or 'alive at Ns'.
-    With review, its shot sheet goes to review/ under that name rather than out."""
+    With review, its shot sheet goes to review/ under that name rather than out.
+    With record, the run's clips also go in that folder (the game's --record)."""
     from PIL import Image
 
     out = Path(out)
@@ -406,13 +431,18 @@ def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=N
         cmd += ["--res", res]
     if perf:
         cmd += ["--profiler"]
+    if record:
+        Path(record).mkdir(parents=True, exist_ok=True)
+        cmd += ["--record", str(Path(record).resolve())]
     cmd += ["--fast-boot", "--seed", "1", "--hidden", "--mute", "--save", str(out / "save.bin"),
             "--settings", str(out / "settings.ini"), "--shots", str(out / "frames"), "--shot-every", str(shot_every)]
 
     # Frames are named by seconds since here, on the clock their mtimes use.
     start = time.time()
     with open(out / "run.log", "wb") as log:
-        proc = subprocess.Popen(cmd, cwd=out, stdout=log, stderr=subprocess.STDOUT)
+        # Recording, in a group of its own with its ffmpegs.
+        proc = subprocess.Popen(cmd, cwd=out, stdout=log, stderr=subprocess.STDOUT,
+                                start_new_session=bool(record) and not WINDOWS)
     try:
         proc.wait(timeout=secs)
         state = f"exited before {secs}s"
@@ -425,6 +455,17 @@ def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=N
         if proc.poll() is None:
             proc.kill()
             proc.wait()
+        if record and not WINDOWS:
+            # A killed game's ffmpeg sees its pipe close and ends the clip
+            # with what it was sent. Given 30 s to, then killed too.
+            for _ in range(300):
+                try:
+                    os.killpg(proc.pid, 0)
+                except ProcessLookupError:
+                    break
+                time.sleep(0.1)
+            else:
+                os.killpg(proc.pid, signal.SIGKILL)
 
     for ppm in sorted((out / "frames").glob("frame_" + "[0-9]" * 6 + ".ppm")):
         Image.open(ppm).save(out / "frames" / f"frame_{ppm.stat().st_mtime - start:07.2f}s.png")
@@ -485,6 +526,54 @@ def cmd_arm(argv):
         print("game functions by samples:")
         for fn, n in sorted(counts.items(), key=lambda kv: -kv[1])[:8]:
             print(f"{n:7d}  {fn}")
+
+
+def cmd_record(argv):
+    parser = argparse.ArgumentParser(prog="ghc.py record")
+    parser.add_argument("scenario")
+    parser.add_argument("--speed", type=float, default=2.5,
+                        help="game seconds a real one; too high and frames repeat, which the log counts")
+    parser.add_argument("--res", default="1080p")
+    parser.add_argument("--secs", type=int, default=900, help="real seconds before it is stopped")
+    parser.add_argument("--disc")
+    parser.add_argument("--discs", type=discs_arg, help="content discs to mount, as gh2,gh1; default every one in game/")
+    parser.add_argument("--set", action="append", default=[], metavar="NAME=VALUE", dest="settings",
+                        help="a settings.ini line over the defaults, e.g. msaa=1; may repeat")
+    args = parser.parse_args(argv)
+    if not shutil.which("ffmpeg"):
+        sys.exit("record needs ffmpeg")
+    name = Path(args.scenario).stem
+    out = ROOT / "runs" / f"{time.strftime('%Y-%m-%d_%H%M%S')}_{name}"
+    clips = out / "clips"
+    prune_runs()
+    # No periodic frames: (shot) steps still come out as a sheet.
+    state = arm(out, args.scenario, args.speed, args.secs, args.disc, 1 << 30, res=args.res, games=args.discs,
+                review=name, settings=args.settings, record=clips)
+    print(f"{state}, log {out / 'run.log'}")
+    for line in (out / "run.log").read_text(errors="replace").splitlines():
+        if line.startswith("[record]") or "FAIL" in line or "STALL" in line:
+            print(line)
+    # Each clip's picture and sound as one .mp4, in the order they were made.
+    videos = sorted(clips.glob("*.ts"), key=lambda p: p.stat().st_mtime)
+    made = 0
+    for video in videos:
+        # A run's one unnamed clip is the scenario's name alone.
+        mp4 = review_path(name if len(videos) == 1 and video.stem.isdigit() else f"{name}_{video.stem}", ".mp4")
+        # Another run's in the same minute stays.
+        stem, again = mp4.stem, 2
+        while mp4.exists():
+            mp4, again = mp4.with_stem(f"{stem}_{again}"), again + 1
+        cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", video]
+        sound = video.with_suffix(".f32")
+        if sound.exists() and sound.stat().st_size:
+            # At the game's kAudioRate (host/audio.h).
+            cmd += ["-f", "f32le", "-ar", "48000", "-ac", "2", "-i", sound, "-c:a", "aac", "-b:a", "192k",
+                    "-shortest"]
+        if subprocess.run([*cmd, "-c:v", "copy", mp4]).returncode == 0:
+            print(mp4)
+            made += 1
+    if not made:
+        return 1
 
 
 def cmd_scenarios(argv):
@@ -691,7 +780,7 @@ def cmd_release(argv):
     parser.add_argument("disc", nargs="?")
     args = parser.parse_args(argv)
     if not args.skip_build:
-        build(args.disc, recomp=not (RECOMP / "output").is_dir())
+        build(args.disc, recomp=not (RECOMP / "output").is_dir(), lto=True)
     if not game_binary().exists():
         sys.exit("no build; run tools/ghc.py build")
     version = tree_version()
@@ -702,8 +791,8 @@ def cmd_release(argv):
     print(f"made {archive}")
 
 
-COMMANDS = {"play": cmd_play, "build": cmd_build, "bind": cmd_bind, "arm": cmd_arm, "scenarios": cmd_scenarios,
-            "release": cmd_release, "ci": cmd_ci}
+COMMANDS = {"play": cmd_play, "build": cmd_build, "bind": cmd_bind, "arm": cmd_arm, "record": cmd_record,
+            "scenarios": cmd_scenarios, "release": cmd_release, "ci": cmd_ci}
 
 
 def main():

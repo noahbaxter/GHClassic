@@ -20,6 +20,7 @@
 #include "ps2_runtime.h"
 #include "render/look.h"
 #include "render/texture_capture.h"
+#include "render/vector_fonts.h"
 #include "settings/settings.h"
 
 #include <unordered_map>
@@ -240,6 +241,8 @@ namespace gh2
         {
             const uint32_t tex = load<uint32_t>(rdram, mat + milo::mat::kDiffuseTex);
             m.texture = capturedTexture(rdram, tex);
+            if (const auto table = vector_fonts::tableOf(tex); table && settings::get(settings::kVectorFonts) != 0)
+                m.vectorTable = static_cast<int32_t>(*table);
             sliderScaleDrawn(tex, m.color);
             colourOff(tex, m.color);
             const uint32_t type = tex != 0u ? load<uint32_t>(rdram, tex + milo::tex::kType) : 0u;

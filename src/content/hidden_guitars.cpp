@@ -307,8 +307,15 @@ namespace gh2
     {
         if (const auto copy = dtb::parse(kGuitarCopyDta))
             for (const dtb::Node &line : copy->nodes)
-                if (line.type == dtb::kArray && line.nodes.size() > 1u && !line.nodes[1].text.empty())
-                    locale::add(line.nodes[0].text, line.nodes[1].text);
+            {
+                if (line.type != dtb::kArray || line.nodes.size() < 2u)
+                    continue;
+                // A blurb for a guitar still locked is blank until written,
+                // where the store would show its token over the "???".
+                const std::string &token = line.nodes[0].text;
+                if (!line.nodes[1].text.empty() || token.ends_with("_locked_desc"))
+                    locale::add(token, line.nodes[1].text);
+            }
     }
 
     void installHiddenGuitars()

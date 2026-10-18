@@ -1,12 +1,22 @@
-# GH Classic
+> [!NOTE]
+> GH Classic is in active development. Expect bugs, missing features and things changing between releases.
+
+# Guitar Hero Classic
 
 ![Guitar Hero II running in GH Classic](assets/gameplay.gif)
 
-GH Classic is a recompilation of the PS2 version of Guitar Hero II that runs natively on macOS, Windows and Linux. Much of the code was written using AI ([more on that below](#how-was-ai-used)). While you can play through the entire campaign, know that it's still experimental so expect (and please report any) bugs and glitches.
+**Guitar Hero Classic** is a modded recompilation of Guitar Hero II for the PS2 that runs natively on Windows, macOS and Linux. It aims to create the most streamlined experience for playing all 3 of the classic Harmonix Guitar Hero games in a single package with minimal setup required.
 
-To run this you need:
-- **Your own disc image** of Guitar Hero II (SLUS-21447 only... for now) as `.chd`, `.iso` or `.bin`
-- (Optional) **Your own disc images** of Guitar Hero, Guitar Hero Encore: Rocks the 80s, and/or Guitar Hero 2 for the Xbox 360.
+[![Join the Discord](https://img.shields.io/badge/Join_the_Discord-5865F2?logo=discord&logoColor=white&style=for-the-badge)](https://discord.gg/EtQcnHqn3)
+
+## Requirements
+- Legally obtained disc images for the following games in `.chd`, `.iso` or `.bin`:
+  - **Required:**
+    - Guitar Hero II (PS2), USA only (SLUS-21447)
+  - **Optional, any region:**
+    - Guitar Hero (PS2)
+    - Guitar Hero II (360)
+    - Guitar Hero Encore: Rocks the 80s (PS2)
 - A GPU with Vulkan support
 
 ## Install
@@ -30,17 +40,13 @@ Everything GHC needs is stored in one folder. Windows and Linux are portable ins
 
 ## Features
 
-- Custom native Vulkan renderering engine
-- GH1, GH2, GH2X and GH80s as their own campaigns and quickplay setlists
-- Xbox 360 models, lighting and rendering
-- Autodetects keyboard, gamepad and guitar input with the ability to remap
-- Independent audio and video latency controls
-- Any resolution, uncapped frame rate, MSAA and mipmaps
+- Fully playable campaigns for Guitar Hero, Guitar Hero 2 (both on PS2 and Xbox 360) and GH80s
+- Quickplay mixing featuring every song from every game, for every character skin, with every guitar, in every venue
+- Custom Vulkan rendering engine lets you play with the PS2's original look, the Xbox 360's, or anything in between
+- Any resolution, uncapped frame rate, plus MSAA, TAA, and mipmaps
+- Modern QOL improvements like note streaks, custom note speed and highway lengths, independent A/V sync, and more!
+- Autodetects guitar, gamepad, and keyboard controls
 - Photo mode
-
-Still to come:
-- Multiplayer (not wired up yet)
-- Easier controller mapping (atm it's just an ini)
 
 ## Controls
 
@@ -73,18 +79,18 @@ sudo dnf install gcc-c++ libX11-devel libXext-devel libXrandr-devel libXcursor-d
 
 ## How Was AI Used?
 
-AI was used to write code and nothing else. This README and any other text a user may see is 100% written by me (or the original developers).
+Generative AI was used to write code and nothing else. This README and any other text a user may see is 100% written by me (or the original developers).
 
-No texture, image, video, audio file or any other game asset was generated, upscaled, or otherwise altered by AI. What you see and hear is what's on the disc, just rendered at a higher resolution and framerate. In some cases assets are converted between formats by code so that content from GH1 can load into the GH2 engine.
+No texture, image, video, audio file or any other game asset was generated or AI upscaled. Some assets like fonts and glyphs were vectorized through tracing or modified through image manipulation tools like GIMP and PIL scripts, but the vast majority of what you see is what is on the discs, just rendered at a higher resolution and framerate. In some cases assets are converted at run time for inter-engine compatibility.
 
-The game is recompiled with my [fork](https://github.com/noahbaxter/PS2Recomp/tree/ghrecomp) of the [PS2Recomp](https://github.com/ran-j/PS2Recomp) project and runs original game code (mostly) unchanged. Everything built around that core recomp (renderer, audio, input, saves, etc.) was written with Claude Code. All generated code gets reviewed and reworked until I am happy with the shape and structure of it and understand how it works. I've been a professional software developer since 2018 and while this is my first time playing around with emulation/graphics, I am not "vibe coding" something I have no understanding of.
+The game is recompiled with my [fork](https://github.com/noahbaxter/PS2Recomp/tree/ghrecomp) of the [PS2Recomp](https://github.com/ran-j/PS2Recomp) project and runs original game code (mostly) unchanged. Everything built around that core recomp (renderer, audio, input, saves, etc.) was written with Claude Code. To be clear I've been a professional software developer since 2018 and while this is my first time playing around with emulation/graphics, I am not "vibe coding" something I have no understanding of. All code is reviewed, and all macro decisions are ultimately being painstakingly made by me.
 
 ## Credits
 
 This project is built on top of a lot of excellent work by others. Please give most of the credit to these fine folk.
 
 - [PS2Recomp](https://github.com/ran-j/PS2Recomp) ([fork](https://github.com/noahbaxter/PS2Recomp/tree/ghrecomp))
-- FelipeLuis: [performance patches](https://github.com/noahbaxter/GHClassic/compare/a04cdbfc...d3485bef) for steady frame pacing
+- [luisfelipe1004](https://github.com/luisfelipe1004): [performance patches](https://github.com/noahbaxter/GHClassic/compare/a04cdbfc...d3485bef) for steady frame pacing
 - Project Deluge: debug builds of GH1, GH2 and Rocks the 80s that the function names come from, matched onto the retail executable
 - [MiloHax](https://github.com/hmxmilohax): those builds collected ([milo-executable-library](https://github.com/hmxmilohax/milo-executable-library)), menu script references ([milo-script-library](https://github.com/hmxmilohax/milo-script-library)), and [gh2-calibration-fix](https://github.com/hmxmilohax/gh2-calibration-fix)
 - [PCSX2](https://github.com/PCSX2/pcsx2) and [psx-spx](https://psx-spx.consoledev.net/): SPU2 reference code/reverb coefficients

@@ -1,0 +1,15 @@
+{
+ "name": "Gunsho",
+ "ship": true,
+ "copyright": "Copyright 2026 Noah Baxter",
+ "sources": [
+  {"tag": "360", "tex": "3da6e8859efcd93c", "cell": [72, 102],
+   "chars": " ABCDEFGHIJKLMNOPQRSTUVWXYZ-."}
+ ],
+ "order": "ABCDEFGHIJKLMNOPQRSTUVWXYZ-.",
+ "fit": {"refine": {}, "smooth": 0.4, "tidy": true, "curve_tol": 0.2},
+ "baseline": 89,
+ "space": 24,
+ "sidebearing": 3,
+ "sample": "ABCDEFGHIJKLM\nNOPQRSTUVWXYZ-.\nGUITAR HERO"
+}

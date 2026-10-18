@@ -89,6 +89,7 @@ namespace gh2::settings
             // can be hit from when the release stops muting.
             {"sustain_release_ms", Type::kInt, 0, 500, 5, 0},
             {"whammy_hold", Type::kBool, 0, 1, 1, 0},
+            {"note_streak", Type::kBool, 0, 1, 1, 0},
             // 70 is Clone Hero's 7.0. The defaults are retail's: 43 is easy and
             // medium's own speed and 60 hard and expert's; the hyperspeed cheat
             // made them 64 and 90 (note_speed.cpp). The menu's sliders stop
@@ -124,6 +125,7 @@ namespace gh2::settings
             {"frame_log", Type::kBool, 0, 1, 1, 0},
             {"lighting", Type::kChoice, 0, 1, 1, kLastGen, "last_gen next_gen"},
             {"perf_overlay", Type::kChoice, 0, 3, 1, 0, "off fps graph full"},
+            {"vector_fonts", Type::kBool, 0, 1, 1, 1},
         };
 
         const Entry *entryNamed(const std::string &name)

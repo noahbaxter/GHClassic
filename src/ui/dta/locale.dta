@@ -123,3 +123,5 @@
 ; A career without encores (content/encores.h) asks for songs of the venue's
 ; five where the disc's song_current_venue_encore asks for the encore.
 (song_current_venue_gh1 "Beat %i/5 songs to continue")
+; And the last venue's, of the same five, as many as the difficulty asks.
+(song_win_gh1 "Beat %i/5 songs to win")

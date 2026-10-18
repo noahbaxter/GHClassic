@@ -24,6 +24,8 @@ layout(push_constant) uniform Push
     int envBase;
 } pc;
 
+out float gl_ClipDistance[1];
+
 layout(set = 1, binding = 0, std430) readonly buffer FrameData
 {
     vec4 data[];
@@ -68,6 +70,8 @@ void main()
         world = mat4(1.0);
     }
     gl_Position = pc.mvp * pos;
+    // As mesh.vert: nearer than the camera's near plane is clipped.
+    gl_ClipDistance[0] = (1.0 - float(pc.flags >> 24u) / 200.0) * gl_Position.w - gl_Position.z;
     vWorldPos = (world * pos).xyz;
     vNormal = normal;
     vTangent = tangent;

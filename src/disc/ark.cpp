@@ -60,6 +60,10 @@ namespace gh2::ark
             std::unordered_map<std::string, std::function<std::optional<Made>()>> makers;
             std::unordered_map<std::string, Entry> made;
             std::unordered_map<std::string, std::function<bool()>> when;
+            // Its own files changed (addFix): those still to change, by
+            // each fix in turn, and those changed.
+            std::unordered_map<std::string, std::vector<std::function<void(std::vector<uint8_t> &)>>> fixes;
+            std::unordered_map<std::string, Entry> fixed;
         };
 
         // Paths under `as` are `source`'s on one disc, and nowhere else.
@@ -238,15 +242,38 @@ namespace gh2::ark
                             size, size});
         }
 
-        // A disc's file as the game gets it: the one made in its place while
-        // that is served, made now if it is still to be, else its own.
-        const Entry *findOn(Disc &disc, const std::string &name)
+        std::optional<std::vector<uint8_t>> read(const Entry *entry, size_t most = SIZE_MAX);
+
+        // A disc's own file, changed now if it is still to be.
+        const Entry *ownOn(Disc &disc, const std::string &name)
         {
             const auto own = disc.files.find(name);
             if (own == disc.files.end())
                 return nullptr;
+            if (const auto fix = disc.fixes.find(name); fix != disc.fixes.end())
+            {
+                const auto changes = std::move(fix->second);
+                disc.fixes.erase(fix);
+                if (auto bytes = read(&own->second))
+                {
+                    for (const auto &change : changes)
+                        change(*bytes);
+                    disc.fixed[name] = addBytes(std::move(*bytes));
+                }
+            }
+            const auto fixed = disc.fixed.find(name);
+            return fixed != disc.fixed.end() ? &fixed->second : &own->second;
+        }
+
+        // A disc's file as the game gets it: the one made in its place while
+        // that is served, made now if it is still to be, else its own.
+        const Entry *findOn(Disc &disc, const std::string &name)
+        {
+            const Entry *own = ownOn(disc, name);
+            if (!own)
+                return nullptr;
             if (const auto when = disc.when.find(name); when != disc.when.end() && !when->second())
-                return &own->second;
+                return own;
             if (const auto maker = disc.makers.find(name); maker != disc.makers.end())
             {
                 const auto make = std::move(maker->second);
@@ -258,7 +285,7 @@ namespace gh2::ark
                 }
             }
             const auto made = disc.made.find(name);
-            return made != disc.made.end() ? &made->second : &own->second;
+            return made != disc.made.end() ? &made->second : own;
         }
 
         // A layer's own file, else its disc's.
@@ -477,6 +504,12 @@ namespace gh2::ark
             s_discs[disc].when.erase(key(path.c_str()));
     }
 
+    void addFix(size_t disc, const std::string &path, std::function<void(std::vector<uint8_t> &)> fix)
+    {
+        if (disc < s_discs.size())
+            s_discs[disc].fixes[key(path.c_str())].push_back(std::move(fix));
+    }
+
     std::vector<std::string> paths(size_t disc, const std::string &prefix)
     {
         std::vector<std::string> out;
@@ -513,7 +546,7 @@ namespace gh2::ark
 
     namespace
     {
-        std::optional<std::vector<uint8_t>> read(const Entry *entry, size_t most = SIZE_MAX)
+        std::optional<std::vector<uint8_t>> read(const Entry *entry, size_t most)
         {
             if (!entry)
                 return std::nullopt;
@@ -556,9 +589,7 @@ namespace gh2::ark
     {
         if (disc >= s_discs.size())
             return std::nullopt;
-        const auto &files = s_discs[disc].files;
-        const auto it = files.find(key(path.c_str()));
-        return read(it != files.end() ? &it->second : nullptr);
+        return read(ownOn(s_discs[disc], key(path.c_str())));
     }
 
     void unlocalize(size_t disc)

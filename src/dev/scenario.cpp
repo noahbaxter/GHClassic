@@ -9,6 +9,7 @@
 #include "hook.h"
 #include "host/input.h"
 #include "host/pad.h"
+#include "host/record.h"
 #include "host/vulkan_frontend.h"
 #include "milo/layout.h"
 #include "movie/movie.h"
@@ -29,6 +30,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 
 namespace gh2::scenario
 {
@@ -48,6 +50,7 @@ namespace gh2::scenario
         Clock::time_point s_release;  // and when it lets go
         std::string s_screen;         // a wait_screen's screen
         uint32_t s_condition = 0u;    // a wait_until's step array
+        uint32_t s_starPower = 0u;    // a star_power's step array, checked each poll
         bool s_shooting = false;      // a shot's frame not yet written
         Clock::time_point s_deadline; // and when either fails
         int s_timeout = kTimeout;     // that deadline's seconds, to report
@@ -143,10 +146,31 @@ namespace gh2::scenario
             return text(rdram, call.arg(0));
         }
 
+        // That Player's guitar tilted up and back, as its mercury switch
+        // reads it: star power deploys if it is ready and not in use
+        // (Player::SetMercurySwitch, 0x111940). Script finds a Player by its
+        // Hmx::Object, a virtual base 0x120 in, which the Player's first word
+        // points to (Player's constructor, debug 0x1125e8).
+        void tilt(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t object)
+        {
+            const uint32_t player = object - 0x120u;
+            if (object < 0x120u || gh2::load<uint32_t>(rdram, player) != object)
+                return;
+            runtime->callGuestFunction(rdram, ctx, s_addresses->playerSetMercurySwitch, {player, 1u});
+            runtime->callGuestFunction(rdram, ctx, s_addresses->playerSetMercurySwitch, {player, 0u});
+        }
+
         // Runs steps until one waits.
         void step(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
             const script::Call steps{rdram, ctx, runtime, s_steps};
+            if (s_starPower != 0u)
+            {
+                const script::Call armed{rdram, ctx, runtime, s_starPower};
+                const script::Node when = armed.arg(2);
+                if (when.type != script::kInt || when.value != 0u)
+                    tilt(rdram, ctx, runtime, armed.object(1));
+            }
             if (s_shooting)
             {
                 if (shotPending() || drawDumpPending())
@@ -226,7 +250,9 @@ namespace gh2::scenario
                     s_deadline = Clock::now() + std::chrono::seconds(s_timeout);
                     return;
                 }
-                if (verb == "print")
+                if (verb == "star_power")
+                    s_starPower = array.size() > 2 ? node.value : 0u;
+                else if (verb == "print")
                 {
                     std::string line;
                     for (int j = 1; j < array.size(); ++j)
@@ -293,6 +319,22 @@ namespace gh2::scenario
                     requestShot(array.symbol(1));
                     s_shooting = true;
                     return;
+                }
+                else if (verb == "pads")
+                    setPads(static_cast<int>(array.number(1)));
+                else if (verb == "record")
+                {
+                    const std::string state = array.symbol(1);
+                    if (state == "on")
+                        record::start(array.size() > 2 ? array.symbol(2) : "");
+                    else if (state == "off")
+                        record::stop();
+                    else
+                    {
+                        std::cerr << "[scenario] FAIL: (record " << state << "), not on or off" << std::endl;
+                        quit();
+                        return;
+                    }
                 }
                 else if (verb == "poke")
                 {
@@ -535,7 +577,22 @@ namespace gh2::scenario
     bool load(const std::string &path)
     {
         s_text.clear();
-        return read(path, s_text);
+        if (!read(path, s_text))
+            return false;
+        // One with (record) steps records only their clips: none until the
+        // first. Its steps are parsed later, by the game, so it is found here
+        // by the text, outside ; comments.
+        std::istringstream lines(s_text);
+        for (std::string line; std::getline(lines, line);)
+            if (line.substr(0, line.find(';')).find("(record ") != std::string::npos)
+            {
+                record::stop();
+                break;
+            }
+        // Its guitars are in from the start, as the game looks for them at boot.
+        if (s_text.find("(pads 2)") != std::string::npos)
+            setPads(2);
+        return true;
     }
 
     void install(PS2Runtime &runtime, const Addresses &addresses)
@@ -552,12 +609,32 @@ namespace gh2::scenario
             std::cerr << "[script] " << line << std::endl;
             return {};
         });
+        // {ghc_star_power player0}: that player's guitar tilted, star power
+        // deployed if ready.
+        script::addCommand("ghc_star_power", [](const script::Call &call) -> script::Node {
+            tilt(call.rdram, call.ctx, call.runtime, call.object(1));
+            return {};
+        });
         s_addresses = &addresses;
         s_poll = runtime.lookupFunction(addresses.uiManagerPoll);
         runtime.replaceFunction(addresses.uiManagerPoll, &uiPoll);
         EntryHook<UiSecondsTag>::install(runtime, addresses.taskMgrSetUISeconds, onSetUISeconds);
         EntryHook<SecondsBeatTag>::install(runtime, addresses.taskMgrSetSecondsBeat, onSetSecondsBeat);
         if (!s_text.empty())
+        {
+            // Each sound cue as it plays, by name, as [sound] lines: what a
+            // press in a menu made heard.
+            struct SequencePlayTag;
+            EntryHook<SequencePlayTag>::install(runtime, addresses.sequencePlay, [](uint8_t *rdram, R5900Context *ctx, PS2Runtime *) {
+                const uint32_t seq = GPR_U32(ctx, 4);
+                uint32_t name = ::gh2::load<uint32_t>(rdram, seq + milo::object::kName);
+                if (name == 0u || name >= 0x2000000u)
+                    name = ::gh2::load<uint32_t>(rdram, ::gh2::load<uint32_t>(rdram, seq) + milo::object::kName);
+                std::cerr << "[sound] "
+                          << (name != 0u && name < 0x2000000u ? reinterpret_cast<const char *>(rdram + name) : "?")
+                          << std::endl;
+            });
             std::thread(watchdog).detach();
+        }
     }
 }

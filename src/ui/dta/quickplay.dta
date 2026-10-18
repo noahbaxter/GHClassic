@@ -65,10 +65,14 @@
          {song_provider set_quickplay FALSE}
       )
       (SCROLL_MSG {$this update_pos})
+      ; The songs ride the View, a frame a row, and a header takes a row of
+      ; its own. GH1 frames its paper from its list's first header by two
+      ; (gElementSpacing, debug 0x3132b0, SpacedSelectedPos 0x127240), so
+      ; its setlist starts a row further down than GH2's.
       (update_pos
          {do
             ($pos {ss_song.lst selected_pos})
-            ($frame {+ $pos {song_provider num_headers $pos}})
+            ($frame {+ $pos {song_provider num_headers $pos} {switch {setlist shown} (gh1 1) 0}})
             {game set_song_index $pos}
             {song_preview {game get_song}}
             {sel_song.view set_frame $frame}

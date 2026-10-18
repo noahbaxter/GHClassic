@@ -12,11 +12,13 @@
 // so all six planes count.
 //
 // Only with the frustum_cull setting, which is off: the cull saves the PS2
-// drawing and can only take from the picture. The career's ending has it
-// regardless: nothing else stops drawing the guitarist the saucer takes.
+// drawing and can only take from the picture. GH2's career ending has it
+// regardless, the 360's too: nothing else stops drawing the guitarist the
+// saucer takes. GH1's does not, whose rising camera would lose its band.
 
 #include "render/native_cull.h"
 
+#include "content/campaigns.h"
 #include "guest.h"
 #include "hook.h"
 #include "settings/settings.h"
@@ -35,7 +37,7 @@ namespace gh2
         constexpr uint32_t kStickySign = 0x80u;
 
         const Addresses *s_addresses = nullptr;
-        bool s_ending = false; // from the career's last song won to the game panel's reset or exit
+        bool s_ending = false; // from GH2's last career song won to the game panel's reset or exit
 
         struct GameOverTag;
         struct ResetTag;
@@ -45,8 +47,10 @@ namespace gh2
         {
             const R5900Context saved = *ctx;
             const bool won = GPR_U32(ctx, 5) != 0u;
-            s_ending = won && runtime->callGuestFunction(rdram, ctx, s_addresses->winCampaignSong,
-                                                         {load<uint32_t>(rdram, s_addresses->theGameConfig)}) != 0u;
+            const std::string &game = campaigns::active();
+            s_ending = won && (game == "gh2" || game == "gh2x") &&
+                       runtime->callGuestFunction(rdram, ctx, s_addresses->winCampaignSong,
+                                                  {load<uint32_t>(rdram, s_addresses->theGameConfig)}) != 0u;
             *ctx = saved;
         }
 

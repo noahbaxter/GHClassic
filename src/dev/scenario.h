@@ -12,6 +12,11 @@
 //   (expect {taskmgr seconds} 33.47 0.1)  or, numbers, is within the third
 //   (press green)                      a fret's colour, up, down, left or right,
 //                                      pressed and let go as a player would
+//   (pads 2)                           a second guitar plugged in, idle, for two
+//                                      players (each on autoplay)
+//   (star_power player0 {player0 star_power_ready})  from here on, that player's
+//                                      guitar tilted each poll the condition holds,
+//                                      deploying star power when ready; (star_power) stops
 //   (clock 100)                        the UI clock runs from there, 1/64 s a poll
 //   (freeze 103 2.5 3.9)               holds TaskMgr's UI seconds (once a clock
 //                                      reaches them), seconds and beat there,
@@ -23,6 +28,9 @@
 //   (peek {dir find a.btn} 364)        prints that word, as an int and as a float
 //   (cam balcony {world find a.cam})   prints that Cam's world transform and y fov under that name
 //   (dump menu)                      the next frame's draws, as draws_menu.json (--shots)
+//   (record on solo) (record off)      --record's clip from here, named or else
+//                                      numbered, and its end; with any, only
+//                                      those clips are recorded
 //   (transplant "../x/frame.ram" frame)  the retail game's memory in place of this one's
 //                                      (dev/transplant.h), then its frame as a shot and a dump
 //   (needs gh1 gh2x)                   skips the run unless those games' discs
@@ -34,7 +42,8 @@
 // given after its screen or condition, fails the run and quits, as does the
 // UI going 8 s without a poll, after naming what each thread waits on and,
 // for one still running, the code and scripts on its stack.
-// {ghc_log ...} prints values and their types from any script.
+// {ghc_log ...} prints values and their types from any script, and
+// {ghc_star_power player0} tilts that player's guitar once.
 
 #include "addresses.h"
 

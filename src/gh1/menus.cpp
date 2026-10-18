@@ -27,12 +27,16 @@
 #include "gh1/screens.h"
 #include "milo/milo.h"
 
+#include <algorithm>
+#include <cstring>
 #include <iostream>
 
 namespace gh2::gh1
 {
     namespace
     {
+        using milo::str;
+
         // The buttons a GH1 panel's script links down its lists, each to the
         // next and the last to the first: (navigator (vertical a b c)).
         // Not the last where its navigator has (wrap FALSE).
@@ -92,11 +96,145 @@ namespace gh2::gh1
             }
         }
 
-        // That screen's scene in that layer, in place of GH2's. False if it
-        // cannot be built.
+        // GH1's song list writes its rows in its hand: song_element.view's
+        // Texts (ghui/resources.rnd), in hand.font or its like on the same
+        // sheet (song_header.font, song_blurb.font); its song_stars.txt it
+        // never fills (SongProvider::GetTextSlot, GH1 0x11a7d8), and it sits
+        // on the score. GH2's stars stay as GH2 has them, between the two,
+        // so a song's stars show as in every other game's list. GH2's rows
+        // (ui_objects.dta's UIList song, list_song.milo) are in
+        // dyingmarker, whose small letters are capitals and whose & is a +.
+        // Here GH2's list takes GH1's Texts by what each shows: their font,
+        // scale, place, alignment, wrap, leading and size, the element
+        // placed where GH2's puts its song's name.
+        // It is a type of its own, which GH1's lists take (addScreen), as
+        // quickplay shows GH1's setlist under any campaign.
+        constexpr const char *kSongList = "song_gh1";
+
+        // False if it cannot be made, for GH1's lists to stay GH2's.
+        bool addSongList(const Look &look)
+        {
+            constexpr const char *kObjects = "ui/gen/ui_objects.dtb";
+            const auto objects = ark::readFile(0u, kObjects);
+            auto root = objects ? dtb::raw(*objects) : std::nullopt;
+            dtb::Node *types = root ? const_cast<dtb::Node *>(dtb::find(*root, "UIList")) : nullptr;
+            types = types ? const_cast<dtb::Node *>(dtb::find(*types, "types")) : nullptr;
+            const dtb::Node *song = types ? dtb::find(*types, "song") : nullptr;
+            auto list = loadScene(0u, "ui/gen/list_song.milo_ps2");
+            if (!song || !list)
+            {
+                std::cerr << "[gh1] cannot read GH2's song list" << std::endl;
+                return false;
+            }
+            dtb::Node type = *song;
+            type.nodes[0].text = kSongList;
+            const std::string file = std::string("list_") + kSongList;
+            if (dtb::Node *resource = const_cast<dtb::Node *>(dtb::find(type, "resource_file"));
+                resource && resource->nodes.size() > 1u)
+                resource->nodes[1].text = file + ".milo";
+            types->nodes.push_back(std::move(type));
+
+            // A GH2 Text 17 has Hmx::Object's header, then a Draw 3 (a
+            // revision, whether it shows, a sphere and an order), then its
+            // Trans 9; a Mesh has its Trans first, then its Draw. A Trans
+            // has its local, a 3x3 and a position, then its world.
+            const auto own = [](const milo::Bytes &b) { return headerEnd(b, 4u).value_or(0u); };
+            const auto theirs = [&](const char *name) -> const milo::Bytes *
+            {
+                const auto i = milo::find(look.resources, name);
+                return i ? &look.resources.bodies[*i] : nullptr;
+            };
+            const auto ours = [&](const char *name) -> milo::Bytes *
+            {
+                const auto i = milo::find(*list, name);
+                return i ? &list->bodies[*i] : nullptr;
+            };
+            const milo::Bytes *name = theirs("song_name.txt");
+            const milo::Bytes *row = ours("list.txt");
+            const auto named = name ? parts("Text", *name) : std::nullopt;
+            if (!named || !row)
+                return false;
+            // The dir's subdirs, a count and their paths: GH1's font's ahead
+            // of dyingmarker's, which GH2's stars keep.
+            size_t at = named->rest;
+            milo::Bytes one, two;
+            milo::putU32(one, 1u);
+            milo::putStr(one, "../dyingmarker.milo");
+            milo::putU32(two, 2u);
+            milo::putStr(two, "../" + typeOf(str(*name, at)) + ".milo");
+            milo::putStr(two, "../dyingmarker.milo");
+            const auto sub = std::search(list->root.begin(), list->root.end(), one.begin(), one.end());
+            if (sub == list->root.end())
+                return false;
+            list->root.insert(list->root.erase(sub, sub + static_cast<std::ptrdiff_t>(one.size())), two.begin(), two.end());
+            const float down = f32(*row, own(*row) + 25u + 48u) - f32(*name, named->trans.at + 48u);
+            const std::pair<const char *, const char *> kTexts[] = {
+                {"list.txt", "song_name.txt"},
+                {"header.txt", "song_header.txt"},
+                {"score.txt", "song_score.txt"},
+                {"blurb.txt", "song_blurb.txt"},
+            };
+            for (const auto &[gh2, gh1] : kTexts)
+            {
+                milo::Bytes *b = ours(gh2);
+                const milo::Bytes *of = theirs(gh1);
+                const auto p = of ? parts("Text", *of) : std::nullopt;
+                if (!b || !p)
+                    continue;
+                const size_t trans = own(*b) + 25u, font = transEnd(*b, trans);
+                for (const size_t local : {trans + 4u, trans + 52u})
+                {
+                    std::memcpy(b->data() + local, of->data() + p->trans.at + 4u, 48u);
+                    const float z = f32(*b, local + 44u) + down;
+                    std::memcpy(b->data() + local + 44u, &z, 4u);
+                }
+                // Then its font, alignment and text, then a colour, wrap,
+                // leading, fixed length, italics and size, as a GH1 Text 15
+                // has them. The text is the list's to set. Last are whether
+                // it takes markup and its caps mode (RndText::Load, debug
+                // 0x207830): GH2's are in capitals, GH1's in their own case.
+                size_t o = font, t = p->rest;
+                str(*b, o);
+                const size_t text = o + 4u;
+                o = text;
+                str(*b, o);
+                milo::Bytes out(b->begin(), b->begin() + static_cast<std::ptrdiff_t>(font));
+                milo::putStr(out, typeOf(str(*of, t)) + ".font");
+                put(out, *of, t, t + 4u);
+                put(out, *b, text, o);
+                t += 4u;
+                str(*of, t);
+                put(out, *of, t, t + 36u);
+                put(out, *b, o + 36u, o + 37u);
+                milo::putU32(out, 0u);
+                *b = std::move(out);
+            }
+            ark::addFile(kObjects, dtb::write(*root));
+            ark::addFile("ui/gen/" + file + ".milo_ps2", milo::write(*list));
+            return true;
+        }
+
+        // A GH2 widget as another type of its class: its class's and
+        // UIComponent's revisions, Hmx::Object's, then the type.
+        void retype(milo::Dir &dir, const std::string &name, const std::string &type)
+        {
+            const auto i = milo::find(dir, name);
+            if (!i)
+                return;
+            milo::Bytes &b = dir.bodies[*i];
+            size_t o = 12u;
+            str(b, o);
+            milo::Bytes out(b.begin(), b.begin() + 12);
+            milo::putStr(out, type);
+            put(out, b, o, b.size());
+            b = std::move(out);
+        }
+
+        // That screen's scene in that layer, in place of GH2's, its song list
+        // GH1's with `songList`. False if it cannot be built.
         bool addScreen(size_t layer, size_t disc, const Screen &screen, const Look &look,
                        const std::map<std::string, std::string> &down, const std::set<std::string> &scripted,
-                       std::map<std::string, std::string> &text)
+                       bool songList, std::map<std::string, std::string> &text)
         {
             const std::string name = screen.ours(), theirName = screen.gh1;
             auto gh1 = loadScene(disc, kFolder + theirName + ".gh");
@@ -140,6 +278,8 @@ namespace gh2::gh1
             }
             if (name == "store")
                 addPosters(*made, disc);
+            if (songList && theirName == "sel_song")
+                retype(*made, "ss_song.lst", kSongList);
             ark::addFile(layer, "ui/gen/" + name + ".milo_ps2", milo::write(*made));
             // Quickplay shows GH1's setlist in GH1's scene from any game's
             // menus, as it does the other games' (content/setlists.h).
@@ -184,6 +324,7 @@ namespace gh2::gh1
             milo::replacePrefix(*list, "rockletters.font", "impactor.font");
             ark::addFile(layer, "ui/gen/list_credits.milo_ps2", milo::write(*list));
         }
+        const bool songList = addSongList(*look);
         std::map<std::string, std::string> down;
         if (const auto scripts = dtb::read(std::string(kFolder) + "ui.dta", macros, theirs))
             links(*scripts, down);
@@ -194,7 +335,7 @@ namespace gh2::gh1
             objects(*scripts, scripted);
         std::set<std::string> built;
         for (const Screen &screen : screens())
-            if (addScreen(layer, disc, screen, *look, down, scripted, text))
+            if (addScreen(layer, disc, screen, *look, down, scripted, songList, text))
                 built.insert(screen.ours());
         return built;
     }

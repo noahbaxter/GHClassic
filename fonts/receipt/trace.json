@@ -1,0 +1,16 @@
+{
+ "name": "Receipt",
+ "ship": true,
+ "copyright": "Copyright 2026 Noah Baxter",
+ "sources": [
+  {"tag": "360", "tex": "afa98675b519a897", "cell": [56, 84],
+   "chars": " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~¡©®¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞß",
+   "exclude": "|©®ÆÇÐØÞß"}
+ ],
+ "baseline": 69,
+ "space": 24,
+ "sidebearing": 4,
+ "fit": {"dots": 4.0, "dot_pitch": [7.6, 7.6]},
+ "iou_min": 0.85,
+ "sample": "ABCDEFGHIJKLMNOPQRSTUVWXYZ\n0123456789 !\"#$%&'()*+,-./:;<=>?@[\\]^_`{}~\n¡¿ÀÁÂÃÄÅÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝ\nSCORE: 123,456  NOTES HIT 98%"
+}
