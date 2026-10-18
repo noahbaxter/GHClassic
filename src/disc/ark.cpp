@@ -521,6 +521,11 @@ namespace gh2::ark
         return out;
     }
 
+    size_t discs()
+    {
+        return s_discs.size();
+    }
+
     bool addFolder(const std::string &root)
     {
         std::error_code error;

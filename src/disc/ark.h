@@ -55,6 +55,8 @@ namespace gh2::ark
     // That disc's archive paths starting `prefix`, in order, once install
     // has run.
     std::vector<std::string> paths(size_t disc, const std::string &prefix);
+    // How many discs are indexed, the game disc first, once install has run.
+    size_t discs();
 
     // Every file under `root`, at its path relative to it. False, with the
     // reason printed, if it cannot be read.

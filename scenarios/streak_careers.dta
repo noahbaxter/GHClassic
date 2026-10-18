@@ -1,0 +1,43 @@
+; The note streak's popups and counter in each disc's career, not just
+; GH2's: GH1's and the 80s' first song by autoplay, shot as the counter is
+; out and as a popup shows.
+(needs gh1 gh80s)
+#include common/first_boot.dta
+{set $pick gh1}
+#include common/career_start.dta
+(press green)
+(wait_screen sel_venue_screen 40)
+(wait 1)
+(press green)
+(wait_screen sel_song_screen)
+(wait 1)
+{set $index 0}
+#include common/career_song.dta
+(wait_until {>= {player0 current_streak} 50} 180)
+(wait 0.3)
+(shot gh1_popup_50)
+(wait_until {>= {player0 current_streak} 64} 180)
+(wait 1)
+(shot gh1_counter_64)
+{player0 win 5}
+#include common/career_song_done.dta
+{ui goto_screen main_screen}
+(wait_screen main_screen 60)
+(wait 2)
+{set $pick gh80s}
+#include common/career_start.dta
+(press green)
+(wait_screen sel_venue_screen 40)
+(wait 1)
+(press green)
+(wait_screen sel_song_screen)
+(wait 1)
+{set $index 0}
+#include common/career_song.dta
+(wait_until {>= {player0 current_streak} 50} 180)
+(wait 0.3)
+(shot gh80s_popup_50)
+(wait_until {>= {player0 current_streak} 64} 180)
+(wait 1)
+(shot gh80s_counter_64)
+(quit)

@@ -173,13 +173,15 @@ namespace gh2
         EntryHook<SetScoreTag>::install(runtime, addresses.bandScoreDisplaySetScore, onSetScore);
         EntryHook<SetDigitMatTag>::install(runtime, addresses.bandScoreDisplaySetDigitMat, onSetDigitMat);
         ark::addMade(streak_counter::kScenePath, streak_counter::makeScene);
-        for (const std::string &path : ark::paths(0u, "hud/gen/"))
-            if (path.ends_with(".milo_ps2"))
-                ark::addFix(0u, path, [](std::vector<uint8_t> &file)
-                            {
-                                auto scene = milo::read(file);
-                                if (scene && streak_counter::addCounter(*scene))
-                                    file = milo::write(*scene);
-                            });
+        // Every disc's HUD scenes: a career's song has its own game's.
+        for (size_t disc = 0u; disc < ark::discs(); ++disc)
+            for (const std::string &path : ark::paths(disc, "hud/gen/"))
+                if (path.ends_with(".milo_ps2"))
+                    ark::addFix(disc, path, [](std::vector<uint8_t> &file)
+                                {
+                                    auto scene = milo::read(file);
+                                    if (scene && streak_counter::addCounter(*scene))
+                                        file = milo::write(*scene);
+                                });
     }
 }
