@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.7.5
+
+**THIS IS UNFINISHED.** Expect bugs, missing features and things changing between releases.
+
+### New
+- **Note Streaks** - Toggleable counter mesh appears under the score meter with streak popups at 50, every 100 to 500, then 750, 1000, 1500 and every 1000 after; easy to toggle off in the settings
+- **HD Fonts** - All on-disc fonts have been retraced to make .otf vectors with a new toggle. Note that some number glyphs were missing on the PS2/360 sheets and so have been compressed to match the resolution/compression quality of other PS2/360 fonts.
+
+### GH1 Improvements
+- Campaign correctly indicates the number of completed songs needed to move onto the next tier/beat the game based on difficulty
+- Setlist now uses the correct GH1 pen font
+- Fixed a bug where GH1 setlist would scroll an extra line after each section pushing the text off screen by the bottom of the setlist
+- Quickplay songs now choose the right default guitar
+- Venues now have more accurate light and drum kit animations
+- Fixed an issue where some pause screens would show GH2 menus in GH1 campaign
+- Results screen now correctly shows GH1 hero images
+- Added Continue and More Stats to the GH1 results screen for parity w GH2 songs
+- Shop no longer plays GH2 shop gate opening sfx, nor does it prevent UI control until said sfx finished playing
+- Fixed an issue where GH1 store guitars loaded in backwards
+
+### Menus
+- Settings screens cursor wrap when scroll above the first item or below the last item
+- Standardized option menu rows across both GH1 and GH2 pause screens
+- Confirm and Back sfx now play in pause settings, the lag screen and photo mode
+- Fixed a consistency issue where GH80s menus spaced the same fonts further apart
+
+### Graphics
+- Fixed reflections on scaled meshes 
+- Geometry is now clipped at the camera to prevent other meshes overlapping the note highway
+
 ## v0.7
 
 **THIS IS UNFINISHED.** Expect bugs, missing features and things changing between releases.
