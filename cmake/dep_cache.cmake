@@ -54,9 +54,12 @@ macro(ghc_provide_dependency method name)
     file(LOCK "${_ghc_dir}.lock" RELEASE)
 
     # Left unpopulated, FetchContent_MakeAvailable carries on as it always
-    # would, taking the source from here instead of downloading it.
+    # would, taking the source from here instead of downloading it. Where it
+    # is, for what reads a source after the build (ghc.py's licenses), beside
+    # where FetchContent would have put it.
     string(TOUPPER "${name}" _ghc_upper)
     set(FETCHCONTENT_SOURCE_DIR_${_ghc_upper} "${_ghc_dir}")
+    file(WRITE "${FETCHCONTENT_BASE_DIR}/${_ghc_name}-src.path" "${_ghc_dir}")
     unset(_ghc_fetch)
     unset(_ghc_skip)
     unset(_ghc_args)

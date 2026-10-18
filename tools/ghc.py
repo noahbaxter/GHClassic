@@ -672,25 +672,29 @@ def notices():
     """Each library built into this platform's game, and its license file.
     glslang only compiles shaders at build time; lzma and miniz are public
     domain; GCC's and LLVM's runtimes waive notices for compiled programs."""
-    deps = GAME / "_deps"
+    def src(name):
+        # In the shared download cache, as its pointer says (cmake/dep_cache.cmake).
+        pointer = GAME / "_deps" / f"{name}-src.path"
+        return Path(pointer.read_text().strip()) if pointer.exists() else GAME / "_deps" / f"{name}-src"
+
     found = [
-        ("SDL", deps / "sdl3-src" / "LICENSE.txt"),
-        ("volk", deps / "volk-src" / "LICENSE.md"),
-        ("vk-bootstrap", deps / "vk-bootstrap-src" / "LICENSE.txt"),
-        ("Vulkan Memory Allocator", deps / "vulkanmemoryallocator-src" / "LICENSE.txt"),
-        ("Vulkan-Headers", deps / "vulkanheaders-src" / "LICENSE.md"),
-        ("raylib", deps / "raylib-src" / "LICENSE"),
-        ("GLFW", deps / "raylib-src" / "src" / "external" / "glfw" / "LICENSE.md"),
+        ("SDL", src("sdl3") / "LICENSE.txt"),
+        ("volk", src("volk") / "LICENSE.md"),
+        ("vk-bootstrap", src("vk-bootstrap") / "LICENSE.txt"),
+        ("Vulkan Memory Allocator", src("vulkanmemoryallocator") / "LICENSE.txt"),
+        ("Vulkan-Headers", src("vulkanheaders") / "LICENSE.md"),
+        ("raylib", src("raylib") / "LICENSE"),
+        ("GLFW", src("raylib") / "src" / "external" / "glfw" / "LICENSE.md"),
         ("libchdr", ROOT / "lib" / "libchdr" / "LICENSE.txt"),
-        ("libmpeg2", deps / "libmpeg2-src" / "COPYING"),
-        ("libogg", deps / "ogg-src" / "COPYING"),
-        ("libvorbis", deps / "vorbis-src" / "COPYING"),
+        ("libmpeg2", src("libmpeg2") / "COPYING"),
+        ("libogg", src("ogg") / "COPYING"),
+        ("libvorbis", src("vorbis") / "COPYING"),
         ("zstd", ROOT / "config" / "licenses" / "zstd.txt"),
         ("PS2Recomp", ROOT / "lib" / "PS2Recomp" / "LICENSE"),
     ]
     if MACOS:
-        found += [("MoltenVK", deps / "moltenvk-src" / "LICENSE"),
-                  ("sse2neon", deps / "sse2neon-src" / "LICENSE")]
+        found += [("MoltenVK", src("moltenvk") / "LICENSE"),
+                  ("sse2neon", src("sse2neon") / "LICENSE")]
     if WINDOWS:
         runtime = BUILD / "toolchain" / LLVM_MINGW / "x86_64-w64-mingw32" / "share" / "mingw32"
         found += [("mingw-w64 runtime", runtime / "COPYING.MinGW-w64-runtime.txt"),

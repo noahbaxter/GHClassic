@@ -4,6 +4,6 @@ ninja==1.13.2
 # Scenario frames and contact sheets.
 pillow==12.3.0
 # Font tracing.
-numpy==2.5.4
+numpy==2.4.6
 scikit-image==0.26.0
 fonttools==4.67.0
