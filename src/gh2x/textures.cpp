@@ -232,6 +232,55 @@ namespace gh2
             }
         }
 
+        // A packed 360 Font gaining the characters `ours` has and it lacks
+        // (the 80s' helveticablack's °), each in a box its traced glyph's
+        // width where the sheet has room, drawn in with the rest (drawAdded).
+        // One with no traced glyph or no room is not added.
+        void addPacked(milo::Bytes &theirs, const std::string &ours, const std::string &name, Widened &out)
+        {
+            auto their = milo::readFont(theirs, 25u);
+            if (!their || !their->infoAt || !their->packed)
+                return;
+            std::string missing;
+            for (const char c : ours)
+                if (their->chars.find(c) == std::string::npos && missing.find(c) == std::string::npos &&
+                    vector_fonts::glyph(name, static_cast<uint8_t>(c)))
+                    missing += c;
+            if (missing.empty())
+                return;
+            uint32_t size[2];
+            float cellUv[2];
+            std::memcpy(size, theirs.data() + their->bitmapAt, 8u);
+            std::memcpy(cellUv, theirs.data() + their->bitmapAt + 8u, 8u);
+            const float W = static_cast<float>(size[0]), H = static_cast<float>(size[1]);
+            const float cellW = cellUv[0] * W, cellH = cellUv[1] * H;
+            if (!(cellW > 0.0f) || !(cellH > 0.0f))
+                return;
+            out.width = W;
+            out.height = H;
+            for (const char c : missing)
+            {
+                const uint8_t code = static_cast<uint8_t>(c);
+                const auto glyph = vector_fonts::glyph(name, code);
+                const float sx = glyph->cell[0] / cellW, sy = glyph->cell[1] / cellH;
+                const int w = static_cast<int>(std::ceil((glyph->bounds[2] + 0.5f) / sx)) + 1, h = static_cast<int>(std::lround(cellH));
+                const auto at = freeBox(theirs, *their, static_cast<int>(size[0]), static_cast<int>(size[1]), w, h);
+                if (!at)
+                    continue;
+                // The string gains it, everything after moving along one.
+                const size_t end = their->charsAt + 4u + their->chars.size();
+                theirs.insert(theirs.begin() + static_cast<std::ptrdiff_t>(end), static_cast<uint8_t>(c));
+                const uint32_t length = static_cast<uint32_t>(their->chars.size() + 1u);
+                std::memcpy(theirs.data() + their->charsAt, &length, 4u);
+                their = milo::readFont(theirs, 25u);
+                const float width = static_cast<float>(w) / cellW;
+                const float info[4] = {static_cast<float>(at->first) / W, static_cast<float>(at->second) / H, width, width};
+                std::memcpy(theirs.data() + their->infoAt + code * 16u, info, 16u);
+                out.cells.push_back({static_cast<float>(at->first), static_cast<float>(at->second), static_cast<float>(w),
+                                     static_cast<float>(h), glyph->layer, sx, sy});
+            }
+        }
+
         // A sheet's decoded pixels grown for what its Font gained, and the
         // traced glyphs drawn into the new cells at its own size, in the
         // colour of its ink. No smaller levels: they no longer match.
@@ -320,14 +369,20 @@ namespace gh2
             return true;
         }
 
-        // The game disc's scene with a stand-in for every Tex that pairs
-        // with one in the 360's. None, which leaves the disc's own, when
-        // nothing pairs.
-        std::optional<ark::Made> makeScene(size_t xbox, const std::string &path, const std::string &twin)
+        // A disc's scene with a stand-in for every Tex that pairs with one in
+        // the 360's. None, which leaves the disc's own, when nothing pairs.
+        // With `fontsOnly` (the 80s', whose art is its own) only a Font's
+        // sheet pairs, and only where the 360's Font keeps every character
+        // ours has but those the game disc's Font of its name gives up too
+        // (dyingmarker's ’, which no text uses).
+        std::optional<ark::Made> makeScene(size_t disc, size_t xbox, const std::string &path, const std::string &twin,
+                                           bool fontsOnly)
         {
-            const auto ours = ark::readFile(0u, path), theirs = ark::readFile(xbox, twin);
+            const auto ours = ark::readFile(disc, path), theirs = ark::readFile(xbox, twin);
             auto scene = ours ? milo::read(*ours) : std::nullopt;
             const auto other = theirs ? milo::read(*theirs) : std::nullopt;
+            const auto gameFile = fontsOnly ? ark::readFile(0u, path) : std::nullopt;
+            const auto game = gameFile ? milo::read(*gameFile) : std::nullopt;
             const auto fonts = scene && other ? fontTextures(*scene, *other) : std::nullopt;
             if (!other || !fonts || scene->version != 24u || other->version != 25u)
                 return std::nullopt;
@@ -340,7 +395,7 @@ namespace gh2
                 const auto tex = className == "Tex" ? milo::readTex(body, 24u) : std::nullopt;
                 const auto font = fonts->find(name);
                 if (!tex || tex->source.empty() || (tex->type & ::milo::tex::kTypeNoPixels) ||
-                    (font != fonts->end() && !font->second) ||
+                    (font != fonts->end() && !font->second) || (fontsOnly && font == fonts->end()) ||
                     std::find(std::begin(kOwnLayout), std::end(kOwnLayout), name) != std::end(kOwnLayout))
                     continue;
                 const auto own = oneLevel(body.data() + tex->bitmap, body.size() - tex->bitmap);
@@ -373,6 +428,23 @@ namespace gh2
                         {
                             widened = widen(scene->bodies[mine], theirs, scene->entries[mine].second);
                             moveNarrow(theirs, scene->entries[mine].second, widened);
+                            if (const auto mineFont = fontsOnly ? milo::readFont(scene->bodies[mine], 24u) : std::nullopt)
+                                addPacked(theirs, mineFont->chars, scene->entries[mine].second, widened);
+                        }
+                        if (fontsOnly)
+                        {
+                            const auto mineFont = milo::readFont(scene->bodies[mine], 24u);
+                            const auto theirFont = milo::readFont(theirs, 25u);
+                            const auto gameAt = game ? std::find(game->entries.begin(), game->entries.end(), scene->entries[mine])
+                                                     : std::vector<std::pair<std::string, std::string>>::const_iterator{};
+                            const auto gameFont = game && gameAt != game->entries.end()
+                                                      ? milo::readFont(game->bodies[static_cast<size_t>(gameAt - game->entries.begin())], 24u)
+                                                      : std::nullopt;
+                            taken = taken && mineFont && theirFont &&
+                                    std::all_of(mineFont->chars.begin(), mineFont->chars.end(), [&](char c) {
+                                        return theirFont->chars.find(c) != std::string::npos ||
+                                               (gameFont && gameFont->chars.find(c) != std::string::npos);
+                                    });
                         }
                         made.push_back(scene->bodies[mine]);
                         taken = taken && takeFont(made.back(), theirs, across, down);
@@ -437,8 +509,30 @@ namespace gh2
                     twin.replace(og, 4u, "/ng/");
                 if (!std::binary_search(theirs.begin(), theirs.end(), twin))
                     continue;
-                const auto make = scene ? makeScene : makeBitmap;
-                ark::addMade(0u, path, [make, disc = *xbox, path, twin] { return make(disc, path, twin); },
+                if (scene)
+                    ark::addMade(0u, path, [disc = *xbox, path, twin] { return makeScene(0u, disc, path, twin, false); },
+                                 [path] { return wanted(path); });
+                else
+                    ark::addMade(0u, path, [disc = *xbox, path, twin] { return makeBitmap(disc, path, twin); },
+                                 [path] { return wanted(path); });
+            }
+        }
+        // The 80s' fonts are GH2's, the same letters, widths and kerning,
+        // its scenes as GH2's are: the 360's spacing for them too, where the
+        // 360's Font keeps every character. Its art stays its own.
+        const auto eighties = games::disc("gh80s");
+        if (!eighties)
+            return;
+        for (const char *folder : {"hud/", "ui/"})
+        {
+            const std::vector<std::string> theirs = ark::paths(*xbox, folder);
+            for (const std::string &path : ark::paths(*eighties, folder))
+            {
+                const std::string twin = path.substr(0u, path.size() - 3u) + "xbox";
+                if (!path.ends_with(".milo_ps2") || !std::binary_search(theirs.begin(), theirs.end(), twin))
+                    continue;
+                ark::addMade(*eighties, path,
+                             [disc = *eighties, xbox = *xbox, path, twin] { return makeScene(disc, xbox, path, twin, true); },
                              [path] { return wanted(path); });
             }
         }
