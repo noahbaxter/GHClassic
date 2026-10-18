@@ -21,7 +21,7 @@ everything made lands in build/, which is safe to delete. build and release
 also take the disc's boot executable alone (SLUS_214.47), which is all the
 recompile reads.
 
-From the system: Python 3.11+, git, and a C++ compiler (Xcode's on macOS, gcc
+From the system: Python (.python-version's or newer), git, and a C++ compiler (Xcode's on macOS, gcc
 or clang on Linux, nothing on Windows, where llvm-mingw is fetched into
 build/). CMake, Ninja and Pillow come from build/venv, made from
 requirements.txt; CMake fetches the game's libraries at pinned versions, once
@@ -61,6 +61,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 import venv
@@ -70,10 +71,13 @@ from pathlib import Path
 
 from releases import content, discs_arg, find_disc, main_checkout, releases
 
-if sys.version_info < (3, 11):
-    sys.exit(f"GH Classic needs Python 3.11 or newer, not {sys.version.split()[0]}")
-
 ROOT = Path(__file__).resolve().parent.parent
+# The Python GH Classic is built and tested on, the oldest it supports: CI
+# runs it, the README states it, and every pin in requirements.txt must
+# install on it (ensure_venv).
+PYTHON = (ROOT / ".python-version").read_text().strip()
+if sys.version_info < tuple(int(n) for n in PYTHON.split(".")):
+    sys.exit(f"GH Classic needs Python {PYTHON} or newer, not {sys.version.split()[0]}")
 BUILD = ROOT / "build"
 VENV = BUILD / "venv"
 TOOLS = BUILD / "tools"
@@ -85,6 +89,13 @@ WINDOWS = sys.platform == "win32"
 EXE = ".exe" if WINDOWS else ""
 VENV_BIN = VENV / ("Scripts" if WINDOWS else "bin")
 VENV_PYTHON = VENV_BIN / f"python{EXE}"
+# The wheels each platform CI builds on can take: Linux's in Ubuntu 22.04's
+# glibc 2.35, macOS's on Apple silicon.
+PLATFORM_TAGS = {
+    "linux": [f"manylinux_2_{n}_x86_64" for n in range(17, 36)] + ["manylinux2014_x86_64"],
+    "windows": ["win_amd64"],
+    "macos": [f"macosx_{n}_0_{arch}" for n in range(11, 16) for arch in ("arm64", "universal2")],
+}
 
 # Every checkout's CMake fetches its libraries into the user's cache, once for
 # all of them (cmake/dep_cache.cmake). Outside build/, so deleting one tree's
@@ -115,10 +126,20 @@ def ensure_venv():
     stamp = VENV / "requirements.txt"
     if VENV_PYTHON.exists() and stamp.exists() and stamp.read_text() == wanted:
         return
+    if f"Python {PYTHON}+" not in (ROOT / "README.md").read_text():
+        sys.exit(f"README.md must say Python {PYTHON}+, as .python-version does")
     print("setting up build/venv", file=sys.stderr)
     venv.create(VENV, with_pip=True, clear=True)
-    subprocess.run([VENV_PYTHON, "-m", "pip", "install", "--quiet", "--disable-pip-version-check",
-                    "-r", ROOT / "requirements.txt"], check=True)
+    pip = [VENV_PYTHON, "-m", "pip", "install", "--quiet", "--disable-pip-version-check"]
+    # Each pin as a wheel for the oldest Python on each platform, before
+    # anything is installed: a pin only newer ones have stops here, not on CI.
+    with tempfile.TemporaryDirectory() as target:
+        for name, tags in PLATFORM_TAGS.items():
+            check = [*pip, "--dry-run", "--ignore-installed", "--target", target, "--python-version", PYTHON,
+                     "--only-binary=:all:", *(f"--platform={tag}" for tag in tags), "-r", ROOT / "requirements.txt"]
+            if subprocess.run(check).returncode:
+                sys.exit(f"requirements.txt does not install on Python {PYTHON} for {name}")
+    subprocess.run([*pip, "-r", ROOT / "requirements.txt"], check=True)
     stamp.write_text(wanted)
 
 

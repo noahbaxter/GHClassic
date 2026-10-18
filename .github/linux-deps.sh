@@ -9,7 +9,9 @@ apt-get install -y wget ca-certificates
 wget -qO /etc/apt/trusted.gpg.d/apt.llvm.org.asc https://apt.llvm.org/llvm-snapshot.gpg.key
 echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-21 main" > /etc/apt/sources.list.d/llvm.list
 apt-get update
-apt-get install -y build-essential g++-12 clang-21 lld-21 python3.11 python3.11-venv pkg-config \
+# Python as .python-version names it, which 22.04's own archive has for 3.11.
+python="python$(cat .python-version)"
+apt-get install -y build-essential g++-12 clang-21 lld-21 "$python" "$python-venv" pkg-config \
   libasound2-dev libpulse-dev libaudio-dev libfribidi-dev libjack-dev libsndio-dev \
   libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev \
   libxtst-dev libxinerama-dev libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev \
