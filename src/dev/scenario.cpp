@@ -621,6 +621,20 @@ namespace gh2::scenario
         EntryHook<UiSecondsTag>::install(runtime, addresses.taskMgrSetUISeconds, onSetUISeconds);
         EntryHook<SecondsBeatTag>::install(runtime, addresses.taskMgrSetSecondsBeat, onSetSecondsBeat);
         if (!s_text.empty())
+        {
+            // Each sound cue as it plays, by name, as [sound] lines: what a
+            // press in a menu made heard.
+            struct SequencePlayTag;
+            EntryHook<SequencePlayTag>::install(runtime, addresses.sequencePlay, [](uint8_t *rdram, R5900Context *ctx, PS2Runtime *) {
+                const uint32_t seq = GPR_U32(ctx, 4);
+                uint32_t name = ::gh2::load<uint32_t>(rdram, seq + milo::object::kName);
+                if (name == 0u || name >= 0x2000000u)
+                    name = ::gh2::load<uint32_t>(rdram, ::gh2::load<uint32_t>(rdram, seq) + milo::object::kName);
+                std::cerr << "[sound] "
+                          << (name != 0u && name < 0x2000000u ? reinterpret_cast<const char *>(rdram + name) : "?")
+                          << std::endl;
+            });
             std::thread(watchdog).detach();
+        }
     }
 }

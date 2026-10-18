@@ -26,6 +26,28 @@
 }
 {ghc_highway}
 
+; Audio Settings in GH1's scenes (gh1/menus.dta), out of a song and in one:
+; GH1's sliders link to nothing, its own script moved between them, so they
+; are linked down and round. Its rows for playing left handed go, each
+; leading to itself: up is to whatever leads down to the focus, the first
+; the scene lists, and one left leading to the top row stops up there.
+{func ghc_gh1_audio_rows ($panel)
+   {do
+      ($dir {$panel loaded_dir})
+      {{$dir find gs_band.sld} set nav_down {$dir find gs_guitar.sld}}
+      {{$dir find gs_guitar.sld} set nav_down {$dir find gs_sfx.sld}}
+      {{$dir find gs_sfx.sld} set nav_down {$dir find gs_stereo.btn}}
+      {{$dir find gs_stereo.btn} set nav_down {$dir find gs_band.sld}}
+      {foreach $o (gs_left_p1.btn gs_left_p2.btn)
+         {if {$dir exists $o}
+            {{$dir find $o} set_showing FALSE}
+            {$panel disable {$dir find $o}}
+            {{$dir find $o} set nav_down {$dir find $o}}
+         }
+      }
+   }
+}
+
 ; The options menu, as the game's own (options.dta) with a Game Settings row
 ; under Video Settings. options.milo has six rows, each button in a group of
 ; its own that fans it about the poster's corner; the seventh is Video
@@ -136,6 +158,8 @@
                {quit.btn get_local_pos $x $y $z}
                {set $row {'-' $z $above}}
                {video_options.btn copy quit.btn 0}
+               ; Not drawn in to QUIT's width: its own, as the other rows.
+               {video_options.btn set fit_text 0}
                {video_options.btn set trans_parent {quit.btn get trans_parent}}
                {video_options.btn set_showing TRUE}
                {video_options.btn set_state kNormal}
@@ -230,7 +254,10 @@
       )
       (BUTTON_DOWN_MSG
          {if {== $button kPad_Start} {$this resume}}
-         {if {== $button kPad_Tri} {ui goto_screen pause_screen}}
+         {if {== $button kPad_Tri}
+            {synth play_sequence button_back.cue}
+            {ui goto_screen pause_screen}
+         }
          kDataUnhandled
       )
    )
@@ -249,6 +276,7 @@
       (BUTTON_DOWN_MSG
          {if {&& {! {pause_audio_settings_panel slider_selected}} {== $button kPad_Tri}}
             {$this set_volumes}
+            {synth play_sequence button_back.cue}
             {ui goto_screen pause_settings_screen}
          }
          kDataUnhandled
@@ -264,6 +292,7 @@
       (animate_transition FALSE)
       (BUTTON_DOWN_MSG
          {if {&& {== $button kPad_Tri} {== {pause_video_settings_panel get picking} none}}
+            {synth play_sequence button_back.cue}
             {ui goto_screen pause_settings_screen}
          }
          kDataUnhandled
@@ -320,6 +349,10 @@
    ; The values stand in a column this many rows' distance right of the
    ; names.
    (column 3.5)
+   ; A scene whose rows were centred (GH1's in a song) has its box this much
+   ; further along, measured from a text's middle.
+   (centred FALSE)
+   (centred_box_dx -60)
    (lay_out
       {if {! {exists vs_msaa.btn}}
          {do
@@ -336,7 +369,7 @@
             ; To the names' side of the box, by the rows' own measure.
             {set $col {'*' [column] {if_else {< [gap] 0} {'-' 0 [gap]} [gap]}}}
             {set $col {'+' $x {if_else {< $half 0} {'-' 0 $col} $col}}}
-            {set $bx {'+' $col $half}}
+            {set $bx {'+' {'+' $col $half} {if_else [centred] [centred_box_dx] 0}}}
             {widescreen.chk set_local_pos $bx $cy $cz}
             {foreach $row [rows]
                {new {widescreen.btn class_name} {elem $row 0}}
@@ -367,6 +400,9 @@
                   {{$this find {elem $row 3}} set_local_pos $col $y {'+' $z {'*' $i {'*' [tight] [gap]}}}}
                   {{$this find {elem $row 3}} set_showing TRUE}
                   {{$this find {elem $row 3}} set draw_order 1}
+                  ; Up goes to what leads down to the focus: its row's own
+                  ; link, copied, would lead there from here.
+                  {{$this find {elem $row 3}} set nav_down {$this find {elem $row 3}}}
                }
                {set $i {'+' $i 1}}
             }
@@ -450,8 +486,9 @@
       {$this sync_rows}
    )
    (enter
-      ; Before the top row's place is taken: its gap to the row under it.
-      {if {gs_left_p1.btn showing}
+      ; The top row's gap to the row under it, which neither leaves: shown
+      ; or not, as GH1's frame in a song has them, from GH2's scene.
+      {if {{$this loaded_dir} exists gs_left_p2.btn}
          {do
             ($x 0) ($y 0) ($top 0) ($under 0)
             {gs_left_p1.btn get_local_pos $x $y $top}
@@ -459,10 +496,15 @@
             {set [gap] {'-' $under $top}}
          }
       }
-      ; Into the top row's place while that row still shows: once for each
-      ; time the scene loads, and not in a scene that is not the game's own
-      ; (GH1's, where the row is placed as it is made).
-      {if {gs_left_p1.btn showing}
+      ; Into the top row's place, the box by as much: again on each entry
+      ; changes nothing. GH1's frame in a song has the row from GH2's scene,
+      ; and its own rows' text is centred, where these are drawn from the
+      ; left as a column.
+      {if {== {widescreen.btn get alignment} 34}
+         {set [centred] TRUE}
+         {widescreen.btn set alignment 33}
+      }
+      {if {{$this loaded_dir} exists gs_left_p1.btn}
          {do
             ($x 0) ($y 0) ($z 0) ($top 0) ($from 0)
             {gs_left_p1.btn get_local_pos $x $y $top}
@@ -472,9 +514,13 @@
             {widescreen.chk set_local_pos $x $y {'+' $z {'-' $top $from}}}
          }
       }
+      ; Each leads to itself: up is to whatever leads down to the focus, the
+      ; first the scene lists, so one left leading to the top row stops up
+      ; from there.
       {foreach $o (gs_left_p1.btn gs_left_p2.btn p_scan.btn calibrate_lag.btn)
          {{$this find $o} set_showing FALSE}
          {{$this find $o} set_state kDisabled}
+         {{$this find $o} set nav_down {$this find $o}}
       }
       {foreach $o (lefty1.chk lefty2.chk p_scan.chk)
          {{$this find $o} set_showing FALSE}
@@ -484,6 +530,7 @@
          {if {exists $o}
             {{$this find $o} set_showing FALSE}
             {{$this find $o} set_state kDisabled}
+            {{$this find $o} set nav_down {$this find $o}}
          }
       }
       {if {== {$this name} pause_video_settings_panel} {gs_title.lbl set_localized "VIDEO"}}
@@ -644,7 +691,8 @@
          {gm_p1.btn set nav_down gm_p2.btn}
          {gm_p1.btn set nav_down gm_lag.btn}
       }
-      {gm_p2.btn set nav_down gm_lag.btn}
+      ; P2 off leads to itself, so up from the lag row finds P1.
+      {gm_p2.btn set nav_down {if_else {$this two_players} gm_lag.btn gm_p2.btn}}
       {gm_lag.btn set nav_down gs_band.sld}
       {foreach $row
          (
@@ -1075,14 +1123,14 @@
    (value_tilt 4)
    (pitch 0.9)
    (block (0.88 0 12))
-   (text_x (-124 44 122 35))
-   (box_x (16 94))
+   (text_x (-124 54 132 35))
+   (box_x (26 104))
    (text_dz 0)
    (box_dz 0)
    (lefty_size 21)
    (lag_size 30)
    (fit (0 0 0 0))
-   (gh1 ((lefty_size 30) (lag_size 44) (fit (100 24 24 250))))
+   (gh1 ((lefty_size 29) (lag_size 44) (fit (0 24 24 250)) (text_x (-132 74 142 35)) (box_x (52 120))))
    (lag_screen lag_screen)
    ; As the main menu has it for its two-player row (main.dta).
    (two_players {! {game is_missing_multi_controller}})
@@ -1113,14 +1161,14 @@
    (value_tilt 4)
    (pitch 0.9)
    (block (0.88 0 12))
-   (text_x (-124 44 122 35))
-   (box_x (16 94))
+   (text_x (-124 54 132 35))
+   (box_x (26 104))
    (text_dz 0)
    (box_dz 0)
    (lefty_size 21)
    (lag_size 30)
    (fit (0 0 0 0))
-   (gh1 ((block (0.88 16 -2)) (lefty_size 30) (lag_size 44) (fit (100 24 24 250)) (tune_bg (-183 -5 26.4 1.4))))
+   (gh1 ((block (0.88 16 -2)) (lefty_size 29) (lag_size 44) (fit (0 24 24 250)) (text_x (-132 74 148 35)) (box_x (52 126)) (tune_bg (-183 -5 26.4 1.4))))
    (lag_screen pause_lag_screen)
    (two_players {> {game num_players} 1})
    GAME_SETTINGS_HANDLERS
@@ -1133,6 +1181,7 @@
    (animate_transition FALSE)
    (BUTTON_DOWN_MSG
       {if {&& {! {pause_game_settings_panel slider_selected}} {== $button kPad_Tri}}
+         {synth play_sequence button_back.cue}
          {ui goto_screen pause_settings_screen}
       }
       kDataUnhandled

@@ -1,0 +1,95 @@
+; The settings screens go down and up round every row, under GH2's menus and
+; GH1's, out of a song and in one, and a GH1 career started under GH1's menus
+; pauses on GH1's own pause menu.
+(needs gh1)
+#include common/first_boot.dta
+(wait 1)
+
+; Up from Game Settings' first row is its last, then P1 with one player.
+{ui goto_screen game_settings_screen}
+(wait_screen game_settings_screen)
+(wait 1)
+(press up)
+(expect {game_settings_screen focus_name} gm_lag.btn)
+(press up)
+(expect {game_settings_screen focus_name} gm_p1.btn)
+; Up from Video Settings' first row is its last, not a value beside it.
+{ui goto_screen video_settings_screen}
+(wait_screen video_settings_screen)
+(wait 1)
+(press up)
+(expect {video_settings_screen focus_name} vs_perf.btn)
+(press down)
+(press down)
+(expect {video_settings_screen focus_name} vs_vfont.btn)
+(press up)
+(expect {video_settings_screen focus_name} widescreen.btn)
+
+{set $ghc_switch gh1}
+{set $ghc_switch_next main_screen}
+{ui goto_screen ghc_switch_screen}
+(wait 3)
+(wait_screen main_screen)
+(expect {campaigns active} gh1)
+; GH1's Audio Settings, up from its first row.
+{ui goto_screen audio_settings_screen}
+(wait_screen audio_settings_screen)
+(wait 1)
+(press up)
+(expect {audio_settings_screen focus_name} gs_stereo.btn)
+
+; A song with GH1's screens around it: its Audio down and up, and its Video's
+; rows each a row apart.
+{quickplay in_song_ui gh1}
+{gamecfg set mode quickplay}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{game set_venue theatre}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 3)
+(press start)
+(wait_screen pause_screen 20)
+{ui goto_screen pause_audio_settings_screen}
+(wait_screen pause_audio_settings_screen)
+(wait 1)
+(press down)
+(expect {pause_audio_settings_screen focus_name} gs_guitar.sld)
+(press down)
+(expect {pause_audio_settings_screen focus_name} gs_sfx.sld)
+(press up)
+(press up)
+(press up)
+(expect {pause_audio_settings_screen focus_name} gs_stereo.btn)
+{ui goto_screen pause_video_settings_screen}
+(wait_screen pause_video_settings_screen)
+(wait 1)
+{set $x 0} {set $y 0} {set $top 0} {set $next 0}
+{{pause_video_settings_panel find widescreen.btn} get_local_pos $x $y $top}
+{{pause_video_settings_panel find vs_vfont.btn} get_local_pos $x $y $next}
+(expect {< $next $top} 1)
+(shot gh1_pause_video)
+{quickplay in_song_ui venue}
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+
+; GH1's career under GH1's menus: its pause is GH1's scene, not GH2's kept
+; from before the switch.
+{set $pick gh1}
+#include common/career_start.dta
+(press green)
+(wait_screen sel_venue_screen 40)
+(wait 1.5)
+(press green)
+(wait_screen sel_song_screen)
+(wait 2)
+(press green)
+(wait_screen game_screen 60)
+(wait 3)
+(press start)
+(wait_screen pause_screen 20)
+(wait 1)
+(expect {{pause_panel find resume.btn} get_type} impactor2)
+(shot gh1_career_pause)
+(quit)

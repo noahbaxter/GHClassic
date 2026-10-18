@@ -361,14 +361,15 @@
       ; The UI gets blue and orange both as kPad_Square.
       (BUTTON_DOWN_MSG
          {cond
-            ({== $button kPad_Tri} {ui goto_screen pause_screen})
-            ({== $button kPad_X} {$this fly {! {world free_cam_active}}})
+            ({== $button kPad_Tri} {synth play_sequence button_back.cue} {ui goto_screen pause_screen})
+            ({== $button kPad_X} {synth play_sequence button_select} {$this fly {! {world free_cam_active}}})
             ({&& {== $button kPad_Square} {pad_held orange}}
+               {synth play_sequence button_toggle}
                {set [clean] {! [clean]}}
                {$this sync}
             )
-            ({== $button kPad_DUp} {$this step -1})
-            ({== $button kPad_DDown} {$this step 1})
+            ({== $button kPad_DUp} {synth play_sequence button_toggle} {$this step -1})
+            ({== $button kPad_DDown} {synth play_sequence button_toggle} {$this step 1})
          }
       )
    )
