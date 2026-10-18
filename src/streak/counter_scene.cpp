@@ -179,6 +179,34 @@ namespace gh2::streak_counter
             return y < 37u || y >= 98u || x < 85u || x >= 243u || (x >= 118u && x < 136u);
         }
 
+        // The frame's art, rows 28 to 101, has its corners and edges clear
+        // where the score's shell met it; the metal here sits a pixel off,
+        // and the venue showed between. Clear pixels from just above the art
+        // to just below it are its opaque black instead.
+        constexpr size_t kArtFrom = 26u, kArtTo = 106u;
+        void closeEdges(milo::Bytes &body, uint32_t version)
+        {
+            const auto tex = milo::readTex(body, version);
+            const auto header = tex ? bitmap::read(body.data() + tex->bitmap, body.size() - tex->bitmap) : std::nullopt;
+            if (!header || header->bpp != 8u)
+                return;
+            const uint8_t *palette = body.data() + tex->bitmap + bitmap::kHeaderBytes;
+            const size_t entries = bitmap::paletteBytes(*header) / 4u;
+            const auto colour = [&](size_t index) { return palette + slot(index, 8u) * 4u; };
+            std::optional<uint8_t> black;
+            for (size_t k = 0; k < entries; ++k)
+                if (const uint8_t *c = colour(k); c[3] >= 0x80u &&
+                    (!black || c[0] + c[1] + c[2] < colour(*black)[0] + colour(*black)[1] + colour(*black)[2]))
+                    black = static_cast<uint8_t>(k);
+            if (!black)
+                return;
+            uint8_t *pixels = body.data() + tex->bitmap + bitmap::kHeaderBytes + entries * 4u;
+            for (size_t y = kArtFrom; y < std::min<size_t>(kArtTo, header->height); ++y)
+                for (size_t x = 0; x < header->width; ++x)
+                    if (uint8_t &index = pixels[y * header->rowBytes + x]; colour(index)[3] == 0u)
+                        index = *black;
+        }
+
         // Where a one-quad Mesh 28's verts are: their count's place. A
         // count, then 48 bytes each (a place, a normal, a colour and a uv),
         // then a count of faces of three shorts.
@@ -445,7 +473,10 @@ namespace gh2::streak_counter
                 if (className == "Mat" && name.starts_with("score_") && name != "score_num_frame.mat")
                     whiten(body);
                 else if (name == "score_num_frame.tex")
+                {
                     invert(body, scene->version, frameKeeps);
+                    closeEdges(body, scene->version);
+                }
                 else if (className == "Tex" && name.starts_with("score_"))
                     invert(body, scene->version);
                 else if (name == "score_num_frame.mesh")

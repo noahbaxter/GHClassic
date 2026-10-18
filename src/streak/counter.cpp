@@ -148,7 +148,7 @@ namespace gh2
             // The first it shows, and the icon, are there at once.
             const bool atOnce = counter.wheels[which].mat == 0u || now == counter.icon;
             const uint32_t mesh = load<uint32_t>(rdram, load<uint32_t>(rdram, display + kMeshes) + 12u * which + 8u);
-            streak_counter::turnTo(rdram, counter.wheels[which], now, mesh, atOnce);
+            streak_counter::turnTo(rdram, counter.wheels[which], now, mesh, atOnce, which + 1u == streak_counter::kWheels);
         }
 
         struct HudEnterTag;

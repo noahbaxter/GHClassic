@@ -49,19 +49,20 @@ namespace gh2::streak_counter
         float lift = 0.0f;
         // A wheel turning, as GH3's do: its old digit gone at once, the new
         // one fading in as it rises into place from a little below. The Mat
-        // it shows, its mesh, where that rests, and how far along it is (0
-        // just turned, 1 in place).
+        // it shows, its mesh, where that rests, how far along it is (0
+        // just turned, 1 in place), and the seconds a turn takes it.
         struct Wheel
         {
             uint32_t mat = 0, mesh = 0;
-            float rest = NAN, along = 1.0f;
+            float rest = NAN, along = 1.0f, length = 0.0f;
             bool turning = false;
         };
         std::array<Wheel, kWheels> wheels{};
     };
 
-    // A wheel given `mat`, its mesh `mesh`: turned in, or there at once.
-    void turnTo(uint8_t *rdram, Counter::Wheel &wheel, uint32_t mat, uint32_t mesh, bool atOnce);
+    // A wheel given `mat`, its mesh `mesh`: turned in, or there at once. The
+    // ones turn quicker than the rest.
+    void turnTo(uint8_t *rdram, Counter::Wheel &wheel, uint32_t mat, uint32_t mesh, bool atOnce, bool ones);
 
     // A frame of the counter: its wheels' turns a step on; its views raised
     // over where their anims (the slide in, the shake) last left them, left

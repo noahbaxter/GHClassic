@@ -15,7 +15,11 @@ namespace gh2::streak_counter
         constexpr float kOut = 0.5f, kIn = 0.45f;
         // A turn's seconds, and how far below its place, in the display's
         // space, a new digit starts: as GH3's, and still inside its wheel.
-        constexpr float kTurn = 0.1f, kRise = 5.0f;
+        // The ones turn with every note, which a run plays faster than a
+        // whole turn, so theirs is quicker, else they never come all the way.
+        // A digit starts half there: from nothing, a turn's first frame is a
+        // blank wheel, one for every note in a run.
+        constexpr float kTurn = 0.1f, kOnesTurn = 0.04f, kRise = 5.0f, kFrom = 0.5f;
 
         // Its Mat's colour's alpha, which the draw reads (native_mat.cpp).
         void fade(uint8_t *rdram, uint32_t mat, float alpha)
@@ -30,8 +34,8 @@ namespace gh2::streak_counter
         {
             if (!wheel.turning || !wheel.mat || !wheel.mesh)
                 return;
-            const float t = wheel.along = std::min(1.0f, wheel.along + dt / kTurn), left = 1.0f - t;
-            fade(rdram, wheel.mat, t);
+            const float t = wheel.along = std::min(1.0f, wheel.along + dt / wheel.length), left = 1.0f - t;
+            fade(rdram, wheel.mat, kFrom + (1.0f - kFrom) * t);
             const uint32_t transform = wheel.mesh + ::milo::mesh::kTransform;
             const uint32_t z = transform + kLocalPos + 8u;
             if (std::isnan(wheel.rest))
@@ -42,15 +46,16 @@ namespace gh2::streak_counter
         }
     }
 
-    void turnTo(uint8_t *rdram, Counter::Wheel &wheel, uint32_t mat, uint32_t mesh, bool atOnce)
+    void turnTo(uint8_t *rdram, Counter::Wheel &wheel, uint32_t mat, uint32_t mesh, bool atOnce, bool ones)
     {
         wheel.mat = mat;
         wheel.mesh = mesh;
+        wheel.length = ones ? kOnesTurn : kTurn;
         // There at once is a turn already done, which the next frame
         // settles: back to rest, should one have been under way.
         wheel.along = atOnce ? 1.0f : 0.0f;
         wheel.turning = true;
-        fade(rdram, mat, wheel.along);
+        fade(rdram, mat, kFrom + (1.0f - kFrom) * wheel.along);
     }
 
     void step(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const Addresses &addresses, uint32_t display,
