@@ -24,7 +24,9 @@ recompile reads.
 From the system: Python 3.11+, git, and a C++ compiler (Xcode's on macOS, gcc
 or clang on Linux, nothing on Windows, where llvm-mingw is fetched into
 build/). CMake, Ninja and Pillow come from build/venv, made from
-requirements.txt; CMake fetches the game's libraries at pinned versions.
+requirements.txt; CMake fetches the game's libraries at pinned versions, once
+for every checkout, into the user's cache (~/Library/Caches/GHClassic on
+macOS, ~/.cache on Linux, %LOCALAPPDATA% on Windows).
 
 arm runs the game once, hidden and muted, with --fast-boot --seed 1, no
 save and default settings: a first boot. out (default
@@ -83,6 +85,18 @@ WINDOWS = sys.platform == "win32"
 EXE = ".exe" if WINDOWS else ""
 VENV_BIN = VENV / ("Scripts" if WINDOWS else "bin")
 VENV_PYTHON = VENV_BIN / f"python{EXE}"
+
+# Every checkout's CMake fetches its libraries into the user's cache, once for
+# all of them (cmake/dep_cache.cmake). Outside build/, so deleting one tree's
+# build/ leaves the others' sources alone.
+if MACOS:
+    DEPS = Path.home() / "Library" / "Caches" / "GHClassic" / "deps"
+elif WINDOWS:
+    DEPS = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "GHClassic" / "deps"
+else:
+    DEPS = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "GHClassic" / "deps"
+DEP_CACHE = [f"-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES={(ROOT / 'cmake' / 'dep_cache.cmake').as_posix()}",
+             f"-DGHC_DEP_CACHE={DEPS.as_posix()}"]
 
 LLVM_MINGW = "llvm-mingw-20260922-ucrt-x86_64"
 LLVM_MINGW_URL = f"https://github.com/mstorsjo/llvm-mingw/releases/download/20260922/{LLVM_MINGW}.zip"
@@ -176,7 +190,7 @@ def colour(code, text):
 def theirs(warning):
     """Whether a warning is third-party code's (a fetched dependency's, or
     libchdr's), which we report but do not fix here."""
-    return "_deps/" in warning or "/lib/libchdr/" in warning
+    return "_deps/" in warning or f"{DEPS.as_posix()}/" in warning.replace("\\", "/") or "/lib/libchdr/" in warning
 
 
 def build_step(title, cmd, env, log):
@@ -235,7 +249,7 @@ def built():
 def build_tools(env, jobs):
     """The analyzer and recompiler, a top-level build of lib/PS2Recomp."""
     configure = ["cmake", "-S", ROOT / "lib" / "PS2Recomp", "-B", TOOLS, "-DCMAKE_BUILD_TYPE=Release",
-                 "-DPS2X_BUILD_RUNTIME=OFF", "-DPS2X_BUILD_TEST=OFF", "-DPS2X_BUILD_STUDIO=OFF"]
+                 "-DPS2X_BUILD_RUNTIME=OFF", "-DPS2X_BUILD_TEST=OFF", "-DPS2X_BUILD_STUDIO=OFF", *DEP_CACHE]
     build_step("configuring recompiler", configure, env, "tools-configure.log")
     targets = ["--target", "ps2_analyzer", "ps2_recomp", "-j", jobs]
     build_step("building recompiler", ["cmake", "--build", TOOLS, *targets], env, "tools.log")
@@ -291,7 +305,7 @@ def build(disc=None, recomp=True, lto=False):
     tag = tree_version()
     configure = ["cmake", "-S", ROOT, "-B", GAME, "-DCMAKE_BUILD_TYPE=Release",
                  f"-DGHC_GENERATED_DIR={RECOMP / 'output'}", f"-DGHC_ENABLE_LTO={'ON' if lto else 'OFF'}",
-                 f"-DGHC_VERSION={tag}", f"-DGHC_EXPERIMENTAL={'ON' if experimental(tag) else 'OFF'}"]
+                 f"-DGHC_VERSION={tag}", f"-DGHC_EXPERIMENTAL={'ON' if experimental(tag) else 'OFF'}", *DEP_CACHE]
     build_step("configuring game", configure, env, "game-configure.log")
     build_step("building game", ["cmake", "--build", GAME, "--target", "GHClassic", "-j", jobs], env, "game.log")
 
