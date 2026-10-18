@@ -31,6 +31,45 @@ namespace gh2::setlists
             Required required;
         };
 
+        // The song list's paper (sel_song.view) is 70 frames, one a row and
+        // one a header, the last its foot: past that the rows scroll on
+        // with no paper or highlight under them. A setlist longer is held
+        // a window at a time, moved along as the highlight nears either
+        // end, far enough from each that the paper's head and foot stay
+        // off screen.
+        constexpr size_t kWindowFrames = 64u, kWindowEdge = 12u;
+        struct Window
+        {
+            size_t first = 0u, count = 0u; // its rows in the window
+            std::vector<size_t> tiers;     // every row's tier
+        };
+        std::map<std::string, Window> s_windows;
+
+        // Rows from `first`, as many as fit with their headers.
+        size_t windowFrom(const std::vector<size_t> &tiers, size_t first)
+        {
+            size_t frames = 0u, r = first;
+            for (; r < tiers.size(); ++r)
+            {
+                frames += r == first || tiers[r - 1u] != tiers[r] ? 2u : 1u;
+                if (frames > kWindowFrames)
+                    break;
+            }
+            return r - first;
+        }
+
+        // The first row of a window with `row` half way down it.
+        size_t windowAround(const std::vector<size_t> &tiers, size_t row)
+        {
+            size_t frames = 0u, r = row;
+            while (r > 0u && frames < kWindowFrames / 2u)
+            {
+                frames += tiers[r - 1u] != tiers[r] ? 2u : 1u;
+                --r;
+            }
+            return r;
+        }
+
         constexpr const char *kOwnLook = "ui/sel_song_quickplay.milo";
         constexpr const char *kOwnScene = "ui/gen/sel_song_quickplay.milo_ps2"; // that, as the disc keeps it
         constexpr int kBands = 8; // the save's band slots
@@ -161,31 +200,43 @@ namespace gh2::setlists
                     return !career;
                 return t < 2u && (!gated || s + 1u < tier.songs.size());
             };
+            // Every row it has, then those of its window.
+            struct Row
+            {
+                size_t tier, song;
+            };
+            std::vector<Row> rows;
             for (size_t t = 0; t < s_shown->tiers.size(); ++t)
             {
                 const Tier &tier = s_shown->tiers[t];
-                bool any = false;
                 for (size_t s = 0; s < tier.songs.size(); ++s)
-                    any = any || open(t, s);
-                if (!any)
-                    continue;
-                const uint32_t header[2] = {static_cast<uint32_t>(s_rowTiers.size()),
-                                            symbol(rdram, ctx, runtime, tier.header)};
-                pushBack(rdram, ctx, runtime, headers, header, 8u, s_addresses->headersInsertOverflow, scratch);
-                for (size_t s = 0; s < tier.songs.size(); ++s)
-                {
                     // A song not open has no row, as the game's own list
                     // has none for a store song not bought: but an encore
                     // still to earn, whose row is there blank.
-                    if (!open(t, s) && !(gated && tier.encore && s + 1u == tier.songs.size()))
-                        continue;
-                    const uint32_t data = static_cast<uint32_t>(
-                        runtime->callGuestFunction(rdram, ctx, s_addresses->songProviderGetSongData,
-                                                   {provider, symbol(rdram, ctx, runtime, tier.songs[s])}));
-                    pushBack(rdram, ctx, runtime, songs, &data, 4u, s_addresses->songsInsertOverflow, scratch);
-                    s_rowTiers.push_back(t);
-                    s_rowActive.push_back(open(t, s));
+                    if (open(t, s) || (gated && tier.encore && s + 1u == tier.songs.size()))
+                        rows.push_back({t, s});
+            }
+            Window &window = s_windows[selected()];
+            window.tiers.clear();
+            for (const Row &row : rows)
+                window.tiers.push_back(row.tier);
+            window.first = std::min(window.first, rows.empty() ? size_t{0} : rows.size() - 1u);
+            window.count = windowFrom(window.tiers, window.first);
+            for (size_t r = window.first; r < window.first + window.count; ++r)
+            {
+                const auto [t, s] = rows[r];
+                if (r == window.first || rows[r - 1u].tier != t)
+                {
+                    const uint32_t header[2] = {static_cast<uint32_t>(s_rowTiers.size()),
+                                                symbol(rdram, ctx, runtime, s_shown->tiers[t].header)};
+                    pushBack(rdram, ctx, runtime, headers, header, 8u, s_addresses->headersInsertOverflow, scratch);
                 }
+                const uint32_t data = static_cast<uint32_t>(
+                    runtime->callGuestFunction(rdram, ctx, s_addresses->songProviderGetSongData,
+                                               {provider, symbol(rdram, ctx, runtime, s_shown->tiers[t].songs[s])}));
+                pushBack(rdram, ctx, runtime, songs, &data, 4u, s_addresses->songsInsertOverflow, scratch);
+                s_rowTiers.push_back(t);
+                s_rowActive.push_back(open(t, s));
             }
             store<int32_t>(rdram, provider + 0x48u, static_cast<int32_t>(s_rowTiers.size()) - 1);
             SET_GPR_U32(ctx, 29, sp);
@@ -274,6 +325,9 @@ namespace gh2::setlists
                 const bool changed = s_setlists.count(name) != 0u && name != selected();
                 if (changed)
                     s_selected = name;
+                // The list opens on its first row, so its window does.
+                if (s_setlists.count(name) != 0u)
+                    s_windows[name].first = 0u;
                 return {changed ? 1u : 0u, script::kInt};
             }
             // The game played's own list is in its own scene, at the game's
@@ -284,7 +338,22 @@ namespace gh2::setlists
                         script::kSymbol};
             if (op == "shown")
                 return {symbol(call.rdram, call.ctx, call.runtime, selected()), script::kSymbol};
-            std::cerr << "[setlist] usage: {setlist select <name>}, {setlist look|shown}" << std::endl;
+            // The list's row now on: the row it is on once the window has
+            // moved to keep it away from either end, -1 if it has not.
+            if (op == "scroll")
+            {
+                Window &w = s_windows[selected()];
+                const size_t row = static_cast<size_t>(std::max(0, static_cast<int>(call.number(2))));
+                const size_t at = w.first + row;
+                const bool nearTop = row < kWindowEdge && w.first > 0u;
+                const bool nearEnd = row + kWindowEdge >= w.count && w.first + w.count < w.tiers.size();
+                if (!s_shown || at >= w.tiers.size() || (!nearTop && !nearEnd))
+                    return {static_cast<uint32_t>(-1), script::kInt};
+                w.first = windowAround(w.tiers, at);
+                return {static_cast<uint32_t>(at - w.first), script::kInt};
+            }
+            std::cerr << "[setlist] usage: {setlist select <name>}, {setlist scroll <row>}, {setlist look|shown}"
+                      << std::endl;
             return {};
         }
     }

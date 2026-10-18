@@ -76,10 +76,20 @@
       (update_pos
          {do
             ($pos {ss_song.lst selected_pos})
-            ($frame {+ $pos {song_provider num_headers $pos} {switch {setlist shown} (gh1 1) 0}})
+            ($moved {setlist scroll $pos})
+            ; A setlist held a window at a time moved along under the
+            ; highlight (content/setlists.h): the same song, its row the
+            ; window's.
+            {if {>= $moved 0}
+               {ss_song.lst set_provider song_provider}
+               {ss_song.lst set_selected $moved}
+               {set $pos $moved}
+            }
             {game set_song_index $pos}
             {song_preview {game get_song}}
-            {sel_song.view set_frame $frame}
+            {sel_song.view set_frame
+               {+ $pos {song_provider num_headers $pos} {switch {setlist shown} (gh1 1) 0}}
+            }
          }
       )
       ; The debug actions' cheats look the song up in the active campaign's

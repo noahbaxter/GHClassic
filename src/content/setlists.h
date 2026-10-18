@@ -9,6 +9,10 @@
 //   {setlist select <name>}  TRUE if it exists and was not already shown
 //   {setlist look}           the shown one's song list scene
 //   {setlist shown}          the shown one's name
+//   {setlist scroll <row>}   the row the list is on once a setlist too long
+//                            for the paper has moved its window along under
+//                            it, the provider to be filled again; -1 if it
+//                            has not moved
 //
 // Each is named for its game: gh2, gh80s.
 

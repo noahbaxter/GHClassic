@@ -1,0 +1,25 @@
+; A setlist longer than the song list's paper scrolls to its last song: the
+; strum held down walks the list, the paper moving along with the highlight.
+(needs gh2x)
+#include common/first_boot.dta
+{set $cheat_enabled_unlock_all 1}
+{campaign set_all_access 1}
+{set $disable_save 1}
+{set $disable_career 1}
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 2)
+{setlist select gh2x}
+{ui goto_screen qp_selsong_screen}
+(wait 2)
+(expect {setlist shown} gh2x)
+(shot top)
+; The strum, libpad's 0x40, held down the list.
+(hold 64)
+(wait 40)
+(hold 0)
+(wait 1)
+(print last song {game get_song})
+(shot bottom)
+(quit)
