@@ -89,6 +89,7 @@ namespace gh2::settings
             // can be hit from when the release stops muting.
             {"sustain_release_ms", Type::kInt, 0, 500, 5, 0},
             {"whammy_hold", Type::kBool, 0, 1, 1, 0},
+            {"strum_limit", Type::kBool, 0, 1, 1, 1},
             {"note_streak", Type::kBool, 0, 1, 1, 0},
             // 70 is Clone Hero's 7.0. The defaults are retail's: 43 is easy and
             // medium's own speed and 60 hard and expert's; the hyperspeed cheat
