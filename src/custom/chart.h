@@ -48,6 +48,10 @@ namespace gh2::custom
         uint32_t tick = 0u, length = 0u;
     };
 
+    // `ticks` (any order) as runs, each a span from its first to past its
+    // last by `tail`, a new one where two are more than `gap` apart.
+    std::vector<Span> runs(std::vector<uint32_t> ticks, uint32_t gap, uint32_t tail);
+
     struct Difficulty
     {
         std::vector<Gem> gems; // by tick
@@ -89,6 +93,13 @@ namespace gh2::custom
         std::vector<std::pair<uint32_t, std::array<uint8_t, 2>>> signatures; // numerator, denominator's log2
         std::vector<std::pair<uint32_t, std::string>> sections; // practice names, "Verse 1"
         std::map<Part, std::array<Difficulty, 4>> parts; // easy first
+        // PART DRUMS' or [ExpertDrums]' expert: its kicks, and every hit
+        // with them, each by tick.
+        std::vector<uint32_t> kicks, drums;
+        // When someone sings: PART VOCALS' phrases (105, 106), else runs
+        // of its notes or lyrics; .chart's [Events] phrase_start and
+        // phrase_end, else runs of its lyrics.
+        std::vector<Span> vocals;
         // .chart's [Song] Offset, in seconds: the audio's lead.
         double offset = 0.0;
         // The song's own HOPO threshold at 480 a beat, as GH2's songs.dta

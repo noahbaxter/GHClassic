@@ -354,6 +354,71 @@ namespace
 
     using midi::note;
 
+    // A .mid at 480 a beat and 120 BPM with one gem on PART GUITAR, then
+    // `more`; a .chart at 192 and 120 BPM with one; a chart at 480 and 120
+    // BPM with nothing; ticks the same at 480.
+    std::vector<uint8_t> oneGemMid(const std::vector<midi::Track> &more)
+    {
+        midi::Track tempo, guitar;
+        tempo.events.push_back({0u, midi::kMeta, midi::kTempo, {0x07u, 0xa1u, 0x20u}});
+        guitar.name = "PART GUITAR";
+        guitar.events = {note(0u, 96u, true), note(60u, 96u, false)};
+        midi::File file{1u, 480u, {tempo, guitar}};
+        file.tracks.insert(file.tracks.end(), more.begin(), more.end());
+        return midi::write(file);
+    }
+    const std::string kOneGemChart = "[Song]\n{\n  Resolution = 192\n}\n[SyncTrack]\n{\n  0 = B 120000\n}\n"
+                                     "[ExpertSingle]\n{\n  0 = N 0 0\n}\n";
+    Chart chart480()
+    {
+        Chart chart;
+        chart.resolution = 480u;
+        chart.tempos = {Tempo{}};
+        return chart;
+    }
+    const auto kSameTicks = [](uint32_t t) { return t; };
+
+    // The drums' expert hits and the singing, from a .mid's PART DRUMS and
+    // PART VOCALS (its phrases, else its notes' runs) and a .chart's
+    // [ExpertDrums] and lyrics.
+    void bandParts()
+    {
+        midi::Track drums, vocals;
+        drums.name = "PART DRUMS";
+        for (const auto &[tick, pitch] : std::vector<std::pair<uint32_t, uint8_t>>{{0u, 96u}, {480u, 97u}, {960u, 95u}, {960u, 99u}, {960u, 84u}})
+        {
+            drums.events.push_back(note(tick, pitch, true));
+            drums.events.push_back(note(tick + 60u, pitch, false));
+        }
+        vocals.name = "PART VOCALS";
+        // Notes only: two runs, a beat and four beats apart.
+        for (const uint32_t tick : {0u, 240u, 480u, 2880u, 3120u})
+        {
+            vocals.events.push_back(note(tick, 60u, true));
+            vocals.events.push_back(note(tick + 120u, 60u, false));
+        }
+        std::string why;
+        const auto mid = parseMid(oneGemMid({drums, vocals}), {}, why);
+        CHECK(mid && mid->kicks == std::vector<uint32_t>({0u, 960u}) &&
+              mid->drums == std::vector<uint32_t>({0u, 480u, 960u, 960u}));
+        CHECK(mid && mid->vocals.size() == 2u && mid->vocals[0].tick == 0u && mid->vocals[1].tick == 2880u);
+
+        // Its phrases where it has them.
+        vocals.events.push_back(note(100u, 105u, true));
+        vocals.events.push_back(note(700u, 105u, false));
+        std::stable_sort(vocals.events.begin(), vocals.events.end(),
+                         [](const midi::Event &a, const midi::Event &b) { return a.tick < b.tick; });
+        const auto phrased = parseMid(oneGemMid({drums, vocals}), {}, why);
+        CHECK(phrased && phrased->vocals.size() == 1u && phrased->vocals[0].tick == 100u && phrased->vocals[0].length == 600u);
+
+        const std::string text = kOneGemChart +
+                                 "[Events]\n{\n  0 = E \"phrase_start\"\n  96 = E \"lyric la\"\n  384 = E \"phrase_end\"\n}\n"
+                                 "[ExpertDrums]\n{\n  0 = N 0 0\n  192 = N 2 0\n  384 = N 32 0\n  384 = N 66 0\n}\n";
+        const auto chart = parseChart(text, {}, why);
+        CHECK(chart && chart->kicks == std::vector<uint32_t>({0u, 384u}) && chart->drums.size() == 3u);
+        CHECK(chart && chart->vocals.size() == 1u && chart->vocals[0].tick == 0u && chart->vocals[0].length == 384u);
+    }
+
     void midTypes()
     {
         midi::File file{1u, 480u, {}};
@@ -1061,6 +1126,7 @@ int main(int argc, char **argv)
     midMarkers();
     lanes();
     chartEdges();
+    bandParts();
     catalogOrder();
     catalogCopies();
     catalogCopiesByFolder();

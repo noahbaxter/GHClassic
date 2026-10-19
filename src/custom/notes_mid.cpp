@@ -10,6 +10,10 @@
 // velocity 41 to 50). Phase Shift's sysex, F0 'P' 'S' 0 0
 // <difficulty, FF all> <1 open, 4 tap> <1 on, 0 off> F7, marks opens and
 // taps too.
+//
+// Past the five-fret parts, each read only for the band to move by: the
+// drums' expert hits (PART DRUMS, [ExpertDrums]) and when there is
+// singing (PART VOCALS, or [Events]' phrase_start, phrase_end and lyric).
 
 #include "custom/chart.h"
 
@@ -189,6 +193,55 @@ namespace gh2::custom
             }
             return out;
         }
+
+        bool noteOn(const midi::Event &e) { return midi::kind(e) == midi::kNoteOn && e.data.size() >= 2u && e.data[1] > 0u; }
+        bool noteOff(const midi::Event &e)
+        {
+            return (midi::kind(e) == midi::kNoteOff ||
+                    (midi::kind(e) == midi::kNoteOn && e.data.size() >= 2u && e.data[1] == 0u)) &&
+                   !e.data.empty();
+        }
+
+        // PART DRUMS' expert: 96 the kick (95 the second pedal's), 97 to
+        // 100 the pads.
+        void midDrums(const midi::Track &track, Chart &chart)
+        {
+            for (const midi::Event &e : track.events)
+                if (noteOn(e) && e.data[0] >= 95u && e.data[0] <= 100u)
+                {
+                    if (e.data[0] <= 96u)
+                        chart.kicks.push_back(e.tick);
+                    chart.drums.push_back(e.tick);
+                }
+        }
+
+        // PART VOCALS: its phrases (105, 106) where it marks them, else its
+        // notes' runs (36 to 84), else its lyrics', two beats apart.
+        void midVocals(const midi::Track &track, Chart &chart)
+        {
+            std::map<uint8_t, uint32_t> on;
+            std::vector<uint32_t> notes, lyrics;
+            for (const midi::Event &e : track.events)
+            {
+                if (e.status == midi::kMeta && e.meta == midi::kLyric)
+                    lyrics.push_back(e.tick);
+                else if (noteOn(e))
+                {
+                    if (e.data[0] == 105u || e.data[0] == 106u)
+                        on[e.data[0]] = e.tick;
+                    else if (e.data[0] >= 36u && e.data[0] <= 84u)
+                        notes.push_back(e.tick);
+                }
+                else if (noteOff(e))
+                    if (const auto it = on.find(e.data[0]); it != on.end())
+                    {
+                        chart.vocals.push_back({it->second, e.tick - it->second});
+                        on.erase(it);
+                    }
+            }
+            if (chart.vocals.empty())
+                chart.vocals = phrasesFrom(notes.empty() ? lyrics : notes, chart.resolution);
+        }
     }
 
     std::optional<Chart> parseMid(const std::vector<uint8_t> &bytes, const Options &options, std::string &why)
@@ -228,6 +281,10 @@ namespace gh2::custom
                     if (e.status == midi::kMeta && e.meta == midi::kText)
                         if (auto name = sectionName(std::string(e.data.begin(), e.data.end())))
                             chart.sections.emplace_back(e.tick, *name);
+            if (track.name == "PART DRUMS" && chart.drums.empty())
+                midDrums(track, chart);
+            if (track.name == "PART VOCALS" && chart.vocals.empty())
+                midVocals(track, chart);
             const auto part = kMidParts.find(track.name);
             if (part == kMidParts.end() || chart.parts.count(part->second))
                 continue;

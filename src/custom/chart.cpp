@@ -20,6 +20,18 @@ namespace gh2::custom
 
     uint32_t Gem::longest() const { return *std::max_element(length.begin(), length.end()); }
 
+    std::vector<Span> runs(std::vector<uint32_t> ticks, uint32_t gap, uint32_t tail)
+    {
+        std::sort(ticks.begin(), ticks.end());
+        std::vector<Span> out;
+        for (const uint32_t t : ticks)
+            if (!out.empty() && t <= out.back().tick + out.back().length + gap)
+                out.back().length = std::max(out.back().length, t + tail - out.back().tick);
+            else
+                out.push_back({t, tail});
+        return out;
+    }
+
     double Chart::seconds(uint32_t tick) const
     {
         double at = 0.0;

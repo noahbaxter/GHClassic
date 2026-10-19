@@ -59,6 +59,8 @@ namespace gh2::custom
         Chart chart;
         std::map<std::pair<Part, size_t>, std::map<uint32_t, Raw>> rawsByTrack;
         std::map<std::pair<Part, size_t>, std::optional<uint32_t>> soloOn;
+        std::optional<uint32_t> phraseOn;
+        std::vector<uint32_t> lyrics;
         std::istringstream in(ini::withoutBom(text));
         std::string line, section;
         while (std::getline(in, line))
@@ -112,8 +114,32 @@ namespace gh2::custom
             if (section == "Events")
             {
                 if (type == "E")
-                    if (auto name = sectionName(unquoted(value.substr(1u))))
+                {
+                    const std::string text = unquoted(value.substr(1u));
+                    if (auto name = sectionName(text))
                         chart.sections.emplace_back(tick, *name);
+                    else if (text == "phrase_start")
+                        phraseOn = tick;
+                    else if (text == "phrase_end" && phraseOn)
+                    {
+                        chart.vocals.push_back({*phraseOn, tick - *phraseOn});
+                        phraseOn.reset();
+                    }
+                    else if (text.rfind("lyric", 0) == 0)
+                        lyrics.push_back(tick);
+                }
+                continue;
+            }
+            // 0 the kick (32 the second pedal's), 1 to 5 the pads.
+            if (section == "ExpertDrums")
+            {
+                int lane = -1;
+                if (type == "N" && (fields >> lane) && (lane == 0 || lane == 32 || (lane >= 1 && lane <= 5)))
+                {
+                    if (lane == 0 || lane == 32)
+                        chart.kicks.push_back(tick);
+                    chart.drums.push_back(tick);
+                }
                 continue;
             }
             const auto track = chartTrack(section);
@@ -168,6 +194,8 @@ namespace gh2::custom
         for (const auto &[track, raws] : rawsByTrack)
             settleGems(chart.parts[track.first][track.second], raws, chart.resolution, chart.hopoThreshold);
         std::erase_if(chart.parts, [](const auto &p) { return !hasGems(p.second); });
+        if (chart.vocals.empty())
+            chart.vocals = phrasesFrom(lyrics, chart.resolution);
         finish(chart);
         if (rawsByTrack.empty() && chart.sections.empty() && chart.tempos.size() == 1u)
         {

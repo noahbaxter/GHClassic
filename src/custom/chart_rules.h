@@ -43,7 +43,10 @@ namespace gh2::custom::rules
     // A section's practice name from an EVENTS text, or none.
     std::optional<std::string> sectionName(const std::string &text);
 
+    // Phrases where a chart marks none: the singing's runs, two beats apart.
+    std::vector<Span> phrasesFrom(const std::vector<uint32_t> &ticks, uint32_t resolution);
+
     // What reading either format ends with: tempos in order, one at 0;
-    // sections in order.
+    // sections, phrases and hits in order.
     void finish(Chart &chart);
 }

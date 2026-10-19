@@ -193,5 +193,13 @@ namespace gh2::custom::rules
             chart.tempos.insert(chart.tempos.begin(), Tempo{});
         std::stable_sort(chart.sections.begin(), chart.sections.end(),
                          [](const auto &a, const auto &b) { return a.first < b.first; });
+        std::stable_sort(chart.vocals.begin(), chart.vocals.end(), byTick);
+        for (std::vector<uint32_t> *hits : {&chart.kicks, &chart.drums})
+            std::sort(hits->begin(), hits->end());
+    }
+
+    std::vector<Span> phrasesFrom(const std::vector<uint32_t> &ticks, uint32_t resolution)
+    {
+        return runs(ticks, resolution * 2u, resolution / 2u);
     }
 }
