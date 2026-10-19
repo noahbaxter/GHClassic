@@ -209,6 +209,7 @@ set(GHC_GAME_SOURCES
     src/lefty_guitarist.cpp
     src/note_speed.cpp
     src/script.cpp
+    src/strum_limit.cpp
     src/sustain_release.cpp
     src/track_start.cpp
     src/whammy_hold.cpp

@@ -63,6 +63,7 @@
 #include "dev/transplant.h"
 #include "synth/synth.h"
 #include "settings/video_options.h"
+#include "strum_limit.h"
 #include "sustain_release.h"
 #include "track_start.h"
 #include "whammy_hold.h"
@@ -108,6 +109,7 @@ namespace
         gh2::installTrackStart(runtime, gh2::kSlus21447);
         gh2::installSustainRelease(runtime, gh2::kSlus21447);
         gh2::installWhammyHold(runtime, gh2::kSlus21447);
+        gh2::installStrumLimit(runtime, gh2::kSlus21447);
         // Off, neither is installed: the score and rock meters stay where
         // retail has them.
         if (gh2::settings::get(gh2::settings::kNoteStreak))
