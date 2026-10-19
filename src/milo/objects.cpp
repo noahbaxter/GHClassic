@@ -97,4 +97,16 @@ namespace gh2::milo
             return std::nullopt;
         return str(body, o);
     }
+
+    bool setMatDrawn(Bytes &body, uint32_t version, uint32_t blend, uint32_t zMode)
+    {
+        size_t o = 0u;
+        if (!enter(body, version, version == 25u ? 28u : 27u, o) || o + 4u + 16u + 2u + 4u > body.size())
+            return false;
+        const float white[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+        std::memcpy(body.data() + o, &blend, 4u);
+        std::memcpy(body.data() + o + 4u, white, 16u);
+        std::memcpy(body.data() + o + 4u + 16u + 2u, &zMode, 4u);
+        return true;
+    }
 }

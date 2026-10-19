@@ -10,6 +10,7 @@
     tools/ghc.py scenarios [-j 4] [--speed 2] [--review] [--discs gh2,gh1] [--releases] [name ...]
     tools/ghc.py release [--skip-build] [disc]  this platform's player package, into build/release
     tools/ghc.py ci                          what builds without a disc, into build/ci
+    tools/ghc.py procedural [name ...]       draw tools/procedural's pictures again
 
 play builds everything from the disc on its first run, then brings the C++
 build up to date before each launch (not the recompile) unless --no-build.
@@ -52,6 +53,11 @@ release packages a build for players, who bring their own disc: a zip of
 the game beside PUT_DISC_HERE on Windows and Linux, a disk image on macOS.
 It only writes build/release, named for the tag it is built at (v0.5);
 .github/workflows/release.yml runs it on each platform when a tag is pushed.
+
+procedural runs each script in tools/procedural, which draw pictures by rule:
+from nothing (a zebra rug's stripes and pile, a word in a traced font), into
+assets/ where the build embeds them, or by transforming art off the discs in
+game/, into build/procedural, never kept in the repo.
 """
 import argparse
 import hashlib
@@ -816,8 +822,22 @@ def cmd_release(argv):
     print(f"made {archive}")
 
 
+def cmd_procedural(argv):
+    """Each of tools/procedural's pictures, drawn again: the ones drawn from
+    nothing into assets/, the ones built on the discs' art into build/."""
+    parser = argparse.ArgumentParser(prog="ghc.py procedural")
+    parser.add_argument("names", nargs="*", help="only these, e.g. zebra_wall; default all")
+    args = parser.parse_args(argv)
+    scripts = sorted(p for p in (ROOT / "tools" / "procedural").glob("*.py") if "def main" in p.read_text())
+    for script in scripts:
+        if args.names and script.stem not in args.names:
+            continue
+        print(f"drawing {script.stem}")
+        subprocess.run([sys.executable, script], check=True)
+
+
 COMMANDS = {"play": cmd_play, "build": cmd_build, "bind": cmd_bind, "arm": cmd_arm, "record": cmd_record,
-            "scenarios": cmd_scenarios, "release": cmd_release, "ci": cmd_ci}
+            "scenarios": cmd_scenarios, "release": cmd_release, "ci": cmd_ci, "procedural": cmd_procedural}
 
 
 def main():

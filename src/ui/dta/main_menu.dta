@@ -30,8 +30,10 @@
       ; the bitmap font nearer full size and so sharper.
       (quit_width 0.44)
       (quit_height 0.72)
-      (quit_dx 47)
-      (quit_dz -14)
+      ; Per game, as the menus' rows sit 16 apart in GH1's and GH2's and 30
+      ; in the 80s': right under Options' right end, as GH1's, but in GH2's
+      ; drawn in from the monster at its right.
+      (quit_place ((gh1 (47 -14)) (gh2 (36 -13)) (gh80s (47 -26))))
       ; The build's version ($ghc_version, menus.cpp): a copy of the help
       ; bar's text, drawn with the menu but placed from the help bar's group,
       ; which gives it the help bar's size and faces it to the menu's light
@@ -72,7 +74,10 @@
                ; Update 0x28ccd8), so a group under it carries the size.
                {new Group quit.grp}
                {quit.grp set trans_parent $group}
-               {quit.grp set_local_pos {'+' $ox [quit_dx]} $oy {'+' $oz [quit_dz]}}
+               {do
+                  ($d {elem {find [quit_place] {campaigns active}} 1})
+                  {quit.grp set_local_pos {'+' $ox {elem $d 0}} $oy {'+' $oz {elem $d 1}}}
+               }
                {quit.grp set_local_scale [quit_width] 1 [quit_height]}
                {quit.btn set trans_parent quit.grp}
                {quit.btn set_local_pos 0 0 0}

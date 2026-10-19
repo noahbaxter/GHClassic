@@ -1,0 +1,4 @@
+#pragma once
+
+// assets/zebra/wall.bin (ui/zebra_wall.cpp): the 80s song list's wall tile.
+inline constexpr unsigned char kZebraWall[] = {@GHC_ZEBRA_WALL@};

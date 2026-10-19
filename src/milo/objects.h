@@ -48,4 +48,8 @@ namespace gh2::milo
 
     // The Tex a Mat body (revision 27 on PS2, 28 on 360) has as its diffuse.
     std::optional<std::string> matDiffuse(const Bytes &body, uint32_t version);
+
+    // A Mat body drawn in its Tex's own colours, opaque, with that blend
+    // and z mode (Mat's set blend and z_mode). False if it cannot be read.
+    bool setMatDrawn(Bytes &body, uint32_t version, uint32_t blend, uint32_t zMode);
 }
