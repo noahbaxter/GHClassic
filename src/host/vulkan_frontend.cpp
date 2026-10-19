@@ -623,7 +623,7 @@ namespace gh2
         const char *const *extensions = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
         auto instance = vkb::InstanceBuilder(vkGetInstanceProcAddr)
                             .set_app_name(title)
-                            .require_api_version(1, 2, 0)
+                            .require_api_version(1, 0, 0)
                             .enable_extensions(extensionCount, extensions)
                             .build();
         if (!instance)
@@ -639,7 +639,7 @@ namespace gh2
             return false;
         }
 
-        auto physical = vkb::PhysicalDeviceSelector(s.instance, s.surface).set_minimum_version(1, 2).select();
+        auto physical = vkb::PhysicalDeviceSelector(s.instance, s.surface).set_minimum_version(1, 0).select();
         if (!physical)
         {
             std::cerr << "[vulkan] device: " << physical.error().message() << std::endl;
@@ -686,7 +686,7 @@ namespace gh2
         functions.vkGetInstanceProcAddr = s.instance.fp_vkGetInstanceProcAddr;
         functions.vkGetDeviceProcAddr = s.device.fp_vkGetDeviceProcAddr;
         VmaAllocatorCreateInfo allocatorInfo{};
-        allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_2;
+        allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_0;
         allocatorInfo.physicalDevice = s.device.physical_device.physical_device;
         allocatorInfo.device = s.device.device;
         allocatorInfo.instance = s.instance.instance;
