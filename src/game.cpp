@@ -37,6 +37,7 @@
 #include "ui/slider_scale.h"
 #include "movie/movie.h"
 #include "dev/cheats.h"
+#include "hopo_lock.h"
 #include "lefty_guitarist.h"
 #include "note_speed.h"
 #include "streak/counter.h"
@@ -110,6 +111,7 @@ namespace
         gh2::installSustainRelease(runtime, gh2::kSlus21447);
         gh2::installWhammyHold(runtime, gh2::kSlus21447);
         gh2::installStrumLimit(runtime, gh2::kSlus21447);
+        gh2::installHopoLock(runtime, gh2::kSlus21447);
         // Off, neither is installed: the score and rock meters stay where
         // retail has them.
         if (gh2::settings::get(gh2::settings::kNoteStreak))

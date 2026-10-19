@@ -206,6 +206,7 @@ set(GHC_GAME_SOURCES
     src/build_info.cpp
     src/game.cpp
     src/frame_step.cpp
+    src/hopo_lock.cpp
     src/lefty_guitarist.cpp
     src/note_speed.cpp
     src/script.cpp

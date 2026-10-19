@@ -66,6 +66,7 @@ namespace gh2
         uint32_t sendWhammy;        // TrackWatcherImpl::SendWhammy
         uint32_t playerSetWhammyBar; // Player::SetWhammyBar
         uint32_t beatMatcherSwing;   // BeatMatcher::Swing(int slot, bool isStrum)
+        uint32_t guitarWatcherJumpHook; // GuitarTrackWatcherImpl::JumpHook
         uint32_t hudPanelEnter;      // HudPanel::Enter
         uint32_t bandScoreDisplaySetScore; // BandScoreDisplay::SetScore(int)
         uint32_t bandScoreDisplaySetDigitMat; // BandScoreDisplay::SetDigitMat(int, RndMat *)
@@ -312,6 +313,7 @@ namespace gh2
         .sendWhammy = 0x249b98u,
         .playerSetWhammyBar = 0x111d88u,
         .beatMatcherSwing = 0x2356b8u,
+        .guitarWatcherJumpHook = 0x24d4e0u,
         .hudPanelEnter = 0x12ba00u,
         .bandScoreDisplaySetScore = 0x291af8u,
         .bandScoreDisplaySetDigitMat = 0x291c48u,
