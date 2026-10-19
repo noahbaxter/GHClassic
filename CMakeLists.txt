@@ -175,6 +175,7 @@ add_executable(custom_chart_test EXCLUDE_FROM_ALL
     src/custom/notes_chart.cpp
     src/custom/notes_mid.cpp
     src/custom/song_ini.cpp
+    src/custom/stage/stage.cpp
     src/custom/text.cpp
     src/formats/md5.cpp
     src/formats/midi.cpp
@@ -311,6 +312,7 @@ set(GHC_GAME_SOURCES
     src/custom/song_files.cpp
     src/custom/song_ini.cpp
     src/custom/songs.cpp
+    src/custom/stage/stage.cpp
     src/custom/text.cpp
     src/dev/cheats.cpp
     src/dev/draw_dump.cpp

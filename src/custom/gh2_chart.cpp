@@ -1,6 +1,6 @@
 #include "custom/gh2_chart.h"
 
-#include "formats/midi.h"
+#include "custom/stage/stage.h"
 
 #include <algorithm>
 
@@ -185,7 +185,6 @@ namespace gh2::custom
         }
         for (const Span &s : lead[3].bigNotes)
             addNote(guitar, gh2Tick(s.tick), gh2Tick(uint64_t(s.tick) + s.length), kBigNote);
-        order(guitar);
 
         midi::Track events;
         events.name = "EVENTS";
@@ -203,13 +202,18 @@ namespace gh2::custom
         events.events.push_back(midi::text(kGh2Resolution * 8u, "[music_start]"));
 
         // Two beats past the last note, or the song's stated length.
-        midi::File file{1u, static_cast<uint16_t>(kGh2Resolution), {tempo, guitar, events}};
-        const midi::TempoMap tempos(file);
+        const midi::TempoMap tempos(midi::File{1u, static_cast<uint16_t>(kGh2Resolution), {tempo}});
         uint32_t end = last + kGh2Resolution * 2u;
         if (lengthSeconds > 0.0)
             end = std::max(end, tempos.tick(lengthSeconds));
-        file.tracks[2].events.push_back(midi::text(end, "[end]"));
-        order(file.tracks[2]);
+        events.events.push_back(midi::text(end, "[end]"));
+
+        std::vector<midi::Track> band = addStage({chart, lead[3], gh2Tick, end}, guitar, events);
+        midi::File file{1u, static_cast<uint16_t>(kGh2Resolution), {tempo, guitar, events}};
+        for (midi::Track &track : band)
+            file.tracks.push_back(std::move(track));
+        for (size_t t = 1u; t < file.tracks.size(); ++t)
+            order(file.tracks[t]);
         out.mid = midi::write(file);
         return out;
     }

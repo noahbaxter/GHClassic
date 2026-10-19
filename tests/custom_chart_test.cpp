@@ -11,6 +11,7 @@
 #include "custom/index.h"
 #include "custom/library.h"
 #include "custom/song_ini.h"
+#include "custom/stage/stage.h"
 #include "formats/md5.h"
 #include "formats/midi.h"
 #include "formats/sng.h"
@@ -255,9 +256,12 @@ namespace
         if (!gh2)
             return;
         const auto back = gh2::midi::parse(gh2->mid);
-        CHECK(back && back->division == 480u && back->tracks.size() == 3u);
-        if (!back || back->tracks.size() != 3u)
+        // Tempo, PART GUITAR, EVENTS, then the band's (custom/stage/stage.h).
+        CHECK(back && back->division == 480u && back->tracks.size() == 7u);
+        if (!back || back->tracks.size() != 7u)
             return;
+        CHECK(back->tracks[3].name == "BAND DRUMS" && back->tracks[4].name == "BAND BASS" &&
+              back->tracks[5].name == "BAND SINGER" && back->tracks[6].name == "TRIGGERS");
         std::map<uint8_t, std::vector<uint32_t>> ons;
         for (const midi::Event &e : back->tracks[1].events)
             if (midi::kind(e) == midi::kNoteOn)
@@ -419,6 +423,68 @@ namespace
         CHECK(chart && chart->vocals.size() == 1u && chart->vocals[0].tick == 0u && chart->vocals[0].length == 384u);
     }
 
+    // A track's texts at each tick, in order.
+    std::vector<std::pair<uint32_t, std::string>> textsOf(const midi::Track &track)
+    {
+        std::vector<std::pair<uint32_t, std::string>> out;
+        for (const midi::Event &e : track.events)
+            if (e.status == midi::kMeta && e.meta == midi::kText)
+                out.emplace_back(e.tick, std::string(e.data.begin(), e.data.end()));
+        return out;
+    }
+
+    // The band made from a chart: names less their numbers, a look by
+    // name or by how busy, the drummer on the beat with no drums, the
+    // singer only where there is singing, a bar's keyframe.
+    void stage()
+    {
+        CHECK(sectionBaseName("Verse 1A") == "verse" && sectionBaseName("chorus_2b") == "chorus" &&
+              sectionBaseName("Gtr Hook") == "gtr hook");
+        CHECK(sectionBaseName("verse1a") == "verse" && sectionBaseName("Solo") == "solo" && sectionBaseName("Outro") == "outro");
+
+        Chart chart = chart480();
+        Difficulty lead;
+        // Sparse in "Riff" and "Riff 2", busy in "Big Part": no name says.
+        for (uint32_t t = 0; t < 32u * 480u; t += 960u)
+            lead.gems.push_back({t, 1u});
+        for (uint32_t t = 32u * 480u; t < 48u * 480u; t += 120u)
+            lead.gems.push_back({t, 2u});
+        for (uint32_t t = 48u * 480u; t < 64u * 480u; t += 960u)
+            lead.gems.push_back({t, 1u});
+        chart.sections = {{0u, "Riff 1"}, {32u * 480u, "Big Part"}, {48u * 480u, "Riff 2"}};
+        chart.vocals = {{480u * 4u, 480u * 8u}};
+        midi::Track guitar, events;
+        const auto band = addStage({chart, lead, [](uint32_t t) { return t; }, 64u * 480u}, guitar, events);
+        CHECK(band.size() == 4u);
+        if (band.size() != 4u)
+            return;
+        const auto ev = textsOf(events);
+        const auto has = [&](uint32_t tick, const std::string &text)
+        { return std::find(ev.begin(), ev.end(), std::pair{tick, text}) != ev.end(); };
+        CHECK(has(0u, "[verse]") && has(32u * 480u, "[chorus]") && has(48u * 480u, "[verse]"));
+        // The same look for both riffs.
+        std::string first, second;
+        for (const auto &[tick, text] : ev)
+            if (text.rfind("[lighting", 0) == 0 && tick == 0u)
+                first = text;
+            else if (text.rfind("[lighting", 0) == 0 && tick == 48u * 480u)
+                second = text;
+        CHECK(!first.empty() && first == second);
+        const auto singer = textsOf(band[2]);
+        const std::vector<std::pair<uint32_t, std::string>> sung = {{1920u, "[play]"}, {5760u, "[idle]"}};
+        CHECK(singer == sung);
+        // No drums: a kick each beat while the band plays.
+        int kicks = 0, keys = 0;
+        for (const midi::Event &e : band[0].events)
+            kicks += midi::kind(e) == midi::kNoteOn && e.data[0] == 36u;
+        for (const midi::Event &e : band[3].events)
+            keys += midi::kind(e) == midi::kNoteOn && e.data[0] == 48u;
+        CHECK(kicks == 63); // beats 0 to 62, the last note's
+
+        CHECK(keys == 16);
+        CHECK(!textsOf(guitar).empty() && textsOf(guitar).front().second == "[play]");
+    }
+
     void midTypes()
     {
         midi::File file{1u, 480u, {}};
@@ -522,8 +588,8 @@ namespace
             // first player, 106 Expert's second, 110.
             const auto gh2 = toGh2(*gh, 0.0);
             const auto back = gh2 ? gh2::midi::parse(gh2->mid) : std::nullopt;
-            CHECK(back && back->tracks.size() == 3u);
-            if (back && back->tracks.size() == 3u)
+            CHECK(back && back->tracks.size() > 1u);
+            if (back && back->tracks.size() > 1u)
             {
                 const auto has = [&](uint8_t pitch, uint32_t tick)
                 {
@@ -548,8 +614,8 @@ namespace
             // Rock Band's 105 and 106 written onto every difficulty.
             const auto gh2 = toGh2(*rb, 0.0);
             const auto back = gh2 ? gh2::midi::parse(gh2->mid) : std::nullopt;
-            CHECK(back && back->tracks.size() == 3u);
-            if (back && back->tracks.size() == 3u)
+            CHECK(back && back->tracks.size() > 1u);
+            if (back && back->tracks.size() > 1u)
                 for (const uint8_t base : {60u, 72u, 84u, 96u})
                 {
                     const auto count = std::count_if(back->tracks[1].events.begin(), back->tracks[1].events.end(),
@@ -1127,6 +1193,7 @@ int main(int argc, char **argv)
     lanes();
     chartEdges();
     bandParts();
+    stage();
     catalogOrder();
     catalogCopies();
     catalogCopiesByFolder();
