@@ -2191,6 +2191,9 @@ namespace gh2
             imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
             imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
             imageInfo.usage = usage | VK_IMAGE_USAGE_SAMPLED_BIT;
+            // The scene pass leaves what it drew in TRANSFER_SRC_OPTIMAL.
+            if (pass == scenePass && (usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) != 0u)
+                imageInfo.usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
             VmaAllocationCreateInfo alloc{};
             alloc.usage = VMA_MEMORY_USAGE_AUTO;
             if (!check(vmaCreateImage(allocator, &imageInfo, &alloc, &out.image, &out.memory, nullptr), "post image"))
