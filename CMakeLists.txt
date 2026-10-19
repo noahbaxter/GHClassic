@@ -315,6 +315,7 @@ set(GHC_GAME_SOURCES
     src/ui/meta_music.cpp
     src/ui/photo_mode.cpp
     src/ui/slider_scale.cpp
+    src/ui/zebra_wall.cpp
     src/host/audio.cpp
     src/host/bind.cpp
     src/host/bindings.cpp
@@ -438,6 +439,11 @@ foreach(GHC_GAME gh1 gh2 gh80s)
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/classic/${GHC_GAME}.bin)
 endforeach()
 configure_file(src/ui/classic_logo.h.in "${GHC_DTA_DIR}/classic_logo.h" @ONLY)
+# The 80s song list's zebra wall (ui/zebra_wall.cpp), tools/procedural/zebra_wall.py's bitmap.
+file(READ assets/zebra/wall.bin GHC_ZEBRA_WALL HEX)
+string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_ZEBRA_WALL "${GHC_ZEBRA_WALL}")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/zebra/wall.bin)
+configure_file(src/ui/zebra_wall_bitmap.h.in "${GHC_DTA_DIR}/zebra_wall_bitmap.h" @ONLY)
 target_include_directories(GHClassic PRIVATE "${GHC_DTA_DIR}")
 
 # What the build is (src/build_info.h), from tools/ghc.py: the tag it was made

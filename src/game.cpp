@@ -27,6 +27,7 @@
 #include "gh2x/install.h"
 #include "ui/help_bar.h"
 #include "ui/classic_scene.h"
+#include "ui/zebra_wall.h"
 #include "settings/latency.h"
 #include "settings/settings.h"
 #include "ui/locale.h"
@@ -73,6 +74,8 @@ namespace
         gh2::ark::install(runtime, gh2::kSlus21447);
         gh2::installHeaps();
         gh2::installGuitarCopy();
+        // Before the 80s, whose setlist reads its song list scene.
+        gh2::installZebraWall();
         gh2::installEighties();
         gh2::installGh1();
         gh2::installClassicLogo();
