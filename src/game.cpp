@@ -26,6 +26,7 @@
 #include "gh80s/install.h"
 #include "gh2x/install.h"
 #include "ui/help_bar.h"
+#include "ui/classic_scene.h"
 #include "settings/latency.h"
 #include "settings/settings.h"
 #include "ui/locale.h"
@@ -74,6 +75,7 @@ namespace
         gh2::installGuitarCopy();
         gh2::installEighties();
         gh2::installGh1();
+        gh2::installClassicLogo();
         gh2::installGh2x();
         gh2::installHiddenGuitars();
         gh2::installGh1Face(runtime, gh2::kSlus21447);
