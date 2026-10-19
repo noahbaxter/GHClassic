@@ -4,7 +4,7 @@
 // only every fourth frame takes one: 15 strums a second, and 16.7 at PAL's 50.
 // On, this isn't installed and retail's check stands.
 
-#include "strum_limit.h"
+#include "gameplay/strum_limit.h"
 
 #include "guest.h"
 #include "ps2_runtime.h"

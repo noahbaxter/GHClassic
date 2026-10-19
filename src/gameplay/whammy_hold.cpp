@@ -1,7 +1,7 @@
 // whammy_hold: a whammy bar held down bends every sustain. Retail bends
 // only once the bar has been at rest since the last sustain ended.
 
-#include "whammy_hold.h"
+#include "gameplay/whammy_hold.h"
 
 #include "guest.h"
 #include "hook.h"

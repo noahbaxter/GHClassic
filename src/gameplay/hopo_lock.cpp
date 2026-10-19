@@ -3,7 +3,7 @@
 // the last such gem locked for good: a restart or a practice rewind plays
 // it again strum-only. Each jump unlocks it here, as a new song does.
 
-#include "hopo_lock.h"
+#include "gameplay/hopo_lock.h"
 
 #include "guest.h"
 #include "hook.h"

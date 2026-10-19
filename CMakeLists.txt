@@ -206,14 +206,8 @@ set(GHC_GAME_SOURCES
     src/build_info.cpp
     src/game.cpp
     src/frame_step.cpp
-    src/hopo_lock.cpp
     src/lefty_guitarist.cpp
-    src/note_speed.cpp
     src/script.cpp
-    src/strum_limit.cpp
-    src/sustain_release.cpp
-    src/track_start.cpp
-    src/whammy_hold.cpp
     src/worker.cpp
     src/content/band.cpp
     src/content/campaigns.cpp
@@ -252,6 +246,12 @@ set(GHC_GAME_SOURCES
     src/formats/dtb_text.cpp
     src/formats/dxt.cpp
     src/formats/midi.cpp
+    src/gameplay/hopo_lock.cpp
+    src/gameplay/note_speed.cpp
+    src/gameplay/strum_limit.cpp
+    src/gameplay/sustain_release.cpp
+    src/gameplay/track_start.cpp
+    src/gameplay/whammy_hold.cpp
     src/gh1/band.cpp
     src/gh1/cameras.cpp
     src/gh1/career.cpp

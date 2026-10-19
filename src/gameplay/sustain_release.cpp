@@ -2,7 +2,7 @@
 // track heard, as one held to its end does. Scoring takes its own sink
 // (Player::ReleaseGem, retail 0x111810) and is as retail's.
 
-#include "sustain_release.h"
+#include "gameplay/sustain_release.h"
 
 #include "hook.h"
 #include "settings/settings.h"

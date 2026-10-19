@@ -37,9 +37,9 @@
 #include "ui/slider_scale.h"
 #include "movie/movie.h"
 #include "dev/cheats.h"
-#include "hopo_lock.h"
+#include "gameplay/hopo_lock.h"
 #include "lefty_guitarist.h"
-#include "note_speed.h"
+#include "gameplay/note_speed.h"
 #include "streak/counter.h"
 #include "streak/note_streak.h"
 #include "dev/null_rnd.h"
@@ -64,10 +64,10 @@
 #include "dev/transplant.h"
 #include "synth/synth.h"
 #include "settings/video_options.h"
-#include "strum_limit.h"
-#include "sustain_release.h"
-#include "track_start.h"
-#include "whammy_hold.h"
+#include "gameplay/strum_limit.h"
+#include "gameplay/sustain_release.h"
+#include "gameplay/track_start.h"
+#include "gameplay/whammy_hold.h"
 
 namespace
 {
