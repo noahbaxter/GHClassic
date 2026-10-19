@@ -53,6 +53,18 @@ namespace gh2::milo
     // The first string in the root and bodies ending `suffix`.
     std::optional<std::string> findSuffix(const Dir &dir, const std::string &suffix);
 
+    // In one body: `from`, length-prefixed, as `to`. False if it has none.
+    bool replaceStr(Bytes &body, const std::string &from, const std::string &to);
+    // A list of names in a body (a Group's objects, a score display's
+    // meshes): where its count is, the list holding `name`. None when no
+    // such list holds it.
+    std::optional<size_t> listHolding(const Bytes &body, const std::string &name);
+    // `name` added to the list holding another, after or before it.
+    bool addAfter(Bytes &body, const std::string &after, const std::string &name);
+    bool addBefore(Bytes &body, const std::string &before, const std::string &name);
+    // `name` taken out of the list holding it.
+    bool remove(Bytes &body, const std::string &name);
+
     // A v24 file the game loads: uncompressed blocks, each whole objects.
     Bytes write(const Dir &dir);
 }
