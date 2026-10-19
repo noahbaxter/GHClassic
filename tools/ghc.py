@@ -11,6 +11,7 @@
     tools/ghc.py release [--skip-build] [disc]  this platform's player package, into build/release
     tools/ghc.py ci                          what builds without a disc, into build/ci
     tools/ghc.py procedural [name ...]       draw tools/procedural's pictures again
+    tools/ghc.py review [archive <folder> ... | archive --landed]  what review/ holds; put it away
 
 play builds everything from the disc on its first run, then brings the C++
 build up to date before each launch (not the recompile) unless --no-build.
@@ -35,14 +36,14 @@ runs/<date>_<time>_<scenario's name>, so runs sort oldest first and none
 overwrites another) gets run.log, frames/ (frame_0012.30s.png, seconds
 since launch), shots/ from the scenario's (shot name) steps, and on macOS
 stack.txt, a 3 s sample taken if it is still alive at --secs. The shots on
-one sheet go to the main checkout's review/ as <date>_<time>_<name>.png,
-where everything to look at goes. scenarios runs the files in scenarios/
+one sheet go to the main checkout's review/<branch>/ as
+<date>_<time>_<name>.png, where everything to look at goes. scenarios runs the files in scenarios/
 through arm side by side, the sheets staying in each run as shots.png unless
 --review: a run passes when it reaches its last step and quits with no FAIL
 or STALL in its log. Both clear runs/ of runs older than three days.
 
 record runs a scenario as arm does and makes it videos, picture and sound,
-in review/ as <date>_<time>_<scenario's name>.mp4: the game pipes each frame
+in review/<branch>/ as <date>_<time>_<scenario's name>.mp4: the game pipes each frame
 to ffmpeg as it draws and writes its mixed sound beside it, both on the
 game's clock, so it can run faster than real time. Without (record) steps the
 whole run is one video; with them, each (record on name) to (record off) is
@@ -58,6 +59,14 @@ procedural runs each script in tools/procedural, which draw pictures by rule:
 from nothing (a zebra rug's stripes and pile, a word in a traced font), into
 assets/ where the build embeds them, or by transforming art off the discs in
 game/, into build/procedural, never kept in the repo.
+
+review/ has a folder per branch, named for it with / as - (feature-dancer),
+holding what that branch's trees made; a detached tree's is
+detached-<commit>. review lists them with each branch's last commit and how
+it stands: checked out in a tree, landed in dev, or gone. archive moves
+folders into review/archive/, each video made small (540 lines, crf 30) and
+every still kept; --landed archives every folder whose branch landed or is
+gone.
 """
 import argparse
 import hashlib
@@ -414,12 +423,29 @@ def cmd_play(argv):
     return subprocess.run([str(game_binary()), disc, *args, *argv]).returncode
 
 
+REVIEW = main_checkout() / "review"
+# An archived video's size: small enough to keep, big enough to tell what it showed.
+ARCHIVE_VIDEO = ["-vf", "scale=-2:'min(540,ih)'", "-c:v", "libx264", "-preset", "veryfast", "-crf", "30",
+                 "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart"]
+
+
+def git_out(*args):
+    return subprocess.run(["git", *args], cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                          text=True).stdout.strip()
+
+
+def branch_folder(branch):
+    return branch.replace("/", "-")
+
+
 def review_path(what, suffix=".png"):
-    """Where something to look at goes: the main checkout's review/, flat and
-    named by when it was made, so it sorts by time."""
-    review = main_checkout() / "review"
-    review.mkdir(exist_ok=True)
-    return review / f"{time.strftime('%Y-%m-%d_%H%M')}_{what}{suffix}"
+    """Where something to look at goes: the main checkout's review/, in the
+    folder of the branch this tree has out (detached-<commit> off one), named
+    by when it was made, so it sorts by time."""
+    branch = git_out("branch", "--show-current")
+    folder = branch_folder(branch) if branch else f"detached-{git_out('rev-parse', '--short', 'HEAD') or 'tree'}"
+    (REVIEW / folder).mkdir(parents=True, exist_ok=True)
+    return REVIEW / folder / f"{time.strftime('%Y-%m-%d_%H%M')}_{what}{suffix}"
 
 
 def prune_runs(days=3):
@@ -836,8 +862,107 @@ def cmd_procedural(argv):
         subprocess.run([sys.executable, script], check=True)
 
 
+def human(size):
+    return f"{size / 1e9:.1f}G" if size >= 1e9 else f"{size / 1e6:.0f}M"
+
+
+def files_in(folder):
+    return [f for f in folder.rglob("*") if f.is_file() and not f.name.startswith(".")]
+
+
+def review_branches():
+    """Each local branch by its review/ folder's name, with its last commit's
+    subject and how it stands: checked out in some tree, landed (no commit
+    dev lacks), or neither."""
+    checked_out = {line.split()[1].removeprefix("refs/heads/")
+                   for line in git_out("worktree", "list", "--porcelain").splitlines() if line.startswith("branch ")}
+    branches = {}
+    for line in git_out("for-each-ref", "--format=%(refname:short)\t%(contents:subject)", "refs/heads").splitlines():
+        branch, subject = line.split("\t", 1)
+        if branch in checked_out:
+            state = "checked out"
+        elif not any(c.startswith("+") for c in git_out("cherry", "dev", branch).splitlines()):
+            state = "landed"
+        else:
+            state = "not checked out"
+        branches[branch_folder(branch)] = (state, subject)
+    return branches
+
+
+def archive_folder(folder):
+    """A review/ folder into review/archive/, each video made small and every
+    still kept as it is."""
+    target = REVIEW / "archive" / folder.name
+    # A folder archived again goes beside the first.
+    stem, again = target.name, 2
+    while target.exists():
+        target, again = target.with_name(f"{stem}_{again}"), again + 1
+    target.parent.mkdir(exist_ok=True)
+    before = sum(f.stat().st_size for f in files_in(folder))
+    shutil.move(folder, target)
+    for video in sorted(target.rglob("*.mp4")):
+        small = video.with_suffix(".small.mp4")
+        cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", video, *ARCHIVE_VIDEO, small]
+        if subprocess.run(cmd).returncode == 0 and small.stat().st_size < video.stat().st_size:
+            small.replace(video)
+        else:
+            small.unlink(missing_ok=True)
+    after = sum(f.stat().st_size for f in files_in(target))
+    print(f"archived {folder.name}: {human(before)} -> {human(after)}")
+
+
+def cmd_review(argv):
+    """review/'s folders and what each is for; archive puts them away."""
+    parser = argparse.ArgumentParser(prog="ghc.py review")
+    parser.add_argument("action", nargs="?", choices=["archive"])
+    parser.add_argument("folders", nargs="*", help="review/ folders to archive")
+    parser.add_argument("--landed", action="store_true",
+                        help="with archive, every folder whose branch landed in dev or is gone")
+    args = parser.parse_args(argv)
+    REVIEW.mkdir(exist_ok=True)
+    branches = review_branches()
+    folders = sorted(p for p in REVIEW.iterdir() if p.is_dir() and p.name != "archive")
+
+    def state(folder):
+        if folder.name.startswith("detached-"):
+            return "detached tree", ""
+        return branches.get(folder.name, ("no branch", ""))
+
+    if args.action == "archive":
+        if args.landed:
+            picked = [f for f in folders if state(f)[0] in ("landed", "no branch")]
+        else:
+            picked = [REVIEW / name for name in args.folders]
+        if not picked:
+            sys.exit("nothing to archive: name folders, or --landed")
+        if any(next(f.rglob("*.mp4"), None) for f in picked if f.is_dir()) and not shutil.which("ffmpeg"):
+            sys.exit("archive needs ffmpeg to make videos small")
+        for folder in picked:
+            if not folder.is_dir():
+                sys.exit(f"no folder {folder}")
+            archive_folder(folder)
+        return
+
+    print(f"{'folder':44} {'files':>6} {'size':>6}  branch")
+    for folder in folders:
+        files = files_in(folder)
+        how, subject = state(folder)
+        size = human(sum(f.stat().st_size for f in files))
+        print(f"{folder.name:44} {len(files):6} {size:>6}  {how}{': ' + subject if subject else ''}")
+    loose = [f for f in REVIEW.iterdir() if f.is_file() and not f.name.startswith(".")]
+    if loose:
+        size = human(sum(f.stat().st_size for f in loose))
+        print(f"{'(loose)':44} {len(loose):6} {size:>6}  in no branch's folder: move each into one")
+    archived = REVIEW / "archive"
+    if archived.is_dir():
+        files = files_in(archived)
+        size = human(sum(f.stat().st_size for f in files))
+        print(f"{'archive/':44} {len(files):6} {size:>6}  {sum(1 for p in archived.iterdir() if p.is_dir())} folders")
+
+
 COMMANDS = {"play": cmd_play, "build": cmd_build, "bind": cmd_bind, "arm": cmd_arm, "record": cmd_record,
-            "scenarios": cmd_scenarios, "release": cmd_release, "ci": cmd_ci, "procedural": cmd_procedural}
+            "scenarios": cmd_scenarios, "release": cmd_release, "ci": cmd_ci, "procedural": cmd_procedural,
+            "review": cmd_review}
 
 
 def main():
