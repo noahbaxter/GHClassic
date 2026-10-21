@@ -9,6 +9,7 @@
 #include "worker.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <chrono>
 #include <cstdlib>
@@ -65,6 +66,10 @@ namespace gh2::textures
         std::unordered_map<uint32_t, std::shared_ptr<Fetch>> s_fetches;
         Clock::time_point s_now{}; // as the last frame ended
         constexpr auto kFetchHold = std::chrono::seconds(10);
+
+        // What get() has cost the game thread (reads()).
+        std::atomic<uint64_t> s_readCount{0};
+        std::atomic<uint64_t> s_readNs{0};
 
         bool same(const Source &a, const Source &b)
         {
@@ -363,14 +368,30 @@ namespace gh2::textures
                 s_fetches.erase(ahead);
             }
         }
+        // Read here, or waited for from the worker, the game's frame held
+        // up meanwhile.
+        const Clock::time_point began = Clock::now();
+        bool here = !fetch;
         std::shared_ptr<const TextureData> data;
         if (fetch)
         {
-            std::call_once(fetch->once, [&] { fetch->data = readEdited(id, source, s_open); });
+            std::call_once(fetch->once, [&]
+            {
+                here = true;
+                fetch->data = readEdited(id, source, s_open);
+            });
             data = fetch->data;
         }
         else
             data = readEdited(id, source, s_open);
+        const auto took = std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - began).count();
+        s_readNs += static_cast<uint64_t>(took);
+        if (here)
+        {
+            ++s_readCount;
+            std::cerr << "[textures] read " << source.path << " " << source.tex << " in " << took / 1000000
+                      << " ms on the game thread" << std::endl;
+        }
         if (!data)
             std::cerr << "[textures] cannot read " << source.path << " " << source.tex << std::endl;
         const std::lock_guard lock(s_mutex);
@@ -410,5 +431,10 @@ namespace gh2::textures
         const std::lock_guard lock(s_mutex);
         s_now = Clock::now();
         std::erase_if(s_fetches, [](const auto &fetch) { return fetch.second->asked + kFetchHold < s_now; });
+    }
+
+    Reads reads()
+    {
+        return {s_readCount.load(), s_readNs.load()};
     }
 }

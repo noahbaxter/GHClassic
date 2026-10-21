@@ -59,4 +59,14 @@ namespace gh2::textures
 
     // The scene file payloads were last read from is let go.
     void endFrame();
+
+    // What get() has held the game thread up for since the run began: the
+    // payloads it read itself, and its time reading them or waiting on the
+    // worker's. Any thread.
+    struct Reads
+    {
+        uint64_t count = 0;
+        uint64_t ns = 0;
+    };
+    Reads reads();
 }
