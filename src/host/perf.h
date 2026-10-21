@@ -30,9 +30,10 @@ namespace gh2::perf
     class Times
     {
     public:
-        // A frame presented, by what it waited for the game's frame, what
-        // recording its draws took, and the GPU's passes.
-        void add(float waitMs, float recordMs, const SceneStats &scene);
+        // A frame presented, whether it shows a new game frame, by what it
+        // waited for the game's frame, what recording its draws took, and the
+        // GPU's passes.
+        void add(bool isNew, float waitMs, float recordMs, const SceneStats &scene);
 
         // The panel for `level`, each of its pixels `scale` of the picture's
         // across: RGBA8, `width` by `height`. Empty for kOff.
@@ -55,6 +56,11 @@ namespace gh2::perf
         float m_gpu[std::size(kGpuSpans)]{};
 
         std::vector<float> m_all, m_allWait, m_allRecord, m_allGpu[std::size(kGpuSpans)];
+        // How long each game frame stayed on screen: a stalled game thread
+        // repeats the picture at full rate, which the frame times above
+        // cannot see.
+        std::chrono::steady_clock::time_point m_lastNew{};
+        std::vector<float> m_allHeld;
         std::vector<uint8_t> m_small, m_pixels;
     };
 }

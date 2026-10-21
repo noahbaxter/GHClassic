@@ -973,7 +973,7 @@ namespace gh2
             if (presented == VK_ERROR_OUT_OF_DATE_KHR || presented == VK_SUBOPTIMAL_KHR)
                 s.swapchainStale = true;
         }
-        s.times.add(static_cast<float>(State::FrameLog::ms(waitEnd - acquireEnd)),
+        s.times.add(isNew || moviePlaying, static_cast<float>(State::FrameLog::ms(waitEnd - acquireEnd)),
                     static_cast<float>(State::FrameLog::ms(recordEnd - recordStart)),
                     moviePlaying ? SceneStats{} : s.scene.stats());
         if (s.frameLog.on)
