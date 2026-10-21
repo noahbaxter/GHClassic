@@ -69,11 +69,13 @@
 //                              game's venues: its world files and its venues'
 //                              scripts, until another or the game played's
 //                              own are asked for, or a switch. Outside a
-//                              career the screens around a song, the HUD and
-//                              the loading tips are in_song_ui's game's, the
-//                              venue's by default, and the gems gems' game's,
-//                              the in-song look's by default (settings.h)
+//                              career the screens around a song, its highway
+//                              (gems, strikeline and HUD) and the loading
+//                              tips are in_song_ui's game's, the venue's by
+//                              default (settings.h); in one, its own, under
+//                              either note engine
 //   {campaigns venue_game}     whose venues those are
+//   {campaigns highway}        whose highway the songs have
 //   {campaigns read_text}      every campaign's text read now, as the boot
 //                              does, so none is read mid-screen
 //
@@ -141,6 +143,9 @@ namespace gh2::campaigns
     // In a career, where every pick is its own game's: the game's mode is
     // career, however it got there.
     bool inCareer(uint8_t *rdram);
+    // From any thread: whether the song's highway (gems, strikeline and HUD)
+    // is GH1's, which gh1::addHighway's scenes are made for.
+    bool gh1Highway();
 
     void install(PS2Runtime &runtime, const Addresses &addresses);
 }

@@ -16,9 +16,8 @@
 //   {quickplay look <character> [<outfit>]}  the outfit last looked at on
 //                                    that character in quickplay's picker
 //   {quickplay in_song_ui [<venue|gh1|gh2|gh80s>]}  whose screens around a
-//                                    song and HUD outside a career, kept in
+//                                    song and highway outside a career, kept in
 //                                    settings.ini (content/campaigns.h)
-//   {quickplay gems [<auto|gh1|gh2>]}  and whose gems
 //   {quickplay menu_music [<theme|gh1|gh2|gh80s|all>]}  whose menu loops
 //                                    outside a career, from the next change
 //                                    of menus (content/campaigns.h)

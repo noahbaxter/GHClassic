@@ -181,4 +181,10 @@ namespace gh2
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
         std::cerr << "[gh1] " << done.size() << " outfits built in " << ms << " ms" << std::endl;
     }
+
+    void installGh1Highway()
+    {
+        if (const auto gh1Disc = games::disc("gh1"))
+            gh1::addHighway(*gh1Disc);
+    }
 }

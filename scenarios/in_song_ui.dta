@@ -1,7 +1,8 @@
-; Outside a career a song's screens around it, HUD and gems are the venue's
-; game's by default (in_song_ui venue, gems auto): GH2's song in GH1's
-; basement has GH1's loading, pause, results and gems. in_song_ui gh2 keeps
-; the room GH1's and the rest GH2's; gems gh1 gives GH1's gems in GH2's room.
+; Outside a career a song's screens around it and its highway (gems,
+; strikeline and HUD) are the venue's game's by default (in_song_ui venue):
+; GH2's song in GH1's basement has GH1's loading, pause, results and
+; highway. in_song_ui gh2 keeps the room GH1's and the rest GH2's. The note
+; engine judges and changes none of it: GH1's in GH2's room is all GH2's.
 (needs gh1)
 #include common/first_boot.dta
 {quickplay song_defaults 0}
@@ -12,14 +13,15 @@
 {game set_quickplay}
 {game set_venue battle}
 
-; The venue's game, GH1's, for everything.
+; The venue's game, GH1's, for the screens.
 (expect {quickplay in_song_ui} venue)
-(expect {quickplay gems} auto)
+(expect {note_engine} gh2)
 {campaigns venues_from gh1}
 {ui goto_screen loading_screen}
 (wait 0.5)
 (shot gh1_loading)
 (wait_screen game_screen 60)
+(expect {campaigns highway} gh1)
 (wait 40)
 (shot gh1_song)
 {ui goto_screen pause_screen}
@@ -35,7 +37,7 @@
 {meta_loading_nosave_goto main_screen}
 (wait_screen main_screen 60)
 
-; GH1's room, GH2's screens around it and gems.
+; GH1's room, GH2's screens around it.
 {quickplay in_song_ui gh2}
 (expect {quickplay in_song_ui} gh2)
 {gamecfg set mode quickplay}
@@ -46,6 +48,7 @@
 (wait 0.5)
 (shot gh2ui_loading)
 (wait_screen game_screen 60)
+(expect {campaigns highway} gh2)
 (wait 40)
 (shot gh2ui_song)
 {ui goto_screen pause_screen}
@@ -57,18 +60,18 @@
 {meta_loading_nosave_goto main_screen}
 (wait_screen main_screen 60)
 
-; GH2's room and screens, GH1's gems.
+; GH2's room, screens and highway, under GH1's engine.
 {quickplay in_song_ui venue}
-{quickplay gems gh1}
+(expect {note_engine set gh1} 1)
 {gamecfg set mode quickplay}
 {game set_quickplay}
 {game set_venue battle}
 {campaigns venues_from gh2}
 {ui goto_screen loading_screen}
 (wait_screen game_screen 60)
+(expect {campaigns highway} gh2)
 (wait 40)
-(shot gh1gems_song)
+(shot gh1engine_song)
 {meta_loading_nosave_goto main_screen}
 (wait_screen main_screen 60)
-{quickplay gems auto}
 (quit)

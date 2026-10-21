@@ -111,7 +111,6 @@ namespace gh2::settings
             // straight to the song.
             {"song_defaults", Type::kBool, 0, 1, 1, 1},
             {"in_song_ui", Type::kChoice, 0, 3, 1, kInSongVenue, "venue gh1 gh2 gh80s"},
-            {"gems", Type::kChoice, 0, 2, 1, kGemsAuto, "auto gh1 gh2"},
             {"menu_music", Type::kChoice, 0, 4, 1, kMusicTheme, "theme gh1 gh2 gh80s all"},
             // Retail plays one loop over and over.
             {"menu_music_order", Type::kChoice, 0, 2, 1, kOrderLoop, "playlist loop shuffle"},
