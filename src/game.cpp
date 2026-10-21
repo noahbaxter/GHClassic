@@ -40,6 +40,7 @@
 #include "gameplay/hopo_lock.h"
 #include "lefty_guitarist.h"
 #include "gameplay/note_speed.h"
+#include "gameplay/note_engine/note_engine.h"
 #include "streak/counter.h"
 #include "streak/note_streak.h"
 #include "dev/null_rnd.h"
@@ -110,7 +111,6 @@ namespace
         gh2::installTrackStart(runtime, gh2::kSlus21447);
         gh2::installSustainRelease(runtime, gh2::kSlus21447);
         gh2::installWhammyHold(runtime, gh2::kSlus21447);
-        gh2::installStrumLimit(runtime, gh2::kSlus21447);
         gh2::installHopoLock(runtime, gh2::kSlus21447);
         // Off, neither is installed: the score and rock meters stay where
         // retail has them.
@@ -120,6 +120,10 @@ namespace
             gh2::installStreakCounter(runtime, gh2::kSlus21447);
         }
         gh2::installFontBake();
+        gh2::installNoteEngine(runtime, gh2::kSlus21447);
+        // After the note engine, whose hook on BeatMatcher::Swing it wraps:
+        // a strum it drops never reaches the engine.
+        gh2::installStrumLimit(runtime, gh2::kSlus21447);
         gh2::installTourOrHigher(runtime, gh2::kSlus21447);
         gh2::installNoteSpeed(runtime, gh2::kSlus21447);
         gh2::slider_scale::install(runtime, gh2::kSlus21447);

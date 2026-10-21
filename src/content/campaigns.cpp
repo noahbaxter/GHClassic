@@ -5,6 +5,7 @@
 #include "content/setlists.h"
 #include "disc/ark.h"
 #include "formats/dtb.h"
+#include "gameplay/note_engine/note_engine.h"
 #include "guest.h"
 #include "hook.h"
 #include "save/save.h"
@@ -671,6 +672,9 @@ namespace gh2::campaigns
         // way that game is the theme from then on, kept for the next boot.
         bool goTo(const script::Call &call, size_t index, bool career)
         {
+            // Under the engine picked, in a career or out of one, before any
+            // game changes.
+            judgeNoteEngine(pickedNoteEngine(), call.rdram, call.ctx, call.runtime);
             s_career = career;
             s_theme = index;
             if (career ? index != s_active : s_active != 0u)
@@ -719,11 +723,11 @@ namespace gh2::campaigns
         // How far band `slot` is through `game`'s career, 0 to 100: its
         // career songs passed on the difficulty that has passed most of
         // them, as a share of the career's.
-        int progress(const std::string &game, int slot)
+        int progress(const std::string &game, int slot, std::optional<NoteEngine> engine)
         {
             const std::vector<std::string> career = setlists::careerSongs(game);
             size_t most = 0u;
-            for (const std::set<std::string> &passed : save::passedSongs(game, slot))
+            for (const std::set<std::string> &passed : save::passedSongs(game, slot, engine))
             {
                 size_t count = 0u;
                 for (const std::string &song : career)
@@ -881,7 +885,9 @@ namespace gh2::campaigns
                 // The career being played as it stands, not as last saved.
                 if (call.symbol(2) == active())
                     save::leaveGame(call.rdram, call.ctx, call.runtime);
-                return {static_cast<uint32_t>(progress(call.symbol(2), static_cast<int>(call.number(3)))), script::kInt};
+                return {static_cast<uint32_t>(progress(call.symbol(2), static_cast<int>(call.number(3)),
+                                                       noteEngineNamed(call.size() > 4 ? call.symbol(4) : ""))),
+                        script::kInt};
             }
             if (op == "count")
                 return {static_cast<uint32_t>(s_campaigns.size()), script::kInt};
@@ -938,7 +944,7 @@ namespace gh2::campaigns
                 const bool career = call.symbol(4) == "career";
                 if (!index)
                     return {0u, script::kInt};
-                if (!changes(*index, career))
+                if (!changes(*index, career) && pickedNoteEngine() == noteEngine())
                 {
                     s_career = career;
                     s_theme = *index;
@@ -949,7 +955,8 @@ namespace gh2::campaigns
                 return {1u, script::kInt};
             }
             std::cerr << "[campaign] usage: {campaigns active|live|count}, {campaigns has <game>}, "
-                         "{campaigns switch <game> [<screen> [career|menus]]}"
+                         "{campaigns switch <game> [<screen> [career|menus]]}, "
+                         "{campaigns progress <game> <band> [<engine>]}"
                       << std::endl;
             return {};
         }
@@ -1131,6 +1138,11 @@ namespace gh2::campaigns
     const std::string &active()
     {
         return s_campaigns[s_active].game;
+    }
+
+    bool career()
+    {
+        return s_career;
     }
 
     std::vector<std::string> games()

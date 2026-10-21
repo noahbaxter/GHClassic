@@ -247,6 +247,10 @@ set(GHC_GAME_SOURCES
     src/formats/dxt.cpp
     src/formats/midi.cpp
     src/gameplay/hopo_lock.cpp
+    src/gameplay/note_engine/gh1_scoring.cpp
+    src/gameplay/note_engine/gh1_star_power.cpp
+    src/gameplay/note_engine/gh1_watcher.cpp
+    src/gameplay/note_engine/note_engine.cpp
     src/gameplay/note_speed.cpp
     src/gameplay/strum_limit.cpp
     src/gameplay/sustain_release.cpp

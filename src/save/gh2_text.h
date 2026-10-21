@@ -16,6 +16,9 @@
 // An item's value lists its flags (store, unlocked, passed, or locked) and,
 // for a song, score=, stars=, gold and trickle=. A song another game brings
 // keeps its scores in that game's sections: [gh1 scores expert].
+//
+// Under a note engine other than GH2's (note_engine.h), each game's name
+// carries it: [band 1 gh2@gh1 expert], [gh1@gh1 scores expert].
 
 #include "save/gh2_stream.h"
 #include "save/store.h"

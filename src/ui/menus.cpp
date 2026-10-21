@@ -49,5 +49,8 @@ namespace gh2
         locale::add("setlist_gh2", "GH2");
         locale::add("setlist_gh2x", "GH2X");
         locale::add("setlist_gh80s", "80s");
+        // Placeholders: the note engine (note_engine.h) shown and picked.
+        locale::add("ghc_engine_gh1", "ENGINE GH1");
+        locale::add("ghc_engine_gh2", "ENGINE GH2");
     }
 }
