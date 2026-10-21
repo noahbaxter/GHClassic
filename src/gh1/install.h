@@ -7,4 +7,7 @@ namespace gh2
     // character. And its songs as quickplay's GH1 setlist. After
     // ark::install, which indexes the discs.
     void installGh1();
+    // And its highway and HUD (gh1::addHighway), after
+    // every other install that changes those scenes.
+    void installGh1Highway();
 }

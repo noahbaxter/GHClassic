@@ -20,7 +20,7 @@
 //               scripts fitted to them
 //   music       GH1's menu loops
 //   sound       GH1's stingers, for every game, and credits music (gh1/sound.h)
-//   gems        GH1's colours on GH2's track (addGems)
+//   highway     GH1's art and colours on GH2's track and HUD (addHighway)
 
 #include "gh1/career.h"
 
@@ -43,6 +43,8 @@
 #include <cstring>
 #include <iostream>
 #include <map>
+#include <memory>
+#include <optional>
 #include <set>
 
 namespace gh2::gh1
@@ -51,6 +53,8 @@ namespace gh2::gh1
     {
         using dtb::array;
         using dtb::symbol;
+        using milo::str;
+        using milo::u32;
 
         std::string keyOf(const dtb::Node &node)
         {
@@ -106,25 +110,142 @@ namespace gh2::gh1
             return file ? dtb::raw(*file) : std::nullopt;
         }
 
-        // GH1's gems: GH2's track, whose gem meshes are GH1's, with GH1's
-        // colours in its gem.tex, flat and bright where GH2's are shaded.
-        // track/textures/gen/gem.png is the bitmap GH1's track.rnd holds.
-        void addGems(size_t layer, size_t disc)
+        // A Tex's size and bits a pixel, and where its bitmap starts: GH1's
+        // Tex 8 has them from 4, GH2's 10 from 13 (texWith), then its file's
+        // path and nine bytes.
+        struct TexFile
         {
-            constexpr const char *kTrack = "track/gen/track.milo_ps2";
-            const auto bitmap = ark::readFile(disc, "track/textures/gen/gem.png_ps2");
-            const auto file = ark::readFile(0u, kTrack);
-            auto track = file ? milo::read(*file) : std::nullopt;
-            const auto tex = track ? milo::find(*track, "gem.tex") : std::nullopt;
-            milo::Bytes gems = bitmap && tex ? texWith(track->bodies[*tex], *bitmap, true) : milo::Bytes();
-            if (gems.empty())
-            {
-                std::cerr << "[gh1] cannot make GH1's gems" << std::endl;
-                return;
-            }
-            track->bodies[*tex] = std::move(gems);
-            ark::addFile(layer, kTrack, milo::write(*track));
+            uint32_t width = 0, height = 0, bpp = 0;
+            size_t bitmap = 0;
+        };
+        std::optional<TexFile> texFile(const milo::Bytes &b)
+        {
+            const size_t at = u32(b, 0u) >= 10u ? 13u : 4u;
+            if (b.size() < at + 16u)
+                return std::nullopt;
+            TexFile t;
+            t.width = u32(b, at);
+            t.height = u32(b, at + 4u);
+            t.bpp = u32(b, at + 8u);
+            size_t o = at + 12u;
+            str(b, o);
+            t.bitmap = o + 9u;
+            if (t.bitmap > b.size())
+                return std::nullopt;
+            return t;
         }
+
+        // A Mat's first texture, blend and colour: where GH1's Mat 21 has
+        // them past its stages (each 60 bytes and a texture's name), and
+        // where GH2's 27 has them past its name.
+        struct MatLook
+        {
+            size_t blend = 0; // the blend, then the colour's four floats
+            size_t texAt = 0; // its texture's name, GH2's
+            std::string tex;
+        };
+        std::optional<MatLook> gh1Mat(const milo::Bytes &b)
+        {
+            MatLook m;
+            size_t o = 4u;
+            const uint32_t stages = u32(b, o);
+            o += 4u;
+            for (uint32_t i = 0; i < stages && o < b.size(); ++i)
+            {
+                o += 60u;
+                const std::string tex = str(b, o);
+                if (i == 0u)
+                    m.tex = tex;
+            }
+            m.blend = o;
+            return o + 20u <= b.size() ? std::optional(m) : std::nullopt;
+        }
+        std::optional<MatLook> gh2Mat(const milo::Bytes &b)
+        {
+            MatLook m;
+            size_t o = 8u;
+            str(b, o);
+            if (o >= b.size() || b[o] != 0u)
+                return std::nullopt;
+            m.blend = o + 1u;
+            m.texAt = m.blend + 4u + 16u + 2u + 4u + 2u + 4u + 4u + 48u;
+            size_t end = m.texAt;
+            if (end + 4u > b.size())
+                return std::nullopt;
+            m.tex = str(b, end);
+            return m;
+        }
+
+        // A scene of GH2's highway or HUD, as the game gets it, with GH1's
+        // art where GH1's scene has the same, or none where nothing changes.
+        // A Tex of GH1's of the same name and size gives its pixels (gem.tex's
+        // colours flat and bright where GH2's are shaded, the rock meter's
+        // face, star power's bolts); a Mat of GH1's of the same name its
+        // blend and colour, where it draws the same texture or one the scene
+        // has, which it is then given.
+        std::optional<milo::Bytes> withGh1(const milo::Dir &gh1, const std::string &path)
+        {
+            const auto file = ark::readFile(0u, path);
+            auto scene = file ? milo::read(*file) : std::nullopt;
+            if (!scene)
+                return std::nullopt;
+            // GH1's bitmaps are its own quantising of mostly the same
+            // pictures, so most of them differ in their bytes alone.
+            std::string changed;
+            size_t texs = 0u;
+            for (size_t i = 0; i < scene->entries.size(); ++i)
+            {
+                const auto &[cls, object] = scene->entries[i];
+                const auto theirs = cls == "Tex" || cls == "Mat" ? milo::find(gh1, object) : std::nullopt;
+                if (!theirs || gh1.entries[*theirs].first != cls)
+                    continue;
+                milo::Bytes &body = scene->bodies[i];
+                const milo::Bytes &their = gh1.bodies[*theirs];
+                if (cls == "Tex")
+                {
+                    const auto a = texFile(body), b = texFile(their);
+                    if (!a || !b || a->width != b->width || a->height != b->height || a->bpp != b->bpp ||
+                        std::equal(body.begin() + static_cast<std::ptrdiff_t>(a->bitmap), body.end(),
+                                   their.begin() + static_cast<std::ptrdiff_t>(b->bitmap), their.end()))
+                        continue;
+                    milo::Bytes made =
+                        texWith(body, milo::Bytes(their.begin() + static_cast<std::ptrdiff_t>(b->bitmap), their.end()), false);
+                    if (made.empty())
+                        continue;
+                    body = std::move(made);
+                    ++texs;
+                    continue;
+                }
+                const auto a = gh2Mat(body), b = gh1Mat(their);
+                if (!a || !b)
+                    continue;
+                // Another texture than GH1's: one the scene has, else not GH1's look.
+                if (!a->tex.empty() && a->tex != b->tex)
+                {
+                    if (b->tex.empty() || !milo::find(*scene, b->tex))
+                        continue;
+                    size_t end = a->texAt;
+                    str(body, end);
+                    milo::Bytes named(body.begin(), body.begin() + static_cast<std::ptrdiff_t>(a->texAt));
+                    const uint32_t n = static_cast<uint32_t>(b->tex.size());
+                    named.insert(named.end(), reinterpret_cast<const uint8_t *>(&n), reinterpret_cast<const uint8_t *>(&n) + 4);
+                    named.insert(named.end(), b->tex.begin(), b->tex.end());
+                    named.insert(named.end(), body.begin() + static_cast<std::ptrdiff_t>(end), body.end());
+                    body = std::move(named);
+                }
+                else if (std::equal(body.begin() + static_cast<std::ptrdiff_t>(a->blend),
+                                    body.begin() + static_cast<std::ptrdiff_t>(a->blend + 20u),
+                                    their.begin() + static_cast<std::ptrdiff_t>(b->blend)))
+                    continue;
+                std::memcpy(body.data() + a->blend, their.data() + b->blend, 20u);
+                changed += " " + object;
+            }
+            if (changed.empty() && texs == 0u)
+                return std::nullopt;
+            std::cerr << "[gh1] " << path << ": " << texs << " bitmaps," << changed << std::endl;
+            return milo::write(*scene);
+        }
+
 
         // `key` with a part of it that is a GH1 name (whole, or set off by
         // underscores) as GH2's for the same thing, or none if it has no
@@ -386,7 +507,6 @@ namespace gh2::gh1
         for (const std::string &video : videos)
             ark::lend(layer, "videos/" + video, disc, "videos/" + video);
         addSounds(layer, disc);
-        addGems(layer, disc);
         const std::set<std::string> scenes = addMenus(layer, disc, text);
         for (dtb::Node &entry : locale->nodes)
             if (const auto it = text.find(keyOf(entry)); entry.type == dtb::kArray && entry.nodes.size() > 1u && it != text.end())
@@ -469,5 +589,35 @@ namespace gh2::gh1
                                      std::move(*file));
         addVenues(layer, disc);
         campaigns::add("gh1", layer);
+    }
+
+    void addHighway(size_t disc)
+    {
+        const std::pair<const char *, std::vector<std::string>> kScenes[] = {
+            {"track/gen/track.rnd_ps2", {"track/gen/track.milo_ps2"}},
+            {"hud/gen/hud.rnd_ps2", ark::paths(0u, "hud/gen/")},
+        };
+        for (const auto &[from, paths] : kScenes)
+        {
+            // GH1's scene, read the first time one of these is made.
+            const auto gh1 = std::make_shared<std::optional<milo::Dir>>();
+            for (const std::string &path : paths)
+            {
+                // Co-op's scenes stay GH2's: GH1 has no co-op.
+                const std::string name = path.substr(path.find_last_of('/') + 1u);
+                if (!ends(path, ".milo_ps2") || name.rfind("coop_", 0) == 0)
+                    continue;
+                ark::addMade(
+                    0u, path,
+                    [disc, from = std::string(from), path, gh1]() -> std::optional<ark::Made>
+                    {
+                        if (!*gh1)
+                            *gh1 = loadScene(disc, from);
+                        auto bytes = *gh1 ? withGh1(**gh1, path) : std::nullopt;
+                        return bytes ? std::optional(ark::held(std::move(*bytes))) : std::nullopt;
+                    },
+                    [] { return campaigns::gh1Highway(); });
+            }
+        }
     }
 }

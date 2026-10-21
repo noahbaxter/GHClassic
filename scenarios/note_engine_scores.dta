@@ -1,0 +1,42 @@
+; High scores under each note engine (note_engine.h) their own: a score set
+; under one is not under the other, either way, and both come back from
+; save.bin.
+#include common/first_boot.dta
+(expect {note_engine} gh2)
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty expert}
+{highscores get_highscore 0 $name $score}
+(expect $name Reiko)
+{highscores add GHTWO 222222}
+{highscores get_highscore 0 $name $score}
+(expect $name GHTWO)
+
+(expect {note_engine set gh1} 1)
+{highscores get_highscore 0 $name $score}
+(expect $name Reiko)
+{highscores add GHONE 111111}
+{highscores get_highscore 0 $name $score}
+(expect $name GHONE)
+
+(expect {note_engine set gh2} 1)
+{highscores get_highscore 0 $name $score}
+(expect $name GHTWO)
+{highscores get_highscore 1 $name $score}
+(expect $name Reiko)
+
+; Saved and loaded under each.
+{campaign mark_needs_save}
+{autosave_goto main_screen}
+(wait_screen autosave)
+(wait_screen main_screen)
+{ui goto_screen bootup_load}
+(wait_screen guitar_help_screen)
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty expert}
+{highscores get_highscore 0 $name $score}
+(expect $name GHTWO)
+(expect {note_engine set gh1} 1)
+{highscores get_highscore 0 $name $score}
+(expect $name GHONE)
+(expect $score 111111)
+(quit)

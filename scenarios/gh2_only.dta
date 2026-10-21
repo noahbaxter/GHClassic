@@ -1,0 +1,41 @@
+; GH2's disc alone (ghc.py scenarios --discs gh2): nothing offers another
+; game or GH1's note engine. No theme on the main screen's help bar, no
+; setlist or engine on quickplay's, no campaign picker before a career, the
+; engine's row off in Game Settings.
+#include common/first_boot.dta
+(expect {campaigns count} 1)
+(expect {note_engine choices} 1)
+(expect {note_engine} gh2)
+(expect {note_engine pick gh1} 0)
+(expect {note_engine set gh1} 0)
+(expect {note_engine picked} gh2)
+(wait 1)
+(shot main_menu)
+
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 2)
+(shot quickplay_songs)
+(press blue)
+(wait 1)
+(expect {note_engine} gh2)
+
+{ui goto_screen game_settings_screen}
+(wait_screen game_settings_screen)
+(wait 1)
+(expect {== {gm_lag.btn get nav_down} {game_settings_panel find gm_engine.btn}} 0)
+(shot options_game)
+
+; A band leads straight to the difficulty: no campaign picker.
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+{gamecfg set mode career}
+{campaign set_profile_name "The Testers" 0}
+{ui goto_screen chooseprof_screen}
+(wait_screen chooseprof_screen)
+(press green)
+(wait_screen sel_difficulty_screen)
+(wait 1)
+(shot career_difficulty)
+(quit)

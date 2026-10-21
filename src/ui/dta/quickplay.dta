@@ -17,8 +17,9 @@
       $lists
    }
 }
-; The yellow fret shows only where there is another setlist. Set from the
-; screen's enter, after the help bar's own has put up the screen's default.
+; The yellow fret shows only where there is another setlist; blue names the
+; note engine quickplay judges by, and changes it. Set from the screen's
+; enter, after the help bar's own has put up the screen's default.
 {func ghc_qp_helpbar
    {do
       ($array)
@@ -27,6 +28,9 @@
       {push_back $array (fret1 help_continue)}
       {push_back $array (fret2 help_back)}
       {if {> {size {ghc_setlists}} 1} {push_back $array (fret3 ghc_setlist)}}
+      {if {> {note_engine choices} 1}
+         {push_back $array {if_else {== gh1 {note_engine}} (fret4 ghc_engine_gh1) (fret4 ghc_engine_gh2)}}
+      }
       {push_back $array (strum help_updown)}
       {helpbar set_display $array}
    }
@@ -120,6 +124,12 @@
       )
       ({&& {== $button kPad_Circle} {> {size {ghc_setlists}} 1} {! {ui in_transition}}}
          {ghc_pick_panel open_with {ghc_setlists} {setlist shown}}
+         TRUE
+      )
+      ({&& {== $button kPad_Square} {> {note_engine choices} 1} {! {ui in_transition}}}
+         {synth play_sequence button_toggle}
+         {note_engine set {note_engine next {note_engine}}}
+         {ghc_qp_helpbar}
          TRUE
       )
       ({&& {== $button kPad_Select} {! {ui in_transition}}}

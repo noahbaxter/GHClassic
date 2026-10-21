@@ -40,6 +40,7 @@
 #include "gameplay/hopo_lock.h"
 #include "lefty_guitarist.h"
 #include "gameplay/note_speed.h"
+#include "gameplay/note_engine/note_engine.h"
 #include "streak/counter.h"
 #include "streak/note_streak.h"
 #include "dev/null_rnd.h"
@@ -59,6 +60,7 @@
 #include "save/card.h"
 #include "save/save.h"
 #include "dev/scenario.h"
+#include "dev/scripted_play.h"
 #include "script.h"
 #include "dev/seed.h"
 #include "dev/transplant.h"
@@ -110,7 +112,6 @@ namespace
         gh2::installTrackStart(runtime, gh2::kSlus21447);
         gh2::installSustainRelease(runtime, gh2::kSlus21447);
         gh2::installWhammyHold(runtime, gh2::kSlus21447);
-        gh2::installStrumLimit(runtime, gh2::kSlus21447);
         gh2::installHopoLock(runtime, gh2::kSlus21447);
         // Off, neither is installed: the score and rock meters stay where
         // retail has them.
@@ -120,6 +121,10 @@ namespace
             gh2::installStreakCounter(runtime, gh2::kSlus21447);
         }
         gh2::installFontBake();
+        gh2::installNoteEngine(runtime, gh2::kSlus21447);
+        // After the note engine, whose hook on BeatMatcher::Swing it wraps:
+        // a strum it drops never reaches the engine.
+        gh2::installStrumLimit(runtime, gh2::kSlus21447);
         gh2::installTourOrHigher(runtime, gh2::kSlus21447);
         gh2::installNoteSpeed(runtime, gh2::kSlus21447);
         gh2::slider_scale::install(runtime, gh2::kSlus21447);
@@ -137,6 +142,9 @@ namespace
         gh2::installHelpBar(runtime, gh2::kSlus21447);
         // After the help bar, which recolours its scene's own pixels.
         gh2::installGh2xAssets(runtime, gh2::kSlus21447);
+        // After the 360's scenes, the streak counter and the font bake: its
+        // highway starts from theirs, and is served over the 360's.
+        gh2::installGh1Highway();
         gh2::setlists::install(runtime, gh2::kSlus21447);
         gh2::encores::install(runtime, gh2::kSlus21447);
         gh2::status_line::install(runtime, gh2::kSlus21447);
@@ -145,6 +153,7 @@ namespace
         gh2::games::install(runtime, gh2::kSlus21447);
         gh2::campaigns::install(runtime, gh2::kSlus21447);
         gh2::scenario::install(runtime, gh2::kSlus21447);
+        gh2::scripted_play::install(runtime, gh2::kSlus21447);
         gh2::transplant::install(runtime, gh2::kSlus21447);
         gh2::cheats::install(runtime, gh2::kSlus21447);
         gh2::fast_boot::install(runtime, gh2::kSlus21447);

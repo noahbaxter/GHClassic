@@ -1,0 +1,183 @@
+; The note engine (note_engine.h): one picked for everything, GH2's at
+; first. Yellow on the campaign picker changes it for every career, which is
+; played under it, kept apart from the same career under the other. Game
+; Settings' engine row is off in a career and changes it outside one, in a
+; song starting it again; blue on quickplay's song list changes it too.
+(needs gh1)
+#include common/first_boot.dta
+(expect {note_engine} gh2)
+(expect {note_engine picked} gh2)
+(expect {note_engine locked} 0)
+
+; Options' Game Settings: the engine's row, lit.
+{ui goto_screen game_settings_screen}
+(wait_screen game_settings_screen)
+(wait 1)
+(press down)
+(press down)
+(press down)
+(press down)
+(press down)
+(wait 1)
+(shot options_game_engine_lit)
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+
+; Yellow on the picker: GH1's for every career.
+{gamecfg set mode career}
+{campaign set_profile_name "The Testers" 0}
+{ui goto_screen chooseprof_screen}
+(wait_screen chooseprof_screen)
+(press green)
+(wait_screen ghc_campaign_screen)
+(wait 1)
+{set $pick gh2}
+#include common/pick_campaign.dta
+(shot campaigns_gh2)
+(press yellow)
+(wait 1)
+(expect {note_engine picked} gh1)
+(shot campaigns_gh1)
+(press green)
+(wait_screen sel_difficulty_screen)
+(expect {campaigns active} gh2)
+(expect {note_engine} gh1)
+(wait 1)
+(press down)
+(press green)
+(wait_screen sel_character_new_screen)
+(wait_until {char_single are_chars_loaded})
+(wait 1)
+(press green)
+(wait_screen sel_guitar_new_screen)
+(wait 3)
+(press green)
+(wait_until
+   {&& {! {ui in_transition}}
+      {|| {== {ui current_screen} tour_start_screen} {== {ui current_screen} career_screen}}} 40)
+(wait 1)
+{if {== {ui current_screen} tour_start_screen} {autosave_goto career_screen}}
+(wait_screen career_screen 40)
+(wait 1)
+(press green)
+(wait_screen sel_venue_screen 40)
+(wait 1)
+(press green)
+(wait_screen sel_song_screen)
+(wait 1)
+{set $index 0}
+#include common/career_song.dta
+(wait 15)
+; Off in a career: it cannot be set, and down from the lag row is round.
+{ui goto_screen pause_screen}
+(wait_screen pause_screen 20)
+{ui goto_screen pause_game_settings_screen}
+(wait_screen pause_game_settings_screen 20)
+(wait 2)
+(shot career_pause_game)
+(expect {note_engine locked} 1)
+(expect {note_engine set gh2} 0)
+(expect {note_engine} gh1)
+(expect {== {gm_lag.btn get nav_down} {pause_game_settings_panel find gm_engine.btn}} 0)
+{ui goto_screen pause_screen}
+(wait_screen pause_screen 20)
+(press green)
+(wait_screen game_screen 20)
+{player0 win 5}
+#include common/career_song_done.dta
+(expect {> {campaigns progress gh2 0 gh1} 0} 1)
+(expect {campaigns progress gh2 0 gh2} 0)
+
+; Out of the career: still the one picked, each career's progress its own.
+{ui goto_screen main_screen}
+(wait_screen main_screen 60)
+(wait 2)
+(expect {campaigns live} gh2)
+(expect {note_engine} gh1)
+(expect {note_engine locked} 0)
+(expect {> {campaigns progress gh2 0 gh1} 0} 1)
+(expect {campaigns progress gh2 0 gh2} 0)
+
+; Blue on quickplay's song list.
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 2)
+(shot quickplay_gh1)
+(press blue)
+(wait 1)
+(expect {note_engine} gh2)
+(expect {note_engine picked} gh2)
+(shot quickplay_gh2)
+(press blue)
+(wait 1)
+(expect {note_engine} gh1)
+
+; The row in a quickplay song: GH1's, then picked, GH2's and the song again.
+{quickplay song_defaults 0}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_song shoutatthedevil}
+{game set_quickplay}
+{game set_venue battle}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 15)
+{ui goto_screen pause_screen}
+(wait_screen pause_screen 20)
+{ui goto_screen pause_game_settings_screen}
+(wait_screen pause_game_settings_screen 20)
+(wait 2)
+; Expert's speed alone, so down from it: length, P1, the lag row, this.
+(press down)
+(press down)
+(press down)
+(press down)
+(wait 1)
+(shot quickplay_pause_game_gh1)
+(press green)
+(wait_screen game_screen 60)
+(expect {note_engine} gh2)
+(expect {note_engine picked} gh2)
+
+; GH1's scenes' Game Settings, in GH1's basement.
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+{gamecfg set mode quickplay}
+{game set_quickplay}
+{game set_venue battle}
+{campaigns venues_from gh1}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 15)
+{ui goto_screen pause_screen}
+(wait_screen pause_screen 20)
+{ui goto_screen pause_game_settings_screen}
+(wait_screen pause_game_settings_screen 20)
+(wait 2)
+(press down)
+(press down)
+(press down)
+(press down)
+(wait 1)
+(shot gh1_pause_game)
+
+; GH1's menus: Options' Game Settings and the campaigns.
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+{set $ghc_switch gh1}
+{set $ghc_switch_next main_screen}
+{set $ghc_switch_as menus}
+{ui goto_screen ghc_switch_screen}
+(wait_until {&& {== {campaigns active} gh1} {== {ui current_screen} main_screen} {! {ui in_transition}}} 60)
+{ui goto_screen game_settings_screen}
+(wait_screen game_settings_screen)
+(wait 2)
+(shot gh1_options_game)
+{gamecfg set mode career}
+{campaign set_profile_slot 0}
+{ui goto_screen ghc_campaign_screen}
+(wait_screen ghc_campaign_screen)
+(wait 2)
+(shot gh1_campaigns)
+(quit)

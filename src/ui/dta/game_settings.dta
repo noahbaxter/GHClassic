@@ -620,6 +620,7 @@
          (gm_p1.btn 3 "P1" gm_p1.lbl)
          (gm_p2.btn 3 "P2" gm_p2.lbl)
          (gm_lag.btn 4 "CALIBRATE LAG" gm_lag.lbl)
+         (gm_engine.btn 5 "ENGINE GH2" gm_engine.lbl)
       )
    )
    ; What a row does when it is lit. A button's text swells and its letters
@@ -693,7 +694,21 @@
       }
       ; P2 off leads to itself, so up from the lag row finds P1.
       {gm_p2.btn set nav_down {if_else {$this two_players} gm_lag.btn gm_p2.btn}}
-      {gm_lag.btn set nav_down gs_band.sld}
+      ; The note engine's row is off in a career, whose engine is picked
+      ; with it, and with no other to pick (GH1's needs its disc), and
+      ; leads to itself, so down from the lag row is round.
+      {if_else {|| {note_engine locked} {< {note_engine choices} 2}}
+         {do
+            {gm_engine.btn set_state kDisabled}
+            {gm_engine.btn set nav_down gm_engine.btn}
+            {gm_lag.btn set nav_down gs_band.sld}
+         }
+         {do
+            {gm_engine.btn set_state kNormal}
+            {gm_lag.btn set nav_down gm_engine.btn}
+            {gm_engine.btn set nav_down gs_band.sld}
+         }
+      }
       {foreach $row
          (
             (gs_band.sld gs_easy.lbl "E/M SPEED" gs_easy.grp)
@@ -807,7 +822,7 @@
             ; The third under the two, where some scenes have it to one side.
             {gs_sfx.sld set_local_pos $sx $y {'+' $top {'*' 2 $gap}}}
             ; A button: its row, where its text starts from the sliders, its
-            ; text. The last is centred on that.
+            ; text. The last two are centred on that.
             {foreach $row [rows]
                {do
                   ($b {elem $row 0})
@@ -827,8 +842,8 @@
                      }
                      {{$this find $b} set fit_text 0}
                   }
-                  {{$this find $b} set alignment {if_else {== $i 3} 34 33}}
-                  {{$this find $b} set text_size {if_else {== $i 3} {$this look lag_size} {$this look lefty_size}}}
+                  {{$this find $b} set alignment {if_else {>= $i 3} 34 33}}
+                  {{$this find $b} set text_size {if_else {>= $i 3} {$this look lag_size} {$this look lefty_size}}}
                   {{$this find $b} set_local_pos {'+' $sx {elem {$this look text_x} $i}} $y
                      {'+' {'+' $top {'*' {elem $row 1} $gap}} {$this look text_dz}}}
                   {{$this find $b} set_showing TRUE}
@@ -907,13 +922,18 @@
    )
    (sync_look
       {$this sync_numbers}
+      ; A token with no string reads as itself: GH1's scenes in a song have
+      ; none of ours.
+      {if {exists gm_engine.btn}
+         {gm_engine.btn set text_token {if_else {== gh1 {note_engine}} "ENGINE GH1" "ENGINE GH2"}}
+      }
       {$this sync_rows}
       {helpbar set_display
          {if_else {$this slider_selected}
             ((fret1 help_confirm) (fret2 help_cancel) (fret3 help_reset) (strum help_updown))
             {if_else {$this on_slider}
                ((fret1 help_select) (fret2 help_back) (fret3 help_reset) (strum help_updown))
-               {if_else {== [at] "gm_lag.btn"}
+               {if_else {|| {== [at] "gm_lag.btn"} {== [at] "gm_engine.btn"}}
                   ((fret1 help_select) (fret2 help_back) (strum help_updown))
                   ((fret1 help_onoff) (fret2 help_back) (strum help_updown))
                }
@@ -1086,6 +1106,12 @@
                (gm_p1.btn {gm_p1.chk toggle} {options set_lefty 0 {gm_p1.chk get_check}} {$this retrack})
                (gm_p2.btn {gm_p2.chk toggle} {options set_lefty 1 {gm_p2.chk get_check}} {$this retrack})
                (gm_lag.btn {lag_panel set from_panel $this} {ui goto_screen [lag_screen]})
+               ; Judged from the next song loaded: in one, this one again.
+               (gm_engine.btn
+                  {if {&& {note_engine set {note_engine next {note_engine}}} {$this in_song}}
+                     {pause_screen restart}
+                  }
+               )
             }
             {synth play_sequence button_toggle}
             {$this sync_look}
@@ -1121,16 +1147,16 @@
    (value_shrink 0.72)
    (value_dip 1)
    (value_tilt 4)
-   (pitch 0.9)
-   (block (0.88 0 12))
-   (text_x (-124 54 132 35))
+   (pitch 0.75)
+   (block (0.88 0 30))
+   (text_x (-124 54 132 35 35))
    (box_x (26 104))
    (text_dz 0)
    (box_dz 0)
    (lefty_size 21)
    (lag_size 30)
-   (fit (0 0 0 0))
-   (gh1 ((lefty_size 29) (lag_size 44) (fit (0 24 24 250)) (text_x (-132 74 142 35)) (box_x (52 120))))
+   (fit (0 0 0 0 0))
+   (gh1 ((block (0.88 0 12)) (lefty_size 29) (lag_size 44) (fit (0 24 24 250 250)) (text_x (-132 74 142 35 35)) (box_x (52 120))))
    (lag_screen lag_screen)
    ; As the main menu has it for its two-player row (main.dta).
    (two_players {! {game is_missing_multi_controller}})
@@ -1159,16 +1185,16 @@
    (value_shrink 0.8)
    (value_dip 1)
    (value_tilt 4)
-   (pitch 0.9)
-   (block (0.88 0 12))
-   (text_x (-124 54 132 35))
+   (pitch 0.75)
+   (block (0.88 0 30))
+   (text_x (-124 54 132 35 35))
    (box_x (26 104))
    (text_dz 0)
    (box_dz 0)
    (lefty_size 21)
    (lag_size 30)
-   (fit (0 0 0 0))
-   (gh1 ((block (0.88 16 -2)) (lefty_size 29) (lag_size 44) (fit (0 24 24 250)) (text_x (-132 74 148 35)) (box_x (52 126)) (tune_bg (-183 -5 26.4 1.4))))
+   (fit (0 0 0 0 0))
+   (gh1 ((block (0.88 16 -2)) (lefty_size 29) (lag_size 44) (fit (0 24 24 250 250)) (text_x (-132 74 148 35 35)) (box_x (52 126)) (tune_bg (-183 -5 26.4 1.4))))
    (lag_screen pause_lag_screen)
    (two_players {> {game num_players} 1})
    GAME_SETTINGS_HANDLERS
