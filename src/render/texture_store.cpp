@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
@@ -52,16 +53,18 @@ namespace gh2::textures
 
         // A payload read ahead of its first draw (prefetch): by whichever
         // thread comes to it first, the other waiting. Held until a draw
-        // takes it, or for kFetchFrames.
+        // takes it, or for kFetchHold. In time, not frames: a frame count is
+        // shorter the higher the frame rate.
+        using Clock = std::chrono::steady_clock;
         struct Fetch
         {
             std::once_flag once;
             std::shared_ptr<const TextureData> data;
-            uint64_t asked = 0;
+            Clock::time_point asked{};
         };
         std::unordered_map<uint32_t, std::shared_ptr<Fetch>> s_fetches;
-        uint64_t s_frame = 0;
-        constexpr uint64_t kFetchFrames = 600;
+        Clock::time_point s_now{}; // as the last frame ended
+        constexpr auto kFetchHold = std::chrono::seconds(10);
 
         bool same(const Source &a, const Source &b)
         {
@@ -386,7 +389,7 @@ namespace gh2::textures
                 if (found == s_payloads.end() || !found->second.data.expired() || s_fetches.contains(id))
                     continue;
                 auto fetch = std::make_shared<Fetch>();
-                fetch->asked = s_frame;
+                fetch->asked = s_now;
                 s_fetches[id] = fetch;
                 wanted.emplace_back(id, found->second.source, std::move(fetch));
             }
@@ -405,7 +408,7 @@ namespace gh2::textures
     {
         s_open.reset();
         const std::lock_guard lock(s_mutex);
-        ++s_frame;
-        std::erase_if(s_fetches, [](const auto &fetch) { return fetch.second->asked + kFetchFrames < s_frame; });
+        s_now = Clock::now();
+        std::erase_if(s_fetches, [](const auto &fetch) { return fetch.second->asked + kFetchHold < s_now; });
     }
 }

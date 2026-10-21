@@ -36,10 +36,13 @@ namespace gh2
         constexpr VkFormat kColorFormat = VK_FORMAT_R8G8B8A8_UNORM;
         // Frames a GPU resource must outlive its last use by.
         constexpr uint64_t kRetireAfter = 3;
-        // Frames a mesh or texture stays on the GPU unused: a camera cut takes
-        // the crowd and set out of view and back within seconds, and each
-        // return would otherwise allocate and upload all of it mid-frame.
-        constexpr uint64_t kEvictAfter = 1800; // 30 s
+        // How long a mesh or texture stays on the GPU unused: a camera cut
+        // takes the crowd and set out of view and back within seconds, and
+        // each return would otherwise allocate and upload all of it
+        // mid-frame. In time, not frames: a frame count is shorter the higher
+        // the frame rate.
+        using Clock = std::chrono::steady_clock;
+        constexpr auto kEvictAfter = std::chrono::seconds(60);
         constexpr uint64_t kScanEvery = 8;     // frames between walks of the caches
 
         // Each frame writes its bones and lighting to its own slot's buffer,
@@ -178,6 +181,7 @@ namespace gh2
             VmaAllocation indexMemory = VK_NULL_HANDLE;
             uint32_t indexCount = 0;
             uint64_t lastUsed = 0;
+            Clock::time_point lastSeen{}; // as of the frame that last used it
             // Four floats a vert (buildTangents), made when a normal-mapped
             // x360 draw first takes the mesh.
             VkBuffer tangents = VK_NULL_HANDLE;
@@ -231,6 +235,7 @@ namespace gh2
             VmaAllocation stagingMemory = VK_NULL_HANDLE;
             uint64_t uploaded = 0;
             uint64_t lastUsed = 0;
+            Clock::time_point lastSeen{}; // as of the frame that last used it
         };
 
         // One image a camera drew into: a rendered RndTex as it stood after
@@ -910,6 +915,7 @@ namespace gh2
         // pool of the GPU's times: at record's start, then at each span's
         // end (kGpuSpans).
         SceneStats stats;
+        Clock::time_point frameAt{}; // when the frame being recorded began
         static constexpr uint32_t kTimes = 1u + std::size(kGpuSpans);
         VkQueryPool times[kFrameSlots]{};
         bool timed[kFrameSlots]{}; // the slot's pool has a frame's times
@@ -1499,6 +1505,7 @@ namespace gh2
             if (found != textures.end())
             {
                 found->second.lastUsed = serial;
+                found->second.lastSeen = frameAt;
                 return &found->second;
             }
 
@@ -1506,6 +1513,7 @@ namespace gh2
             gpu.source = data;
             gpu.uploaded = serial;
             gpu.lastUsed = serial;
+            gpu.lastSeen = frameAt;
             // The game's levels are uploaded; with the mipmaps setting, the
             // rest down to 1x1 are blitted from the smallest of them, fonts
             // aside.
@@ -2477,6 +2485,7 @@ namespace gh2
                 found = meshes.emplace(mesh.get(), std::move(gpu)).first;
             }
             found->second.lastUsed = serial;
+            found->second.lastSeen = frameAt;
             return &found->second;
         }
 
@@ -2854,14 +2863,16 @@ namespace gh2
         // The descriptor pool holds kMaxTextures; keep a quarter spare.
         static constexpr size_t kTextureLimit = kMaxTextures - kMaxTextures / 4u;
 
-        // Whether a mesh or texture goes: unused for `keep` frames, or with
-        // nothing but this cache holding its source, when no capture can
-        // hand that pointer over again and it is garbage once no frame in
-        // flight reads it.
+        // Whether a mesh or texture goes, once no frame in flight reads it:
+        // unused for kEvictAfter, or at once when `crowded`, or with nothing
+        // but this cache holding its source, when no capture can hand that
+        // pointer over again and it is garbage.
         template <typename Gpu>
-        static bool spent(const Gpu &gpu, uint64_t keep, uint64_t serial)
+        bool spent(const Gpu &gpu, bool crowded, uint64_t serial) const
         {
-            return gpu.lastUsed + keep < serial || (gpu.source.use_count() == 1 && gpu.lastUsed + kRetireAfter < serial);
+            if (gpu.lastUsed + kRetireAfter >= serial)
+                return false;
+            return crowded || gpu.lastSeen + kEvictAfter < frameAt || gpu.source.use_count() == 1;
         }
 
         void retire(uint64_t serial)
@@ -2882,10 +2893,10 @@ namespace gh2
                 return;
             // Near the descriptor pool's end, nothing is kept past its frames
             // in flight.
-            const uint64_t keep = textures.size() > kTextureLimit ? kRetireAfter : kEvictAfter;
+            const bool crowded = textures.size() > kTextureLimit;
             for (auto it = meshes.begin(); it != meshes.end();)
             {
-                if (spent(it->second, keep, serial))
+                if (spent(it->second, crowded, serial))
                 {
                     destroyMesh(it->second);
                     it = meshes.erase(it);
@@ -2897,7 +2908,7 @@ namespace gh2
             for (auto it = textures.begin(); it != textures.end();)
             {
                 GpuTexture &texture = it->second;
-                if (spent(texture, keep, serial))
+                if (spent(texture, crowded, serial))
                 {
                     destroyTexture(texture);
                     it = textures.erase(it);
@@ -3094,6 +3105,7 @@ namespace gh2
             return false;
         s.stats.meshesCreated = s.stats.texturesCreated = s.stats.evicted = 0u;
         s.stats.uploadBytes = 0u;
+        s.frameAt = Clock::now();
         s.takeTimes(cmd, serial);
         s.stamp(cmd, serial, 0u);
 
