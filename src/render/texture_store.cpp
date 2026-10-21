@@ -40,6 +40,8 @@ namespace gh2::textures
         };
         std::unordered_map<uint32_t, Payload> s_payloads;
         std::unordered_map<uint32_t, std::function<void(TextureData &)>> s_edits; // under s_mutex
+        // The bundled pictures by name (addBundled), under s_mutex.
+        std::unordered_map<std::string, std::pair<const uint8_t *, size_t>> s_bundled;
         // Over the payloads and the fetches: a scene is made, and its
         // pictures read ahead, on the worker's thread too.
         std::mutex s_mutex;
@@ -257,6 +259,16 @@ namespace gh2::textures
         // `open` is the reading thread's own.
         std::shared_ptr<TextureData> read(const Source &source, std::optional<Open> &open)
         {
+            if (source.disc == kBundled)
+            {
+                std::pair<const uint8_t *, size_t> picture{nullptr, 0u};
+                {
+                    const std::lock_guard lock(s_mutex);
+                    if (const auto found = s_bundled.find(source.path); found != s_bundled.end())
+                        picture = found->second;
+                }
+                return picture.first ? decode(picture.first, picture.second) : nullptr;
+            }
             if (source.tex.empty())
             {
                 const auto file = ark::readFile(source.disc, source.path);
@@ -316,6 +328,12 @@ namespace gh2::textures
                 edit(*data);
             return data;
         }
+    }
+
+    void addBundled(const std::string &name, const uint8_t *data, size_t size)
+    {
+        const std::lock_guard lock(s_mutex);
+        s_bundled[name] = {data, size};
     }
 
     void addEdit(uint32_t id, std::function<void(TextureData &)> edit)

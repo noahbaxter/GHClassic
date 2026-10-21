@@ -4,7 +4,9 @@
 ; difficulty screen as it always did.
 ;
 ; The picker is the practice speed screen's scene (sel_speed.milo, four
-; buttons), in the skin of the game being played. Picking another game
+; buttons), in the skin of the game being played: in GH2's and the 80s',
+; the Demo's amp poster and a case for each game, the picked one spinning
+; over its one line (content/campaign_case.h). Picking another game
 ; goes through ghc_switch_screen, which has no panels: there the switch
 ; happens ({campaigns switch}, content/campaigns.h), with nothing loaded that
 ; it changes.
@@ -28,15 +30,32 @@
          {do
             ($count {size [games]})
             ($band {campaign profile_slot})
+            ($x 0) ($y 0) ($z 0)
+            ; The one line shown, the picked game's, just over the title,
+            ; under the case, across where the scene's buttons stand. Taken
+            ; once: the buttons are all moved there.
+            ; A scene with no cases (GH1's own, content/campaign_case.h)
+            ; keeps its list. GH2's is always listed, so has one where any do.
+            {set [cased] {exists ghc_cover_gh2.mesh}}
+            {if {&& [cased] {== [line_z] none}}
+               {speed3.btn get_local_pos $x $y $z}
+               {set [line_x] $x}
+               {set [line_y] $y}
+               {title.lbl get_local_pos $x $y $z}
+               {set [title_z] $z}
+               {set [line_z] {'+' {'-' $z [title_drop]} [line_above]}}
+            }
             {foreach_int $i 0 {size [buttons]}
                {do
                   ($btn {elem [buttons] $i})
                   {if_else {< $i $count}
                      {do
                         ($game {elem [games] $i})
-                        {{{$this loaded_dir} find $btn} set_showing TRUE}
                         {$this enable $btn}
                         {$this label $i}
+                        {if [cased]
+                           {{{$this loaded_dir} find $btn} set_local_pos [line_x] [line_y] [line_z]}
+                        }
                         ; Down steps through the listed ones and wraps.
                         {{{$this loaded_dir} find $btn} set nav_down
                            {{$this loaded_dir} find {elem [buttons] {mod {'+' $i 1} $count}}}
@@ -54,6 +73,119 @@
                }
             }
             {$this set_focus {elem [buttons] [picked]}}
+         }
+         {set [spin_from] {taskmgr ui_seconds}}
+         {$this show_line}
+         {$this place_title}
+         {$this lay_cases}
+      )
+      ; With cases, the title moves down off the poster's red and white
+      ; into its black below the city, where it reads: by this much, in its
+      ; parent's units, and the line stands this far over it.
+      (title_drop 52)
+      (line_above 44)
+      (title_z none)
+      (place_title
+         {if [cased]
+            {do
+               ($x 0) ($y 0) ($z 0)
+               {title.lbl get_local_pos $x $y $z}
+               {title.lbl set_local_pos $x $y {'-' [title_z] [title_drop]}}
+            }
+         }
+      )
+      (cased FALSE)
+      (line_x 0)
+      (line_y 0)
+      (line_z none)
+      ; With cases, only the picked game's button shows.
+      (show_line
+         {foreach_int $i 0 {size [games]}
+            {{{$this loaded_dir} find {elem [buttons] $i}} set_showing {|| {! [cased]} {== $i [picked]}}}
+         }
+      )
+      ; Each game's front cover, flat, in a row along the poster's foot, the
+      ; picked one bigger and nearer; and over the city, large, the picked
+      ; game's case, spinning (content/campaign_case.h). The row: how big a
+      ; cover is and the picked one, how far apart their middles stand, how
+      ; high the row is and how far in front of the poster, the picked one's
+      ; too. The case: how big, where its middle is, the angle it starts at,
+      ; and how fast it spins, in degrees a second.
+      (cover_scale 17)
+      (cover_picked_scale 20)
+      (cover_gap 58)
+      (cover_z -138)
+      (cover_y -12)
+      (cover_picked_y -20)
+      (case_scale 34)
+      (case_x 0)
+      (case_y -40)
+      (case_z 46)
+      ; Its spin is the store's guitar's way, negative about the upright
+      ; (store.milo's guitar_single.tnm: 0, -120, -240), from a little
+      ; short of facing front, a wind-up before it comes round head on.
+      (case_turn 45)
+      (case_spin 90)
+      ; When the picked case began to spin, from where it stood turned.
+      (spin_from 0)
+      ; The scene has a case for each game listed and no other
+      ; (content/campaign_case.cpp), where the pack has its art.
+      (lay_cases
+         {foreach_int $i 0 {size [games]}
+            {if {exists {symbol {sprint "ghc_cover_" {elem [games] $i} ".mesh"}}}
+               {$this lay_case {elem [games] $i} $i}
+            }
+         }
+      )
+      ; Game $g's cover, the row's $i'th, and its case, shown while it is
+      ; picked: the case's sleeve and plastic placed alike, drawn by depth,
+      ; the plastic in the console's colour.
+      (lay_case
+         ($g $i)
+         {do
+            ($count {size [games]})
+            ($picked {== $i [picked]})
+            ($cover {$this find {symbol {sprint "ghc_cover_" $g ".mesh"}}})
+            {$cover set_local_pos
+               {'*' [cover_gap] {'-' $i {/ {'-' $count 1} 2.0}}}
+               {if_else $picked [cover_picked_y] [cover_y]}
+               [cover_z]
+            }
+            {$this turn $cover 0 {if_else $picked [cover_picked_scale] [cover_scale]}}
+            {{$this find {symbol {sprint "ghc_case_" $g ".mat"}}} set z_mode 1}
+            {{$this find {symbol {sprint "ghc_shell_" $g ".mat"}}} set z_mode 1}
+            ; Its colour and light are in its vertex colours
+            ; (content/campaign_case.cpp): drawn only by a prelit material.
+            {{$this find {symbol {sprint "ghc_shell_" $g ".mat"}}} set prelit TRUE}
+            {foreach $part (_sleeve.mesh _shell.mesh)
+               {do
+                  ($mesh {$this find {symbol {sprint "ghc_case_" $g $part}}})
+                  {$mesh set_showing $picked}
+                  {$mesh set_local_pos [case_x] [case_y] [case_z]}
+                  {$this turn $mesh [case_turn] [case_scale]}
+               }
+            }
+         }
+      )
+      ; A mesh turned $deg about the upright, at that size: a turn is set as
+      ; a rotation alone, which drops the scale, so the scale is set after.
+      (turn
+         ($mesh $deg $scale)
+         {$mesh set_local_rot 0 0 $deg}
+         {$mesh set_local_scale $scale $scale $scale}
+      )
+      ; The picked game's case spins.
+      (poll
+         {do
+            ($g {elem [games] [picked]})
+            ($angle
+               {mod {'-' {'+' [case_turn] 360} {mod {'*' [case_spin] {'-' {taskmgr ui_seconds} [spin_from]}} 360}} 360}
+            )
+            {foreach $part (_sleeve.mesh _shell.mesh)
+               {if {exists {symbol {sprint "ghc_case_" $g $part}}}
+                  {$this turn {$this find {symbol {sprint "ghc_case_" $g $part}}} $angle [case_scale]}
+               }
+            }
          }
       )
       ; Button $i: its game, how far the band is through its career under
@@ -81,6 +213,11 @@
          {foreach_int $i 0 {size [games]}
             {if {== {sprint {$new_focus name}} {sprint {elem [buttons] $i}}} {set [picked] $i}}
          }
+         ; The case left stands turned again, and its line goes; the one
+         ; picked spins from where it stood.
+         {set [spin_from] {taskmgr ui_seconds}}
+         {$this show_line}
+         {$this lay_cases}
          kDataUnhandled
       )
    )

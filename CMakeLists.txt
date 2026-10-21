@@ -210,6 +210,7 @@ set(GHC_GAME_SOURCES
     src/script.cpp
     src/worker.cpp
     src/content/band.cpp
+    src/content/campaign_case.cpp
     src/content/campaigns.cpp
     src/content/card.cpp
     src/content/crowd_cards.cpp
@@ -438,6 +439,13 @@ file(READ fonts/vector_fonts.bin GHC_VECTOR_FONTS_PACK HEX)
 string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_VECTOR_FONTS_PACK "${GHC_VECTOR_FONTS_PACK}")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS fonts/vector_fonts.bin)
 configure_file(src/render/vector_fonts_pack.h.in "${GHC_DTA_DIR}/vector_fonts_pack.h" @ONLY)
+
+# The campaign picker's case and pictures (content/campaign_case.h),
+# tools/campaign_art.py's pack.
+file(READ assets/campaign_select.bin GHC_CAMPAIGN_PACK HEX)
+string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_CAMPAIGN_PACK "${GHC_CAMPAIGN_PACK}")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/campaign_select.bin)
+configure_file(src/content/campaign_pack.h.in "${GHC_DTA_DIR}/campaign_pack.h" @ONLY)
 # Each game's "Classic" under its menus' logo (ui/classic_scene.cpp), tools/procedural/classic_logo.py's bitmaps.
 foreach(GHC_GAME gh1 gh2 gh80s)
     string(TOUPPER "${GHC_GAME}" GHC_GAME_UPPER)

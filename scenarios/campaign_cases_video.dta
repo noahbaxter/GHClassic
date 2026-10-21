@@ -1,0 +1,28 @@
+; The campaign picker as a video (scripts/record.sh campaign_cases_video):
+; each game's case picked in turn, held
+; until it has spun once round by the picker's own clock (360 at
+; case_spin's 90 degrees a second is 4 s) and a beat more, then the next.
+; Four holds go round four games; with fewer, the strum wraps and the
+; first comes again.
+#include common/first_boot.dta
+{gamecfg set mode career}
+{campaign set_profile_name "The Testers" 0}
+{ui goto_screen chooseprof_screen}
+(wait_screen chooseprof_screen)
+(press green)
+(wait_screen ghc_campaign_screen)
+(wait 1)
+(record on picker)
+; The first case from where it stands, as each after it starts when picked.
+{ghc_campaign_panel set spin_from {taskmgr ui_seconds}}
+(wait_until {>= {'-' {taskmgr ui_seconds} {ghc_campaign_panel get spin_from}} 4.3} 10)
+(press down)
+(wait_until {>= {'-' {taskmgr ui_seconds} {ghc_campaign_panel get spin_from}} 4.3} 10)
+(press down)
+(wait_until {>= {'-' {taskmgr ui_seconds} {ghc_campaign_panel get spin_from}} 4.3} 10)
+(press down)
+(wait_until {>= {'-' {taskmgr ui_seconds} {ghc_campaign_panel get spin_from}} 4.3} 10)
+(press down)
+(wait 1)
+(record off)
+(quit)
