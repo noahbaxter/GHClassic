@@ -60,6 +60,7 @@
 #include "save/card.h"
 #include "save/save.h"
 #include "dev/scenario.h"
+#include "dev/scripted_play.h"
 #include "script.h"
 #include "dev/seed.h"
 #include "dev/transplant.h"
@@ -152,6 +153,7 @@ namespace
         gh2::games::install(runtime, gh2::kSlus21447);
         gh2::campaigns::install(runtime, gh2::kSlus21447);
         gh2::scenario::install(runtime, gh2::kSlus21447);
+        gh2::scripted_play::install(runtime, gh2::kSlus21447);
         gh2::transplant::install(runtime, gh2::kSlus21447);
         gh2::cheats::install(runtime, gh2::kSlus21447);
         gh2::fast_boot::install(runtime, gh2::kSlus21447);

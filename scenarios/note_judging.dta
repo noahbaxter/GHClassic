@@ -1,0 +1,49 @@
+; The note engines' rules as a player meets them: Cochise played at exact
+; song times under GH2's, then GH1's (common/judged_cochise.dta), and Higher
+; Ground's HOPOs under each, which tools/hopo_count.py counts from its chart:
+; 193 by GH2's rule and none by GH1's. Its last load back under GH2's puts
+; GH2's scoring numbers back in the live config.
+(needs gh1)
+#include common/first_boot.dta
+
+{note_engine set gh2}
+{set $crowd_medium 0.5}
+{set $crowd_hard 0.6}
+{set $stars_top 2.8}
+{set $tenth 100}
+{set $hit_early 1}
+{set $hit_lifted 1}
+#include common/judged_cochise.dta
+
+{note_engine set gh1}
+{set $crowd_medium 0.6}
+{set $crowd_hard 0.65}
+{set $stars_top 3.0}
+{set $tenth 50}
+{set $hit_early 0}
+{set $hit_lifted 0}
+#include common/judged_cochise.dta
+
+; main_screen puts the difficulty back, so each load sets it.
+{{game get_player_config 0} set_difficulty expert}
+{game set_song higherground}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait_until {> {ghc_play gems} 0})
+(expect {ghc_play hopos} 0)
+{ui goto_screen main_screen}
+(wait_screen main_screen 30)
+
+{note_engine set gh2}
+{{game get_player_config 0} set_difficulty expert}
+{game set_song higherground}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait_until {> {ghc_play gems} 0})
+(expect {ghc_play hopos} 193)
+(expect {ghc_play scoring crowd 1} 0.5 0.001)
+(expect {ghc_play scoring crowd 2} 0.6 0.001)
+(expect {ghc_play scoring stars 3} 2.8 0.001)
+(quit)

@@ -66,6 +66,11 @@ namespace gh2
         uint32_t sendWhammy;        // TrackWatcherImpl::SendWhammy
         uint32_t playerSetWhammyBar; // Player::SetWhammyBar
         uint32_t beatMatcherSwing;   // BeatMatcher::Swing(int slot, bool isStrum)
+        uint32_t beatMatcherFretButtonDown; // BeatMatcher::FretButtonDown(int slot)
+        uint32_t beatMatcherFretButtonUp;   // BeatMatcher::FretButtonUp(int slot)
+        uint32_t beatMatcherNonStrumSwing;  // BeatMatcher::NonStrumSwing(int slot, bool isPress)
+        uint32_t beatMatcherPoll;           // BeatMatcher::Poll(float)
+        uint32_t beatMatcherDtor;           // BeatMatcher::~BeatMatcher
         uint32_t guitarWatcherJumpHook; // GuitarTrackWatcherImpl::JumpHook
         uint32_t hudPanelEnter;      // HudPanel::Enter
         uint32_t bandScoreDisplaySetScore; // BandScoreDisplay::SetScore(int)
@@ -340,6 +345,11 @@ namespace gh2
         .sendWhammy = 0x249b98u,
         .playerSetWhammyBar = 0x111d88u,
         .beatMatcherSwing = 0x2356b8u,
+        .beatMatcherFretButtonDown = 0x235568u,
+        .beatMatcherFretButtonUp = 0x235610u,
+        .beatMatcherNonStrumSwing = 0x2358f0u,
+        .beatMatcherPoll = 0x235340u,
+        .beatMatcherDtor = 0x234b08u,
         .guitarWatcherJumpHook = 0x24d4e0u,
         .hudPanelEnter = 0x12ba00u,
         .bandScoreDisplaySetScore = 0x291af8u,

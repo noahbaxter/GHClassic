@@ -233,6 +233,7 @@ set(GHC_GAME_SOURCES
     src/dev/mesh_packet.cpp
     src/dev/null_rnd.cpp
     src/dev/scenario.cpp
+    src/dev/scripted_play.cpp
     src/dev/seed.cpp
     src/dev/timing.cpp
     src/dev/transplant.cpp
