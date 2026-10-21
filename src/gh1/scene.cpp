@@ -252,23 +252,10 @@ namespace gh2::gh1
         const uint32_t groups = u32(b, o);
         const size_t sizes = o + 4u;
         o = sizes + groups;
-        Bytes out;
         if (o + 4u != b.size() || u32(b, o) != 0u)
-            return out;
-        size_t at = face;
-        for (uint32_t g = 0; g < groups; ++g)
-        {
-            const uint32_t size = b[sizes + g];
-            putU32(out, size);
-            if (size != 0u)
-                putU32(out, 3u * size);
-            for (uint32_t i = 1u; i < size; ++i)
-                putU32(out, 3u * i);
-            putU32(out, 3u * size);
-            put(out, b, at, at + 6u * size);
-            at += 6u * size;
-        }
-        return out;
+            return Bytes();
+        return milo::strips(b.data() + face, std::vector<uint32_t>(b.begin() + static_cast<std::ptrdiff_t>(sizes),
+                                                                   b.begin() + static_cast<std::ptrdiff_t>(o)));
     }
 
     std::vector<std::string> named(const Bytes &b, const std::string &suffix)

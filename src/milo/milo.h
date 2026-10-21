@@ -65,6 +65,12 @@ namespace gh2::milo
     // `name` taken out of the list holding it.
     bool remove(Bytes &body, const std::string &name);
 
+    // A Mesh's PS2 strips as RndMesh::Load (0x3d5420) reads them: for each
+    // face group a strip a face, as the strip count, the vert total, each
+    // strip's end, and the verts. `faces` is three shorts a face, the
+    // groups' faces one after another.
+    Bytes strips(const uint8_t *faces, const std::vector<uint32_t> &groups);
+
     // A v24 file the game loads: uncompressed blocks, each whole objects.
     Bytes write(const Dir &dir);
 }
