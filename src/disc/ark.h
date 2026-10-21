@@ -41,7 +41,8 @@ namespace gh2::ark
     // disc's turn) and nowhere else, made when the game first asks for it.
     // None leaves the disc's own. With `when`, it is served only while that
     // holds, asked each time the file is looked for, and made the first time
-    // it does. Once install has run.
+    // it does. Of several for one path, the last added that is served and
+    // makes one wins. Once install has run.
     void addMade(size_t disc, const std::string &path, std::function<std::optional<Made>()> make,
                  std::function<bool()> when = {});
 
