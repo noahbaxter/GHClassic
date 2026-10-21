@@ -340,6 +340,27 @@ namespace gh2
             s_textures[tex] = std::move(data);
         }
 
+        // s_standIns' entries, counted by the store for each payload.
+        void standFor(uint32_t tex, uint32_t id)
+        {
+            const auto [at, added] = s_standIns.try_emplace(tex, id);
+            if (!added)
+            {
+                textures::standInGone(at->second);
+                at->second = id;
+            }
+            textures::standInMade(id);
+        }
+
+        void dropStandIn(uint32_t tex)
+        {
+            const auto found = s_standIns.find(tex);
+            if (found == s_standIns.end())
+                return;
+            textures::standInGone(found->second);
+            s_standIns.erase(found);
+        }
+
         // The host payload a bitmap stands in for, named in its first pixel
         // bytes (render/texture_store.h).
         std::optional<uint32_t> standIn(uint8_t *rdram, uint32_t bitmap)
@@ -361,7 +382,7 @@ namespace gh2
             const auto id = standIn(rdram, bitmap);
             if (!id)
             {
-                s_standIns.erase(tex);
+                dropStandIn(tex);
                 keep(rdram, tex, decodeWithMips(rdram, bitmap));
                 return;
             }
@@ -369,7 +390,7 @@ namespace gh2
             const auto was = s_standIns.find(tex);
             if (was != s_standIns.end() && was->second == *id)
                 return;
-            s_standIns[tex] = *id;
+            standFor(tex, *id);
             s_textures.erase(tex);
         }
 
@@ -393,7 +414,7 @@ namespace gh2
             if (load<uint32_t>(rdram, tex + milo::tex::kType) & milo::tex::kTypeNoPixels)
             {
                 s_textures.erase(tex);
-                s_standIns.erase(tex);
+                dropStandIn(tex);
             }
             else
                 capture(rdram, tex);
@@ -403,7 +424,7 @@ namespace gh2
         {
             const uint32_t tex = GPR_U32(ctx, 4);
             s_textures.erase(tex);
-            s_standIns.erase(tex);
+            dropStandIn(tex);
             s_textTextures.erase(tex);
             vector_fonts::forget(tex);
             std::erase(s_yellowFretIcons, tex);
@@ -519,6 +540,8 @@ namespace gh2
     void forgetTextureAddresses()
     {
         s_textures.clear();
+        for (const auto &[tex, id] : s_standIns)
+            textures::standInGone(id);
         s_standIns.clear();
         s_textTextures.clear();
         vector_fonts::forgetAll();

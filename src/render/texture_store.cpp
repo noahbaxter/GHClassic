@@ -29,12 +29,14 @@ namespace gh2::textures
         // can be (samePicture): compression leaves them a few levels off.
         constexpr uint64_t kSamePictureLevels = 12u;
 
-        // Held only by what draws it: the capture's entry for each guest
-        // texture, then the renderer's copy for a few frames more.
+        // Held by what draws it: the capture's entry for each guest texture,
+        // then the renderer's copy for a few frames more; and by its scene's
+        // Group while that is loaded.
         struct Payload
         {
             Source source;
             std::weak_ptr<const TextureData> data;
+            uint32_t standIns = 0; // the guest's Texes standing in for it
         };
         std::unordered_map<uint32_t, Payload> s_payloads;
         std::unordered_map<uint32_t, std::function<void(TextureData &)>> s_edits; // under s_mutex
@@ -66,6 +68,21 @@ namespace gh2::textures
         std::unordered_map<uint32_t, std::shared_ptr<Fetch>> s_fetches;
         Clock::time_point s_now{}; // as the last frame ended
         constexpr auto kFetchHold = std::chrono::seconds(10);
+
+        // One prefetch's payloads, a scene's, held while any of them has a
+        // stand-in in the guest's memory: a picture first drawn minutes in
+        // (star power's lights) or not drawn for a while (the crowd, off
+        // camera) is not read from the disc again on the game thread. Its
+        // 360 maps, which no stand-in names, go with it. Before the guest has
+        // synced any, held for kFetchHold.
+        struct Group
+        {
+            Clock::time_point asked{};
+            std::vector<uint32_t> ids;
+            std::vector<std::shared_ptr<Fetch>> fetches;
+        };
+        std::vector<Group> s_groups; // under s_mutex
+        Clock::time_point s_groupsChecked{};
 
         // What get() has cost the game thread (reads()).
         std::atomic<uint64_t> s_readCount{0};
@@ -404,13 +421,26 @@ namespace gh2::textures
         std::vector<std::tuple<uint32_t, Source, std::shared_ptr<Fetch>>> wanted;
         {
             const std::lock_guard lock(s_mutex);
+            Group &group = s_groups.emplace_back(Group{s_now, ids, {}});
             for (const uint32_t id : ids)
             {
                 const auto found = s_payloads.find(id);
-                if (found == s_payloads.end() || !found->second.data.expired() || s_fetches.contains(id))
+                if (found == s_payloads.end())
                     continue;
+                if (const auto ahead = s_fetches.find(id); ahead != s_fetches.end())
+                {
+                    group.fetches.push_back(ahead->second);
+                    continue;
+                }
                 auto fetch = std::make_shared<Fetch>();
                 fetch->asked = s_now;
+                group.fetches.push_back(fetch);
+                // Read already: the group holds it too.
+                if (auto held = found->second.data.lock())
+                {
+                    std::call_once(fetch->once, [&] { fetch->data = std::move(held); });
+                    continue;
+                }
                 s_fetches[id] = fetch;
                 wanted.emplace_back(id, found->second.source, std::move(fetch));
             }
@@ -421,7 +451,14 @@ namespace gh2::textures
         {
             std::optional<Open> open;
             for (const auto &[id, source, fetch] : wanted)
+            {
                 std::call_once(fetch->once, [&] { fetch->data = readEdited(id, source, open); });
+                // Found by get() once its fetch is let go, while the group
+                // holds it.
+                const std::lock_guard lock(s_mutex);
+                if (Payload &payload = s_payloads[id]; payload.data.expired())
+                    payload.data = fetch->data;
+            }
         });
     }
 
@@ -431,6 +468,34 @@ namespace gh2::textures
         const std::lock_guard lock(s_mutex);
         s_now = Clock::now();
         std::erase_if(s_fetches, [](const auto &fetch) { return fetch.second->asked + kFetchHold < s_now; });
+        // A scene's Texes go together, so once a second is soon enough.
+        if (s_now - s_groupsChecked < std::chrono::seconds(1))
+            return;
+        s_groupsChecked = s_now;
+        std::erase_if(s_groups, [](const Group &group)
+        {
+            if (group.asked + kFetchHold >= s_now)
+                return false;
+            return std::none_of(group.ids.begin(), group.ids.end(), [](uint32_t id)
+            {
+                const auto found = s_payloads.find(id);
+                return found != s_payloads.end() && found->second.standIns > 0u;
+            });
+        });
+    }
+
+    void standInMade(uint32_t id)
+    {
+        const std::lock_guard lock(s_mutex);
+        if (const auto found = s_payloads.find(id); found != s_payloads.end())
+            ++found->second.standIns;
+    }
+
+    void standInGone(uint32_t id)
+    {
+        const std::lock_guard lock(s_mutex);
+        if (const auto found = s_payloads.find(id); found != s_payloads.end() && found->second.standIns > 0u)
+            --found->second.standIns;
     }
 
     Reads reads()
