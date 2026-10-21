@@ -6,8 +6,8 @@
 
 #include "gameplay/strum_limit.h"
 
-#include "guest.h"
-#include "ps2_runtime.h"
+#include "guest/beatmatch.h"
+#include "hook.h"
 #include "ps2_runtime_macros.h"
 #include "settings/settings.h"
 
@@ -15,40 +15,31 @@ namespace gh2
 {
     namespace
     {
-        constexpr uint32_t kNow = 0xa4u;       // BeatMatcher: the song's ms this frame
-        constexpr uint32_t kLastSwing = 0xc4u; // and when it last took a strum
-
         constexpr float kRetailGapMs = 52.0f;
-
-        PS2Runtime::RecompiledFunction s_swing = nullptr;
 
         // BeatMatcher::Swing(slot, isStrum), retail 0x2356b8: drops a strum
         // when now <= lastSwing + 52, else sets lastSwing to now and hands it
         // to the track's watcher.
-        void swing(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        struct SwingTag;
+        bool onSwing(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
-            const uint32_t matcher = GPR_U32(ctx, 4);
-            const bool isStrum = GPR_U32(ctx, 6) != 0u;
-            if (isStrum)
+            if (GPR_U32(ctx, 6) == 0u)
+                return false;
+            const guest::BeatMatcher matcher(rdram, GPR_U32(ctx, 4));
+            if (matcher.now() <= matcher.lastSwing())
             {
-                const float now = load<float>(rdram, matcher + kNow);
-                if (now <= load<float>(rdram, matcher + kLastSwing))
-                {
-                    ctx->pc = GPR_U32(ctx, 31);
-                    return;
-                }
-                // Far enough back that retail's own check takes it.
-                store<float>(rdram, matcher + kLastSwing, now - kRetailGapMs - 1.0f);
+                leave(ctx);
+                return true;
             }
-            s_swing(rdram, ctx, runtime);
+            // Far enough back that retail's own check takes it.
+            matcher.setLastSwing(matcher.now() - kRetailGapMs - 1.0f);
+            return false;
         }
     }
 
     void installStrumLimit(PS2Runtime &runtime, const Addresses &addresses)
     {
-        if (settings::get(settings::kStrumLimit))
-            return;
-        s_swing = runtime.lookupFunction(addresses.beatMatcherSwing);
-        runtime.replaceFunction(addresses.beatMatcherSwing, &swing);
+        if (!settings::get(settings::kStrumLimit))
+            Override<SwingTag>::install(runtime, addresses.beatMatcherSwing, onSwing);
     }
 }

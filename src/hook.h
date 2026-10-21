@@ -62,4 +62,36 @@ namespace gh2
         inline static PS2Runtime::RecompiledFunction s_original = nullptr;
         inline static Callback s_onEntry = nullptr;
     };
+
+    // A function replaced by one of ours that answers some calls itself
+    // and hands the rest to the original. One that answers sets the return
+    // and leaves for $ra.
+    template <typename Tag>
+    struct Override
+    {
+        using Callback = bool (*)(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
+
+        static void install(PS2Runtime &runtime, uint32_t address, Callback answer)
+        {
+            s_original = runtime.lookupFunction(address);
+            s_answer = answer;
+            runtime.replaceFunction(address, &run);
+        }
+
+    private:
+        static void run(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            if (!s_answer(rdram, ctx, runtime))
+                s_original(rdram, ctx, runtime);
+        }
+
+        inline static PS2Runtime::RecompiledFunction s_original = nullptr;
+        inline static Callback s_answer = nullptr;
+    };
+
+    // Back to the caller, as an Override that answers does.
+    inline void leave(R5900Context *ctx)
+    {
+        ctx->pc = GPR_U32(ctx, 31);
+    }
 }

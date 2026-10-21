@@ -5,7 +5,7 @@
 
 #include "gameplay/hopo_lock.h"
 
-#include "guest.h"
+#include "guest/beatmatch.h"
 #include "hook.h"
 #include "ps2_runtime_macros.h"
 
@@ -13,18 +13,15 @@ namespace gh2
 {
     namespace
     {
-        // GuitarTrackWatcherImpl: the gem no longer hammered, -1 from its
-        // ctor (0x24d458).
-        constexpr uint32_t kHopoLockedGem = 0x8cu;
-
         struct JumpHookTag;
 
         // GuitarTrackWatcherImpl::JumpHook, retail 0x24d4e0: clears the
-        // pending gem, the HOPO hit and chordFinishedMs, but not the lock.
-        // A restart gets here by BeatMatcher::Jump(0) (0x235480).
+        // pending gem, the HOPO hit and chordFinishedMs, but not the lock,
+        // -1 from its ctor (0x24d458). A restart gets here by
+        // BeatMatcher::Jump(0) (0x235480).
         void onJumpHook(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
-            store<int32_t>(rdram, GPR_U32(ctx, 4) + kHopoLockedGem, -1);
+            guest::GuitarTrackWatcherImpl(rdram, GPR_U32(ctx, 4)).setHopoLockedGem(-1);
         }
     }
 
