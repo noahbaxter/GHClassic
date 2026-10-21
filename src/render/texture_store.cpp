@@ -421,6 +421,14 @@ namespace gh2::textures
         std::vector<std::tuple<uint32_t, Source, std::shared_ptr<Fetch>>> wanted;
         {
             const std::lock_guard lock(s_mutex);
+            // A scene loaded again while it is held keeps its one group,
+            // which has all it can read.
+            const auto same = std::find_if(s_groups.begin(), s_groups.end(), [&](const Group &g) { return g.ids == ids; });
+            if (same != s_groups.end())
+            {
+                same->asked = s_now;
+                return;
+            }
             Group &group = s_groups.emplace_back(Group{s_now, ids, {}});
             for (const uint32_t id : ids)
             {
