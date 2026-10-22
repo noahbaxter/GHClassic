@@ -88,9 +88,15 @@ namespace gh2::perf
         return s_logging;
     }
 
-    void Times::add(float waitMs, float recordMs, const SceneStats &scene)
+    void Times::add(bool isNew, float waitMs, float recordMs, const SceneStats &scene)
     {
         const auto now = std::chrono::steady_clock::now();
+        if (isNew)
+        {
+            if (s_logging && m_lastNew != std::chrono::steady_clock::time_point{})
+                m_allHeld.push_back(std::chrono::duration<float, std::milli>(now - m_lastNew).count());
+            m_lastNew = now;
+        }
         const float ms = m_frames == 0 ? 0.0f : std::chrono::duration<float, std::milli>(now - m_last).count();
         m_last = now;
         if (m_frames++ == 0)
@@ -212,6 +218,19 @@ namespace gh2::perf
                       percentile(m_all, 0.99), *std::max_element(m_all.begin(), m_all.end()),
                       std::count_if(m_all.begin(), m_all.end(), [late](float ms) { return ms > late; }), late);
         out += line;
+        if (!m_allHeld.empty())
+        {
+            // 50 ms frozen is seen at any frame rate.
+            constexpr float kFrozenMs = 50.0f;
+            std::snprintf(line, sizeof(line),
+                          "[perf] game frame shown ms: median %.2f, 99th %.2f, longest %.2f, %td over %.0f\n",
+                          percentile(m_allHeld, 0.5), percentile(m_allHeld, 0.99),
+                          *std::max_element(m_allHeld.begin(), m_allHeld.end()),
+                          std::count_if(m_allHeld.begin(), m_allHeld.end(),
+                                        [](float ms) { return ms > kFrozenMs; }),
+                          kFrozenMs);
+            out += line;
+        }
         std::snprintf(line, sizeof(line), "[perf] host ms, median: wait for game's frame %.2f, record draws %.2f\n",
                       percentile(m_allWait, 0.5), percentile(m_allRecord, 0.5));
         out += line;

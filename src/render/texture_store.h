@@ -36,9 +36,15 @@ namespace gh2::textures
     void addEdit(uint32_t id, std::function<void(TextureData &)> edit);
 
     // Those payloads read on the worker's thread, ahead of the draw that
-    // will first ask for them, and held for it a while: a scene's, as the
-    // game loads the scene. Game thread only.
+    // will first ask for them: a scene's, as the game loads the scene. All
+    // of them are held while the guest keeps a stand-in for any. Game thread
+    // only.
     void prefetch(const std::vector<uint32_t> &ids);
+
+    // A guest Tex has synced as a stand-in for that payload, or has let it
+    // go (texture_capture.cpp).
+    void standInMade(uint32_t id);
+    void standInGone(uint32_t id);
 
     // The bytes a stand-in's pixels start with: a magic word and the id.
     constexpr size_t kNameBytes = 8u;
@@ -59,4 +65,14 @@ namespace gh2::textures
 
     // The scene file payloads were last read from is let go.
     void endFrame();
+
+    // What get() has held the game thread up for since the run began: the
+    // payloads it read itself, and its time reading them or waiting on the
+    // worker's. Any thread.
+    struct Reads
+    {
+        uint64_t count = 0;
+        uint64_t ns = 0;
+    };
+    Reads reads();
 }
