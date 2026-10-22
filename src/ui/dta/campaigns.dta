@@ -126,8 +126,8 @@
       ; With cases, the title moves down off the poster's red and white
       ; into its black below the city, where it reads: by this much, in its
       ; parent's units, and the line stands this far over it.
-      (title_drop 52)
-      (line_above 44)
+      (title_drop 70)
+      (line_above 77)
       (title_z none)
       (place_title
          {if [cased]
@@ -158,13 +158,15 @@
       (cover_scale 17)
       (cover_picked_scale 20)
       (cover_gap 58)
-      (cover_z -138)
+      (cover_z -144)
       (cover_y -12)
       (cover_picked_y -20)
-      (case_scale 34)
+      ; A cover not picked, dimmed to this much of its light.
+      (cover_dim 0.45)
+      (case_scale 40)
       (case_x 0)
       (case_y -40)
-      (case_z 46)
+      (case_z 75)
       ; Its spin is the store's guitar's way, negative about the upright
       ; (store.milo's guitar_single.tnm: 0, -120, -240), from a little
       ; short of facing front, a wind-up before it comes round head on.
@@ -196,6 +198,11 @@
                [cover_z]
             }
             {$this turn $cover 0 {if_else $picked [cover_picked_scale] [cover_scale]}}
+            ; Its Mat is the sleeve's too, which shows only while picked.
+            {do
+               ($light {if_else $picked 1 [cover_dim]})
+               {{$this find {symbol {sprint "ghc_case_" $g ".mat"}}} set color {pack_color $light $light $light}}
+            }
             {{$this find {symbol {sprint "ghc_case_" $g ".mat"}}} set z_mode 1}
             {{$this find {symbol {sprint "ghc_shell_" $g ".mat"}}} set z_mode 1}
             ; Its colour and light are in its vertex colours
