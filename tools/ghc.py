@@ -151,6 +151,9 @@ def ensure_venv():
     print("setting up build/venv", file=sys.stderr)
     venv.create(VENV, with_pip=True, clear=True)
     pip = [VENV_PYTHON, "-m", "pip", "install", "--quiet", "--disable-pip-version-check"]
+    # The check below needs pip's --dry-run (22.2); a venv takes the pip its
+    # Python bundles, older on Ubuntu 22.04's 3.11.
+    subprocess.run([*pip, "--upgrade", "pip"], check=True)
     # Each pin as a wheel for the oldest Python on each platform, before
     # anything is installed: a pin only newer ones have stops here, not on CI.
     with tempfile.TemporaryDirectory() as target:
