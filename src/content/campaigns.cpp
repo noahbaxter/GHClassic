@@ -727,21 +727,41 @@ namespace gh2::campaigns
             return s_found[{s_active, second}] = outfit ? outfit->text : "punk1";
         }
 
-        // How far band `slot` is through `game`'s career, 0 to 100: its
-        // career songs passed on the difficulty that has passed most of
-        // them, as a share of the career's.
+        // How far band `slot` is through `game`'s career, 0 to 100: each
+        // difficulty with a career song passed a quarter over the one below,
+        // by its career songs passed, so expert done is 100 whatever was
+        // played under it; the best difficulty's.
         int progress(const std::string &game, int slot, std::optional<NoteEngine> engine)
         {
             const std::vector<std::string> career = setlists::careerSongs(game);
-            size_t most = 0u;
-            for (const std::set<std::string> &passed : save::passedSongs(game, slot, engine))
+            if (career.empty())
+                return 0;
+            const auto passed = save::passedSongs(game, slot, engine);
+            size_t best = 0u;
+            for (size_t d = 0; d < passed.size(); ++d)
             {
                 size_t count = 0u;
                 for (const std::string &song : career)
-                    count += passed.count(song);
-                most = std::max(most, count);
+                    count += passed[d].count(song);
+                if (count > 0u)
+                    best = std::max(best, 25u * d + 25u * count / career.size());
             }
-            return career.empty() ? 0 : static_cast<int>(most * 100u / career.size());
+            return static_cast<int>(best);
+        }
+
+        // Its expert full combos (save::fullComboSongs) as a share of every
+        // song, career and bonus, 0 to 100.
+        int fullCombos(const std::string &game, int slot, std::optional<NoteEngine> engine)
+        {
+            const std::set<std::string> combos = save::fullComboSongs(game, slot, engine).back();
+            size_t count = 0u, all = 0u;
+            for (const std::vector<std::string> &songs : {setlists::careerSongs(game), setlists::bonusSongs(game)})
+                for (const std::string &song : songs)
+                {
+                    count += combos.count(song);
+                    ++all;
+                }
+            return all == 0u ? 0 : static_cast<int>(count * 100u / all);
         }
 
         // Whether `game`'s store sells `item`: named in any of store.dta's
@@ -896,6 +916,25 @@ namespace gh2::campaigns
                                                        noteEngineNamed(call.size() > 4 ? call.symbol(4) : ""))),
                         script::kInt};
             }
+            if (op == "full_combos")
+            {
+                if (call.symbol(2) == active())
+                    save::leaveGame(call.rdram, call.ctx, call.runtime);
+                return {static_cast<uint32_t>(fullCombos(call.symbol(2), static_cast<int>(call.number(3)),
+                                                         noteEngineNamed(call.size() > 4 ? call.symbol(4) : ""))),
+                        script::kInt};
+            }
+            // From onFinishSong: band, difficulty, song, then player 0's
+            // longest streak, gems hit, gems passed and percent hit, which
+            // is of the song's every gem, so a song cut short is none.
+            if (op == "finished")
+            {
+                const auto longest = call.number(5), hit = call.number(6), passed = call.number(7);
+                if (hit > 0 && passed == 0 && longest == hit && call.number(8) == 100)
+                    save::keepFullCombo(static_cast<int>(call.number(2)), static_cast<int>(call.number(3)),
+                                        call.symbol(4));
+                return {};
+            }
             if (op == "count")
                 return {static_cast<uint32_t>(s_campaigns.size()), script::kInt};
             if (op == "venues")
@@ -965,7 +1004,7 @@ namespace gh2::campaigns
             }
             std::cerr << "[campaign] usage: {campaigns active|live|count}, {campaigns has <game>}, "
                          "{campaigns switch <game> [<screen> [career|menus]]}, "
-                         "{campaigns progress <game> <band> [<engine>]}"
+                         "{campaigns progress <game> <band> [<engine>]}, {campaigns full_combos <game> <band> [<engine>]}"
                       << std::endl;
             return {};
         }
@@ -1056,6 +1095,20 @@ namespace gh2::campaigns
             const auto it = s_menuScreens.find(screen);
             const size_t owner = it == s_menuScreens.end() ? s_active : it->second ? s_menus : s_lookFrom;
             locale::own(locale::kScreen, s_campaigns[owner].game);
+        }
+
+        // A career song passed, alone (ProfileState::FinishSong, from
+        // {campaign finish_song}; co-op has its own): kept as a full combo
+        // where player 0 hit every gem and its longest streak is all of
+        // them ({campaigns finished}).
+        struct FinishSongTag;
+        void onFinishSong(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const R5900Context saved = *ctx;
+            script::run(rdram, ctx, runtime,
+                        "{campaigns finished {campaign profile_slot} {game get_difficulty 0} {game get_song} "
+                        "{player0 longest_streak} {player0 gems_hit} {player0 gems_passed} {player0 percent_hit}}");
+            *ctx = saved;
         }
 
         struct GotoScreenTag;
@@ -1323,6 +1376,7 @@ namespace gh2::campaigns
         script::runWhenUiReady("{campaigns read_text}");
         EntryHook<PollTag>::install(runtime, addresses.uiManagerPoll, onUiPoll);
         EntryHook<GotoScreenTag>::install(runtime, addresses.uiGotoScreen, onGotoScreen);
+        EntryHook<FinishSongTag>::install(runtime, addresses.profileStateFinishSong, onFinishSong);
         EntryHook<MetaMusicStopTag>::install(runtime, addresses.metaMusicStop, onMetaMusicStop);
     }
 }

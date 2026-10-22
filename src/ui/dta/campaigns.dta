@@ -73,6 +73,7 @@
                }
             }
             {$this set_focus {elem [buttons] [picked]}}
+            {$this tint_line}
          }
          {set [spin_from] {taskmgr ui_seconds}}
          {$this show_line}
@@ -188,19 +189,66 @@
             }
          }
       )
-      ; Button $i: its game, how far the band is through its career under
-      ; the note engine picked, and that engine.
+      ; Button $i: how far the band is through its game's career under the
+      ; note engine picked ({campaigns progress}); once that is all of it,
+      ; in gold, its share of the game's songs full combo'd on expert
+      ; ({campaigns full_combos}). With cases that alone, the case naming
+      ; the game, at line_size times the button's own size; in a list, the
+      ; game's name before it.
+      (line_size 1.5)
+      (gold (1 0.78 0.16))
+      (beaten
+         ($game)
+         {== {campaigns progress $game {campaign profile_slot} {note_engine picked}} 100}
+      )
       (label
          ($i)
          {do
             ($game {elem [games] $i})
-            ($engine {note_engine picked})
-            ; The engine named only where there is another to pick.
-            {{{$this loaded_dir} find {elem [buttons] $i}} set_localized_text
-               {sprint {localize {sprint "campaign_" $game}} "  "
-                  {campaigns progress $game {campaign profile_slot} $engine} "%"
-                  {if_else {> {note_engine choices} 1} {sprint "  " {localize {sprint "ghc_engine_" $engine}}} ""}
+            ($btn {{$this loaded_dir} find {elem [buttons] $i}})
+            ($band {campaign profile_slot})
+            ($done {campaigns progress $game $band {note_engine picked}})
+            ($shown
+               {if_else {== $done 100}
+                  {sprint {campaigns full_combos $game $band {note_engine picked}} "% FC"}
+                  {sprint $done "%"}
                }
+            )
+            ; Its size first: setting it reads the button's own text again.
+            {if [cased]
+               {if {== [own_size] none} {set [own_size] {$btn get text_size}}}
+               {$btn set fit_text 0}
+               {$btn set text_size {'*' [line_size] [own_size]}}
+            }
+            {$btn set_localized_text
+               {if_else [cased] $shown {sprint {localize {sprint "campaign_" $game}} "  " $shown}}
+            }
+         }
+      )
+      (own_size none)
+      ; The picked game's line in gold once its career is beaten: a button
+      ; draws in its dir's focus colour, the only one focused the picked
+      ; game's. A colour set reads the buttons' own text again, so each is
+      ; labelled after one.
+      (own_focus_color none)
+      ; Its scene is practice's speed picker's too.
+      (exit
+         {if {!= [own_focus_color] none} {{$this loaded_dir} set focus_color [own_focus_color]}}
+      )
+      (tint_line
+         {do
+            ($dir {$this loaded_dir})
+            ($color)
+            {if {== [own_focus_color] none} {set [own_focus_color] {$dir get focus_color}}}
+            {set $color
+               {if_else {&& [cased] {$this beaten {elem [games] [picked]}}}
+                  {pack_color {elem [gold] 0} {elem [gold] 1} {elem [gold] 2}}
+                  [own_focus_color]
+               }
+            }
+            {if {!= $color {$dir get focus_color}}
+               {$dir set focus_color $color}
+               {foreach_int $i 0 {size [games]} {$this label $i}}
             }
          }
       )
@@ -208,6 +256,7 @@
       (next_engine
          {note_engine pick {note_engine next {note_engine picked}}}
          {foreach_int $i 0 {size [games]} {$this label $i}}
+         {$this tint_line}
       )
       (FOCUS_MSG
          {foreach_int $i 0 {size [games]}
@@ -218,6 +267,7 @@
          {set [spin_from] {taskmgr ui_seconds}}
          {$this show_line}
          {$this lay_cases}
+         {$this tint_line}
          kDataUnhandled
       )
    )

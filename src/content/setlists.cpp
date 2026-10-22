@@ -324,15 +324,22 @@ namespace gh2::setlists
         s_zeroScores.insert(game);
     }
 
-    std::vector<std::string> careerSongs(const std::string &name)
+    namespace
     {
-        std::vector<std::string> songs;
-        if (const auto it = s_setlists.find(name); it != s_setlists.end())
-            for (const Tier &tier : it->second.tiers)
-                if (tier.encore)
-                    songs.insert(songs.end(), tier.songs.begin(), tier.songs.end());
-        return songs;
+        std::vector<std::string> tierSongs(const std::string &name, bool career)
+        {
+            std::vector<std::string> songs;
+            if (const auto it = s_setlists.find(name); it != s_setlists.end())
+                for (const Tier &tier : it->second.tiers)
+                    if (tier.encore == career)
+                        songs.insert(songs.end(), tier.songs.begin(), tier.songs.end());
+            return songs;
+        }
     }
+
+    std::vector<std::string> careerSongs(const std::string &name) { return tierSongs(name, true); }
+
+    std::vector<std::string> bonusSongs(const std::string &name) { return tierSongs(name, false); }
 
     void addDisc(const std::string &game, size_t disc, bool inConfig)
     {

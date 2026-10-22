@@ -59,8 +59,13 @@
 //                              sell, or one some band has bought in its career
 //   {campaigns progress <game> <band> [<engine>]}  how far that band (from 0)
 //                              is through that game's career under that
-//                              engine, or any, 0 to 100: the career songs
-//                              passed on the difficulty it has passed most on
+//                              engine, or any: easy's career songs passed
+//                              up to 25, medium's from 25 to 50, hard's to
+//                              75, expert's to 100, the best of them
+//   {campaigns full_combos <game> <band> [<engine>]}  the share of that
+//                              game's songs, career and bonus, the band has
+//                              full combo'd on expert, 0 to 100
+//                              (save::fullComboSongs)
 //   {campaigns venues <game>}  that game's venues, as its config lists them
 //   {campaigns venue_open <game> <venue>}  TRUE if a song may play there
 //                              outside its career: its first, or one a band

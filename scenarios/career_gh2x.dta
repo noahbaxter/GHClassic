@@ -109,12 +109,13 @@
 (expect {campaign cash} $cash)
 (expect {campaign career_score} $score)
 
-; One song of forty-eight passed.
+; One song of forty-eight passed, on medium: easy's quarter, and medium's
+; next quarter a forty-eighth in, rounded down.
 {ui goto_screen ghc_campaign_screen}
 (wait_screen ghc_campaign_screen)
 (wait 2)
 (shot campaigns_after)
-(expect {campaigns progress gh2x 0} 2)
+(expect {campaigns progress gh2x 0} 25)
 (expect {campaigns progress gh2 0} 0)
 
 ; The band's GH2 career is a new one, at PS2's prices.

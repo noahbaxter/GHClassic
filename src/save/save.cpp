@@ -712,6 +712,28 @@ namespace gh2::save
         return passed;
     }
 
+    std::array<std::set<std::string>, 4> fullComboSongs(const std::string &game, int slot,
+                                                        std::optional<NoteEngine> engine)
+    {
+        std::array<std::set<std::string>, 4> found;
+        for (const NoteEngine e : kNoteEngines)
+            if (!engine || e == *engine)
+                for (int d = 0; d < gh2::kDifficulties; ++d)
+                    if (const Section *section = bandSection(slot, game, e, kDifficulties[d]))
+                        for (const auto &[key, value] : section->values)
+                            if (key.rfind("fc.", 0) == 0)
+                                found[static_cast<size_t>(d)].insert(key.substr(3));
+        return found;
+    }
+
+    void keepFullCombo(int slot, int difficulty, const std::string &song)
+    {
+        if (slot < 0 || slot >= gh2::kProfiles || difficulty < 0 || difficulty >= gh2::kDifficulties)
+            return;
+        s_store.section("band " + std::to_string(slot + 1) + " " + sectionGame(s_game) + " " + kDifficulties[difficulty])
+            .set("fc." + song, "1");
+    }
+
     std::set<std::string> unlockedSongs(const std::string &game)
     {
         std::set<std::string> unlocked;
