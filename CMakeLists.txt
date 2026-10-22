@@ -207,13 +207,10 @@ set(GHC_GAME_SOURCES
     src/game.cpp
     src/frame_step.cpp
     src/lefty_guitarist.cpp
-    src/note_speed.cpp
     src/script.cpp
-    src/sustain_release.cpp
-    src/track_start.cpp
-    src/whammy_hold.cpp
     src/worker.cpp
     src/content/band.cpp
+    src/content/campaign_case.cpp
     src/content/campaigns.cpp
     src/content/card.cpp
     src/content/crowd_cards.cpp
@@ -237,6 +234,7 @@ set(GHC_GAME_SOURCES
     src/dev/mesh_packet.cpp
     src/dev/null_rnd.cpp
     src/dev/scenario.cpp
+    src/dev/scripted_play.cpp
     src/dev/seed.cpp
     src/dev/timing.cpp
     src/dev/transplant.cpp
@@ -250,6 +248,16 @@ set(GHC_GAME_SOURCES
     src/formats/dtb_text.cpp
     src/formats/dxt.cpp
     src/formats/midi.cpp
+    src/gameplay/hopo_lock.cpp
+    src/gameplay/note_engine/gh1_scoring.cpp
+    src/gameplay/note_engine/gh1_star_power.cpp
+    src/gameplay/note_engine/gh1_watcher.cpp
+    src/gameplay/note_engine/note_engine.cpp
+    src/gameplay/note_speed.cpp
+    src/gameplay/strum_limit.cpp
+    src/gameplay/sustain_release.cpp
+    src/gameplay/track_start.cpp
+    src/gameplay/whammy_hold.cpp
     src/gh1/band.cpp
     src/gh1/cameras.cpp
     src/gh1/career.cpp
@@ -310,10 +318,12 @@ set(GHC_GAME_SOURCES
     src/ui/fast_boot.cpp
     src/ui/locale.cpp
     src/ui/help_bar.cpp
+    src/ui/classic_scene.cpp
     src/ui/menus.cpp
     src/ui/meta_music.cpp
     src/ui/photo_mode.cpp
     src/ui/slider_scale.cpp
+    src/ui/zebra_wall.cpp
     src/host/audio.cpp
     src/host/bind.cpp
     src/host/bindings.cpp
@@ -429,6 +439,26 @@ file(READ fonts/vector_fonts.bin GHC_VECTOR_FONTS_PACK HEX)
 string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_VECTOR_FONTS_PACK "${GHC_VECTOR_FONTS_PACK}")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS fonts/vector_fonts.bin)
 configure_file(src/render/vector_fonts_pack.h.in "${GHC_DTA_DIR}/vector_fonts_pack.h" @ONLY)
+
+# The campaign picker's case and pictures (content/campaign_case.h),
+# tools/campaign_art.py's pack.
+file(READ assets/campaign_select.bin GHC_CAMPAIGN_PACK HEX)
+string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_CAMPAIGN_PACK "${GHC_CAMPAIGN_PACK}")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/campaign_select.bin)
+configure_file(src/content/campaign_pack.h.in "${GHC_DTA_DIR}/campaign_pack.h" @ONLY)
+# Each game's "Classic" under its menus' logo (ui/classic_scene.cpp), tools/procedural/classic_logo.py's bitmaps.
+foreach(GHC_GAME gh1 gh2 gh80s)
+    string(TOUPPER "${GHC_GAME}" GHC_GAME_UPPER)
+    file(READ assets/classic/${GHC_GAME}.bin GHC_CLASSIC_${GHC_GAME_UPPER} HEX)
+    string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_CLASSIC_${GHC_GAME_UPPER} "${GHC_CLASSIC_${GHC_GAME_UPPER}}")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/classic/${GHC_GAME}.bin)
+endforeach()
+configure_file(src/ui/classic_logo.h.in "${GHC_DTA_DIR}/classic_logo.h" @ONLY)
+# The 80s song list's zebra wall (ui/zebra_wall.cpp), tools/procedural/zebra_wall.py's bitmap.
+file(READ assets/zebra/wall.bin GHC_ZEBRA_WALL HEX)
+string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_ZEBRA_WALL "${GHC_ZEBRA_WALL}")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/zebra/wall.bin)
+configure_file(src/ui/zebra_wall_bitmap.h.in "${GHC_DTA_DIR}/zebra_wall_bitmap.h" @ONLY)
 target_include_directories(GHClassic PRIVATE "${GHC_DTA_DIR}")
 
 # What the build is (src/build_info.h), from tools/ghc.py: the tag it was made

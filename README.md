@@ -9,6 +9,17 @@
 
 [![Join the Discord](https://img.shields.io/badge/Join_the_Discord-5865F2?logo=discord&logoColor=white&style=for-the-badge)](https://discord.gg/EtQcnHqn3)
 
+## Features
+
+- Fully playable campaigns for Guitar Hero, Guitar Hero 2 (both on PS2 and Xbox 360) and GH80s
+- Swap between the note engine of GH2, or GH1 if you really hate yourself
+- Quickplay mixing featuring every song from every game, for every character skin, with every guitar, in every venue
+- Custom Vulkan rendering engine lets you play with the PS2's original look, the Xbox 360's, or anything in between
+- Any resolution, uncapped frame rate, plus MSAA, TAA, and mipmaps
+- Modern QOL improvements like note streaks, custom note speed and highway lengths, independent A/V sync, and more!
+- Autodetects guitar, gamepad, and keyboard controls
+- Photo mode
+
 ## Requirements
 - Legally obtained disc images for the following games in `.chd`, `.iso` or `.bin`:
   - **Required:**
@@ -30,33 +41,23 @@ Grab the latest [Releases](https://github.com/noahbaxter/GHClassic/releases).
 
 Everything GHC needs is stored in one folder. Windows and Linux are portable installs, so just place the extracted zip anywhere you want. On macOS it's at `~/Library/Application Support/GHClassic`.
 
-| Item | Description |
-|---|---|
-| `PUT_DISC_HERE/` | Your disc images |
-| `settings.ini` | Every setting, includes some not in menus |
-| `input.ini` | Controller bindings |
-| `save.bin` | All bands progress |
-| `GHClassic.log` | The last session's log, for bug reports |
-
-## Features
-
-- Fully playable campaigns for Guitar Hero, Guitar Hero 2 (both on PS2 and Xbox 360) and GH80s
-- Quickplay mixing featuring every song from every game, for every character skin, with every guitar, in every venue
-- Custom Vulkan rendering engine lets you play with the PS2's original look, the Xbox 360's, or anything in between
-- Any resolution, uncapped frame rate, plus MSAA, TAA, and mipmaps
-- Modern QOL improvements like note streaks, custom note speed and highway lengths, independent A/V sync, and more!
-- Autodetects guitar, gamepad, and keyboard controls
-- Photo mode
+| Item             | Description                               |
+| ---------------- | ----------------------------------------- |
+| `PUT_DISC_HERE/` | Your disc images                          |
+| `settings.ini`   | Every setting, includes some not in menus |
+| `input.ini`      | Controller bindings                       |
+| `save.bin`       | All bands progress                        |
+| `GHClassic.log`  | The last session's log, for bug reports   |
 
 ## Controls
 
-| | Keyboard | Gamepad |
-|---|---|---|
-| Frets | `1` `2` `3` `4` `5` | L2 L1 R1 R2 Cross |
-| Strum | Up, Down | D-pad up, down |
-| Start | Enter | Start |
-| Star power | Right Shift | Select |
-| Whammy | | Left stick up |
+|            | Keyboard            | Gamepad           |
+| ---------- | ------------------- | ----------------- |
+| Frets      | `1` `2` `3` `4` `5` | L2 L1 R1 R2 Cross |
+| Strum      | Up, Down            | D-pad up, down    |
+| Start      | Enter               | Start             |
+| Star power | Right Shift         | Select            |
+| Whammy     |                     | Left stick up     |
 
 Certain guitars with built-in profiles should auto detect: PS3, Wii (through a raphnet adapter), Xbox 360, Rock Band 4 and World Tour PC. Anything else can be remapped by editing `input.ini`, which lists every device's current bindings. It sits beside the game on Windows and Linux, and in `~/Library/Application Support/GHClassic` on macOS.
 Fullscreen is `Cmd+F` on macOS, `F11` elsewhere.
@@ -98,7 +99,8 @@ This project is built on top of a lot of excellent work by others. Please give m
 - [ps2sdk](https://github.com/ps2dev/ps2sdk) and mymc: memory card format, sound library names
 - [libchdr](https://github.com/rtissera/libchdr): reading `.chd` disc images
 - [Redump](http://redump.org/): disc hashes the images are checked against
-- ([SteamGridDB](https://www.steamgriddb.com/grid/378598)): Temp icon
+- ["Silent Hill 3 Ps2 Game cover"](https://skfb.ly/oR9ZT) by eyewideasca, [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/): the campaign picker's game case
+- [generalrose](https://www.steamgriddb.com/grid/681069) and [David0Mario](https://www.steamgriddb.com/logo/59969) on SteamGridDB: the icon's GH2 cover art and GH1 logo
 
 ## License
 

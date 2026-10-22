@@ -133,6 +133,23 @@ namespace gh2::milo
         out.insert(out.end(), s.begin(), s.end());
     }
 
+    Bytes strips(const uint8_t *faces, const std::vector<uint32_t> &groups)
+    {
+        Bytes out;
+        for (const uint32_t size : groups)
+        {
+            putU32(out, size);
+            if (size != 0u)
+                putU32(out, 3u * size);
+            for (uint32_t i = 1u; i < size; ++i)
+                putU32(out, 3u * i);
+            putU32(out, 3u * size);
+            out.insert(out.end(), faces, faces + 6u * size);
+            faces += 6u * size;
+        }
+        return out;
+    }
+
     std::optional<Bytes> inflate(const Bytes &file)
     {
         Reader r{file};
@@ -300,6 +317,89 @@ namespace gh2::milo
             if (auto s = find(b))
                 return s;
         return std::nullopt;
+    }
+
+    namespace
+    {
+        Bytes lengthPrefixed(const std::string &s)
+        {
+            Bytes out;
+            putStr(out, s);
+            return out;
+        }
+
+        // `name` put in the list holding `member`, after it or before it.
+        bool addBeside(Bytes &body, const std::string &member, const std::string &name, bool after)
+        {
+            const auto count = listHolding(body, member);
+            if (!count)
+                return false;
+            const Bytes there = lengthPrefixed(member), added = lengthPrefixed(name);
+            const auto at = std::search(body.begin(), body.end(), there.begin(), there.end());
+            body.insert(after ? at + static_cast<std::ptrdiff_t>(there.size()) : at, added.begin(), added.end());
+            const uint32_t n = u32(body, *count) + 1u;
+            std::memcpy(body.data() + *count, &n, 4u);
+            return true;
+        }
+    }
+
+    bool replaceStr(Bytes &body, const std::string &from, const std::string &to)
+    {
+        const Bytes a = lengthPrefixed(from), b = lengthPrefixed(to);
+        const auto it = std::search(body.begin(), body.end(), a.begin(), a.end());
+        if (it == body.end())
+            return false;
+        const auto at = body.erase(it, it + static_cast<std::ptrdiff_t>(a.size()));
+        body.insert(at, b.begin(), b.end());
+        return true;
+    }
+
+    std::optional<size_t> listHolding(const Bytes &body, const std::string &name)
+    {
+        const Bytes member = lengthPrefixed(name);
+        const auto it = std::search(body.begin(), body.end(), member.begin(), member.end());
+        if (it == body.end())
+            return std::nullopt;
+        const size_t at = static_cast<size_t>(it - body.begin());
+        for (size_t count = at; count >= 4u; --count)
+        {
+            const uint32_t n = u32(body, count - 4u);
+            if (n == 0u || n > 64u)
+                continue;
+            size_t o = count;
+            bool covers = false;
+            for (uint32_t k = 0; k < n && o < body.size(); ++k)
+            {
+                covers = covers || o == at;
+                str(body, o);
+            }
+            if (covers)
+                return count - 4u;
+        }
+        return std::nullopt;
+    }
+
+    bool addAfter(Bytes &body, const std::string &after, const std::string &name)
+    {
+        return addBeside(body, after, name, true);
+    }
+
+    bool addBefore(Bytes &body, const std::string &before, const std::string &name)
+    {
+        return addBeside(body, before, name, false);
+    }
+
+    bool remove(Bytes &body, const std::string &name)
+    {
+        const auto count = listHolding(body, name);
+        if (!count)
+            return false;
+        const Bytes member = lengthPrefixed(name);
+        const auto at = std::search(body.begin(), body.end(), member.begin(), member.end());
+        body.erase(at, at + static_cast<std::ptrdiff_t>(member.size()));
+        const uint32_t n = u32(body, *count) - 1u;
+        std::memcpy(body.data() + *count, &n, 4u);
+        return true;
     }
 
     std::optional<Dir> read(const Bytes &file)

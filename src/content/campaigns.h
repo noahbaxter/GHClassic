@@ -45,20 +45,27 @@
 //   {campaigns has <game>}     TRUE if that game has a campaign
 //   {campaigns switch <game> [<screen> [career]]}  to that game's menus
 //                              outside a career, or with career into its
-//                              career, at the next UI poll once no script is
-//                              running, then to that screen; TRUE unless there
-//                              is nothing to change or no such game. Either
-//                              way that game becomes the theme. A career left
-//                              for main_screen goes back to its menus outside
-//                              it on its own.
+//                              career, under the note engine picked
+//                              (note_engine.h), at the next UI poll once no
+//                              script is running, then to that screen; TRUE
+//                              unless there is nothing to change or no such
+//                              game. Either way that game becomes the theme.
+//                              A career left for main_screen goes back to
+//                              its menus outside it on its own.
 //   {campaigns first_character}   the first player's default outfit there
 //   {campaigns second_character}  the second player's default outfit there
 //   {campaigns owns <game> <item>}  TRUE if that game's item is there to use
 //                              outside its own career: one its store does not
 //                              sell, or one some band has bought in its career
-//   {campaigns progress <game> <band>}  how far that band (from 0) is through
-//                              that game's career, 0 to 100: the career songs
-//                              passed on the difficulty it has passed most on
+//   {campaigns progress <game> <band> [<engine>]}  how far that band (from 0)
+//                              is through that game's career under that
+//                              engine, or any: easy's career songs passed
+//                              up to 25, medium's from 25 to 50, hard's to
+//                              75, expert's to 100, the best of them
+//   {campaigns full_combos <game> <band> [<engine>]}  the share of that
+//                              game's songs, career and bonus, the band has
+//                              full combo'd on expert, 0 to 100
+//                              (save::fullComboSongs)
 //   {campaigns venues <game>}  that game's venues, as its config lists them
 //   {campaigns venue_open <game> <venue>}  TRUE if a song may play there
 //                              outside its career: its first, or one a band
@@ -67,11 +74,13 @@
 //                              game's venues: its world files and its venues'
 //                              scripts, until another or the game played's
 //                              own are asked for, or a switch. Outside a
-//                              career the screens around a song, the HUD and
-//                              the loading tips are in_song_ui's game's, the
-//                              venue's by default, and the gems gems' game's,
-//                              the in-song look's by default (settings.h)
+//                              career the screens around a song, its highway
+//                              (gems, strikeline and HUD) and the loading
+//                              tips are in_song_ui's game's, the venue's by
+//                              default (settings.h); in one, its own, under
+//                              either note engine
 //   {campaigns venue_game}     whose venues those are
+//   {campaigns highway}        whose highway the songs have
 //   {campaigns read_text}      every campaign's text read now, as the boot
 //                              does, so none is read mid-screen
 //
@@ -99,6 +108,8 @@ namespace gh2::campaigns
 
     // The active campaign's game: the career's in one, else gh2.
     const std::string &active();
+    // Whether a career is being played.
+    bool career();
     // Every campaign's game, gh2 first.
     std::vector<std::string> games();
     // That game's venues, the active game's by default, in its config's
@@ -137,6 +148,9 @@ namespace gh2::campaigns
     // In a career, where every pick is its own game's: the game's mode is
     // career, however it got there.
     bool inCareer(uint8_t *rdram);
+    // From any thread: whether the song's highway (gems, strikeline and HUD)
+    // is GH1's, which gh1::addHighway's scenes are made for.
+    bool gh1Highway();
 
     void install(PS2Runtime &runtime, const Addresses &addresses);
 }

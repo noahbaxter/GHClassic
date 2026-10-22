@@ -1,7 +1,7 @@
 // track_on_at_start: a player's track heard from the song's start, as if
 // the note before its first had been hit, rather than silent until a hit.
 
-#include "track_start.h"
+#include "gameplay/track_start.h"
 
 #include "guest.h"
 #include "ps2_runtime.h"

@@ -1,9 +1,11 @@
 #pragma once
 
 #include "addresses.h"
+#include "gameplay/note_engine/note_engine.h"
 
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -53,18 +55,38 @@ namespace gh2::save
     // and the songs any band has unlocked there on any. A song is passed
     // once it has stars, and unlocked only as progress: a fresh campaign's
     // own open songs are in neither.
-    std::array<std::set<std::string>, 4> passedSongs(const std::string &game, int slot);
+    // With an engine, its career alone (note_engine.h), else every engine's.
+    std::array<std::set<std::string>, 4> passedSongs(const std::string &game, int slot,
+                                                     std::optional<NoteEngine> engine = std::nullopt);
+    // The same, those full combo'd: every gem hit and the streak never
+    // broken, so no overstrum either (Player::Penalize, 0x1114c0, ends it),
+    // which the game's gold (every gem hit, CampaignState::FinishSong
+    // 0x131ee0) does not ask. Bonus songs too. GH Classic's own, as
+    // fc.<song> in the band's section for the difficulty, which the game's
+    // save keeps for it unread.
+    std::array<std::set<std::string>, 4> fullComboSongs(const std::string &game, int slot,
+                                                        std::optional<NoteEngine> engine = std::nullopt);
+    // A full combo on `song` by band `slot` (from 0) on `difficulty` (easy
+    // 0), in the career being played under the engine judging.
+    void keepFullCombo(int slot, int difficulty, const std::string &song);
     std::set<std::string> unlockedSongs(const std::string &game);
     // Whether any band has unlocked that item, of any kind, in `game`'s
-    // career: an outfit or guitar bought.
+    // career under any engine: an outfit or guitar bought.
     bool unlockedItem(const std::string &game, const std::string &item);
+
+    // The note engine picked (note_engine.h), by name as state.ini keeps it:
+    // empty for none.
+    std::string keptEngine();
+    void keepEngine(const std::string &engine);
 
     // A campaign switch (content/campaigns.h), either side of the Campaign
     // being rebuilt. leaveGame puts the career as it stands into the save's
     // sections, in memory, where the next save writes it and the two above
     // read it. enterGame takes the new Campaign as `game`'s fresh one and
     // loads that game's career from its own sections, and keeps `game` as
-    // the last.
+    // the last. reloadGame loads the same game's again, from the sections
+    // of the note engine judging now: around a change of engine, after
+    // leaveGame.
     // The game whose menus were last up, which the next boot opens with:
     // state.ini's, else the save's (read from disk before the boot loads
     // it); gh2 for neither. Kept in state.ini beside save.bin.
@@ -72,6 +94,7 @@ namespace gh2::save
     void keepLastGame(const std::string &game);
     void leaveGame(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
     void enterGame(const std::string &game, uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
+    void reloadGame(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
 
     void install(PS2Runtime &runtime, const Addresses &addresses);
 }

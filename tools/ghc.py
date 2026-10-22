@@ -5,11 +5,14 @@
     tools/ghc.py build [disc] [--skip-recomp] [--lto]
     tools/ghc.py bind [--isolated] [keyboard | <n>]   set up a controller; with no device, list them
     tools/ghc.py arm [out] [--scenario <file>] [--speed <x>] [--secs 30] [--disc <image>] [--shot-every 60]
-                     [--res 1080p] [--set <name>=<value> ...]
+                     [--res 1080p] [--set <name>=<value> ...] [--series <name>]
     tools/ghc.py record <scenario> [--speed 2.5] [--res 1080p] [--secs 900] [--set <name>=<value> ...]
+                        [--series <name>]
     tools/ghc.py scenarios [-j 4] [--speed 2] [--review] [--discs gh2,gh1] [--releases] [name ...]
     tools/ghc.py release [--skip-build] [disc]  this platform's player package, into build/release
     tools/ghc.py ci                          what builds without a disc, into build/ci
+    tools/ghc.py procedural [name ...]       draw tools/procedural's pictures again
+    tools/ghc.py review [archive <folder> ... | archive --landed]  what review/ holds; put it away
 
 play builds everything from the disc on its first run, then brings the C++
 build up to date before each launch (not the recompile) unless --no-build.
@@ -21,7 +24,7 @@ everything made lands in build/, which is safe to delete. build and release
 also take the disc's boot executable alone (SLUS_214.47), which is all the
 recompile reads.
 
-From the system: Python 3.11+, git, and a C++ compiler (Xcode's on macOS, gcc
+From the system: Python (.python-version's or newer), git, and a C++ compiler (Xcode's on macOS, gcc
 or clang on Linux, nothing on Windows, where llvm-mingw is fetched into
 build/). CMake, Ninja and Pillow come from build/venv, made from
 requirements.txt; CMake fetches the game's libraries at pinned versions, once
@@ -33,25 +36,42 @@ save and default settings: a first boot. out (default
 runs/<date>_<time>_<scenario's name>, so runs sort oldest first and none
 overwrites another) gets run.log, frames/ (frame_0012.30s.png, seconds
 since launch), shots/ from the scenario's (shot name) steps, and on macOS
-stack.txt, a 3 s sample taken if it is still alive at --secs. The shots on
-one sheet go to the main checkout's review/ as <date>_<time>_<name>.png,
-where everything to look at goes. scenarios runs the files in scenarios/
+stack.txt, a 3 s sample taken if it is still alive at --secs. The shots, on
+one sheet (shots.png) and each full size, go to the main checkout's
+review/<branch>/<date>_<time>_<name>/, the run's own set, where everything to
+look at goes and nothing is loose. scenarios runs the files in scenarios/
 through arm side by side, the sheets staying in each run as shots.png unless
 --review: a run passes when it reaches its last step and quits with no FAIL
 or STALL in its log. Both clear runs/ of runs older than three days.
 
 record runs a scenario as arm does and makes it videos, picture and sound,
-in review/ as <date>_<time>_<scenario's name>.mp4: the game pipes each frame
-to ffmpeg as it draws and writes its mixed sound beside it, both on the
-game's clock, so it can run faster than real time. Without (record) steps the
-whole run is one video; with them, each (record on name) to (record off) is
-its own, <scenario's name>_<name>.mp4. A run stopped at --secs keeps what it
-drew.
+in the run's set, review/<branch>/<date>_<time>_<scenario's name>/, beside
+its shots: the game pipes each frame to ffmpeg as it draws and writes its
+mixed sound beside it, both on the game's clock, so it can run faster than
+real time. Without (record) steps the whole run is one video,
+<scenario's name>.mp4; with them, each (record on name) to (record off) is
+its own, <name>.mp4. A run stopped at --secs keeps what it drew. With
+--series <name>, arm and record add to one set, review/<branch>/<date>_<name>/,
+made the first time and found again after, each take's files named by its
+time, so the takes of something being worked on sit side by side.
 
 release packages a build for players, who bring their own disc: a zip of
 the game beside PUT_DISC_HERE on Windows and Linux, a disk image on macOS.
 It only writes build/release, named for the tag it is built at (v0.5);
 .github/workflows/release.yml runs it on each platform when a tag is pushed.
+
+procedural runs each script in tools/procedural, which draw pictures by rule:
+from nothing (a zebra rug's stripes and pile, a word in a traced font), into
+assets/ where the build embeds them, or by transforming art off the discs in
+game/, into build/procedural, never kept in the repo.
+
+review/ has a folder per branch, named for it with / as - (feature-dancer),
+holding what that branch's trees made; a detached tree's is
+detached-<commit>. review lists them with each branch's last commit and how
+it stands: checked out in a tree, landed in dev, or gone. archive moves
+folders into review/archive/, each video made small (540 lines, crf 30) and
+every still kept; --landed archives every folder whose branch landed or is
+gone.
 """
 import argparse
 import hashlib
@@ -61,6 +81,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 import venv
@@ -70,10 +91,13 @@ from pathlib import Path
 
 from releases import content, discs_arg, find_disc, main_checkout, releases
 
-if sys.version_info < (3, 11):
-    sys.exit(f"GH Classic needs Python 3.11 or newer, not {sys.version.split()[0]}")
-
 ROOT = Path(__file__).resolve().parent.parent
+# The Python GH Classic is built and tested on, the oldest it supports: CI
+# runs it, the README states it, and every pin in requirements.txt must
+# install on it (ensure_venv).
+PYTHON = (ROOT / ".python-version").read_text().strip()
+if sys.version_info < tuple(int(n) for n in PYTHON.split(".")):
+    sys.exit(f"GH Classic needs Python {PYTHON} or newer, not {sys.version.split()[0]}")
 BUILD = ROOT / "build"
 VENV = BUILD / "venv"
 TOOLS = BUILD / "tools"
@@ -85,6 +109,13 @@ WINDOWS = sys.platform == "win32"
 EXE = ".exe" if WINDOWS else ""
 VENV_BIN = VENV / ("Scripts" if WINDOWS else "bin")
 VENV_PYTHON = VENV_BIN / f"python{EXE}"
+# The wheels each platform CI builds on can take: Linux's in Ubuntu 22.04's
+# glibc 2.35, macOS's on Apple silicon.
+PLATFORM_TAGS = {
+    "linux": [f"manylinux_2_{n}_x86_64" for n in range(17, 36)] + ["manylinux2014_x86_64"],
+    "windows": ["win_amd64"],
+    "macos": [f"macosx_{n}_0_{arch}" for n in range(11, 16) for arch in ("arm64", "universal2")],
+}
 
 # Every checkout's CMake fetches its libraries into the user's cache, once for
 # all of them (cmake/dep_cache.cmake). Outside build/, so deleting one tree's
@@ -115,10 +146,20 @@ def ensure_venv():
     stamp = VENV / "requirements.txt"
     if VENV_PYTHON.exists() and stamp.exists() and stamp.read_text() == wanted:
         return
+    if f"Python {PYTHON}+" not in (ROOT / "README.md").read_text():
+        sys.exit(f"README.md must say Python {PYTHON}+, as .python-version does")
     print("setting up build/venv", file=sys.stderr)
     venv.create(VENV, with_pip=True, clear=True)
-    subprocess.run([VENV_PYTHON, "-m", "pip", "install", "--quiet", "--disable-pip-version-check",
-                    "-r", ROOT / "requirements.txt"], check=True)
+    pip = [VENV_PYTHON, "-m", "pip", "install", "--quiet", "--disable-pip-version-check"]
+    # Each pin as a wheel for the oldest Python on each platform, before
+    # anything is installed: a pin only newer ones have stops here, not on CI.
+    with tempfile.TemporaryDirectory() as target:
+        for name, tags in PLATFORM_TAGS.items():
+            check = [*pip, "--dry-run", "--ignore-installed", "--target", target, "--python-version", PYTHON,
+                     "--only-binary=:all:", *(f"--platform={tag}" for tag in tags), "-r", ROOT / "requirements.txt"]
+            if subprocess.run(check).returncode:
+                sys.exit(f"requirements.txt does not install on Python {PYTHON} for {name}")
+    subprocess.run([*pip, "-r", ROOT / "requirements.txt"], check=True)
     stamp.write_text(wanted)
 
 
@@ -387,12 +428,59 @@ def cmd_play(argv):
     return subprocess.run([str(game_binary()), disc, *args, *argv]).returncode
 
 
-def review_path(what, suffix=".png"):
-    """Where something to look at goes: the main checkout's review/, flat and
-    named by when it was made, so it sorts by time."""
-    review = main_checkout() / "review"
-    review.mkdir(exist_ok=True)
-    return review / f"{time.strftime('%Y-%m-%d_%H%M')}_{what}{suffix}"
+REVIEW = main_checkout() / "review"
+# An archived video's size: small enough to keep, big enough to tell what it showed.
+ARCHIVE_VIDEO = ["-vf", "scale=-2:'min(540,ih)'", "-c:v", "libx264", "-preset", "veryfast", "-crf", "30",
+                 "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart"]
+
+
+def git_out(*args):
+    return subprocess.run(["git", *args], cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                          text=True).stdout.strip()
+
+
+def branch_folder(branch):
+    return branch.replace("/", "-")
+
+
+_review_sets = {}
+# --series: one set that each run adds to, for a thing being worked on.
+SERIES = None
+
+
+def series_name(file):
+    """A file's name in a run's set: as it is, or in a series, after the
+    time the run made it, so a series' takes sort side by side."""
+    return f"{time.strftime('%Y-%m-%d_%H%M')}_{file}" if SERIES else file
+
+
+def review_set(name):
+    """Where a run's things to look at go: the main checkout's review/, in
+    the folder of the branch this tree has out (detached-<commit> off one),
+    in a set of their own named by when the run made its first and what it
+    ran, so a folder sorts by time and nothing in it is loose. Everything
+    one run makes under `name` (its sheet, its shots, its clips) shares the
+    set; a second run in the same minute gets its own. With SERIES, every
+    run's goes into that one set, made the first time (<date>_<series>/)
+    and found again after, its files named by series_name."""
+    if SERIES:
+        name = SERIES
+    if name in _review_sets:
+        return _review_sets[name]
+    branch = git_out("branch", "--show-current")
+    folder = branch_folder(branch) if branch else f"detached-{git_out('rev-parse', '--short', 'HEAD') or 'tree'}"
+    if SERIES:
+        found = sorted((REVIEW / folder).glob(f"*_{SERIES}")) if (REVIEW / folder).is_dir() else []
+        if found:
+            _review_sets[name] = found[-1]
+            return found[-1]
+    stem = REVIEW / folder / f"{time.strftime('%Y-%m-%d_%H%M')}_{name}"
+    path, again = stem, 2
+    while path.exists():
+        path, again = stem.with_name(f"{stem.name}_{again}"), again + 1
+    path.mkdir(parents=True)
+    _review_sets[name] = path
+    return path
 
 
 def prune_runs(days=3):
@@ -488,7 +576,13 @@ def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=N
             x = (i % cols) * cell_w + (cell_w - shot.width) // 2
             y = (i // cols) * cell_h + (cell_h - shot.height) // 2
             sheet.paste(shot, (x, y))
-        sheet.save(review_path(review) if review else out / "shots.png")
+        sheet.save(out / "shots.png")
+        # Into the run's review set: the sheet, and each shot full size.
+        if review:
+            folder = review_set(review)
+            shutil.copy2(out / "shots.png", folder / series_name("shots.png"))
+            for png in shots:
+                shutil.copy2(png, folder / series_name(png.name))
     return state
 
 
@@ -506,7 +600,10 @@ def cmd_arm(argv):
                         help="a settings.ini line over the defaults, e.g. msaa=1; may repeat")
     parser.add_argument("--profiler", action="store_true", dest="perf",
                         help="the game's --profiler: frametimes.csv in the run, and its summary printed here")
+    parser.add_argument("--series", help="add to that one review set, each take named by its time")
     args = parser.parse_args(argv)
+    global SERIES
+    SERIES = args.series
     name = Path(args.scenario).stem if args.scenario else "run"
     out = Path(args.out) if args.out else ROOT / "runs" / f"{time.strftime('%Y-%m-%d_%H%M%S')}_{name}"
     prune_runs()
@@ -539,9 +636,15 @@ def cmd_record(argv):
     parser.add_argument("--discs", type=discs_arg, help="content discs to mount, as gh2,gh1; default every one in game/")
     parser.add_argument("--set", action="append", default=[], metavar="NAME=VALUE", dest="settings",
                         help="a settings.ini line over the defaults, e.g. msaa=1; may repeat")
+    parser.add_argument("--series", help="add to that one review set, each take named by its time")
     args = parser.parse_args(argv)
+    global SERIES
+    SERIES = args.series
     if not shutil.which("ffmpeg"):
         sys.exit("record needs ffmpeg")
+    # A path, or a scenario's name alone: scenarios/<name>.dta.
+    if not Path(args.scenario).is_file() and (ROOT / "scenarios" / f"{args.scenario}.dta").is_file():
+        args.scenario = str(ROOT / "scenarios" / f"{args.scenario}.dta")
     name = Path(args.scenario).stem
     out = ROOT / "runs" / f"{time.strftime('%Y-%m-%d_%H%M%S')}_{name}"
     clips = out / "clips"
@@ -557,12 +660,9 @@ def cmd_record(argv):
     videos = sorted(clips.glob("*.ts"), key=lambda p: p.stat().st_mtime)
     made = 0
     for video in videos:
-        # A run's one unnamed clip is the scenario's name alone.
-        mp4 = review_path(name if len(videos) == 1 and video.stem.isdigit() else f"{name}_{video.stem}", ".mp4")
-        # Another run's in the same minute stays.
-        stem, again = mp4.stem, 2
-        while mp4.exists():
-            mp4, again = mp4.with_stem(f"{stem}_{again}"), again + 1
+        # A run's one unnamed clip is the scenario's name alone; each clip
+        # into the run's review set, beside its shots.
+        mp4 = review_set(name) / series_name(f"{name if len(videos) == 1 and video.stem.isdigit() else video.stem}.mp4")
         cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", video]
         sound = video.with_suffix(".f32")
         if sound.exists() and sound.stat().st_size:
@@ -795,8 +895,121 @@ def cmd_release(argv):
     print(f"made {archive}")
 
 
+def cmd_procedural(argv):
+    """Each of tools/procedural's pictures, drawn again: the ones drawn from
+    nothing into assets/, the ones built on the discs' art into build/."""
+    parser = argparse.ArgumentParser(prog="ghc.py procedural")
+    parser.add_argument("names", nargs="*", help="only these, e.g. zebra_wall; default all")
+    args = parser.parse_args(argv)
+    scripts = sorted(p for p in (ROOT / "tools" / "procedural").glob("*.py") if "def main" in p.read_text())
+    for script in scripts:
+        if args.names and script.stem not in args.names:
+            continue
+        print(f"drawing {script.stem}")
+        subprocess.run([sys.executable, script], check=True)
+
+
+def human(size):
+    return f"{size / 1e9:.1f}G" if size >= 1e9 else f"{size / 1e6:.0f}M"
+
+
+def files_in(folder):
+    return [f for f in folder.rglob("*") if f.is_file() and not f.name.startswith(".")]
+
+
+def review_branches():
+    """Each local branch by its review/ folder's name, with its last commit's
+    subject and how it stands: checked out in some tree, landed (no commit
+    dev lacks), or neither."""
+    checked_out = {line.split()[1].removeprefix("refs/heads/")
+                   for line in git_out("worktree", "list", "--porcelain").splitlines() if line.startswith("branch ")}
+    branches = {}
+    for line in git_out("for-each-ref", "--format=%(refname:short)\t%(contents:subject)", "refs/heads").splitlines():
+        branch, subject = line.split("\t", 1)
+        if branch in checked_out:
+            state = "checked out"
+        elif not any(c.startswith("+") for c in git_out("cherry", "dev", branch).splitlines()):
+            state = "landed"
+        else:
+            state = "not checked out"
+        branches[branch_folder(branch)] = (state, subject)
+    return branches
+
+
+def archive_folder(folder):
+    """A review/ folder into review/archive/, each video made small and every
+    still kept as it is."""
+    target = REVIEW / "archive" / folder.name
+    # A folder archived again goes beside the first.
+    stem, again = target.name, 2
+    while target.exists():
+        target, again = target.with_name(f"{stem}_{again}"), again + 1
+    target.parent.mkdir(exist_ok=True)
+    before = sum(f.stat().st_size for f in files_in(folder))
+    shutil.move(folder, target)
+    for video in sorted(target.rglob("*.mp4")):
+        small = video.with_suffix(".small.mp4")
+        cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", video, *ARCHIVE_VIDEO, small]
+        if subprocess.run(cmd).returncode == 0 and small.stat().st_size < video.stat().st_size:
+            small.replace(video)
+        else:
+            small.unlink(missing_ok=True)
+    after = sum(f.stat().st_size for f in files_in(target))
+    print(f"archived {folder.name}: {human(before)} -> {human(after)}")
+
+
+def cmd_review(argv):
+    """review/'s folders and what each is for; archive puts them away."""
+    parser = argparse.ArgumentParser(prog="ghc.py review")
+    parser.add_argument("action", nargs="?", choices=["archive"])
+    parser.add_argument("folders", nargs="*", help="review/ folders to archive")
+    parser.add_argument("--landed", action="store_true",
+                        help="with archive, every folder whose branch landed in dev or is gone")
+    args = parser.parse_args(argv)
+    REVIEW.mkdir(exist_ok=True)
+    branches = review_branches()
+    folders = sorted(p for p in REVIEW.iterdir() if p.is_dir() and p.name != "archive")
+
+    def state(folder):
+        if folder.name.startswith("detached-"):
+            return "detached tree", ""
+        return branches.get(folder.name, ("no branch", ""))
+
+    if args.action == "archive":
+        if args.landed:
+            picked = [f for f in folders if state(f)[0] in ("landed", "no branch")]
+        else:
+            picked = [REVIEW / name for name in args.folders]
+        if not picked:
+            sys.exit("nothing to archive: name folders, or --landed")
+        if any(next(f.rglob("*.mp4"), None) for f in picked if f.is_dir()) and not shutil.which("ffmpeg"):
+            sys.exit("archive needs ffmpeg to make videos small")
+        for folder in picked:
+            if not folder.is_dir():
+                sys.exit(f"no folder {folder}")
+            archive_folder(folder)
+        return
+
+    print(f"{'folder':44} {'files':>6} {'size':>6}  branch")
+    for folder in folders:
+        files = files_in(folder)
+        how, subject = state(folder)
+        size = human(sum(f.stat().st_size for f in files))
+        print(f"{folder.name:44} {len(files):6} {size:>6}  {how}{': ' + subject if subject else ''}")
+    loose = [f for f in REVIEW.iterdir() if f.is_file() and not f.name.startswith(".")]
+    if loose:
+        size = human(sum(f.stat().st_size for f in loose))
+        print(f"{'(loose)':44} {len(loose):6} {size:>6}  in no branch's folder: move each into one")
+    archived = REVIEW / "archive"
+    if archived.is_dir():
+        files = files_in(archived)
+        size = human(sum(f.stat().st_size for f in files))
+        print(f"{'archive/':44} {len(files):6} {size:>6}  {sum(1 for p in archived.iterdir() if p.is_dir())} folders")
+
+
 COMMANDS = {"play": cmd_play, "build": cmd_build, "bind": cmd_bind, "arm": cmd_arm, "record": cmd_record,
-            "scenarios": cmd_scenarios, "release": cmd_release, "ci": cmd_ci}
+            "scenarios": cmd_scenarios, "release": cmd_release, "ci": cmd_ci, "procedural": cmd_procedural,
+            "review": cmd_review}
 
 
 def main():

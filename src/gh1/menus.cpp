@@ -26,6 +26,7 @@
 #include "gh1/scene.h"
 #include "gh1/screens.h"
 #include "milo/milo.h"
+#include "ui/classic_scene.h"
 
 #include <algorithm>
 #include <cstring>
@@ -280,6 +281,8 @@ namespace gh2::gh1
                 addPosters(*made, disc);
             if (songList && theirName == "sel_song")
                 retype(*made, "ss_song.lst", kSongList);
+            if (name == "main" || name == "splash")
+                addClassicLogo(*made, "gh1", name);
             ark::addFile(layer, "ui/gen/" + name + ".milo_ps2", milo::write(*made));
             // Quickplay shows GH1's setlist in GH1's scene from any game's
             // menus, as it does the other games' (content/setlists.h).

@@ -32,6 +32,7 @@ namespace gh2::settings
         kTrackOnAtStart, // the player's track heard before its first hit
         kSustainReleaseMs, // a sustain let go this close to its end stays heard
         kWhammyHold, // a whammy bar held down bends every sustain
+        kStrumLimit, // a strum within 52 ms of the last taken is dropped, as retail
         kNoteStreak, // the streak counter under the score meter and its popups
         kNoteSpeedEasy, // Clone Hero's note speed in tenths, on easy and medium
         kNoteSpeedHard, // and on hard and expert
@@ -42,8 +43,7 @@ namespace gh2::settings
         kDepthOfField, // the PS2's blur behind what a camera shot looks at
         kBandShadows,  // the band's shadows in GH1's venues: none, the room's as GH1 drew them, or GH2's own
         kSongDefaults, // quickplay plays a song as its own game's guitarist, guitar and venue, unpicked
-        kInSongUi,     // outside a career, whose loading, pause, fail, results, HUD and tips a song has
-        kGems,         // outside a career, whose gems: the in-song look's, or one game's
+        kInSongUi,     // outside a career, whose loading, pause, fail, results, tips and highway a song has
         kMenuMusic,    // outside a career, whose menu loops: the theme's, one game's, or every game's
         kMenuMusicOrder, // the loops one after another in order, one over and over, or shuffled
         kVenues,     // outside a career, kSd or kHd: GH2's venues as the PS2 has them, or the 360's
@@ -81,13 +81,6 @@ namespace gh2::settings
         kInSongGh1,
         kInSongGh2,
         kInSongGh80s,
-    };
-
-    enum Gems
-    {
-        kGemsAuto,
-        kGemsGh1,
-        kGemsGh2,
     };
 
     enum BandShadows

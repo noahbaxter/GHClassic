@@ -24,80 +24,10 @@ namespace gh2::streak_counter
         // streak_counter<n>, for each meter <n>.
         constexpr const char *kCounterDisplay = "streak_counter";
 
-        milo::Bytes lengthPrefixed(const std::string &s)
-        {
-            milo::Bytes out;
-            milo::putStr(out, s);
-            return out;
-        }
-
-        // `from`, length-prefixed, as `to`. False if the body has none.
-        bool replaceStr(milo::Bytes &body, const std::string &from, const std::string &to)
-        {
-            const milo::Bytes a = lengthPrefixed(from), b = lengthPrefixed(to);
-            const auto it = std::search(body.begin(), body.end(), a.begin(), a.end());
-            if (it == body.end())
-                return false;
-            const auto at = body.erase(it, it + static_cast<std::ptrdiff_t>(a.size()));
-            body.insert(at, b.begin(), b.end());
-            return true;
-        }
-
-        // A list of names in a body (a Group's objects, a score display's
-        // meshes): where its count is, the list holding `name`. None when
-        // no such list holds it.
-        std::optional<size_t> listHolding(const milo::Bytes &body, const std::string &name)
-        {
-            const milo::Bytes member = lengthPrefixed(name);
-            const auto it = std::search(body.begin(), body.end(), member.begin(), member.end());
-            if (it == body.end())
-                return std::nullopt;
-            const size_t at = static_cast<size_t>(it - body.begin());
-            for (size_t count = at; count >= 4u; --count)
-            {
-                const uint32_t n = milo::u32(body, count - 4u);
-                if (n == 0u || n > 64u)
-                    continue;
-                size_t o = count;
-                bool covers = false;
-                for (uint32_t k = 0; k < n && o < body.size(); ++k)
-                {
-                    covers = covers || o == at;
-                    milo::str(body, o);
-                }
-                if (covers)
-                    return count - 4u;
-            }
-            return std::nullopt;
-        }
-
-        // `name` added to the list holding `after`, after it.
-        bool addAfter(milo::Bytes &body, const std::string &after, const std::string &name)
-        {
-            const auto count = listHolding(body, after);
-            if (!count)
-                return false;
-            const milo::Bytes member = lengthPrefixed(after), added = lengthPrefixed(name);
-            const auto at = std::search(body.begin(), body.end(), member.begin(), member.end());
-            body.insert(at + static_cast<std::ptrdiff_t>(member.size()), added.begin(), added.end());
-            const uint32_t n = milo::u32(body, *count) + 1u;
-            std::memcpy(body.data() + *count, &n, 4u);
-            return true;
-        }
-
-        // `name` taken out of the list holding it.
-        bool remove(milo::Bytes &body, const std::string &name)
-        {
-            const auto count = listHolding(body, name);
-            if (!count)
-                return false;
-            const milo::Bytes member = lengthPrefixed(name);
-            const auto at = std::search(body.begin(), body.end(), member.begin(), member.end());
-            body.erase(at, at + static_cast<std::ptrdiff_t>(member.size()));
-            const uint32_t n = milo::u32(body, *count) - 1u;
-            std::memcpy(body.data() + *count, &n, 4u);
-            return true;
-        }
+        using milo::addAfter;
+        using milo::listHolding;
+        using milo::remove;
+        using milo::replaceStr;
 
         // A Mat (revision 27)'s colour white: past its type, a byte and its
         // blend. The score's digits are tinted (0, 0.75, 1).

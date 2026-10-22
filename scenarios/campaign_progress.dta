@@ -1,0 +1,109 @@
+; The campaign picker's number for a GH2 expert career: a song played whole
+; by autoplay is a full combo (its longest streak every gem hit, a chord one
+; of each), a song won by the cheat is passed but none, and both hold
+; through a load. One career song passed on expert is expert's quarter
+; floor, 75.
+#include common/first_boot.dta
+{gamecfg set mode career}
+{campaign set_profile_name "The Testers" 0}
+{ui goto_screen chooseprof_screen}
+(wait_screen chooseprof_screen)
+(press green)
+(wait_screen ghc_campaign_screen)
+(wait 1)
+(expect {campaigns progress gh2 0} 0)
+(expect {campaigns full_combos gh2 0} 0)
+{set $pick gh2}
+#include common/pick_campaign.dta
+(press green)
+(wait_screen sel_difficulty_screen)
+(wait 1)
+(press down)
+(press down)
+(press down)
+(press green)
+(wait_screen sel_character_new_screen)
+(wait_until {char_single are_chars_loaded})
+(wait 1)
+(press green)
+(wait_screen sel_guitar_new_screen)
+(wait 2)
+(press green)
+(wait_screen tour_start_screen)
+(wait 1)
+(press green)
+(wait_screen career_screen 40)
+(wait 1)
+(expect {game get_difficulty_sym 0} expert)
+(press green)
+(wait_screen sel_venue_screen 40)
+(wait 1)
+(press green)
+(wait_screen sel_song_screen)
+(wait 2)
+{{game get_player_config 0} set autoplay TRUE}
+(press green)
+(wait_screen game_screen 60)
+{set $song {gamecfg get_song}}
+(wait_screen endgame_screen 900)
+(expect {player0 percent_hit} 100)
+(expect {player0 gems_passed} 0)
+(expect {player0 longest_streak} {player0 gems_hit})
+(wait 2)
+(press green)
+(wait_screen cashaward_screen)
+(press green)
+(wait_screen complete_screen)
+(wait 1)
+(expect {campaigns progress gh2 0} 75)
+(expect {> {campaigns full_combos gh2 0} 0} 1)
+{set $combos {campaigns full_combos gh2 0}}
+
+; A second song, won by the cheat a few seconds in: passed, no full combo.
+{gamecfg set mode career}
+{campaign set_profile_slot 0}
+{ui goto_screen ghc_campaign_screen}
+(wait_screen ghc_campaign_screen)
+(wait 1)
+#include common/pick_campaign.dta
+(press green)
+(wait_screen sel_difficulty_screen)
+(wait 1)
+(press green)
+(wait_screen career_screen 40)
+(wait 1)
+(expect {game get_difficulty_sym 0} expert)
+(press green)
+(wait_screen sel_venue_screen 40)
+(wait 1)
+(press green)
+(wait_screen sel_song_screen)
+(wait 2)
+(press down)
+{{game get_player_config 0} set autoplay TRUE}
+(press green)
+(wait_screen game_screen 60)
+(expect {!= {gamecfg get_song} $song} 1)
+(wait 5)
+{player0 win 5}
+(wait_screen endgame_screen 400)
+(wait 2)
+(press green)
+(wait_screen cashaward_screen)
+(press green)
+(wait_screen complete_screen)
+(wait 1)
+(expect {campaigns full_combos gh2 0} $combos)
+
+; Saved and loaded back.
+{ui goto_screen bootup_load}
+(wait_screen main_screen 40)
+(expect {campaigns progress gh2 0} 75)
+(expect {campaigns full_combos gh2 0} $combos)
+{gamecfg set mode career}
+{campaign set_profile_slot 0}
+{ui goto_screen ghc_campaign_screen}
+(wait_screen ghc_campaign_screen)
+(wait 2)
+(shot picker)
+(quit)

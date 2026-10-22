@@ -10,6 +10,7 @@
 #include "host/scene_renderer.h"
 #include "movie/screen.h"
 #include "render/frame.h"
+#include "render/texture_store.h"
 #include "runtime/ee_scheduler.h"
 #include "runtime/host_clock.h"
 #include "settings/settings.h"
@@ -175,6 +176,7 @@ namespace gh2
             Clock::time_point start{}, lastPresent{}, lastFlush{};
             uint64_t lastGame = 0;
             uint64_t lastDropped = 0;
+            textures::Reads lastReads;
 
             static double ms(Clock::duration d)
             {
@@ -194,7 +196,8 @@ namespace gh2
                     on = false;
                     return;
                 }
-                out << "t_ms,dt_ms,new,game,wait_ms,acq_ms,rec_ms,mesh_new,tex_new,upload_kb,evicted,vbl_drop,gpu_ms";
+                out << "t_ms,dt_ms,new,game,wait_ms,acq_ms,rec_ms,mesh_new,tex_new,upload_kb,evicted,vbl_drop,"
+                       "tex_reads,tex_read_ms,gpu_ms";
                 for (const char *span : kGpuSpans)
                     out << ",gpu_" << span << "_ms";
                 out << "\n";
@@ -212,15 +215,21 @@ namespace gh2
                 lastGame = game;
                 const uint64_t newDropped = dropped - std::min(dropped, lastDropped);
                 lastDropped = dropped;
+                // The game thread's texture reads since the last row.
+                const textures::Reads reads = textures::reads();
+                const uint64_t newReads = reads.count - lastReads.count;
+                const double readMs = static_cast<double>(reads.ns - lastReads.ns) / 1e6;
+                lastReads = reads;
                 float gpuMs = 0.0f;
                 for (float span : scene.gpuMs)
                     gpuMs += span;
-                char row[160];
-                std::snprintf(row, sizeof(row), "%.2f,%.2f,%d,%llu,%.2f,%.2f,%.2f,%u,%u,%llu,%u,%llu,%.2f",
+                char row[192];
+                std::snprintf(row, sizeof(row), "%.2f,%.2f,%d,%llu,%.2f,%.2f,%.2f,%u,%u,%llu,%u,%llu,%llu,%.2f,%.2f",
                               ms(now - start), dtMs, isNew ? 1 : 0, static_cast<unsigned long long>(newGame), waitMs,
                               acqMs, recMs, scene.meshesCreated, scene.texturesCreated,
                               static_cast<unsigned long long>(scene.uploadBytes >> 10), scene.evicted,
-                              static_cast<unsigned long long>(newDropped), gpuMs);
+                              static_cast<unsigned long long>(newDropped), static_cast<unsigned long long>(newReads),
+                              readMs, gpuMs);
                 out << row;
                 for (float span : scene.gpuMs)
                 {
@@ -233,7 +242,8 @@ namespace gh2
                               << ", acq " << static_cast<int>(acqMs) << ", rec " << static_cast<int>(recMs)
                               << ", gpu " << static_cast<int>(gpuMs) << ", +" << scene.meshesCreated << " meshes, +"
                               << scene.texturesCreated << " tex (" << (scene.uploadBytes >> 10) << " KB), "
-                              << scene.evicted << " evicted, " << newDropped << " vblanks dropped" << std::endl;
+                              << scene.evicted << " evicted, " << newDropped << " vblanks dropped, " << newReads
+                              << " game thread reads (" << static_cast<int>(readMs) << " ms)" << std::endl;
                 if (now - lastFlush >= std::chrono::seconds(1))
                 {
                     out.flush();
@@ -623,7 +633,7 @@ namespace gh2
         const char *const *extensions = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
         auto instance = vkb::InstanceBuilder(vkGetInstanceProcAddr)
                             .set_app_name(title)
-                            .require_api_version(1, 2, 0)
+                            .require_api_version(1, 0, 0)
                             .enable_extensions(extensionCount, extensions)
                             .build();
         if (!instance)
@@ -639,7 +649,7 @@ namespace gh2
             return false;
         }
 
-        auto physical = vkb::PhysicalDeviceSelector(s.instance, s.surface).set_minimum_version(1, 2).select();
+        auto physical = vkb::PhysicalDeviceSelector(s.instance, s.surface).set_minimum_version(1, 0).select();
         if (!physical)
         {
             std::cerr << "[vulkan] device: " << physical.error().message() << std::endl;
@@ -686,7 +696,7 @@ namespace gh2
         functions.vkGetInstanceProcAddr = s.instance.fp_vkGetInstanceProcAddr;
         functions.vkGetDeviceProcAddr = s.device.fp_vkGetDeviceProcAddr;
         VmaAllocatorCreateInfo allocatorInfo{};
-        allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_2;
+        allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_0;
         allocatorInfo.physicalDevice = s.device.physical_device.physical_device;
         allocatorInfo.device = s.device.device;
         allocatorInfo.instance = s.instance.instance;
@@ -963,7 +973,7 @@ namespace gh2
             if (presented == VK_ERROR_OUT_OF_DATE_KHR || presented == VK_SUBOPTIMAL_KHR)
                 s.swapchainStale = true;
         }
-        s.times.add(static_cast<float>(State::FrameLog::ms(waitEnd - acquireEnd)),
+        s.times.add(isNew || moviePlaying, static_cast<float>(State::FrameLog::ms(waitEnd - acquireEnd)),
                     static_cast<float>(State::FrameLog::ms(recordEnd - recordStart)),
                     moviePlaying ? SceneStats{} : s.scene.stats());
         if (s.frameLog.on)

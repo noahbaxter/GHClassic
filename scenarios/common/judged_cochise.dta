@@ -1,0 +1,86 @@
+; Cochise on expert played by ghc_play (dev/scripted_play.h) under the note
+; engine set, failing turned off. Each case on gems of its own, its result
+; against $hit_*: 1 where that engine counts the gem hit, 0 where it lets it
+; pass. The cases and results are those the scripted player of
+; .planning/note-engine/DIFF.md found in game, at exact song times.
+{gamecfg set mode quickplay}
+{quickplay song_defaults 0}
+{{game get_player_config 0} set_difficulty expert}
+{game set_song cochise}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait_until {> {ghc_play gems} 0})
+{player0 set_crowd_rating_active FALSE}
+(expect {ghc_play scoring crowd 1} $crowd_medium 0.001)
+(expect {ghc_play scoring crowd 2} $crowd_hard 0.001)
+(expect {ghc_play scoring stars 3} $stars_top 0.001)
+
+; Clear of the song's first seconds, where loading stalls the game most.
+; Hammered on or pulled off to 70 ms early: inside GH2's 100, not GH1's 40.
+{set $early {ghc_play find hammer 15000}}
+{ghc_play strum {- $early 1} 0}
+{ghc_play hammer $early -70}
+{ghc_play release {+ {ghc_play gem $early ms} 100}}
+
+; And 20 early: inside both.
+{set $near {ghc_play find hammer {+ {ghc_play gem $early ms} 2000}}}
+{ghc_play strum {- $near 1} 0}
+{ghc_play hammer $near -20}
+{ghc_play release {+ {ghc_play gem $near ms} 100}}
+
+; Every fret let go after the strum: GH1 hammers nothing until the next.
+{set $lifted {ghc_play find hammer {+ {ghc_play gem $near ms} 2000}}}
+{ghc_play strum {- $lifted 1} 0}
+{ghc_play release {+ {ghc_play gem {- $lifted 1} ms} 30}}
+{ghc_play hammer $lifted -20}
+{ghc_play release {+ {ghc_play gem $lifted ms} 100}}
+
+; A strum 60 ms after a gem hammered on time is eaten in both: the streak
+; stands.
+{set $eaten {ghc_play find hammer {+ {ghc_play gem $lifted ms} 2000}}}
+{ghc_play strum {- $eaten 1} 0}
+{ghc_play hammer $eaten 0}
+{ghc_play mark {+ {ghc_play gem $eaten ms} 60} eaten_before streak}
+{ghc_play strum $eaten 60}
+{ghc_play mark {+ {ghc_play gem $eaten ms} 60} eaten_after streak}
+{ghc_play release {+ {ghc_play gem $eaten ms} 100}}
+
+; Strums on lone gems: 75 ms either side inside both windows of 100, 130
+; outside them.
+{set $late_in {ghc_play find lone {+ {ghc_play gem $eaten ms} 2000}}}
+{ghc_play strum $late_in 75}
+{set $early_in {ghc_play find lone {+ {ghc_play gem $late_in ms} 1000}}}
+{ghc_play strum $early_in -75}
+{set $late_out {ghc_play find lone {+ {ghc_play gem $early_in ms} 1000}}}
+{ghc_play strum $late_out 130}
+{set $early_out {ghc_play find lone {+ {ghc_play gem $late_out ms} 1000}}}
+{ghc_play strum $early_out -130}
+{ghc_play release {+ {ghc_play gem $early_out ms} 100}}
+
+; Ten gems strummed on time from a streak of none: the tenth's points, 50 a
+; fret at the multiplier GH2 gives the streak it makes and GH1 the one before
+; it, $tenth a fret.
+{set $run {ghc_play find run {+ {ghc_play gem $early_out ms} 1000}}}
+{set $tenth_gem {+ $run 9}}
+{ghc_play mark {ghc_play gem $tenth_gem ms} before score}
+{ghc_play play $run 10}
+{ghc_play mark {ghc_play gem $tenth_gem ms} after score}
+
+; Every case is 20 ms or more inside or outside the edge it tests, so an
+; action further off than that means the game stalled, not a rule broke.
+(wait_until {ghc_play idle} 120)
+(wait 0.5)
+(expect {< {ghc_play worst} 20} 1)
+(expect {- $after $before} {* $tenth {ghc_play gem $tenth_gem frets}})
+(expect {ghc_play gem $early played} $hit_early)
+(expect {ghc_play gem $near played} 1)
+(expect {ghc_play gem $lifted played} $hit_lifted)
+(expect {> $eaten_before 0} 1)
+(expect $eaten_after $eaten_before)
+(expect {ghc_play gem $late_in played} 1)
+(expect {ghc_play gem $early_in played} 1)
+(expect {ghc_play gem $late_out played} 0)
+(expect {ghc_play gem $early_out played} 0)
+{ui goto_screen main_screen}
+(wait_screen main_screen 30)

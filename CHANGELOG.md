@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.8
+
+**THIS IS UNFINISHED.** Expect bugs, missing features and things changing between releases.
+
+### New
+- Brand new campaign hub with per game progress tracking, followed by FC tracking after you've already beaten all core campaign songs on expert
+- GH1 note engine is now available to play with in quickplay or its own dedicated campaign, enjoy never hitting another HOPO again
+- Added a strum limit toggle, just in case you really don't want to FC Trogdor (you can also set framerate to 50 limit with the limit on for the theoretically playable PAL experience)
+- Added a simple "Classic" logo using the in game marker font underneath each game's logo, plus a redesigned icon
+- Added a procedurally generated Zebra rug texture under the setlist wall for GH80s to differentiate from reused GH2 wall textures
+
+### Bugs
+- Reduced lag spikes worst with next gen lighting enabled due to textures reloading mid-song
+- The streak counter would only appear in GH2 HUDs
+- Some HUD themes would be missing certain digit glyphs for rok font
+- The classic HOPO bug where a note would lock from a wrong fret and carry over even after restarts or practice skips
+
+### Compatibility
+- Dropped Vulkan version to 1.0 to enable older GPU support since GHC doesn't really use modern features anyways
+- The renderer would break a Vulkan rule each frame that most drivers ignored, but may have caused instability on some GPUs
+
 ## v0.7.5
 
 **THIS IS UNFINISHED.** Expect bugs, missing features and things changing between releases.

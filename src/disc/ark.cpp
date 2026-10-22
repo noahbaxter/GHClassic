@@ -54,12 +54,17 @@ namespace gh2::ark
             std::string serial; // Volume::serial's
             std::unordered_map<std::string, Entry> files; // dir/name -> entry
             Volume *volume = nullptr;
-            // Files served in place of its own (addMade): those still to
-            // make, those made, and when each is served (always, for one
-            // with none).
-            std::unordered_map<std::string, std::function<std::optional<Made>()>> makers;
-            std::unordered_map<std::string, Entry> made;
-            std::unordered_map<std::string, std::function<bool()>> when;
+            // Files served in place of its own (addMade), each path's in the
+            // order added: how each is made, when it is served (always, for
+            // one with none), and it once made.
+            struct Maker
+            {
+                std::function<std::optional<Made>()> make;
+                std::function<bool()> when;
+                bool tried = false;
+                std::optional<Entry> made;
+            };
+            std::unordered_map<std::string, std::vector<Maker>> makers;
             // Its own files changed (addFix): those still to change, by
             // each fix in turn, and those changed.
             std::unordered_map<std::string, std::vector<std::function<void(std::vector<uint8_t> &)>>> fixes;
@@ -265,27 +270,34 @@ namespace gh2::ark
             return fixed != disc.fixed.end() ? &fixed->second : &own->second;
         }
 
-        // A disc's file as the game gets it: the one made in its place while
-        // that is served, made now if it is still to be, else its own.
+        // A disc's file as the game gets it: the one made in its place by
+        // the last added maker that is served now, made now if it is still
+        // to be, else its own.
         const Entry *findOn(Disc &disc, const std::string &name)
         {
             const Entry *own = ownOn(disc, name);
             if (!own)
                 return nullptr;
-            if (const auto when = disc.when.find(name); when != disc.when.end() && !when->second())
+            const auto makers = disc.makers.find(name);
+            if (makers == disc.makers.end())
                 return own;
-            if (const auto maker = disc.makers.find(name); maker != disc.makers.end())
+            for (auto maker = makers->second.rbegin(); maker != makers->second.rend(); ++maker)
             {
-                const auto make = std::move(maker->second);
-                disc.makers.erase(maker);
-                if (auto file = make())
+                if (maker->when && !maker->when())
+                    continue;
+                if (!maker->tried)
                 {
-                    const uint32_t size = file->size;
-                    disc.made[name] = addPart({std::move(file->read), size, size});
+                    maker->tried = true;
+                    if (auto file = maker->make())
+                    {
+                        const uint32_t size = file->size;
+                        maker->made = addPart({std::move(file->read), size, size});
+                    }
                 }
+                if (maker->made)
+                    return &*maker->made;
             }
-            const auto made = disc.made.find(name);
-            return made != disc.made.end() ? &made->second : own;
+            return own;
         }
 
         // A layer's own file, else its disc's.
@@ -497,11 +509,7 @@ namespace gh2::ark
     {
         if (disc >= s_discs.size())
             return;
-        s_discs[disc].makers[key(path.c_str())] = std::move(make);
-        if (when)
-            s_discs[disc].when[key(path.c_str())] = std::move(when);
-        else
-            s_discs[disc].when.erase(key(path.c_str()));
+        s_discs[disc].makers[key(path.c_str())].push_back({std::move(make), std::move(when)});
     }
 
     void addFix(size_t disc, const std::string &path, std::function<void(std::vector<uint8_t> &)> fix)
@@ -519,6 +527,11 @@ namespace gh2::ark
                     out.push_back(name);
         std::sort(out.begin(), out.end());
         return out;
+    }
+
+    size_t discs()
+    {
+        return s_discs.size();
     }
 
     bool addFolder(const std::string &root)

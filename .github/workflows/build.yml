@@ -18,7 +18,7 @@ jobs:
           submodules: recursive
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.11"
+          python-version-file: .python-version
       - run: python tools/ghc.py ci
 
   windows:
@@ -29,7 +29,7 @@ jobs:
           submodules: recursive
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.11"
+          python-version-file: .python-version
       - run: python tools/ghc.py ci
 
   # The release baseline: Ubuntu 22.04, glibc 2.35, clang 21 over GCC 12's
@@ -51,4 +51,4 @@ jobs:
       # The container runs as root over a checkout owned by the runner.
       - run: git config --global --add safe.directory '*'
       - run: .github/linux-deps.sh
-      - run: python3.11 tools/ghc.py ci
+      - run: python$(cat .python-version) tools/ghc.py ci

@@ -5,10 +5,13 @@
 #include common/first_boot.dta
 (wait 1)
 
-; Up from Game Settings' first row is its last, then P1 with one player.
+; Up from Game Settings' first row is its last, the note engine's with
+; GH1's disc, then the lag row, then P1 with one player.
 {ui goto_screen game_settings_screen}
 (wait_screen game_settings_screen)
 (wait 1)
+(press up)
+(expect {game_settings_screen focus_name} gm_engine.btn)
 (press up)
 (expect {game_settings_screen focus_name} gm_lag.btn)
 (press up)

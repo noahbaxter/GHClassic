@@ -41,7 +41,8 @@ namespace gh2::ark
     // disc's turn) and nowhere else, made when the game first asks for it.
     // None leaves the disc's own. With `when`, it is served only while that
     // holds, asked each time the file is looked for, and made the first time
-    // it does. Once install has run.
+    // it does. Of several for one path, the last added that is served and
+    // makes one wins. Once install has run.
     void addMade(size_t disc, const std::string &path, std::function<std::optional<Made>()> make,
                  std::function<bool()> when = {});
 
@@ -55,6 +56,8 @@ namespace gh2::ark
     // That disc's archive paths starting `prefix`, in order, once install
     // has run.
     std::vector<std::string> paths(size_t disc, const std::string &prefix);
+    // How many discs are indexed, the game disc first, once install has run.
+    size_t discs();
 
     // Every file under `root`, at its path relative to it. False, with the
     // reason printed, if it cannot be read.

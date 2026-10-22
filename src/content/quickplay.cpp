@@ -204,8 +204,6 @@ namespace gh2::quickplay
             };
             if (op == "in_song_ui")
                 return choice(settings::kInSongUi, {"venue", "gh1", "gh2", "gh80s"});
-            if (op == "gems")
-                return choice(settings::kGems, {"auto", "gh1", "gh2"});
             if (op == "menu_music")
                 return choice(settings::kMenuMusic, {"theme", "gh1", "gh2", "gh80s", "all"});
             if (op == "menu_music_order")
@@ -266,7 +264,7 @@ namespace gh2::quickplay
             }
             std::cerr << "[quickplay] usage: {quickplay song_defaults [<0|1>]}, {quickplay outfit <game>}, "
                          "{quickplay pick|picked <what>}, {quickplay look <character> [<outfit>]}, "
-                         "{quickplay in_song_ui [venue|gh1|gh2|gh80s]}, {quickplay gems [auto|gh1|gh2]}, "
+                         "{quickplay in_song_ui [venue|gh1|gh2|gh80s]},"
                          "{quickplay menu_music [theme|gh1|gh2|gh80s|all]}, "
                          "{quickplay menu_music_order [playlist|loop|shuffle]}, "
                          "{quickplay characters|guitars|venues [sd|hd]}, {quickplay has_hd outfit|guitar <name>}"

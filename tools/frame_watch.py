@@ -21,6 +21,8 @@ IDLE_EXIT_S = 5.0
 
 def cause(row):
     """The likeliest reason a frame ran long, from what it recorded."""
+    if float(row.get("tex_read_ms") or 0) >= 4.0:
+        return "texture reads on the game thread"
     if int(row["mesh_new"]) + int(row["tex_new"]) >= 4 or int(row["upload_kb"]) >= 1024:
         return "uploads"
     if int(row["vbl_drop"]) > 0:

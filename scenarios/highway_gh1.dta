@@ -1,0 +1,68 @@
+; GH1's highway (gh1/career.cpp's addHighway): GH1's art and colours on
+; GH2's track and HUD, wherever a song's look is GH1's, whichever note engine
+; judges. The same song in GH2's battle venue at the same point, its look
+; GH2's then GH1's (in_song_ui), star power out in each, both judged by
+; GH2's engine. Then GH1's career, always its own look, under GH2's engine.
+(needs gh1)
+#include common/first_boot.dta
+{quickplay song_defaults 0}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+(expect {note_engine} gh2)
+{quickplay in_song_ui gh2}
+{gamecfg set mode quickplay}
+{game set_song shoutatthedevil}
+{game set_quickplay}
+{game set_venue battle}
+{campaigns venues_from gh2}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(expect {campaigns highway} gh2)
+(wait 25)
+(shot gh2_highway)
+(wait_until {player0 star_power_ready} 150)
+(star_power player0 {player0 star_power_ready})
+(wait 1.5)
+(shot gh2_star_power)
+(star_power)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+
+{quickplay in_song_ui gh1}
+{{game get_player_config 0} set_difficulty expert}
+{gamecfg set mode quickplay}
+{game set_song shoutatthedevil}
+{game set_quickplay}
+{game set_venue battle}
+{campaigns venues_from gh2}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(expect {campaigns highway} gh1)
+(expect {note_engine} gh2)
+(wait 25)
+(shot gh1_highway)
+(wait_until {player0 star_power_ready} 150)
+(star_power player0 {player0 star_power_ready})
+(wait 1.5)
+(shot gh1_star_power)
+(star_power)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+
+; GH1's career whatever quickplay's look: its first song.
+{quickplay in_song_ui gh2}
+{set $pick gh1}
+#include common/career_start.dta
+(press green)
+(wait_screen sel_venue_screen 40)
+(wait 1)
+(press green)
+(wait_screen sel_song_screen)
+(wait 2)
+{set $index 0}
+#include common/career_song.dta
+(expect {campaigns highway} gh1)
+(expect {note_engine} gh2)
+(wait 25)
+(shot gh1_career_highway)
+(quit)

@@ -5,6 +5,7 @@
 #include "content/setlists.h"
 #include "disc/ark.h"
 #include "formats/dtb.h"
+#include "gameplay/note_engine/note_engine.h"
 #include "guest.h"
 #include "hook.h"
 #include "save/save.h"
@@ -16,6 +17,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cstring>
 #include <functional>
@@ -74,7 +76,7 @@ namespace gh2::campaigns
         const std::vector<const char *> kVenueFiles = {"world/", "venues/"};
         // The in-song look lends the screens around the song: loading before
         // and after, pause and its settings, lose, the results and the high
-        // scores, and the HUD. Their scenes as its scripts name them, and the
+        // scores. Their scenes as its scripts name them, and the
         // pieces beside them: the 80s' pause art is pause_lose_tex, its
         // loading words loading_word, and the results' photo picture_endgame.
         const std::set<std::string> kSongPanels = {
@@ -95,9 +97,10 @@ namespace gh2::campaigns
         // the look's scene.
         const std::vector<const char *> kSongFiles = {
             "ui/image/og/eng/gen/loading_word", "ui/gen/pause_settings.milo", "ui/gen/pause_lose_tex.milo",
-            "ui/gen/picture_endgame.milo",      "ui/gen/highscore.milo",      "hud/gen/",
+            "ui/gen/picture_endgame.milo",      "ui/gen/highscore.milo",
         };
-        constexpr const char *kTrack = "track/gen/track.milo_ps2"; // the gems
+        // The highway lends its gems and strikeline, and the HUD's meters.
+        const std::vector<const char *> kHighway = {"track/gen/track.milo_ps2", "hud/gen/"};
         constexpr size_t kTips = 3u;                                // kConfig's tips: the loading screen's
         constexpr const char *kRootConfig = "config/gh2.dta";
         constexpr const char *kUi = "ui/ui.dta";
@@ -114,8 +117,9 @@ namespace gh2::campaigns
         size_t s_theme = 0u;     // the menus picked for outside a career
         bool s_career = false;   // in a career, where everything is the active one's
         size_t s_venueFrom = 0u; // the campaign whose venues the next song plays in
-        size_t s_lookFrom = 0u;  // whose screens around it and HUD it has
-        size_t s_gemsFrom = 0u;  // and whose gems
+        size_t s_lookFrom = 0u;  // whose screens around it it has
+        size_t s_gemsFrom = 0u;  // and whose highway, which is lent apart
+        std::atomic<bool> s_gh1Highway{false}; // that one is GH1's, for gh1Highway
         std::vector<std::string> s_menusLent, s_lookLent;
 
         struct Pending
@@ -392,9 +396,11 @@ namespace gh2::campaigns
 
         std::optional<size_t> indexOf(const std::string &game);
 
-        // Outside a career, the game whose screens around a song and HUD it
-        // has (in_song_ui): the venue's, or one game's where it is there.
-        // In a career, the active one's.
+        // Outside a career, the game whose screens around a song and highway
+        // (gems, strikeline and HUD, all but its surface, which is the
+        // guitarist's) it has (in_song_ui): the venue's, or one game's where
+        // it is there. In a career, the active one's, whatever note engine
+        // judges.
         size_t lookFor(uint8_t *rdram, size_t venue)
         {
             static const char *const kGames[] = {"", "gh1", "gh2", "gh80s"};
@@ -407,34 +413,39 @@ namespace gh2::campaigns
             return venue;
         }
 
-        // And whose gems: the look's, or one game's.
-        size_t gemsFor(uint8_t *rdram, size_t look)
+        // The highway's files lent from the look's game, the active one's own
+        // back when it is that. False if that game cannot be read.
+        bool highwayFrom(const script::Call &call, size_t from)
         {
-            const int pick = settings::get(settings::kGems);
-            if (inCareer(rdram))
-                return s_active;
-            if (pick == settings::kGemsGh2)
-                return 0u;
-            if (pick == settings::kGemsGh1)
-                if (const auto index = indexOf("gh1"))
-                    return *index;
-            return look;
+            if (from == s_gemsFrom)
+                return true;
+            if (!built(Guest{call}, from))
+                return false;
+            for (const char *prefix : kHighway)
+                if (from == s_active)
+                    ark::unlend(prefix);
+                else
+                    ark::lend(prefix, s_campaigns[from].front);
+            s_gemsFrom = from;
+            s_gh1Highway = s_campaigns[from].game == "gh1";
+            std::cerr << "[campaign] highway from " << s_campaigns[from].game << std::endl;
+            return true;
         }
 
         // The next song's venue is that campaign's: its world and venue
         // files from its layer, and its venues' scripts in the config's
-        // types. Its screens around it, HUD and loading tips are the look's
-        // (lookFor), and its gems gemsFor's. The active one's puts the
+        // types. Its screens around it and loading tips are the look's
+        // (lookFor), and its highway the same game's. The active one's puts the
         // active one's back.
         bool venuesFrom(const script::Call &call, size_t index)
         {
-            const size_t look = lookFor(call.rdram, index), gems = gemsFor(call.rdram, look);
+            const size_t look = lookFor(call.rdram, index);
             // The venue's name is its game's, wherever it shows.
             locale::own(locale::kVenue, s_campaigns[index].game);
-            if (index == s_venueFrom && look == s_lookFrom && gems == s_gemsFrom)
-                return true;
+            if (index == s_venueFrom && look == s_lookFrom)
+                return highwayFrom(call, look);
             const Guest guest{call};
-            if (!built(guest, index) || !built(guest, look) || !built(guest, gems))
+            if (!built(guest, index) || !built(guest, look))
                 return false;
             const auto lendFrom = [](const std::string &prefix, size_t from)
             {
@@ -478,14 +489,9 @@ namespace gh2::campaigns
                 script::patchSongUiAgain(call.rdram, call.ctx, call.runtime);
                 s_lookFrom = look;
             }
-            if (gems != s_gemsFrom)
-            {
-                lendFrom(kTrack, gems);
-                s_gemsFrom = gems;
-            }
             std::cerr << "[campaign] venues from " << s_campaigns[index].game << ", screens around the song from "
-                      << s_campaigns[look].game << ", gems from " << s_campaigns[gems].game << std::endl;
-            return true;
+                      << s_campaigns[look].game << std::endl;
+            return highwayFrom(call, look);
         }
 
         // That campaign's menu loops, as its (synth metamusic music) names
@@ -604,9 +610,11 @@ namespace gh2::campaigns
                 ark::unlend(prefix);
             for (const std::string &prefix : s_lookLent)
                 ark::unlend(prefix);
-            ark::unlend(kTrack);
+            for (const char *prefix : kHighway)
+                ark::unlend(prefix);
             s_lookLent.clear();
             s_venueFrom = s_lookFrom = s_gemsFrom = index;
+            s_gh1Highway = s_campaigns[index].game == "gh1";
             for (const std::string &prefix : s_menusLent)
                 ark::unlend(prefix);
             s_menusLent.clear();
@@ -671,6 +679,9 @@ namespace gh2::campaigns
         // way that game is the theme from then on, kept for the next boot.
         bool goTo(const script::Call &call, size_t index, bool career)
         {
+            // Under the engine picked, in a career or out of one, before any
+            // game changes.
+            judgeNoteEngine(pickedNoteEngine(), call.rdram, call.ctx, call.runtime);
             s_career = career;
             s_theme = index;
             if (career ? index != s_active : s_active != 0u)
@@ -716,21 +727,41 @@ namespace gh2::campaigns
             return s_found[{s_active, second}] = outfit ? outfit->text : "punk1";
         }
 
-        // How far band `slot` is through `game`'s career, 0 to 100: its
-        // career songs passed on the difficulty that has passed most of
-        // them, as a share of the career's.
-        int progress(const std::string &game, int slot)
+        // How far band `slot` is through `game`'s career, 0 to 100: each
+        // difficulty with a career song passed a quarter over the one below,
+        // by its career songs passed, so expert done is 100 whatever was
+        // played under it; the best difficulty's.
+        int progress(const std::string &game, int slot, std::optional<NoteEngine> engine)
         {
             const std::vector<std::string> career = setlists::careerSongs(game);
-            size_t most = 0u;
-            for (const std::set<std::string> &passed : save::passedSongs(game, slot))
+            if (career.empty())
+                return 0;
+            const auto passed = save::passedSongs(game, slot, engine);
+            size_t best = 0u;
+            for (size_t d = 0; d < passed.size(); ++d)
             {
                 size_t count = 0u;
                 for (const std::string &song : career)
-                    count += passed.count(song);
-                most = std::max(most, count);
+                    count += passed[d].count(song);
+                if (count > 0u)
+                    best = std::max(best, 25u * d + 25u * count / career.size());
             }
-            return career.empty() ? 0 : static_cast<int>(most * 100u / career.size());
+            return static_cast<int>(best);
+        }
+
+        // Its expert full combos (save::fullComboSongs) as a share of every
+        // song, career and bonus, 0 to 100.
+        int fullCombos(const std::string &game, int slot, std::optional<NoteEngine> engine)
+        {
+            const std::set<std::string> combos = save::fullComboSongs(game, slot, engine).back();
+            size_t count = 0u, all = 0u;
+            for (const std::vector<std::string> &songs : {setlists::careerSongs(game), setlists::bonusSongs(game)})
+                for (const std::string &song : songs)
+                {
+                    count += combos.count(song);
+                    ++all;
+                }
+            return all == 0u ? 0 : static_cast<int>(count * 100u / all);
         }
 
         // Whether `game`'s store sells `item`: named in any of store.dta's
@@ -881,7 +912,28 @@ namespace gh2::campaigns
                 // The career being played as it stands, not as last saved.
                 if (call.symbol(2) == active())
                     save::leaveGame(call.rdram, call.ctx, call.runtime);
-                return {static_cast<uint32_t>(progress(call.symbol(2), static_cast<int>(call.number(3)))), script::kInt};
+                return {static_cast<uint32_t>(progress(call.symbol(2), static_cast<int>(call.number(3)),
+                                                       noteEngineNamed(call.size() > 4 ? call.symbol(4) : ""))),
+                        script::kInt};
+            }
+            if (op == "full_combos")
+            {
+                if (call.symbol(2) == active())
+                    save::leaveGame(call.rdram, call.ctx, call.runtime);
+                return {static_cast<uint32_t>(fullCombos(call.symbol(2), static_cast<int>(call.number(3)),
+                                                         noteEngineNamed(call.size() > 4 ? call.symbol(4) : ""))),
+                        script::kInt};
+            }
+            // From onFinishSong: band, difficulty, song, then player 0's
+            // longest streak, gems hit, gems passed and percent hit, which
+            // is of the song's every gem, so a song cut short is none.
+            if (op == "finished")
+            {
+                const auto longest = call.number(5), hit = call.number(6), passed = call.number(7);
+                if (hit > 0 && passed == 0 && longest == hit && call.number(8) == 100)
+                    save::keepFullCombo(static_cast<int>(call.number(2)), static_cast<int>(call.number(3)),
+                                        call.symbol(4));
+                return {};
             }
             if (op == "count")
                 return {static_cast<uint32_t>(s_campaigns.size()), script::kInt};
@@ -900,6 +952,8 @@ namespace gh2::campaigns
             }
             if (op == "venue_game")
                 return {script::symbol(call.rdram, call.ctx, call.runtime, venueGame()), script::kSymbol};
+            if (op == "highway")
+                return {script::symbol(call.rdram, call.ctx, call.runtime, s_campaigns[s_gemsFrom].game), script::kSymbol};
             if (op == "read_text")
             {
                 for (size_t i = 0; i < s_campaigns.size(); ++i)
@@ -938,7 +992,7 @@ namespace gh2::campaigns
                 const bool career = call.symbol(4) == "career";
                 if (!index)
                     return {0u, script::kInt};
-                if (!changes(*index, career))
+                if (!changes(*index, career) && pickedNoteEngine() == noteEngine())
                 {
                     s_career = career;
                     s_theme = *index;
@@ -949,7 +1003,8 @@ namespace gh2::campaigns
                 return {1u, script::kInt};
             }
             std::cerr << "[campaign] usage: {campaigns active|live|count}, {campaigns has <game>}, "
-                         "{campaigns switch <game> [<screen> [career|menus]]}"
+                         "{campaigns switch <game> [<screen> [career|menus]]}, "
+                         "{campaigns progress <game> <band> [<engine>]}, {campaigns full_combos <game> <band> [<engine>]}"
                       << std::endl;
             return {};
         }
@@ -1042,6 +1097,20 @@ namespace gh2::campaigns
             locale::own(locale::kScreen, s_campaigns[owner].game);
         }
 
+        // A career song passed, alone (ProfileState::FinishSong, from
+        // {campaign finish_song}; co-op has its own): kept as a full combo
+        // where player 0 hit every gem and its longest streak is all of
+        // them ({campaigns finished}).
+        struct FinishSongTag;
+        void onFinishSong(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const R5900Context saved = *ctx;
+            script::run(rdram, ctx, runtime,
+                        "{campaigns finished {campaign profile_slot} {game get_difficulty 0} {game get_song} "
+                        "{player0 longest_streak} {player0 gems_hit} {player0 gems_passed} {player0 percent_hit}}");
+            *ctx = saved;
+        }
+
         struct GotoScreenTag;
         void onGotoScreen(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
@@ -1131,6 +1200,11 @@ namespace gh2::campaigns
     const std::string &active()
     {
         return s_campaigns[s_active].game;
+    }
+
+    bool career()
+    {
+        return s_career;
     }
 
     std::vector<std::string> games()
@@ -1271,6 +1345,11 @@ namespace gh2::campaigns
         return index ? usable(s_campaigns[*index]).outfits : std::vector<std::string>();
     }
 
+    bool gh1Highway()
+    {
+        return s_gh1Highway;
+    }
+
     bool inCareer(uint8_t *rdram)
     {
         // GameConfig's mode Symbol, +0x3c (SongProvider::GetHighScore, 0x117b38).
@@ -1297,6 +1376,7 @@ namespace gh2::campaigns
         script::runWhenUiReady("{campaigns read_text}");
         EntryHook<PollTag>::install(runtime, addresses.uiManagerPoll, onUiPoll);
         EntryHook<GotoScreenTag>::install(runtime, addresses.uiGotoScreen, onGotoScreen);
+        EntryHook<FinishSongTag>::install(runtime, addresses.profileStateFinishSong, onFinishSong);
         EntryHook<MetaMusicStopTag>::install(runtime, addresses.metaMusicStop, onMetaMusicStop);
     }
 }

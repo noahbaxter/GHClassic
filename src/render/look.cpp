@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstring>
 #include <map>
 #include <mutex>
@@ -23,21 +24,24 @@ namespace gh2::look
 
         // Each Mat's maps once read, held while draws ask for them. Game
         // thread only.
+        using Clock = std::chrono::steady_clock;
         struct Held
         {
             Look look;
             std::shared_ptr<const Shading> shading;
-            uint64_t asked = 0;
+            Clock::time_point asked{};
         };
         std::unordered_map<std::string, Held> s_held;
-        uint64_t s_frame = 0;
-        // Frames a Mat's maps outlast the last draw that asked for them.
-        constexpr uint64_t kHoldFrames = 600;
+        Clock::time_point s_now{}; // as the last frame ended
+        // How long a Mat's maps outlast the last draw that asked for them.
+        // In time, not frames: a frame count is shorter the higher the frame
+        // rate.
+        constexpr auto kHold = std::chrono::seconds(10);
         uint32_t s_luminance = 0;
         bool s_inVenue = false;
         // Game thread only.
         std::vector<uint32_t> s_boards;
-        uint64_t s_boardsAt = 0;
+        Clock::time_point s_boardsAt{};
         constexpr size_t kPlayers = 2;
         bool s_star = false;
         bool s_swung = false; // star power has been on since the boards were made
@@ -82,7 +86,7 @@ namespace gh2::look
             look = byDiffuse->second;
         }
         Held &held = s_held[std::string(mat) + '/' + std::to_string(diffuse)];
-        held.asked = s_frame;
+        held.asked = s_now;
         if (!held.shading || !same(held.look, look))
         {
             auto shading = std::make_shared<Shading>();
@@ -130,9 +134,9 @@ namespace gh2::look
 
     void addBoard(uint32_t mat)
     {
-        if (s_frame > s_boardsAt + kHoldFrames)
+        if (s_now > s_boardsAt + kHold)
             s_boards.clear();
-        s_boardsAt = s_frame;
+        s_boardsAt = s_now;
         // A new board is a new song's, whose star power is off; a song
         // restarted at once adds its boards to the last's, so only as many
         // as there are players are kept.
@@ -169,8 +173,8 @@ namespace gh2::look
 
     void endFrame()
     {
-        ++s_frame;
-        std::erase_if(s_held, [](const auto &entry) { return entry.second.asked + kHoldFrames < s_frame; });
+        s_now = Clock::now();
+        std::erase_if(s_held, [](const auto &entry) { return entry.second.asked + kHold < s_now; });
     }
 
     void setInVenue(bool drawn) { s_inVenue = drawn; }

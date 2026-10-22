@@ -1,0 +1,21 @@
+#pragma once
+
+// assets/classic/<game>.bin (ui/classic_scene.cpp), tools/procedural/classic_logo.py's
+// bitmaps of the "Classic" each game's menus put under their logo.
+#include <cstddef>
+
+struct ClassicLogo
+{
+    const char *game;
+    const unsigned char *bitmap;
+    size_t size;
+};
+
+inline constexpr unsigned char kClassicGh1[] = {@GHC_CLASSIC_GH1@};
+inline constexpr unsigned char kClassicGh2[] = {@GHC_CLASSIC_GH2@};
+inline constexpr unsigned char kClassicGh80s[] = {@GHC_CLASSIC_GH80S@};
+inline constexpr ClassicLogo kClassicLogos[] = {
+    {"gh1", kClassicGh1, sizeof kClassicGh1},
+    {"gh2", kClassicGh2, sizeof kClassicGh2},
+    {"gh80s", kClassicGh80s, sizeof kClassicGh80s},
+};

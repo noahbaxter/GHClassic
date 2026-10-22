@@ -29,8 +29,10 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <functional>
 #include <iostream>
 #include <map>
+#include <memory>
 
 namespace gh2
 {
@@ -374,9 +376,10 @@ namespace gh2
         // With `fontsOnly` (the 80s', whose art is its own) only a Font's
         // sheet pairs, and only where the 360's Font keeps every character
         // ours has but those the game disc's Font of its name gives up too
-        // (dyingmarker's ’, which no text uses).
+        // (dyingmarker's ’, which no text uses). `paired` takes each payload
+        // a stand-in names.
         std::optional<ark::Made> makeScene(size_t disc, size_t xbox, const std::string &path, const std::string &twin,
-                                           bool fontsOnly)
+                                           bool fontsOnly, std::vector<uint32_t> &paired)
         {
             const auto ours = ark::readFile(disc, path), theirs = ark::readFile(xbox, twin);
             auto scene = ours ? milo::read(*ours) : std::nullopt;
@@ -387,7 +390,6 @@ namespace gh2
             if (!other || !fonts || scene->version != 24u || other->version != 25u)
                 return std::nullopt;
 
-            size_t paired = 0u;
             for (size_t i = 0; i < scene->entries.size(); ++i)
             {
                 const auto &[className, name] = scene->entries[i];
@@ -470,20 +472,47 @@ namespace gh2
                 std::memcpy(body.data() + tex->bpp, &bpp, 4u);
                 body.resize(tex->bitmap);
                 body.insert(body.end(), standIn.begin(), standIn.end());
-                ++paired;
+                paired.push_back(id);
             }
-            return paired ? std::optional(ark::held(milo::write(*scene))) : std::nullopt;
+            if (paired.empty())
+                return std::nullopt;
+            textures::prefetch(paired);
+            return ark::held(milo::write(*scene));
         }
 
-        // A stand-in for a bitmap file the 360 has at the same path.
-        std::optional<ark::Made> makeBitmap(size_t xbox, const std::string &path, const std::string &twin)
+        // A stand-in for a bitmap file the 360 has at the same path, its
+        // payload in `paired`.
+        std::optional<ark::Made> makeBitmap(size_t xbox, const std::string &path, const std::string &twin,
+                                            std::vector<uint32_t> &paired)
         {
             const auto ours = ark::readFile(0u, path), theirs = ark::readFile(xbox, twin);
             const auto own = ours ? bitmap::read(ours->data(), ours->size()) : std::nullopt;
             if (!own || !theirs || !isPicture(theirs->data(), theirs->size()))
                 return std::nullopt;
-            std::vector<uint8_t> standIn = textures::standIn(textures::add({xbox, twin, {}}), own->width, own->height);
-            return standIn.empty() ? std::nullopt : std::optional(ark::held(std::move(standIn)));
+            const uint32_t id = textures::add({xbox, twin, {}});
+            std::vector<uint8_t> standIn = textures::standIn(id, own->width, own->height);
+            if (standIn.empty())
+                return std::nullopt;
+            paired.push_back(id);
+            textures::prefetch(paired);
+            return ark::held(std::move(standIn));
+        }
+
+        // Whether a made file is served, its pictures read again as the game
+        // loads it: made once, it may be loaded again after they were let go.
+        // Read while it loads, not as each picture first shows: star power's
+        // meter lightning, a streak's digits.
+        std::function<bool()> servedAndRead(const std::string &path,
+                                            const std::shared_ptr<const std::vector<uint32_t>> &paired)
+        {
+            return [path, paired]
+            {
+                if (!wanted(path))
+                    return false;
+                if (!paired->empty())
+                    textures::prefetch(*paired);
+                return true;
+            };
         }
     }
 
@@ -509,12 +538,14 @@ namespace gh2
                     twin.replace(og, 4u, "/ng/");
                 if (!std::binary_search(theirs.begin(), theirs.end(), twin))
                     continue;
+                const auto paired = std::make_shared<std::vector<uint32_t>>();
                 if (scene)
-                    ark::addMade(0u, path, [disc = *xbox, path, twin] { return makeScene(0u, disc, path, twin, false); },
-                                 [path] { return wanted(path); });
+                    ark::addMade(0u, path,
+                                 [disc = *xbox, path, twin, paired] { return makeScene(0u, disc, path, twin, false, *paired); },
+                                 servedAndRead(path, paired));
                 else
-                    ark::addMade(0u, path, [disc = *xbox, path, twin] { return makeBitmap(disc, path, twin); },
-                                 [path] { return wanted(path); });
+                    ark::addMade(0u, path, [disc = *xbox, path, twin, paired] { return makeBitmap(disc, path, twin, *paired); },
+                                 servedAndRead(path, paired));
             }
         }
         // The 80s' fonts are GH2's, the same letters, widths and kerning,
@@ -531,9 +562,11 @@ namespace gh2
                 const std::string twin = path.substr(0u, path.size() - 3u) + "xbox";
                 if (!path.ends_with(".milo_ps2") || !std::binary_search(theirs.begin(), theirs.end(), twin))
                     continue;
+                const auto paired = std::make_shared<std::vector<uint32_t>>();
                 ark::addMade(*eighties, path,
-                             [disc = *eighties, xbox = *xbox, path, twin] { return makeScene(disc, xbox, path, twin, true); },
-                             [path] { return wanted(path); });
+                             [disc = *eighties, xbox = *xbox, path, twin, paired]
+                             { return makeScene(disc, xbox, path, twin, true, *paired); },
+                             servedAndRead(path, paired));
             }
         }
     }
