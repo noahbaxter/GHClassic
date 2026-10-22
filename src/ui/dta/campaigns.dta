@@ -6,7 +6,8 @@
 ; The picker is the practice speed screen's scene (sel_speed.milo, four
 ; buttons), in the skin of the game being played: in GH2's and the 80s',
 ; the Demo's amp poster and a case for each game, the picked one spinning
-; over its one line (content/campaign_case.h). Picking another game
+; over how far the band is through it, and the note engine's mark
+; (content/campaign_case.h). Picking another game
 ; goes through ghc_switch_screen, which has no panels: there the switch
 ; happens ({campaigns switch}, content/campaigns.h), with nothing loaded that
 ; it changes.
@@ -79,6 +80,48 @@
          {$this show_line}
          {$this place_title}
          {$this lay_cases}
+         {$this mark_engine}
+      )
+      ; The note engine picked, at the poster's foot on the right: its
+      ; numeral, I for GH1's and II for GH2's, in a ring (content/
+      ; campaign_case.h). The ring: where its middle is and how big, in the
+      ; poster's units. The numeral: a copy of the title, this far across and
+      ; down from where the title stands, its text this much of the title's.
+      (engine_x 150)
+      (engine_y -20)
+      (engine_z -150)
+      (engine_scale 14)
+      (numeral_x 152)
+      (numeral_z -63)
+      (numeral_size 0.45)
+      (mark_engine
+         {if [cased]
+            {do
+               ($ring {$this find ghc_engine.mesh})
+               ($title {$this find title.lbl})
+               ($group {$title get trans_parent})
+               ($x 0) ($y 0) ($z 0)
+               {{$this find ghc_engine.mat} set prelit TRUE}
+               {$ring set_local_pos [engine_x] [engine_y] [engine_z]}
+               {$this turn $ring 0 [engine_scale]}
+               {if {! {{$this loaded_dir} exists ghc_numeral.lbl}}
+                  {do
+                     ($lbl {new {$title class_name} ghc_numeral.lbl})
+                     {$lbl copy $title 0}
+                     {$lbl set trans_parent $group}
+                     {$lbl set fit_text 0}
+                     {$lbl set text_size {'*' [numeral_size] {$title get text_size}}}
+                     {$group insert (objects {$group size objects}) $lbl}
+                  }
+               }
+               {$title get_local_pos $x $y $z}
+               {{$this find ghc_numeral.lbl} set_local_pos {'+' $x [numeral_x]} $y {'+' $z [numeral_z]}}
+               {{$this find ghc_numeral.lbl} set_localized_text {if_else {== gh1 {note_engine picked}} "I" "II"}}
+               ; Only where there is another to pick.
+               {$ring set_showing {> {note_engine choices} 1}}
+               {{$this find ghc_numeral.lbl} set_showing {> {note_engine choices} 1}}
+            }
+         }
       )
       ; With cases, the title moves down off the poster's red and white
       ; into its black below the city, where it reads: by this much, in its
@@ -257,6 +300,7 @@
          {note_engine pick {note_engine next {note_engine picked}}}
          {foreach_int $i 0 {size [games]} {$this label $i}}
          {$this tint_line}
+         {$this mark_engine}
       )
       (FOCUS_MSG
          {foreach_int $i 0 {size [games]}
@@ -272,17 +316,17 @@
       )
    )
 }
-; The campaigns' help bar: yellow names the engine picked, and changes it.
+; The campaigns' help bar: yellow changes the engine, whose mark is on the
+; poster.
 {func ghc_campaign_helpbar
    {do
       ($array)
-      ($engine {note_engine picked})
       {set $array ()}
       {resize $array 0}
       {push_back $array (fret1 help_select)}
       {push_back $array (fret2 help_back)}
       {if {> {note_engine choices} 1}
-         {push_back $array {if_else {== gh1 $engine} (fret3 ghc_engine_gh1) (fret3 ghc_engine_gh2)}}
+         {push_back $array (fret3 ghc_engine)}
       }
       {push_back $array (strum help_updown)}
       {helpbar set_display $array}
@@ -315,9 +359,14 @@
                {ui goto_screen chooseprof_screen}
                kDataUnhandled
             )
+            ; The engine changed, with a sound of the game it plays as: the
+            ; guitar slider's lick for GH1's, the song start for GH2's.
             ({&& {== $button kPad_Circle} {> {note_engine choices} 1} {! {ui in_transition}}}
-               {synth play_sequence button_toggle}
                {ghc_campaign_panel next_engine}
+               {if_else {== gh1 {note_engine picked}}
+                  {play_sfx slider_gtr}
+                  {synth play_sequence button_play}
+               }
                {ghc_campaign_helpbar}
                TRUE
             )

@@ -9,6 +9,8 @@
 //   ghc_case_<game>_shell.mesh    the plastic, Mat ghc_shell_<game>.mat
 //   ghc_cover_<game>.mesh         its front cover alone, flat, the case's
 //                                 size, Mat ghc_case_<game>.mat
+//   ghc_engine.mesh               a ring 1 across, Mat ghc_engine.mat, its
+//                                 colour in its verts: the note engine's mark
 //
 // both under speed_poster.grp until a script moves them, a case's middle at
 // its origin, x across its front, z up, its front toward -y, about 2.4 by

@@ -191,6 +191,23 @@ namespace gh2::campaign_case
             return quad;
         }
 
+        // A flat ring, 1 across its outside, facing front.
+        Mesh ring()
+        {
+            constexpr int kSides = 48;
+            constexpr float kInside = 0.84f;
+            Mesh ring;
+            for (int i = 0; i < kSides; ++i)
+            {
+                const float a = 2.0f * 3.14159265f * static_cast<float>(i) / kSides;
+                for (const float r : {1.0f, kInside})
+                    ring.verts.insert(ring.verts.end(), {r * std::cos(a), 0, r * std::sin(a), 0, -1, 0, 0, 0});
+                const auto at = [](int side, int inner) { return static_cast<uint16_t>((side % kSides) * 2 + inner); };
+                ring.faces.insert(ring.faces.end(), {at(i, 0), at(i, 1), at(i + 1, 0), at(i + 1, 0), at(i, 1), at(i + 1, 1)});
+            }
+            return ring;
+        }
+
         Bytes *body(milo::Dir &dir, const std::string &cls, const std::string &name)
         {
             const auto it = std::find(dir.entries.begin(), dir.entries.end(), std::make_pair(cls, name));
@@ -261,6 +278,18 @@ namespace gh2::campaign_case
                     milo::addAfter(*group, std::string(kPoster) + ".mesh", "ghc_case_" + game + "_sleeve.mesh");
                 }
             }
+            // The note engine's mark (campaigns.dta): a ring in the title's
+            // grey blue, its colour in its verts as the plastic's is, with
+            // the engine's numeral over it in the title's own font.
+            Bytes ringMat = mat;
+            milo::replaceStr(ringMat, std::string(kPoster) + ".tex", "");
+            const auto ringMesh = meshBody(mesh, ring(), "ghc_engine.mesh", "ghc_engine.mat", false, {0.56f, 0.66f, 0.76f});
+            if (!ringMesh)
+                return false;
+            milo::add(dir, "Mat", "ghc_engine.mat", std::move(ringMat));
+            milo::add(dir, "Mesh", "ghc_engine.mesh", *ringMesh);
+            if (Bytes *group = body(dir, "Group", "background.view"))
+                milo::addAfter(*group, std::string(kPoster) + ".mesh", "ghc_engine.mesh");
             return true;
         }
     }
