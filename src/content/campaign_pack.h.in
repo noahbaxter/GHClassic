@@ -1,0 +1,5 @@
+#pragma once
+
+// assets/campaign_select.bin (content/campaign_case.h), tools/campaign_art.py's
+// pack of the campaign picker's case and pictures.
+inline constexpr unsigned char kCampaignPack[] = {@GHC_CAMPAIGN_PACK@};

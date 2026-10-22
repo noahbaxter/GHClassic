@@ -133,6 +133,23 @@ namespace gh2::milo
         out.insert(out.end(), s.begin(), s.end());
     }
 
+    Bytes strips(const uint8_t *faces, const std::vector<uint32_t> &groups)
+    {
+        Bytes out;
+        for (const uint32_t size : groups)
+        {
+            putU32(out, size);
+            if (size != 0u)
+                putU32(out, 3u * size);
+            for (uint32_t i = 1u; i < size; ++i)
+                putU32(out, 3u * i);
+            putU32(out, 3u * size);
+            out.insert(out.end(), faces, faces + 6u * size);
+            faces += 6u * size;
+        }
+        return out;
+    }
+
     std::optional<Bytes> inflate(const Bytes &file)
     {
         Reader r{file};

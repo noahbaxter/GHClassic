@@ -58,6 +58,17 @@ namespace gh2::save
     // With an engine, its career alone (note_engine.h), else every engine's.
     std::array<std::set<std::string>, 4> passedSongs(const std::string &game, int slot,
                                                      std::optional<NoteEngine> engine = std::nullopt);
+    // The same, those full combo'd: every gem hit and the streak never
+    // broken, so no overstrum either (Player::Penalize, 0x1114c0, ends it),
+    // which the game's gold (every gem hit, CampaignState::FinishSong
+    // 0x131ee0) does not ask. Bonus songs too. GH Classic's own, as
+    // fc.<song> in the band's section for the difficulty, which the game's
+    // save keeps for it unread.
+    std::array<std::set<std::string>, 4> fullComboSongs(const std::string &game, int slot,
+                                                        std::optional<NoteEngine> engine = std::nullopt);
+    // A full combo on `song` by band `slot` (from 0) on `difficulty` (easy
+    // 0), in the career being played under the engine judging.
+    void keepFullCombo(int slot, int difficulty, const std::string &song);
     std::set<std::string> unlockedSongs(const std::string &game);
     // Whether any band has unlocked that item, of any kind, in `game`'s
     // career under any engine: an outfit or guitar bought.

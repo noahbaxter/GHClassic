@@ -248,6 +248,7 @@ namespace gh2
         uint32_t campaignStateGetSongsBeat;
         uint32_t campaignStateGetNumSongs;
         uint32_t campaignStateGetStatusSym;
+        uint32_t profileStateFinishSong;              // a career song passed, player 0's stats still up
         uint32_t songProviderGetBlurb;                // (int row)
         uint32_t songProviderGetHighScore;            // (int row)
         uint32_t makeStringInt;                       // MakeString(const char *, int)
@@ -527,6 +528,7 @@ namespace gh2
         .campaignStateGetSongsBeat = 0x132f00u,
         .campaignStateGetNumSongs = 0x133020u,
         .campaignStateGetStatusSym = 0x132760u,
+        .profileStateFinishSong = 0x13ba20u,
         .songProviderGetBlurb = 0x117df8u,
         .songProviderGetHighScore = 0x117b38u,
         .makeStringInt = 0x3147a8u,

@@ -27,6 +27,14 @@ namespace gh2::textures
         std::string tex;
     };
 
+    // A source's disc for a picture bundled with the game: its path is the
+    // name addBundled gave it.
+    constexpr size_t kBundled = static_cast<size_t>(-1);
+
+    // A picture bundled with the game, as a 360 bitmap, kept where `data`
+    // is for the run. Any thread, before a source names it.
+    void addBundled(const std::string &name, const uint8_t *data, size_t size);
+
     // Its payload's id, the same for the same source, in any run that
     // mounts the same discs. Nothing is read. Any thread.
     uint32_t add(const Source &source);

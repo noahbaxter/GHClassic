@@ -880,7 +880,9 @@ namespace gh2
 
         VkDescriptorSetLayout setLayout = VK_NULL_HANDLE;
         VkDescriptorPool pool = VK_NULL_HANDLE;
-        VkSampler samplers[3]{}; // clamped, wrapped, and wrapped between two levels for an x360 Mat's maps
+        // Clamped, wrapped, wrapped between two levels (an x360 Mat's maps,
+        // a smooth TextureData's), and clamped between two levels.
+        VkSampler samplers[4]{};
         std::unordered_map<const TextureData *, GpuTexture> textures;
         // What an untextured pass samples, so every pass multiplies by a
         // texture.
@@ -1374,7 +1376,7 @@ namespace gh2
                 // A normal or specular map between two of its levels: the
                 // nearest one alone has a highlight jump as a surface turns.
                 info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-                if (wrap && !check(vkCreateSampler(device, &info, nullptr, &samplers[2]), "map sampler"))
+                if (!check(vkCreateSampler(device, &info, nullptr, &samplers[wrap ? 2 : 3]), "map sampler"))
                     return false;
             }
 
@@ -1585,7 +1587,8 @@ namespace gh2
             }
             for (int wrap = 0; wrap < 2 && !data->cube; ++wrap)
             {
-                VkDescriptorImageInfo image{samplers[wrap], gpu.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+                const VkSampler sampler = data->smooth ? samplers[wrap ? 2 : 3] : samplers[wrap];
+                VkDescriptorImageInfo image{sampler, gpu.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
                 VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
                 write.dstSet = gpu.sets[wrap];
                 write.descriptorCount = 1;

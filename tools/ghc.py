@@ -5,8 +5,9 @@
     tools/ghc.py build [disc] [--skip-recomp] [--lto]
     tools/ghc.py bind [--isolated] [keyboard | <n>]   set up a controller; with no device, list them
     tools/ghc.py arm [out] [--scenario <file>] [--speed <x>] [--secs 30] [--disc <image>] [--shot-every 60]
-                     [--res 1080p] [--set <name>=<value> ...]
+                     [--res 1080p] [--set <name>=<value> ...] [--series <name>]
     tools/ghc.py record <scenario> [--speed 2.5] [--res 1080p] [--secs 900] [--set <name>=<value> ...]
+                        [--series <name>]
     tools/ghc.py scenarios [-j 4] [--speed 2] [--review] [--discs gh2,gh1] [--releases] [name ...]
     tools/ghc.py release [--skip-build] [disc]  this platform's player package, into build/release
     tools/ghc.py ci                          what builds without a disc, into build/ci
@@ -35,20 +36,24 @@ save and default settings: a first boot. out (default
 runs/<date>_<time>_<scenario's name>, so runs sort oldest first and none
 overwrites another) gets run.log, frames/ (frame_0012.30s.png, seconds
 since launch), shots/ from the scenario's (shot name) steps, and on macOS
-stack.txt, a 3 s sample taken if it is still alive at --secs. The shots on
-one sheet go to the main checkout's review/<branch>/ as
-<date>_<time>_<name>.png, where everything to look at goes. scenarios runs the files in scenarios/
+stack.txt, a 3 s sample taken if it is still alive at --secs. The shots, on
+one sheet (shots.png) and each full size, go to the main checkout's
+review/<branch>/<date>_<time>_<name>/, the run's own set, where everything to
+look at goes and nothing is loose. scenarios runs the files in scenarios/
 through arm side by side, the sheets staying in each run as shots.png unless
 --review: a run passes when it reaches its last step and quits with no FAIL
 or STALL in its log. Both clear runs/ of runs older than three days.
 
 record runs a scenario as arm does and makes it videos, picture and sound,
-in review/<branch>/ as <date>_<time>_<scenario's name>.mp4: the game pipes each frame
-to ffmpeg as it draws and writes its mixed sound beside it, both on the
-game's clock, so it can run faster than real time. Without (record) steps the
-whole run is one video; with them, each (record on name) to (record off) is
-its own, <scenario's name>_<name>.mp4. A run stopped at --secs keeps what it
-drew.
+in the run's set, review/<branch>/<date>_<time>_<scenario's name>/, beside
+its shots: the game pipes each frame to ffmpeg as it draws and writes its
+mixed sound beside it, both on the game's clock, so it can run faster than
+real time. Without (record) steps the whole run is one video,
+<scenario's name>.mp4; with them, each (record on name) to (record off) is
+its own, <name>.mp4. A run stopped at --secs keeps what it drew. With
+--series <name>, arm and record add to one set, review/<branch>/<date>_<name>/,
+made the first time and found again after, each take's files named by its
+time, so the takes of something being worked on sit side by side.
 
 release packages a build for players, who bring their own disc: a zip of
 the game beside PUT_DISC_HERE on Windows and Linux, a disk image on macOS.
@@ -438,14 +443,44 @@ def branch_folder(branch):
     return branch.replace("/", "-")
 
 
-def review_path(what, suffix=".png"):
-    """Where something to look at goes: the main checkout's review/, in the
-    folder of the branch this tree has out (detached-<commit> off one), named
-    by when it was made, so it sorts by time."""
+_review_sets = {}
+# --series: one set that each run adds to, for a thing being worked on.
+SERIES = None
+
+
+def series_name(file):
+    """A file's name in a run's set: as it is, or in a series, after the
+    time the run made it, so a series' takes sort side by side."""
+    return f"{time.strftime('%Y-%m-%d_%H%M')}_{file}" if SERIES else file
+
+
+def review_set(name):
+    """Where a run's things to look at go: the main checkout's review/, in
+    the folder of the branch this tree has out (detached-<commit> off one),
+    in a set of their own named by when the run made its first and what it
+    ran, so a folder sorts by time and nothing in it is loose. Everything
+    one run makes under `name` (its sheet, its shots, its clips) shares the
+    set; a second run in the same minute gets its own. With SERIES, every
+    run's goes into that one set, made the first time (<date>_<series>/)
+    and found again after, its files named by series_name."""
+    if SERIES:
+        name = SERIES
+    if name in _review_sets:
+        return _review_sets[name]
     branch = git_out("branch", "--show-current")
     folder = branch_folder(branch) if branch else f"detached-{git_out('rev-parse', '--short', 'HEAD') or 'tree'}"
-    (REVIEW / folder).mkdir(parents=True, exist_ok=True)
-    return REVIEW / folder / f"{time.strftime('%Y-%m-%d_%H%M')}_{what}{suffix}"
+    if SERIES:
+        found = sorted((REVIEW / folder).glob(f"*_{SERIES}")) if (REVIEW / folder).is_dir() else []
+        if found:
+            _review_sets[name] = found[-1]
+            return found[-1]
+    stem = REVIEW / folder / f"{time.strftime('%Y-%m-%d_%H%M')}_{name}"
+    path, again = stem, 2
+    while path.exists():
+        path, again = stem.with_name(f"{stem.name}_{again}"), again + 1
+    path.mkdir(parents=True)
+    _review_sets[name] = path
+    return path
 
 
 def prune_runs(days=3):
@@ -541,7 +576,13 @@ def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=N
             x = (i % cols) * cell_w + (cell_w - shot.width) // 2
             y = (i // cols) * cell_h + (cell_h - shot.height) // 2
             sheet.paste(shot, (x, y))
-        sheet.save(review_path(review) if review else out / "shots.png")
+        sheet.save(out / "shots.png")
+        # Into the run's review set: the sheet, and each shot full size.
+        if review:
+            folder = review_set(review)
+            shutil.copy2(out / "shots.png", folder / series_name("shots.png"))
+            for png in shots:
+                shutil.copy2(png, folder / series_name(png.name))
     return state
 
 
@@ -559,7 +600,10 @@ def cmd_arm(argv):
                         help="a settings.ini line over the defaults, e.g. msaa=1; may repeat")
     parser.add_argument("--profiler", action="store_true", dest="perf",
                         help="the game's --profiler: frametimes.csv in the run, and its summary printed here")
+    parser.add_argument("--series", help="add to that one review set, each take named by its time")
     args = parser.parse_args(argv)
+    global SERIES
+    SERIES = args.series
     name = Path(args.scenario).stem if args.scenario else "run"
     out = Path(args.out) if args.out else ROOT / "runs" / f"{time.strftime('%Y-%m-%d_%H%M%S')}_{name}"
     prune_runs()
@@ -592,9 +636,15 @@ def cmd_record(argv):
     parser.add_argument("--discs", type=discs_arg, help="content discs to mount, as gh2,gh1; default every one in game/")
     parser.add_argument("--set", action="append", default=[], metavar="NAME=VALUE", dest="settings",
                         help="a settings.ini line over the defaults, e.g. msaa=1; may repeat")
+    parser.add_argument("--series", help="add to that one review set, each take named by its time")
     args = parser.parse_args(argv)
+    global SERIES
+    SERIES = args.series
     if not shutil.which("ffmpeg"):
         sys.exit("record needs ffmpeg")
+    # A path, or a scenario's name alone: scenarios/<name>.dta.
+    if not Path(args.scenario).is_file() and (ROOT / "scenarios" / f"{args.scenario}.dta").is_file():
+        args.scenario = str(ROOT / "scenarios" / f"{args.scenario}.dta")
     name = Path(args.scenario).stem
     out = ROOT / "runs" / f"{time.strftime('%Y-%m-%d_%H%M%S')}_{name}"
     clips = out / "clips"
@@ -610,12 +660,9 @@ def cmd_record(argv):
     videos = sorted(clips.glob("*.ts"), key=lambda p: p.stat().st_mtime)
     made = 0
     for video in videos:
-        # A run's one unnamed clip is the scenario's name alone.
-        mp4 = review_path(name if len(videos) == 1 and video.stem.isdigit() else f"{name}_{video.stem}", ".mp4")
-        # Another run's in the same minute stays.
-        stem, again = mp4.stem, 2
-        while mp4.exists():
-            mp4, again = mp4.with_stem(f"{stem}_{again}"), again + 1
+        # A run's one unnamed clip is the scenario's name alone; each clip
+        # into the run's review set, beside its shots.
+        mp4 = review_set(name) / series_name(f"{name if len(videos) == 1 and video.stem.isdigit() else video.stem}.mp4")
         cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", video]
         sound = video.with_suffix(".f32")
         if sound.exists() and sound.stat().st_size:

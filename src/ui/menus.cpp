@@ -52,5 +52,7 @@ namespace gh2
         // Placeholders: the note engine (note_engine.h) shown and picked.
         locale::add("ghc_engine_gh1", "ENGINE GH1");
         locale::add("ghc_engine_gh2", "ENGINE GH2");
+        // The campaign picker's, whose poster shows which (campaigns.dta).
+        locale::add("ghc_engine", "ENGINE");
     }
 }

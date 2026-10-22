@@ -57,6 +57,8 @@ namespace gh2::setlists
 
     // A game's career songs: its tiers' own, without the store's.
     std::vector<std::string> careerSongs(const std::string &name);
+    // And its store's: the bonus songs.
+    std::vector<std::string> bonusSongs(const std::string &name);
 
     // A game that keeps its career as GH2 does, read off its disc: the
     // career's tiers (campaign.dta's order), then the store's songs, in its

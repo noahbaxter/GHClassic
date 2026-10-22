@@ -60,6 +60,10 @@ namespace gh2
         // A font's glyphs, drawn near their own size: generated levels would
         // only blur them.
         bool text = false;
+        // Sampled between two of its levels, not the nearest alone: one of
+        // our own pictures (textures::addBundled), whose case turns and
+        // would jump from one level to the next.
+        bool smooth = false;
         // A cube map: each level holds the six faces in turn, +x -x +y -y
         // +z -z, each a level's width by height.
         bool cube = false;

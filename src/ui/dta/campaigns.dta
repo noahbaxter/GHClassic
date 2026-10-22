@@ -4,7 +4,10 @@
 ; difficulty screen as it always did.
 ;
 ; The picker is the practice speed screen's scene (sel_speed.milo, four
-; buttons), in the skin of the game being played. Picking another game
+; buttons), in the skin of the game being played: in GH2's and the 80s',
+; the Demo's amp poster and a case for each game, the picked one spinning
+; over how far the band is through it, and the note engine's mark
+; (content/campaign_case.h). Picking another game
 ; goes through ghc_switch_screen, which has no panels: there the switch
 ; happens ({campaigns switch}, content/campaigns.h), with nothing loaded that
 ; it changes.
@@ -28,15 +31,32 @@
          {do
             ($count {size [games]})
             ($band {campaign profile_slot})
+            ($x 0) ($y 0) ($z 0)
+            ; The one line shown, the picked game's, just over the title,
+            ; under the case, across where the scene's buttons stand. Taken
+            ; once: the buttons are all moved there.
+            ; A scene with no cases (GH1's own, content/campaign_case.h)
+            ; keeps its list. GH2's is always listed, so has one where any do.
+            {set [cased] {exists ghc_cover_gh2.mesh}}
+            {if {&& [cased] {== [line_z] none}}
+               {speed3.btn get_local_pos $x $y $z}
+               {set [line_x] $x}
+               {set [line_y] $y}
+               {title.lbl get_local_pos $x $y $z}
+               {set [title_z] $z}
+               {set [line_z] {'+' {'-' $z [title_drop]} [line_above]}}
+            }
             {foreach_int $i 0 {size [buttons]}
                {do
                   ($btn {elem [buttons] $i})
                   {if_else {< $i $count}
                      {do
                         ($game {elem [games] $i})
-                        {{{$this loaded_dir} find $btn} set_showing TRUE}
                         {$this enable $btn}
                         {$this label $i}
+                        {if [cased]
+                           {{{$this loaded_dir} find $btn} set_local_pos [line_x] [line_y] [line_z]}
+                        }
                         ; Down steps through the listed ones and wraps.
                         {{{$this loaded_dir} find $btn} set nav_down
                            {{$this loaded_dir} find {elem [buttons] {mod {'+' $i 1} $count}}}
@@ -54,21 +74,231 @@
                }
             }
             {$this set_focus {elem [buttons] [picked]}}
+            {$this tint_line}
+         }
+         {set [spin_from] {taskmgr ui_seconds}}
+         {$this show_line}
+         {$this place_title}
+         {$this lay_cases}
+         {$this mark_engine}
+      )
+      ; The note engine picked, at the poster's foot on the right: its
+      ; numeral, I for GH1's and II for GH2's, in a ring (content/
+      ; campaign_case.h). The ring: where its middle is and how big, in the
+      ; poster's units. The numeral: a copy of the title, this far across and
+      ; down from where the title stands, its text this much of the title's.
+      (engine_x 150)
+      (engine_y -20)
+      (engine_z -150)
+      (engine_scale 14)
+      (numeral_x 152)
+      (numeral_z -63)
+      (numeral_size 0.45)
+      (mark_engine
+         {if [cased]
+            {do
+               ($ring {$this find ghc_engine.mesh})
+               ($title {$this find title.lbl})
+               ($group {$title get trans_parent})
+               ($x 0) ($y 0) ($z 0)
+               {{$this find ghc_engine.mat} set prelit TRUE}
+               {$ring set_local_pos [engine_x] [engine_y] [engine_z]}
+               {$this turn $ring 0 [engine_scale]}
+               {if {! {{$this loaded_dir} exists ghc_numeral.lbl}}
+                  {do
+                     ($lbl {new {$title class_name} ghc_numeral.lbl})
+                     {$lbl copy $title 0}
+                     {$lbl set trans_parent $group}
+                     {$lbl set fit_text 0}
+                     {$lbl set text_size {'*' [numeral_size] {$title get text_size}}}
+                     {$group insert (objects {$group size objects}) $lbl}
+                  }
+               }
+               {$title get_local_pos $x $y $z}
+               {{$this find ghc_numeral.lbl} set_local_pos {'+' $x [numeral_x]} $y {'+' $z [numeral_z]}}
+               {{$this find ghc_numeral.lbl} set_localized_text {if_else {== gh1 {note_engine picked}} "I" "II"}}
+               ; Only where there is another to pick.
+               {$ring set_showing {> {note_engine choices} 1}}
+               {{$this find ghc_numeral.lbl} set_showing {> {note_engine choices} 1}}
+            }
          }
       )
-      ; Button $i: its game, how far the band is through its career under
-      ; the note engine picked, and that engine.
+      ; With cases, the title moves down off the poster's red and white
+      ; into its black below the city, where it reads: by this much, in its
+      ; parent's units, and the line stands this far over it.
+      (title_drop 70)
+      (line_above 77)
+      (title_z none)
+      (place_title
+         {if [cased]
+            {do
+               ($x 0) ($y 0) ($z 0)
+               {title.lbl get_local_pos $x $y $z}
+               {title.lbl set_local_pos $x $y {'-' [title_z] [title_drop]}}
+            }
+         }
+      )
+      (cased FALSE)
+      (line_x 0)
+      (line_y 0)
+      (line_z none)
+      ; With cases, only the picked game's button shows.
+      (show_line
+         {foreach_int $i 0 {size [games]}
+            {{{$this loaded_dir} find {elem [buttons] $i}} set_showing {|| {! [cased]} {== $i [picked]}}}
+         }
+      )
+      ; Each game's front cover, flat, in a row along the poster's foot, the
+      ; picked one bigger and nearer; and over the city, large, the picked
+      ; game's case, spinning (content/campaign_case.h). The row: how big a
+      ; cover is and the picked one, how far apart their middles stand, how
+      ; high the row is and how far in front of the poster, the picked one's
+      ; too. The case: how big, where its middle is, the angle it starts at,
+      ; and how fast it spins, in degrees a second.
+      (cover_scale 17)
+      (cover_picked_scale 20)
+      (cover_gap 58)
+      (cover_z -144)
+      (cover_y -12)
+      (cover_picked_y -20)
+      ; A cover not picked, dimmed to this much of its light.
+      (cover_dim 0.45)
+      (case_scale 40)
+      (case_x 0)
+      (case_y -40)
+      (case_z 75)
+      ; Its spin is the store's guitar's way, negative about the upright
+      ; (store.milo's guitar_single.tnm: 0, -120, -240), from a little
+      ; short of facing front, a wind-up before it comes round head on.
+      (case_turn 45)
+      (case_spin 90)
+      ; When the picked case began to spin, from where it stood turned.
+      (spin_from 0)
+      ; The scene has a case for each game listed and no other
+      ; (content/campaign_case.cpp), where the pack has its art.
+      (lay_cases
+         {foreach_int $i 0 {size [games]}
+            {if {exists {symbol {sprint "ghc_cover_" {elem [games] $i} ".mesh"}}}
+               {$this lay_case {elem [games] $i} $i}
+            }
+         }
+      )
+      ; Game $g's cover, the row's $i'th, and its case, shown while it is
+      ; picked: the case's sleeve and plastic placed alike, drawn by depth,
+      ; the plastic in the console's colour.
+      (lay_case
+         ($g $i)
+         {do
+            ($count {size [games]})
+            ($picked {== $i [picked]})
+            ($cover {$this find {symbol {sprint "ghc_cover_" $g ".mesh"}}})
+            {$cover set_local_pos
+               {'*' [cover_gap] {'-' $i {/ {'-' $count 1} 2.0}}}
+               {if_else $picked [cover_picked_y] [cover_y]}
+               [cover_z]
+            }
+            {$this turn $cover 0 {if_else $picked [cover_picked_scale] [cover_scale]}}
+            ; Its Mat is the sleeve's too, which shows only while picked.
+            {do
+               ($light {if_else $picked 1 [cover_dim]})
+               {{$this find {symbol {sprint "ghc_case_" $g ".mat"}}} set color {pack_color $light $light $light}}
+            }
+            {{$this find {symbol {sprint "ghc_case_" $g ".mat"}}} set z_mode 1}
+            {{$this find {symbol {sprint "ghc_shell_" $g ".mat"}}} set z_mode 1}
+            ; Its colour and light are in its vertex colours
+            ; (content/campaign_case.cpp): drawn only by a prelit material.
+            {{$this find {symbol {sprint "ghc_shell_" $g ".mat"}}} set prelit TRUE}
+            {foreach $part (_sleeve.mesh _shell.mesh)
+               {do
+                  ($mesh {$this find {symbol {sprint "ghc_case_" $g $part}}})
+                  {$mesh set_showing $picked}
+                  {$mesh set_local_pos [case_x] [case_y] [case_z]}
+                  {$this turn $mesh [case_turn] [case_scale]}
+               }
+            }
+         }
+      )
+      ; A mesh turned $deg about the upright, at that size: a turn is set as
+      ; a rotation alone, which drops the scale, so the scale is set after.
+      (turn
+         ($mesh $deg $scale)
+         {$mesh set_local_rot 0 0 $deg}
+         {$mesh set_local_scale $scale $scale $scale}
+      )
+      ; The picked game's case spins.
+      (poll
+         {do
+            ($g {elem [games] [picked]})
+            ($angle
+               {mod {'-' {'+' [case_turn] 360} {mod {'*' [case_spin] {'-' {taskmgr ui_seconds} [spin_from]}} 360}} 360}
+            )
+            {foreach $part (_sleeve.mesh _shell.mesh)
+               {if {exists {symbol {sprint "ghc_case_" $g $part}}}
+                  {$this turn {$this find {symbol {sprint "ghc_case_" $g $part}}} $angle [case_scale]}
+               }
+            }
+         }
+      )
+      ; Button $i: how far the band is through its game's career under the
+      ; note engine picked ({campaigns progress}); once that is all of it,
+      ; in gold, its share of the game's songs full combo'd on expert
+      ; ({campaigns full_combos}). With cases that alone, the case naming
+      ; the game, at line_size times the button's own size; in a list, the
+      ; game's name before it.
+      (line_size 1.5)
+      (gold (1 0.78 0.16))
+      (beaten
+         ($game)
+         {== {campaigns progress $game {campaign profile_slot} {note_engine picked}} 100}
+      )
       (label
          ($i)
          {do
             ($game {elem [games] $i})
-            ($engine {note_engine picked})
-            ; The engine named only where there is another to pick.
-            {{{$this loaded_dir} find {elem [buttons] $i}} set_localized_text
-               {sprint {localize {sprint "campaign_" $game}} "  "
-                  {campaigns progress $game {campaign profile_slot} $engine} "%"
-                  {if_else {> {note_engine choices} 1} {sprint "  " {localize {sprint "ghc_engine_" $engine}}} ""}
+            ($btn {{$this loaded_dir} find {elem [buttons] $i}})
+            ($band {campaign profile_slot})
+            ($done {campaigns progress $game $band {note_engine picked}})
+            ($shown
+               {if_else {== $done 100}
+                  {sprint {campaigns full_combos $game $band {note_engine picked}} "% FC"}
+                  {sprint $done "%"}
                }
+            )
+            ; Its size first: setting it reads the button's own text again.
+            {if [cased]
+               {if {== [own_size] none} {set [own_size] {$btn get text_size}}}
+               {$btn set fit_text 0}
+               {$btn set text_size {'*' [line_size] [own_size]}}
+            }
+            {$btn set_localized_text
+               {if_else [cased] $shown {sprint {localize {sprint "campaign_" $game}} "  " $shown}}
+            }
+         }
+      )
+      (own_size none)
+      ; The picked game's line in gold once its career is beaten: a button
+      ; draws in its dir's focus colour, the only one focused the picked
+      ; game's. A colour set reads the buttons' own text again, so each is
+      ; labelled after one.
+      (own_focus_color none)
+      ; Its scene is practice's speed picker's too.
+      (exit
+         {if {!= [own_focus_color] none} {{$this loaded_dir} set focus_color [own_focus_color]}}
+      )
+      (tint_line
+         {do
+            ($dir {$this loaded_dir})
+            ($color)
+            {if {== [own_focus_color] none} {set [own_focus_color] {$dir get focus_color}}}
+            {set $color
+               {if_else {&& [cased] {$this beaten {elem [games] [picked]}}}
+                  {pack_color {elem [gold] 0} {elem [gold] 1} {elem [gold] 2}}
+                  [own_focus_color]
+               }
+            }
+            {if {!= $color {$dir get focus_color}}
+               {$dir set focus_color $color}
+               {foreach_int $i 0 {size [games]} {$this label $i}}
             }
          }
       )
@@ -76,26 +306,34 @@
       (next_engine
          {note_engine pick {note_engine next {note_engine picked}}}
          {foreach_int $i 0 {size [games]} {$this label $i}}
+         {$this tint_line}
+         {$this mark_engine}
       )
       (FOCUS_MSG
          {foreach_int $i 0 {size [games]}
             {if {== {sprint {$new_focus name}} {sprint {elem [buttons] $i}}} {set [picked] $i}}
          }
+         ; The case left stands turned again, and its line goes; the one
+         ; picked spins from where it stood.
+         {set [spin_from] {taskmgr ui_seconds}}
+         {$this show_line}
+         {$this lay_cases}
+         {$this tint_line}
          kDataUnhandled
       )
    )
 }
-; The campaigns' help bar: yellow names the engine picked, and changes it.
+; The campaigns' help bar: yellow changes the engine, whose mark is on the
+; poster.
 {func ghc_campaign_helpbar
    {do
       ($array)
-      ($engine {note_engine picked})
       {set $array ()}
       {resize $array 0}
       {push_back $array (fret1 help_select)}
       {push_back $array (fret2 help_back)}
       {if {> {note_engine choices} 1}
-         {push_back $array {if_else {== gh1 $engine} (fret3 ghc_engine_gh1) (fret3 ghc_engine_gh2)}}
+         {push_back $array (fret3 ghc_engine)}
       }
       {push_back $array (strum help_updown)}
       {helpbar set_display $array}
@@ -128,9 +366,14 @@
                {ui goto_screen chooseprof_screen}
                kDataUnhandled
             )
+            ; The engine changed, with a sound of the game it plays as: the
+            ; guitar slider's lick for GH1's, the song start for GH2's.
             ({&& {== $button kPad_Circle} {> {note_engine choices} 1} {! {ui in_transition}}}
-               {synth play_sequence button_toggle}
                {ghc_campaign_panel next_engine}
+               {if_else {== gh1 {note_engine picked}}
+                  {play_sfx slider_gtr}
+                  {synth play_sequence button_play}
+               }
                {ghc_campaign_helpbar}
                TRUE
             )

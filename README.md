@@ -98,6 +98,7 @@ This project is built on top of a lot of excellent work by others. Please give m
 - [ps2sdk](https://github.com/ps2dev/ps2sdk) and mymc: memory card format, sound library names
 - [libchdr](https://github.com/rtissera/libchdr): reading `.chd` disc images
 - [Redump](http://redump.org/): disc hashes the images are checked against
+- ["Silent Hill 3 Ps2 Game cover"](https://skfb.ly/oR9ZT) by eyewideasca, [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/): the campaign picker's game case
 - ([SteamGridDB](https://www.steamgriddb.com/grid/378598)): Temp icon
 
 ## License

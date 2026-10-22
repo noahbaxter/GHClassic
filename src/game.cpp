@@ -14,6 +14,7 @@
 #include "content/tour_or_higher.h"
 #include "content/locale.h"
 #include "content/outfits.h"
+#include "content/campaign_case.h"
 #include "content/campaigns.h"
 #include "content/setlists.h"
 #include "content/songs.h"
@@ -145,6 +146,8 @@ namespace
         // After the 360's scenes, the streak counter and the font bake: its
         // highway starts from theirs, and is served over the 360's.
         gh2::installGh1Highway();
+        // After the 360's menu art, whose speed poster it puts the amp over.
+        gh2::campaign_case::install();
         gh2::setlists::install(runtime, gh2::kSlus21447);
         gh2::encores::install(runtime, gh2::kSlus21447);
         gh2::status_line::install(runtime, gh2::kSlus21447);
