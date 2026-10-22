@@ -12,6 +12,7 @@
 ## Features
 
 - Fully playable campaigns for Guitar Hero, Guitar Hero 2 (both on PS2 and Xbox 360) and GH80s
+- Swap between the note engine of GH2, or GH1 if you really hate yourself
 - Quickplay mixing featuring every song from every game, for every character skin, with every guitar, in every venue
 - Custom Vulkan rendering engine lets you play with the PS2's original look, the Xbox 360's, or anything in between
 - Any resolution, uncapped frame rate, plus MSAA, TAA, and mipmaps
@@ -99,7 +100,7 @@ This project is built on top of a lot of excellent work by others. Please give m
 - [libchdr](https://github.com/rtissera/libchdr): reading `.chd` disc images
 - [Redump](http://redump.org/): disc hashes the images are checked against
 - ["Silent Hill 3 Ps2 Game cover"](https://skfb.ly/oR9ZT) by eyewideasca, [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/): the campaign picker's game case
-- ([SteamGridDB](https://www.steamgriddb.com/grid/378598)): Temp icon
+- [generalrose](https://www.steamgriddb.com/grid/681069) and [David0Mario](https://www.steamgriddb.com/logo/59969) on SteamGridDB: the icon's GH2 cover art and GH1 logo
 
 ## License
 
