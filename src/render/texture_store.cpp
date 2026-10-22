@@ -267,7 +267,10 @@ namespace gh2::textures
                     if (const auto found = s_bundled.find(source.path); found != s_bundled.end())
                         picture = found->second;
                 }
-                return picture.first ? decode(picture.first, picture.second) : nullptr;
+                auto data = picture.first ? decode(picture.first, picture.second) : nullptr;
+                if (data)
+                    data->smooth = true;
+                return data;
             }
             if (source.tex.empty())
             {
