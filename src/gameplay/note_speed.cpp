@@ -224,6 +224,19 @@ namespace gh2
                 runtime->callGuestFunction(rdram, ctx, load<uint32_t>(rdram, vtable + 0x14u),
                                            {cam + static_cast<uint32_t>(load<int16_t>(rdram, vtable + 0x10u))});
                 args.restore(ctx);
+                // The track's environ (its copy of the scene's, the Track's
+                // +0xac, made after SetupFade) fades what blends, gems and
+                // tails, out with distance from the camera, 135 to 180 at
+                // the game's own length: as much further as the far end is.
+                // A shorter track's end is already well inside it.
+                const uint32_t environ = load<uint32_t>(rdram, track + 0xacu);
+                const uint32_t farEnd = load<uint32_t>(rdram, load<uint32_t>(rdram, track + 0x58u) + 0x14u);
+                if (environ != 0u && farEnd != 0u && by > 1.0f)
+                {
+                    const float further = load<float>(rdram, farEnd + milo::transformable::kLocal + 0x34u) * (by - 1.0f);
+                    for (const uint32_t at : {milo::environment::kFadeStart, milo::environment::kFadeEnd})
+                        store<float>(rdram, environ + at, load<float>(rdram, environ + at) + further);
+                }
             }
             if (by == 1.0f)
             {
