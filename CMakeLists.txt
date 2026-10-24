@@ -254,6 +254,7 @@ set(GHC_GAME_SOURCES
     src/gameplay/note_engine/gh1_watcher.cpp
     src/gameplay/note_engine/note_engine.cpp
     src/gameplay/note_speed.cpp
+    src/gameplay/retrack.cpp
     src/gameplay/strum_limit.cpp
     src/gameplay/sustain_release.cpp
     src/gameplay/track_start.cpp

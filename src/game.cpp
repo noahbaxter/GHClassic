@@ -42,6 +42,7 @@
 #include "lefty_guitarist.h"
 #include "gameplay/note_speed.h"
 #include "gameplay/note_engine/note_engine.h"
+#include "gameplay/retrack.h"
 #include "streak/counter.h"
 #include "streak/note_streak.h"
 #include "dev/null_rnd.h"
@@ -128,6 +129,7 @@ namespace
         gh2::installStrumLimit(runtime, gh2::kSlus21447);
         gh2::installTourOrHigher(runtime, gh2::kSlus21447);
         gh2::installNoteSpeed(runtime, gh2::kSlus21447);
+        gh2::installRetrack(runtime, gh2::kSlus21447);
         gh2::slider_scale::install(runtime, gh2::kSlus21447);
         gh2::installMovies(runtime, gh2::kSlus21447);
         gh2::installVideoOptions(runtime, gh2::kSlus21447);

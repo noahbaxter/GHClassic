@@ -106,6 +106,16 @@ namespace gh2
         uint32_t trackSetupFade;     // Track::SetupFade
         uint32_t trackDraw;          // Track::Draw
         uint32_t trackSurfaceGetFadeCenter; // TrackSurface::GetFadeCenter
+        uint32_t trackPanelReset;         // TrackPanel::Reset
+        uint32_t gemManagerJump;          // GemManager::Jump(float ms)
+        uint32_t gemManagerPoll;          // GemManager::Poll
+        uint32_t gemManagerHit;           // GemManager::Hit(float ms, int gem, PhraseState)
+        uint32_t gemUpperBound;           // upper_bound<Gem *, Gem, less<Gem>>
+        uint32_t gemPoll;                 // Gem::Poll(float...)
+        uint32_t gemHit;                  // Gem::Hit
+        uint32_t gemMiss;                 // Gem::Miss
+        uint32_t gemRelease;              // Gem::Release
+        uint32_t gemSetTailStart;         // Gem::SetTailStart(float)
         uint32_t bandSliderDrawShowing; // BandSlider::DrawShowing
         uint32_t checkBoxDrawShowing;   // CheckBox::DrawShowing
         uint32_t bandSliderDtor;        // BandSlider::~BandSlider
@@ -386,6 +396,16 @@ namespace gh2
         .trackSetupFade = 0x150908u,
         .trackDraw = 0x151188u,
         .trackSurfaceGetFadeCenter = 0x154fb0u,
+        .trackPanelReset = 0x153c38u,
+        .gemManagerJump = 0x156da0u,
+        .gemManagerPoll = 0x1564f8u,
+        .gemManagerHit = 0x156b08u,
+        .gemUpperBound = 0x32b490u,
+        .gemPoll = 0x157868u,
+        .gemHit = 0x157c20u,
+        .gemMiss = 0x157bc0u,
+        .gemRelease = 0x157c80u,
+        .gemSetTailStart = 0x157de0u,
         .bandSliderDrawShowing = 0x296bd8u,
         .checkBoxDrawShowing = 0x29bde8u,
         .bandSliderDtor = 0x296528u,
