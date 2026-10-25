@@ -37,6 +37,7 @@
 #include "ui/menus.h"
 #include "ui/meta_music.h"
 #include "ui/photo_mode.h"
+#include "ui/song_progress.h"
 #include "ui/slider_scale.h"
 #include "movie/movie.h"
 #include "dev/cheats.h"
@@ -124,6 +125,8 @@ namespace
             gh2::installNoteStreak(runtime, gh2::kSlus21447);
             gh2::installStreakCounter(runtime, gh2::kSlus21447);
         }
+        if (gh2::settings::get(gh2::settings::kSongProgress))
+            gh2::installSongProgress(runtime, gh2::kSlus21447);
         gh2::installFontBake();
         gh2::installNoteEngine(runtime, gh2::kSlus21447);
         // After the note engine, whose hook on BeatMatcher::Swing it wraps:

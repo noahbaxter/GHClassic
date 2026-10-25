@@ -52,6 +52,8 @@ namespace gh2
         uint32_t guitarCharacterPoll;      // GuitarCharacter::Poll
         uint32_t guitarCharacterDtor;
         uint32_t objectDirFindObject;      // ObjectDir::FindObject
+        uint32_t dataSetThis;    // DataSetThis(Hmx::Object *): $this, and the dir {new} names into
+        uint32_t dataThis;       // Hmx::Object *, $this
         uint32_t worldXfm;       // RndTransformable::WorldXfm
         uint32_t setWorldXfm;    // RndTransformable::SetWorldXfm
         uint32_t setDirty;       // RndTransformable::SetDirty
@@ -73,6 +75,7 @@ namespace gh2
         uint32_t beatMatcherDtor;           // BeatMatcher::~BeatMatcher
         uint32_t guitarWatcherJumpHook; // GuitarTrackWatcherImpl::JumpHook
         uint32_t hudPanelEnter;      // HudPanel::Enter
+        uint32_t hudPanelSetMetersShowing; // HudPanel::SetMetersShowing(bool)
         uint32_t bandScoreDisplaySetScore; // BandScoreDisplay::SetScore(int)
         uint32_t bandScoreDisplaySetDigitMat; // BandScoreDisplay::SetDigitMat(int, RndMat *)
         uint32_t willBeNoStrum;      // GameGemList::WillBeNoStrum
@@ -346,6 +349,8 @@ namespace gh2
         .guitarCharacterPoll = 0x10ac90u,
         .guitarCharacterDtor = 0x109f58u,
         .objectDirFindObject = 0x2bb4f0u,
+        .dataSetThis = 0x2b8f70u,
+        .dataThis = 0x3de778u,
         .worldXfm = 0x3d8ea0u,
         .setWorldXfm = 0x1dd7b8u,
         .setDirty = 0x1dd748u,
@@ -367,6 +372,7 @@ namespace gh2
         .beatMatcherDtor = 0x234b08u,
         .guitarWatcherJumpHook = 0x24d4e0u,
         .hudPanelEnter = 0x12ba00u,
+        .hudPanelSetMetersShowing = 0x12c210u,
         .bandScoreDisplaySetScore = 0x291af8u,
         .bandScoreDisplaySetDigitMat = 0x291c48u,
         .willBeNoStrum = 0x24d360u,
