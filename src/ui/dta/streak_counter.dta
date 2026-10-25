@@ -33,25 +33,38 @@
 {set $streak_counter_display2 0}
 {set $streak_counter_band 0}
 
-; Counter <n>'s streak as `count`.
-{func streak_counter ($n $count)
+; Counter <n>'s streak as `count`, its digits purple while `fc`.
+{func streak_counter ($n $count $fc)
    {do
       ($display {if_else {== $n 1} $streak_counter_display1 $streak_counter_display2})
       {if $display
-         {ghc_streak_counter $display $count {>= $count $streak_counter_from}}
+         {ghc_streak_counter $display $count {>= $count $streak_counter_from} $fc}
       }
    }
 }
 
 {func streak_counter_coop {== {gamecfg get mode} multi_coop}}
 
+; A player's full combo still alive: every gem hit so far in one streak. A
+; miss, a pass or an overstrum ends the streak, which never again catches up
+; with the gems hit, as {campaigns finished} keeps a full combo.
+{func streak_counter_fc ($player)
+   {if_else {== $player 0}
+      {== {player0 current_streak} {player0 gems_hit}}
+      {== {player1 current_streak} {player1 gems_hit}}
+   }
+}
+
 {func streak_counter_hit ($player)
    {if_else {streak_counter_coop}
       {do
          {set $streak_counter_band {+ $streak_counter_band 1}}
-         {streak_counter 1 $streak_counter_band}
+         {streak_counter 1 $streak_counter_band {&& {streak_counter_fc 0} {streak_counter_fc 1}}}
       }
-      {streak_counter {+ $player 1} {if_else {== $player 0} {player0 current_streak} {player1 current_streak}}}
+      {streak_counter {+ $player 1}
+         {if_else {== $player 0} {player0 current_streak} {player1 current_streak}}
+         {streak_counter_fc $player}
+      }
    }
 }
 
@@ -59,9 +72,9 @@
    {if_else {streak_counter_coop}
       {do
          {set $streak_counter_band 0}
-         {streak_counter 1 0}
+         {streak_counter 1 0 FALSE}
       }
-      {streak_counter {+ $player 1} 0}
+      {streak_counter {+ $player 1} 0 FALSE}
    }
 }
 
@@ -98,7 +111,7 @@
             {ghc_streak_counter_digit $display $w $d {$display find {sprint "streak_w" $w "_" $d ".mat"}}}
          }
       }
-      {streak_counter $n 0}
+      {streak_counter $n 0 FALSE}
    }
 }
 

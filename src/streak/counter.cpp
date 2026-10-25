@@ -50,7 +50,7 @@ namespace gh2
             return object > kDisplayObject ? object - kDisplayObject : 0u;
         }
 
-        // {ghc_streak_counter <display> <count> <out>}
+        // {ghc_streak_counter <display> <count> <out> <full combo>}
         script::Node streakCounter(const script::Call &call)
         {
             if (const uint32_t display = displayOf(call))
@@ -58,6 +58,7 @@ namespace gh2
                 Counter &counter = s_counters[display];
                 counter.streak = static_cast<int32_t>(call.number(2));
                 counter.shown = call.number(3) != 0.0f;
+                counter.fullCombo = call.size() > 4 && call.number(4) != 0.0f;
             }
             return {};
         }

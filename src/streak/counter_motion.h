@@ -26,6 +26,10 @@ namespace gh2::streak_counter
     struct Counter
     {
         int32_t streak = 0;
+        // Whether the streak is every gem hit so far, a full combo still
+        // alive: its digits purple, and `tinted` whether they are, unknown
+        // (so set) on a song's first frame, the Mats a retry's as left.
+        bool fullCombo = false, tinted = true;
         std::array<std::array<uint32_t, 10>, kWheels> digits{};
         uint32_t icon = 0;
         // Its slide: where it rests, how far below that it hides, `out` how
@@ -51,6 +55,9 @@ namespace gh2::streak_counter
     // A wheel given `mat`, its mesh `mesh`: turned in, or there at once. The
     // ones turn quicker than the rest.
     void turnTo(uint8_t *rdram, Counter::Wheel &wheel, uint32_t mat, uint32_t mesh, bool atOnce, bool ones);
+
+    // Every digit Mat purple for a full combo, else back to white.
+    void tint(uint8_t *rdram, Counter &counter);
 
     // A frame of the counter: its wheels' turns a step on, and its slide a
     // step on, eased out on the way out, so it goes back in gathering speed.

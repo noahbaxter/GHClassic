@@ -58,9 +58,24 @@ namespace gh2::streak_counter
         fade(rdram, mat, kFrom + (1.0f - kFrom) * wheel.along);
     }
 
+    void tint(uint8_t *rdram, Counter &counter)
+    {
+        // Its alpha left as the wheel's turn has it.
+        constexpr float kPurple[3] = {0.72f, 0.42f, 1.0f}, kWhite[3] = {1.0f, 1.0f, 1.0f};
+        const float *colour = counter.fullCombo ? kPurple : kWhite;
+        for (const auto &wheel : counter.digits)
+            for (const uint32_t mat : wheel)
+                if (mat)
+                    for (uint32_t ch = 0; ch < 3u; ++ch)
+                        store<float>(rdram, mat + ::milo::mat::kColor + 4u * ch, colour[ch]);
+        counter.tinted = counter.fullCombo;
+    }
+
     void step(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const Addresses &addresses, uint32_t display,
               Counter &counter)
     {
+        if (counter.tinted != counter.fullCombo)
+            tint(rdram, counter);
         const auto now = ps2x::host_clock::now();
         const float dt = counter.last == std::chrono::steady_clock::time_point{}
                              ? 0.0f
