@@ -293,6 +293,7 @@ set(GHC_GAME_SOURCES
     src/gh2x/textures.cpp
     src/gh2x/track.cpp
     src/gh80s/install.cpp
+    src/hub/poster_meshes.cpp
     src/milo/milo.cpp
     src/milo/objects.cpp
     src/movie/movie.cpp

@@ -79,11 +79,7 @@ namespace gh2
                 std::cerr << "[help_bar] cannot read " << path << std::endl;
                 return;
             }
-            const auto body = [&](const std::string &cls, const std::string &name) -> milo::Bytes *
-            {
-                const auto it = std::find(dir->entries.begin(), dir->entries.end(), std::make_pair(cls, name));
-                return it == dir->entries.end() ? nullptr : &dir->bodies[static_cast<size_t>(it - dir->entries.begin())];
-            };
+            const auto body = [&](const std::string &cls, const std::string &name) { return milo::body(*dir, cls, name); };
             // The help bar's box is black and half clear, its middle
             // (help_box_mid) and its round end (help_box_corner). Each again
             // in white and solid, for a box of any colour (box.dta): a Mat's
