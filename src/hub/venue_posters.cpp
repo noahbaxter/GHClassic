@@ -2,6 +2,7 @@
 
 #include "content/games.h"
 #include "disc/ark.h"
+#include "disc/made_cache.h"
 #include "hub/picture.h"
 #include "milo/milo.h"
 #include "poster_faces.h"
@@ -19,6 +20,7 @@
 #include <map>
 #include <mutex>
 #include <numeric>
+#include <optional>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -46,7 +48,8 @@
 //      the tape over its top corners. Song defaults' "?" poster is blank
 //      paper through the same finish, no map.
 // made then turns each into RGBA bytes, which the hub's poster Tex is
-// swapped for (hub/hub_scene.cpp).
+// swapped for (hub/hub_scene.cpp), and keeps them in made_cache: every run
+// after the first reads them back instead.
 
 namespace gh2::venue_posters
 {
@@ -1228,14 +1231,60 @@ namespace gh2::venue_posters
         };
         Made &s_made = *new Made;
 
-        const std::map<std::string, std::shared_ptr<const TextureData>> &made(const std::string &game)
+        using Posters = std::map<std::string, std::shared_ptr<const TextureData>>;
+
+        // A game's posters as made_cache keeps them: each its venue's name
+        // and a 0, its width and height, then its RGBA.
+        std::vector<uint8_t> pack(const Posters &posters)
+        {
+            std::vector<uint8_t> out;
+            for (const auto &[venue, data] : posters)
+            {
+                out.insert(out.end(), venue.begin(), venue.end());
+                out.push_back(0u);
+                for (const uint32_t v : {data->width, data->height})
+                    out.insert(out.end(), reinterpret_cast<const uint8_t *>(&v), reinterpret_cast<const uint8_t *>(&v) + 4);
+                out.insert(out.end(), data->rgba.begin(), data->rgba.end());
+            }
+            return out;
+        }
+
+        std::optional<Posters> unpack(const std::vector<uint8_t> &bytes)
+        {
+            Posters out;
+            for (size_t at = 0; at < bytes.size();)
+            {
+                const auto end = std::find(bytes.begin() + std::ptrdiff_t(at), bytes.end(), uint8_t(0));
+                if (bytes.end() - end < 9)
+                    return std::nullopt;
+                const std::string venue(bytes.begin() + std::ptrdiff_t(at), end);
+                at = size_t(end - bytes.begin()) + 1u;
+                auto data = std::make_shared<TextureData>();
+                std::memcpy(&data->width, bytes.data() + at, 4u);
+                std::memcpy(&data->height, bytes.data() + at + 4u, 4u);
+                at += 8u;
+                const size_t size = size_t(data->width) * data->height * 4u;
+                if (bytes.size() - at < size)
+                    return std::nullopt;
+                data->rgba.assign(bytes.begin() + std::ptrdiff_t(at), bytes.begin() + std::ptrdiff_t(at + size));
+                at += size;
+                out[venue] = std::move(data);
+            }
+            return out;
+        }
+
+        // Made from the disc the first run, read back from made_cache after.
+        const Posters &made(const std::string &game)
         {
             const std::lock_guard lock(s_made.mutex);
             if (const auto found = s_made.games.find(game); found != s_made.games.end())
                 return found->second;
-            const auto posters = game == "gh1" ? gh1Posters() : mapPosters(game);
+            const std::string kept = "posters_" + game;
+            if (const auto bytes = made_cache::read(kept))
+                if (auto posters = unpack(*bytes))
+                    return s_made.games[game] = std::move(*posters);
             auto &out = s_made.games[game];
-            for (const auto &[venue, image] : posters)
+            for (const auto &[venue, image] : game == "gh1" ? gh1Posters() : mapPosters(game))
             {
                 auto data = std::make_shared<TextureData>();
                 data->width = uint32_t(image.w);
@@ -1243,6 +1292,7 @@ namespace gh2::venue_posters
                 data->rgba = picture::toRgba(image);
                 out[venue] = std::move(data);
             }
+            made_cache::write(kept, pack(out));
             return out;
         }
     }

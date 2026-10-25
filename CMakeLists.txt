@@ -248,6 +248,7 @@ set(GHC_GAME_SOURCES
     src/disc/ark.cpp
     src/disc/crypt.cpp
     src/disc/disc.cpp
+    src/disc/made_cache.cpp
     src/disc/sha1.cpp
     src/disc/volume.cpp
     src/formats/bitmap.cpp
