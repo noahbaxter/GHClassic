@@ -77,7 +77,8 @@ namespace gh2
 
         std::optional<Gh2Clip> readGh2Clip(const Bytes &b)
         {
-            if (u32(b, 0u) < 8u || u32(b, 4u) != 5u)
+            const uint32_t rev = u32(b, 0u);
+            if (u32(b, 4u) != 5u)
                 return std::nullopt;
             Gh2Clip clip;
             std::memcpy(&clip.start, b.data() + kClipTiming, 4u);
@@ -102,7 +103,7 @@ namespace gh2
                 str(b, p);
             }
             clip.eventsEnd = p;
-            auto sets = readSamples(b, p, u32(b, 0u), 3);
+            auto sets = readSamples(b, p, rev, rev < 8u ? 2 : 3);
             if (!sets)
                 return std::nullopt;
             clip.sets = std::move(*sets);

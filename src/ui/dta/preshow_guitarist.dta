@@ -1,0 +1,258 @@
+; The pre-show's guitarist: the outfit's song figure, as a song shows it,
+; its guitar loaded and held as on stage (hub/menu_guitarist.h). A
+; preview panel of its own, ghc_preshow_char, loads it as
+; {ghc_preshow_name <outfit>}: char_single's list (career.dta
+; LOAD_CHARACTERS) is character select's, which walks it.
+{func ghc_preshow_name ($outfit) {symbol {sprint ghcsong_ $outfit}}}
+{if {! {exists ghc_preshow_char}} {new CharsysPanel ghc_preshow_char}}
+; Typed with every outfit's song figure the game has (config's characters,
+; which another game's menus change): its model cache is sized from them.
+{set $ghc_preshow_typed_for ""}
+{set $ghc_preshow_type ((num_placers 1) (load_order ()))}
+{func ghc_preshow_type_char
+   {if {!= $ghc_preshow_typed_for {campaigns active}}
+      {do
+         ($l {elem {find $ghc_preshow_type load_order} 1})
+         {set $ghc_preshow_typed_for {campaigns active}}
+         {foreach_int $i 1 {size {find $syscfg characters}}
+            {do
+               ($c {elem {find $syscfg characters} $i})
+               {foreach_int $j 1 {size $c}
+                  {do
+                     ($song {ghc_preshow_name {elem {elem $c $j} 0}})
+                     {if {! {find_elem $l $song}} {push_back $l $song}}
+                  }
+               }
+            }
+         }
+         {retype ghc_preshow_char $ghc_preshow_type}
+      }
+   }
+}
+; A song stands its guitarist on a stage mark (Character::Teleport,
+; 0x162b30), which its walks and turns are measured from; without one it
+; walks off. This one is the size of the venues' start marks
+; (start_guitarist0.way), where the placer puts it.
+{if {! {exists ghc_preshow.way}} {new Waypoint ghc_preshow.way}}
+{ghc_preshow.way set flags 1}
+{ghc_preshow.way set radius 12}
+; Once it is placed and loaded ({ghc_preshow_char are_chars_loaded}): on its
+; mark, in one of its walk-ons or wins (hub/menu_guitarist.h), then its
+; idle for $ghc_preshow_idle_secs, then the next walk-on, and round again.
+; Put on its mark only the once, while parked (ghc_qp_pose): again,
+; standing, it lands far off. The clips barely move it.
+;
+; Each clip but the entrance blends in from the last (kPlayNow). A clip played
+; drops any still waiting at no weight (CharClipDriver's constructor,
+; 0x198660), so the idle is queued behind the walk-on only once the walk-on
+; shows, and the next walk-on comes only once the idle shows: kept by what
+; {ghc_preshow_showing} says is on screen, from the panel's poll
+; (ghc_preshow_walkons). $ghc_preshow_phase: walk_on, its idle queued
+; (queued), or idle since $ghc_preshow_idle_from.
+{set $ghc_preshow_idle_secs 20} ; mostly idle, a flourish now and then
+; Past this in a walk-on or waiting on the idle, the next walk-on anyway.
+{set $ghc_preshow_stuck_secs 30}
+{set $ghc_preshow_walkon 1} ; the walk-on last played
+{set $ghc_preshow_phase idle}
+{set $ghc_preshow_idle_from 0}
+{set $ghc_preshow_phase_from 0}
+{func ghc_preshow_guitarist
+   {do
+      ($char {ghc_preshow_char get_char 0})
+      {$char start_at ghc_preshow.way}
+      {ghc_preshow_ready $char}
+      {ghc_preshow_walk_on $char 1}
+   }
+}
+; The strumming hand closed on its pick at the strings, ready, under
+; whatever the body plays: a song moves it from its notes (right_hand.drv,
+; the set's _strum clips, char_objects.dta), and with none it floats open
+; above them. A strum's first frame, held (kPlayUserTime): it never strums.
+; The fretting hand stays as its clips have it.
+{set $ghc_preshow_ready_clip strum_short_01}
+{func ghc_preshow_ready ($char)
+   {do
+      ($hand {$char find right_hand.drv})
+      {if {&& $hand {{$hand get_clips} find $ghc_preshow_ready_clip}}
+         {$hand play {{$hand get_clips} find $ghc_preshow_ready_clip} {| kPlayNoBlend kPlayLoop kPlayUserTime}}
+      }
+   }
+}
+; Its clip $n, picked by hand (hub/preshow_picks.dta); an idle between
+; each.
+{func ghc_preshow_clip ($drv $n) {symbol {sprint preshow_pick_ $n}}}
+; Clip $n, blended in now: 1 is the entrance (hub/menu_guitarist.h),
+; played once as it appears; the interludes from 2, round again from 2 past
+; the last, so it never picks its guitar up again. With no interludes, only
+; the idle after the entrance, for good; with no entrance either, from the
+; start.
+{func ghc_preshow_walk_on ($char $n)
+   {do
+      ($drv {$char find main.drv})
+      {if {! {{$drv get_clips} find {ghc_preshow_clip $drv $n}}}
+         {set $n {if_else {{$drv get_clips} find {ghc_preshow_clip $drv 2}} 2 $n}}
+      }
+      {set $ghc_preshow_walkon $n}
+      {set $ghc_preshow_phase walk_on}
+      {set $ghc_preshow_phase_from {taskmgr ui_seconds}}
+      ; The entrance cut in at its first frame: it starts while the figure
+      ; is still hidden (ghc_qp_pose), and blended in it still held the
+      ; idle's hands on the guitar as it showed (glam's catch).
+      {if_else {{$drv get_clips} find {ghc_preshow_clip $drv $n}}
+         {$drv play {{$drv get_clips} find {ghc_preshow_clip $drv $n}}
+            {| {if_else {== $n 1} kPlayNoBlend kPlayNow} kPlayNoLoop kPlayRealTime}}
+         {do
+            {set $ghc_preshow_phase idle_only}
+            {if {== $n 1}
+               {$drv play {{$drv get_clips} find preshow_idle} {| kPlayNoBlend kPlayRealTime}}}
+         }
+      }
+   }
+}
+; The idle goes round by its way back to itself, blended each time: a plain
+; loop ran its tail, which turns away, and snapped back from it, and
+; kPlayGraphLoop alone stops on its last frame after one round. Queued (kPlayLast),
+; it takes over at the walk-on's own way into it, and the next round is
+; queued behind each as it shows alone ({ghc_preshow_nodes} 1).
+{func ghc_preshow_idle_round ($drv)
+   {if {&& {== {ghc_preshow_showing $drv} preshow_idle} {== {ghc_preshow_nodes $drv} 1}}
+      {$drv play {{$drv get_clips} find preshow_idle} {| kPlayLast kPlayRealTime}}
+   }
+}
+{func ghc_preshow_walkons
+   {do
+      ($char {ghc_preshow_char get_char 0})
+      ($drv 0)
+      ($on 0)
+      {ghc_sandbox_poll}
+      {if_else {&& $char {size $ghc_sb_loop}}
+         {ghc_sb_poll $char}
+      {if $char
+         {do
+            {set $drv {$char find main.drv}}
+            {set $on {ghc_preshow_showing $drv}}
+            {ghc_preshow_idle_round $drv}
+            {if {&& {== $ghc_preshow_phase idle}
+                  {> {'-' {taskmgr ui_seconds} $ghc_preshow_idle_from} $ghc_preshow_idle_secs}}
+               {ghc_preshow_walk_on $char {'+' $ghc_preshow_walkon 1}}
+            }
+            {if {&& {== $ghc_preshow_phase queued} {== $on preshow_idle}}
+               {set $ghc_preshow_phase idle}
+               {set $ghc_preshow_idle_from {taskmgr ui_seconds}}
+            }
+            {if {&& {== $ghc_preshow_phase walk_on}
+                  {== $on {ghc_preshow_clip $drv $ghc_preshow_walkon}}
+                  {{$drv get_clips} find preshow_idle}}
+               {set $ghc_preshow_phase queued}
+               {$drv play {{$drv get_clips} find preshow_idle} {| kPlayLast kPlayGraphLoop kPlayRealTime}}
+            }
+            {if {&& {!= $ghc_preshow_phase idle} {!= $ghc_preshow_phase idle_only}
+                  {> {'-' {taskmgr ui_seconds} $ghc_preshow_phase_from} $ghc_preshow_stuck_secs}}
+               {ghc_preshow_walk_on $char {'+' $ghc_preshow_walkon 1}}
+            }
+         }
+      }}
+   }
+}
+
+; The animation sandbox (tools/ghc.py sandbox): the file it watches calls
+; these, run again each time it is saved.
+;   {sandbox_outfit glam1}       that outfit in the door
+;   {sandbox_characters hd}      sd or hd models, then the outfit again
+;   {sandbox_loop (intro_03 idle stand_fast_02 idle)}  played in turn, round
+;                                and round, in place of the pre-show's own: a
+;                                song clip by name, as the pre-show would show
+;                                it (its preshow_all_ copy), or any clip of
+;                                the set as it is; idle is the pre-show's idle
+;   {sandbox_idle_secs 4}        how long each idle in the loop lasts
+;   {sandbox_auto}               the pre-show's own clips again
+; Each clip blends in, the idle is queued behind it, and the next comes once
+; the idle has it ($ghc_sb_step: none, play, handed or idle).
+{set $ghc_sb_loop ()}
+{set $ghc_sb_i 0}
+{set $ghc_sb_step none}
+{set $ghc_sb_cur none}
+{set $ghc_sb_from 0}
+{set $ghc_sb_until 0}
+{set $ghc_sb_idle_secs 4}
+{func sandbox_outfit ($o)
+   {quickplay pick outfit $o}
+   {ghc_qp_recall}
+   {ghc_qp_show_guitarist sel_character_panel}
+   {set $ghc_sb_i 0}
+   {set $ghc_sb_step none}
+}
+{func sandbox_characters ($c)
+   {quickplay characters $c}
+   {sandbox_outfit {quickplay pick outfit}}
+}
+{func sandbox_loop ($clips)
+   {set $ghc_sb_loop $clips}
+   {set $ghc_sb_i 0}
+   {set $ghc_sb_step none}
+}
+{func sandbox_idle_secs ($s) {set $ghc_sb_idle_secs $s}}
+{func sandbox_auto {set $ghc_sb_loop ()}}
+{func ghc_sb_next
+   {set $ghc_sb_i {mod {'+' $ghc_sb_i 1} {size $ghc_sb_loop}}}
+   {set $ghc_sb_step none}
+}
+; Clip $name of the figure's: its pre-show copy, else itself, else 0.
+{func ghc_sb_clip ($drv $name)
+   {do
+      ($all {symbol {sprint preshow_all_ $name}})
+      {if_else {{$drv get_clips} find $all}
+         $all
+         {if_else {{$drv get_clips} find $name} $name 0}
+      }
+   }
+}
+{func ghc_sb_start ($drv)
+   {do
+      ($name {elem $ghc_sb_loop $ghc_sb_i})
+      ($clip 0)
+      {set $ghc_sb_from {taskmgr ui_seconds}}
+      {if_else {== $name idle}
+         {do
+            {if {!= {ghc_preshow_showing $drv} preshow_idle}
+               {$drv play {{$drv get_clips} find preshow_idle} {| kPlayNow kPlayGraphLoop kPlayRealTime}}
+            }
+            {set $ghc_sb_until {'+' {taskmgr ui_seconds} $ghc_sb_idle_secs}}
+            {set $ghc_sb_step idle}
+            {ghc_log sandbox idle}
+         }
+         {do
+            {set $clip {ghc_sb_clip $drv $name}}
+            {if_else $clip
+               {do
+                  {set $ghc_sb_cur $clip}
+                  {set $ghc_sb_step play}
+                  {$drv play {{$drv get_clips} find $clip} {| kPlayNow kPlayNoLoop kPlayRealTime}}
+                  {ghc_log sandbox $name}
+               }
+               {do
+                  {ghc_log sandbox no_clip $name}
+                  {ghc_sb_next}
+               }
+            }
+         }
+      }
+   }
+}
+{func ghc_sb_poll ($char)
+   {do
+      ($drv {$char find main.drv})
+      ($on 0)
+      {if {== $ghc_sb_step none} {ghc_sb_start $drv}}
+      {ghc_preshow_idle_round $drv}
+      {set $on {ghc_preshow_showing $drv}}
+      {if {&& {== $ghc_sb_step handed} {== $on preshow_idle}} {ghc_sb_next}}
+      {if {&& {== $ghc_sb_step play} {== $on $ghc_sb_cur}}
+         {set $ghc_sb_step handed}
+         {$drv play {{$drv get_clips} find preshow_idle} {| kPlayLast kPlayGraphLoop kPlayRealTime}}
+      }
+      {if {&& {== $ghc_sb_step idle} {> {taskmgr ui_seconds} $ghc_sb_until}} {ghc_sb_next}}
+      ; Never there: on to the next.
+      {if {> {'-' {taskmgr ui_seconds} $ghc_sb_from} 60} {ghc_sb_next}}
+   }
+}

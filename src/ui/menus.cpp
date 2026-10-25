@@ -34,6 +34,8 @@ namespace gh2
         script::patchUi(kSelCharacterDta);
         script::patchUi(kQuickplayDta);
         script::patchUi(kCampaignsDta);
+        // Before the pickers, whose character screen keeps its panel loaded.
+        script::patchUi(kPreshowGuitaristDta);
         script::patchUi(kQuickplayPickersDta);
         script::patchUi(kQuickplaySetupDta);
         locale::add("ghc_select_campaign", "select campaign");

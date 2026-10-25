@@ -263,6 +263,9 @@ namespace gh2
             std::atomic<bool> done{false};
         };
 
+        // addGh2xSceneFix's, by PS2 path; only read once install is done.
+        std::map<std::string, std::vector<std::function<void(milo::Dir &)>>> s_fixes;
+
         void convertOnce(const Discs &discs, Scene &scene)
         {
             std::call_once(scene.once, [&]
@@ -275,6 +278,9 @@ namespace gh2
                     return;
                 }
                 addSkins(discs, scene.path, scene.twin, *converted, scene.looks, scene.pictures);
+                if (const auto fixes = s_fixes.find(scene.path); fixes != s_fixes.end())
+                    for (const auto &fix : fixes->second)
+                        fix(*converted);
                 scene.bytes = milo::write(*converted);
             });
             scene.done = true;
@@ -295,6 +301,11 @@ namespace gh2
             scene.bytes.reset();
             return made;
         }
+    }
+
+    void addGh2xSceneFix(const std::string &path, std::function<void(milo::Dir &)> fix)
+    {
+        s_fixes[path].push_back(std::move(fix));
     }
 
     void installGh2xModels()

@@ -13,6 +13,7 @@
     tools/ghc.py ci                          what builds without a disc, into build/ci
     tools/ghc.py procedural [name ...]       draw tools/procedural's pictures again
     tools/ghc.py review [archive <folder> ... | archive --landed]  what review/ holds; put it away
+    tools/ghc.py sandbox [--4x3] [--no-build]  the hub's guitarist, playing what sandbox.dta says, live
 
 play builds everything from the disc on its first run, then brings the C++
 build up to date before each launch (not the recompile) unless --no-build.
@@ -429,6 +430,35 @@ def cmd_play(argv):
     args = [*content(tool_env(), games), *data_dir(isolated)]
     show_launch(disc, args)
     return subprocess.run([str(game_binary()), disc, *args, *argv]).returncode
+
+
+def cmd_sandbox(argv):
+    """The quickplay hub's guitarist, live: the game in a window on a first
+    boot straight into the hub, running sandbox.dta (from
+    tools/sandbox/sandbox.dta the first time) each time it is saved, with
+    every clip the pre-show weighs playable (hub/menu_guitarist.h)."""
+    parser = argparse.ArgumentParser(prog="ghc.py sandbox")
+    parser.add_argument("--4x3", action="store_true", dest="narrow", help="a 4:3 picture, not 16:9")
+    parser.add_argument("--no-build", action="store_true")
+    args, rest = parser.parse_known_args(argv)
+    live = ROOT / "sandbox.dta"
+    if not live.exists():
+        shutil.copy(ROOT / "tools" / "sandbox" / "sandbox.dta", live)
+    if not built():
+        sys.exit("no build; run tools/ghc.py build")
+    if not args.no_build:
+        build_step("building game", ["cmake", "--build", GAME, "--target", "GHClassic"], tool_env(), "game.log")
+    # A first boot each time, as boot.dta expects, beside the player's own.
+    out = ROOT / "runs" / "sandbox"
+    shutil.rmtree(out, ignore_errors=True)
+    out.mkdir(parents=True)
+    (out / "settings.ini").write_text(f"widescreen = {'false' if args.narrow else 'true'}\n")
+    env = {**os.environ, "GHC_SANDBOX": str(live), "GHC_PRESHOW_GALLERY": "1"}
+    cmd = [str(game_binary()), find_disc(tool_env()), *content(tool_env(), None),
+           "--scenario", str(ROOT / "tools" / "sandbox" / "boot.dta"), "--fast-boot",
+           "--save", str(out / "save.bin"), "--settings", str(out / "settings.ini"), *rest]
+    print(f"edit and save {live}; the hub plays it")
+    return subprocess.run(cmd, env=env, cwd=out).returncode
 
 
 REVIEW = main_checkout() / "review"
@@ -1019,7 +1049,7 @@ def cmd_review(argv):
 
 COMMANDS = {"play": cmd_play, "build": cmd_build, "bind": cmd_bind, "arm": cmd_arm, "record": cmd_record,
             "scenarios": cmd_scenarios, "release": cmd_release, "ci": cmd_ci, "procedural": cmd_procedural,
-            "review": cmd_review}
+            "review": cmd_review, "sandbox": cmd_sandbox}
 
 
 def main():

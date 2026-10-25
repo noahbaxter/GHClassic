@@ -1,0 +1,14 @@
+; tools/ghc.py sandbox: from a first boot straight to the quickplay hub, its
+; guitarist in the door, then left running for the watched sandbox.dta.
+(wait_screen bootup_create_save_check)
+{ui goto_screen bootup_create_save}
+(wait_screen guitar_help_screen)
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+{campaign set_all_access 1}
+{quickplay song_defaults 0}
+{gamecfg set mode quickplay}
+{quickplay pick outfit punk1}
+{quickplay pick venue_game gh2} {quickplay pick venue battle}
+{ui goto_screen ghc_qp_setup_screen}
+(wait_screen ghc_qp_setup_screen)
