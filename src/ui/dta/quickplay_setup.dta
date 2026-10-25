@@ -1,0 +1,698 @@
+; Quickplay's setup, the show's, from the main menu: play the show, or first
+; pick the guitarist, the guitar, the venue or the modifiers, each picker
+; leading back here (quickplay_pickers.dta). Playing the show is the song
+; list, then a song's difficulty and the song, then the list again, as many
+; songs as are played; back from the list is here. With song defaults on
+; ({quickplay song_defaults}) a song plays as its setlist's game boots and
+; the three pickers are greyed. The guitarist a song will play stands
+; there, in character select's doorway, by a picture of the venue
+; (hub/hub_scene.h).
+;
+; What a song plays with is its own casting (GameConfig::SetQuickplay,
+; 0x126828) under whatever was last picked ({quickplay pick}), put together
+; again each time, so a picker backed out of leaves nothing.
+{func ghc_qp_recall
+   {game set_quickplay}
+   {if {quickplay picked outfit} {game set_character {quickplay pick outfit} TRUE}}
+   {if {quickplay picked guitar} {game set_guitar {quickplay pick guitar} {quickplay pick skin}}}
+   {if {quickplay picked venue} {game set_venue {quickplay pick venue}}}
+}
+; The song started: with song defaults, as the setlist's game boots, with its
+; first guitar, in its own game's venue for the song's tier; else as picked,
+; the venue in its own game's venues.
+{func ghc_qp_play
+   {if_else {quickplay song_defaults}
+      {do
+         {game set_quickplay}
+         {campaigns venues_from {ghc_venue_game {setlist shown}}}
+         {game set_character {quickplay outfit {setlist shown}} TRUE}
+         {game set_guitar_index 0}
+      }
+      {do
+         {ghc_qp_recall}
+         {if {quickplay picked venue_game} {campaigns venues_from {quickplay pick venue_game}}}
+      }
+   }
+   {campaigns text_outfit {game get_character_outfit}}
+   {ui goto_screen loading_screen}
+}
+; The venue map opens on the game's whose venue was last picked, else the
+; menus' game's.
+{func ghc_qp_to_venues
+   {set $ghc_qp_venues
+      {if_else {quickplay picked venue_game}
+         {quickplay pick venue_game}
+         {ghc_venue_game {campaigns active}}
+      }
+   }
+   {campaigns text_venues $ghc_qp_venues}
+   {ui goto_screen ghc_qp_venue_screen}
+}
+; The hub's rows: each a button named for what it does, its text, and how
+; wide that text draws, in the arrow picture's units (it is 200 across),
+; measured off the screen: no label tells its width. A token with no string
+; reads as itself. Song defaults' text is its state's (ghc_qp_sync_rows).
+{set $ghc_qp_rows
+   (
+      (ghc_play.btn "PLAY SHOW" 101)
+      (ghc_character.btn "CHARACTER" 102)
+      (ghc_guitar.btn "GUITAR" 64)
+      (ghc_venue.btn "VENUE" 59)
+      (ghc_modifiers.btn "MODIFIERS" 96)
+      (ghc_defaults.btn "" 102)
+   )
+}
+; The row last focused, focused again back from its screen; PLAY SHOW from
+; the main menu (main_menu.dta).
+{set $ghc_qp_row ghc_play.btn}
+; The hub is character select's room (sel_character.dta) with the hero's
+; words, portraits and list given over to the rows, the guitarist in the
+; doorway and the venue among the stickers. Both are one screen's scene,
+; one panel loaded once: going between them is no transition, just what
+; shows (ghc_qp_hub_enter). Where things stand in it:
+;
+; The rows: outfit1 to outfit2's spacing apart, from $ghc_qp_row_start steps
+; under where the hero's name stands, each row's text as theirs, the outfit
+; picker's arrow behind the focused one as behind outfit1.
+{set $ghc_qp_row_start 0.5}
+; The venue's poster (ghc_qp_show_venue) on the open door: where in the
+; door's panel, its turn into its face, and its half-width.
+{set $ghc_qp_poster_pos (-62 38 1)}
+{set $ghc_qp_poster_rot (-90 0 0)}
+{set $ghc_qp_poster_scale 30}
+; With song defaults, the question mark in the doorway: rows across and
+; down from where the guitarist's name stood, and times its text.
+{set $ghc_qp_unknown_pos (9 3)}
+{set $ghc_qp_unknown_size 4}
+; The door stays open, wider than the scene has it (cs_door.mesh at 90 0
+; 125), clear of a walk-on's wide step. Character select hands it to the
+; guitarist's entrance (set_door), whose clip swings it: not here.
+{set $ghc_qp_door_rot (90 0 165)}
+; Where the guitarist stands: out of the doorway, in front of its frame,
+; toward the rows enough that a guitar's head clears the open door (x toward
+; the hall, y toward the rows). Its picks keep within the room this leaves
+; (hub/preshow_picks.dta); or its character's own spot: grim's
+; wings reach the rows from there. The view looks across both, measured at
+; 720 lines (2026-10-24): +x goes right 5.7 px a unit and away, +y left
+; 2.7 px and away. So right on screen at the same size is (+1 -0.77) a
+; step (8 px), toward the camera in the same place (-1 -2.07) (bigger by
+; 7 px). A turn of more degrees faces further right, away from the rows.
+{set $ghc_qp_stand_pos (-6 -9 0)}
+{set $ghc_qp_stand_for
+   (
+      (grim (-9 -29 0) 8) ; GH2's: right and well toward the camera, his wings off the wall
+      (grimgh1 (-12 -30 0)) ; right and well toward the camera, his wings off the wall
+      (punk1 (-5 -15 0)) ; right and a little forward, his intro_03 clear of the door
+      (punk (-5.5 -9.5 0)) ; a little right, his jumps and spins off the wall
+      (alternagh1 (-6 -16 0) 10)
+      (glam1 (-4 -18 0)) ; well right
+      (goth1 (-6 -9 0) 10)
+      (metal1 (-1 -13 0) -18) ; right, turned clockwise toward the camera
+      (rock1 (-16 -6.3 0) 10) ; left, intro_03's long walk in starting on screen
+      (rockabill1 (4 -8 0) 10) ; back, his hair under the top, and right of the rows
+      (funk1 (-11 -21.4 0)) ; toward the camera, win_02's jump off the wall
+      (deathmetal1 (-12 -21.4 0)) ; toward the camera, intro_01's step back off the wall
+   )
+}
+; Character select's own placer, as its scene has it, for its turn: read as
+; the scene loads. Its door stays open, its guitarist already in the
+; doorway (sel_character.dta pick), until another one walks in.
+{set $ghc_qp_home_pos (0 0 0)}
+{set $ghc_qp_home_rz 0}
+; The hub's guitarist turned this far about up, from character select's
+; straight out of the door toward the hub's camera, along the wall.
+{set $ghc_qp_face -25}
+; The arrow's point from a row, as the picker's from outfit1 on its anim's
+; first frame, read as the scene loads; its scale there; and how much
+; longer its bar is than the row's words, in the picture's units, for where
+; the head ends against them and a little past their end.
+{set $ghc_qp_arrow_x 0} {set $ghc_qp_arrow_y 0} {set $ghc_qp_arrow_z 0}
+{set $ghc_qp_arrow_scale 1}
+{set $ghc_qp_arrow_past 14}
+{set $ghc_qp_arrow_head 32} ; the head's length (hub/hub_scene.cpp kHead)
+; The hub's view: low on the left of the room, looking up along its wall
+; to the guitarist in the door. The scene's camera group (cs_camerafix.grp)
+; turned [0] degrees about up and tilted [1], moved [2] across, [3] in and
+; [4] up. The words stay put on the screen as it turns (ghc_rows.grp). Set
+; for 4:3: 16:9 shows the same with more either side. Character select
+; keeps the scene's own view; only going between the two moves it, eased,
+; over $ghc_qp_view_frames.
+{set $ghc_qp_angle (28 -4 -160 -5 -20)}
+; The words this much in from the view's own left, room for the arrow's head.
+{set $ghc_qp_rows_in 45}
+{set $ghc_qp_view_frames 36}
+; Where the view is (0 character select's, 1 the hub's) and where it is
+; going.
+{set $ghc_qp_view 1}
+{set $ghc_qp_view_goal 1}
+; The camera group as the scene has it, read as it loads: place and turn.
+{set $ghc_qp_cx 0} {set $ghc_qp_cy 0} {set $ghc_qp_cz 0}
+{set $ghc_qp_crx 0} {set $ghc_qp_cry 0} {set $ghc_qp_crz 0}
+
+; Run from the panel's pick, with it as $this, as either screen enters: the
+; hub's rows and pictures made the first time its scene loads, then either
+; the hub's things showing or character select's.
+{func ghc_qp_hub_enter ($panel)
+   {do
+      ($hub {== {{ui current_screen} name} ghc_qp_setup_screen})
+      {$panel set hub $hub}
+      {if {! {exists ghc_play.btn}} {ghc_qp_hub_build $panel}}
+      ; Eased from the other's view going between them, else straight to it.
+      {ghc_qp_view_to $panel {if_else $hub 1 0} $ghc_qp_same_scene}
+      {foreach $o (sg_selectyourhero.lbl sc_char_nm.lbl sc_char_blurb.lbl char_highlight.mesh character.lst)
+         {$o set_showing {! $hub}}
+      }
+      {foreach_int $i 1 {size {find $syscfg characters}}
+         {{symbol {sprint "char_" {elem {elem {find $syscfg characters} $i} 0} ".mesh"}} set_showing {! $hub}}
+      }
+      {foreach $row $ghc_qp_rows {{elem $row 0} set_showing $hub}}
+      {ghc_arrow_head.mesh set_showing $hub}
+      {ghc_arrow_bar.mesh set_showing $hub}
+      {ghc_qp_show_venue $panel}
+      {if_else $hub
+         {do
+            {foreach $o (character.lst outfit1.btn outfit2.btn) {$panel disable $o}}
+            {foreach $row $ghc_qp_rows {$panel enable {elem $row 0}}}
+            {ghc_qp_sync_rows $panel}
+            {ghc_unknown.lbl set_showing {quickplay song_defaults}}
+            {$panel set_focus $ghc_qp_row}
+            {ghc_qp_point $ghc_qp_row}
+         }
+         {do
+            {foreach $row $ghc_qp_rows {$panel disable {elem $row 0}}}
+            {ghc_unknown.lbl set_showing FALSE}
+            {$panel enable character.lst}
+            {$panel set_focus character.lst}
+            {char_single.placer set_local_pos {elem $ghc_qp_home_pos 0} {elem $ghc_qp_home_pos 1} {elem $ghc_qp_home_pos 2}}
+            {char_single.placer set_local_rot 0 0 $ghc_qp_home_rz}
+         }
+      }
+   }
+}
+; The hub's rows, as copies of outfit1 in the hero's words' group, its arrow
+; and its question mark; and where character select's placer stands. The
+; scene's own outfit buttons and arrow are character select's still.
+{func ghc_qp_hub_build ($panel)
+   {do
+      ($x 0) ($y 0) ($z 0) ($a 0) ($b 0) ($top 0) ($ax 0) ($ay 0) ($az 0) ($step 0)
+      ($group {$panel find text_character.grp})
+      ($count {size $ghc_qp_rows})
+      {char_single.placer get_local_pos $x $y $z}
+      {set $ghc_qp_home_pos ($x $y $z)}
+      {char_single.placer get_local_rot $x $y $ghc_qp_home_rz}
+      {{$panel find cs_camerafix.grp} get_local_pos $ghc_qp_cx $ghc_qp_cy $ghc_qp_cz}
+      {{$panel find cs_camerafix.grp} get_local_rot $ghc_qp_crx $ghc_qp_cry $ghc_qp_crz}
+      ; The words' group (and the hero's, character select's) hangs from a
+      ; stand-in for the camera group where the scene has it, which the
+      ; view never moves: the words stay where they stand on the screen.
+      {do
+         ($anchor {new Group ghc_rows.grp})
+         ($sx 1) ($sy 1) ($sz 1)
+         {{$panel find cs_camerafix.grp} get_local_scale $sx $sy $sz}
+         {$anchor set_local_rot $ghc_qp_crx $ghc_qp_cry $ghc_qp_crz}
+         {$anchor set_local_scale $sx $sy $sz}
+         {$anchor set_local_pos
+            {'+' $ghc_qp_cx $ghc_qp_rows_in} $ghc_qp_cy
+            $ghc_qp_cz}
+         {$group set trans_parent $anchor}
+      }
+      {cs_arrow.tnm set_frame 0}
+      {outfit2.btn get_local_pos $x $y $b}
+      {cs_arrow.mesh get_local_pos $ax $ay $az}
+      {outfit1.btn get_local_pos $x $y $a}
+      {set $ghc_qp_arrow_x {'-' $ax $x}}
+      {set $ghc_qp_arrow_y {'-' $ay $y}}
+      {set $ghc_qp_arrow_z {'-' $az $a}}
+      {cs_arrow.mesh get_local_scale $ghc_qp_arrow_scale $ay $az}
+      {sc_char_nm.lbl get_local_pos $x $y $top}
+      {set $step {'-' $b $a}}
+      {foreach_int $i 0 $count
+         {do
+            ($row {elem $ghc_qp_rows $i})
+            ($btn {new {outfit1.btn class_name} {elem $row 0}})
+            {$btn copy outfit1.btn 0}
+            {$btn set trans_parent $group}
+            {$btn set_local_pos $x $y {'+' $top {'*' {'+' $ghc_qp_row_start $i} $step}}}
+            {$btn set text_token {elem $row 1}}
+            {$btn set text_size {outfit1.btn get text_size}}
+            {$group insert (objects {$group size objects}) $btn}
+         }
+      }
+      {foreach_int $i 0 $count
+         {{elem {elem $ghc_qp_rows $i} 0} set nav_down
+            {$panel find {elem {elem $ghc_qp_rows {mod {'+' $i 1} $count}} 0}}
+         }
+      }
+      ; Drawn first of the rows' group, under their text: the rows went in
+      ; at its front ({$group size objects} is 0 here).
+      {foreach $piece (ghc_arrow_bar.mesh ghc_arrow_head.mesh)
+         {{$panel find $piece} set trans_parent $group}
+         {$group insert (objects 0) {$panel find $piece}}
+      }
+      {ghc_qp_add_unknown sc_char_nm.lbl {elem $ghc_qp_unknown_pos 0} {elem $ghc_qp_unknown_pos 1} $step
+         $ghc_qp_unknown_size}
+      {{$panel loaded_dir} sync_objects}
+   }
+}
+; The arrow behind row $btn: its head where the picker's points, its bar on
+; to just past the row's words.
+{func ghc_qp_point ($btn)
+   {do
+      ($x 0) ($y 0) ($z 0)
+      ($words {elem {find $ghc_qp_rows {symbol $btn}} 2}) ; a focus names it in a string
+      ($bar {'+' $words $ghc_qp_arrow_past})
+      {$btn get_local_pos $x $y $z}
+      {set $x {'+' $x $ghc_qp_arrow_x}}
+      {set $y {'+' $y $ghc_qp_arrow_y}}
+      {set $z {'+' $z $ghc_qp_arrow_z}}
+      {ghc_arrow_head.mesh set_local_pos $x $y $z}
+      {ghc_arrow_head.mesh set_local_scale $ghc_qp_arrow_scale $ghc_qp_arrow_scale $ghc_qp_arrow_scale}
+      {ghc_arrow_bar.mesh set_local_pos {'+' $x {'*' $ghc_qp_arrow_head $ghc_qp_arrow_scale}} $y $z}
+      ; The bar's picture is 168 across (hub/hub_scene.cpp).
+      {ghc_arrow_bar.mesh set_local_scale {'*' $ghc_qp_arrow_scale {'/' {max 1 $bar} 168}} $ghc_qp_arrow_scale
+         $ghc_qp_arrow_scale}
+   }
+}
+; Song defaults' row says its state, and greys the three pickers it
+; overrules.
+{func ghc_qp_sync_rows ($panel)
+   {{$panel find ghc_defaults.btn} set text_token
+      {sprint "SONG DEFAULTS: " {if_else {quickplay song_defaults} "ON" "OFF"}}
+   }
+   {foreach $btn (ghc_character.btn ghc_guitar.btn ghc_venue.btn)
+      {{$panel find $btn} set_state {if_else {quickplay song_defaults} kDisabled kNormal}}
+   }
+}
+; With song defaults, a big question mark where the guitarist stands: a copy
+; of the scene's label $like in its group, $x and $z rows' $step across and
+; down from it and $size times its text.
+{func ghc_qp_add_unknown ($like $x $z $step $size)
+   {do
+      ($group {$like get trans_parent})
+      ($lbl {new {$like class_name} ghc_unknown.lbl})
+      ($lx 0) ($ly 0) ($lz 0)
+      {$like get_local_pos $lx $ly $lz}
+      {$lbl copy $like 0}
+      {$lbl set trans_parent $group}
+      {$lbl set_local_pos {'+' $lx {'*' $x {max $step {'-' 0 $step}}}} $ly {'+' $lz {'*' $z $step}}}
+      {$lbl set fit_text 0}
+      {$lbl set text_size {'*' $size {$like get text_size}}}
+      {$lbl set_text "?"}
+      {$group insert (objects {$group size objects}) $lbl}
+   }
+}
+; The venue a song will play in, by its poster's mesh (hub/hub_scene.h):
+; the last picked, else the one the recall left in the menus' game. With
+; song defaults, where each song has its own, that game's ? poster. None
+; outside the hub.
+{func ghc_qp_venue_mesh ($panel)
+   {if_else {! {$panel get hub}}
+      none
+      {symbol
+         {sprint "ghc_venue_"
+            {if_else {quickplay picked venue_game} {quickplay pick venue_game} {ghc_venue_game {campaigns active}}}
+            "_" {if_else {quickplay song_defaults} unknown {game get_venue}} ".mesh"
+         }
+      }
+   }
+}
+; Of the venues' posters in $panel's scene (hub/venue_posters.h), only
+; that one shows, taped up: to the open door, hung from cs_door.mesh, whose
+; panel runs x 0 (the hinge) to -100 and y -100 to 100 up, its back toward
+; the camera, at $ghc_qp_poster_pos in it. Turned $ghc_qp_poster_rot to
+; stand in its face, $ghc_qp_poster_scale half-wide. Its tape's margin is
+; clear in its alpha.
+{func ghc_qp_show_venue ($panel)
+   {do
+      ($shown {ghc_qp_venue_mesh $panel})
+      ($door {$panel find cs_door.mesh})
+      {foreach $g (gh1 gh2 gh80s)
+         {if {campaigns has $g}
+            {foreach $v {campaigns venues $g}
+               {ghc_qp_hang_poster $panel {sprint "ghc_venue_" $g "_" $v} $shown $door}
+            }
+            {ghc_qp_hang_poster $panel {sprint "ghc_venue_" $g "_unknown"} $shown $door}
+         }
+      }
+   }
+}
+{func ghc_qp_hang_poster ($panel $name $shown $on)
+   {do
+      ($mesh {$panel find {symbol {sprint $name ".mesh"}}})
+      ($mat {$panel find {symbol {sprint $name ".mat"}}})
+      {$mesh set_showing {== {symbol {sprint $name ".mesh"}} $shown}}
+      {$mesh set trans_parent $on}
+      ; A turn drops the scale: turned first.
+      {$mesh set_local_rot {elem $ghc_qp_poster_rot 0} {elem $ghc_qp_poster_rot 1} {elem $ghc_qp_poster_rot 2}}
+      {$mesh set_local_scale $ghc_qp_poster_scale $ghc_qp_poster_scale $ghc_qp_poster_scale}
+      {$mesh set_local_pos {elem $ghc_qp_poster_pos 0} {elem $ghc_qp_poster_pos 1} {elem $ghc_qp_poster_pos 2}}
+      {$mat set blend 3}
+   }
+}
+; The guitarist, the outfit a song will play, as a song shows it
+; (preshow_guitarist.dta), stands at the scene's placer, placed by
+; ghc_qp_place first, and plays its walk-ons as soon as it loads
+; (ghc_qp_pose). With song defaults no one stands there, each song having
+; its own: the question mark does instead.
+{func ghc_qp_show_guitarist ($panel)
+   {ghc_qp_unpark $panel}
+   {set $ghc_qp_posed TRUE}
+   {set $ghc_qp_posed_at 0}
+   {{$panel find ghc_unknown.lbl} set_showing {quickplay song_defaults}}
+   ; Placed once, a figure stays where it stood: hidden instead.
+   {do
+      ($char {ghc_preshow_char get_char 0})
+      {if $char {$char set_showing {! {quickplay song_defaults}}}}
+   }
+   {if {! {quickplay song_defaults}}
+      {do
+         {set $ghc_qp_posed FALSE}
+         {ghc_preshow_type_char}
+         {ghc_preshow_char set_placer 0 {$panel find char_single.placer}}
+         {ghc_preshow_char set_env 0 {$panel find character.env}}
+         {ghc_qp_place $panel}
+         ; Out of sight until it shows (ghc_qp_pose).
+         {do
+            ($p {$panel find char_single.placer})
+            {$p get_local_pos $ghc_qp_at_x $ghc_qp_at_y $ghc_qp_at_z}
+            {$p set_local_pos $ghc_qp_at_x $ghc_qp_at_y {'-' $ghc_qp_at_z 10000}}
+            {set $ghc_qp_parked TRUE}
+         }
+         {ghc_preshow_char show_char 0 {ghc_preshow_name {game get_character_outfit}}}
+      }
+   }
+}
+; The door held open and the guitarist's placer on its spot.
+{func ghc_qp_place ($panel)
+   {do
+      ($for $ghc_qp_stand_for)
+      ; The outfit's own spot (alternagh1), else its character's (alterna).
+      ($own {if_else {find_exists $for {game get_character_outfit}}
+         {find $for {game get_character_outfit}}
+         {if_else {find_exists $for {game get_character}} {find $for {game get_character}} 0}
+      })
+      ($pos {if_else $own {elem $own 1} $ghc_qp_stand_pos})
+      ; An own spot's third field, if any: degrees more turned than $ghc_qp_face.
+      ($turn {if_else {&& $own {> {size $own} 2}} {elem $own 2} 0})
+      {{$panel find cs_door.mesh} set_local_rot {elem $ghc_qp_door_rot 0} {elem $ghc_qp_door_rot 1}
+         {elem $ghc_qp_door_rot 2}}
+      {{$panel find char_single.placer} set_local_pos {elem $pos 0} {elem $pos 1} {elem $pos 2}}
+      {{$panel find char_single.placer} set_local_rot 0 0 {'+' $ghc_qp_home_rz {'+' $ghc_qp_face $turn}}}
+   }
+}
+; From the panel's poll: the guitarist, once loaded, on its mark and in its
+; walk-ons. Nothing until it is shown (ghc_qp_show_guitarist): the panels
+; poll through the screen's transition in. Its placer stands out of sight
+; until then, and it stays hidden for $ghc_qp_reveal seconds after, while its
+; guitar loads: neither its rest pose nor empty hands show.
+{set $ghc_qp_posed TRUE}
+{set $ghc_qp_posed_at 0}
+{set $ghc_qp_reveal 0.3}
+{set $ghc_qp_at_x 0}
+{set $ghc_qp_at_y 0}
+{set $ghc_qp_at_z 0}
+{set $ghc_qp_parked FALSE}
+; The placer back where it stood.
+{func ghc_qp_unpark ($panel)
+   {if $ghc_qp_parked
+      {set $ghc_qp_parked FALSE}
+      {{$panel find char_single.placer} set_local_pos $ghc_qp_at_x $ghc_qp_at_y $ghc_qp_at_z}
+   }
+}
+; With no figure placed (the hub on its way out, set_placer 0) the panel
+; counts as loaded but has none.
+{func ghc_qp_pose ($panel)
+   {do
+      ($char {ghc_preshow_char get_char 0})
+      ; Back in place but hidden at once, so that its hair, thrown by the
+      ; jump, settles out of sight.
+      {if {&& $char {! $ghc_qp_posed} {ghc_preshow_char are_chars_loaded}}
+         {set $ghc_qp_posed TRUE}
+         {set $ghc_qp_posed_at {taskmgr ui_seconds}}
+         {$char set_showing FALSE}
+         {ghc_preshow_guitarist}
+         {ghc_qp_unpark $panel}
+      }
+      ; Shown once the view has settled: the door says loading while the
+      ; camera moves.
+      {if {&& $char $ghc_qp_posed_at {> {'-' {taskmgr ui_seconds} $ghc_qp_posed_at} $ghc_qp_reveal}
+            {== $ghc_qp_view $ghc_qp_view_goal}}
+         {set $ghc_qp_posed_at 0}
+         ; Its hair still swinging from the jump back: at rest where it
+         ; stands now (CharUtlResetHair, 0x184288), as character select
+         ; sets a figure's before it shows.
+         {reset_hair $char}
+         {$char set_showing TRUE}
+      }
+      {if {&& $char $ghc_qp_posed} {ghc_preshow_walkons}}
+   }
+}
+; The panel's poll on the hub. Never character select's scribbled loading:
+; it is written on the closed door, and the hub's stands open, so it hung in
+; the empty doorway.
+{func ghc_qp_hub_poll ($panel)
+   {scl_loading.lbl set_showing FALSE}
+   {ghc_qp_pose $panel}
+}
+
+; The view $t of the way from character select's (0) to the hub's (1).
+{func ghc_qp_view_set ($panel $t)
+   {do
+      ($a $ghc_qp_angle)
+      ($e {'*' {'*' $t $t} {'-' 3 {'*' 2 $t}}}) ; eased in and out
+      {{$panel find cs_camerafix.grp} set_local_rot {'+' $ghc_qp_crx {'*' $e {elem $a 1}}} $ghc_qp_cry
+         {'+' $ghc_qp_crz {'*' $e {elem $a 0}}}}
+      {{$panel find cs_camerafix.grp} set_local_pos {'+' $ghc_qp_cx {'*' $e {elem $a 2}}}
+         {'+' $ghc_qp_cy {'*' $e {elem $a 3}}} {'+' $ghc_qp_cz {'*' $e {elem $a 4}}}}
+   }
+}
+; Toward view $goal: from where it is with $ease, else there now.
+{func ghc_qp_view_to ($panel $goal $ease)
+   {set $ghc_qp_view_goal $goal}
+   {if {! $ease} {set $ghc_qp_view $goal}}
+   {ghc_qp_view_set $panel $ghc_qp_view}
+}
+; From either screen's poll, once a frame: the view a step nearer its goal,
+; the same step each frame, which the UI's clock is too coarse to give.
+; The room seen through the door (cs_posters.mesh) slides as the scene
+; comes in (cs_posters.tnm, frames 0 to 10): straight on a parallax, from
+; the hub's angle the back room swinging. Held at its end; in quickplay the
+; view's clock starts past it anyway (sel_character.dta enter).
+{func ghc_qp_view_poll ($panel)
+   {do
+      ($posters {$panel find cs_posters.tnm})
+      {$posters stop_animation}
+      {$posters set_frame {$posters end_frame}}
+   }
+   {if {!= $ghc_qp_view $ghc_qp_view_goal}
+      {do
+         ($step {'/' 1.0 $ghc_qp_view_frames})
+         ($char {char_single get_char 0})
+         {set $ghc_qp_view
+            {if_else {> $ghc_qp_view_goal $ghc_qp_view}
+               {min $ghc_qp_view_goal {'+' $ghc_qp_view $step}}
+               {max $ghc_qp_view_goal {'-' $ghc_qp_view $step}}
+            }
+         }
+         {ghc_qp_view_set $panel $ghc_qp_view}
+         ; Character select's guitarist, in the door only once the camera
+         ; is there; till then its loading says so (sel_character.dta poll).
+         {if {&& $char {! {$panel get hub}}}
+            {$char set_showing FALSE}
+            {set $ghc_qp_char_held TRUE}
+         }
+      }
+   }
+   ; Shown again once settled and loaded: hidden only by the above.
+   {if {&& $ghc_qp_char_held {== $ghc_qp_view $ghc_qp_view_goal} {char_single are_chars_loaded}}
+      {set $ghc_qp_char_held FALSE}
+      {if {char_single get_char 0} {{char_single get_char 0} set_showing TRUE}}
+   }
+}
+{set $ghc_qp_char_held FALSE}
+{set $ghc_qp_fade_in 0.4} ; seconds the hub takes to come up from black
+
+; TRUE while going between the hub and character select, one scene: no
+; transition plays (GHScreen::CheckAnimateTransition, 0x145dc8, reads it on
+; each enter and exit). Either screen's TRANSITION_COMPLETE_MSG clears it.
+{set $ghc_qp_same_scene FALSE}
+{if {! {exists ghc_qp_setup_screen}} {new GHScreen ghc_qp_setup_screen}}
+{retype ghc_qp_setup_screen
+   (
+      ; Character select's (quickplay_pickers.dta), so that it stays loaded
+      ; going between them, but for its char_single: beside another, a
+      ; preview panel's figure stands in its bind pose.
+      (panels meta sel_character_panel helpbar ghc_preshow_char fade_panel)
+      (focus sel_character_panel)
+      (allow_back FALSE)
+      ; Never the scene's swoop: it fights the hub's own view (ghc_qp_view),
+      ; which is already in place as the screen fades in.
+      (animate_transition FALSE)
+      (helpbar (default ((fret1 help_continue) (fret2 help_back) (strum help_updown))))
+      (enter
+         ; In from black, the room still: but not back from character
+         ; select, the same room.
+         {if {! $ghc_qp_same_scene}
+            {fade_panel start_fade $ghc_qp_fade_in (color 0 0 0) (fade_synth FALSE) (fade_out FALSE)}}
+         {set $ghc_qp_posed TRUE} {ghc_qp_recall} {sel_character_panel pick})
+      (TRANSITION_COMPLETE_MSG
+         {set $ghc_qp_same_scene FALSE}
+         ; The panel enters before the screen recalls the picks.
+         {ghc_qp_show_venue sel_character_panel}
+         {ghc_qp_show_guitarist sel_character_panel}
+      )
+      (exit
+         {ghc_qp_unpark sel_character_panel}
+         {ghc_preshow_char set_placer 0}
+      )
+      (SELECT_START_MSG
+         {switch $component
+            (ghc_play.btn {ui goto_screen qp_selsong_screen})
+            (ghc_character.btn
+               {set $ghc_qp_same_scene TRUE}
+               {ui goto_screen ghc_qp_character_screen}
+            )
+            (ghc_guitar.btn {ui goto_screen ghc_qp_guitar_screen})
+            (ghc_venue.btn {ghc_qp_to_venues})
+            (ghc_modifiers.btn {ui goto_screen ghc_qp_extras_screen})
+            (ghc_defaults.btn
+               {quickplay song_defaults {! {quickplay song_defaults}}}
+               {ghc_qp_sync_rows sel_character_panel}
+               {ghc_qp_show_venue sel_character_panel}
+               {ghc_qp_show_guitarist sel_character_panel}
+            )
+         }
+         kDataUnhandled
+      )
+      (BUTTON_DOWN_MSG
+         {if {== $button kPad_Tri}
+            {$this backwards_anim}
+            {synth play_sequence button_back.cue}
+            {ui goto_screen main_screen}
+         }
+         kDataUnhandled
+      )
+   )
+}
+
+; The modifiers: the game's own cheats (long_cheats, gh2.dta) as boxes, named
+; as its own messages for them name them (cheat_*), each the global the cheat
+; sets. Hyperspeed's is gone (game_settings.dta). The two crowds are one
+; global, so one ticked unticks the other. The scene is Video Settings'
+; (video_settings.milo): its four rows of a box each, and two more as its
+; last again, a row further down each.
+{if {! {exists ghc_qp_extras_screen}}
+   ; As the scene's own panel is (options.dta): a plain one takes no select.
+   {new SliderPanel ghc_qp_extras_panel}
+   {new GHScreen ghc_qp_extras_screen}
+}
+{retype ghc_qp_extras_panel
+   (
+      (file ui/video_settings.milo)
+      (focus gs_left_p1.btn)
+      (reset_focus TRUE)
+      (drawn_in 0.5)
+      (text_size 0)
+      ; A row's button, its box, and its cheat's name.
+      (rows
+         (
+            (gs_left_p1.btn lefty1.chk cheat_air_guitar)
+            (gs_left_p2.btn lefty2.chk cheat_performance_mode)
+            (widescreen.btn widescreen.chk cheat_horse_head_mode)
+            (p_scan.btn p_scan.chk cheat_flaming_head)
+            (ex_eyeball.btn ex_eyeball.chk cheat_eyeball_head_crowd)
+            (ex_monkey.btn ex_monkey.chk cheat_monkey_head_crowd)
+         )
+      )
+      (enter
+         ; Up is the first component whose nav_down is the focus, or past it
+         ; while that is disabled (PanelDir::ComponentNav, 0x211040): the
+         ; hidden one links to itself, out of the way.
+         {calibrate_lag.btn set_showing FALSE}
+         {calibrate_lag.btn set_state kDisabled}
+         {calibrate_lag.btn set nav_down calibrate_lag.btn}
+         {vs_title.lbl set_localized "MODIFIERS"}
+         {$this add_rows}
+         ; Each row's text is drawn in to its width, so a short name stands
+         ; larger: all are one size instead, the scene's own times drawn_in.
+         {if {! [text_size]} {set [text_size] {'*' [drawn_in] {widescreen.btn get text_size}}}}
+         {foreach $row [rows]
+            {{$this find {elem $row 0}} set text_token {elem $row 2}}
+            {{$this find {elem $row 0}} set fit_text 0}
+            {{$this find {elem $row 0}} set text_size [text_size]}
+         }
+         {$this sync}
+      )
+      (add_rows
+         {if {! {exists ex_eyeball.btn}}
+            {do
+               ($x 0) ($y 0) ($z 0) ($cx 0) ($cy 0) ($cz 0) ($gap 0) ($i 1)
+               {widescreen.btn get_local_pos $x $y $gap}
+               {p_scan.btn get_local_pos $x $y $z}
+               {p_scan.chk get_local_pos $cx $cy $cz}
+               {set $gap {'-' $z $gap}}
+               {foreach $row ((ex_eyeball.btn ex_eyeball.chk) (ex_monkey.btn ex_monkey.chk))
+                  {new {p_scan.btn class_name} {elem $row 0}}
+                  {{$this find {elem $row 0}} copy p_scan.btn 0}
+                  {{$this find {elem $row 0}} set trans_parent {p_scan.btn get trans_parent}}
+                  {{$this find {elem $row 0}} set_local_pos $x $y {'+' $z {'*' $i $gap}}}
+                  {new {p_scan.chk class_name} {elem $row 1}}
+                  {{$this find {elem $row 1}} copy p_scan.chk 0}
+                  {{$this find {elem $row 1}} set trans_parent {p_scan.chk get trans_parent}}
+                  {{$this find {elem $row 1}} set_local_pos $cx $cy {'+' $cz {'*' $i $gap}}}
+                  ; Last of what their groups draw, over the poster's art.
+                  {foreach $o $row
+                     {do
+                        ($group {{$this find $o} get trans_parent})
+                        {$group insert (objects {$group size objects}) {$this find $o}}
+                     }
+                  }
+                  {set $i {'+' $i 1}}
+               }
+               {p_scan.btn set nav_down ex_eyeball.btn}
+               {ex_eyeball.btn set nav_down ex_monkey.btn}
+               {ex_monkey.btn set nav_down gs_left_p1.btn}
+               {{$this loaded_dir} sync_objects}
+            }
+         }
+      )
+      (sync
+         {lefty1.chk set_check {== $cheat_guitar air_guitar}}
+         {lefty2.chk set_check $cheat_enabled_performance_mode}
+         {widescreen.chk set_check $cheat_enabled_horse_head_mode}
+         {p_scan.chk set_check $cheat_enabled_flaming_head}
+         {ex_eyeball.chk set_check {== $cheat_crowd_heads eyeball_crowd_heads}}
+         {ex_monkey.chk set_check {== $cheat_crowd_heads monkey_crowd_heads}}
+      )
+      (SELECT_START_MSG
+         {switch $component
+            (gs_left_p1.btn {set $cheat_guitar {if_else {== $cheat_guitar air_guitar} 0 air_guitar}})
+            (gs_left_p2.btn {set $cheat_enabled_performance_mode {! $cheat_enabled_performance_mode}})
+            (widescreen.btn {set $cheat_enabled_horse_head_mode {! $cheat_enabled_horse_head_mode}})
+            (p_scan.btn {set $cheat_enabled_flaming_head {! $cheat_enabled_flaming_head}})
+            (ex_eyeball.btn
+               {set $cheat_crowd_heads {if_else {== $cheat_crowd_heads eyeball_crowd_heads} 0 eyeball_crowd_heads}})
+            (ex_monkey.btn
+               {set $cheat_crowd_heads {if_else {== $cheat_crowd_heads monkey_crowd_heads} 0 monkey_crowd_heads}})
+         }
+         {$this sync}
+         kDataUnhandled
+      )
+   )
+}
+{retype ghc_qp_extras_screen
+   (
+      (panels meta ghc_qp_extras_panel helpbar)
+      (focus ghc_qp_extras_panel)
+      (allow_back FALSE)
+      (helpbar (default ((fret1 help_onoff) (fret2 help_back) (strum help_updown))))
+      (BUTTON_DOWN_MSG
+         {if {== $button kPad_Tri}
+            {$this backwards_anim}
+            {synth play_sequence button_back.cue}
+            {ui goto_screen ghc_qp_setup_screen}
+         }
+         kDataUnhandled
+      )
+   )
+}

@@ -117,9 +117,10 @@
 {func ghc_qp_button ($button)
    {cond
       ({ghc_pick_button $button} TRUE)
+      ; Back to the show's setup (quickplay_setup.dta).
       ({== $button kPad_Tri}
          {synth play_sequence button_back.cue}
-         {ui goto_screen main_screen FALSE TRUE}
+         {ui goto_screen ghc_qp_setup_screen}
          TRUE
       )
       ({&& {== $button kPad_Circle} {> {size {ghc_setlists}} 1} {! {ui in_transition}}}

@@ -17,13 +17,10 @@
 (expect {campaigns active} gh2)
 {quickplay song_defaults 0}
 {gamecfg set mode quickplay}
-{ui goto_screen qp_selsong_screen}
-(wait_screen qp_selsong_screen)
+{ui goto_screen ghc_qp_setup_screen}
+(wait_screen ghc_qp_setup_screen)
 (wait 1)
-(press green)
-(wait_screen qp_diff_screen)
-(wait 1)
-(press green)
+{ui goto_screen ghc_qp_character_screen}
 (wait_screen ghc_qp_character_screen)
 (wait_until {char_single are_chars_loaded})
 {sel_character_panel set char_focus grim}

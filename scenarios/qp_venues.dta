@@ -26,16 +26,10 @@
 {qp_selsong_twin_screen ghc_picked gh2}
 (wait_screen qp_selsong_screen)
 (wait 1)
-(press green)
-(wait_screen qp_diff_screen)
+(press red)
+(wait_screen ghc_qp_setup_screen)
 (wait 1)
-(press green)
-(wait_screen ghc_qp_character_screen)
-(wait_until {char_single are_chars_loaded})
-{ui goto_screen ghc_qp_guitar_screen}
-(wait_screen ghc_qp_guitar_screen)
-(wait 2)
-{ghc_qp_guitar_screen goto_career}
+{ghc_qp_to_venues}
 (wait_screen ghc_qp_venue_screen)
 (wait 2)
 (expect $ghc_qp_venues gh2)
@@ -61,6 +55,15 @@
 {ghc_qp_venue_screen ghc_picked gh1}
 (wait_screen ghc_qp_venue_twin_screen)
 (wait 2)
+(press green)
+(wait_screen ghc_qp_setup_screen)
+(wait 1)
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 1)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
 {{game get_player_config 0} set autoplay TRUE}
 (press green)
 (wait_screen game_screen 60)

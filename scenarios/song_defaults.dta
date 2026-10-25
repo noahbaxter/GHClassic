@@ -1,16 +1,20 @@
-; Quickplay with song defaults: it opens on the menus' game's setlist
-; whatever was picked last, select's menu flips the defaults (off at first),
-; and with them on a GH1 song plays as GH1 boots (metal), straight from the
+; Quickplay with song defaults: its setup's PLAY SHOW opens the setlist
+; picked last, select's menu flips the defaults (off at first), and with
+; them on a GH1 song plays as GH1 boots (metal), straight from the
 ; difficulty.
 #include common/first_boot.dta
 (needs gh1)
-{setlist select gh1}
+{setlist select gh2}
 ; Into quickplay as a player goes: a first boot leaves the main menu on
 ; options, with no tutorial or multiplayer rows to pass.
 (wait 1)
 (press up)
 (wait 0.5)
 (expect {main_panel focus_name} main_quickspin.btn)
+(press green)
+(wait_screen ghc_qp_setup_screen)
+(wait 1)
+(expect {sel_character_panel focus_name} ghc_play.btn)
 (press green)
 (wait_screen qp_selsong_screen)
 (wait 1)

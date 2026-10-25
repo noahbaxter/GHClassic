@@ -415,10 +415,12 @@ file(READ src/gh1/scripts.dta GHC_GH1_SCRIPTS_DTA)
 file(READ src/content/guitar_copy.dta GHC_GUITAR_COPY_DTA)
 file(READ src/ui/dta/picker.dta GHC_PICKER_DTA)
 file(READ src/ui/dta/quickplay_pickers.dta GHC_QUICKPLAY_PICKERS_DTA)
+file(READ src/ui/dta/quickplay_setup.dta GHC_QUICKPLAY_SETUP_DTA)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     src/ui/dta/lag_panel.dta src/ui/dta/highscore_panel.dta src/ui/dta/main_menu.dta src/ui/dta/fast_boot.dta
     src/ui/dta/locale.dta src/ui/dta/crowd.dta src/ui/dta/sel_character.dta src/ui/dta/quickplay.dta
     src/ui/dta/campaigns.dta src/gh1/menus.dta src/gh1/scripts.dta src/ui/dta/picker.dta src/ui/dta/quickplay_pickers.dta
+    src/ui/dta/quickplay_setup.dta
     src/content/guitar_copy.dta src/ui/dta/game_settings.dta src/ui/dta/photo_mode.dta src/ui/dta/box.dta
     src/ui/dta/note_streak.dta src/ui/dta/streak_counter.dta)
 file(READ src/ui/dta/box.dta GHC_BOX_DTA)

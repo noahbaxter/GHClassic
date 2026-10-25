@@ -1,6 +1,7 @@
-; Quickplay's pickers start on what was last picked, over the song's own
-; casting, so green on each plays as before: the outfit, the guitar and
-; finish, and the venue on its game's map.
+; Quickplay's pickers, opened from the setup, start on what was last
+; picked, so green on each keeps it: the outfit, the guitar and finish, and
+; the venue on its game's map. The venue goes back to the setup, and a song
+; from PLAY SHOW's list plays with them.
 #include common/first_boot.dta
 (needs gh1)
 {quickplay song_defaults 0}
@@ -10,13 +11,10 @@
 {quickplay pick venue battle}
 {quickplay pick venue_game gh1}
 {gamecfg set mode quickplay}
-{ui goto_screen qp_selsong_screen}
-(wait_screen qp_selsong_screen)
+{ui goto_screen ghc_qp_setup_screen}
+(wait_screen ghc_qp_setup_screen)
 (wait 1)
-(press green)
-(wait_screen qp_diff_screen)
-(wait 1)
-(press green)
+{ui goto_screen ghc_qp_character_screen}
 (wait_screen ghc_qp_character_screen)
 (expect {game get_character_outfit} glam1)
 (expect {game get_guitar} sg)
@@ -27,13 +25,27 @@
 (wait 2)
 (expect {sel_guitar_panel get_selected_guitar 0} sg)
 {ghc_qp_guitar_screen goto_career}
+(wait_screen ghc_qp_setup_screen)
+(wait 1)
+{ghc_qp_to_venues}
 (wait_screen ghc_qp_venue_screen)
 (wait 2)
 (expect $ghc_qp_venues gh1)
 (expect {game get_venue} battle)
 (shot venue)
 (press green)
+(wait_screen ghc_qp_setup_screen)
+(wait 1)
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 1)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+(press green)
 (wait_screen game_screen 60)
 (expect {quickplay pick venue_game} gh1)
 (expect {quickplay pick outfit} glam1)
+(expect {game get_character_outfit} glam1)
+(expect {game get_venue} battle)
 (quit)
