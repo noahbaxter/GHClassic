@@ -7,6 +7,7 @@ runs/
 .worktrees/
 .planning/
 review/
+/sandbox.dta
 mods/
 fonts/**/*.png
 fonts/*/ofl/

@@ -106,6 +106,9 @@ namespace gh2::textures
                     mix(static_cast<uint8_t>(c));
                 mix(0u);
             }
+            // Only then, so every other source's id stays as it was.
+            if (source.paletted)
+                mix(1u);
             return hash;
         }
 
@@ -125,9 +128,38 @@ namespace gh2::textures
 
         // A 360 bitmap: its header, then each level, the next half the one
         // before.
-        std::shared_ptr<TextureData> decode(const uint8_t *data, size_t size)
+        // A PS2's 4- or 8-bit picture: its first level, each pixel its
+        // palette entry, whose alpha runs to 0x80 for opaque.
+        std::shared_ptr<TextureData> decodePalette(const bitmap::Header &header, const uint8_t *data, size_t size)
+        {
+            const size_t palette = bitmap::paletteBytes(header), row = header.rowBytes;
+            if (palette == 0u || size < bitmap::kHeaderBytes + palette + row * header.height)
+                return nullptr;
+            const uint8_t *colours = data + bitmap::kHeaderBytes, *pixels = colours + palette;
+            auto out = std::make_shared<TextureData>();
+            out->width = header.width;
+            out->height = header.height;
+            out->rgba.resize(size_t(header.width) * header.height * 4u);
+            for (size_t y = 0; y < header.height; ++y)
+                for (size_t x = 0; x < header.width; ++x)
+                {
+                    const uint8_t b = pixels[y * row + x * header.bpp / 8u];
+                    const size_t index = header.bpp == 8u ? b : (b >> (4u * (x & 1u))) & 15u;
+                    const uint8_t *c = colours + 4u * bitmap::paletteSlot(index, header.bpp);
+                    uint8_t *px = out->rgba.data() + (y * header.width + x) * 4u;
+                    px[0] = c[0];
+                    px[1] = c[1];
+                    px[2] = c[2];
+                    px[3] = static_cast<uint8_t>(std::min(255u, c[3] * 2u));
+                }
+            return out;
+        }
+
+        std::shared_ptr<TextureData> decode(const uint8_t *data, size_t size, bool paletted = false)
         {
             const auto header = bitmap::read(data, size);
+            if (paletted && header && (header->bpp == 4u || header->bpp == 8u))
+                return decodePalette(*header, data, size);
             const auto encoded = header ? format(header->encoding) : std::nullopt;
             if (!encoded || header->width == 0u || header->height == 0u)
                 return nullptr;
@@ -275,7 +307,7 @@ namespace gh2::textures
             if (source.tex.empty())
             {
                 const auto file = ark::readFile(source.disc, source.path);
-                return file ? decode(file->data(), file->size()) : nullptr;
+                return file ? decode(file->data(), file->size(), source.paletted) : nullptr;
             }
             if (!open || open->disc != source.disc || open->path != source.path)
             {
@@ -298,7 +330,7 @@ namespace gh2::textures
             }
             const milo::Bytes &body = dir.bodies[static_cast<size_t>(found - dir.entries.begin())];
             const auto tex = milo::readTex(body, dir.version);
-            auto own = tex ? decode(body.data() + tex->bitmap, body.size() - tex->bitmap) : nullptr;
+            auto own = tex ? decode(body.data() + tex->bitmap, body.size() - tex->bitmap, source.paletted) : nullptr;
             if (!own || tex->source.empty() || dir.version != 25u)
                 return own;
             // The largest copy of its picture the disc has. The scene's own
@@ -343,6 +375,18 @@ namespace gh2::textures
     {
         const std::lock_guard lock(s_mutex);
         s_edits[id] = std::move(edit);
+    }
+
+    std::shared_ptr<TextureData> readNow(const Source &source)
+    {
+        std::optional<Open> open;
+        return read(source, open);
+    }
+
+    std::shared_ptr<TextureData> decodeTex(const std::vector<uint8_t> &body, uint32_t version, bool paletted)
+    {
+        const auto tex = milo::readTex(body, version);
+        return tex ? decode(body.data() + tex->bitmap, body.size() - tex->bitmap, paletted) : nullptr;
     }
 
     uint32_t add(const Source &source)

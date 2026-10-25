@@ -125,7 +125,8 @@ namespace gh2
         // GH2's CharClipSamples (Load, 0x16b608): samples rev, then CharClip
         // (0x197000) rev 5: object header, start, end, rate, flags, play
         // flags, a float, a word, a bool, transitions (a clip, then its beat
-        // pairs), events (enter, exit, then timed ones); then three sets.
+        // pairs), events (enter, exit, then timed ones); then three sets. Or
+        // one writeClip made, at GH1's samples rev with GH1's two.
         struct Gh2Clip
         {
             float start = 0.0f, end = 0.0f, rate = 0.0f;

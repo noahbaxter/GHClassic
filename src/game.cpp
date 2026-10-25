@@ -15,6 +15,8 @@
 #include "content/locale.h"
 #include "content/outfits.h"
 #include "content/campaign_case.h"
+#include "hub/hub_scene.h"
+#include "hub/menu_guitarist.h"
 #include "content/campaigns.h"
 #include "content/setlists.h"
 #include "content/songs.h"
@@ -143,6 +145,7 @@ namespace
         gh2::installMenus(runtime);
         gh2::installPhotoMode(runtime, gh2::kSlus21447);
         gh2::installHelpBar(runtime, gh2::kSlus21447);
+        gh2::menu_guitarist::install(runtime, gh2::kSlus21447);
         // After the help bar, which recolours its scene's own pixels.
         gh2::installGh2xAssets(runtime, gh2::kSlus21447);
         // After the 360's scenes, the streak counter and the font bake: its
@@ -150,6 +153,7 @@ namespace
         gh2::installGh1Highway();
         // After the 360's menu art, whose speed poster it puts the amp over.
         gh2::campaign_case::install();
+        gh2::hub_scene::install();
         gh2::setlists::install(runtime, gh2::kSlus21447);
         gh2::encores::install(runtime, gh2::kSlus21447);
         gh2::status_line::install(runtime, gh2::kSlus21447);

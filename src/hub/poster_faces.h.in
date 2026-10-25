@@ -1,0 +1,6 @@
+#pragma once
+
+// The traced faces the venue posters are lettered in (hub/venue_posters.h):
+// fonts/rokk/Rokk.otf and fonts/helveticablackcondensed/Helveticablackcondensed.otf.
+inline constexpr unsigned char kPosterFaceRokk[] = {@GHC_POSTER_FACE_ROKK@};
+inline constexpr unsigned char kPosterFaceHelvetica[] = {@GHC_POSTER_FACE_HELVETICABLACKCONDENSED@};

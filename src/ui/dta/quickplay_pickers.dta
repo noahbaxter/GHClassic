@@ -1,8 +1,7 @@
-; Quickplay's pickers: after the song and its difficulty, the guitarist
-; and outfit, the guitar and finish, and the venue, each any that a career
-; has opened. The game's own quickplay goes from the difficulty straight to
-; the song, as the song's entry casts it, and so does this with song
-; defaults on; off, that casting is where each screen starts. Outside a
+; Quickplay's pickers, each opened from the setup (quickplay_setup.dta) and
+; leading back to it: the guitarist and outfit, the guitar and finish, and
+; the venue, each any that a career has opened. The song's own casting is
+; where each screen starts, under what was picked before. Outside a
 ; career the game counts an item unlocked that any band has
 ; (Campaign::IsItemUnlocked, 0x12d490), and another game's outfit is there
 ; once its own game's career has it (sel_character.dta).
@@ -71,17 +70,6 @@
       {ghc_qp_hd_helpbar guitars {ghc_qp_guitar_has_hd}}
    }
 }
-; What was last picked ({quickplay pick}, kept through a switch of menus),
-; put back over the song's own casting, so each screen starts there and
-; green on each plays as before: the outfit, the guitar and finish, and the
-; venue with its game's map. None until a song is started from the pickers.
-{func ghc_qp_recall
-   {if {quickplay picked outfit}
-      {game set_character {quickplay pick outfit} TRUE}
-      {game set_guitar {quickplay pick guitar} {quickplay pick skin}}
-      {game set_venue {quickplay pick venue}}
-   }
-}
 {retype qp_diff_screen
    (
       (panels meta sel_difficulty_panel helpbar)
@@ -95,28 +83,9 @@
             )
          )
       )
-      ; With song defaults on ({quickplay song_defaults}, select's menu on
-      ; the song list) the song plays as the setlist's game boots, with
-      ; its first guitar, in its own game's venue for the song's tier; off,
-      ; each is picked.
-      (SELECT_START_MSG
-         {if_else {quickplay song_defaults}
-            {do
-               {campaigns venues_from {ghc_venue_game {setlist shown}}}
-               {game set_quickplay}
-               {game set_character {quickplay outfit {setlist shown}} TRUE}
-               {game set_guitar_index 0}
-               {campaigns text_outfit {game get_character_outfit}}
-               {ui goto_screen loading_screen}
-            }
-            {do
-               {game set_quickplay}
-               {ghc_qp_recall}
-               {ui goto_screen ghc_qp_character_screen}
-            }
-         }
-         kDataUnhandled
-      )
+      ; Straight to the song, with what the setup picked
+      ; (quickplay_setup.dta).
+      (SELECT_START_MSG {ghc_qp_play} kDataUnhandled)
    )
 }
 ; The guitar picker as GH2's, the 80s' and GH1's campaigns all have it
@@ -159,8 +128,18 @@
 {if {! {exists ghc_qp_character_screen}} {new GHScreen ghc_qp_character_screen}}
 {retype ghc_qp_character_screen
    (
-      (done_screen ghc_qp_guitar_screen)
-      (back_screen qp_diff_screen)
+      (done_screen ghc_qp_setup_screen)
+      (back_screen ghc_qp_setup_screen)
+      ; The setup's scene (quickplay_setup.dta), going either way with no
+      ; transition. Its guitarist's preview panel is not up here: beside
+      ; another, a preview panel's figure stands in its bind pose.
+      (panels meta sel_character_panel char_single helpbar)
+      (animate_transition {! $ghc_qp_same_scene})
+      ; As SEL_CHARACTER_COMMON's, the panel opened again first.
+      (enter
+         {sel_character_panel pick}
+         {char_single set_door 0 {sel_character_panel find cs_door.mesh}}
+      )
       ; Blue, which the UI gets as orange too (host/pad.cpp), then red as
       ; SEL_CHARACTER_COMMON has it.
       (BUTTON_DOWN_MSG
@@ -179,6 +158,7 @@
                   {do
                      {$this backwards_anim}
                      {synth play_sequence button_back.cue}
+                     {set $ghc_qp_same_scene TRUE}
                      {ui goto_screen [back_screen]}
                   }
                }
@@ -189,6 +169,7 @@
       )
       ; As SEL_CHARACTER_COMMON's, then the help bar over the screen's own.
       (TRANSITION_COMPLETE_MSG
+         {set $ghc_qp_same_scene FALSE}
          {char_single set_placer 0 {sel_character_panel find char_single.placer}}
          {char_single set_env 0 {sel_character_panel find character.env}}
          {ghc_qp_character_helpbar}
@@ -200,27 +181,16 @@
 {if {! {exists ghc_qp_guitar_screen}} {new GHScreen ghc_qp_guitar_screen}}
 {retype ghc_qp_guitar_screen
    (
-      ; What a guitar picked leads to, the career's name for it. The venue
-      ; map opens on the game's whose venue was last played, else the
-      ; menus' game's.
+      ; What a guitar picked leads to, the career's name for it.
       (goto_career
-         {game set_guitar {sel_guitar_panel get_selected_guitar 0} {sel_guitar_panel get_selected_skin 0}}
-         {quickplay pick outfit {game get_character_outfit}}
          {quickplay pick guitar {sel_guitar_panel get_selected_guitar 0}}
          {quickplay pick skin {sel_guitar_panel get_selected_skin 0}}
-         {set $ghc_qp_venues
-            {if_else {quickplay picked venue_game}
-               {quickplay pick venue_game}
-               {ghc_venue_game {campaigns active}}
-            }
-         }
-         {campaigns text_venues $ghc_qp_venues}
-         {ui goto_screen ghc_qp_venue_screen}
+         {ui goto_screen ghc_qp_setup_screen}
       )
       (go_back
          {$this backwards_anim}
          {synth play_sequence button_back.cue}
-         {ui goto_screen ghc_qp_character_screen}
+         {ui goto_screen ghc_qp_setup_screen}
       )
       ; Blue, then red as SEL_GUITAR_COMMON has it.
       (BUTTON_DOWN_MSG
@@ -315,14 +285,12 @@
       }
    }
 }
-; A venue picked: the song in its game's venues, the character's name its
-; outfit's game's.
+; A venue picked, and its game's map, which the song plays it from
+; (ghc_qp_play).
 {func ghc_qp_venue_select
-   {campaigns venues_from $ghc_qp_venues}
    {quickplay pick venue {game get_venue}}
    {quickplay pick venue_game $ghc_qp_venues}
-   {campaigns text_outfit {game get_character_outfit}}
-   {ui goto_screen loading_screen}
+   {ui goto_screen ghc_qp_setup_screen}
 }
 {func ghc_qp_venue_button ($button)
    {cond
@@ -330,7 +298,7 @@
       ({== $button kPad_Tri}
          {{ui current_screen} backwards_anim}
          {synth play_sequence button_back.cue}
-         {ui goto_screen ghc_qp_guitar_screen}
+         {ui goto_screen ghc_qp_setup_screen}
          TRUE
       )
       ({&& {== $button kPad_Circle} {> {size {ghc_venue_games}} 1} {! {ui in_transition}}}

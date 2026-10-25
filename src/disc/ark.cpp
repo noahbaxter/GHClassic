@@ -637,6 +637,8 @@ namespace gh2::ark
         return std::nullopt;
     }
 
+    const std::string &serial(size_t disc) { return s_discs[disc].serial; }
+
     void front(std::optional<size_t> layer) { s_front = layer; }
 
     void alias(const std::string &as, std::optional<size_t> layer)

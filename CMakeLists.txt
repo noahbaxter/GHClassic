@@ -144,6 +144,13 @@ target_include_directories(mpeg2 SYSTEM PUBLIC "${libmpeg2_SOURCE_DIR}/include")
 target_include_directories(mpeg2 PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/libmpeg2")
 set_target_properties(mpeg2 PROPERTIES C_STANDARD 99)
 
+# stb_truetype, the venue posters' lettering (hub/venue_posters.cpp).
+# Public domain, headers only.
+FetchContent_Declare(stb
+    GIT_REPOSITORY https://github.com/nothings/stb.git
+    GIT_TAG 2c980bb59875b0d32144a71867fbdebb2f77cd20)
+FetchContent_MakeAvailable(stb)
+
 # The save code's round trips, which need no disc and no game.
 add_executable(save_test EXCLUDE_FROM_ALL
     tests/save_test.cpp
@@ -241,6 +248,7 @@ set(GHC_GAME_SOURCES
     src/disc/ark.cpp
     src/disc/crypt.cpp
     src/disc/disc.cpp
+    src/disc/made_cache.cpp
     src/disc/sha1.cpp
     src/disc/volume.cpp
     src/formats/bitmap.cpp
@@ -293,6 +301,11 @@ set(GHC_GAME_SOURCES
     src/gh2x/textures.cpp
     src/gh2x/track.cpp
     src/gh80s/install.cpp
+    src/hub/hub_scene.cpp
+    src/hub/menu_guitarist.cpp
+    src/hub/picture.cpp
+    src/hub/poster_meshes.cpp
+    src/hub/venue_posters.cpp
     src/milo/milo.cpp
     src/milo/objects.cpp
     src/movie/movie.cpp
@@ -413,13 +426,17 @@ file(READ src/ui/dta/campaigns.dta GHC_CAMPAIGNS_DTA)
 file(READ src/gh1/menus.dta GHC_GH1_MENUS_DTA)
 file(READ src/gh1/scripts.dta GHC_GH1_SCRIPTS_DTA)
 file(READ src/content/guitar_copy.dta GHC_GUITAR_COPY_DTA)
+file(READ src/hub/preshow_picks.dta GHC_PRESHOW_PICKS_DTA)
 file(READ src/ui/dta/picker.dta GHC_PICKER_DTA)
 file(READ src/ui/dta/quickplay_pickers.dta GHC_QUICKPLAY_PICKERS_DTA)
+file(READ src/ui/dta/quickplay_setup.dta GHC_QUICKPLAY_SETUP_DTA)
+file(READ src/ui/dta/preshow_guitarist.dta GHC_PRESHOW_GUITARIST_DTA)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     src/ui/dta/lag_panel.dta src/ui/dta/highscore_panel.dta src/ui/dta/main_menu.dta src/ui/dta/fast_boot.dta
     src/ui/dta/locale.dta src/ui/dta/crowd.dta src/ui/dta/sel_character.dta src/ui/dta/quickplay.dta
     src/ui/dta/campaigns.dta src/gh1/menus.dta src/gh1/scripts.dta src/ui/dta/picker.dta src/ui/dta/quickplay_pickers.dta
-    src/content/guitar_copy.dta src/ui/dta/game_settings.dta src/ui/dta/photo_mode.dta src/ui/dta/box.dta
+    src/ui/dta/quickplay_setup.dta src/ui/dta/preshow_guitarist.dta
+    src/content/guitar_copy.dta src/hub/preshow_picks.dta src/ui/dta/game_settings.dta src/ui/dta/photo_mode.dta src/ui/dta/box.dta
     src/ui/dta/note_streak.dta src/ui/dta/streak_counter.dta)
 file(READ src/ui/dta/box.dta GHC_BOX_DTA)
 file(READ src/ui/dta/note_streak.dta GHC_NOTE_STREAK_DTA)
@@ -447,6 +464,15 @@ file(READ assets/campaign_select.bin GHC_CAMPAIGN_PACK HEX)
 string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_CAMPAIGN_PACK "${GHC_CAMPAIGN_PACK}")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/campaign_select.bin)
 configure_file(src/content/campaign_pack.h.in "${GHC_DTA_DIR}/campaign_pack.h" @ONLY)
+# The faces the pre-show's venue posters are lettered in (hub/venue_posters.h).
+foreach(GHC_FACE rokk/Rokk helveticablackcondensed/Helveticablackcondensed)
+    get_filename_component(GHC_FACE_NAME "${GHC_FACE}" NAME)
+    string(TOUPPER "${GHC_FACE_NAME}" GHC_FACE_UPPER)
+    file(READ fonts/${GHC_FACE}.otf GHC_POSTER_FACE_${GHC_FACE_UPPER} HEX)
+    string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_POSTER_FACE_${GHC_FACE_UPPER} "${GHC_POSTER_FACE_${GHC_FACE_UPPER}}")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS fonts/${GHC_FACE}.otf)
+endforeach()
+configure_file(src/hub/poster_faces.h.in "${GHC_DTA_DIR}/poster_faces.h" @ONLY)
 # Each game's "Classic" under its menus' logo (ui/classic_scene.cpp), tools/procedural/classic_logo.py's bitmaps.
 foreach(GHC_GAME gh1 gh2 gh80s)
     string(TOUPPER "${GHC_GAME}" GHC_GAME_UPPER)
@@ -534,6 +560,7 @@ set_source_files_properties(${GHC_GAME_SOURCES} PROPERTIES SKIP_UNITY_BUILD_INCL
 
 # miniz comes with libchdr; its target leaves out its own include path.
 target_include_directories(GHClassic PRIVATE "${GHC_GENERATED_DIR}" src lib/libchdr/deps/miniz-3.1.2)
+target_include_directories(GHClassic SYSTEM PRIVATE "${stb_SOURCE_DIR}")
 target_link_libraries(GHClassic PRIVATE
     miniz
     ps2_runtime

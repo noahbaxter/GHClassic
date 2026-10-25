@@ -3,6 +3,7 @@
 // Outfits beyond config's own, for each character's outfit picker.
 
 #include "addresses.h"
+#include "milo/milo.h"
 
 #include <cstdint>
 #include <functional>
@@ -46,6 +47,9 @@ namespace gh2::outfits
     // GH2's art is grey, inked in the Mat's black; `colour` art is drawn as is.
     void portrait(const std::string &outfit, bool colour,
                   std::function<std::vector<uint8_t>(const std::vector<uint8_t> &tex)> make);
+    // Something more in quickplay's picker scene, `edit` run on it after the
+    // portraits go in. False leaves it out.
+    void pickerScene(std::function<bool(milo::Dir &scene)> edit);
 
     void install(PS2Runtime &runtime, const Addresses &addresses);
 }

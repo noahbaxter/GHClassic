@@ -40,4 +40,8 @@ namespace gh2::bitmap
     // RndBitmap::PaletteBytes (0x1ae3e8): 4 bytes an entry up to 8 bits a
     // pixel, none for a block-compressed one.
     size_t paletteBytes(const Header &header);
+
+    // Where a palette's entry for an index is: an 8-bit one is stored in the
+    // GS's CSM1 order.
+    size_t paletteSlot(size_t index, uint8_t bpp);
 }

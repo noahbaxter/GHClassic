@@ -58,6 +58,8 @@ namespace gh2::ark
     std::vector<std::string> paths(size_t disc, const std::string &prefix);
     // How many discs are indexed, the game disc first, once install has run.
     size_t discs();
+    // That disc's serial, as discWithSerial takes it.
+    const std::string &serial(size_t disc);
 
     // Every file under `root`, at its path relative to it. False, with the
     // reason printed, if it cannot be read.

@@ -43,6 +43,10 @@ namespace gh2::milo
     // Where the object of that name is among a dir's entries.
     std::optional<size_t> find(const Dir &dir, const std::string &name);
 
+    // The body of the dir's object of that class and name, or null.
+    Bytes *body(Dir &dir, const std::string &className, const std::string &name);
+    const Bytes *body(const Dir &dir, const std::string &className, const std::string &name);
+
     // One more object, its string table hints grown to fit its names.
     void add(Dir &dir, const std::string &className, const std::string &name, Bytes body);
 

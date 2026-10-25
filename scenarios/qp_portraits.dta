@@ -5,13 +5,10 @@
 {campaign set_all_access 1}
 {quickplay song_defaults 0}
 {gamecfg set mode quickplay}
-{ui goto_screen qp_selsong_screen}
-(wait_screen qp_selsong_screen)
+{ui goto_screen ghc_qp_setup_screen}
+(wait_screen ghc_qp_setup_screen)
 (wait 1)
-(press green)
-(wait_screen qp_diff_screen)
-(wait 1)
-(press green)
+{ui goto_screen ghc_qp_character_screen}
 (wait_screen ghc_qp_character_screen)
 (wait_until {char_single are_chars_loaded})
 {set $tile {{sel_character_panel loaded_dir} find char_punk.mesh}}
@@ -50,9 +47,9 @@
 (expect {{{{sel_character_panel loaded_dir} find char_grim.mesh} mat} name} portrait_grim2.mat)
 ; Leaving the screen and coming back keeps it.
 (press red)
-(wait_screen qp_diff_screen)
+(wait_screen ghc_qp_setup_screen)
 (wait 1)
-(press green)
+{ui goto_screen ghc_qp_character_screen}
 (wait_screen ghc_qp_character_screen)
 (wait_until {char_single are_chars_loaded})
 (expect {{{{sel_character_panel loaded_dir} find char_grim.mesh} mat} name} portrait_grim2.mat)

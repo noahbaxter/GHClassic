@@ -238,6 +238,10 @@ namespace gh2
         uint32_t cacheModelUnload;       // CharsysPanel::CacheModel::Unload()
         uint32_t cacheModelIsLoading;    // CharsysPanel::CacheModel::IsLoading()
         uint32_t guitarElLoadGuitar;     // GuitarDisplayPanel::GuitarEl::LoadGuitar(UIProxy *, DataArray *, RndAnimatable *, float)
+        uint32_t filePathSet;                 // FilePath::Set(const char *root, const char *path)
+        uint32_t charDriverStarved;           // CharDriver::Starved()
+        uint32_t guitarCharacterGetClipGroup; // GuitarCharacter::GetClipGroup()
+        uint32_t gameConfigPlayerConfig;      // GameConfig::GetPlayerConfig(int) (symbol map: GetVenueIndex)
         uint32_t localeInit;       // Locale::Init
         uint32_t localeTerminate;  // Locale::Terminate
         uint32_t campaignStateIsEncoreSong;           // (Symbol song)
@@ -528,6 +532,10 @@ namespace gh2
         .cacheModelUnload = 0x141250u,
         .cacheModelIsLoading = 0x141730u,
         .guitarElLoadGuitar = 0x1470d8u,
+        .filePathSet = 0x2cb2f8u,
+        .charDriverStarved = 0x1710b8u,
+        .guitarCharacterGetClipGroup = 0x10b7b0u,
+        .gameConfigPlayerConfig = 0x1264f8u,
         .localeInit = 0x2cb798u,
         .localeTerminate = 0x2cba98u,
         .campaignStateIsEncoreSong = 0x131d30u,

@@ -28,6 +28,7 @@
 #include "gh1/rig.h"
 #include "gh1/scene.h"
 #include "gh1/songs.h"
+#include "hub/menu_guitarist.h"
 #include "milo/milo.h"
 #include "save/gh1_stream.h"
 
@@ -148,7 +149,12 @@ namespace gh2
             ark::addFile("char/" + name + "/og/gen/" + name + ".milo_ps2", milo::write(main));
             ark::addFile("char/" + name + "/og/gen/" + name + "_ui.milo_ps2", milo::write(ui));
             ark::addFile("char/" + name + "/anims/gen/" + name + "_ui.milo_ps2", *picker);
-            ark::addFile("char/" + name + "/anims/gen/" + name + "_main.milo_ps2", songs->main);
+            // The pre-show's walk-ons (hub/menu_guitarist.h).
+            auto songDir = milo::read(songs->main);
+            if (!songDir || !menu_guitarist::addWalkOns(*songDir, "gh1"))
+                std::cerr << "[gh1] no walk-ons for " << name << std::endl;
+            ark::addFile("char/" + name + "/anims/gen/" + name + "_main.milo_ps2",
+                         songDir ? milo::write(*songDir) : songs->main);
             ark::addFile("char/" + name + "/anims/gen/" + name + "_fret.milo_ps2", songs->fret);
             ark::addFile("char/" + name + "/anims/gen/" + name + "_strum.milo_ps2", songs->strum);
             // _horse and anything else beside it is GH2's base outfit's. The
