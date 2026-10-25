@@ -73,16 +73,6 @@ namespace gh2::streak_counter
             turn(rdram, ctx, runtime, addresses, wheel, dt);
         if (!counter.placed)
             return;
-        for (Counter::Raised &raised : counter.raised)
-        {
-            const uint32_t z = raised.view + kLocalPos + 8u;
-            const float there = load<float>(rdram, z);
-            if (there == raised.written)
-                continue;
-            raised.written = there + counter.lift;
-            store<float>(rdram, z, raised.written);
-            runtime->callGuestFunction(rdram, ctx, addresses.setDirty, {raised.view});
-        }
         const float in = 1.0f - counter.out, eased = 1.0f - in * in * in;
         const float place[3] = {counter.at[0], counter.at[1], counter.at[2] - counter.drop * (1.0f - eased)};
         const uint32_t pos = display + kDisplayTrans + kLocalPos;

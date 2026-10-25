@@ -456,4 +456,37 @@ namespace gh2::streak_counter
         }
         return added;
     }
+
+    bool raiseMeters(milo::Dir &scene)
+    {
+        bool raised = false;
+        for (size_t i = 0; i < scene.entries.size(); ++i)
+        {
+            if (scene.entries[i].first != "TransAnim")
+                continue;
+            // A TransAnim 6: Hmx::Object's header, an Anim 4, the Trans it
+            // moves, its turning keys (a quaternion and a frame each), then
+            // its places (a position and a frame each), z up the screen.
+            milo::Bytes &body = scene.bodies[i];
+            size_t o = 8u;
+            milo::str(body, o);
+            o += 13u;
+            const std::string moved = milo::str(body, o);
+            if (moved != "hud1_score_meter0.view" && moved != "hud1_rock_meter.view")
+                continue;
+            const size_t places = o + 4u + 20u * milo::u32(body, o);
+            const size_t end = places + 4u + 16u * milo::u32(body, places);
+            if (end > body.size())
+                continue;
+            for (size_t key = places + 4u; key < end; key += 16u)
+            {
+                float z;
+                std::memcpy(&z, body.data() + key + 8u, 4u);
+                z += kLift;
+                std::memcpy(body.data() + key + 8u, &z, 4u);
+                raised = true;
+            }
+        }
+        return raised;
+    }
 }

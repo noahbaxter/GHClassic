@@ -43,9 +43,6 @@ namespace gh2
         // Its wheels and Mats (SyncScore, 0x291b20): its display meshes and
         // digit Mats, vectors of 12-byte ObjPtrs, the object at +8.
         constexpr uint32_t kMeshes = 0x214u, kDigitMats = 0x228u;
-        // A Group's RndTransformable, from the Hmx::Object script hands over
-        // (its local place found at -0xc0 and its world's at -0x80).
-        constexpr uint32_t kGroupObject = 0x110u;
 
         uint32_t displayOf(const script::Call &call)
         {
@@ -65,25 +62,18 @@ namespace gh2
             return {};
         }
 
-        // {ghc_streak_counter_place <display> <x> <y> <z> <drop> <lift> <view>...}:
-        // where it rests, in its parent's space, how far below that it
-        // hides, and the views it raises all song, by how much in their
-        // parent's.
+        // {ghc_streak_counter_place <display> <x> <y> <z> <drop>}: where it
+        // rests, in its parent's space, and how far below that it hides.
         script::Node streakCounterPlace(const script::Call &call)
         {
             const uint32_t display = displayOf(call);
-            if (!display || call.size() < 7)
+            if (!display || call.size() < 6)
                 return {};
             Counter &counter = s_counters[display];
             for (int axis = 0; axis < 3; ++axis)
                 counter.at[axis] = call.number(2 + axis);
             counter.drop = call.number(5);
-            counter.lift = call.number(6);
             counter.placed = true;
-            counter.raised.clear();
-            for (int i = 7; i < call.size(); ++i)
-                if (const uint32_t view = call.object(i); view > kGroupObject)
-                    counter.raised.push_back({view - kGroupObject});
             return {};
         }
 
@@ -180,7 +170,10 @@ namespace gh2
                     ark::addFix(disc, path, [](std::vector<uint8_t> &file)
                                 {
                                     auto scene = milo::read(file);
-                                    if (scene && streak_counter::addCounter(*scene))
+                                    if (!scene)
+                                        return;
+                                    const bool added = streak_counter::addCounter(*scene);
+                                    if (streak_counter::raiseMeters(*scene) || added)
                                         file = milo::write(*scene);
                                 });
     }
