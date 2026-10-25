@@ -432,6 +432,8 @@ def cmd_play(argv):
 
 
 REVIEW = main_checkout() / "review"
+# A recorded clip's picture as it goes into review: full size, but compressed.
+RECORD_VIDEO = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p", "-movflags", "+faststart"]
 # An archived video's size: small enough to keep, big enough to tell what it showed.
 ARCHIVE_VIDEO = ["-vf", "scale=-2:'min(540,ih)'", "-c:v", "libx264", "-preset", "veryfast", "-crf", "30",
                  "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart"]
@@ -552,7 +554,8 @@ def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=N
             for _ in range(300):
                 try:
                     os.killpg(proc.pid, 0)
-                except ProcessLookupError:
+                # macOS says EPERM, not ESRCH, for a group whose leader is gone.
+                except (ProcessLookupError, PermissionError):
                     break
                 time.sleep(0.1)
             else:
@@ -672,9 +675,13 @@ def cmd_record(argv):
             # At the game's kAudioRate (host/audio.h).
             cmd += ["-f", "f32le", "-ar", "48000", "-ac", "2", "-i", sound, "-c:a", "aac", "-b:a", "192k",
                     "-shortest"]
-        if subprocess.run([*cmd, "-c:v", "copy", mp4]).returncode == 0:
-            print(mp4)
+        # Compressed as it goes in (the raw picture is several hundred MB a
+        # minute), and the raw clip let go once it is in.
+        if subprocess.run([*cmd, *RECORD_VIDEO, mp4]).returncode == 0:
+            print(f"{mp4} ({mp4.stat().st_size / 1e6:.1f} MB)")
             made += 1
+            video.unlink()
+            sound.unlink(missing_ok=True)
     if not made:
         return 1
 

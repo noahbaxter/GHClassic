@@ -123,14 +123,19 @@ namespace gh2::record
             s_clip = s_next.empty() ? number : s_next;
             s_next.clear();
             const std::string path = s_dir + "/" + s_clip;
-            // VideoToolbox: the Mac's own encoder, far faster than the game.
-            // At the game's own rate, so the picture keeps time with the sound.
+            // VideoToolbox: the Mac's own encoder, far faster than the game;
+            // elsewhere x264 at its fastest. At the game's own rate, so the
+            // picture keeps time with the sound.
+#ifdef __APPLE__
+            constexpr const char *kEncoder = "h264_videotoolbox";
+#else
+            constexpr const char *kEncoder = "libx264 -preset ultrafast";
+#endif
             char rate[32];
             std::snprintf(rate, sizeof(rate), "%.6f", 1e9 / static_cast<double>(period.count()));
             const std::string command = "ffmpeg -hide_banner -loglevel error -y -f rawvideo -pix_fmt rgba -s " +
                                         std::to_string(s_width) + "x" + std::to_string(s_height) + " -r " + rate +
-                                        " -i - -c:v h264_videotoolbox -b:v 30M -pix_fmt yuv420p \"" + path +
-                                        ".ts\"";
+                                        " -i - -c:v " + kEncoder + " -b:v 30M -pix_fmt yuv420p \"" + path + ".ts\"";
             s_video = popen(command.c_str(), "w");
             s_sound = std::fopen((path + ".f32").c_str(), "wb");
             if (!s_video || !s_sound)
