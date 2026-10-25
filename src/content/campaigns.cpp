@@ -728,25 +728,23 @@ namespace gh2::campaigns
         }
 
         // How far band `slot` is through `game`'s career, 0 to 100: each
-        // difficulty with a career song passed a quarter over the one below,
-        // by its career songs passed, so expert done is 100 whatever was
-        // played under it; the best difficulty's.
+        // career song a quarter for every difficulty up to the hardest it was
+        // passed on, so expert done is 100 whatever was played under it.
         int progress(const std::string &game, int slot, std::optional<NoteEngine> engine)
         {
             const std::vector<std::string> career = setlists::careerSongs(game);
             if (career.empty())
                 return 0;
             const auto passed = save::passedSongs(game, slot, engine);
-            size_t best = 0u;
-            for (size_t d = 0; d < passed.size(); ++d)
-            {
-                size_t count = 0u;
-                for (const std::string &song : career)
-                    count += passed[d].count(song);
-                if (count > 0u)
-                    best = std::max(best, 25u * d + 25u * count / career.size());
-            }
-            return static_cast<int>(best);
+            size_t quarters = 0u;
+            for (const std::string &song : career)
+                for (size_t d = passed.size(); d > 0u; --d)
+                    if (passed[d - 1u].count(song))
+                    {
+                        quarters += d;
+                        break;
+                    }
+            return static_cast<int>(25u * quarters / career.size());
         }
 
         // Its expert full combos (save::fullComboSongs) as a share of every

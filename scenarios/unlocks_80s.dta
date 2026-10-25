@@ -103,8 +103,9 @@
 (expect {campaign cash} $cash)
 (expect {campaign is_unlocked $item} 1)
 (expect {campaign is_unlocked small1} 1)
-; Four of thirty songs passed.
-(expect {campaigns progress gh80s 0} 13)
+; Four of thirty songs passed, on medium: half of each one's thirtieth,
+; rounded down.
+(expect {campaigns progress gh80s 0} 6)
 
 ; Playing GH2: the 80s list's first tier has its encore.
 {set $ghc_switch gh2}
