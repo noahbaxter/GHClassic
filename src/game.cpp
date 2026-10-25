@@ -15,6 +15,7 @@
 #include "content/locale.h"
 #include "content/outfits.h"
 #include "content/campaign_case.h"
+#include "hub/hub_scene.h"
 #include "content/campaigns.h"
 #include "content/setlists.h"
 #include "content/songs.h"
@@ -150,6 +151,7 @@ namespace
         gh2::installGh1Highway();
         // After the 360's menu art, whose speed poster it puts the amp over.
         gh2::campaign_case::install();
+        gh2::hub_scene::install();
         gh2::setlists::install(runtime, gh2::kSlus21447);
         gh2::encores::install(runtime, gh2::kSlus21447);
         gh2::status_line::install(runtime, gh2::kSlus21447);

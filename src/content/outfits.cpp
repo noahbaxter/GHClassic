@@ -256,8 +256,7 @@ namespace gh2::outfits
         }
     }
 
-    void portrait(const std::string &outfit, bool colour,
-                  std::function<std::vector<uint8_t>(const std::vector<uint8_t> &tex)> make)
+    namespace
     {
         struct Portrait
         {
@@ -265,9 +264,15 @@ namespace gh2::outfits
             bool colour;
             std::function<milo::Bytes(const milo::Bytes &)> make;
         };
-        static std::vector<Portrait> s_portraits;
-        if (s_portraits.empty())
+        std::vector<Portrait> s_portraits;
+        std::vector<std::function<bool(milo::Dir &)>> s_pickerEdits;
+
+        void addPicker()
         {
+            static bool s_added = false;
+            if (s_added)
+                return;
+            s_added = true;
             // Quickplay's picker is GH2's scene whatever the menus, by its own
             // path (sel_character.dta), so this is no career's.
             ark::addMade("ghc/gh2/ui/gen/sel_character.milo_ps2", []() -> std::optional<ark::Made>
@@ -304,6 +309,9 @@ namespace gh2::outfits
                                  milo::add(*scene, "Tex", "portrait_" + name + ".tex", std::move(image));
                                  milo::add(*scene, "Mat", "portrait_" + name + ".mat", std::move(over.bodies[0]));
                              }
+                             for (const auto &edit : s_pickerEdits)
+                                 if (!edit(*scene))
+                                     return std::nullopt;
                              auto bytes = std::make_shared<milo::Bytes>(milo::write(*scene));
                              return ark::Made{static_cast<uint32_t>(bytes->size()),
                                               [bytes](uint64_t offset, uint8_t *dst, size_t n)
@@ -316,7 +324,19 @@ namespace gh2::outfits
                                               }};
                          });
         }
+    }
+
+    void portrait(const std::string &outfit, bool colour,
+                  std::function<std::vector<uint8_t>(const std::vector<uint8_t> &tex)> make)
+    {
+        addPicker();
         s_portraits.push_back({outfit, colour, std::move(make)});
+    }
+
+    void pickerScene(std::function<bool(milo::Dir &scene)> edit)
+    {
+        addPicker();
+        s_pickerEdits.push_back(std::move(edit));
     }
 
     void install(PS2Runtime &runtime, const Addresses &addresses)

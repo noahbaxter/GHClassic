@@ -144,6 +144,13 @@ target_include_directories(mpeg2 SYSTEM PUBLIC "${libmpeg2_SOURCE_DIR}/include")
 target_include_directories(mpeg2 PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/libmpeg2")
 set_target_properties(mpeg2 PROPERTIES C_STANDARD 99)
 
+# stb_truetype, the venue posters' lettering (hub/venue_posters.cpp).
+# Public domain, headers only.
+FetchContent_Declare(stb
+    GIT_REPOSITORY https://github.com/nothings/stb.git
+    GIT_TAG 2c980bb59875b0d32144a71867fbdebb2f77cd20)
+FetchContent_MakeAvailable(stb)
+
 # The save code's round trips, which need no disc and no game.
 add_executable(save_test EXCLUDE_FROM_ALL
     tests/save_test.cpp
@@ -293,7 +300,10 @@ set(GHC_GAME_SOURCES
     src/gh2x/textures.cpp
     src/gh2x/track.cpp
     src/gh80s/install.cpp
+    src/hub/hub_scene.cpp
+    src/hub/picture.cpp
     src/hub/poster_meshes.cpp
+    src/hub/venue_posters.cpp
     src/milo/milo.cpp
     src/milo/objects.cpp
     src/movie/movie.cpp
@@ -450,6 +460,15 @@ file(READ assets/campaign_select.bin GHC_CAMPAIGN_PACK HEX)
 string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_CAMPAIGN_PACK "${GHC_CAMPAIGN_PACK}")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/campaign_select.bin)
 configure_file(src/content/campaign_pack.h.in "${GHC_DTA_DIR}/campaign_pack.h" @ONLY)
+# The faces the pre-show's venue posters are lettered in (hub/venue_posters.h).
+foreach(GHC_FACE rokk/Rokk helveticablackcondensed/Helveticablackcondensed)
+    get_filename_component(GHC_FACE_NAME "${GHC_FACE}" NAME)
+    string(TOUPPER "${GHC_FACE_NAME}" GHC_FACE_UPPER)
+    file(READ fonts/${GHC_FACE}.otf GHC_POSTER_FACE_${GHC_FACE_UPPER} HEX)
+    string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_POSTER_FACE_${GHC_FACE_UPPER} "${GHC_POSTER_FACE_${GHC_FACE_UPPER}}")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS fonts/${GHC_FACE}.otf)
+endforeach()
+configure_file(src/hub/poster_faces.h.in "${GHC_DTA_DIR}/poster_faces.h" @ONLY)
 # Each game's "Classic" under its menus' logo (ui/classic_scene.cpp), tools/procedural/classic_logo.py's bitmaps.
 foreach(GHC_GAME gh1 gh2 gh80s)
     string(TOUPPER "${GHC_GAME}" GHC_GAME_UPPER)
@@ -537,6 +556,7 @@ set_source_files_properties(${GHC_GAME_SOURCES} PROPERTIES SKIP_UNITY_BUILD_INCL
 
 # miniz comes with libchdr; its target leaves out its own include path.
 target_include_directories(GHClassic PRIVATE "${GHC_GENERATED_DIR}" src lib/libchdr/deps/miniz-3.1.2)
+target_include_directories(GHClassic SYSTEM PRIVATE "${stb_SOURCE_DIR}")
 target_link_libraries(GHClassic PRIVATE
     miniz
     ps2_runtime

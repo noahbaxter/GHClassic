@@ -3,7 +3,7 @@
 // Meshes and pictures added to one of GH2's scenes by copying its own: the
 // campaign picker's cases on the amp poster (content/campaign_case.h) and
 // the quickplay pre-show's venues among character select's portraits
-// (content/preshow.h).
+// (hub/hub_scene.h).
 
 #include "milo/milo.h"
 #include "render/texture_store.h"
