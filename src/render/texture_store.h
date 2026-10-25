@@ -19,12 +19,16 @@
 namespace gh2::textures
 {
     // A Tex object of a scene file in a disc's archive, or with no `tex` a
-    // bitmap file there.
+    // bitmap file there. Its 360 bitmap, or with `paletted` a PS2's 4- or
+    // 8-bit one too: only for a picture drawn in a stand-in's place, as a
+    // PS2 Tex the game draws itself may have been changed since (font bake,
+    // its own scripts).
     struct Source
     {
         size_t disc = 0;
         std::string path;
         std::string tex;
+        bool paletted = false;
     };
 
     // A source's disc for a picture bundled with the game: its path is the
@@ -42,6 +46,15 @@ namespace gh2::textures
     // That payload's pixels changed by `edit` each time they are read: a
     // font sheet given glyphs its disc lacks (gh2x/textures.cpp). Any thread.
     void addEdit(uint32_t id, std::function<void(TextureData &)> edit);
+
+    // A source's pixels read now, kept nowhere and with no edit: the
+    // pictures another is made from (hub/venue_posters.cpp). Null if
+    // they cannot be. Any thread.
+    std::shared_ptr<TextureData> readNow(const Source &source);
+
+    // A Tex body's own picture, as readNow would decode it from a scene of
+    // that milo version. Null if it has none. Any thread.
+    std::shared_ptr<TextureData> decodeTex(const std::vector<uint8_t> &body, uint32_t version, bool paletted);
 
     // Those payloads read on the worker's thread, ahead of the draw that
     // will first ask for them: a scene's, as the game loads the scene. All
