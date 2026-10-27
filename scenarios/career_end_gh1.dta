@@ -82,5 +82,6 @@
 (shot won)
 (press green)
 (wait 6)
-(expect {campaigns progress gh1 0} 80)
+; Twenty-four of thirty passed on medium: half of each one's thirtieth.
+(expect {campaigns progress gh1 0} 40)
 (quit)

@@ -621,6 +621,7 @@
          (gm_p2.btn 3 "P2" gm_p2.lbl)
          (gm_lag.btn 4 "CALIBRATE LAG" gm_lag.lbl)
          (gm_engine.btn 5 "ENGINE GH2" gm_engine.lbl)
+         (gm_unlock.btn 6 "UNLOCK ALL OFF" gm_unlock.lbl)
       )
    )
    ; What a row does when it is lit. A button's text swells and its letters
@@ -694,19 +695,26 @@
       }
       ; P2 off leads to itself, so up from the lag row finds P1.
       {gm_p2.btn set nav_down {if_else {$this two_players} gm_lag.btn gm_p2.btn}}
-      ; The note engine's row is off in a career, whose engine is picked
-      ; with it, and with no other to pick (GH1's needs its disc), and
-      ; leads to itself, so down from the lag row is round.
-      {if_else {|| {note_engine locked} {< {note_engine choices} 2}}
-         {do
-            {gm_engine.btn set_state kDisabled}
-            {gm_engine.btn set nav_down gm_engine.btn}
-            {gm_lag.btn set nav_down gs_band.sld}
-         }
-         {do
-            {gm_engine.btn set_state kNormal}
-            {gm_lag.btn set nav_down gm_engine.btn}
-            {gm_engine.btn set nav_down gs_band.sld}
+      ; Unlock all is out of a song, where the lists it opens are: in one it
+      ; is put away (sync_rows) and leads to itself.
+      {do
+         ($last {if_else {$this in_song} gs_band.sld gm_unlock.btn})
+         {gm_unlock.btn set_state {if_else {$this in_song} kDisabled kNormal}}
+         {gm_unlock.btn set nav_down {if_else {$this in_song} gm_unlock.btn gs_band.sld}}
+         ; The note engine's row is off in a career, whose engine is picked
+         ; with it, and with no other to pick (GH1's needs its disc), and
+         ; leads to itself, so down from the lag row is past it.
+         {if_else {|| {note_engine locked} {< {note_engine choices} 2}}
+            {do
+               {gm_engine.btn set_state kDisabled}
+               {gm_engine.btn set nav_down gm_engine.btn}
+               {gm_lag.btn set nav_down $last}
+            }
+            {do
+               {gm_engine.btn set_state kNormal}
+               {gm_lag.btn set nav_down gm_engine.btn}
+               {gm_engine.btn set nav_down $last}
+            }
          }
       }
       {foreach $row
@@ -927,13 +935,16 @@
       {if {exists gm_engine.btn}
          {gm_engine.btn set text_token {if_else {== gh1 {note_engine}} "ENGINE GH1" "ENGINE GH2"}}
       }
+      {if {exists gm_unlock.btn}
+         {gm_unlock.btn set text_token {if_else {campaigns unlock_all} "UNLOCK ALL ON" "UNLOCK ALL OFF"}}
+      }
       {$this sync_rows}
       {helpbar set_display
          {if_else {$this slider_selected}
             ((fret1 help_confirm) (fret2 help_cancel) (fret3 help_reset) (strum help_updown))
             {if_else {$this on_slider}
                ((fret1 help_select) (fret2 help_back) (fret3 help_reset) (strum help_updown))
-               {if_else {|| {== [at] "gm_lag.btn"} {== [at] "gm_engine.btn"}}
+               {if_else {|| {== [at] "gm_lag.btn"} {== [at] "gm_engine.btn"} {== [at] "gm_unlock.btn"}}
                   ((fret1 help_select) (fret2 help_back) (strum help_updown))
                   ((fret1 help_onoff) (fret2 help_back) (strum help_updown))
                }
@@ -956,7 +967,8 @@
             ($steady FALSE)
             ($dir {$this loaded_dir})
             {foreach $s [steady] {if {== $s $b} {set $steady TRUE}}}
-            {{$this find $b} set_showing {&& {! $steady} {! [tuning]}}}
+            {{$this find $b} set_showing
+               {&& {! $steady} {! [tuning]} {! {&& {== $b gm_unlock.btn} {$this in_song}}}}}
             {{$this find $l} set_showing {&& $steady {! [tuning]}}}
             {if $steady
                {{$this find $l} set color
@@ -1112,6 +1124,9 @@
                      {pause_screen restart}
                   }
                )
+               ; Every song, venue, guitarist and guitar open outside a
+               ; career, from the next list shown (campaigns.cpp).
+               (gm_unlock.btn {campaigns unlock_all {! {campaigns unlock_all}}})
             }
             {synth play_sequence button_toggle}
             {$this sync_look}
@@ -1147,16 +1162,18 @@
    (value_shrink 0.72)
    (value_dip 1)
    (value_tilt 4)
-   (pitch 0.75)
-   (block (0.88 0 30))
-   (text_x (-124 54 132 35 35))
+   ; Closer, and its button rows smaller, than the pause menu's: out of a
+   ; song it has unlock all's row too.
+   (pitch 0.65)
+   (block (0.88 0 38))
+   (text_x (-124 54 132 35 35 35))
    (box_x (26 104))
    (text_dz 0)
    (box_dz 0)
    (lefty_size 21)
-   (lag_size 30)
-   (fit (0 0 0 0 0))
-   (gh1 ((block (0.88 0 12)) (lefty_size 29) (lag_size 44) (fit (0 24 24 250 250)) (text_x (-132 74 142 35 35)) (box_x (52 120))))
+   (lag_size 24)
+   (fit (0 0 0 0 0 0))
+   (gh1 ((block (0.88 0 12)) (lefty_size 29) (lag_size 36) (fit (0 24 24 250 250 250)) (text_x (-132 74 142 35 35 35)) (box_x (52 120))))
    (lag_screen lag_screen)
    ; As the main menu has it for its two-player row (main.dta).
    (two_players {! {game is_missing_multi_controller}})
@@ -1187,14 +1204,14 @@
    (value_tilt 4)
    (pitch 0.75)
    (block (0.88 0 30))
-   (text_x (-124 54 132 35 35))
+   (text_x (-124 54 132 35 35 35))
    (box_x (26 104))
    (text_dz 0)
    (box_dz 0)
    (lefty_size 21)
    (lag_size 30)
-   (fit (0 0 0 0 0))
-   (gh1 ((block (0.88 16 -2)) (lefty_size 29) (lag_size 44) (fit (0 24 24 250 250)) (text_x (-132 74 148 35 35)) (box_x (52 126)) (tune_bg (-183 -5 26.4 1.4))))
+   (fit (0 0 0 0 0 0))
+   (gh1 ((block (0.88 16 -2)) (lefty_size 29) (lag_size 44) (fit (0 24 24 250 250 250)) (text_x (-132 74 148 35 35 35)) (box_x (52 126)) (tune_bg (-183 -5 26.4 1.4))))
    (lag_screen pause_lag_screen)
    (two_players {> {game num_players} 1})
    GAME_SETTINGS_HANDLERS

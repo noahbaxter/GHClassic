@@ -1,0 +1,47 @@
+; A full combo in quickplay, which has no band: a song played whole by
+; autoplay is kept as one, under the song's game, a song won by the cheat
+; is not, and the one kept counts in the campaign picker's number and holds
+; through a load.
+#include common/first_boot.dta
+(expect {campaigns full_combo shoutatthedevil 3} 0)
+(expect {campaigns full_combos gh2 0} 0)
+{gamecfg set mode quickplay}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait_screen endgame_screen 900)
+(expect {player0 percent_hit} 100)
+(expect {campaigns full_combo shoutatthedevil 3} 1)
+(expect {campaigns full_combo shoutatthedevil 2} 0)
+(expect {> {campaigns full_combos gh2 0} 0} 1)
+
+; Won by the cheat a few seconds in: no full combo.
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+{gamecfg set mode quickplay}
+{game set_song mother}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 5)
+{player0 win 5}
+(wait_screen endgame_screen 400)
+(expect {campaigns full_combo mother 3} 0)
+
+; Saved and loaded back.
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+{campaign mark_needs_save}
+{autosave_goto main_screen}
+(wait_screen autosave)
+(wait_screen main_screen)
+{ui goto_screen bootup_load}
+(wait_screen guitar_help_screen)
+(expect {campaigns full_combo shoutatthedevil 3} 1)
+(expect {campaigns full_combo mother 3} 0)
+(quit)

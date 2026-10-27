@@ -91,6 +91,10 @@ namespace gh2::settings
             {"whammy_hold", Type::kBool, 0, 1, 1, 0},
             {"strum_limit", Type::kBool, 0, 1, 1, 1},
             {"note_streak", Type::kBool, 0, 1, 1, 0},
+            {"song_progress", Type::kBool, 0, 1, 1, 0},
+            // The unlock-all cheat's, without its turning off saving and the
+            // career (content/campaigns.cpp).
+            {"unlock_all", Type::kBool, 0, 1, 1, 0},
             // 70 is Clone Hero's 7.0. The defaults are retail's: 43 is easy and
             // medium's own speed and 60 hard and expert's; the hyperspeed cheat
             // made them 64 and 90 (note_speed.cpp). The menu's sliders stop

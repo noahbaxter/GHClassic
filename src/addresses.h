@@ -52,6 +52,8 @@ namespace gh2
         uint32_t guitarCharacterPoll;      // GuitarCharacter::Poll
         uint32_t guitarCharacterDtor;
         uint32_t objectDirFindObject;      // ObjectDir::FindObject
+        uint32_t dataSetThis;    // DataSetThis(Hmx::Object *): $this, and the dir {new} names into
+        uint32_t dataThis;       // Hmx::Object *, $this
         uint32_t worldXfm;       // RndTransformable::WorldXfm
         uint32_t setWorldXfm;    // RndTransformable::SetWorldXfm
         uint32_t setDirty;       // RndTransformable::SetDirty
@@ -73,6 +75,8 @@ namespace gh2
         uint32_t beatMatcherDtor;           // BeatMatcher::~BeatMatcher
         uint32_t guitarWatcherJumpHook; // GuitarTrackWatcherImpl::JumpHook
         uint32_t hudPanelEnter;      // HudPanel::Enter
+        uint32_t hudPanelSetMetersShowing; // HudPanel::SetMetersShowing(bool)
+        uint32_t hudPanelOnGameOver; // HudPanel::OnGameOver, as a song is won or lost
         uint32_t bandScoreDisplaySetScore; // BandScoreDisplay::SetScore(int)
         uint32_t bandScoreDisplaySetDigitMat; // BandScoreDisplay::SetDigitMat(int, RndMat *)
         uint32_t willBeNoStrum;      // GameGemList::WillBeNoStrum
@@ -208,6 +212,9 @@ namespace gh2
         uint32_t songProviderGapSize;
         uint32_t songProviderIsActive;
         uint32_t songProviderGetSongData; // (Symbol)
+        uint32_t songProviderGetSong;     // (int row) const: the row's song Symbol
+        uint32_t songProviderMat;         // (UIListMesh *, int row, int slot) const
+        uint32_t dynamicCast;             // __dynamic_cast
         uint32_t campaignDataGetVenueForSong;
         uint32_t addLoadChar; // (list<Character *> &, const char *object, const char *character)
         uint32_t worldCrowdSetFullness; // (float flat, float whole)
@@ -231,6 +238,7 @@ namespace gh2
         uint32_t venueProviderInitData; // VenueProvider::InitData(RndDir *)
         uint32_t campaignCtor;
         uint32_t campaignDtor;
+        uint32_t campaignSave;             // Campaign::Save(BinStream &)
         uint32_t campaignIsItemUnlocked;   // Campaign::IsItemUnlocked(Symbol) const
         uint32_t campaignIsItemUnlockedOn; // Campaign::IsItemUnlocked(Symbol, Difficulty) const
         uint32_t selectGuitarProviderInitData; // SelectGuitarProvider::InitData(RndDir *)
@@ -346,6 +354,8 @@ namespace gh2
         .guitarCharacterPoll = 0x10ac90u,
         .guitarCharacterDtor = 0x109f58u,
         .objectDirFindObject = 0x2bb4f0u,
+        .dataSetThis = 0x2b8f70u,
+        .dataThis = 0x3de778u,
         .worldXfm = 0x3d8ea0u,
         .setWorldXfm = 0x1dd7b8u,
         .setDirty = 0x1dd748u,
@@ -367,6 +377,8 @@ namespace gh2
         .beatMatcherDtor = 0x234b08u,
         .guitarWatcherJumpHook = 0x24d4e0u,
         .hudPanelEnter = 0x12ba00u,
+        .hudPanelSetMetersShowing = 0x12c210u,
+        .hudPanelOnGameOver = 0x12c340u,
         .bandScoreDisplaySetScore = 0x291af8u,
         .bandScoreDisplaySetDigitMat = 0x291c48u,
         .willBeNoStrum = 0x24d360u,
@@ -502,6 +514,9 @@ namespace gh2
         .songProviderGapSize = 0x1181d8u,
         .songProviderIsActive = 0x117a50u,
         .songProviderGetSongData = 0x118318u,
+        .songProviderGetSong = 0x1182d8u,
+        .songProviderMat = 0x117870u,
+        .dynamicCast = 0x101ec0u,
         .campaignDataGetVenueForSong = 0x1312a0u,
         .addLoadChar = 0x128778u,
         .worldCrowdSetFullness = 0x26bdf0u,
@@ -525,6 +540,7 @@ namespace gh2
         .venueProviderInitData = 0x118a90u,
         .campaignCtor = 0x12cf00u,
         .campaignDtor = 0x12d0c0u,
+        .campaignSave = 0x12ec90u,
         .campaignIsItemUnlocked = 0x12d490u,
         .campaignIsItemUnlockedOn = 0x12d5a0u,
         .selectGuitarProviderInitData = 0x119060u,

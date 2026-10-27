@@ -12,6 +12,21 @@
 ; happens ({campaigns switch}, content/campaigns.h), with nothing loaded that
 ; it changes.
 {func ghc_campaigns {> {campaigns count} 1}}
+
+; system_script.dta's, which makes no save with all access on: GH2's
+; unlock-all cheat turns saving off with it. Game Settings' unlock all puts
+; all access on too, saving left on ({campaigns cheat_access}). GH1's has no
+; all access, and is this one otherwise.
+{func autosave_goto ($next_screen)
+   {if_else {&& {campaign needs_save} {! {campaigns cheat_access}} $autosave {! $disable_save}}
+      {do
+         {set $mc_save_success_screen $next_screen}
+         {set $mc_save_failed_screen $next_screen}
+         {ui goto_screen autosave}
+      }
+      {ui goto_screen $next_screen}
+   }
+}
 {if {! {exists ghc_campaign_panel}} {new GHPanel ghc_campaign_panel}}
 {retype ghc_campaign_panel
    (

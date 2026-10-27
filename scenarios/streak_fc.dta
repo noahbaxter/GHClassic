@@ -1,0 +1,21 @@
+; The streak counter's digits purple while the run is a full combo, every
+; gem hit in one streak, and white once a miss has broken it: the first 70
+; gems played, ten left to pass by, then 70 more.
+#include common/first_boot.dta
+{gamecfg set mode quickplay}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty expert}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait_until {> {ghc_play gems} 0})
+{ghc_play play 0 70}
+{ghc_play play 80 70}
+(wait_until {>= {player0 current_streak} 60} 120)
+(expect {streak_counter_fc 0} 1)
+(shot fc_purple)
+(wait_until {== {player0 current_streak} 0} 30)
+(wait_until {>= {player0 current_streak} 60} 120)
+(expect {streak_counter_fc 0} 0)
+(shot broken_white)
+(quit)

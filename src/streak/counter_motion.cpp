@@ -58,9 +58,24 @@ namespace gh2::streak_counter
         fade(rdram, mat, kFrom + (1.0f - kFrom) * wheel.along);
     }
 
+    void tint(uint8_t *rdram, Counter &counter)
+    {
+        // Its alpha left as the wheel's turn has it.
+        constexpr float kPurple[3] = {0.72f, 0.42f, 1.0f}, kWhite[3] = {1.0f, 1.0f, 1.0f};
+        const float *colour = counter.fullCombo ? kPurple : kWhite;
+        for (const auto &wheel : counter.digits)
+            for (const uint32_t mat : wheel)
+                if (mat)
+                    for (uint32_t ch = 0; ch < 3u; ++ch)
+                        store<float>(rdram, mat + ::milo::mat::kColor + 4u * ch, colour[ch]);
+        counter.tinted = counter.fullCombo;
+    }
+
     void step(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const Addresses &addresses, uint32_t display,
               Counter &counter)
     {
+        if (counter.tinted != counter.fullCombo)
+            tint(rdram, counter);
         const auto now = ps2x::host_clock::now();
         const float dt = counter.last == std::chrono::steady_clock::time_point{}
                              ? 0.0f
@@ -73,16 +88,6 @@ namespace gh2::streak_counter
             turn(rdram, ctx, runtime, addresses, wheel, dt);
         if (!counter.placed)
             return;
-        for (Counter::Raised &raised : counter.raised)
-        {
-            const uint32_t z = raised.view + kLocalPos + 8u;
-            const float there = load<float>(rdram, z);
-            if (there == raised.written)
-                continue;
-            raised.written = there + counter.lift;
-            store<float>(rdram, z, raised.written);
-            runtime->callGuestFunction(rdram, ctx, addresses.setDirty, {raised.view});
-        }
         const float in = 1.0f - counter.out, eased = 1.0f - in * in * in;
         const float place[3] = {counter.at[0], counter.at[1], counter.at[2] - counter.drop * (1.0f - eased)};
         const uint32_t pos = display + kDisplayTrans + kLocalPos;

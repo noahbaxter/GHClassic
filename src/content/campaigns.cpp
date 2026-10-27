@@ -120,6 +120,9 @@ namespace gh2::campaigns
         size_t s_lookFrom = 0u;  // whose screens around it it has
         size_t s_gemsFrom = 0u;  // and whose highway, which is lent apart
         std::atomic<bool> s_gh1Highway{false}; // that one is GH1's, for gh1Highway
+        bool s_unlocked = false; // all access put on by unlock_all, not the cheat
+        PS2Runtime::RecompiledFunction s_campaignSave = nullptr;
+        void syncUnlockAll(uint8_t *rdram);
         std::vector<std::string> s_menusLent, s_lookLent;
 
         struct Pending
@@ -728,25 +731,33 @@ namespace gh2::campaigns
         }
 
         // How far band `slot` is through `game`'s career, 0 to 100: each
-        // difficulty with a career song passed a quarter over the one below,
-        // by its career songs passed, so expert done is 100 whatever was
-        // played under it; the best difficulty's.
+        // career song a quarter for every difficulty up to the hardest it was
+        // passed on, so expert done is 100 whatever was played under it.
         int progress(const std::string &game, int slot, std::optional<NoteEngine> engine)
         {
             const std::vector<std::string> career = setlists::careerSongs(game);
             if (career.empty())
                 return 0;
             const auto passed = save::passedSongs(game, slot, engine);
-            size_t best = 0u;
-            for (size_t d = 0; d < passed.size(); ++d)
-            {
-                size_t count = 0u;
-                for (const std::string &song : career)
-                    count += passed[d].count(song);
-                if (count > 0u)
-                    best = std::max(best, 25u * d + 25u * count / career.size());
-            }
-            return static_cast<int>(best);
+            size_t quarters = 0u;
+            for (const std::string &song : career)
+                for (size_t d = passed.size(); d > 0u; --d)
+                    if (passed[d - 1u].count(song))
+                    {
+                        quarters += d;
+                        break;
+                    }
+            return static_cast<int>(25u * quarters / career.size());
+        }
+
+        // A song finished as a full combo, from a player's longest streak,
+        // gems hit, gems passed and percent hit at `at` on: every gem hit in
+        // one streak. The percent is of the song's every gem, so a song cut
+        // short is none.
+        bool fullCombo(const script::Call &call, int at)
+        {
+            const auto longest = call.number(at), hit = call.number(at + 1), passed = call.number(at + 2);
+            return hit > 0 && passed == 0 && longest == hit && call.number(at + 3) == 100;
         }
 
         // Its expert full combos (save::fullComboSongs) as a share of every
@@ -925,16 +936,30 @@ namespace gh2::campaigns
                         script::kInt};
             }
             // From onFinishSong: band, difficulty, song, then player 0's
-            // longest streak, gems hit, gems passed and percent hit, which
-            // is of the song's every gem, so a song cut short is none.
+            // numbers as fullCombo takes them.
             if (op == "finished")
             {
-                const auto longest = call.number(5), hit = call.number(6), passed = call.number(7);
-                if (hit > 0 && passed == 0 && longest == hit && call.number(8) == 100)
+                if (fullCombo(call, 5))
                     save::keepFullCombo(static_cast<int>(call.number(2)), static_cast<int>(call.number(3)),
                                         call.symbol(4));
                 return {};
             }
+            // From onGameOver, a quickplay song alone: difficulty, song, then
+            // as finished's. A song lost has gems passed.
+            if (op == "finished_quickplay")
+            {
+                if (fullCombo(call, 4) && !save::hasFullCombo(call.symbol(3), static_cast<int>(call.number(2))))
+                {
+                    save::keepQuickplayFullCombo(static_cast<int>(call.number(2)), call.symbol(3));
+                    // Quickplay saves only when something asks it to.
+                    script::run(call.rdram, call.ctx, call.runtime, "{campaign mark_needs_save}");
+                }
+                return {};
+            }
+            // Whether a song has been full combo'd on a difficulty, by any
+            // band or in quickplay (save::hasFullCombo).
+            if (op == "full_combo")
+                return {save::hasFullCombo(call.symbol(2), static_cast<int>(call.number(3))) ? 1u : 0u, script::kInt};
             if (op == "count")
                 return {static_cast<uint32_t>(s_campaigns.size()), script::kInt};
             if (op == "venues")
@@ -995,6 +1020,7 @@ namespace gh2::campaigns
                 if (!changes(*index, career) && pickedNoteEngine() == noteEngine())
                 {
                     s_career = career;
+                    syncUnlockAll(call.rdram);
                     s_theme = *index;
                     save::keepLastGame(s_campaigns[*index].game);
                     return {0u, script::kInt};
@@ -1002,20 +1028,76 @@ namespace gh2::campaigns
                 s_pending = Pending{*index, call.size() > 3 ? call.symbol(3) : "", career};
                 return {1u, script::kInt};
             }
+            if (op == "unlock_all")
+            {
+                if (call.size() > 2)
+                {
+                    settings::set(settings::kUnlockAll, call.number(2) != 0.0f ? 1 : 0);
+                    syncUnlockAll(call.rdram);
+                }
+                return {settings::get(settings::kUnlockAll) ? 1u : 0u, script::kInt};
+            }
+            if (op == "cheat_access")
+            {
+                // All access the cheat put on, which keeps a save from being
+                // made (campaigns.dta's autosave_goto); unlock_all's does not.
+                const uint32_t campaign = load<uint32_t>(call.rdram, s_addresses->theCampaign);
+                const bool on = campaign != 0u && load<uint32_t>(call.rdram, campaign + kAllAccess) != 0u;
+                return {on && !s_unlocked ? 1u : 0u, script::kInt};
+            }
             std::cerr << "[campaign] usage: {campaigns active|live|count}, {campaigns has <game>}, "
                          "{campaigns switch <game> [<screen> [career|menus]]}, "
-                         "{campaigns progress <game> <band> [<engine>]}, {campaigns full_combos <game> <band> [<engine>]}"
+                         "{campaigns progress <game> <band> [<engine>]}, {campaigns full_combos <game> <band> [<engine>]}, "
+                         "{campaigns unlock_all [<on>]}, {campaigns full_combo <song> <difficulty>}"
                       << std::endl;
             return {};
+        }
+
+        // unlock_all: the Campaign's all access, as the unlock-all cheat puts
+        // on, outside a career. Not in one, whose unlocks are earned there:
+        // all access has every song passed and every item open
+        // (Campaign::AllSongsPassed 0x12d890, IsItemUnlocked 0x12d490). The
+        // cheat's own is left as it is.
+        void syncUnlockAll(uint8_t *rdram)
+        {
+            const uint32_t campaign = load<uint32_t>(rdram, s_addresses->theCampaign);
+            if (campaign == 0u)
+                return;
+            if (settings::get(settings::kUnlockAll) && !s_career)
+            {
+                store<uint32_t>(rdram, campaign + kAllAccess, 1u);
+                s_unlocked = true;
+            }
+            else if (s_unlocked)
+            {
+                store<uint32_t>(rdram, campaign + kAllAccess, 0u);
+                s_unlocked = false;
+            }
+        }
+
+        // Campaign::Save writes nothing with all access on, which is how the
+        // cheat turns saving off. unlock_all's is off while it writes: it is
+        // read there first, so put back however the save goes on.
+        void campaignSave(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t campaign = GPR_U32(ctx, 4);
+            const bool lift = s_unlocked && load<uint32_t>(rdram, campaign + kAllAccess) != 0u;
+            if (lift)
+                store<uint32_t>(rdram, campaign + kAllAccess, 0u);
+            s_campaignSave(rdram, ctx, runtime);
+            if (lift)
+                store<uint32_t>(rdram, campaign + kAllAccess, 1u);
         }
 
         // A switch asked for from a script happens here, at the next
         // UIManager::Poll, with no script running: the screen that asked
         // takes a new script too. The band stays the one picked. One that
-        // fails leaves the game as it was, at the main menu.
+        // fails leaves the game as it was, at the main menu. And unlock_all
+        // kept as the setting and the career have it.
         struct PollTag;
         void onUiPoll(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
+            syncUnlockAll(rdram);
             if (!s_pending)
                 return;
             const Pending pending = *s_pending;
@@ -1025,7 +1107,10 @@ namespace gh2::campaigns
             // cycles count for, time the game would then wait out.
             const EeScheduler::UnpacedScope unpaced(runtime->eeScheduler());
             script::run(rdram, ctx, runtime, "{set $ghc_band {campaign profile_slot}}");
-            if (!goTo(script::Call{rdram, ctx, runtime, 0u}, pending.index, pending.career))
+            const bool went = goTo(script::Call{rdram, ctx, runtime, 0u}, pending.index, pending.career);
+            // Before the next screen, which may be a career's.
+            syncUnlockAll(rdram);
+            if (!went)
                 script::run(rdram, ctx, runtime, "{ui goto_screen main_screen}");
             else
                 script::run(rdram, ctx, runtime,
@@ -1108,6 +1193,19 @@ namespace gh2::campaigns
             script::run(rdram, ctx, runtime,
                         "{campaigns finished {campaign profile_slot} {game get_difficulty 0} {game get_song} "
                         "{player0 longest_streak} {player0 gems_hit} {player0 gems_passed} {player0 percent_hit}}");
+            *ctx = saved;
+        }
+
+        // A song won or lost: in quickplay, alone, kept as a full combo as a
+        // career's is (onFinishSong), its band none.
+        struct GameOverTag;
+        void onGameOver(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const R5900Context saved = *ctx;
+            script::run(rdram, ctx, runtime,
+                        "{if {&& {== {gamecfg get mode} quickplay} {== {game num_players} 1}} "
+                        "{campaigns finished_quickplay {game get_difficulty 0} {game get_song} {player0 longest_streak} "
+                        "{player0 gems_hit} {player0 gems_passed} {player0 percent_hit}}}");
             *ctx = saved;
         }
 
@@ -1375,8 +1473,11 @@ namespace gh2::campaigns
         // stop for one the first time a name of its own is shown.
         script::runWhenUiReady("{campaigns read_text}");
         EntryHook<PollTag>::install(runtime, addresses.uiManagerPoll, onUiPoll);
+        s_campaignSave = runtime.lookupFunction(addresses.campaignSave);
+        runtime.replaceFunction(addresses.campaignSave, &campaignSave);
         EntryHook<GotoScreenTag>::install(runtime, addresses.uiGotoScreen, onGotoScreen);
         EntryHook<FinishSongTag>::install(runtime, addresses.profileStateFinishSong, onFinishSong);
+        EntryHook<GameOverTag>::install(runtime, addresses.hudPanelOnGameOver, onGameOver);
         EntryHook<MetaMusicStopTag>::install(runtime, addresses.metaMusicStop, onMetaMusicStop);
     }
 }

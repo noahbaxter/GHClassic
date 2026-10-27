@@ -1,0 +1,20 @@
+; The song progress bar under the rock meter: made as the HUD enters, out of
+; sight until the meters slide in, a sliver at the start and further along
+; later.
+#include common/first_boot.dta
+{gamecfg set mode quickplay}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(expect {!= {hud find song_progress_track.mesh} 0} 1)
+; Hidden with the meters through the intro, shown as they slide in.
+(expect {{hud find song_progress_track.mesh} showing} 0)
+(wait_until {{hud find song_progress_track.mesh} showing} 60)
+(wait_until {>= {taskmgr seconds} 15} 60)
+(shot early)
+(wait_until {>= {taskmgr seconds} {/ {game song_duration_sec} 2}} 200)
+(shot half)
+(quit)

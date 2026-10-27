@@ -34,6 +34,8 @@ namespace gh2::settings
         kWhammyHold, // a whammy bar held down bends every sustain
         kStrumLimit, // a strum within 52 ms of the last taken is dropped, as retail
         kNoteStreak, // the streak counter under the score meter and its popups
+        kSongProgress, // a bar under the rock meter filling as the song plays
+        kUnlockAll,    // outside a career, every song, venue, guitarist and guitar open
         kNoteSpeedEasy, // Clone Hero's note speed in tenths, on easy and medium
         kNoteSpeedHard, // and on hard and expert
         kHighwayLength, // how far up the track a gem first shows: the game's 110

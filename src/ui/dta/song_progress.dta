@@ -1,0 +1,106 @@
+; How far through the song it is: a small tube under the rock meter, in the
+; meter's own space so it slides in and shakes with it, from the HUD's own
+; art: the star meter's fill, dark for the track and lit warm over it, drawn
+; out to the song's seconds, with the rock needle's LED at its head. Single
+; player's rock meter only.
+;
+; song_progress.cpp calls song_progress_enter as each song's HUD enters, and
+; draws the fill out and moves the head each frame.
+
+; Its left edge, middle and size in the rock meter's space, z up the screen.
+{set $song_progress_pos (-75 -5 -160)}
+{set $song_progress_size (150 8)}
+; What it is made of, in the order drawn.
+{set $song_progress_parts
+   (song_progress_track.mesh song_progress_fill.mesh song_progress_glow.mesh
+      song_progress_socket_left.mesh song_progress_socket_mid.mesh song_progress_socket_right.mesh
+      song_progress_head.mesh)
+}
+
+; As the HUD's own handlers run, so what it makes is the HUD scene's.
+{func song_progress_enter
+   {if {hud find hud1_rock_meter.view}
+      {ghc_with_this hud song_progress_make}
+   }
+}
+
+; Mat $m_name, a copy of $m_from tinted, written to the depth buffer whatever
+; is there so a venue's focus blur leaves it alone.
+{func song_progress_mat ($m_name $m_from $m_r $m_g $m_b $m_alpha)
+   {new Mat $m_name}
+   {{hud find $m_name} copy $m_from 1}
+   {{hud find $m_name} set color {pack_color $m_r $m_g $m_b}}
+   {{hud find $m_name} set alpha $m_alpha}
+   {{hud find $m_name} set z_mode 3}
+}
+
+; Mesh $q_name in $q_mat: its left edge at $q_x, its middle at $q_z, $q_wide
+; by $q_tall in the meter's space, drawn $q_order among the meter's. The help
+; bar's round end, the one of its quads whose texture runs corner to corner
+; (its middle's is all one colour, and so is one point of it), 16 by 16
+; before it is drawn out.
+{func song_progress_quad ($q_name $q_mat $q_x $q_y $q_z $q_wide $q_tall $q_order)
+   {new {{helpbar find help_box_right.mesh} class_name} $q_name}
+   {{hud find $q_name} copy {helpbar find help_box_right.mesh} 1}
+   {{hud find $q_name} set_mat {hud find $q_mat}}
+   {{hud find $q_name} set trans_parent {hud find hud1_rock_meter.view}}
+   {{hud find $q_name} set_local_rot 0 0 0}
+   {{hud find $q_name} set_local_pos $q_x $q_y $q_z}
+   {{hud find $q_name} set_local_scale {/ $q_wide 16.0} 1 {/ $q_tall 16.0}}
+   {{hud find $q_name} set draw_order $q_order}
+}
+
+{func song_progress_make
+   {do
+      ($meter {hud find hud1_rock_meter.view})
+      ($star {hud find BandStarMeterDir1})
+      ($crowd {hud find BandCrowdMeterDir1})
+      ($x {elem $song_progress_pos 0})
+      ($y {elem $song_progress_pos 1})
+      ($z {elem $song_progress_pos 2})
+      ($wide {elem $song_progress_size 0})
+      ($tall {elem $song_progress_size 1})
+      {if {&& $meter $star $crowd}
+         ; The track, the fill's own gradient dark; the fill over it, a
+         ; little nearer, lit warm; over that, drawn out with it, the rock
+         ; meter's lamp glow in amber, soft to its left, top and bottom
+         ; (song_progress.cpp), a hair taller than the fill so none of it
+         ; shows past: its soft edges are dark, and hide what is behind them
+         ; (the star meter's own glow is blue, and stays blue whatever its
+         ; tint).
+         {song_progress_mat song_progress_track.mat {$star find amp_inside_star.mat} 0.35 0.35 0.38 0.75}
+         {song_progress_quad song_progress_track.mesh song_progress_track.mat $x $y $z $wide $tall 1}
+         {song_progress_mat song_progress_fill.mat {$star find amp_inside_star.mat} 1 0.93 0.8 1}
+         {song_progress_quad song_progress_fill.mesh song_progress_fill.mat $x {'-' $y 0.1} $z $wide $tall 2}
+         {song_progress_mat song_progress_glow.mat {$crowd find rock_light_green.mat} 1 0.78 0.42 0.6}
+         {song_progress_quad song_progress_glow.mesh song_progress_glow.mat $x {'-' $y 0.15} $z $wide {+ $tall 0.6} 3}
+         ; The needle's LED, its middle on the fill's front edge.
+         {song_progress_mat song_progress_head.mat {$crowd find amp_star_tip.mat} 1 1 1 1}
+         {song_progress_quad song_progress_head.mesh song_progress_head.mat
+            {'-' $x {* $tall 1.6}} {'-' $y 0.2} $z {* $tall 3.2} {* $tall 3.2} 5}
+         ; A dark round socket behind it, over the fill, moving with it in
+         ; its 16 by 16: the LED adds its red, which over the lit fill is
+         ; lost, so it reads as behind it.
+         {ghc_box_make hud song_progress_socket {hud find song_progress_head.mesh} 4}
+         {ghc_box_color hud song_progress_socket 0 0 0 0.9}
+         {ghc_box_put hud song_progress_socket 5.4 0.05 0 5.2 5 2.5 2.5}
+         {ghc_song_progress {hud find song_progress_fill.mesh} {/ $wide 16.0}
+            {hud find song_progress_glow.mesh} {hud find song_progress_head.mesh}}
+         ; Hidden while the meters are, until they start to slide in: off
+         ; screen, the rock meter still leaves the bar's left end in sight.
+         {song_progress_show {ghc_song_progress_meters}}
+         ; Drawn by the meter's Group, after its own.
+         {foreach $part $song_progress_parts
+            {$meter insert (objects {$meter size (objects)}) {hud find $part}}
+         }
+         {{hud loaded_dir} sync_objects}
+      }
+   }
+}
+
+; song_progress.cpp calls it as the HUD shows or hides its meters.
+{func song_progress_show ($on)
+   {foreach $part $song_progress_parts
+      {{hud find $part} set_showing $on}
+   }
+}
