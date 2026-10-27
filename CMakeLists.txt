@@ -166,6 +166,11 @@ target_link_libraries(save_test PRIVATE miniz)
 add_executable(releases_test EXCLUDE_FROM_ALL tests/releases_test.cpp src/host/releases.cpp)
 target_include_directories(releases_test PRIVATE src)
 
+# Which layout each controller gets, and input.ini's sections.
+add_executable(input_test EXCLUDE_FROM_ALL tests/input_test.cpp src/host/bindings.cpp src/host/profiles.cpp)
+target_include_directories(input_test PRIVATE src)
+target_link_libraries(input_test PRIVATE SDL3::SDL3)
+
 # Ogg Vorbis for 360 GH2's .mogg audio: libogg and libvorbis (BSD-3-Clause),
 # the decoder and vorbisfile only. Their own CMake wants an older CMake and
 # an installed Ogg, so their sources are built here (the lists in their

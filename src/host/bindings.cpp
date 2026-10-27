@@ -49,6 +49,8 @@ namespace gh2::input
             return buf;
         }
 
+        const char *const kAccelAxes[] = {"x", "y", "z"};
+
         // SDL names the comma key ",", which the list would split on.
         constexpr const char *kCommaName = "comma";
 
@@ -137,6 +139,20 @@ namespace gh2::input
                     return std::nullopt;
                 return s;
             }
+            if (name == "accel")
+            {
+                std::string axis;
+                if (!(in >> axis))
+                    return std::nullopt;
+                s.kind = Source::kPadAccel;
+                s.index = -1;
+                for (int i = 0; i < 3; ++i)
+                    if (axis == kAccelAxes[i])
+                        s.index = i;
+                if (s.index < 0 || !parseAxisRange(in, s))
+                    return std::nullopt;
+                return s;
+            }
             s.kind = Source::kPadButton;
             s.index = SDL_GetGamepadButtonFromString(name.c_str());
             if (s.index == SDL_GAMEPAD_BUTTON_INVALID)
@@ -167,6 +183,9 @@ namespace gh2::input
         case Source::kPadAxis:
             return std::string("pad axis ") + SDL_GetGamepadStringForAxis(static_cast<SDL_GamepadAxis>(s.index)) +
                    " " + formatFloat(s.rest) + " " + formatFloat(s.full);
+        case Source::kPadAccel:
+            return std::string("pad accel ") + kAccelAxes[s.index] + " " + formatFloat(s.rest) + " " +
+                   formatFloat(s.full);
         }
         return "";
     }
@@ -292,6 +311,7 @@ namespace gh2::input
                        ";   axis 2 -0.11 0.70      a controller axis, from its rest value to its full one\n"
                        ";   pad a                  a gamepad button (a, b, x, y, back, start, leftshoulder, dpup...)\n"
                        ";   pad axis righty 0 -1   a gamepad axis (leftx ... righttrigger), rest then full\n"
+                       ";   pad accel x 0 12       a gamepad's accelerometer (x, y or z), rest then full\n"
                        ";\n"
                        "; An action takes several controls, comma separated, and none unbinds it.\n";
             for (const std::string &line : kept)

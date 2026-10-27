@@ -12,9 +12,9 @@
 
 namespace gh2::input
 {
-    // A device's raw controls at one moment: a joystick's, and the same as
-    // SDL's gamepad layout reads them when it has one. Every source reads
-    // off one.
+    // A device's raw controls at one moment: a joystick's, the same as SDL's
+    // gamepad layout reads them when it has one, and its accelerometer in
+    // m/s^2 when that is turned on. Every source reads off one.
     struct Snapshot
     {
         std::vector<bool> buttons;
@@ -22,6 +22,7 @@ namespace gh2::input
         std::vector<float> axes;
         std::vector<bool> padButtons; // by SDL_GamepadButton
         std::vector<float> padAxes;   // by SDL_GamepadAxis
+        std::vector<float> accel;
     };
 
     // A joystick's own controls, without its gamepad layout.

@@ -12,6 +12,7 @@
 //     pad a                  an SDL gamepad button, by SDL's mapping name (a, b,
 //                            x, y, back, start, leftshoulder, dpup...)
 //     pad axis righty 0 -1   an SDL gamepad axis (leftx ... righttrigger), rest then full
+//     pad accel x 0 12       a gamepad's accelerometer (x, y or z), in m/s^2, rest then full
 //
 // An action takes any number of sources, comma separated, and is held when
 // any of them is. Whammy takes the largest amount.
@@ -74,9 +75,10 @@ namespace gh2::input
             kAxis,
             kPadButton,
             kPadAxis,
+            kPadAccel,
         };
         Kind kind = kKey;
-        int index = 0;      // scancode, button, hat, axis, SDL_GamepadButton or SDL_GamepadAxis
+        int index = 0;      // scancode, button, hat, axis, SDL_GamepadButton, SDL_GamepadAxis, or accelerometer axis
         uint8_t hat = 0;    // SDL_HAT_* bit
         float rest = 0.0f;  // axes: the value untouched
         float full = 1.0f;  // axes: the value fully pressed

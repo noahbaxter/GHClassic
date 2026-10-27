@@ -3,13 +3,15 @@
 #include "host/layouts.h"
 #include "host/profiles.h"
 
+#include <algorithm>
 #include <iostream>
 
 namespace gh2::input
 {
     namespace
     {
-        // Its raw controls, and its gamepad layout's.
+        // Its raw controls, its gamepad layout's, and its accelerometer
+        // while that is on.
         Snapshot read(const Device &d)
         {
             Snapshot s = readJoystick(d.joystick);
@@ -19,6 +21,10 @@ namespace gh2::input
                 s.padButtons.push_back(SDL_GetGamepadButton(d.gamepad, static_cast<SDL_GamepadButton>(b)));
             for (int a = 0; a < SDL_GAMEPAD_AXIS_COUNT; ++a)
                 s.padAxes.push_back(axisValue(SDL_GetGamepadAxis(d.gamepad, static_cast<SDL_GamepadAxis>(a))));
+            float accel[3] = {};
+            if (SDL_GamepadSensorEnabled(d.gamepad, SDL_SENSOR_ACCEL) &&
+                SDL_GetGamepadSensorData(d.gamepad, SDL_SENSOR_ACCEL, accel, 3))
+                s.accel = {accel[0], accel[1], accel[2]};
             return s;
         }
     }
@@ -68,7 +74,8 @@ namespace gh2::input
             }
             const std::string name = SDL_GetJoystickName(d.joystick) ? SDL_GetJoystickName(d.joystick) : "";
             d.name = name;
-            const auto builtin = builtinProfile(d.joystick, d.gamepad);
+            const DeviceInfo info = deviceInfo(d.joystick, d.gamepad);
+            const auto builtin = builtinProfile(info);
             const Section *own = sectionOf(name);
             d.sectionName = name;
             d.builtin = builtin ? builtin->profile : Profile{};
@@ -79,6 +86,13 @@ namespace gh2::input
             if (!builtin && !bound)
                 std::cerr << "[input]   unbound; run GHClassic --bind to set it up" << std::endl;
             listInFile(name, d.builtin);
+            // One read off the accelerometer needs SDL to send it.
+            const bool accel = std::any_of(d.profile.begin(), d.profile.end(), [](const auto &sources) {
+                return std::any_of(sources.begin(), sources.end(),
+                                   [](const Source &s) { return s.kind == Source::kPadAccel; });
+            });
+            if (accel && d.gamepad && !SDL_SetGamepadSensorEnabled(d.gamepad, SDL_SENSOR_ACCEL, true))
+                std::cerr << "[input]   no accelerometer: " << SDL_GetError() << std::endl;
             d.now = read(d);
             devices().push_back(d);
         }

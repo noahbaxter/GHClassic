@@ -34,6 +34,8 @@ namespace gh2::input
             return at(now.padButtons, s.index) && now.padButtons[static_cast<size_t>(s.index)] ? 1.0f : 0.0f;
         case Source::kPadAxis:
             return at(now.padAxes, s.index) ? travel(now.padAxes[static_cast<size_t>(s.index)]) : 0.0f;
+        case Source::kPadAccel:
+            return at(now.accel, s.index) ? travel(now.accel[static_cast<size_t>(s.index)]) : 0.0f;
         }
         return 0.0f;
     }
