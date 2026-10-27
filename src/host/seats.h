@@ -47,8 +47,8 @@ namespace gh2::input
         // read, whatever the instrument.
         std::array<float, kActionCount> held{};
         uint16_t buttons = 0;
-        // The keyboard's: Tab gone down, its Start for joining (Enter
-        // being taken), and Escape held.
+        // The keyboard's: Tab held, its Start for joining (Enter being
+        // taken), and Escape held.
         bool tab = false, escape = false;
 
         bool keyboard() const { return id.backend == DeviceId::kKeyboard; }
@@ -99,6 +99,7 @@ namespace gh2::input
         // and those that play nothing until they let go of the Start that
         // seated them.
         std::map<DeviceId, uint16_t> m_held;
+        bool m_tabWas = false, m_escapeWas = false;
         std::set<DeviceId> m_letGo;
         std::map<std::string, std::string> m_saved; // as [seats] has it
         bool m_savedChanged = false;

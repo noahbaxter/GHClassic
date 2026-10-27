@@ -143,11 +143,10 @@ namespace gh2
             {SDL_SCANCODE_LEFT, pad::kLeft},   {SDL_SCANCODE_RIGHT, pad::kRight},
             {SDL_SCANCODE_RETURN, pad::kR2},   {SDL_SCANCODE_ESCAPE, pad::kCircle},
         };
-        // The host thread's: Tab and the mode last poll, and the menu keys
-        // held as the mode changed, which do nothing until let go: the Enter
-        // that paused would pick Resume, the Escape that left the
-        // Controllers screen would back out of the menu under it.
-        bool s_tabWas = false;
+        // The host thread's: the mode last poll, and the menu keys held as
+        // the mode changed, which do nothing until let go: the Enter that
+        // paused would pick Resume, the Escape that left the Controllers
+        // screen would back out of the menu under it.
         Mode s_modeWas = Mode::kMenu;
         std::array<bool, SDL_SCANCODE_COUNT> s_keyWait{};
 
@@ -184,8 +183,7 @@ namespace gh2
         {
             Read r{DeviceId::keyboard(), "keyboard", DeviceKind::kKeyboard, "keyboard"};
             play(keyboardLayout(), Snapshot{}, keys, r.held);
-            r.tab = keys[SDL_SCANCODE_TAB] && !s_tabWas;
-            s_tabWas = keys[SDL_SCANCODE_TAB];
+            r.tab = keys[SDL_SCANCODE_TAB];
             r.escape = keys[SDL_SCANCODE_ESCAPE];
             return r;
         }

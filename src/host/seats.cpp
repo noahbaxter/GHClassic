@@ -61,8 +61,6 @@ namespace gh2::input
     // presses with it. P1 is never empty while P2 is not.
     void Seats::seat(const std::vector<Read> &reads, Mode mode, uint64_t nowMs)
     {
-        if (mode == Mode::kControllers)
-            return;
         const bool playersStep = mode == Mode::kPlayers;
         // Only devices here are remembered, and a seat's while it is away.
         const auto here = [&](const DeviceId &id) {
@@ -70,9 +68,11 @@ namespace gh2::input
         };
         std::erase_if(m_held, [&](const auto &held) { return !here(held.first); });
         std::erase_if(m_letGo, [&](const DeviceId &id) { return !here(id) && seatOf(id) < 0; });
-        // Each button going down this poll.
+        // Each button going down this poll, and the keyboard's Tab and Esc.
         std::vector<uint16_t> down(reads.size());
-        std::vector<bool> pressed(reads.size()), started(reads.size()), switched(reads.size());
+        std::vector<bool> pressed(reads.size()), started(reads.size()), switched(reads.size()),
+            escaped(reads.size());
+        bool tab = false, escape = false;
         for (size_t i = 0; i < reads.size(); ++i)
         {
             const Read &r = reads[i];
@@ -80,9 +80,18 @@ namespace gh2::input
             down[i] = static_cast<uint16_t>(r.buttons & ~was);
             was = r.buttons;
             pressed[i] = pressing(down[i]);
-            started[i] = r.keyboard() ? r.tab : (down[i] & pad::kStart) != 0;
+            started[i] = r.keyboard() ? r.tab && !m_tabWas : (down[i] & pad::kStart) != 0;
+            escaped[i] = r.keyboard() && r.escape && !m_escapeWas;
             switched[i] = r.keyboard() ? (down[i] & kFrets) != 0 : pressed[i];
+            tab = tab || (r.keyboard() && r.tab);
+            escape = escape || (r.keyboard() && r.escape);
         }
+        m_tabWas = tab;
+        m_escapeWas = escape;
+        // On the Controllers screen nothing moves, and what is held there
+        // has not gone down once it goes: red held to leave takes no seat.
+        if (mode == Mode::kControllers)
+            return;
         // In a song a seat whose device is gone, paused for it, is taken by
         // Start (the keyboard's Esc too) on any without a seat: a pad that
         // comes back on another cable or by Bluetooth has another GUID, and
@@ -92,7 +101,7 @@ namespace gh2::input
             for (int seat = 0; seat < kPlayers; ++seat)
                 if (m_away[seat])
                     for (size_t i = 0; i < reads.size(); ++i)
-                        if (seatOf(reads[i].id) < 0 && (started[i] || reads[i].escape))
+                        if (seatOf(reads[i].id) < 0 && (started[i] || escaped[i]))
                         {
                             sit(seat, reads[i], true);
                             break;
@@ -169,6 +178,11 @@ namespace gh2::input
                     trade(seat, (seat + seated - 1) % seated, reads[i]);
             }
         }
+        // Until last run's seats stop being put back, one that shows up
+        // after the seat behind it still finds its own, and [seats] stays
+        // as it was.
+        if (nowMs < m_restoreUntilMs)
+            return;
         for (int seat = 0; seat + 1 < kSeats; ++seat)
             if (m_seats[seat].none() && !m_seats[seat + 1].none())
             {
@@ -192,7 +206,8 @@ namespace gh2::input
 
     // A seat's device back from a replug: the same identity, or on Linux,
     // where its /dev/input node can change, one of its model in no other seat
-    // and not there when it went: an idle twin is not it.
+    // and not there when it went: an idle twin is not it, from the poll it
+    // goes on.
     void Seats::follow(const std::vector<Read> &reads, bool readingNone)
     {
         for (int seat = 0; seat < kSeats; ++seat)
@@ -201,7 +216,13 @@ namespace gh2::input
             bool here = id.none() || readingNone;
             for (const Read &r : reads)
                 here = here || r.id == id;
-            const std::vector<DeviceId> &there = m_thereWhenAway[seat];
+            std::vector<DeviceId> &there = m_thereWhenAway[seat];
+            if (!here && !m_away[seat])
+            {
+                there.clear();
+                for (const Read &r : reads)
+                    there.push_back(r.id);
+            }
             for (const Read &r : reads)
             {
                 if (here || !r.id.sameModel(id) ||
@@ -216,10 +237,8 @@ namespace gh2::input
             {
                 m_away[seat] = !here;
                 std::cerr << "[input] P" << seat + 1 << (here ? " plugged back in" : " unplugged") << std::endl;
-                m_thereWhenAway[seat].clear();
-                if (!here)
-                    for (const Read &r : reads)
-                        m_thereWhenAway[seat].push_back(r.id);
+                if (here)
+                    there.clear();
             }
         }
     }

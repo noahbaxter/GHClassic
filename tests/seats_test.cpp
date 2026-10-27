@@ -219,10 +219,72 @@ int main()
         seats.seat({device(twin), device(a), device(b)}, Mode::kMenu, 10);
         CHECK(seats[0] == b && seats[1] == a);
         CHECK(!seats.takeSaved());
-        press(seats, {device(a, pad::kTriangle), device(b)}, Mode::kPlayers);
+        seats.seat({device(a, pad::kTriangle), device(b)}, Mode::kPlayers, 2000);
         const auto saved = seats.takeSaved();
         CHECK(saved && saved->at("p1") == "guid-a /dev/a");
         CHECK(!seats.takeSaved());
+    }
+
+    // A saved P1 that shows up after P2 still takes P1, and [seats] is left
+    // as it was until they stop being put back.
+    {
+        Seats seats;
+        seats.restore({{"p1", b.text()}, {"p2", a.text()}}, 1000);
+        seats.seat({device(a)}, Mode::kMenu, 10);
+        CHECK(seats[0].none() && seats[1] == a);
+        seats.seat({device(a), device(b)}, Mode::kMenu, 20);
+        CHECK(seats[0] == b && seats[1] == a);
+        seats.seat({device(a), device(b)}, Mode::kMenu, 2000);
+        CHECK(!seats.takeSaved());
+    }
+
+    // One that never comes: P2 moves up as they stop, and is saved then.
+    {
+        Seats seats;
+        seats.restore({{"p1", b.text()}, {"p2", a.text()}}, 1000);
+        seats.seat({device(a)}, Mode::kMenu, 10);
+        CHECK(!seats.takeSaved());
+        seats.seat({device(a)}, Mode::kMenu, 2000);
+        CHECK(seats[0] == a && seats[1].none());
+        const auto saved = seats.takeSaved();
+        CHECK(saved && saved->at("p1") == a.text() && !saved->count("p2"));
+    }
+
+    // An idle twin never takes a seat its model's device leaves, from the
+    // poll it goes on; that device back on another path does.
+    {
+        Seats seats;
+        const DeviceId twin = sdl("guid-a", "/dev/twin"), back = sdl("guid-a", "/dev/new");
+        press(seats, {device(a, pad::kR2), device(twin)});
+        seats.follow({device(twin)}, false);
+        CHECK(seats.away(0) && seats[0] == a);
+        seats.follow({device(twin)}, false);
+        CHECK(seats.away(0) && seats[0] == a);
+        seats.follow({device(twin), device(back)}, false);
+        CHECK(!seats.away(0) && seats[0] == back);
+    }
+
+    // In a song the keyboard's Esc takes a seat only going down: one held
+    // since before the seat's device went takes nothing.
+    {
+        Seats seats;
+        press(seats, {device(a, pad::kR2)});
+        seats.seat({device(a), keyboard(false, true)}, Mode::kPlaying, 0);
+        seats.follow({keyboard(false, true)}, false);
+        seats.seat({keyboard(false, true)}, Mode::kPlaying, 0);
+        CHECK(seats.away(0) && seats[0] == a);
+        seats.seat({keyboard()}, Mode::kPlaying, 0);
+        seats.seat({keyboard(false, true)}, Mode::kPlaying, 0);
+        CHECK(seats[0] == kKeyboard);
+    }
+
+    // Red held on the Controllers screen to leave it takes no seat after.
+    {
+        Seats seats;
+        press(seats, {device(a, pad::kR2), device(b)});
+        seats.seat({device(a), device(b, pad::kCircle)}, Mode::kControllers, 0);
+        seats.seat({device(a), device(b, pad::kCircle)}, Mode::kMenu, 0);
+        CHECK(seats[0] == a);
     }
 
     // A scenario's devices are never saved.
