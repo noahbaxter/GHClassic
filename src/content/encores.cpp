@@ -22,6 +22,7 @@ namespace gh2::encores
         std::set<std::string> s_none;
         PS2Runtime::RecompiledFunction s_isEncoreSong = nullptr;
         PS2Runtime::RecompiledFunction s_isEncoreUnlockPossible = nullptr;
+        PS2Runtime::RecompiledFunction s_isNewEncoreUnlock = nullptr;
         PS2Runtime::RecompiledFunction s_checkUnlockVenue = nullptr;
         PS2Runtime::RecompiledFunction s_getBlurb = nullptr;
 
@@ -60,6 +61,27 @@ namespace gh2::encores
             if (played())
                 return s_isEncoreUnlockPossible(rdram, ctx, runtime);
             answer(ctx, 0u);
+        }
+
+        // CampaignState::IsNewEncoreUnlock(Symbol venue, bool &isFreebird)
+        // (0x132a68) flags the special encore by the name "freebird", which
+        // the 80s' retail code has as "playwithme": its finale's confirms
+        // and text hang on the flag.
+        void isNewEncoreUnlock(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t returnTo = GPR_U32(ctx, 31);
+            const uint32_t state = GPR_U32(ctx, 4), venue = GPR_U32(ctx, 5), flag = GPR_U32(ctx, 6);
+            s_isNewEncoreUnlock(rdram, ctx, runtime);
+            const uint32_t result = GPR_U32(ctx, 2);
+            if (campaigns::active() == "gh80s")
+            {
+                const uint32_t encore = static_cast<uint32_t>(
+                    runtime->callGuestFunction(rdram, ctx, s_addresses->campaignStateGetCurEncore, {state, venue}));
+                if (encore == script::symbol(rdram, ctx, runtime, "playwithme"))
+                    store<uint8_t>(rdram, flag, 1u);
+            }
+            SET_GPR_U32(ctx, 2, result);
+            ctx->pc = returnTo;
         }
 
         // CampaignState::CheckUnlockVenue(Symbol song) (0x1322c8) as it runs
@@ -160,6 +182,8 @@ namespace gh2::encores
         runtime.replaceFunction(addresses.campaignStateIsEncoreSong, &isEncoreSong);
         s_isEncoreUnlockPossible = runtime.lookupFunction(addresses.campaignStateIsEncoreUnlockPossible);
         runtime.replaceFunction(addresses.campaignStateIsEncoreUnlockPossible, &isEncoreUnlockPossible);
+        s_isNewEncoreUnlock = runtime.lookupFunction(addresses.campaignStateIsNewEncoreUnlock);
+        runtime.replaceFunction(addresses.campaignStateIsNewEncoreUnlock, &isNewEncoreUnlock);
         s_checkUnlockVenue = runtime.lookupFunction(addresses.campaignStateCheckUnlockVenue);
         runtime.replaceFunction(addresses.campaignStateCheckUnlockVenue, &checkUnlockVenue);
         s_getBlurb = runtime.lookupFunction(addresses.songProviderGetBlurb);

@@ -254,6 +254,8 @@ namespace gh2
         uint32_t localeTerminate;  // Locale::Terminate
         uint32_t campaignStateIsEncoreSong;           // (Symbol song)
         uint32_t campaignStateIsEncoreUnlockPossible; // (Symbol song)
+        uint32_t campaignStateIsNewEncoreUnlock;      // (Symbol venue, bool &isFreebird)
+        uint32_t campaignStateGetCurEncore;           // (Symbol venue)
         uint32_t campaignStateCheckUnlockVenue;       // (Symbol song)
         uint32_t campaignStateGetNumPassedSongs;      // (Symbol venue)
         uint32_t campaignStateIsVenuePassed;          // (Symbol venue)
@@ -556,6 +558,8 @@ namespace gh2
         .localeTerminate = 0x2cba98u,
         .campaignStateIsEncoreSong = 0x131d30u,
         .campaignStateIsEncoreUnlockPossible = 0x132b18u,
+        .campaignStateIsNewEncoreUnlock = 0x132a68u,
+        .campaignStateGetCurEncore = 0x132ca8u,
         .campaignStateCheckUnlockVenue = 0x1322c8u,
         .campaignStateGetNumPassedSongs = 0x132450u,
         .campaignStateIsVenuePassed = 0x132428u,
