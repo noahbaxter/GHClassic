@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace gh2
 {
@@ -74,10 +75,10 @@ namespace gh2
     // as a real one does, through its layout, the seat rules and the
     // Controllers screen, in a hidden run too. Held until the next set, none
     // to let go: the controls its layout gives the actions of those libpad
-    // bits. Callable from any thread.
+    // bits, and raw buttons by number. Callable from any thread.
     void addScriptedDevice(const std::string &name);
     void removeScriptedDevice(const std::string &name); // unplugged
-    void setScriptedDevice(const std::string &name, uint16_t pressed);
+    void setScriptedDevice(const std::string &name, uint16_t pressed, const std::vector<int> &buttons = {});
     // A scenario's key, SDL's scancode, held on the keyboard until let go;
     // in a hidden run, from the first, the keyboard is there. Callable from
     // any thread.

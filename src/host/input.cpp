@@ -428,7 +428,7 @@ namespace gh2
         std::erase_if(s_scriptedDevices, [&](const Scripted &d) { return d.name == name; });
     }
 
-    void setScriptedDevice(const std::string &name, uint16_t pressed)
+    void setScriptedDevice(const std::string &name, uint16_t pressed, const std::vector<int> &buttons)
     {
         std::lock_guard<std::mutex> lock(s_mutex);
         for (Scripted &d : s_scriptedDevices)
@@ -437,6 +437,9 @@ namespace gh2
                 d.raw = scriptedRest();
                 for (int a = 0; a < kActionCount; ++a)
                     d.raw.buttons[static_cast<size_t>(a)] = (pressed & kActions[a].button) != 0u;
+                for (int b : buttons)
+                    if (b >= 0 && static_cast<size_t>(b) < kScriptedButtons)
+                        d.raw.buttons[static_cast<size_t>(b)] = true;
             }
     }
 
