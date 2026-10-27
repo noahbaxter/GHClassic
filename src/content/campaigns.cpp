@@ -750,6 +750,16 @@ namespace gh2::campaigns
             return static_cast<int>(25u * quarters / career.size());
         }
 
+        // A song finished as a full combo, from a player's longest streak,
+        // gems hit, gems passed and percent hit at `at` on: every gem hit in
+        // one streak. The percent is of the song's every gem, so a song cut
+        // short is none.
+        bool fullCombo(const script::Call &call, int at)
+        {
+            const auto longest = call.number(at), hit = call.number(at + 1), passed = call.number(at + 2);
+            return hit > 0 && passed == 0 && longest == hit && call.number(at + 3) == 100;
+        }
+
         // Its expert full combos (save::fullComboSongs) as a share of every
         // song, career and bonus, 0 to 100.
         int fullCombos(const std::string &game, int slot, std::optional<NoteEngine> engine)
@@ -926,16 +936,30 @@ namespace gh2::campaigns
                         script::kInt};
             }
             // From onFinishSong: band, difficulty, song, then player 0's
-            // longest streak, gems hit, gems passed and percent hit, which
-            // is of the song's every gem, so a song cut short is none.
+            // numbers as fullCombo takes them.
             if (op == "finished")
             {
-                const auto longest = call.number(5), hit = call.number(6), passed = call.number(7);
-                if (hit > 0 && passed == 0 && longest == hit && call.number(8) == 100)
+                if (fullCombo(call, 5))
                     save::keepFullCombo(static_cast<int>(call.number(2)), static_cast<int>(call.number(3)),
                                         call.symbol(4));
                 return {};
             }
+            // From onGameOver, a quickplay song alone: difficulty, song, then
+            // as finished's. A song lost has gems passed.
+            if (op == "finished_quickplay")
+            {
+                if (fullCombo(call, 4) && !save::hasFullCombo(call.symbol(3), static_cast<int>(call.number(2))))
+                {
+                    save::keepQuickplayFullCombo(static_cast<int>(call.number(2)), call.symbol(3));
+                    // Quickplay saves only when something asks it to.
+                    script::run(call.rdram, call.ctx, call.runtime, "{campaign mark_needs_save}");
+                }
+                return {};
+            }
+            // Whether a song has been full combo'd on a difficulty, by any
+            // band or in quickplay (save::hasFullCombo).
+            if (op == "full_combo")
+                return {save::hasFullCombo(call.symbol(2), static_cast<int>(call.number(3))) ? 1u : 0u, script::kInt};
             if (op == "count")
                 return {static_cast<uint32_t>(s_campaigns.size()), script::kInt};
             if (op == "venues")
@@ -1024,7 +1048,7 @@ namespace gh2::campaigns
             std::cerr << "[campaign] usage: {campaigns active|live|count}, {campaigns has <game>}, "
                          "{campaigns switch <game> [<screen> [career|menus]]}, "
                          "{campaigns progress <game> <band> [<engine>]}, {campaigns full_combos <game> <band> [<engine>]}, "
-                         "{campaigns unlock_all [<on>]}"
+                         "{campaigns unlock_all [<on>]}, {campaigns full_combo <song> <difficulty>}"
                       << std::endl;
             return {};
         }
@@ -1169,6 +1193,19 @@ namespace gh2::campaigns
             script::run(rdram, ctx, runtime,
                         "{campaigns finished {campaign profile_slot} {game get_difficulty 0} {game get_song} "
                         "{player0 longest_streak} {player0 gems_hit} {player0 gems_passed} {player0 percent_hit}}");
+            *ctx = saved;
+        }
+
+        // A song won or lost: in quickplay, alone, kept as a full combo as a
+        // career's is (onFinishSong), its band none.
+        struct GameOverTag;
+        void onGameOver(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const R5900Context saved = *ctx;
+            script::run(rdram, ctx, runtime,
+                        "{if {&& {== {gamecfg get mode} quickplay} {== {game num_players} 1}} "
+                        "{campaigns finished_quickplay {game get_difficulty 0} {game get_song} {player0 longest_streak} "
+                        "{player0 gems_hit} {player0 gems_passed} {player0 percent_hit}}}");
             *ctx = saved;
         }
 
@@ -1440,6 +1477,7 @@ namespace gh2::campaigns
         runtime.replaceFunction(addresses.campaignSave, &campaignSave);
         EntryHook<GotoScreenTag>::install(runtime, addresses.uiGotoScreen, onGotoScreen);
         EntryHook<FinishSongTag>::install(runtime, addresses.profileStateFinishSong, onFinishSong);
+        EntryHook<GameOverTag>::install(runtime, addresses.hudPanelOnGameOver, onGameOver);
         EntryHook<MetaMusicStopTag>::install(runtime, addresses.metaMusicStop, onMetaMusicStop);
     }
 }

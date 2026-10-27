@@ -63,12 +63,19 @@ namespace gh2::save
     // which the game's gold (every gem hit, CampaignState::FinishSong
     // 0x131ee0) does not ask. Bonus songs too. GH Classic's own, as
     // fc.<song> in the band's section for the difficulty, which the game's
-    // save keeps for it unread.
+    // save keeps for it unread, and quickplay's (keepQuickplayFullCombo).
     std::array<std::set<std::string>, 4> fullComboSongs(const std::string &game, int slot,
                                                         std::optional<NoteEngine> engine = std::nullopt);
     // A full combo on `song` by band `slot` (from 0) on `difficulty` (easy
     // 0), in the career being played under the engine judging.
     void keepFullCombo(int slot, int difficulty, const std::string &song);
+    // One in quickplay, which has no band: fc.<song> in [quickplay <game>
+    // <difficulty>], the song's own game under the engine judging. Counted
+    // with every band's (fullComboSongs, hasFullCombo).
+    void keepQuickplayFullCombo(int difficulty, const std::string &song);
+    // Whether `song` has been full combo'd on `difficulty` under the engine
+    // judging: by any band in its game's career, or in quickplay.
+    bool hasFullCombo(const std::string &song, int difficulty);
     std::set<std::string> unlockedSongs(const std::string &game);
     // Whether any band has unlocked that item, of any kind, in `game`'s
     // career under any engine: an outfit or guitar bought.

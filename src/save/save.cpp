@@ -156,6 +156,12 @@ namespace gh2::save
             return s_store.find("band " + std::to_string(slot + 1) + " " + sectionGame(game, engine) + " " + difficulty);
         }
 
+        // [quickplay <game> <difficulty>] under that engine, if the save has it.
+        const Section *quickplaySection(const std::string &game, NoteEngine engine, const char *difficulty)
+        {
+            return s_store.find("quickplay " + sectionGame(game, engine) + " " + difficulty);
+        }
+
         gh2::Games games()
         {
             gh2::Games out{sectionGame(s_game), {}};
@@ -719,10 +725,12 @@ namespace gh2::save
         for (const NoteEngine e : kNoteEngines)
             if (!engine || e == *engine)
                 for (int d = 0; d < gh2::kDifficulties; ++d)
-                    if (const Section *section = bandSection(slot, game, e, kDifficulties[d]))
-                        for (const auto &[key, value] : section->values)
-                            if (key.rfind("fc.", 0) == 0)
-                                found[static_cast<size_t>(d)].insert(key.substr(3));
+                    for (const Section *section :
+                         {bandSection(slot, game, e, kDifficulties[d]), quickplaySection(game, e, kDifficulties[d])})
+                        if (section)
+                            for (const auto &[key, value] : section->values)
+                                if (key.rfind("fc.", 0) == 0)
+                                    found[static_cast<size_t>(d)].insert(key.substr(3));
         return found;
     }
 
@@ -732,6 +740,27 @@ namespace gh2::save
             return;
         s_store.section("band " + std::to_string(slot + 1) + " " + sectionGame(s_game) + " " + kDifficulties[difficulty])
             .set("fc." + song, "1");
+    }
+
+    void keepQuickplayFullCombo(int difficulty, const std::string &song)
+    {
+        if (difficulty < 0 || difficulty >= gh2::kDifficulties)
+            return;
+        s_store.section("quickplay " + sectionGame(gameOf(song)) + " " + kDifficulties[difficulty]).set("fc." + song, "1");
+    }
+
+    bool hasFullCombo(const std::string &song, int difficulty)
+    {
+        if (difficulty < 0 || difficulty >= gh2::kDifficulties)
+            return false;
+        const std::string game = gameOf(song), key = "fc." + song;
+        const char *const name = kDifficulties[difficulty];
+        if (const Section *section = quickplaySection(game, noteEngine(), name); section && section->get(key))
+            return true;
+        for (int slot = 0; slot < gh2::kProfiles; ++slot)
+            if (const Section *section = bandSection(slot, game, noteEngine(), name); section && section->get(key))
+                return true;
+        return false;
     }
 
     std::set<std::string> unlockedSongs(const std::string &game)
