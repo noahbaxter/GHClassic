@@ -44,6 +44,7 @@ namespace gh2::input
         // The host thread's: keys and devices down last poll, when red went
         // down on the device shown, and the capture under way.
         std::array<bool, SDL_SCANCODE_COUNT> s_keyWas{};
+        std::array<uint64_t, 2> s_repeatAtMs{}; // Up's and Down's next step, 0 while not held
         std::map<DeviceId, bool> s_touchWas;
         uint64_t s_redSinceMs = 0;
         std::optional<Capture> s_capture;
@@ -100,6 +101,26 @@ namespace gh2::input
             if (keys[k] && !s_keyWas[static_cast<size_t>(k)] && !opened)
                 down.push_back(k);
             s_keyWas[static_cast<size_t>(k)] = keys[k];
+        }
+        // Up and Down held step on, as a menu's do: again after a moment,
+        // then steadily, until let go.
+        constexpr uint64_t kRepeatDelayMs = 400, kRepeatMs = 80;
+        const uint64_t ms = SDL_GetTicks();
+        for (size_t i = 0; i < s_repeatAtMs.size(); ++i)
+        {
+            const SDL_Scancode k = i == 0 ? SDL_SCANCODE_UP : SDL_SCANCODE_DOWN;
+            uint64_t &at = s_repeatAtMs[i];
+            if (!keys || !keys[k])
+                at = 0;
+            else if (opened)
+                at = UINT64_MAX; // held as the screen came up
+            else if (at == 0)
+                at = ms + kRepeatDelayMs;
+            else if (ms >= at)
+            {
+                down.push_back(k);
+                at = ms + kRepeatMs;
+            }
         }
         // What the screen asked for since the last poll, taken under the
         // lock; input.ini is written outside it.

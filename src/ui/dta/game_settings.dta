@@ -48,56 +48,142 @@
    }
 }
 
-; The options menu, as the game's own (options.dta) with a Game Settings row
-; under Video Settings. options.milo has six rows, each button in a group of
-; its own that fans it about the poster's corner; the seventh is Video
-; Settings cloned on entry into a group turned between its neighbours', and
-; the three rows under it moved down to keep the gaps even (x right, z up, in
-; op_buttons.view).
+; The options menu, as the game's own (options.dta) with its Audio and Video
+; rows folded into one Settings row, as the pause menu has: Settings, Manage
+; Band, Data Settings, Bonus Videos, Credits. Settings shows the same poster
+; with the rows Audio, Video, Controllers (controllers.dta) and Game Settings,
+; and red goes back to the first rows. $ghc_options_settings is which shows,
+; so each of those screens, going back to options_screen, comes back to it.
+;
+; options.milo has six rows, each button in a group of its own that fans it
+; about the poster's corner. Each row's place is kept as a group where its
+; button stands, and the rows shown are put in the places from the top; the
+; last, Credits', is left empty. Game Settings and Controllers are Video
+; Settings cloned on entry. GH1's scene (gh1/screens.cpp) has Game Settings
+; already and its seven rows evenly down the poster, so its places are its
+; first five.
 {retype options_panel
    (
       ; From the ARK root: a path resolves against the file its array came
       ; from, and this one comes from no file.
       (file ui/options.milo)
       (focus op_audio.btn)
-      (enter {$this add_game})
-      (add_game
-         {if {! {exists game_settings.btn}}
+      (enter {$this add_rows} {$this show_rows})
+      (add_rows
+         {if {! {exists ghc_op_place1.grp}}
             {do
-               ($x 0) ($y 0) ($z 0)
+               ($x 0) ($y 0) ($z 0) ($place 0)
                ($draw {video_settings.btn get trans_parent})
-               {new Group game_settings.grp}
-               {game_settings.grp set trans_parent op_buttons.view}
-               {game_settings.grp set_local_rot 0 8 0}
-               {new {video_settings.btn class_name} game_settings.btn}
-               {game_settings.btn copy video_settings.btn 0}
-               {game_settings.btn set trans_parent game_settings.grp}
-               {game_settings.btn set_local_pos 24 0 -14}
+               ($from
+                  {if_else {exists game_settings.btn}
+                     (op_audio.btn video_settings.btn game_settings.btn op_data.btn memory_card.btn)
+                     (op_audio.btn video_settings.btn op_data.btn memory_card.btn op_bonus.btn)
+                  }
+               )
+               {foreach $btn $from
+                  {set $place {'+' $place 1}}
+                  {do
+                     ($grp {symbol {sprint "ghc_op_place" $place ".grp"}})
+                     {new Group $grp}
+                     {$grp set trans_parent {$btn get trans_parent}}
+                     {$btn get_local_pos $x $y $z}
+                     {$grp set_local_pos $x $y $z}
+                  }
+               }
+               {foreach $btn (game_settings.btn controllers.btn)
+                  {if {! {exists $btn}}
+                     {new {video_settings.btn class_name} $btn}
+                     {$btn copy video_settings.btn 0}
+                     {$draw insert (objects {$draw size objects}) $btn}
+                  }
+               }
                ; A token with no string reads as itself.
                {game_settings.btn set text_token "Game Settings"}
-               {video_settings.btn set nav_down game_settings.btn}
-               {game_settings.btn set nav_down op_data.btn}
-               {foreach $row ((op_data.view -15) (op_memory_card.grp -9) (op_bonus.view -5))
-                  {{elem $row 0} get_local_pos $x $y $z}
-                  {{elem $row 0} set_local_pos $x $y {'+' $z {elem $row 1}}}
-               }
-               {$draw insert (objects {$draw size objects}) game_settings.btn}
+               {controllers.btn set text_token "Controllers"}
                {{$this loaded_dir} sync_objects}
             }
+         }
+      )
+      (show_rows
+         {do
+            ($rows
+               {if_else $ghc_options_settings
+                  (op_audio.btn video_settings.btn controllers.btn game_settings.btn)
+                  (op_audio.btn op_data.btn memory_card.btn op_bonus.btn op_credit.btn)
+               }
+            )
+            ($place 0)
+            ($last {elem $rows {'-' {size $rows} 1}})
+            ; The row focused, coming back to the menu, keeps its focus. Up
+            ; goes to the row whose nav_down is this one, so a hidden row's
+            ; points at itself: the stock scene's and the other set's would
+            ; be found first and lead nowhere.
+            {foreach $btn (video_settings.btn controllers.btn game_settings.btn op_data.btn memory_card.btn
+                  op_bonus.btn op_credit.btn)
+               {if {! {find_elem $rows $btn}}
+                  {$btn set_showing FALSE}
+                  {$btn set_state kDisabled}
+                  {$btn set nav_down $btn}
+               }
+            }
+            {foreach $btn $rows
+               {set $place {'+' $place 1}}
+               {$btn set trans_parent {$this find {sprint "ghc_op_place" $place ".grp"}}}
+               {$btn set_local_pos 0 0 0}
+               {$btn set_showing TRUE}
+               {if {== {$btn get_state} kDisabled} {$btn set_state kNormal}}
+               {$last set nav_down $btn}
+               {set $last $btn}
+            }
+            {op_audio.btn set text_token {if_else $ghc_options_settings op_game_settings "Settings"}}
          }
       )
       (poll {if $disable_save {op_data.btn set_state kDisabled} {memory_card.btn set_state kDisabled}})
       (SELECT_START_MSG
          {switch $component
-            (op_audio.btn {ui goto_screen audio_settings_screen})
+            (op_audio.btn
+               {if_else $ghc_options_settings
+                  {ui goto_screen audio_settings_screen}
+                  {do {set $ghc_options_settings TRUE} {$this show_rows}}
+               }
+            )
             (video_settings.btn {ui goto_screen video_settings_screen})
             (game_settings.btn {ui goto_screen game_settings_screen})
+            (controllers.btn {ui goto_screen ghc_controllers_screen})
             (op_data.btn {ui goto_screen options_chooseprof_screen})
             (memory_card.btn {ui goto_screen mem_card_screen})
             (op_bonus.btn {ui goto_screen bonus_material_screen})
             (op_credit.btn {ui goto_screen credits_screen})
          }
          kDataUnhandled
+      )
+   )
+}
+{retype options_screen
+   (
+      (panels meta options_panel helpbar)
+      (focus options_panel)
+      (helpbar (default ((fret1 help_continue) (fret2 help_back) (strum help_updown))))
+      ; Settings opens its rows on the same screen, so it is taken here,
+      ; before its button's pressed pop starts: the screen changing would
+      ; hide that, and here it would play on over the new rows.
+      (BUTTON_DOWN_MSG
+         {cond
+            ({&& $ghc_options_settings {== $button kPad_Tri}}
+               {synth play_sequence button_back.cue}
+               {set $ghc_options_settings FALSE}
+               {options_panel show_rows}
+               {options_panel set_focus {options_panel find op_audio.btn}}
+               TRUE
+            )
+            ({&& {! $ghc_options_settings} {== $button kPad_X} {== {options_panel focus_name} op_audio.btn}}
+               {synth play_sequence button_select}
+               {set $ghc_options_settings TRUE}
+               {options_panel show_rows}
+               TRUE
+            )
+            (TRUE kDataUnhandled)
+         }
       )
    )
 }

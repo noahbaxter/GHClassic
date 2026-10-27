@@ -344,6 +344,7 @@ set(GHC_GAME_SOURCES
     src/ui/locale.cpp
     src/ui/help_bar.cpp
     src/ui/players.cpp
+    src/ui/controllers.cpp
     src/ui/classic_scene.cpp
     src/ui/menus.cpp
     src/ui/meta_music.cpp
@@ -459,7 +460,8 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     src/ui/dta/campaigns.dta src/gh1/menus.dta src/gh1/scripts.dta src/ui/dta/picker.dta src/ui/dta/quickplay_pickers.dta
     src/ui/dta/quickplay_setup.dta src/ui/dta/preshow_guitarist.dta src/ui/dta/in_song.dta
     src/content/guitar_copy.dta src/hub/preshow_picks.dta src/ui/dta/game_settings.dta src/ui/dta/photo_mode.dta src/ui/dta/box.dta
-    src/ui/dta/note_streak.dta src/ui/dta/streak_counter.dta src/ui/dta/song_progress.dta src/ui/dta/players.dta)
+    src/ui/dta/note_streak.dta src/ui/dta/streak_counter.dta src/ui/dta/song_progress.dta src/ui/dta/players.dta
+    src/ui/dta/controllers.dta)
 file(READ src/ui/dta/box.dta GHC_BOX_DTA)
 file(READ src/ui/dta/note_streak.dta GHC_NOTE_STREAK_DTA)
 file(READ src/ui/dta/streak_counter.dta GHC_STREAK_COUNTER_DTA)
@@ -467,6 +469,7 @@ file(READ src/ui/dta/song_progress.dta GHC_SONG_PROGRESS_DTA)
 file(READ src/ui/dta/game_settings.dta GHC_GAME_SETTINGS_DTA)
 file(READ src/ui/dta/photo_mode.dta GHC_PHOTO_MODE_DTA)
 file(READ src/ui/dta/players.dta GHC_PLAYERS_DTA)
+file(READ src/ui/dta/controllers.dta GHC_CONTROLLERS_DTA)
 configure_file(src/ui/dta/dta.h.in "${GHC_DTA_DIR}/dta.h" @ONLY)
 file(READ config/settings.template.ini GHC_SETTINGS_TEMPLATE)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS config/settings.template.ini)
@@ -488,6 +491,11 @@ file(READ assets/campaign_select.bin GHC_CAMPAIGN_PACK HEX)
 string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_CAMPAIGN_PACK "${GHC_CAMPAIGN_PACK}")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/campaign_select.bin)
 configure_file(src/content/campaign_pack.h.in "${GHC_DTA_DIR}/campaign_pack.h" @ONLY)
+# The Controllers screen's black poster (ui/controllers.cpp), a 360 bitmap.
+file(READ assets/controllers_poster.bin GHC_CONTROLLERS_POSTER HEX)
+string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_CONTROLLERS_POSTER "${GHC_CONTROLLERS_POSTER}")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/controllers_poster.bin)
+configure_file(src/ui/controllers_poster.h.in "${GHC_DTA_DIR}/controllers_poster.h" @ONLY)
 # The faces the pre-show's venue posters are lettered in (hub/venue_posters.h).
 foreach(GHC_FACE rokk/Rokk helveticablackcondensed/Helveticablackcondensed)
     get_filename_component(GHC_FACE_NAME "${GHC_FACE}" NAME)

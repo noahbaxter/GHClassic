@@ -250,8 +250,10 @@ namespace gh2::scenario
                     }
                     setScriptedKey(s_pressKey, true);
                     s_pressed = true;
-                    s_release = now() + std::chrono::milliseconds(150);
-                    s_until = now() + std::chrono::milliseconds(400);
+                    // Held that many seconds, else let go as a tap is.
+                    const int heldMs = array.size() > 2 ? static_cast<int>(array.number(2) * 1000.0f) : 150;
+                    s_release = now() + std::chrono::milliseconds(heldMs);
+                    s_until = now() + std::chrono::milliseconds(heldMs + 250);
                     return;
                 }
                 if (verb == "press")

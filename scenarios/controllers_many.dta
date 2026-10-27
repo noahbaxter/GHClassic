@@ -1,0 +1,50 @@
+; The Controllers screen with six devices: its row of five scrolls to keep the
+; one shown in it, with a < or > while more are past an end.
+#include common/first_boot.dta
+(device guitar)
+(device pad)
+(device Steam_Controller)
+(device guitar2)
+(device DUALSHOCK_4_Wireless_Controller)
+(press down Steam_Controller)
+(expect {seat_has 0 Steam_Controller} 1)
+{ui goto_screen ghc_controllers_screen}
+(wait_screen ghc_controllers_screen)
+(wait 1)
+; The first shown: the row starts at it.
+(expect {ghc_controllers text title} GUITAR)
+(expect {ghc_controllers chip_on 0} 1)
+(expect {ghc_controllers text before} "")
+; The keyboard not in it till a key is pressed: five fit.
+(expect {ghc_controllers text after} "")
+; Chips go by each device's own name (a seat ahead of it once taken).
+(expect {ghc_controllers text chip 0} "GUITAR")
+; A seat ahead: as long as the longest name, WII GUITAR (RAPHNET).
+(expect {ghc_controllers text chip 2} "P1  STEAM CONTROLLER")
+(shot start)
+; Right to the fifth stays in the first five, the keyboard past them.
+(key Right)
+(key Right)
+(key Right)
+(key Right)
+(wait 0.3)
+(expect {ghc_controllers chip_on 4} 1)
+(expect {ghc_controllers text before} "")
+(expect {ghc_controllers text after} ">")
+(shot middle)
+; One more scrolls to the last, the keyboard: nothing past it.
+(key Right)
+(wait 0.3)
+(expect {ghc_controllers text title} KEYBOARD)
+(expect {ghc_controllers chip_on 4} 1)
+(expect {ghc_controllers text before} "<")
+(expect {ghc_controllers text after} "")
+(shot end)
+; Pressing a device off the row brings it in.
+(hold pad red)
+(wait 0.3)
+(hold pad)
+(expect {ghc_controllers text title} PAD)
+(expect {ghc_controllers chip_on 0} 1)
+(shot pressed)
+(quit)
