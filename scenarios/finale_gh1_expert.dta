@@ -1,0 +1,15 @@
+; GH1 on expert ends at the arena's fifth song.
+(needs gh1)
+{set $pick gh1}
+{set $d1 down}
+{set $d2 down}
+{set $d3 down}
+{set $v1 none}
+{set $finale_venue arena}
+{set $b1 godzilla}
+{set $b2 texasflood}
+{set $b3 frankenstein}
+{set $b4 cowboysfromhell}
+{set $idx 4}
+{set $play barkatthemoon}
+#include common/finale_direct.dta

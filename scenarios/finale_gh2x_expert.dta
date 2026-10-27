@@ -1,0 +1,14 @@
+; The 360 GH2 on expert ends at its encore, Free Bird.
+(needs gh2x)
+{set $d1 down}
+{set $d2 down}
+{set $d3 down}
+{set $pick gh2x}
+{set $b1 x_beastandtheharlot}
+{set $b2 x_carrymehome}
+{set $b3 x_institutionalized}
+{set $b4 x_misirlou}
+{set $idx 4}
+{set $offer x_hangar18}
+{set $final x_freebird}
+#include common/finale_encore.dta

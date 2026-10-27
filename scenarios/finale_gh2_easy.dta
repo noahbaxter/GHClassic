@@ -1,0 +1,15 @@
+; GH2 on easy has no encore: it ends at the arena's fourth song.
+(needs gh2)
+{set $pick gh2}
+{set $d1 none}
+{set $d2 none}
+{set $d3 none}
+{set $v1 down}
+{set $finale_venue arena}
+{set $b1 madhouse}
+{set $b2 carrymehome}
+{set $b3 laidtorest}
+{set $b4 laidtorest}
+{set $idx 3}
+{set $play psychobilly}
+#include common/finale_direct.dta

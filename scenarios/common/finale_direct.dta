@@ -1,0 +1,45 @@
+; A career's final song with no encore before it, on the difficulty $d1 $d2
+; $d3 name (career_start_diff.dta): the venue $finale_venue, reached by $v1 on the
+; map from the last the all-access cheat opens, its songs $b1 to $b4 passed
+; by the game's cheat, the song at $idx, $play, the final one. It is lost
+; once with nobody playing and played again from the lose screen, and its
+; win is the career's ending.
+#include first_boot.dta
+#include career_start_diff.dta
+{campaign set_all_access 1}
+(press green)
+(wait_screen sel_venue_screen 40)
+(wait 1)
+(press $v1)
+(wait 1)
+(expect {game get_venue} $finale_venue)
+(press green)
+(wait_screen sel_song_screen)
+(wait 1)
+{campaign cheat_beat_song $b1 100000}
+{campaign cheat_beat_song $b2 100000}
+{campaign cheat_beat_song $b3 100000}
+{campaign cheat_beat_song $b4 100000}
+{{game get_player_config 0} set autoplay FALSE}
+{game set_song_index $idx}
+{sel_song_panel refresh}
+(wait 1)
+(press green)
+(wait_screen game_screen 60)
+(expect {gamecfg get_song} $play)
+(wait 3)
+(expect {campaign final_song} 1)
+(wait_screen lose_screen 240)
+(wait 2)
+(shot lost)
+(press green)
+(wait_screen game_screen 60)
+(wait 3)
+(expect {gamecfg get_song} $play)
+(expect {campaign final_song} 1)
+{player0 win 5}
+(wait 12)
+(shot ending)
+(wait 40)
+(shot after_ending)
+(quit)

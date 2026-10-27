@@ -1,0 +1,15 @@
+; GH1 on easy ends at fest's fourth song, not the arena's.
+(needs gh1)
+{set $pick gh1}
+{set $d1 none}
+{set $d2 none}
+{set $d3 none}
+{set $v1 down}
+{set $finale_venue fest}
+{set $b1 spanishcastlemagic}
+{set $b2 higherground}
+{set $b3 nooneknows}
+{set $b4 nooneknows}
+{set $idx 3}
+{set $play aceofspades}
+#include common/finale_direct.dta
