@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 namespace gh2
 {
@@ -45,8 +46,30 @@ namespace gh2
     // controllers alone. Before openInput.
     void leaveControllers();
 
-    // The state the last poll saw. Callable from any thread.
-    HostPad hostPad();
+    // Up to four players; GH2 has two ports' worth of screens, so two join.
+    constexpr int kSeats = 4;
+    constexpr int kPlayers = 2;
+
+    // A seat's controller as the last poll saw it, idle when no device is
+    // in it. Seat N is libpad's port N. Callable from any thread.
+    HostPad hostPad(int seat = 0);
+    // Whether the game sees a controller in that seat's port.
+    bool seatPlugged(int seat);
+    // While a song plays, a press on another device takes no seat.
+    // Callable from any thread.
+    void lockSeats(bool locked);
+
+    // A scenario's controllers that are not plugged in, by name. Each plays
+    // as a real one does, through its layout and the seat rules, in a
+    // hidden run too. Held until the next set, none to let go: the controls
+    // its layout gives the actions of those libpad bits. Callable from any
+    // thread.
+    void addScriptedDevice(const std::string &name);
+    void removeScriptedDevice(const std::string &name); // unplugged
+    void setScriptedDevice(const std::string &name, uint16_t pressed);
+    // Whether that seat reads the device of that name: a scripted one's, or
+    // a real one's as the log names it. Callable from any thread.
+    bool seatHas(int seat, const std::string &name);
 
     // The free camera's controls (ui/photo_mode.h): W A S D as how far it
     // is pushed right and forward, -1 to 1, the mouse's travel in pixels,

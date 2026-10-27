@@ -171,6 +171,11 @@ add_executable(input_test EXCLUDE_FROM_ALL tests/input_test.cpp src/host/binding
 target_include_directories(input_test PRIVATE src)
 target_link_libraries(input_test PRIVATE SDL3::SDL3)
 
+# Who sits where as devices press.
+add_executable(seats_test EXCLUDE_FROM_ALL tests/seats_test.cpp src/host/seats.cpp)
+target_include_directories(seats_test PRIVATE src)
+target_link_libraries(seats_test PRIVATE SDL3::SDL3)
+
 # Ogg Vorbis for 360 GH2's .mogg audio: libogg and libvorbis (BSD-3-Clause),
 # the decoder and vorbisfile only. Their own CMake wants an older CMake and
 # an installed Ogg, so their sources are built here (the lists in their
@@ -359,6 +364,7 @@ set(GHC_GAME_SOURCES
     src/host/record.cpp
     src/host/releases.cpp
     src/host/sdl_devices.cpp
+    src/host/seats.cpp
     src/host/update.cpp
     src/host/vulkan_frontend.cpp
     src/host/vma.cpp

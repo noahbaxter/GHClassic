@@ -1,0 +1,161 @@
+#include "host/seats.h"
+
+#include <algorithm>
+#include <iostream>
+#include <iterator>
+#include <utility>
+
+namespace gh2::input
+{
+    namespace
+    {
+        constexpr uint16_t kFrets = pad::kR2 | pad::kCircle | pad::kTriangle | pad::kCross | pad::kSquare;
+        constexpr uint16_t kClaims = kFrets | pad::kUp | pad::kDown | pad::kStart;
+    }
+
+    bool pressing(uint16_t buttons)
+    {
+        return (buttons & kClaims) != 0;
+    }
+
+    int Seats::seatOf(const DeviceId &id) const
+    {
+        for (int seat = 0; seat < kSeats; ++seat)
+            if (m_seats[seat] == id)
+                return seat;
+        return -1;
+    }
+
+    void Seats::sit(int seat, const Read &r, bool joined)
+    {
+        m_seats[seat] = r.id;
+        if (joined)
+            m_letGo.insert(r.id);
+        std::cerr << "[input] P" << seat + 1 << ": " << r.name << ", " << kindName(r.kind) << std::endl;
+    }
+
+    // With no seated device here, the first to press anything is P1, so one
+    // player never has to join. While P1 plays alone, any fret, strum or
+    // Start on another device takes P1 from whatever had it: the one player
+    // picking up another controller. Not off a press a seated device made in
+    // the same poll: Steam Input's mirror of a pad presses with it. P1 is
+    // never empty while another seat is not.
+    void Seats::seat(const std::vector<Read> &reads, Mode mode)
+    {
+        // Only devices here are remembered, and a seat's while it is away.
+        const auto here = [&](const DeviceId &id) {
+            return std::any_of(reads.begin(), reads.end(), [&](const Read &r) { return r.id == id; });
+        };
+        std::erase_if(m_held, [&](const auto &held) { return !here(held.first); });
+        std::erase_if(m_letGo, [&](const DeviceId &id) { return !here(id) && seatOf(id) < 0; });
+        // Each button going down this poll.
+        std::vector<uint16_t> down(reads.size());
+        std::vector<bool> pressed(reads.size()), started(reads.size());
+        for (size_t i = 0; i < reads.size(); ++i)
+        {
+            const Read &r = reads[i];
+            uint16_t &was = m_held[r.id];
+            down[i] = static_cast<uint16_t>(r.buttons & ~was);
+            was = r.buttons;
+            pressed[i] = pressing(down[i]);
+            started[i] = (down[i] & pad::kStart) != 0;
+        }
+        // In a song a seat whose device is gone, paused for it, is taken by
+        // Start on any without a seat: a pad that comes back on another
+        // cable or by Bluetooth has another GUID, and would never be found.
+        if (inSong(mode))
+        {
+            for (int seat = 0; seat < kPlayers; ++seat)
+                if (m_away[seat])
+                    for (size_t i = 0; i < reads.size(); ++i)
+                        if (seatOf(reads[i].id) < 0 && started[i])
+                        {
+                            sit(seat, reads[i], true);
+                            break;
+                        }
+            return;
+        }
+
+        const bool solo = m_seats[1].none();
+        bool anyHere = false, seatedStart = false, seatedPress = false;
+        for (size_t i = 0; i < reads.size(); ++i)
+            if (seatOf(reads[i].id) >= 0)
+            {
+                anyHere = true;
+                seatedStart = seatedStart || started[i];
+                seatedPress = seatedPress || pressed[i];
+            }
+        if (!anyHere)
+        {
+            for (size_t i = 0; i < reads.size(); ++i)
+                if (pressed[i])
+                {
+                    std::fill(std::begin(m_seats), std::end(m_seats), DeviceId{});
+                    sit(0, reads[i], false);
+                    break;
+                }
+        }
+        else
+        {
+            for (size_t i = 0; i < reads.size(); ++i)
+            {
+                if (seatOf(reads[i].id) >= 0)
+                    continue;
+                if (started[i] && !seatedStart)
+                    sit(0, reads[i], true);
+                // One player: whatever they last pressed is theirs, the press
+                // playing as it would on it.
+                else if (solo && pressed[i] && !seatedPress)
+                    sit(0, reads[i], false);
+            }
+        }
+        for (int seat = 0; seat + 1 < kSeats; ++seat)
+            if (m_seats[seat].none() && !m_seats[seat + 1].none())
+            {
+                std::swap(m_seats[seat], m_seats[seat + 1]);
+                std::cerr << "[input] P" << seat + 2 << " is P" << seat + 1 << std::endl;
+            }
+    }
+
+    // A seat's device back from a replug: the same identity, or on Linux,
+    // where its /dev/input node can change, one of its model in no other seat
+    // and not there when it went: an idle twin is not it.
+    void Seats::follow(const std::vector<Read> &reads, bool readingNone)
+    {
+        for (int seat = 0; seat < kSeats; ++seat)
+        {
+            const DeviceId id = m_seats[seat];
+            bool here = id.none() || readingNone;
+            for (const Read &r : reads)
+                here = here || r.id == id;
+            const std::vector<DeviceId> &there = m_thereWhenAway[seat];
+            for (const Read &r : reads)
+            {
+                if (here || !r.id.sameModel(id) ||
+                    std::find(std::begin(m_seats), std::end(m_seats), r.id) != std::end(m_seats) ||
+                    std::find(there.begin(), there.end(), r.id) != there.end())
+                    continue;
+                m_seats[seat] = r.id;
+                here = true;
+                std::cerr << "[input] P" << seat + 1 << " back: " << r.name << std::endl;
+            }
+            if (m_away[seat] != !here)
+            {
+                m_away[seat] = !here;
+                std::cerr << "[input] P" << seat + 1 << (here ? " plugged back in" : " unplugged") << std::endl;
+                m_thereWhenAway[seat].clear();
+                if (!here)
+                    for (const Read &r : reads)
+                        m_thereWhenAway[seat].push_back(r.id);
+            }
+        }
+    }
+
+    bool Seats::holding(const Read &r)
+    {
+        if (m_letGo.count(r.id) && pressing(r.buttons))
+            return true;
+        m_letGo.erase(r.id);
+        return false;
+    }
+}

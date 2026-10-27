@@ -1,8 +1,8 @@
-// libpad's scePadRead, answered from the host controller.
+// libpad's scePadRead, answered from the host's seats.
 //
 // The upstream stub reads through its override state when one is set. That
-// state answers every port, so GH2 saw one controller as two pads and each
-// press moved twice: port 0 has the pad and the rest read as unplugged.
+// state answers every port, so it is set before each port's read: port N
+// reads seat N (input.h), and a port with no seat to it reads as unplugged.
 //
 // Port 0 is a RedOctane guitar. GH2's config/gen/joypad.dtb classifies
 //     ro_guitar  (detect (type kJoypadAnalog) (button kPad_DLeft))
@@ -31,8 +31,7 @@ namespace gh2
 {
     namespace
     {
-        std::atomic<uint16_t> s_scripted{0};
-        std::atomic<int> s_pads{1}; // ports with a guitar in: a scenario's (pads 2)
+        std::atomic<uint16_t> s_scripted{0}; // a scenario's presses on P1's port
         std::atomic<uint64_t> s_scriptedAt{0}; // --timing: when a scripted press was set
 
         // --timing: a press this read is the first to see, the player's or
@@ -59,20 +58,20 @@ namespace gh2
         void padRead(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
             const uint32_t returnTo = GPR_U32(ctx, 31);
-            if (getRegU32(ctx, 4) == 0u)
+            const int port = static_cast<int>(getRegU32(ctx, 4));
+            if (port >= 0 && port < kSeats && seatPlugged(port))
             {
-                const HostPad pad = hostPad();
-                if (timing::on())
-                    timePress(pad);
-                const uint16_t pressed = pad.pressed | s_scripted.load(std::memory_order_relaxed) | pad::kLeft;
+                // Its seat's guitar, idle until a device sits in it.
+                const HostPad pad = hostPad(port);
+                uint16_t pressed = pad.pressed | pad::kLeft;
+                if (port == 0)
+                {
+                    if (timing::on())
+                        timePress(pad);
+                    pressed |= s_scripted.load(std::memory_order_relaxed);
+                }
                 // The stub wants buttons active low.
                 ps2_stubs::setPadOverrideState(static_cast<uint16_t>(~pressed), pad.lx, pad.ly, pad.rx, pad.ry);
-                ps2_stubs::scePadRead(rdram, ctx, runtime);
-            }
-            else if (getRegU32(ctx, 4) < static_cast<uint32_t>(s_pads.load(std::memory_order_relaxed)))
-            {
-                // Another guitar for a two-player run, plugged in and idle.
-                ps2_stubs::setPadOverrideState(static_cast<uint16_t>(~pad::kLeft), 128, 128, 128, 128);
                 ps2_stubs::scePadRead(rdram, ctx, runtime);
             }
             else
@@ -113,16 +112,22 @@ namespace gh2
             const uint16_t pressed = hostPad().pressed | s_scripted.load(std::memory_order_relaxed);
             return {bit != 0u && (pressed & bit) != 0u ? 1u : 0u, script::kInt};
         }
+
+        // {seat_has <seat> <device>}: 1 while that seat reads that device, a
+        // scenario's (device <name>) or a real one as the log names it.
+        script::Node seatHasCommand(const script::Call &call)
+        {
+            return {seatHas(static_cast<int>(call.number(1)), call.symbol(2)) ? 1u : 0u, script::kInt};
+        }
     }
 
     void installPad(PS2Runtime &runtime, const Addresses &addresses)
     {
         script::addCommand("pad_held", padHeld);
+        script::addCommand("seat_has", seatHasCommand);
         runtime.replaceFunction(addresses.scePadRead, padRead);
         runtime.replaceFunction(addresses.scePadInfoAct, padInfoAct);
     }
-
-    void setPads(int count) { s_pads.store(count, std::memory_order_relaxed); }
 
     void setScriptedPad(uint16_t pressed)
     {

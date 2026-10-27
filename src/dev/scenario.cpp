@@ -48,6 +48,7 @@ namespace gh2::scenario
         Clock::time_point s_until;    // a wait's end
         bool s_pressed = false;       // a press's button still held
         Clock::time_point s_release;  // and when it lets go
+        std::string s_pressDevice;    // on that (device), when named, else P1's port
         std::string s_screen;         // a wait_screen's screen
         uint32_t s_condition = 0u;    // a wait_until's step array
         uint32_t s_starPower = 0u;    // a star_power's step array, checked each poll
@@ -210,7 +211,10 @@ namespace gh2::scenario
             }
             if (s_pressed && now() >= s_release)
             {
-                setScriptedPad(0u);
+                if (s_pressDevice.empty())
+                    setScriptedPad(0u);
+                else
+                    setScriptedDevice(s_pressDevice, 0u);
                 s_pressed = false;
             }
             if (now() < s_until)
@@ -233,11 +237,28 @@ namespace gh2::scenario
                 if (verb == "press")
                 {
                     // Held long enough for the pad to be read, then let go
-                    // before the next step.
-                    setScriptedPad(padButton(array.symbol(1)));
+                    // before the next step. On P1's port, or by a (device)
+                    // named, through its layout and the seat rules.
+                    const uint16_t bits = padButton(array.symbol(1));
+                    s_pressDevice = array.size() > 2 ? array.symbol(2) : "";
+                    if (s_pressDevice.empty())
+                        setScriptedPad(bits);
+                    else
+                        setScriptedDevice(s_pressDevice, bits);
                     s_pressed = true;
                     s_release = now() + std::chrono::milliseconds(150);
                     s_until = now() + std::chrono::milliseconds(400);
+                    return;
+                }
+                if (verb == "hold" && !array.symbol(1).empty())
+                {
+                    // A (device), by name, holding those controls until its
+                    // next hold; none lets go. (hold <libpad bits>) is P1's.
+                    uint16_t bits = 0;
+                    for (int j = 2; j < array.size(); ++j)
+                        bits |= padButton(array.symbol(j));
+                    setScriptedDevice(array.symbol(1), bits);
+                    s_until = now() + std::chrono::milliseconds(200);
                     return;
                 }
                 if (verb == "wait_screen" || verb == "wait_until")
@@ -320,8 +341,13 @@ namespace gh2::scenario
                     s_shooting = true;
                     return;
                 }
-                else if (verb == "pads")
-                    setPads(static_cast<int>(array.number(1)));
+                else if (verb == "device")
+                    // A controller that is not there, by name; its presses go
+                    // through the seat rules. Read from the file at boot too.
+                    addScriptedDevice(array.symbol(1));
+                else if (verb == "unplug")
+                    // That (device) pulled out; (device <name>) again plugs it back.
+                    removeScriptedDevice(array.symbol(1));
                 else if (verb == "record")
                 {
                     const std::string state = array.symbol(1);
@@ -582,16 +608,26 @@ namespace gh2::scenario
         // One with (record) steps records only their clips: none until the
         // first. Its steps are parsed later, by the game, so it is found here
         // by the text, outside ; comments.
+        // Its (device) controllers are plugged in from the start too, as the
+        // game looks for its pads at boot.
         std::istringstream lines(s_text);
+        bool recording = false;
         for (std::string line; std::getline(lines, line);)
-            if (line.substr(0, line.find(';')).find("(record ") != std::string::npos)
+        {
+            const std::string code = line.substr(0, line.find(';'));
+            if (!recording && code.find("(record ") != std::string::npos)
             {
                 record::stop();
-                break;
+                recording = true;
             }
-        // Its guitars are in from the start, as the game looks for them at boot.
-        if (s_text.find("(pads 2)") != std::string::npos)
-            setPads(2);
+            for (size_t at = code.find("(device "); at != std::string::npos; at = code.find("(device ", at + 1))
+            {
+                std::istringstream words(code.substr(at + 8));
+                std::string name;
+                if (words >> name)
+                    addScriptedDevice(name.substr(0, name.find(')')));
+            }
+        }
         return true;
     }
 

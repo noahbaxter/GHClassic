@@ -1,12 +1,13 @@
 #pragma once
 
 // Every device a player can hold but the keyboard, whatever reads it: SDL's
-// controllers (sdl_devices.cpp). Each backend opens its own into the one list
-// and fills their raw controls each poll; what they play and log reads only
-// those. The host thread's own.
+// controllers (sdl_devices.cpp) and a scenario's (input.cpp). Each backend
+// opens its own into the one list and fills their raw controls each poll;
+// what they play and log reads only those. The host thread's own.
 
 #include "host/bindings.h"
 #include "host/capture.h"
+#include "host/device_id.h"
 
 #include <SDL3/SDL.h>
 
@@ -19,7 +20,10 @@ namespace gh2::input
 {
     struct Device
     {
-        std::string name; // as the log names it
+        DeviceId id;
+        std::string name;  // as the log names it
+        std::string label; // what a player is shown: its layout's, else its name
+        DeviceKind kind = DeviceKind::kController;
         // Its input.ini section, by SDL's name and GUID.
         std::string sectionName, sectionGuid;
         Profile builtin; // its layout before input.ini
@@ -36,6 +40,7 @@ namespace gh2::input
     };
 
     std::vector<Device> &devices();
+    Device *deviceById(const DeviceId &id);
 
     // The first time each of a device's controls is pressed, or its axis
     // pushed half way from where it first read, the log names it and what
