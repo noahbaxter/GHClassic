@@ -146,7 +146,7 @@ namespace gh2::input
             });
             if (accel && d.gamepad && !SDL_SetGamepadSensorEnabled(d.gamepad, SDL_SENSOR_ACCEL, true))
                 std::cerr << "[input]   no accelerometer: " << SDL_GetError() << std::endl;
-            d.now = read(d);
+            d.now = d.rest = read(d);
             d.openedMs = SDL_GetTicks();
             opened.push_back(d);
         }
@@ -160,5 +160,131 @@ namespace gh2::input
         for (Device &d : devices())
             if (sdl(d))
                 d.now = read(d);
+    }
+
+    void enableAccel(Device &d)
+    {
+        if (d.gamepad && SDL_GamepadHasSensor(d.gamepad, SDL_SENSOR_ACCEL))
+            SDL_SetGamepadSensorEnabled(d.gamepad, SDL_SENSOR_ACCEL, true);
+    }
+
+    std::string shown(const SDL_Gamepad *gamepad, const Source &s)
+    {
+        const bool playStation =
+            gamepad && SDL_GetGamepadButtonLabel(const_cast<SDL_Gamepad *>(gamepad), SDL_GAMEPAD_BUTTON_SOUTH) ==
+                           SDL_GAMEPAD_BUTTON_LABEL_CROSS;
+        const auto way = [&](const char *stick, bool vertical) {
+            const bool more = s.full > s.rest;
+            return std::string(stick) + (vertical ? (more ? " Down" : " Up") : (more ? " Right" : " Left"));
+        };
+        switch (s.kind)
+        {
+        case Source::kKey:
+            return formatSource(s).substr(4);
+        case Source::kButton:
+            return "Button " + std::to_string(s.index + 1);
+        case Source::kHat:
+            switch (s.hat)
+            {
+            case SDL_HAT_UP:
+                return "D-pad Up";
+            case SDL_HAT_DOWN:
+                return "D-pad Down";
+            case SDL_HAT_LEFT:
+                return "D-pad Left";
+            default:
+                return "D-pad Right";
+            }
+        case Source::kAxis:
+            return "Axis " + std::to_string(s.index + 1) + (s.full > s.rest ? " +" : " -");
+        case Source::kPadButton:
+            switch (static_cast<SDL_GamepadButton>(s.index))
+            {
+            case SDL_GAMEPAD_BUTTON_SOUTH:
+            case SDL_GAMEPAD_BUTTON_EAST:
+            case SDL_GAMEPAD_BUTTON_WEST:
+            case SDL_GAMEPAD_BUTTON_NORTH:
+                switch (gamepad ? SDL_GetGamepadButtonLabel(const_cast<SDL_Gamepad *>(gamepad),
+                                                            static_cast<SDL_GamepadButton>(s.index))
+                                : SDL_GAMEPAD_BUTTON_LABEL_UNKNOWN)
+                {
+                case SDL_GAMEPAD_BUTTON_LABEL_A:
+                    return "A";
+                case SDL_GAMEPAD_BUTTON_LABEL_B:
+                    return "B";
+                case SDL_GAMEPAD_BUTTON_LABEL_X:
+                    return "X";
+                case SDL_GAMEPAD_BUTTON_LABEL_Y:
+                    return "Y";
+                case SDL_GAMEPAD_BUTTON_LABEL_CROSS:
+                    return "Cross";
+                case SDL_GAMEPAD_BUTTON_LABEL_CIRCLE:
+                    return "Circle";
+                case SDL_GAMEPAD_BUTTON_LABEL_SQUARE:
+                    return "Square";
+                case SDL_GAMEPAD_BUTTON_LABEL_TRIANGLE:
+                    return "Triangle";
+                default:
+                    break;
+                }
+                {
+                    const char *const kFaces[] = {"A", "B", "X", "Y"};
+                    return kFaces[s.index];
+                }
+            case SDL_GAMEPAD_BUTTON_BACK:
+                return playStation ? "Select" : "Back";
+            case SDL_GAMEPAD_BUTTON_GUIDE:
+                return "Guide";
+            case SDL_GAMEPAD_BUTTON_START:
+                return "Start";
+            case SDL_GAMEPAD_BUTTON_LEFT_STICK:
+                return playStation ? "L3" : "L Stick Press";
+            case SDL_GAMEPAD_BUTTON_RIGHT_STICK:
+                return playStation ? "R3" : "R Stick Press";
+            case SDL_GAMEPAD_BUTTON_LEFT_SHOULDER:
+                return playStation ? "L1" : "LB";
+            case SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER:
+                return playStation ? "R1" : "RB";
+            case SDL_GAMEPAD_BUTTON_DPAD_UP:
+                return "D-pad Up";
+            case SDL_GAMEPAD_BUTTON_DPAD_DOWN:
+                return "D-pad Down";
+            case SDL_GAMEPAD_BUTTON_DPAD_LEFT:
+                return "D-pad Left";
+            case SDL_GAMEPAD_BUTTON_DPAD_RIGHT:
+                return "D-pad Right";
+            case SDL_GAMEPAD_BUTTON_TOUCHPAD:
+                return "Touchpad";
+            default:
+                return "Extra " + std::to_string(s.index);
+            }
+        case Source::kPadAxis:
+            switch (static_cast<SDL_GamepadAxis>(s.index))
+            {
+            case SDL_GAMEPAD_AXIS_LEFT_TRIGGER:
+                return playStation ? "L2" : "LT";
+            case SDL_GAMEPAD_AXIS_RIGHT_TRIGGER:
+                return playStation ? "R2" : "RT";
+            case SDL_GAMEPAD_AXIS_LEFTX:
+                return way("L Stick", false);
+            case SDL_GAMEPAD_AXIS_LEFTY:
+                return way("L Stick", true);
+            case SDL_GAMEPAD_AXIS_RIGHTX:
+                return way("R Stick", false);
+            default:
+                return way("R Stick", true);
+            }
+        case Source::kPadAccel:
+            return "Tilt Sensor";
+        }
+        return "";
+    }
+
+    std::string joined(const SDL_Gamepad *gamepad, const std::vector<Source> &sources)
+    {
+        std::string text;
+        for (const Source &s : sources)
+            text += (text.empty() ? "" : " / ") + shown(gamepad, s);
+        return text;
     }
 }

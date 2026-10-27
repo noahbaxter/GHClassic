@@ -71,10 +71,10 @@ namespace gh2
     void songScreen(SongScreen screen);
 
     // A scenario's controllers that are not plugged in, by name. Each plays
-    // as a real one does, through its layout and the seat rules, in a
-    // hidden run too. Held until the next set, none to let go: the controls
-    // its layout gives the actions of those libpad bits. Callable from any
-    // thread.
+    // as a real one does, through its layout, the seat rules and the
+    // Controllers screen, in a hidden run too. Held until the next set, none
+    // to let go: the controls its layout gives the actions of those libpad
+    // bits. Callable from any thread.
     void addScriptedDevice(const std::string &name);
     void removeScriptedDevice(const std::string &name); // unplugged
     void setScriptedDevice(const std::string &name, uint16_t pressed);

@@ -193,6 +193,15 @@ int main()
         CHECK(seats[0] == back);
     }
 
+    // On the Controllers screen nothing moves the seats.
+    {
+        Seats seats;
+        press(seats, {device(a, pad::kR2), device(b)});
+        press(seats, {device(a), device(b, pad::kStart)}, Mode::kControllers);
+        press(seats, {device(a), device(b, pad::kR2)}, Mode::kControllers);
+        CHECK(seats[0] == a && seats[1].none());
+    }
+
     // A window without the controllers pauses for no one.
     {
         Seats seats;

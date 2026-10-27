@@ -357,6 +357,7 @@ set(GHC_GAME_SOURCES
     src/host/bindings.cpp
     src/host/capture.cpp
     src/host/device.cpp
+    src/host/device_screen.cpp
     src/host/input.cpp
     src/host/layouts.cpp
     src/host/owner.cpp

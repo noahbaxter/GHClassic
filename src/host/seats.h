@@ -22,7 +22,8 @@ namespace gh2::input
     enum class Mode
     {
         kMenu,
-        kPlayers, // Multiplayer's screen, where players join and reorder
+        kPlayers,     // Multiplayer's screen, where players join and reorder
+        kControllers, // the Controllers screen, where devices only show
         // A song is up and holds the seats: on a screen of its own besides
         // these two (loading, results), played, or paused.
         kSong,
@@ -41,8 +42,9 @@ namespace gh2::input
         std::string name;  // as the log names it
         DeviceKind kind = DeviceKind::kController;
         std::string label; // what a player is shown
-        // Each of its instrument's actions, 0 to 1; and the libpad buttons
-        // they press, which is all the seats read, whatever the instrument.
+        // Each of its instrument's actions, 0 to 1, for the Controllers
+        // screen; and the libpad buttons they press, which is all the seats
+        // read, whatever the instrument.
         std::array<float, kActionCount> held{};
         uint16_t buttons = 0;
         // The keyboard's: Tab gone down, its Start for joining (Enter
@@ -63,10 +65,14 @@ namespace gh2::input
         // devices show up until `untilMs`.
         void restore(std::map<std::string, std::string> saved, uint64_t untilMs);
 
+        // Who sits where; on the Controllers screen, nothing moves.
         void seat(const std::vector<Read> &reads, Mode mode, uint64_t nowMs);
         // A seat's device gone or back. `readingNone` in a window without
         // the controllers, which pauses for none.
         void follow(const std::vector<Read> &reads, bool readingNone);
+        // Every seated device plays nothing until it lets go of what it
+        // holds: leaving the Controllers screen.
+        void letGoAll();
         // Whether a seated device still holds what seated it, playing
         // nothing; false once it lets go, for good.
         bool holding(const Read &r);

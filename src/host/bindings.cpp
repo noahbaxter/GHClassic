@@ -340,14 +340,7 @@ namespace gh2::input
 
     bool writeTemplate(const std::string &path, const std::string &section, const Profile &profile)
     {
-        std::vector<std::string> kept;
-        {
-            std::ifstream in(path);
-            for (std::string line; std::getline(in, line);)
-                kept.push_back(line);
-        }
-        while (!kept.empty() && trim(kept.back()).empty())
-            kept.pop_back();
+        std::vector<std::string> kept = linesWithout(path, section);
 
         return !ini::writeReplacing(path, [&](std::ofstream &out) {
             if (kept.empty())

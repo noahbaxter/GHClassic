@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 
 namespace gh2::settings
@@ -151,6 +152,26 @@ int main()
     CHECK(file.seats.size() == 1 && file.seats.at("p1") == "0300bbbb /dev/b");
     CHECK(!file.sections.count("seats"));
     CHECK(formatSource(deviceBindings(file, "Guitar", "0300aaaa")->at(kRed).at(0)) == "button 2");
+    // An action written with nothing is unbound, not left as it was.
+    CHECK(writeSection(path, deviceSection("Guitar", "0300aaaa"), {{kWhammy, {}}}));
+    file = loadBindingFile(path);
+    own = deviceBindings(file, "Guitar", "0300aaaa");
+    CHECK(own && own->count(kWhammy) && own->at(kWhammy).empty());
+    // Reset: the section is its layout again as comments, in place of its own.
+    Profile layout{};
+    layout[kGreen] = {*parseSource("button 0")};
+    CHECK(writeTemplate(path, deviceSection("Guitar", "0300aaaa"), layout));
+    file = loadBindingFile(path);
+    own = deviceBindings(file, "Guitar", "0300aaaa");
+    CHECK(own && own->empty());
+    CHECK(formatSource(deviceBindings(file, "Guitar", "0300bbbb")->at(kGreen).at(0)) == "button 9");
+    {
+        std::ifstream in(path);
+        std::stringstream text;
+        text << in.rdbuf();
+        CHECK(text.str().find("; green = button 0") != std::string::npos);
+        CHECK(text.str().find("[device \"Guitar\" 0300aaaa]") == text.str().rfind("[device \"Guitar\" 0300aaaa]"));
+    }
     std::filesystem::remove(path);
 
     // Catching a control: the first to move from rest, once back at rest.

@@ -3,9 +3,10 @@
 //
 // Each poll reads every device into its actions (sdl_devices.cpp, the
 // keyboard through its layout in layouts.cpp, a scenario's as scripted),
-// moves the seats by them (seats.cpp), then gives each seat's port what its
-// device holds. A seat reads one device and nothing else, so a controller
-// nobody holds (a resting whammy, a drifting stick) never plays.
+// moves the seats by them (seats.cpp), or on the Controllers screen shows
+// them there instead (device_screen.cpp), then gives each seat's port what
+// its device holds. A seat reads one device and nothing else, so a
+// controller nobody holds (a resting whammy, a drifting stick) never plays.
 //
 // The actions land on the RedOctane guitar's buttons (see pad.cpp for why the
 // pad is one): frets R2 Circle Triangle Cross Square, the guitar slots in
@@ -19,6 +20,7 @@
 #include "dev/timing.h"
 #include "host/bindings.h"
 #include "host/device.h"
+#include "host/device_screen.h"
 #include "host/layouts.h"
 #include "host/owner.h"
 #include "host/sdl_devices.h"
@@ -82,7 +84,7 @@ namespace gh2
         }
 
         // A scenario's devices into the list, each as it holds its controls
-        // now.
+        // now; a change to its layout stays in this run.
         void syncScripted(const std::vector<Scripted> &scripted)
         {
             std::erase_if(devices(), [&](const Device &d) {
@@ -104,8 +106,10 @@ namespace gh2
                     std::replace(made.label.begin(), made.label.end(), '_', ' ');
                     made.kind = s.kind;
                     made.sectionName = "script " + s.name;
+                    made.keepInMemory = true;
                     made.builtin = scriptedLayout();
                     made.profile = overlay(made.builtin, sectionOf(made.sectionName, ""));
+                    made.rest = scriptedRest();
                     made.openedMs = SDL_GetTicks();
                     devices().push_back(made);
                     d = &devices().back();
@@ -141,15 +145,18 @@ namespace gh2
         };
         // The host thread's: Tab and the mode last poll, and the menu keys
         // held as the mode changed, which do nothing until let go: the Enter
-        // that paused would pick Resume.
+        // that paused would pick Resume, the Escape that left the
+        // Controllers screen would back out of the menu under it.
         bool s_tabWas = false;
         Mode s_modeWas = Mode::kMenu;
         std::array<bool, SDL_SCANCODE_COUNT> s_keyWait{};
 
-        // What is up, from what each part of the game says of it: a song
-        // over Multiplayer's screen.
+        // What is up, from what each part of the game says of it: the
+        // Controllers screen over a song, a song over Multiplayer's screen.
         Mode currentMode()
         {
+            if (controllersScreen())
+                return Mode::kControllers;
             if (s_locked.load(std::memory_order_relaxed))
                 switch (s_songScreen.load(std::memory_order_relaxed))
                 {
@@ -254,8 +261,15 @@ namespace gh2
         for (Read &r : reads)
             r.buttons = padOf(r.held).pressed;
 
+        // On the Controllers screen devices only show there. Leaving it,
+        // nothing held there plays until let go: red held to leave would
+        // back out of the menu under it.
         const Mode mode = currentMode();
+        if (mode == Mode::kControllers)
+            screenPoll(reads, keys, s_modeWas != Mode::kControllers, s_seats);
         s_seats.seat(reads, mode, SDL_GetTicks());
+        if (s_modeWas == Mode::kControllers && mode != Mode::kControllers)
+            s_seats.letGoAll();
 
         // A window without the controllers reads none, and pauses for none.
         s_seats.follow(reads, s_open && !owner);
@@ -271,7 +285,8 @@ namespace gh2
                 if (seated[seat])
                     std::cerr << "[input] song: P" << seat + 1 << " on " << kindName(seated[seat]->kind) << std::endl;
 
-        // A device just seated plays from when it lets go of what it held.
+        // A device just seated, or just off the Controllers screen, plays
+        // from when it lets go of what it held.
         HostPad pads[kSeats];
         for (int seat = 0; seat < kSeats; ++seat)
             if (seated[seat] && !s_seats.holding(*seated[seat]))
@@ -301,6 +316,8 @@ namespace gh2
                 }
             }
         s_modeWas = mode;
+        if (mode == Mode::kControllers)
+            std::fill(std::begin(pads), std::end(pads), HostPad{});
 
         if (s_open)
             if (const auto saved = s_seats.takeSaved(); saved && !writeSeats(bindingFilePath(), *saved))
