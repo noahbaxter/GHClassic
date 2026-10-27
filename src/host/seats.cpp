@@ -48,19 +48,20 @@ namespace gh2::input
         std::cerr << "[input] " << r.name << " is P" << with + 1 << std::endl;
     }
 
-    // With no seated device here, the first to press anything is P1, so one
-    // player never has to join. While P1 plays alone, any fret, strum or
-    // Start on another device takes P1 from whatever had it: the one player
-    // picking up another controller. The keyboard's strums and Start are its
-    // menu keys, which move P1's menus whoever holds it, so only its frets
-    // take P1 that way. Otherwise only Start on a device with no seat does
-    // anything to the seats: on Multiplayer's screen it joins, into the first
-    // free seat, and anywhere else it takes P1. There, too, yellow moves a
-    // seated player up a seat, the first round to the last. Not off a press a
-    // seated device made in the same poll: Steam Input's mirror of a pad
-    // presses with it. P1 is never empty while P2 is not.
-    void Seats::seat(const std::vector<Read> &reads, Mode mode, uint64_t nowMs)
+    // With no seated controller here, the first to press anything is P1, so
+    // one player never has to join. While P1 plays alone, any fret, strum or
+    // Start on another controller takes P1 from whatever had it: the one
+    // player picking up another controller. Otherwise only Start on a
+    // controller with no seat does anything to the seats: on Multiplayer's
+    // screen it joins, into the first free seat, and anywhere else it takes
+    // P1. There, too, yellow moves a seated player up a seat, the first round
+    // to the last. Not off a press a seated controller made in the same poll:
+    // Steam Input's mirror of a pad presses with it. P1 is never empty while
+    // P2 is not. The keyboard takes no seat.
+    void Seats::seat(const std::vector<Read> &all, Mode mode, uint64_t nowMs)
     {
+        std::vector<Read> reads;
+        std::copy_if(all.begin(), all.end(), std::back_inserter(reads), [](const Read &r) { return !r.keyboard(); });
         const bool playersStep = mode == Mode::kPlayers;
         // Only devices here are remembered, and a seat's while it is away.
         const auto here = [&](const DeviceId &id) {
@@ -68,11 +69,9 @@ namespace gh2::input
         };
         std::erase_if(m_held, [&](const auto &held) { return !here(held.first); });
         std::erase_if(m_letGo, [&](const DeviceId &id) { return !here(id) && seatOf(id) < 0; });
-        // Each button going down this poll, and the keyboard's Tab and Esc.
+        // Each button going down this poll.
         std::vector<uint16_t> down(reads.size());
-        std::vector<bool> pressed(reads.size()), started(reads.size()), switched(reads.size()),
-            escaped(reads.size());
-        bool tab = false, escape = false;
+        std::vector<bool> pressed(reads.size()), started(reads.size());
         for (size_t i = 0; i < reads.size(); ++i)
         {
             const Read &r = reads[i];
@@ -80,34 +79,14 @@ namespace gh2::input
             down[i] = static_cast<uint16_t>(r.buttons & ~was);
             was = r.buttons;
             pressed[i] = pressing(down[i]);
-            started[i] = r.keyboard() ? r.tab && !m_tabWas : (down[i] & pad::kStart) != 0;
-            escaped[i] = r.keyboard() && r.escape && !m_escapeWas;
-            switched[i] = r.keyboard() ? (down[i] & kFrets) != 0 : pressed[i];
-            tab = tab || (r.keyboard() && r.tab);
-            escape = escape || (r.keyboard() && r.escape);
+            started[i] = (down[i] & pad::kStart) != 0;
         }
-        m_tabWas = tab;
-        m_escapeWas = escape;
         // On the Controllers screen nothing moves, and what is held there
         // has not gone down once it goes: red held to leave takes no seat.
-        if (mode == Mode::kControllers)
+        // In a song a seat whose controller is gone waits for it (follow):
+        // no other takes it.
+        if (mode == Mode::kControllers || inSong(mode))
             return;
-        // In a song a seat whose device is gone, paused for it, is taken by
-        // Start (the keyboard's Esc too) on any without a seat: a pad that
-        // comes back on another cable or by Bluetooth has another GUID, and
-        // would never be found.
-        if (inSong(mode))
-        {
-            for (int seat = 0; seat < kPlayers; ++seat)
-                if (m_away[seat])
-                    for (size_t i = 0; i < reads.size(); ++i)
-                        if (seatOf(reads[i].id) < 0 && (started[i] || escaped[i]))
-                        {
-                            sit(seat, reads[i], true);
-                            break;
-                        }
-            return;
-        }
 
         // Each seat's own device first, then one of its model, so two the
         // same are not swapped by the order SDL lists them in.
@@ -162,7 +141,7 @@ namespace gh2::input
                     sit(0, reads[i], true);
                 // One player: whatever they last pressed is theirs, the press
                 // playing as it would on it.
-                else if (solo && !playersStep && switched[i] && !seatedPress)
+                else if (solo && !playersStep && pressed[i] && !seatedPress)
                     sit(0, reads[i], false);
             }
         }
@@ -240,6 +219,22 @@ namespace gh2::input
                 if (here)
                     there.clear();
             }
+        }
+    }
+
+    void Seats::setModes(const std::vector<Read> &reads, bool songUp)
+    {
+        if (songUp)
+            return;
+        for (int seat = 0; seat < kSeats; ++seat)
+        {
+            bool pad = m_seats[seat].none() ? false : m_pad[seat];
+            for (const Read &r : reads)
+                if (r.id == m_seats[seat])
+                    pad = r.kind == DeviceKind::kGamepad;
+            if (pad != m_pad[seat])
+                std::cerr << "[input] P" << seat + 1 << ": " << (pad ? "pad" : "guitar") << " mode" << std::endl;
+            m_pad[seat] = pad;
         }
     }
 

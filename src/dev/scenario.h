@@ -28,6 +28,8 @@
 //                                      layout may not bind
 //   (key Tab)                          a key by SDL's name, pressed and let go;
 //                                      (key Down 1) holds it a second first
+//   (keys 1 Down)                      those keys held until the next (keys);
+//                                      none lets go
 //   (star_power player0 {player0 star_power_ready})  from here on, that player's
 //                                      guitar tilted each poll the condition holds,
 //                                      deploying star power when ready; (star_power) stops

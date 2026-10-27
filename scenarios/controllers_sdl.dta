@@ -97,8 +97,9 @@
 (key Escape)
 (wait_screen options_screen)
 (wait 1)
-; Mid-song, P1's X-plorer pulled out pauses the song; the DualSense's press
-; takes nothing, and the X-plorer back is P1 again, its green resuming.
+; Mid-song, P1's X-plorer pulled out pauses the song; the keyboard pressed
+; meanwhile stands in, and the X-plorer back, a new joystick to SDL, is P1
+; again, its green resuming.
 {game set_song shoutatthedevil}
 {{game get_player_config 0} set_difficulty easy}
 {{game get_player_config 0} set autoplay TRUE}
@@ -109,10 +110,10 @@
 (expect {seat_has 0 xplorer} 1)
 (unplug xplorer)
 (wait_screen pause_controller_screen 10)
-(press a dualsense)
 (wait 1)
-(expect {seat_has 0 dualsense} 0)
-(wait_screen pause_controller_screen 1)
+(key Down)
+(wait 0.5)
+(expect {seat_has 0 keyboard} 1)
 (controller xplorer "1430:4748" pad)
 (wait 0.5)
 (expect {seat_has 0 xplorer} 1)

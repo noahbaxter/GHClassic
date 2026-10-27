@@ -46,12 +46,23 @@ namespace gh2
 
         bool s_open = false;
         Seats s_seats; // the host thread's own
-        std::atomic<bool> s_locked{false};
+        std::atomic<bool> s_locked{false};     // a venue drawn
+        std::atomic<bool> s_practicing{false}; // or practice's song up
+
+        // A song is up, holding the seats.
+        bool songUp()
+        {
+            return s_locked.load(std::memory_order_relaxed) || s_practicing.load(std::memory_order_relaxed);
+        }
         std::atomic<bool> s_playersStep{false};
         std::atomic<SongScreen> s_songScreen{SongScreen::kOther};
         // The seats as the last poll left them, for any thread.
         std::atomic<bool> s_away[kSeats] = {};   // a seated device not plugged in
         std::atomic<bool> s_filled[kSeats] = {}; // a device in it, for seatPlugged
+        std::atomic<bool> s_standIn[kSeats] = {}; // the keyboard playing for one away
+        // Its controller gone before the song: the keyboard stands in from
+        // when GH2 sets the song up, so it never pauses for it.
+        std::atomic<bool> s_goneBefore[kSeats] = {};
         std::atomic<uint32_t> s_trades{0};
 
         std::mutex s_mutex;
@@ -62,9 +73,8 @@ namespace gh2
         HostFly s_fly, s_scriptedFly;
         uint64_t s_pressEventNs = 0; // the host thread's own
 
-        // The keyboard in a menu, whoever holds it: the arrows move, Enter
-        // picks and Esc backs out, as green and red. Unseated, these drive
-        // P1's port, so a guitar player always has the keyboard too.
+        // The keyboard in a menu, on the port it drives: the arrows move,
+        // Enter picks and Esc backs out, as green and red.
         struct MenuKey
         {
             SDL_Scancode key;
@@ -80,8 +90,11 @@ namespace gh2
         // paused would pick Resume, the Escape that left the Controllers
         // screen would back out of the menu under it.
         Mode s_modeWas = Mode::kMenu;
-        bool s_joypad[kSeats] = {}; // each seat playing this song as a DualShock
         std::array<bool, SDL_SCANCODE_COUNT> s_keyWait{};
+        // The keyboard: anything of its held last poll, and whether it plays
+        // nothing until it lets go, the press that stood it in for a seat or
+        // what it held as the mode changed.
+        bool s_keyboardWas = false, s_keyboardQuiet = false;
 
         // What is up, from what each part of the game says of it: the
         // Controllers screen over a song, a song over Multiplayer's screen.
@@ -89,7 +102,7 @@ namespace gh2
         {
             if (controllersScreen())
                 return Mode::kControllers;
-            if (s_locked.load(std::memory_order_relaxed))
+            if (songUp())
                 switch (s_songScreen.load(std::memory_order_relaxed))
                 {
                 case SongScreen::kPlaying:
@@ -125,8 +138,6 @@ namespace gh2
         {
             Read r{DeviceId::keyboard(), "keyboard", DeviceKind::kKeyboard, "keyboard"};
             play(keyboardLayout(), Snapshot{}, keys, r.held);
-            r.tab = keys[SDL_SCANCODE_TAB];
-            r.escape = keys[SDL_SCANCODE_ESCAPE];
             return r;
         }
     }
@@ -224,33 +235,73 @@ namespace gh2
                 if (seated[seat])
                     std::cerr << "[input] song: P" << seat + 1 << " on " << kindName(seated[seat]->kind) << std::endl;
 
+        // Each seat's mode, pad or guitar, as its controller sits (seats.h).
+        // GH2 reads a seat in pad mode as a DualShock only in a song: its
+        // menus answer the guitar whatever holds it.
+        s_seats.setModes(reads, songUp());
         // A device just seated, or just off the Controllers screen, plays
         // from when it lets go of what it held.
-        // A gamepad's seat plays the song as a DualShock, decided as it
-        // starts and kept to its end, its controller away or not.
-        if (!inSong(mode))
-            std::fill(std::begin(s_joypad), std::end(s_joypad), false);
-        else if (!inSong(s_modeWas))
-            for (int seat = 0; seat < kSeats; ++seat)
-                s_joypad[seat] = seated[seat] && seated[seat]->kind == DeviceKind::kGamepad;
         HostPad pads[kSeats];
         for (int seat = 0; seat < kSeats; ++seat)
         {
+            const bool joypad = s_seats.pad(seat) && songUp();
             if (seated[seat] && !s_seats.holding(*seated[seat]))
-                pads[seat] = padOf(seated[seat]->held, s_joypad[seat]);
-            pads[seat].joypad = s_joypad[seat];
+                pads[seat] = padOf(seated[seat]->held, joypad);
+            pads[seat].joypad = joypad;
         }
 
-        // The keyboard's menu keys, on its own seat's port or else P1's, its
-        // Enter there no Start. In a song playing only its Esc, as Start,
-        // and in the song's pause menu Esc is Start too.
+        // The keyboard drives P1, or mid-song the first seat whose controller
+        // is gone, whose pause it is. A press there stands it in for that
+        // controller until it is back, and plays nothing itself.
+        int to = 0;
+        if (inSong(mode))
+            for (int seat = 0; seat < kPlayers; ++seat)
+                if (s_seats.away(seat))
+                {
+                    to = seat;
+                    break;
+                }
+        for (int seat = 0; seat < kSeats; ++seat)
+        {
+            if (!inSong(mode))
+                s_goneBefore[seat].store(seat < kPlayers && s_seats.away(seat), std::memory_order_relaxed);
+            if (!inSong(mode) || !s_seats.away(seat))
+                s_standIn[seat].store(false, std::memory_order_relaxed);
+            else if (s_goneBefore[seat].load(std::memory_order_relaxed))
+                s_standIn[seat].store(true, std::memory_order_relaxed);
+        }
         for (const Read &r : reads)
-            if (r.keyboard() && !s_seats.waiting(r.id))
+            if (r.keyboard())
             {
-                const int seat = s_seats.seatOf(r.id);
-                HostPad &to = pads[seat < 0 ? 0 : seat];
-                if (seat >= 0 && mode != Mode::kPlaying)
-                    to.pressed &= static_cast<uint16_t>(~pad::kStart);
+                bool any = std::any_of(r.held.begin(), r.held.end(), [](float h) { return h > kHeld; });
+                for (const MenuKey &k : kMenuKeys)
+                    any = any || keys[k.key];
+                if (any && !s_keyboardWas && inSong(mode) && s_seats.away(to) &&
+                    !s_standIn[to].load(std::memory_order_relaxed))
+                {
+                    s_standIn[to].store(true, std::memory_order_relaxed);
+                    s_keyboardQuiet = true;
+                    std::cerr << "[input] P" << to + 1 << ": keyboard, standing in" << std::endl;
+                }
+                s_keyboardWas = any;
+                // Nor does what it holds as the mode changes: the Enter that
+                // resumed would pause again, as Start.
+                if (any && mode != s_modeWas)
+                    s_keyboardQuiet = true;
+                if (!any)
+                    s_keyboardQuiet = false;
+                if (s_keyboardQuiet)
+                    break;
+
+                // Its keys as the seat's mode plays them, its Enter Start
+                // only in a song playing.
+                HostPad &port = pads[to];
+                uint16_t played = padOf(r.held, port.joypad).pressed;
+                if (mode != Mode::kPlaying)
+                    played &= static_cast<uint16_t>(~pad::kStart);
+                port.pressed |= played;
+                // Its menu keys. In a song playing only its Esc, as Start,
+                // and in the song's pause menu Esc is Start too.
                 for (const MenuKey &k : kMenuKeys)
                 {
                     const bool esc = k.key == SDL_SCANCODE_ESCAPE;
@@ -261,16 +312,17 @@ namespace gh2
                     if (!keys[k.key])
                         s_keyWait[k.key] = false;
                     else if (!s_keyWait[k.key])
-                        to.pressed |= esc && (mode == Mode::kPlaying || mode == Mode::kPaused) ? pad::kStart
-                                      // A DualShock picks with X and backs out with Triangle.
-                                      : to.joypad && k.bit == pad::kR2      ? pad::kCross
-                                      : to.joypad && k.bit == pad::kCircle  ? pad::kTriangle
-                                                                            : k.bit;
+                        port.pressed |= esc && (mode == Mode::kPlaying || mode == Mode::kPaused) ? pad::kStart
+                                        // A DualShock picks with X and backs out with Triangle.
+                                        : port.joypad && k.bit == pad::kR2     ? pad::kCross
+                                        : port.joypad && k.bit == pad::kCircle ? pad::kTriangle
+                                                                               : k.bit;
                 }
             }
         s_modeWas = mode;
         if (mode == Mode::kControllers)
-            std::fill(std::begin(pads), std::end(pads), HostPad{});
+            for (HostPad &pad : pads)
+                pad = HostPad{.joypad = pad.joypad};
 
         // A window without the controllers, a scripted one's among them,
         // leaves last run's seats alone.
@@ -292,8 +344,10 @@ namespace gh2
         std::lock_guard<std::mutex> lock(s_mutex);
         for (int seat = 0; seat < kSeats; ++seat)
         {
-            s_seatNames[seat] = seated[seat] ? seated[seat]->name : "";
-            s_seatLabels[seat] = seated[seat] ? seated[seat]->label : "";
+            const bool keyboard = !seated[seat] && (s_standIn[seat].load(std::memory_order_relaxed) ||
+                                                    (seat == 0 && s_seats[0].none()));
+            s_seatNames[seat] = seated[seat] ? seated[seat]->name : keyboard ? "keyboard" : "";
+            s_seatLabels[seat] = seated[seat] ? seated[seat]->label : keyboard ? "keyboard" : "";
         }
         HostPad &pad = pads[0];
         pad.pressCount = s_pads[0].pressCount;
@@ -347,10 +401,12 @@ namespace gh2
     {
         if (seat < 0 || seat >= kSeats)
             return false;
-        // A seated device gone mid-song: GH2 pauses for it until it is back.
-        // Outside one the next press takes the seat instead.
-        if (s_locked.load(std::memory_order_relaxed) && s_away[seat].load(std::memory_order_relaxed))
-            return false;
+        // A seated device gone mid-song: GH2 pauses for it until it is back,
+        // or the keyboard stands in. Outside one the next press takes the
+        // seat instead.
+        if (songUp() && s_away[seat].load(std::memory_order_relaxed))
+            return s_standIn[seat].load(std::memory_order_relaxed) ||
+                   s_goneBefore[seat].load(std::memory_order_relaxed);
         // P1's port always reads a guitar, so a menu answers before anyone
         // has pressed; the rest read one once a player sits there, which is
         // when GH2 offers Multiplayer.
@@ -360,6 +416,11 @@ namespace gh2
     void lockSeats(bool locked)
     {
         s_locked.store(locked, std::memory_order_relaxed);
+    }
+
+    void practicing(bool on)
+    {
+        s_practicing.store(on, std::memory_order_relaxed);
     }
 
     void songScreen(SongScreen screen)

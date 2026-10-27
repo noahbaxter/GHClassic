@@ -137,6 +137,12 @@ namespace gh2
             songScreen(name == "game_screen" || name == "practice_game_screen"  ? SongScreen::kPlaying
                        : name == "pause_screen" || name == "pract_pause_screen" ? SongScreen::kPaused
                                                                                 : SongScreen::kOther);
+            // Practice draws no venue, which holds the seats in a song
+            // (native_rnd.cpp), so its song's own screens do, from its
+            // loading on.
+            practicing(name == "practice_loading_screen" || name == "practice_game_screen" ||
+                       name == "pract_pause_screen" || name == "practice_pause_controller_screen" ||
+                       name == "practice_change_speed_screen" || name == "practice_end_screen");
         }
     }
 

@@ -1,6 +1,7 @@
-; A guitar plays P1 and the keyboard sits in no seat: in the song its Esc
-; pauses and resumes, and in the pause menu its arrows and Enter pick, so
-; Restart puts the song back to playing with Esc pausing it again.
+; A guitar plays P1 and the keyboard, in no seat, drives P1's port too: in
+; the song its Esc and Enter (Start) pause and its Esc resumes, and in the
+; pause menu its arrows and Enter pick, so Restart puts the song back to
+; playing with Esc pausing it again.
 #include common/first_boot.dta
 (device guitar)
 (press down guitar)
@@ -12,10 +13,11 @@
 {ui goto_screen loading_screen}
 (wait_screen game_screen 60)
 (wait 2)
-; Enter while it plays is nothing, not green.
 (key Return)
-(wait 0.5)
-(expect {== {ui current_screen} game_screen} 1)
+(wait_screen pause_screen 10)
+(key Escape)
+(wait_screen game_screen 10)
+(wait 2)
 (key Escape)
 (wait_screen pause_screen 10)
 (key Escape)

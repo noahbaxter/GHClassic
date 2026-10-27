@@ -1,5 +1,6 @@
 ; A gamepad plays a song as GH2 plays a DualShock, a fret press strumming;
-; a guitar as a guitar. Decided as the song starts, from the seat's device.
+; a guitar as a guitar. The seat's mode is set as its controller sits; the
+; menus before the song answer the guitar either way.
 #include common/first_boot.dta
 (device pad)
 (device guitar)

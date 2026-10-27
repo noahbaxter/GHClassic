@@ -62,6 +62,7 @@ namespace gh2::scenario
         Clock::time_point s_release;  // and when it lets go
         std::string s_pressDevice;    // on that (device), when named, else P1's port,
         int s_pressKey = 0;           // or that key, a (key) step's
+        std::vector<int> s_heldKeys;  // a (keys) step's, held until the next
         std::string s_screen;         // a wait_screen's screen
         uint32_t s_condition = 0u;    // a wait_until's step array
         uint32_t s_starPower = 0u;    // a star_power's step array, checked each poll
@@ -268,6 +269,30 @@ namespace gh2::scenario
                     const int heldMs = array.size() > 2 ? static_cast<int>(array.number(2) * 1000.0f) : 150;
                     s_release = now() + std::chrono::milliseconds(heldMs);
                     s_until = now() + std::chrono::milliseconds(heldMs + 250);
+                    return;
+                }
+                if (verb == "keys")
+                {
+                    for (int key : s_heldKeys)
+                        setScriptedKey(key, false);
+                    s_heldKeys.clear();
+                    for (int k = 1; k < array.size(); ++k)
+                    {
+                        // A digit's key reads as its number.
+                        const std::string name = array.symbol(k).empty()
+                                                     ? std::to_string(static_cast<int>(array.number(k)))
+                                                     : array.symbol(k);
+                        const int key = SDL_GetScancodeFromName(name.c_str());
+                        if (key == SDL_SCANCODE_UNKNOWN)
+                        {
+                            std::cerr << "[scenario] FAIL: no key " << name << std::endl;
+                            quit();
+                            return;
+                        }
+                        setScriptedKey(key, true);
+                        s_heldKeys.push_back(key);
+                    }
+                    s_until = now() + std::chrono::milliseconds(100);
                     return;
                 }
                 if (verb == "press")

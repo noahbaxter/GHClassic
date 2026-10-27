@@ -1,0 +1,112 @@
+; The keyboard about P1's controller in a song: with a guitar it plays P1's
+; frets too; with the guitar gone it stands in and plays them, the guitar
+; coming back mid-play taking over with no pause. In a gamepad's song it
+; plays the seat's pad mode, its 1 a DualShock's L2, and with the gamepad
+; gone Quit leaves the song for menus the keyboard still drives, the
+; gamepad back P1's. A song started with P1's gamepad already gone is still
+; the seat's pad mode, the keyboard standing in from the start.
+#include common/first_boot.dta
+(device guitar)
+(device pad)
+(press down guitar)
+(expect {seat_has 0 guitar} 1)
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty easy}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 2)
+(keys 1)
+(expect {pad_held green} 1)
+(keys)
+(expect {pad_held green} 0)
+(unplug guitar)
+(wait_screen pause_controller_screen 10)
+(key Down)
+(wait 0.5)
+(expect {seat_has 0 keyboard} 1)
+(key Return 0.5)
+(wait_screen game_screen 10)
+(wait 2)
+(keys 1 Down)
+(expect {pad_held green} 1)
+(expect {pad_held down} 1)
+(device guitar)
+(wait 0.5)
+(expect {seat_has 0 guitar} 1)
+(expect {{ui current_screen} name} game_screen)
+(expect {pad_held green} 1)
+(keys)
+(wait 0.5)
+(expect {{ui current_screen} name} game_screen)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+(wait 1)
+
+; A gamepad's song: the keyboard's frets play as the pad's.
+(press down pad)
+(expect {seat_has 0 pad} 1)
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty easy}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 2)
+(keys 1 Down)
+(expect {pad_held tilt} 1)
+(expect {pad_held green} 0)
+(expect {pad_held down} 1)
+(keys)
+(unplug pad)
+(wait_screen pause_controller_screen 10)
+(key Down)
+(wait 0.5)
+(expect {seat_has 0 keyboard} 1)
+(key Return)
+(wait_screen game_screen 10)
+(wait 1)
+(key Escape)
+(wait_screen pause_screen 10)
+(wait 0.5)
+; Up from Resume round to Quit.
+(key Up)
+(wait 0.5)
+(expect {pause_panel focus_name} quit.btn)
+(key Return)
+(wait_until {&& {! {ui in_transition}} {== {ui current_screen} qp_selsong_screen}} 60)
+(wait 1)
+(key Down)
+(wait 0.5)
+(key Escape)
+(wait 1)
+(device pad)
+(press down pad)
+(wait 0.5)
+(expect {seat_has 0 pad} 1)
+{ui goto_screen main_screen}
+(wait_screen main_screen 60)
+(wait 1)
+
+; A song started with P1's gamepad gone: the keyboard's from the start, with
+; no pause for the gamepad, in the seat's pad mode; the gamepad back
+; mid-song plays on as P1.
+(unplug pad)
+(wait 0.5)
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty easy}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 2)
+(expect {{ui current_screen} name} game_screen)
+(expect {game get_controller 0} joypad_guitar)
+(expect {seat_has 0 keyboard} 1)
+(keys 1)
+(expect {pad_held tilt} 1)
+(keys)
+(device pad)
+(wait 0.5)
+(expect {seat_has 0 pad} 1)
+(expect {{ui current_screen} name} game_screen)
+(quit)

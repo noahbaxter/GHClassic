@@ -1,6 +1,7 @@
 ; P1's controller pulled out mid-song: GH2's own controller pause, which
-; holds until the same controller is back, and then its X resumes, the pad
-; playing as a DualShock (its orange, Cross or A).
+; holds until a controller is back in the seat, here the same one, and then
+; its X resumes, the pad playing as a DualShock (its orange, Cross or A).
+; Another device taking the seat is solo_reconnect_other.
 #include common/first_boot.dta
 (device pad)
 (device guitar)
@@ -15,11 +16,7 @@
 (wait 1)
 (unplug pad)
 (wait_screen pause_controller_screen 10)
-; Another controller's press takes nothing and resumes nothing.
-(press green guitar)
 (wait 1)
-(expect {seat_has 0 guitar} 0)
-(wait_screen pause_controller_screen 1)
 (device pad)
 (wait 0.5)
 (expect {seat_has 0 pad} 1)
