@@ -18,6 +18,7 @@
 #include "host/bindings.h"
 #include "host/device.h"
 #include "host/layouts.h"
+#include "host/owner.h"
 #include "host/sdl_devices.h"
 
 #include <SDL3/SDL.h>
@@ -66,6 +67,7 @@ namespace gh2
         loadLayouts();
         s_open = true;
         openDevices();
+        claimControllers();
     }
 
     void pollInput(bool devicesChanged)
@@ -75,13 +77,17 @@ namespace gh2
         if (devicesChanged)
             openDevices();
         const bool *keys = SDL_GetKeyboardState(nullptr);
-        readSdlDevices();
         std::array<float, kActionCount> held{};
-        play(keyboardLayout(), Snapshot{}, keys, held);
-        for (Device &d : devices())
+        // A window without the controllers reads none.
+        if (ownsControllers())
         {
-            nameControls(d);
-            play(d.profile, d.now, keys, held);
+            readSdlDevices();
+            play(keyboardLayout(), Snapshot{}, keys, held);
+            for (Device &d : devices())
+            {
+                nameControls(d);
+                play(d.profile, d.now, keys, held);
+            }
         }
         HostPad pad = padOf(held);
 

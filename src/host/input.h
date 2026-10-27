@@ -35,6 +35,16 @@ namespace gh2
     void pollInput(bool devicesChanged);
     void closeInput();
 
+    // Of the GHClassic windows open, the first up, or else the last focused,
+    // reads the controllers, focused or not; the others read nothing
+    // pressed. A hidden run opens no input at all. Call when this window
+    // gains focus.
+    void takeControllers();
+    // A scripted run never takes them, at launch or on focus: a window that
+    // opens over the player's (as a new one does on KDE) leaves their
+    // controllers alone. Before openInput.
+    void leaveControllers();
+
     // The state the last poll saw. Callable from any thread.
     HostPad hostPad();
 

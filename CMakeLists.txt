@@ -352,6 +352,7 @@ set(GHC_GAME_SOURCES
     src/host/device.cpp
     src/host/input.cpp
     src/host/layouts.cpp
+    src/host/owner.cpp
     src/host/pad.cpp
     src/host/perf.cpp
     src/host/profiles.cpp
