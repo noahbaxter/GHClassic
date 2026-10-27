@@ -503,6 +503,9 @@ def review_set(name):
     if name in _review_sets:
         return _review_sets[name]
     branch = git_out("branch", "--show-current")
+    # A chunk of a bigger branch shares that one's folder: git config
+    # branch.<chunk>.review <bigger branch>.
+    branch = (branch and git_out("config", f"branch.{branch}.review")) or branch
     folder = branch_folder(branch) if branch else f"detached-{git_out('rev-parse', '--short', 'HEAD') or 'tree'}"
     if SERIES:
         found = sorted((REVIEW / folder).glob(f"*_{SERIES}")) if (REVIEW / folder).is_dir() else []
