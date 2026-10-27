@@ -1,0 +1,58 @@
+; The main menu's Quit under each game's menus: idle, and focused.
+(needs gh1 gh80s)
+#include common/first_boot.dta
+(wait 2)
+{set $ghc_switch gh1}
+{set $ghc_switch_next main_screen}
+{set $ghc_switch_as menus}
+{ui goto_screen ghc_switch_screen}
+(wait 5)
+(wait_screen main_screen)
+(wait 2)
+(expect {campaigns active} gh1)
+(shot gh1)
+{set $ghc_switch gh80s}
+{set $ghc_switch_next main_screen}
+{set $ghc_switch_as menus}
+{ui goto_screen ghc_switch_screen}
+(wait 5)
+(wait_screen main_screen)
+(wait 2)
+(expect {campaigns active} gh80s)
+(shot gh80s)
+; Quit on hover: the focus starts on Training, two rows above it.
+(press down)
+(press down)
+(wait 1)
+(shot gh80s_quit_hover)
+{set $ghc_switch gh2}
+{set $ghc_switch_next main_screen}
+{set $ghc_switch_as menus}
+{ui goto_screen ghc_switch_screen}
+(wait 5)
+(wait_screen main_screen)
+(wait 2)
+(expect {campaigns active} gh2)
+(shot gh2)
+; Each row on hover, from the top: the focus starts on Training.
+(press up)
+(press up)
+(press up)
+(wait 1)
+(shot gh2_row0)
+(press down)
+(wait 1)
+(shot gh2_row1)
+(press down)
+(wait 1)
+(shot gh2_row2)
+(press down)
+(wait 1)
+(shot gh2_row3)
+(press down)
+(wait 1)
+(shot gh2_row4)
+(press down)
+(wait 1)
+(shot gh2_row5)
+(quit)

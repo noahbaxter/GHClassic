@@ -28,12 +28,17 @@
       ; Quit's size, and where from Options (x right, z up): small, in the
       ; black gap at the poster's foot. Shrunk less in height, which keeps
       ; the bitmap font nearer full size and so sharper.
-      (quit_width 0.44)
-      (quit_height 0.72)
+      (quit_size ((gh1 (0.44 0.72)) (gh2 (0.41 0.67)) (gh80s (0.52 0.72))))
+      ; The rows drawn a little smaller, towards one fixed point (the top
+      ; row, or Quit), to make room below Options for Quit or close the gap
+      ; above it.
+      (menu_shrink ((gh1 (0.93 career)) (gh2 (0.95 quit)) (gh80s (0.93 career))))
+      ; The whole menu raised by this much (z up), with the shrink.
+      (menu_lift ((gh1 0) (gh2 0) (gh80s 6)))
       ; Per game, as the menus' rows sit 16 apart in GH1's and GH2's and 30
       ; in the 80s': right under Options' right end, as GH1's, but in GH2's
       ; drawn in from the monster at its right.
-      (quit_place ((gh1 (47 -14)) (gh2 (36 -13)) (gh80s (47 -26))))
+      (quit_place ((gh1 (-4 -14)) (gh2 (44 -14)) (gh80s (35 -26))))
       ; The build's version ($ghc_version, menus.cpp): a copy of the help
       ; bar's text, drawn with the menu but placed from the help bar's group,
       ; which gives it the help bar's size and faces it to the menu's light
@@ -67,6 +72,32 @@
             {do
                ($ox 0) ($oy 0) ($oz 0)
                ($group {main_options.btn get trans_parent})
+               ($k {elem {elem {find [menu_shrink] {campaigns active}} 1} 0})
+               ($pivot {elem {elem {find [menu_shrink] {campaigns active}} 1} 1})
+               ($dq {elem {find [quit_place] {campaigns active}} 1})
+               ($gx 0) ($gy 0) ($gz 0) ($cx 0) ($cy 0) ($cz 0) ($sx 1) ($sy 1) ($sz 1)
+               ($w {elem {elem {find [quit_size] {campaigns active}} 1} 0})
+               ($h {elem {elem {find [quit_size] {campaigns active}} 1} 1})
+               {if {!= $k 1}
+                  {$group get_local_pos $gx $gy $gz}
+                  {if_else {== $pivot quit}
+                     {do
+                        {main_options.btn get_local_pos $ox $oy $oz}
+                        {set $cx {'+' $ox {elem $dq 0}}}
+                        {set $cz {'+' $oz {elem $dq 1}}}
+                        ; Quit is drawn as large as it was, not shrunk with the rest.
+                        {set $w {'/' $w $k}}
+                        {set $h {'/' $h $k}}
+                     }
+                     {main_career.btn get_local_pos $cx $cy $cz}
+                  }
+                  {$group get_local_scale $sx $sy $sz}
+                  {$group set_local_scale {'*' $sx $k} $sy {'*' $sz $k}}
+                  ; Its own scale and place kept: the pivot stays where it is.
+                  {$group set_local_pos
+                     {'+' $gx {'*' {'-' 1 $k} {'*' $sx $cx}}} $gy
+                     {'+' {'+' $gz {'*' {'-' 1 $k} {'*' $sz $cz}}} {elem {find [menu_lift] {campaigns active}} 1}}}
+               }
                {new {main_options.btn class_name} quit.btn}
                {quit.btn copy main_options.btn 0}
                {main_options.btn get_local_pos $ox $oy $oz}
@@ -78,7 +109,7 @@
                   ($d {elem {find [quit_place] {campaigns active}} 1})
                   {quit.grp set_local_pos {'+' $ox {elem $d 0}} $oy {'+' $oz {elem $d 1}}}
                }
-               {quit.grp set_local_scale [quit_width] 1 [quit_height]}
+               {quit.grp set_local_scale $w 1 $h}
                {quit.btn set trans_parent quit.grp}
                {quit.btn set_local_pos 0 0 0}
                {quit.btn set text_token pause_quit} ; "QUIT", the pause menu's
