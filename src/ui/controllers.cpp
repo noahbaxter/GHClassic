@@ -154,7 +154,7 @@ namespace gh2
 
         // A device's own name cut to fit a chip: its layout's or SDL's name
         // without the filler (DualSense Wireless Controller is DUALSENSE
-        // CONTROLLER), at most 20 letters.
+        // CONTROLLER), at most 16 letters, which fit beside a seat's P1.
         std::string shortName(const DeviceView &v)
         {
             if (keyboard(v))
@@ -166,7 +166,7 @@ namespace gh2
                     words += (words.empty() ? "" : " ") + word;
             if (words.empty())
                 words = upper(kindName(v.kind));
-            constexpr size_t kMost = 20;
+            constexpr size_t kMost = 16;
             if (words.size() > kMost)
                 words = words.substr(0, words.find_last_of(' ', kMost) == std::string::npos
                                             ? kMost
@@ -230,8 +230,12 @@ namespace gh2
                 return "";
             if (s_rebinding && row == s_focus)
                 return "PRESS";
-            const std::string &bound = s_shown.bound[static_cast<size_t>(kRows[row].action)];
-            return bound.empty() ? "NOT SET" : bound;
+            // Its first control, and how many more: three in a row run into
+            // its name.
+            const auto &bound = s_shown.bound[static_cast<size_t>(kRows[row].action)];
+            if (bound.empty())
+                return "NOT SET";
+            return bound.front() + (bound.size() > 1 ? " +" + std::to_string(bound.size() - 1) : "");
         }
 
         std::string text(const std::string &what, int i)

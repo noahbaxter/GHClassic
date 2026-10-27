@@ -26,7 +26,7 @@ namespace gh2::input
         int seat = -1;           // the seat it holds, -1 for none
         int number = 0;          // 1, 2... among devices of one model, 0 when alone
         std::array<float, kActionCount> amount{}; // each action now, 0 to 1
-        std::array<std::string, kActionCount> bound{}; // what each is bound to as a player calls it, "" for nothing
+        std::array<std::vector<std::string>, kActionCount> bound{}; // each one's controls as a player calls them
     };
 
     // Every device, controllers in the order SDL lists them, the keyboard last.

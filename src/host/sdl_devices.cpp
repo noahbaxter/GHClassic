@@ -76,6 +76,8 @@ namespace gh2::input
                 std::cerr << "[input] open: " << SDL_GetError() << std::endl;
                 return std::nullopt;
             }
+            d.isVirtual = SDL_IsJoystickVirtual(joystick);
+            d.keepInMemory = d.isVirtual;
             const std::string name = SDL_GetJoystickName(d.joystick) ? SDL_GetJoystickName(d.joystick) : "";
             d.name = name;
             // Its GUID and path: the same controller in the same port after
@@ -116,7 +118,7 @@ namespace gh2::input
             }
             if (!builtin && !bound)
                 std::cerr << "[input]   unbound; run GHClassic --bind to set it up" << std::endl;
-            if (!own)
+            if (!own && !d.isVirtual)
                 listInFile(name, guid, d.builtin);
             // One read off the accelerometer needs SDL to send it.
             const bool accel = std::any_of(d.profile.begin(), d.profile.end(), [](const auto &sources) {
@@ -139,11 +141,14 @@ namespace gh2::input
         std::erase_if(devices(), sdl);
     }
 
-    void openDevices()
+    void openDevices(bool virtualOnly)
     {
         int count = 0;
         SDL_JoystickID *ids = SDL_GetJoysticks(&count);
-        const std::vector<SDL_JoystickID> now(ids, ids + (ids ? count : 0));
+        std::vector<SDL_JoystickID> now;
+        for (int i = 0; i < count && ids; ++i)
+            if (!virtualOnly || SDL_IsJoystickVirtual(ids[i]))
+                now.push_back(ids[i]);
         SDL_free(ids);
         // Only what came or went: one still plugged in keeps its rest, its
         // accelerometer and what its log has named.
@@ -169,10 +174,10 @@ namespace gh2::input
         devices().insert(devices().begin(), listed.begin(), listed.end());
     }
 
-    void readSdlDevices()
+    void readSdlDevices(bool virtualOnly)
     {
         for (Device &d : devices())
-            if (sdl(d))
+            if (sdl(d) && (!virtualOnly || d.isVirtual))
                 d.now = read(d);
     }
 
@@ -292,13 +297,5 @@ namespace gh2::input
             return "Tilt Sensor";
         }
         return "";
-    }
-
-    std::string joined(const SDL_Gamepad *gamepad, const std::vector<Source> &sources)
-    {
-        std::string text;
-        for (const Source &s : sources)
-            text += (text.empty() ? "" : " / ") + shown(gamepad, s);
-        return text;
     }
 }

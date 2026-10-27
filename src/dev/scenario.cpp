@@ -228,6 +228,8 @@ namespace gh2::scenario
                     setScriptedKey(s_pressKey, false);
                 else if (s_pressDevice.empty())
                     setScriptedPad(0u);
+                else if (hasVirtualController(s_pressDevice))
+                    setVirtualController(s_pressDevice, {});
                 else
                     setScriptedDevice(s_pressDevice, 0u);
                 s_pressed = false;
@@ -280,6 +282,8 @@ namespace gh2::scenario
                     s_pressDevice = array.size() > 2 ? array.symbol(2) : "";
                     if (s_pressDevice.empty())
                         setScriptedPad(bits);
+                    else if (hasVirtualController(s_pressDevice))
+                        setVirtualController(s_pressDevice, {array.symbol(1)});
                     else
                         setScriptedDevice(s_pressDevice, bits, buttons);
                     s_pressed = true;
@@ -293,9 +297,16 @@ namespace gh2::scenario
                     // next hold; none lets go. (hold <libpad bits>) is P1's.
                     uint16_t bits = 0;
                     std::vector<int> buttons;
+                    std::vector<std::string> raw;
                     for (int j = 2; j < array.size(); ++j)
+                    {
                         control(array.symbol(j), bits, buttons);
-                    setScriptedDevice(array.symbol(1), bits, buttons);
+                        raw.push_back(array.symbol(j));
+                    }
+                    if (hasVirtualController(array.symbol(1)))
+                        setVirtualController(array.symbol(1), raw);
+                    else
+                        setScriptedDevice(array.symbol(1), bits, buttons);
                     s_until = now() + std::chrono::milliseconds(200);
                     return;
                 }
@@ -383,9 +394,27 @@ namespace gh2::scenario
                     // A controller that is not there, by name; its presses go
                     // through the seat rules. Read from the file at boot too.
                     addScriptedDevice(array.symbol(1));
+                else if (verb == "controller")
+                {
+                    // One plugged into SDL as a real one is: "vendor:product"
+                    // in hex, then pad (SDL's gamepad layout), guitar or
+                    // joystick.
+                    const std::string ids = text(rdram, array.arg(2));
+                    const std::string type = array.symbol(3);
+                    addVirtualController(array.symbol(1),
+                                         static_cast<uint16_t>(std::strtoul(ids.c_str(), nullptr, 16)),
+                                         static_cast<uint16_t>(std::strtoul(ids.c_str() + ids.find(':') + 1, nullptr, 16)),
+                                         type == "pad"      ? SDL_JOYSTICK_TYPE_GAMEPAD
+                                         : type == "guitar" ? SDL_JOYSTICK_TYPE_GUITAR
+                                                            : SDL_JOYSTICK_TYPE_UNKNOWN);
+                }
                 else if (verb == "unplug")
-                    // That (device) pulled out; (device <name>) again plugs it back.
+                {
+                    // That (device) or (controller) pulled out; the same step
+                    // again plugs it back.
                     removeScriptedDevice(array.symbol(1));
+                    removeVirtualController(array.symbol(1));
+                }
                 else if (verb == "record")
                 {
                     const std::string state = array.symbol(1);

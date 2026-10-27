@@ -2,10 +2,10 @@
 // a seat's PS2 guitar.
 //
 // Each poll reads every device into its actions (sdl_devices.cpp, the
-// keyboard through its layout in layouts.cpp, a scenario's as scripted),
-// moves the seats by them (seats.cpp), or on the Controllers screen shows
-// them there instead (device_screen.cpp), then gives each seat's port what
-// its device holds. A seat reads one device and nothing else, so a
+// keyboard through its layout in layouts.cpp, a scenario's in
+// scripted_devices.cpp), moves the seats by them (seats.cpp), or on the
+// Controllers screen shows them there instead (device_screen.cpp), then
+// gives each seat's port what its device holds. A seat reads one device and nothing else, so a
 // controller nobody holds (a resting whammy, a drifting stick) never plays.
 //
 // The actions land on the RedOctane guitar's buttons (see pad.cpp for why the
@@ -23,6 +23,7 @@
 #include "host/device_screen.h"
 #include "host/layouts.h"
 #include "host/owner.h"
+#include "host/scripted_devices.h"
 #include "host/sdl_devices.h"
 #include "host/seats.h"
 
@@ -53,79 +54,10 @@ namespace gh2
         std::atomic<bool> s_filled[kSeats] = {}; // a device in it, for seatPlugged
         std::atomic<uint32_t> s_trades{0};
 
-        // A scenario's devices: name, a gamepad when its name says pad, and
-        // the raw controls it holds: each action's button in its layout's
-        // order, and whammy's axis.
-        struct Scripted
-        {
-            std::string name;
-            DeviceKind kind;
-            Snapshot raw;
-        };
-        constexpr size_t kScriptedButtons = 16;
-
-        Snapshot scriptedRest()
-        {
-            Snapshot s;
-            s.buttons.assign(kScriptedButtons, false);
-            s.axes.assign(1, 0.0f);
-            return s;
-        }
-
-        // A scenario's device plays as its buttons and axis are laid out.
-        Profile scriptedLayout()
-        {
-            Profile profile;
-            for (int a = 0; a < kActionCount; ++a)
-                if (kActions[a].button)
-                    profile[a] = {{Source::kButton, a}};
-            profile[kWhammy] = {{Source::kAxis, 0, 0, 0.0f, 1.0f}};
-            return profile;
-        }
-
-        // A scenario's devices into the list, each as it holds its controls
-        // now; a change to its layout stays in this run.
-        void syncScripted(const std::vector<Scripted> &scripted)
-        {
-            std::erase_if(devices(), [&](const Device &d) {
-                return d.id.backend == DeviceId::kScripted &&
-                       std::none_of(scripted.begin(), scripted.end(),
-                                    [&](const Scripted &s) { return s.name == d.id.model; });
-            });
-            for (const Scripted &s : scripted)
-            {
-                const DeviceId id{DeviceId::kScripted, s.name, ""};
-                Device *d = deviceById(id);
-                if (!d)
-                {
-                    Device made;
-                    made.id = id;
-                    made.name = s.name;
-                    // _ in its name is a space (Steam_Controller).
-                    made.label = s.name;
-                    std::replace(made.label.begin(), made.label.end(), '_', ' ');
-                    made.kind = s.kind;
-                    made.sectionName = "script " + s.name;
-                    made.keepInMemory = true;
-                    made.builtin = scriptedLayout();
-                    made.profile = overlay(made.builtin, sectionOf(made.sectionName, ""));
-                    made.rest = scriptedRest();
-                    made.openedMs = SDL_GetTicks();
-                    devices().push_back(made);
-                    d = &devices().back();
-                }
-                d->now = s.raw;
-            }
-        }
-
         std::mutex s_mutex;
         HostPad s_pads[kSeats];
         std::string s_seatNames[kSeats]; // for seatHas
         std::string s_seatLabels[kSeats];
-        std::vector<Scripted> s_scriptedDevices;
-        // A scenario's keys, down until let go.
-        std::array<bool, SDL_SCANCODE_COUNT> s_scriptedKeys{};
-        bool s_keysScripted = false;
         bool s_flying = false;
         HostFly s_fly, s_scriptedFly;
         uint64_t s_pressEventNs = 0; // the host thread's own
@@ -212,24 +144,25 @@ namespace gh2
         // and its keys, as the keyboard.
         const bool *keys = nullptr;
         std::array<bool, SDL_SCANCODE_COUNT> scriptedKeys{};
-        bool keysScripted = false;
-        {
-            std::lock_guard<std::mutex> lock(s_mutex);
-            keysScripted = s_keysScripted;
-            scriptedKeys = s_scriptedKeys;
-        }
+        const bool keysScripted = input::scriptedKeys(scriptedKeys);
+        // A scenario's SDL controllers play in any run, the player's only
+        // in one with input open.
+        const bool virtualChanged = syncVirtualControllers();
+        if (!s_open && virtualChanged)
+            openDevices(true);
         std::vector<Read> reads;
-        bool owner = false;
+        const bool owner = s_open && ownsControllers();
         if (!s_open && keysScripted)
         {
             keys = scriptedKeys.data();
             reads.push_back(keyboardRead(keys));
         }
+        if (s_open && (devicesChanged || virtualChanged))
+            openDevices();
+        if (!owner)
+            readSdlDevices(true);
         if (s_open)
         {
-            if (devicesChanged)
-                openDevices();
-            owner = ownsControllers();
             keys = SDL_GetKeyboardState(nullptr);
             if (keysScripted)
             {
@@ -243,13 +176,11 @@ namespace gh2
                 readSdlDevices();
             }
         }
-        {
-            std::lock_guard<std::mutex> lock(s_mutex);
-            syncScripted(s_scriptedDevices);
-        }
-        // A window without the controllers reads none of SDL's.
+        syncScriptedDevices();
+        // A window without the controllers reads none of SDL's, but a
+        // scenario's.
         for (Device &d : devices())
-            if (d.id.backend != DeviceId::kSdl || owner)
+            if (d.id.backend != DeviceId::kSdl || owner || d.isVirtual)
             {
                 nameControls(d);
                 Read r{d.id, d.name, d.kind, d.label};
@@ -317,7 +248,9 @@ namespace gh2
         if (mode == Mode::kControllers)
             std::fill(std::begin(pads), std::end(pads), HostPad{});
 
-        if (s_open)
+        // A window without the controllers, a scripted one's among them,
+        // leaves last run's seats alone.
+        if (owner)
             if (const auto saved = s_seats.takeSaved(); saved && !writeSeats(bindingFilePath(), *saved))
                 std::cerr << "[input] could not write " << bindingFilePath() << std::endl;
         for (int seat = 0; seat < kSeats; ++seat)
@@ -408,46 +341,6 @@ namespace gh2
     void songScreen(SongScreen screen)
     {
         s_songScreen.store(screen, std::memory_order_relaxed);
-    }
-
-    void addScriptedDevice(const std::string &name)
-    {
-        std::lock_guard<std::mutex> lock(s_mutex);
-        for (const Scripted &d : s_scriptedDevices)
-            if (d.name == name)
-                return;
-        s_scriptedDevices.push_back(
-            {name, name.find("pad") != std::string::npos ? DeviceKind::kGamepad : DeviceKind::kGuitar, scriptedRest()});
-    }
-
-    void removeScriptedDevice(const std::string &name)
-    {
-        std::lock_guard<std::mutex> lock(s_mutex);
-        std::erase_if(s_scriptedDevices, [&](const Scripted &d) { return d.name == name; });
-    }
-
-    void setScriptedDevice(const std::string &name, uint16_t pressed, const std::vector<int> &buttons)
-    {
-        std::lock_guard<std::mutex> lock(s_mutex);
-        for (Scripted &d : s_scriptedDevices)
-            if (d.name == name)
-            {
-                d.raw = scriptedRest();
-                for (int a = 0; a < kActionCount; ++a)
-                    d.raw.buttons[static_cast<size_t>(a)] = (pressed & kActions[a].button) != 0u;
-                for (int b : buttons)
-                    if (b >= 0 && static_cast<size_t>(b) < kScriptedButtons)
-                        d.raw.buttons[static_cast<size_t>(b)] = true;
-            }
-    }
-
-    void setScriptedKey(int scancode, bool down)
-    {
-        std::lock_guard<std::mutex> lock(s_mutex);
-        if (scancode <= SDL_SCANCODE_UNKNOWN || scancode >= SDL_SCANCODE_COUNT)
-            return;
-        s_scriptedKeys[static_cast<size_t>(scancode)] = down;
-        s_keysScripted = true;
     }
 
     bool seatHas(int seat, const std::string &name)

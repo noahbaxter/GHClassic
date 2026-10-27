@@ -79,6 +79,22 @@ namespace gh2
     void addScriptedDevice(const std::string &name);
     void removeScriptedDevice(const std::string &name); // unplugged
     void setScriptedDevice(const std::string &name, uint16_t pressed, const std::vector<int> &buttons = {});
+    // A scenario's controller plugged into SDL as a real one shows up: a
+    // virtual joystick with that USB vendor and product and SDL joystick
+    // type (SDL_JoystickType). A gamepad has SDL's gamepad buttons and axes
+    // and layout (SDL gives a virtual one a layout only typed so), the rest
+    // 16 buttons, 6 axes and a hat. It goes through everything a real one
+    // does (the catalogue, its layout, the seats, the Controllers screen, a
+    // replug) in a hidden run too, its input.ini section kept in memory.
+    // Callable from any thread; the next poll plugs it in or pulls it out.
+    void addVirtualController(const std::string &name, uint16_t vendor, uint16_t product, int type);
+    void removeVirtualController(const std::string &name);
+    // Its controls held until the next set, none to let go: a gamepad
+    // button by SDL's name (a, back, dpdown), "button<n>", "hat<n><up|
+    // down|left|right>", or an axis pushed all the way, by SDL's gamepad
+    // name or "axis<n>", then + or - (righty-, axis2+).
+    void setVirtualController(const std::string &name, const std::vector<std::string> &controls);
+    bool hasVirtualController(const std::string &name);
     // A scenario's key, SDL's scancode, held on the keyboard until let go;
     // in a hidden run, from the first, the keyboard is there. Callable from
     // any thread.

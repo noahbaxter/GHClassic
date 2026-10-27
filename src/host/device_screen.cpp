@@ -237,7 +237,8 @@ namespace gh2::input
             for (int a = 0; a < kActionCount; ++a)
             {
                 v.amount[static_cast<size_t>(a)] = r.held[a];
-                v.bound[static_cast<size_t>(a)] = joined(d ? d->gamepad : nullptr, profile[static_cast<size_t>(a)]);
+                for (const Source &s : profile[static_cast<size_t>(a)])
+                    v.bound[static_cast<size_t>(a)].push_back(shown(d ? d->gamepad : nullptr, s));
             }
             v.seat = seats.seatOf(v.id);
             s_views.push_back(v);

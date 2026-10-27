@@ -115,7 +115,7 @@
       ; Reset. The row picked has a faint box behind it; a row held has it
       ; filled in its colour.
       (row_x 127)
-      (read_x 255)
+      (read_x 268)
       (row_top 134)
       (row_gap 25)
       (reset_gap 16)
