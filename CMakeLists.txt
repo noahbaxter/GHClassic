@@ -343,12 +343,16 @@ set(GHC_GAME_SOURCES
     src/host/audio.cpp
     src/host/bind.cpp
     src/host/bindings.cpp
+    src/host/capture.cpp
+    src/host/device.cpp
     src/host/input.cpp
+    src/host/layouts.cpp
     src/host/pad.cpp
     src/host/perf.cpp
     src/host/profiles.cpp
     src/host/record.cpp
     src/host/releases.cpp
+    src/host/sdl_devices.cpp
     src/host/update.cpp
     src/host/vulkan_frontend.cpp
     src/host/vma.cpp

@@ -82,6 +82,9 @@ namespace gh2::input
         float full = 1.0f;  // axes: the value fully pressed
     };
 
+    // An action's amount past which it is held.
+    constexpr float kHeld = 0.5f;
+
     // An SDL axis reading as -1..1, the scale rest and full are in.
     inline float axisValue(int16_t v)
     {
