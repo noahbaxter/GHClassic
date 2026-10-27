@@ -90,7 +90,7 @@ set(GLSLANG_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
 # SYSTEM: their headers' warnings are not ours to fix.
 FetchContent_Declare(SDL3
     GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-    GIT_TAG release-3.4.16
+    GIT_TAG release-3.4.18
     GIT_SHALLOW TRUE
     SYSTEM)
 FetchContent_Declare(VulkanHeaders
@@ -165,6 +165,11 @@ target_link_libraries(save_test PRIVATE miniz)
 # Which release the game offers as an update.
 add_executable(releases_test EXCLUDE_FROM_ALL tests/releases_test.cpp src/host/releases.cpp)
 target_include_directories(releases_test PRIVATE src)
+
+# Which layout each controller gets, and input.ini's sections.
+add_executable(input_test EXCLUDE_FROM_ALL tests/input_test.cpp src/host/bindings.cpp src/host/profiles.cpp)
+target_include_directories(input_test PRIVATE src)
+target_link_libraries(input_test PRIVATE SDL3::SDL3)
 
 # Ogg Vorbis for 360 GH2's .mogg audio: libogg and libvorbis (BSD-3-Clause),
 # the decoder and vorbisfile only. Their own CMake wants an older CMake and
@@ -343,12 +348,17 @@ set(GHC_GAME_SOURCES
     src/host/audio.cpp
     src/host/bind.cpp
     src/host/bindings.cpp
+    src/host/capture.cpp
+    src/host/device.cpp
     src/host/input.cpp
+    src/host/layouts.cpp
+    src/host/owner.cpp
     src/host/pad.cpp
     src/host/perf.cpp
     src/host/profiles.cpp
     src/host/record.cpp
     src/host/releases.cpp
+    src/host/sdl_devices.cpp
     src/host/update.cpp
     src/host/vulkan_frontend.cpp
     src/host/vma.cpp

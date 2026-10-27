@@ -12,11 +12,14 @@
 //     pad a                  an SDL gamepad button, by SDL's mapping name (a, b,
 //                            x, y, back, start, leftshoulder, dpup...)
 //     pad axis righty 0 -1   an SDL gamepad axis (leftx ... righttrigger), rest then full
+//     pad accel x 0 12       a gamepad's accelerometer (x, y or z), in m/s^2, rest then full
 //
 // An action takes any number of sources, comma separated, and is held when
 // any of them is. Whammy takes the largest amount.
 
 #include "host/input.h"
+
+#include <SDL3/SDL.h>
 
 #include <array>
 #include <cstdint>
@@ -74,13 +77,17 @@ namespace gh2::input
             kAxis,
             kPadButton,
             kPadAxis,
+            kPadAccel,
         };
         Kind kind = kKey;
-        int index = 0;      // scancode, button, hat, axis, SDL_GamepadButton or SDL_GamepadAxis
+        int index = 0;      // scancode, button, hat, axis, SDL_GamepadButton, SDL_GamepadAxis, or accelerometer axis
         uint8_t hat = 0;    // SDL_HAT_* bit
         float rest = 0.0f;  // axes: the value untouched
         float full = 1.0f;  // axes: the value fully pressed
     };
+
+    // An action's amount past which it is held.
+    constexpr float kHeld = 0.5f;
 
     // An SDL axis reading as -1..1, the scale rest and full are in.
     inline float axisValue(int16_t v)
@@ -94,16 +101,26 @@ namespace gh2::input
     // Each action's sources. An action with none is unbound.
     using Profile = std::array<std::vector<Source>, kActionCount>;
 
-    // input.ini: [keyboard], then one [device "<SDL joystick name>"] per
-    // controller. A section lists only the actions it changes; the rest keep
-    // the built-in profile's. Comments take whole lines, starting ; or #.
+    // input.ini: [keyboard], then one [device "<SDL joystick name>" <GUID>]
+    // per kind of controller; older files name a device without its GUID. A
+    // section lists only the actions it changes; the rest keep the built-in
+    // profile's. Comments take whole lines, starting ; or #.
     struct BindingFile
     {
         std::map<std::string, std::map<Action, std::vector<Source>>> sections; // by section name
     };
 
     std::string keyboardSection();
-    std::string deviceSection(const std::string &name);
+    std::string deviceSection(const std::string &name, const std::string &guid);
+    std::string deviceSection(const std::string &name); // an older file's
+    // SDL's GUID for a controller, as the sections write it: the same for
+    // every one of its kind on one system.
+    std::string joystickGuid(SDL_Joystick *joystick);
+
+    // A device's section: its GUID's, else one naming it alone; none if
+    // the file has neither.
+    const std::map<Action, std::vector<Source>> *deviceBindings(const BindingFile &file, const std::string &name,
+                                                                 const std::string &guid);
 
     // Missing is empty; a line that does not parse is reported and skipped.
     BindingFile loadBindingFile(const std::string &path);
