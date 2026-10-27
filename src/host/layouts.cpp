@@ -54,6 +54,23 @@ namespace gh2::input
         return sdlName.empty() ? named(keyboardSection()) : deviceBindings(s_file, sdlName, guid);
     }
 
+    std::string sectionMode(const std::string &sdlName, const std::string &guid)
+    {
+        for (const std::string &name : {nameOf(sdlName, guid), deviceSection(sdlName)})
+            if (named(name))
+            {
+                const auto mode = s_file.modes.find(name);
+                return mode == s_file.modes.end() ? "" : mode->second;
+            }
+        return "";
+    }
+
+    DeviceKind kindOf(const std::string &sdlName, const std::string &guid, DeviceKind detected)
+    {
+        const std::string mode = sectionMode(sdlName, guid);
+        return mode == "pad" ? DeviceKind::kGamepad : mode == "guitar" ? DeviceKind::kGuitar : detected;
+    }
+
     void listInFile(const std::string &sdlName, const std::string &guid, const Profile &builtin)
     {
         const std::string name = nameOf(sdlName, guid);
@@ -66,17 +83,24 @@ namespace gh2::input
     }
 
     bool editSection(const std::string &sdlName, const std::string &guid, const Profile &builtin, bool inMemory,
-                     const std::function<void(Section &)> &change)
+                     const std::function<void(Section &, std::string &)> &change)
     {
         const std::string name = nameOf(sdlName, guid);
         const Section *own = sectionOf(sdlName, guid);
         Section lines = own ? *own : Section{};
-        change(lines);
+        std::string mode = sectionMode(sdlName, guid);
+        change(lines, mode);
         const std::string path = bindingFilePath();
         inMemory = inMemory || !s_writable;
         if (inMemory)
+        {
             s_file.sections[name] = lines;
-        else if (!(lines.empty() ? writeTemplate(path, name, builtin) : writeSection(path, name, lines)))
+            if (mode.empty())
+                s_file.modes.erase(name);
+            else
+                s_file.modes[name] = mode;
+        }
+        else if (!(lines.empty() ? writeTemplate(path, name, builtin, mode) : writeSection(path, name, lines, mode)))
         {
             std::cerr << "[input] could not write " << path << std::endl;
             return false;

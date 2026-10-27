@@ -80,6 +80,7 @@
 (key Up)
 (key Up)
 (key Up)
+(key Up)
 (expect {ghc_controllers focus} 9)
 (key Return)
 (wait 0.3)

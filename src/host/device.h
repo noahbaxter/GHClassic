@@ -24,7 +24,9 @@ namespace gh2::input
         DeviceId id;
         std::string name;  // as the log names it
         std::string label; // what a player is shown: its layout's, else its name
-        DeviceKind kind = DeviceKind::kController;
+        // What it plays as, its section's mode line over what it was
+        // detected as.
+        DeviceKind kind = DeviceKind::kController, detected = DeviceKind::kController;
         // Its input.ini section, by SDL's name and GUID, and whether a
         // change to it stays in memory: a scenario's is not the player's.
         std::string sectionName, sectionGuid;

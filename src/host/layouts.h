@@ -5,6 +5,7 @@
 // the keyboard's. The host thread's own.
 
 #include "host/bindings.h"
+#include "host/device_id.h"
 
 #include <functional>
 #include <map>
@@ -26,14 +27,18 @@ namespace gh2::input
     // A device's section: its GUID's, else one naming it alone; none if the
     // file has neither.
     const Section *sectionOf(const std::string &sdlName, const std::string &guid);
+    // That section's mode line, pad or guitar, "" for none; and the kind a
+    // device plays as, `detected` unless the line says otherwise.
+    std::string sectionMode(const std::string &sdlName, const std::string &guid);
+    DeviceKind kindOf(const std::string &sdlName, const std::string &guid, DeviceKind detected);
     // A device input.ini has no section for gets one, its built-in layout
     // as comments, so the file shows what there is to change.
     void listInFile(const std::string &sdlName, const std::string &guid, const Profile &builtin);
-    // The section written with `change` made to what it had (an older file's
-    // section by name alone moving to its GUID's), and read back; or with
-    // `inMemory` kept to this run. A section with nothing of its own left is
-    // its built-in layout again, as comment lines. False when the file could
-    // not be written.
+    // The section written with `change` made to what it had and its mode
+    // (an older file's section by name alone moving to its GUID's), and read
+    // back; or with `inMemory` kept to this run. A section with no bindings
+    // of its own left is its built-in layout again, as comment lines. False
+    // when the file could not be written.
     bool editSection(const std::string &sdlName, const std::string &guid, const Profile &builtin, bool inMemory,
-                     const std::function<void(Section &)> &change);
+                     const std::function<void(Section &, std::string &mode)> &change);
 }

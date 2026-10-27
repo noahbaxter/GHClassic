@@ -38,7 +38,12 @@ namespace gh2::input
         {
             DeviceId id;
             Action action = kGreen;
-            bool reset = false;
+            enum
+            {
+                kClear, // the action
+                kReset,
+                kMode, // pad and guitar swapped
+            } what = kClear;
         };
         std::vector<BindingEdit> s_edits;
         // The host thread's: keys and devices down last poll, when red went
@@ -50,9 +55,10 @@ namespace gh2::input
         std::optional<Capture> s_capture;
         bool s_caughtNamed = false; // the log has said what it caught
 
-        // A device's section written with `change` made to it, and every
-        // device of its model, which share it, playing it from then.
-        void rewrite(const DeviceId &id, const std::function<void(Section &)> &change)
+        // A device's section written with `change` made to it and its mode,
+        // and every device of its model, which share it, playing it from
+        // then.
+        void rewrite(const DeviceId &id, const std::function<void(Section &, std::string &)> &change)
         {
             if (id.backend == DeviceId::kKeyboard)
             {
@@ -65,7 +71,10 @@ namespace gh2::input
             const std::string name = d->sectionName, guid = d->sectionGuid;
             for (Device &same : devices())
                 if (same.sectionName == name && same.sectionGuid == guid)
+                {
                     same.profile = overlay(same.builtin, sectionOf(name, guid));
+                    same.kind = kindOf(name, guid, same.detected);
+                }
         }
 
         // A device that went from nothing pressed to something: a bound
@@ -148,12 +157,27 @@ namespace gh2::input
         }
 
         for (const BindingEdit &e : edits)
-            rewrite(e.id, [&](Section &lines) {
-                if (e.reset)
+        {
+            // The mode it was detected as needs no line.
+            const Device *d = deviceById(e.id);
+            if (e.what == BindingEdit::kMode && !d)
+                continue;
+            const DeviceKind swapped = d && d->kind == DeviceKind::kGamepad ? DeviceKind::kGuitar : DeviceKind::kGamepad;
+            rewrite(e.id, [&](Section &lines, std::string &mode) {
+                if (e.what == BindingEdit::kReset)
+                {
                     lines.clear();
+                    mode.clear();
+                }
+                else if (e.what == BindingEdit::kMode)
+                    mode = swapped == d->detected ? "" : swapped == DeviceKind::kGamepad ? "pad" : "guitar";
                 else
                     lines[e.action] = {};
             });
+            if (e.what == BindingEdit::kMode)
+                std::cerr << "[input] " << d->name << ": " << (swapped == DeviceKind::kGamepad ? "pad" : "guitar")
+                          << " mode" << std::endl;
+        }
 
         if (!rebinding)
             s_capture.reset();
@@ -203,7 +227,7 @@ namespace gh2::input
             {
                 std::cerr << "[input] " << (d ? d->name : "keyboard") << ": " << kActions[ask.action].name << " = "
                           << formatSource(*got) << std::endl;
-                rewrite(ask.id, [&](Section &lines) { lines[ask.action] = {*got}; });
+                rewrite(ask.id, [&](Section &lines, std::string &) { lines[ask.action] = {*got}; });
             }
             // Bound, or its device unplugged.
             done = got || (!d && !keyboard);
@@ -335,12 +359,18 @@ namespace gh2::input
     void clearBinding(const DeviceId &id, Action action)
     {
         std::lock_guard<std::mutex> lock(s_mutex);
-        s_edits.push_back({id, action, false});
+        s_edits.push_back({id, action, BindingEdit::kClear});
     }
 
     void resetBindings(const DeviceId &id)
     {
         std::lock_guard<std::mutex> lock(s_mutex);
-        s_edits.push_back({id, kGreen, true});
+        s_edits.push_back({id, kGreen, BindingEdit::kReset});
+    }
+
+    void swapMode(const DeviceId &id)
+    {
+        std::lock_guard<std::mutex> lock(s_mutex);
+        s_edits.push_back({id, kGreen, BindingEdit::kMode});
     }
 }

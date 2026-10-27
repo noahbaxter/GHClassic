@@ -1,0 +1,54 @@
+; A guitar taken for the wrong thing: the Controllers screen's mode row
+; swaps it to pad, kept in its input.ini section (in memory for a
+; scenario's device), and its seat plays songs as a DualShock from then.
+; The menus still answer it as a guitar. Swapped back, it is a guitar's.
+#include common/first_boot.dta
+(device guitar)
+(press down guitar)
+(expect {seat_has 0 guitar} 1)
+{ui goto_screen ghc_controllers_screen}
+(wait_screen ghc_controllers_screen)
+(wait 1)
+(expect {ghc_controllers text title} GUITAR)
+; Up from the first row round to Reset, then the mode above it.
+(key Up)
+(key Up)
+(expect {ghc_controllers text row {ghc_controllers focus}} MODE)
+(expect {ghc_controllers text read {ghc_controllers focus}} GUITAR)
+(key Return)
+(wait 0.5)
+(expect {ghc_controllers text read {ghc_controllers focus}} PAD)
+(shot mode_pad)
+(key Escape)
+(wait_screen options_screen)
+(wait 1)
+(press down guitar)
+(wait 0.5)
+(expect {game get_controller 0} guitar)
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty easy}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 1)
+(expect {game get_controller 0} joypad_guitar)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+(wait 1)
+{ui goto_screen ghc_controllers_screen}
+(wait_screen ghc_controllers_screen)
+(wait 1)
+(key Up)
+(key Up)
+(key Return)
+(wait 0.5)
+(expect {ghc_controllers text read {ghc_controllers focus}} GUITAR)
+(key Escape)
+(wait 1)
+{game set_song shoutatthedevil}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 1)
+(expect {game get_controller 0} guitar)
+(quit)

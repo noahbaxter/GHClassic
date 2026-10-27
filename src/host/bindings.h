@@ -104,10 +104,13 @@ namespace gh2::input
     // input.ini: [keyboard], then one [device "<SDL joystick name>" <GUID>]
     // per kind of controller; older files name a device without its GUID. A
     // section lists only the actions it changes; the rest keep the built-in
-    // profile's. Comments take whole lines, starting ; or #.
+    // profile's. A controller's section may also say how a seat it sits in
+    // plays, `mode = pad` or `mode = guitar`, over what it was detected as.
+    // Comments take whole lines, starting ; or #.
     struct BindingFile
     {
         std::map<std::string, std::map<Action, std::vector<Source>>> sections; // by section name
+        std::map<std::string, std::string> modes; // by section name, for those that say
         // [seats]: p1 = <device>, ... as the last run left them.
         std::map<std::string, std::string> seats;
     };
@@ -129,13 +132,15 @@ namespace gh2::input
 
     // Missing is empty; a line that does not parse is reported and skipped.
     BindingFile loadBindingFile(const std::string &path);
-    // Replaces one section, keeping the rest of the file as it was.
+    // Replaces one section, keeping the rest of the file as it was; with
+    // its mode line when `mode` is not "".
     bool writeSection(const std::string &path, const std::string &section,
-                      const std::map<Action, std::vector<Source>> &bindings);
+                      const std::map<Action, std::vector<Source>> &bindings, const std::string &mode = "");
 
     // The section as `profile` in comment lines, in place of any it had, for
     // the player to uncomment and change; a new file starts with how to.
-    bool writeTemplate(const std::string &path, const std::string &section, const Profile &profile);
+    bool writeTemplate(const std::string &path, const std::string &section, const Profile &profile,
+                       const std::string &mode = "");
 
     // `base` with every action the section names replaced.
     Profile overlay(Profile base, const std::map<Action, std::vector<Source>> *section);

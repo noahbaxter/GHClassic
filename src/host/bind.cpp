@@ -201,7 +201,8 @@ namespace gh2
             std::map<Action, std::vector<Source>> merged = had ? *had : std::map<Action, std::vector<Source>>{};
             for (auto &[action, sources] : bound)
                 merged[action] = std::move(sources);
-            if (writeSection(path, section, merged))
+            const auto mode = file.modes.find(section);
+            if (writeSection(path, section, merged, mode == file.modes.end() ? "" : mode->second))
                 std::cout << "wrote [" << section << "] to " << path << std::endl;
             else
             {

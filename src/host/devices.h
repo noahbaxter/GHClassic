@@ -49,7 +49,11 @@ namespace gh2::input
     void cancelRebind();
     bool rebinding();
     // The action unbound in the device's section, or the section's own
-    // lines dropped so its built-in layout is all it plays.
+    // lines dropped so its built-in layout and detected mode are all it
+    // plays.
     void clearBinding(const DeviceId &id, Action action);
     void resetBindings(const DeviceId &id);
+    // A controller's mode swapped, pad for guitar or back, in its section of
+    // input.ini: how a seat it sits in plays (input.cpp). Its kind shows it.
+    void swapMode(const DeviceId &id);
 }

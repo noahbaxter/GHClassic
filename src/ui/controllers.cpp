@@ -30,8 +30,9 @@ namespace gh2
         using namespace input;
 
         // The rows: the buttons in the order a guitar is played, then the
-        // two that have meters, then the row that puts the device back to
-        // its built-in layout. The frets are kGreen to kOrange in order.
+        // two that have meters, then the device's mode, pad or guitar, and
+        // the row that puts the device back to its built-in layout and the
+        // mode it was detected as. The frets are kGreen to kOrange in order.
         struct Row
         {
             Action action;
@@ -44,7 +45,8 @@ namespace gh2
         };
         constexpr int kFrets = kOrange - kGreen + 1;
         constexpr int kActionRows = static_cast<int>(sizeof kRows / sizeof kRows[0]);
-        constexpr int kRowCount = kActionRows + 1; // and Reset
+        constexpr int kModeRow = kActionRows;
+        constexpr int kRowCount = kModeRow + 2; // and Reset
         constexpr float kHoldToLeave = 3.0f;
         constexpr int kChips = 5;
         constexpr const char *kPosterScene = "ui/gen/lag.milo_ps2";
@@ -226,6 +228,9 @@ namespace gh2
 
         std::string read(int row)
         {
+            // The keyboard plays as a guitar.
+            if (row == kModeRow)
+                return s_shown.kind == DeviceKind::kGamepad ? "PAD" : "GUITAR";
             if (row >= kActionRows)
                 return "";
             if (s_rebinding && row == s_focus)
@@ -249,7 +254,7 @@ namespace gh2
             if (what == "after")
                 return s_first + kChips < static_cast<int>(s_views.size()) ? ">" : "";
             if (what == "row")
-                return i < kActionRows ? kRows[i].name : "RESET TO DEFAULT";
+                return i < kActionRows ? kRows[i].name : i == kModeRow ? "MODE" : "RESET TO DEFAULT";
             if (what == "read")
                 return read(i);
             return "";
@@ -318,7 +323,12 @@ namespace gh2
                     break;
                 case SDL_SCANCODE_RETURN:
                 case SDL_SCANCODE_KP_ENTER:
-                    if (s_focus >= kActionRows)
+                    if (s_focus == kModeRow)
+                    {
+                        if (!keyboard(s_shown) && !s_shown.id.none())
+                            swapMode(s_shown.id);
+                    }
+                    else if (s_focus > kModeRow)
                         resetBindings(s_shown.id);
                     else if (!s_shown.id.none())
                         startRebind(s_shown.id, kRows[s_focus].action);

@@ -216,8 +216,9 @@ namespace gh2::input
                 // _ in its name is a space (Steam_Controller).
                 made.label = s.name;
                 std::replace(made.label.begin(), made.label.end(), '_', ' ');
-                made.kind = s.kind;
+                made.detected = s.kind;
                 made.sectionName = "script " + s.name;
+                made.kind = kindOf(made.sectionName, "", made.detected);
                 made.keepInMemory = true;
                 made.builtin = scriptedLayout();
                 made.profile = overlay(made.builtin, sectionOf(made.sectionName, ""));

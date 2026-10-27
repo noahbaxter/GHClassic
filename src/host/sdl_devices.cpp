@@ -92,7 +92,8 @@ namespace gh2::input
             const DeviceInfo info = deviceInfo(d.joystick, d.gamepad);
             const auto builtin = builtinProfile(info);
             if (builtin)
-                d.kind = builtin->gamepad ? DeviceKind::kGamepad : DeviceKind::kGuitar;
+                d.detected = builtin->gamepad ? DeviceKind::kGamepad : DeviceKind::kGuitar;
+            d.kind = kindOf(name, guid, d.detected);
             d.label = builtin && !builtin->gamepad ? builtin->label : name;
             const Section *own = sectionOf(name, guid);
             d.sectionName = name;

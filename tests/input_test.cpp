@@ -157,13 +157,28 @@ int main()
     file = loadBindingFile(path);
     own = deviceBindings(file, "Guitar", "0300aaaa");
     CHECK(own && own->count(kWhammy) && own->at(kWhammy).empty());
+    // A section's mode line, kept beside its bindings or its comments; only
+    // pad or guitar.
+    CHECK(writeSection(path, deviceSection("Guitar", "0300bbbb"), {{kGreen, {*parseSource("button 9")}}}, "pad"));
+    file = loadBindingFile(path);
+    CHECK(file.modes.at(deviceSection("Guitar", "0300bbbb")) == "pad");
+    CHECK(!file.modes.count(deviceSection("Guitar", "0300aaaa")));
+    {
+        std::ofstream out(path, std::ios::app);
+        out << "\n[device \"Pad\" 0300cccc]\nmode = drums\n";
+    }
+    file = loadBindingFile(path);
+    CHECK(!file.modes.count(deviceSection("Pad", "0300cccc")));
     // Reset: the section is its layout again as comments, in place of its own.
     Profile layout{};
     layout[kGreen] = {*parseSource("button 0")};
     CHECK(writeTemplate(path, deviceSection("Guitar", "0300aaaa"), layout));
+    CHECK(writeTemplate(path, deviceSection("Guitar", "0300cccc"), layout, "guitar"));
     file = loadBindingFile(path);
     own = deviceBindings(file, "Guitar", "0300aaaa");
     CHECK(own && own->empty());
+    CHECK(!file.modes.count(deviceSection("Guitar", "0300aaaa")));
+    CHECK(file.modes.at(deviceSection("Guitar", "0300cccc")) == "guitar");
     CHECK(formatSource(deviceBindings(file, "Guitar", "0300bbbb")->at(kGreen).at(0)) == "button 9");
     {
         std::ifstream in(path);
