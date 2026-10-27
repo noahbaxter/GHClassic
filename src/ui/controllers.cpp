@@ -10,6 +10,7 @@
 #include "milo/milo.h"
 #include "render/texture_store.h"
 #include "script.h"
+#include "settings/settings.h"
 #include "ui/players.h"
 
 #include <SDL3/SDL.h>
@@ -39,7 +40,7 @@ namespace gh2
         const Row kRows[] = {
             {kGreen, "GREEN"},          {kRed, "RED"},           {kYellow, "YELLOW"}, {kBlue, "BLUE"},
             {kOrange, "ORANGE"},        {kStrumUp, "STRUM UP"},  {kStrumDown, "STRUM DOWN"},
-            {kStarPower, "SELECT"},     {kStart, "START"},       {kWhammy, "WHAMMY"}, {kTilt, "TILT"},
+            {kStarPower, "STAR POWER"}, {kStart, "START"},       {kWhammy, "WHAMMY"}, {kTilt, "TILT"},
         };
         constexpr int kFrets = kOrange - kGreen + 1;
         constexpr int kActionRows = static_cast<int>(sizeof kRows / sizeof kRows[0]);
@@ -47,6 +48,7 @@ namespace gh2
         constexpr float kHoldToLeave = 3.0f;
         constexpr int kChips = 5;
         constexpr const char *kPosterScene = "ui/gen/lag.milo_ps2";
+        constexpr const char *kTutorialScene = "ui/gen/tut_script.milo_ps2";
 
         // The Rat Cellar's TV in the corner (small1_geom: the PS2's channels
         // the venue's TV never shows but one of), its frame and each
@@ -339,6 +341,18 @@ namespace gh2
             return "paint";
         }
 
+        // Whether the tutorial's guitar is the 360's X-plorer art: its menu
+        // art on (gh2x/textures.h) over GH2's own scene, not that of `game`,
+        // whose career is played, when its disc has its own (the 80s' SG).
+        // A theme's menus leave this scene GH2's.
+        bool explorer(const std::string &game)
+        {
+            if (!games::disc("gh2x") || !settings::hd(settings::kLookUiArt))
+                return false;
+            const auto disc = game == "gh2" ? std::nullopt : games::disc(game);
+            return !disc || ark::paths(*disc, kTutorialScene).empty();
+        }
+
         script::Node symbolNode(const script::Call &call, const std::string &text)
         {
             return {script::symbol(call.rdram, call.ctx, call.runtime, text), script::kSymbol};
@@ -360,8 +374,9 @@ namespace gh2
         // {ghc_controllers fret_held <fret>}: that fret, 0 green to 4 orange.
         // {ghc_controllers rebinding}, {ghc_controllers keyboard}: whether a
         // control is awaited, and whether the device shown is the keyboard.
-        // {ghc_controllers explorer}: whether the tutorial's guitar is the
-        // 360's X-plorer art (gh2x/textures.h), else the PS2's SG.
+        // {ghc_controllers explorer <game>}: see explorer(), the game being
+        // {campaigns live}.
+        // {ghc_controllers seat}: the seat of the device shown, -1 for none.
         // {ghc_controllers tv}: the texture the corner's TV shows now.
         // {ghc_controllers blink}: 0 to 1 and back twice a second while a
         // control is awaited, else 0.
@@ -406,7 +421,9 @@ namespace gh2
                 return {v && v->id == s_shown.id ? 1u : 0u, script::kInt};
             }
             if (op == "explorer")
-                return {games::disc("gh2x") ? 1u : 0u, script::kInt};
+                return {explorer(call.symbol(2)) ? 1u : 0u, script::kInt};
+            if (op == "seat")
+                return {static_cast<uint32_t>(s_shown.seat), script::kInt};
             if (op == "rebinding")
                 return {s_rebinding ? 1u : 0u, script::kInt};
             if (op == "keyboard")
@@ -436,7 +453,13 @@ namespace gh2
         // The screen's black poster: a Tex of its own beside Calibrate Lag's
         // in that scene, which the screen's copy of it draws instead.
         textures::addBundled("controllers/poster", kControllersPoster, sizeof kControllersPoster);
-        if (const auto disc = games::disc("gh2"))
+        // Into GH2's scenes and the 80s' own of them, which its career and
+        // its theme's menus draw instead.
+        const auto gh2 = games::disc("gh2");
+        for (const auto disc : {gh2, games::disc("gh80s")})
+        {
+            if (!disc || !gh2)
+                continue;
             ark::addFix(*disc, kPosterScene, [](std::vector<uint8_t> &file)
                         {
                             auto scene = milo::read(file);
@@ -451,32 +474,31 @@ namespace gh2
                                       gh1::texWith(scene->bodies[*at], textures::standIn(id, 64u, 64u), true));
                             file = milo::write(*scene);
                         });
-        // The TV's pictures, copied into the tutorial's scene the screen
-        // draws in, either hand's.
-        if (const auto disc = games::disc("gh2"))
-            for (const char *tutorial : {"ui/gen/tut_script.milo_ps2", "ui/gen/tut_script_lefty.milo_ps2"})
-                ark::addFix(*disc, tutorial, [disc = *disc](std::vector<uint8_t> &file)
+            // The TV's pictures, GH2's, copied into the tutorial's scene the
+            // screen draws in.
+            ark::addFix(*disc, kTutorialScene, [gh2 = *gh2](std::vector<uint8_t> &file)
+                        {
+                            auto scene = milo::read(file);
+                            if (!scene)
+                                return;
+                            std::vector<const char *> wanted = {kTvFrame, kTestCard};
+                            for (const auto &frames : kChannels)
+                                wanted.insert(wanted.end(), frames.begin(), frames.end());
+                            for (const char *from : {kTvScene, kBarsScene})
                             {
-                                auto scene = milo::read(file);
-                                if (!scene)
-                                    return;
-                                std::vector<const char *> wanted = {kTvFrame, kTestCard};
-                                for (const auto &frames : kChannels)
-                                    wanted.insert(wanted.end(), frames.begin(), frames.end());
-                                for (const char *from : {kTvScene, kBarsScene})
+                                const auto bytes = ark::readFile(gh2, from);
+                                const auto source = bytes ? milo::read(*bytes) : std::nullopt;
+                                if (!source)
                                 {
-                                    const auto bytes = ark::readFile(disc, from);
-                                    const auto source = bytes ? milo::read(*bytes) : std::nullopt;
-                                    if (!source)
-                                    {
-                                        std::cerr << "[controllers] no TV art in " << from << std::endl;
-                                        continue;
-                                    }
-                                    for (const char *name : wanted)
-                                        if (const auto at = milo::find(*source, name); at && !milo::find(*scene, name))
-                                            milo::add(*scene, "Tex", name, source->bodies[*at]);
+                                    std::cerr << "[controllers] no TV art in " << from << std::endl;
+                                    continue;
                                 }
-                                file = milo::write(*scene);
-                            });
+                                for (const char *name : wanted)
+                                    if (const auto at = milo::find(*source, name); at && !milo::find(*scene, name))
+                                        milo::add(*scene, "Tex", name, source->bodies[*at]);
+                            }
+                            file = milo::write(*scene);
+                        });
+        }
     }
 }

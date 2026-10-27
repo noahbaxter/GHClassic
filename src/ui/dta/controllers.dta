@@ -90,8 +90,9 @@
 {retype ghc_controllers_panel
    (
       ; From the ARK root: a path resolves against the file its array came
-      ; from, and this one comes from no file.
-      (file {if_else {options get_lefty 0} ui/tut_script_lefty.milo ui/tut_script.milo})
+      ; from, and this one comes from no file. The right-handed scene for
+      ; everyone: a lefty player's guitar is it mirrored (light).
+      (file ui/tut_script.milo)
       ; All of it inside the poster's black, x -287 to 287 and z 211 to
       ; -182, with a margin, but the keys along the bottom.
       (labels
@@ -122,14 +123,20 @@
       (read_size 0.28)
       ; Each row's name in its fret's colour, green to orange, else white.
       (row_colors ((0.16 0.75 0.24) (0.86 0.2 0.2) (0.94 0.82 0.16) (0.2 0.43 0.9) (0.94 0.51 0.12) (0.9 0.9 0.9)))
-      ; The guitar's view: where it stands and its size, the tutorial's
-      ; 0.35 being 600 wide.
-      (guitar (-180 26 0.21))
+      ; The guitar's view: where it stands, either art's outline as far
+      ; below the devices' boxes as above the TV, and its size, the
+      ; tutorial's 0.35 being 600 wide; and the art's middle across, which a
+      ; lefty player's is mirrored about.
+      (guitar (-180 44 0.21))
+      ; The X-plorer's neck sits lower in its outline than the SG's, so it
+      ; is lifted by this and the SG lowered, their necks level.
+      (neck_lift 4.5)
+      (guitar_mid -89)
       ; Its frets in its own units: each one's middle across, the two arts'
       ; middles up (the 360's X-plorer sits lower in the PS2's scene than
       ; the SG it was drawn for), and a fret's size, measured off the art;
       ; then each fret's colour lit.
-      (fret_x (-109 -43.3 22.4 87.6 153.3))
+      (fret_x (-106.4 -36.1 27.7 93 159.8))
       (fret_z_explorer 71)
       (fret_z_sg 109)
       (fret_wide 44)
@@ -138,7 +145,7 @@
       ; The strum bar's middle on screen, and each arrow's size and how far
       ; its middle sits above or below it.
       (strum_x -1)
-      (strum_z 42)
+      (strum_z 60)
       (arrow_wide 26)
       (arrow_tall 52)
       (arrow_off 40)
@@ -217,10 +224,6 @@
             )
             {{$this find $o} set_showing FALSE}
          }
-         {t1_guitar.view set_showing TRUE}
-         {t1_guitar.view set_frame 0}
-         {t1_guitar.view set_local_pos {elem [guitar] 0} 0 {elem [guitar] 1}}
-         {t1_guitar.view set_local_scale {elem [guitar] 2} 1 {elem [guitar] 2}}
          {t1_guitar_3.mat set diffuse_tex t1_guitar_3_blank.tex}
          {t1_guitar_1.mat set diffuse_tex t1_guitar_1.tex}
          ; The frets' own views stand on them in either guitar's art, and
@@ -238,9 +241,20 @@
          }
          {if {! {exists ghc_ct.grp}}
             {new Group ghc_ct.grp}
+            {new Group ghc_ct_guitar.grp}
+            {{$this find ghc_ct_guitar.grp} set trans_parent {$this find ghc_ct.grp}}
             {$this ghc_make}
             {{$this loaded_dir} sync_objects}
          }
+         ; The guitar on a group at the art's middle, which a lefty player's
+         ; mirrors.
+         {{$this find ghc_ct_guitar.grp} set_local_pos [guitar_mid] 0
+            {'+' {elem [guitar] 1} {if_else {ghc_controllers explorer {campaigns live}} [neck_lift] {'-' 0 [neck_lift]}}}}
+         {t1_guitar.view set trans_parent {$this find ghc_ct_guitar.grp}}
+         {t1_guitar.view set_showing TRUE}
+         {t1_guitar.view set_frame 0}
+         {t1_guitar.view set_local_pos {'-' {elem [guitar] 0} [guitar_mid]} 0 0}
+         {t1_guitar.view set_local_scale {elem [guitar] 2} 1 {elem [guitar] 2}}
       )
       (ghc_make
          {foreach $l [labels]
@@ -271,7 +285,7 @@
          ; fret's top and bottom: the SG's frets are round at the bottom.
          {foreach_int $f 0 5
             {do
-               ($sg {! {ghc_controllers explorer}})
+               ($sg {! {ghc_controllers explorer {campaigns live}}})
                ($grp {symbol {sprint ghc_ct_fret $f ".grp"}})
                ($lit {elem [fret_lit] $f})
                ($halo {symbol {sprint ghc_ct_halo $f}})
@@ -292,7 +306,7 @@
          ; Select's and Start's glow, round over each, on the guitar's frame.
          {foreach $b [buttons]
             {do
-               ($at {if_else {ghc_controllers explorer} {elem $b 1} {elem $b 2}})
+               ($at {if_else {ghc_controllers explorer {campaigns live}} {elem $b 1} {elem $b 2}})
                ($w {elem $at 2})
                ($h {elem $at 3})
                ($box {symbol {sprint ghc_ct_btn_ {elem $b 0}}})
@@ -316,20 +330,22 @@
          ; Strum's two arrows by the strum bar, the tutorial's own arrow on a
          ; help bar end's quad (0 to 16 across, 16 tall about its middle,
          ; its whole picture), up's mirrored top to bottom so its lit side
-         ; matches; each shows only while strummed that way.
+         ; matches; each shows only while strummed that way. On the guitar's
+         ; group, so they mirror with it.
          {foreach $a ((up 180) (down 0))
             {do
                ($dir {elem $a 0})
                ($mesh {symbol {sprint ghc_ct_arrow_ $dir ".mesh"}})
                ($turned {== {elem $a 1} 180})
-               {ghc_ct_arrow $this {symbol {sprint ghc_ct_arrow_ $dir}} {$this find ghc_ct.grp}}
+               ($z {'-' [strum_z] {elem [guitar] 1}})
+               {ghc_ct_arrow $this {symbol {sprint ghc_ct_arrow_ $dir}} {$this find ghc_ct_guitar.grp}}
                {{$this find $mesh} set_local_scale {/ [arrow_wide] 16.0} 1
                   {'*' {/ [arrow_tall] 16.0} {if_else $turned -1 1}}
                }
                {{$this find $mesh} set_local_pos
-                  {'-' [strum_x] {/ [arrow_wide] 2}}
+                  {'-' {'-' [strum_x] [guitar_mid]} {/ [arrow_wide] 2}}
                   0
-                  {if_else $turned {'+' [strum_z] [arrow_off]} {'-' [strum_z] [arrow_off]}}
+                  {if_else $turned {'+' $z [arrow_off]} {'-' $z [arrow_off]}}
                }
             }
          }
@@ -441,6 +457,12 @@
       (light
          ; The TV's channel, or test card (ui/controllers.cpp).
          {{$this find ghc_ct_tv_screen.mat} set diffuse_tex {$this find {ghc_controllers tv}}}
+         ; The guitar mirrored for a lefty player's device.
+         {do
+            ($seat {ghc_controllers seat})
+            {{$this find ghc_ct_guitar.grp} set_local_scale
+               {if_else {&& {>= $seat 0} {options get_lefty $seat}} -1 1} 1 1}
+         }
          ; While a control is awaited its row's box fades in and out; once
          ; bound, paint puts the box back.
          {if {ghc_controllers rebinding}
@@ -493,11 +515,6 @@
             {{$this find $o} set_showing FALSE}
          }
          {{$this find syncoff_backdrop.mat} set diffuse_tex {$this find ghc_ct_poster.tex}}
-      )
-   )
-}
-{retype ghc_controllers_screen
-   (
          {$this ghc_swing}
       )
       (exit {$this ghc_swing})
@@ -511,6 +528,11 @@
       (ghc_swing
          {{$this loaded_dir} set cam
             {if_else {ui in_transition} {ghc_controllers_panel find meta.cam} ""}}
+      )
+   )
+}
+{retype ghc_controllers_screen
+   (
       (panels meta ghc_controllers_bg_panel helpbar ghc_controllers_panel)
       (focus ghc_controllers_panel)
    )
