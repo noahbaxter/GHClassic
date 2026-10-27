@@ -2,19 +2,18 @@
 //
 // The device must be left alone while its resting state is taken. Each
 // action then takes the first control that moves: a key, a button, a hat
-// direction, or an axis moved over half its travel. Escape, or ten seconds
-// untouched, skips an action, which keeps what input.ini had for it. Whammy
-// is the axis pushed furthest while the prompt is up, from its rest to the
-// furthest point.
+// direction, or an axis moved over half its travel (host/capture.h). Escape,
+// or ten seconds untouched, skips an action, which keeps what input.ini had
+// for it.
 
 #include "host/bind.h"
 
 #include "host/bindings.h"
+#include "host/capture.h"
 
 #include <SDL3/SDL.h>
 
 #include <chrono>
-#include <cmath>
 #include <cstdlib>
 #include <iostream>
 #include <string>
@@ -29,13 +28,6 @@ namespace gh2
         using Clock = std::chrono::steady_clock;
 
         constexpr auto kSkipAfter = std::chrono::seconds(10);
-
-        struct Snapshot
-        {
-            std::vector<bool> buttons;
-            std::vector<uint8_t> hats;
-            std::vector<float> axes;
-        };
 
         const char *const kPrompts[kActionCount] = {
             "press green",
@@ -52,18 +44,6 @@ namespace gh2
         };
 
         SDL_Window *s_window = nullptr;
-
-        Snapshot read(SDL_Joystick *joy)
-        {
-            Snapshot s;
-            for (int i = 0; i < SDL_GetNumJoystickButtons(joy); ++i)
-                s.buttons.push_back(SDL_GetJoystickButton(joy, i));
-            for (int i = 0; i < SDL_GetNumJoystickHats(joy); ++i)
-                s.hats.push_back(SDL_GetJoystickHat(joy, i));
-            for (int i = 0; i < SDL_GetNumJoystickAxes(joy); ++i)
-                s.axes.push_back(axisValue(SDL_GetJoystickAxis(joy, i)));
-            return s;
-        }
 
         // Pumps events; false when the window closed. Collects keys pressed.
         bool pump(std::vector<SDL_Scancode> *keysDown)
@@ -85,38 +65,11 @@ namespace gh2
             SDL_SetWindowTitle(s_window, ("GH Classic bind: " + text).c_str());
         }
 
-        // The first control away from rest, as a source.
-        std::optional<Source> moved(const Snapshot &rest, const Snapshot &now)
-        {
-            for (size_t i = 0; i < now.buttons.size(); ++i)
-                if (now.buttons[i] && !rest.buttons[i])
-                    return Source{Source::kButton, static_cast<int>(i)};
-            for (size_t i = 0; i < now.hats.size(); ++i)
-                for (uint8_t bit : {SDL_HAT_UP, SDL_HAT_RIGHT, SDL_HAT_DOWN, SDL_HAT_LEFT})
-                    if ((now.hats[i] & bit) && !(rest.hats[i] & bit))
-                        return Source{Source::kHat, static_cast<int>(i), bit};
-            for (size_t i = 0; i < now.axes.size(); ++i)
-                if (std::fabs(now.axes[i] - rest.axes[i]) > 0.5f)
-                    return Source{Source::kAxis, static_cast<int>(i), 0, rest.axes[i], now.axes[i]};
-            return std::nullopt;
-        }
-
-        bool atRest(const Snapshot &rest, const Snapshot &now)
-        {
-            if (now.buttons != rest.buttons || now.hats != rest.hats)
-                return false;
-            for (size_t i = 0; i < now.axes.size(); ++i)
-                if (std::fabs(now.axes[i] - rest.axes[i]) > 0.25f)
-                    return false;
-            return true;
-        }
-
         // A key for the keyboard, a control for a joystick; nothing on skip.
-        // An axis keeps the furthest point it reached before letting go.
         std::optional<Source> capture(SDL_Joystick *joy, const Snapshot &rest, bool whammy, bool &quit)
         {
             const auto start = Clock::now();
-            std::optional<Source> found;
+            Capture caught(rest, whammy ? Capture::kAxisOnly : Capture::kAny);
             while (Clock::now() - start < kSkipAfter)
             {
                 std::vector<SDL_Scancode> keys;
@@ -132,27 +85,11 @@ namespace gh2
                     if (!joy)
                         return Source{Source::kKey, k};
                 }
-                if (joy)
-                {
-                    const Snapshot now = read(joy);
-                    if (!found)
-                    {
-                        const auto m = moved(rest, now);
-                        if (m && (!whammy || m->kind == Source::kAxis))
-                            found = m;
-                    }
-                    if (found && found->kind == Source::kAxis)
-                    {
-                        const float v = now.axes[found->index];
-                        if (std::fabs(v - found->rest) > std::fabs(found->full - found->rest))
-                            found->full = v;
-                    }
-                    if (found && atRest(rest, now))
-                        return found;
-                }
+                if (joy && caught.feed(readJoystick(joy)))
+                    return caught.found();
                 std::this_thread::sleep_for(std::chrono::milliseconds(5));
             }
-            return found;
+            return caught.found();
         }
 
         int list()
@@ -222,7 +159,7 @@ namespace gh2
                 pump(nullptr);
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
-            rest = read(joy);
+            rest = readJoystick(joy);
             std::cout << "ok\n";
         }
 

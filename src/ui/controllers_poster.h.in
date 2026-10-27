@@ -1,0 +1,5 @@
+#pragma once
+
+// assets/controllers_poster.bin (ui/controllers.cpp): Calibrate Lag's poster
+// with its art painted out to black, as a 360 bitmap.
+inline constexpr unsigned char kControllersPoster[] = {@GHC_CONTROLLERS_POSTER@};

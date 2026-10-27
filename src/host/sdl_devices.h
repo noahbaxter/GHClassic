@@ -4,7 +4,13 @@
 // layout it plays: its built-in one (profiles.cpp) with its section of
 // input.ini laid over it. The host thread's own.
 
+#include "host/bindings.h"
 #include "host/device.h"
+
+#include <SDL3/SDL.h>
+
+#include <string>
+#include <vector>
 
 namespace gh2::input
 {
@@ -14,4 +20,13 @@ namespace gh2::input
     void closeDevices();
     // Each one's raw controls into its snapshot.
     void readSdlDevices();
+    // Its accelerometer turned on, which sends nothing until it is.
+    void enableAccel(Device &d);
+
+    // A control as a player calls it, for the Controllers screen: a
+    // gamepad's by its own labels (Cross and L1 on a PlayStation pad, A and
+    // LB on the rest), a stick by its direction, a key by its name; several
+    // joined with " / ".
+    std::string shown(const SDL_Gamepad *gamepad, const Source &s);
+    std::string joined(const SDL_Gamepad *gamepad, const std::vector<Source> &sources);
 }

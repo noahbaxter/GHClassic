@@ -32,6 +32,14 @@
 (press down)
 (wait 1)
 (shot options)
+; Settings, its rows on the same poster, and Video Settings under Audio.
+(press up)
+(wait 0.5)
+(press green)
+(wait 1)
+(shot options_settings)
+(press down)
+(wait 0.5)
 (press green)
 (wait_screen video_settings_screen)
 {ui goto_screen training_screen}

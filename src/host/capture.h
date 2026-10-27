@@ -1,6 +1,9 @@
 #pragma once
 
-// A device's raw controls at one moment, and what a layout plays on them.
+// Catching the control a player presses for an action: the first that moves
+// away from where the device rested, kept until it is back at rest.
+// An axis keeps the furthest point it reached, so whammy and tilt come out
+// with their rest and full the right way round.
 
 #include "host/bindings.h"
 
@@ -8,6 +11,7 @@
 
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 namespace gh2::input
@@ -34,4 +38,42 @@ namespace gh2::input
     float amount(const Source &s, const Snapshot &now, const bool *keys);
     // Each action's amount on `profile`: the most of its sources.
     void play(const Profile &profile, const Snapshot &now, const bool *keys, std::array<float, kActionCount> &held);
+
+    // The first control away from rest, as a source: a button or hat
+    // direction gone down, or an axis moved over half its travel.
+    std::optional<Source> moved(const Snapshot &rest, const Snapshot &now);
+    bool atRest(const Snapshot &rest, const Snapshot &now);
+    // That one control back where it rested, whatever the rest are doing:
+    // a pad's touch sensors and gyro are never all still.
+    bool backAtRest(const Source &s, const Snapshot &rest, const Snapshot &now);
+
+    // One control being caught, fed a snapshot each poll.
+    class Capture
+    {
+    public:
+        enum Mode
+        {
+            kAny,
+            kAxisOnly, // whammy, which a button cannot be
+            // Tilt, which is often a sensor that moves only part of its
+            // travel: a button still counts, else whichever axis or
+            // accelerometer axis moved furthest, once it comes back.
+            kTilt,
+        };
+        Capture(Snapshot rest, Mode mode) : m_rest(std::move(rest)), m_mode(mode) {}
+
+        // True once a control moved and is back at rest.
+        bool feed(const Snapshot &now);
+        const std::optional<Source> &found() const { return m_found; }
+
+    private:
+        bool feedTilt(const Snapshot &now);
+
+        Snapshot m_rest;
+        Mode m_mode;
+        std::optional<Source> m_found;
+        // Tilt: each axis's, then each accelerometer axis's, furthest
+        // reading from rest.
+        std::vector<float> m_peak;
+    };
 }

@@ -1,0 +1,38 @@
+; A controller rebound on the Controllers screen: the next control it moves
+; is the action's, kept in memory for a scenario's device, and played from
+; then on.
+#include common/first_boot.dta
+(device guitar)
+(press down guitar)
+(expect {seat_has 0 guitar} 1)
+{ui goto_screen ghc_controllers_screen}
+(wait_screen ghc_controllers_screen)
+(wait 1)
+(expect {ghc_controllers text title} GUITAR)
+(expect {ghc_controllers text read 2} "Button 3")
+; Yellow waits for a control; the guitar's seventh button is it once let go.
+(key Down)
+(key Down)
+(key Return)
+(wait 0.3)
+(expect {ghc_controllers rebinding} 1)
+(hold guitar button6)
+(wait 0.3)
+(hold guitar)
+(wait 0.3)
+(expect {ghc_controllers rebinding} 0)
+(expect {ghc_controllers text read 2} "Button 7")
+(hold guitar button6)
+(wait 0.3)
+(expect {ghc_controllers held yellow} 1 0.01)
+(hold guitar)
+(shot rebound)
+; Out of the screen it plays yellow on P1's port.
+(key Escape)
+(wait_screen options_screen)
+(wait 1)
+(hold guitar button6)
+(wait 0.3)
+(expect {pad_held yellow} 1)
+(hold guitar)
+(quit)

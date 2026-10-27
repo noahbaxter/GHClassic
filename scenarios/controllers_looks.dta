@@ -1,0 +1,76 @@
+; The Controllers screen over each game's menus: GH2's, then in a GH1 and an
+; 80s career, each with P1's guitar right handed and then a lefty player's,
+; mirrored, its strum arrow on the other side. Its art is GH2's tutorial's
+; (the 360's X-plorer with that disc mounted, else the PS2's SG) whatever
+; the game.
+(needs gh1 gh80s)
+#include common/first_boot.dta
+(device guitar)
+(press down guitar)
+(expect {seat_has 0 guitar} 1)
+{ui goto_screen ghc_controllers_screen}
+(wait_screen ghc_controllers_screen)
+(wait 1)
+(hold guitar green blue down)
+(wait 0.3)
+(shot gh2)
+{options set_lefty 0 TRUE}
+(wait 0.3)
+(shot gh2_lefty)
+(hold guitar)
+{options set_lefty 0 FALSE}
+(key Escape)
+(wait_screen options_screen)
+(wait 1)
+
+; The 80s as the menus' theme: the screen's scene stays GH2's, its guitar
+; and the frets lit on it too.
+{campaigns switch gh80s}
+(wait 2)
+(expect {campaigns active} gh80s)
+{ui goto_screen ghc_controllers_screen}
+(wait_screen ghc_controllers_screen)
+(wait 1)
+(hold guitar green blue down)
+(wait 0.3)
+(shot gh80s_theme)
+(hold guitar)
+(key Escape)
+(wait_screen options_screen)
+(wait 1)
+{campaigns switch gh2}
+(wait 2)
+
+{set $pick gh1}
+#include common/career_start.dta
+{ui goto_screen ghc_controllers_screen}
+(wait_screen ghc_controllers_screen)
+(wait 1)
+(hold guitar green blue down)
+(wait 0.3)
+(shot gh1)
+{options set_lefty 0 TRUE}
+(wait 0.3)
+(shot gh1_lefty)
+(hold guitar)
+{options set_lefty 0 FALSE}
+(key Escape)
+(wait_screen options_screen)
+(wait 1)
+
+{set $pick gh80s}
+#include common/career_start.dta
+{ui goto_screen ghc_controllers_screen}
+(wait_screen ghc_controllers_screen)
+(wait 1)
+(hold guitar green blue down)
+(wait 0.3)
+(shot gh80s)
+{options set_lefty 0 TRUE}
+(wait 0.3)
+(shot gh80s_lefty)
+(hold guitar)
+{options set_lefty 0 FALSE}
+(key Escape)
+(wait_screen options_screen)
+(quit)

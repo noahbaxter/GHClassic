@@ -1,0 +1,305 @@
+; Every vertical menu goes round both ways from the keyboard: each Down and
+; Up moves the focus, and a lap of as many as it has rows comes back to the
+; row it began on. A hidden row left pointing at a shown one stops Up there
+; (game_settings.dta).
+#include common/first_boot.dta
+(device guitar)
+(press down guitar)
+; The main menu.
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+(wait 1)
+{set $start {{ui current_screen} focus_name}}
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+(expect {== {{ui current_screen} focus_name} $start} 1)
+{set $start {{ui current_screen} focus_name}}
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+(expect {== {{ui current_screen} focus_name} $start} 1)
+; Options' first rows.
+{ui goto_screen options_screen}
+(wait_screen options_screen)
+(wait 1)
+{set $start {{ui current_screen} focus_name}}
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+(expect {== {{ui current_screen} focus_name} $start} 1)
+{set $start {{ui current_screen} focus_name}}
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+(expect {== {{ui current_screen} focus_name} $start} 1)
+; Its Settings rows.
+(key Return)
+(wait 0.5)
+(expect {options_screen focus_name} op_audio.btn)
+{set $start {{ui current_screen} focus_name}}
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+(expect {== {{ui current_screen} focus_name} $start} 1)
+{set $start {{ui current_screen} focus_name}}
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+(expect {== {{ui current_screen} focus_name} $start} 1)
+; Audio Settings.
+{ui goto_screen audio_settings_screen}
+(wait_screen audio_settings_screen)
+(wait 1)
+{set $start {{ui current_screen} focus_name}}
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+(expect {== {{ui current_screen} focus_name} $start} 1)
+{set $start {{ui current_screen} focus_name}}
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+(expect {== {{ui current_screen} focus_name} $start} 1)
+; Video Settings.
+{ui goto_screen video_settings_screen}
+(wait_screen video_settings_screen)
+(wait 1)
+{set $start {{ui current_screen} focus_name}}
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+(expect {== {{ui current_screen} focus_name} $start} 1)
+{set $start {{ui current_screen} focus_name}}
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+(expect {== {{ui current_screen} focus_name} $start} 1)
+; Game Settings.
+{ui goto_screen game_settings_screen}
+(wait_screen game_settings_screen)
+(wait 1)
+{set $start {{ui current_screen} focus_name}}
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+(expect {== {{ui current_screen} focus_name} $start} 1)
+{set $start {{ui current_screen} focus_name}}
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+(expect {== {{ui current_screen} focus_name} $start} 1)
+; A song's pause menu.
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty easy}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 2)
+(key Escape)
+(wait_screen pause_screen 10)
+(wait 1)
+{set $start {{ui current_screen} focus_name}}
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Down)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+(expect {== {{ui current_screen} focus_name} $start} 1)
+{set $start {{ui current_screen} focus_name}}
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+{set $was {{ui current_screen} focus_name}}
+(key Up)
+(expect {!= {{ui current_screen} focus_name} $was} 1)
+(expect {== {{ui current_screen} focus_name} $start} 1)
+(quit)

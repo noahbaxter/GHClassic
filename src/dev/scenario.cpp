@@ -31,6 +31,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <vector>
 
 namespace gh2::scenario
 {
@@ -40,6 +41,17 @@ namespace gh2::scenario
 
         constexpr uint32_t kString = 0x12u;
         constexpr int kTimeout = 30; // seconds
+
+        // A control a press or hold names: an action (green, strum's up and
+        // down, start, tilt...) as its libpad bit, or a raw button by number
+        // on a (device), button6.
+        void control(const std::string &name, uint16_t &bits, std::vector<int> &buttons)
+        {
+            if (name.size() > 6 && name.rfind("button", 0) == 0)
+                buttons.push_back(std::atoi(name.c_str() + 6));
+            else
+                bits |= padButton(name);
+        }
 
         std::string s_text;
         uint32_t s_steps = 0u; // the parsed file, a DataArray
@@ -250,8 +262,10 @@ namespace gh2::scenario
                     }
                     setScriptedKey(s_pressKey, true);
                     s_pressed = true;
-                    s_release = now() + std::chrono::milliseconds(150);
-                    s_until = now() + std::chrono::milliseconds(400);
+                    // Held that many seconds, else let go as a tap is.
+                    const int heldMs = array.size() > 2 ? static_cast<int>(array.number(2) * 1000.0f) : 150;
+                    s_release = now() + std::chrono::milliseconds(heldMs);
+                    s_until = now() + std::chrono::milliseconds(heldMs + 250);
                     return;
                 }
                 if (verb == "press")
@@ -260,12 +274,14 @@ namespace gh2::scenario
                     // Held long enough for the pad to be read, then let go
                     // before the next step. On P1's port, or by a (device)
                     // named, through its layout and the seat rules.
-                    const uint16_t bits = padButton(array.symbol(1));
+                    uint16_t bits = 0;
+                    std::vector<int> buttons;
+                    control(array.symbol(1), bits, buttons);
                     s_pressDevice = array.size() > 2 ? array.symbol(2) : "";
                     if (s_pressDevice.empty())
                         setScriptedPad(bits);
                     else
-                        setScriptedDevice(s_pressDevice, bits);
+                        setScriptedDevice(s_pressDevice, bits, buttons);
                     s_pressed = true;
                     s_release = now() + std::chrono::milliseconds(150);
                     s_until = now() + std::chrono::milliseconds(400);
@@ -276,9 +292,10 @@ namespace gh2::scenario
                     // A (device), by name, holding those controls until its
                     // next hold; none lets go. (hold <libpad bits>) is P1's.
                     uint16_t bits = 0;
+                    std::vector<int> buttons;
                     for (int j = 2; j < array.size(); ++j)
-                        bits |= padButton(array.symbol(j));
-                    setScriptedDevice(array.symbol(1), bits);
+                        control(array.symbol(j), bits, buttons);
+                    setScriptedDevice(array.symbol(1), bits, buttons);
                     s_until = now() + std::chrono::milliseconds(200);
                     return;
                 }

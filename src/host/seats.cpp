@@ -61,6 +61,8 @@ namespace gh2::input
     // presses with it. P1 is never empty while P2 is not.
     void Seats::seat(const std::vector<Read> &reads, Mode mode, uint64_t nowMs)
     {
+        if (mode == Mode::kControllers)
+            return;
         const bool playersStep = mode == Mode::kPlayers;
         // Only devices here are remembered, and a seat's while it is away.
         const auto here = [&](const DeviceId &id) {
@@ -220,6 +222,13 @@ namespace gh2::input
                         m_thereWhenAway[seat].push_back(r.id);
             }
         }
+    }
+
+    void Seats::letGoAll()
+    {
+        for (const DeviceId &id : m_seats)
+            if (!id.none())
+                m_letGo.insert(id);
     }
 
     bool Seats::holding(const Read &r)
