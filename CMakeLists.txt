@@ -167,7 +167,8 @@ add_executable(releases_test EXCLUDE_FROM_ALL tests/releases_test.cpp src/host/r
 target_include_directories(releases_test PRIVATE src)
 
 # Which layout each controller gets, and input.ini's sections.
-add_executable(input_test EXCLUDE_FROM_ALL tests/input_test.cpp src/host/bindings.cpp src/host/profiles.cpp)
+add_executable(input_test EXCLUDE_FROM_ALL tests/input_test.cpp src/host/bindings.cpp src/host/capture.cpp
+                                          src/host/profiles.cpp)
 target_include_directories(input_test PRIVATE src)
 target_link_libraries(input_test PRIVATE SDL3::SDL3)
 

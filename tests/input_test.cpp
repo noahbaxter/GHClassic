@@ -1,10 +1,13 @@
-// Which built-in layout each controller gets, and input.ini's sections by
-// GUID. tools/ghc.py ci builds and runs it; it exits 1 on any failed check.
+// Which built-in layout each controller gets, input.ini's sections by GUID,
+// and catching the control pressed for an action. tools/ghc.py ci builds and
+// runs it; it exits 1 on any failed check.
 
 #include "host/bindings.h"
+#include "host/capture.h"
 #include "host/profiles.h"
 #include "settings/settings.h"
 
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -149,6 +152,108 @@ int main()
     CHECK(!file.sections.count("seats"));
     CHECK(formatSource(deviceBindings(file, "Guitar", "0300aaaa")->at(kRed).at(0)) == "button 2");
     std::filesystem::remove(path);
+
+    // Catching a control: the first to move from rest, once back at rest.
+    const Snapshot rest{{false, false}, {SDL_HAT_CENTERED}, {0.0f, -1.0f}};
+    Snapshot now = rest;
+    {
+        Capture c(rest, Capture::kAny);
+        CHECK(!c.feed(rest));
+        now.buttons[1] = true;
+        CHECK(!c.feed(now));
+        now.buttons[1] = false;
+        CHECK(c.feed(now) && formatSource(*c.found()) == "button 1");
+    }
+    {
+        Capture c(rest, Capture::kAny);
+        now.hats[0] = SDL_HAT_DOWN;
+        CHECK(!c.feed(now));
+        now.hats[0] = SDL_HAT_CENTERED;
+        CHECK(c.feed(now) && formatSource(*c.found()) == "hat 0 down");
+    }
+    {
+        // Whammy: a button pressed first is passed over, and the axis keeps
+        // the furthest point it reached on the way.
+        Capture c(rest, Capture::kAxisOnly);
+        now.buttons[0] = true;
+        CHECK(!c.feed(now) && !c.found());
+        now.buttons[0] = false;
+        for (float v : {-0.4f, 0.2f, 0.8f, 0.3f})
+        {
+            now.axes[1] = v;
+            CHECK(!c.feed(now));
+        }
+        now.axes[1] = -0.9f;
+        CHECK(c.feed(now));
+        CHECK(c.found() && c.found()->kind == Source::kAxis && c.found()->index == 1);
+        CHECK(c.found() && c.found()->rest == -1.0f && c.found()->full == 0.8f);
+    }
+    {
+        // Tilt: an axis moving only a quarter of its travel is caught, the
+        // one that moved furthest, once it comes most of the way back.
+        Capture c(rest, Capture::kTilt);
+        Snapshot tilt = rest;
+        tilt.axes[0] = 0.1f;
+        tilt.axes[1] = -0.75f;
+        CHECK(!c.feed(tilt));
+        tilt.axes[1] = -0.7f;
+        CHECK(!c.feed(tilt));
+        tilt.axes[0] = 0.0f;
+        tilt.axes[1] = -0.95f;
+        CHECK(c.feed(tilt));
+        CHECK(c.found() && c.found()->kind == Source::kAxis && c.found()->index == 1);
+        CHECK(c.found() && c.found()->rest == -1.0f && std::fabs(c.found()->full + 0.7f) < 1e-5f);
+    }
+    {
+        // Tilt on a gamepad's accelerometer: its first reading is its rest,
+        // and a quarter turn moves one axis by about a g.
+        Snapshot still = rest;
+        Capture c(still, Capture::kTilt);
+        still.accel = {0.0f, 9.8f, 0.0f};
+        CHECK(!c.feed(still));
+        Snapshot turned = still;
+        turned.accel = {9.6f, 2.0f, 0.0f};
+        CHECK(!c.feed(turned));
+        CHECK(c.feed(still));
+        CHECK(c.found() && c.found()->kind == Source::kPadAccel && c.found()->index == 0);
+        CHECK(c.found() && c.found()->rest == 0.0f && std::fabs(c.found()->full - 9.6f) < 1e-4f);
+    }
+    {
+        // Whammy on a pad whose touch sensor flickers and gyro drifts: the
+        // stick back at rest is enough.
+        const Snapshot pad{{false, false}, {SDL_HAT_CENTERED}, {0.0f, 0.0f, 0.0f}};
+        Capture c(pad, Capture::kAxisOnly);
+        Snapshot now = pad;
+        now.axes[1] = 1.0f;
+        now.axes[2] = 0.6f;
+        now.buttons[1] = true;
+        CHECK(!c.feed(now));
+        now.axes[1] = 0.0f;
+        CHECK(c.feed(now) && c.found() && c.found()->index == 1);
+    }
+    {
+        // Tilt on a stick while the accelerometer, turned on for it, moves
+        // further in the player's hands and never settles.
+        Snapshot still{{false}, {SDL_HAT_CENTERED}, {0.0f}};
+        Capture c(still, Capture::kTilt);
+        still.accel = {0.0f, 9.8f, 0.0f};
+        CHECK(!c.feed(still));
+        Snapshot now = still;
+        now.axes[0] = -1.0f;
+        now.accel = {12.0f, 2.0f, 0.0f};
+        CHECK(!c.feed(now));
+        now.axes[0] = 0.0f;
+        now.accel = {11.0f, 3.0f, 0.0f};
+        CHECK(c.feed(now) && c.found() && c.found()->kind == Source::kAxis && c.found()->index == 0);
+    }
+    {
+        // Tilt on a switch: a button, as any control is.
+        Capture c(rest, Capture::kTilt);
+        Snapshot tilt = rest;
+        tilt.buttons[0] = true;
+        CHECK(!c.feed(tilt));
+        CHECK(c.feed(rest) && formatSource(*c.found()) == "button 0");
+    }
 
     if (s_failed)
         std::cerr << s_failed << " failed" << std::endl;
