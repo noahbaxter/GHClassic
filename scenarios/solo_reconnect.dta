@@ -1,5 +1,6 @@
 ; P1's controller pulled out mid-song: GH2's own controller pause, which
-; holds until the same controller is back, and then its green resumes.
+; holds until the same controller is back, and then its X resumes, the pad
+; playing as a DualShock (its orange, Cross or A).
 #include common/first_boot.dta
 (device pad)
 (device guitar)
@@ -22,6 +23,6 @@
 (device pad)
 (wait 0.5)
 (expect {seat_has 0 pad} 1)
-(press green pad)
+(press orange pad)
 (wait_screen game_screen 10)
 (quit)

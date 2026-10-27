@@ -22,7 +22,9 @@
 (press start guitar)
 (wait 0.5)
 (expect {seat_has 0 guitar} 1)
-(press green guitar)
+; The song stays a pad's, which GH2 fixed as it started: X resumes it, the
+; guitar's orange.
+(press orange guitar)
 (wait_screen game_screen 10)
 ; The guitar gone too: the keyboard's Esc takes it, Enter goes on to the
 ; pause menu, and Esc resumes.

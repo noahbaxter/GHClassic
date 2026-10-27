@@ -80,6 +80,7 @@ namespace gh2
         // paused would pick Resume, the Escape that left the Controllers
         // screen would back out of the menu under it.
         Mode s_modeWas = Mode::kMenu;
+        bool s_joypad[kSeats] = {}; // each seat playing this song as a DualShock
         std::array<bool, SDL_SCANCODE_COUNT> s_keyWait{};
 
         // What is up, from what each part of the game says of it: the
@@ -101,12 +102,21 @@ namespace gh2
             return s_playersStep.load(std::memory_order_relaxed) ? Mode::kPlayers : Mode::kMenu;
         }
 
-        HostPad padOf(const std::array<float, kActionCount> &held)
+        // Each action on a DualShock, as GH2's joypad layout takes it
+        // (config/beatmatch_controller.dta, joypad): frets L2 L1 R1 R2 X,
+        // star power on Select; tilt is a guitar's alone.
+        constexpr uint16_t kJoypadButtons[kActionCount] = {
+            pad::kL2, pad::kL1, pad::kR1, pad::kR2, pad::kCross, pad::kUp, pad::kDown, pad::kStart, pad::kSelect, 0, 0,
+        };
+
+        // The guitar's buttons, or with `joypad` a DualShock's.
+        HostPad padOf(const std::array<float, kActionCount> &held, bool joypad = false)
         {
             HostPad pad;
+            pad.joypad = joypad;
             for (int a = 0; a < kActionCount; ++a)
                 if (held[a] > kHeld)
-                    pad.pressed |= kActions[a].button;
+                    pad.pressed |= joypad ? kJoypadButtons[a] : kActions[a].button;
             pad.ly = static_cast<uint8_t>(std::lround(128.0f * (1.0f - held[kWhammy])));
             return pad;
         }
@@ -216,10 +226,20 @@ namespace gh2
 
         // A device just seated, or just off the Controllers screen, plays
         // from when it lets go of what it held.
+        // A gamepad's seat plays the song as a DualShock, decided as it
+        // starts and kept to its end, its controller away or not.
+        if (!inSong(mode))
+            std::fill(std::begin(s_joypad), std::end(s_joypad), false);
+        else if (!inSong(s_modeWas))
+            for (int seat = 0; seat < kSeats; ++seat)
+                s_joypad[seat] = seated[seat] && seated[seat]->kind == DeviceKind::kGamepad;
         HostPad pads[kSeats];
         for (int seat = 0; seat < kSeats; ++seat)
+        {
             if (seated[seat] && !s_seats.holding(*seated[seat]))
-                pads[seat] = padOf(seated[seat]->held);
+                pads[seat] = padOf(seated[seat]->held, s_joypad[seat]);
+            pads[seat].joypad = s_joypad[seat];
+        }
 
         // The keyboard's menu keys, on its own seat's port or else P1's, its
         // Enter there no Start. In a song playing only its Esc, as Start,
@@ -241,7 +261,11 @@ namespace gh2
                     if (!keys[k.key])
                         s_keyWait[k.key] = false;
                     else if (!s_keyWait[k.key])
-                        to.pressed |= esc && (mode == Mode::kPlaying || mode == Mode::kPaused) ? pad::kStart : k.bit;
+                        to.pressed |= esc && (mode == Mode::kPlaying || mode == Mode::kPaused) ? pad::kStart
+                                      // A DualShock picks with X and backs out with Triangle.
+                                      : to.joypad && k.bit == pad::kR2      ? pad::kCross
+                                      : to.joypad && k.bit == pad::kCircle  ? pad::kTriangle
+                                                                            : k.bit;
                 }
             }
         s_modeWas = mode;

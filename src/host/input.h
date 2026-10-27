@@ -12,6 +12,9 @@ namespace gh2
     {
         uint16_t pressed = 0;
         uint8_t lx = 0x80, ly = 0x80, rx = 0x80, ry = 0x80;
+        // A gamepad in a song: GH2 reads it as a DualShock, a fret press
+        // strumming (pad.cpp), its frets L2 L1 R1 R2 X.
+        bool joypad = false;
         // --timing: the last poll that saw a button go down, counted, with
         // the OS's time for the press (0 if it gave none) and the poll's.
         uint32_t pressCount = 0;
