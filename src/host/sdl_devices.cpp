@@ -4,12 +4,28 @@
 #include "host/profiles.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <iostream>
 
 namespace gh2::input
 {
     namespace
     {
+        const char *typeName(SDL_JoystickType type)
+        {
+            switch (type)
+            {
+            case SDL_JOYSTICK_TYPE_GAMEPAD:
+                return "SDL type gamepad";
+            case SDL_JOYSTICK_TYPE_GUITAR:
+                return "SDL type guitar";
+            case SDL_JOYSTICK_TYPE_DRUM_KIT:
+                return "SDL type drum kit";
+            default:
+                return "SDL type other";
+            }
+        }
+
         // Its raw controls, its gamepad layout's, and its accelerometer
         // while that is on.
         Snapshot read(const Device &d)
@@ -74,18 +90,40 @@ namespace gh2::input
             }
             const std::string name = SDL_GetJoystickName(d.joystick) ? SDL_GetJoystickName(d.joystick) : "";
             d.name = name;
+            const std::string guid = joystickGuid(d.joystick);
+            const char *path = SDL_GetJoystickPath(d.joystick);
+            // Two of the same controller share a name; the log tells them
+            // apart by where they are plugged in.
+            if (path)
+                d.name += std::string(" (") + path + ")";
             const DeviceInfo info = deviceInfo(d.joystick, d.gamepad);
             const auto builtin = builtinProfile(info);
-            const Section *own = sectionOf(name);
+            const Section *own = sectionOf(name, guid);
             d.sectionName = name;
+            d.sectionGuid = guid;
             d.builtin = builtin ? builtin->profile : Profile{};
             d.profile = overlay(d.builtin, own);
             const bool bound = own && !own->empty();
+            char vidPid[16];
+            std::snprintf(vidPid, sizeof vidPid, "%04x:%04x", info.vendor, info.product);
             std::cerr << "[input] " << name << ": " << (builtin ? builtin->label : "no built-in layout")
                       << (bound ? ", with input.ini" : "") << std::endl;
+            std::cerr << "[input]   " << vidPid << ", GUID " << guid << ", " << typeName(info.type)
+                      << (d.gamepad ? std::string(", ") + SDL_GetGamepadStringForType(info.gamepadType) + " gamepad"
+                                    : std::string(", no gamepad layout"))
+                      << std::endl;
+            for (int a = 0; a < kActionCount; ++a)
+            {
+                std::string sources;
+                for (const Source &s : d.profile[a])
+                    sources += (sources.empty() ? "" : ", ") + formatSource(s);
+                std::cerr << "[input]   " << kActions[a].name << " = " << (sources.empty() ? "none" : sources)
+                          << std::endl;
+            }
             if (!builtin && !bound)
                 std::cerr << "[input]   unbound; run GHClassic --bind to set it up" << std::endl;
-            listInFile(name, d.builtin);
+            if (!own)
+                listInFile(name, guid, d.builtin);
             // One read off the accelerometer needs SDL to send it.
             const bool accel = std::any_of(d.profile.begin(), d.profile.end(), [](const auto &sources) {
                 return std::any_of(sources.begin(), sources.end(),
@@ -94,6 +132,7 @@ namespace gh2::input
             if (accel && d.gamepad && !SDL_SetGamepadSensorEnabled(d.gamepad, SDL_SENSOR_ACCEL, true))
                 std::cerr << "[input]   no accelerometer: " << SDL_GetError() << std::endl;
             d.now = read(d);
+            d.openedMs = SDL_GetTicks();
             devices().push_back(d);
         }
         SDL_free(ids);

@@ -16,9 +16,9 @@ namespace gh2::input
             return profile;
         }
 
-        std::string nameOf(const std::string &sdlName)
+        std::string nameOf(const std::string &sdlName, const std::string &guid)
         {
-            return sdlName.empty() ? keyboardSection() : deviceSection(sdlName);
+            return sdlName.empty() ? keyboardSection() : deviceSection(sdlName, guid);
         }
 
         const Section *named(const std::string &name)
@@ -34,7 +34,7 @@ namespace gh2::input
         s_file = loadBindingFile(path);
         keyboard() = overlay(keyboardProfile(), named(keyboardSection()));
         std::cerr << "[input] bindings: " << path << (s_file.sections.empty() ? " (none yet)" : "") << std::endl;
-        listInFile("", keyboardProfile());
+        listInFile("", "", keyboardProfile());
     }
 
     const BindingFile &layoutFile()
@@ -47,14 +47,14 @@ namespace gh2::input
         return keyboard();
     }
 
-    const Section *sectionOf(const std::string &sdlName)
+    const Section *sectionOf(const std::string &sdlName, const std::string &guid)
     {
-        return named(nameOf(sdlName));
+        return sdlName.empty() ? named(keyboardSection()) : deviceBindings(s_file, sdlName, guid);
     }
 
-    void listInFile(const std::string &sdlName, const Profile &builtin)
+    void listInFile(const std::string &sdlName, const std::string &guid, const Profile &builtin)
     {
-        const std::string name = nameOf(sdlName);
+        const std::string name = nameOf(sdlName, guid);
         if (named(name))
             return;
         if (writeTemplate(bindingFilePath(), name, builtin))

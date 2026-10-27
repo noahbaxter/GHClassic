@@ -190,6 +190,7 @@ namespace gh2
 
         SDL_Joystick *joy = nullptr;
         std::string section = keyboardSection();
+        std::string name;
         if (target != "keyboard")
         {
             int count = 0;
@@ -205,7 +206,8 @@ namespace gh2
                 SDL_Quit();
                 return 2;
             }
-            section = deviceSection(SDL_GetJoystickName(joy) ? SDL_GetJoystickName(joy) : "");
+            name = SDL_GetJoystickName(joy) ? SDL_GetJoystickName(joy) : "";
+            section = deviceSection(name, joystickGuid(joy));
         }
 
         s_window = SDL_CreateWindow("GH Classic bind", 480, 120, 0);
@@ -252,9 +254,14 @@ namespace gh2
         }
         else
         {
-            // A skipped action keeps what the section already had.
+            // A skipped action keeps what the device's section already had,
+            // an older file's by name alone included.
             const std::string path = bindingFilePath();
-            std::map<Action, std::vector<Source>> merged = loadBindingFile(path).sections[section];
+            const BindingFile file = loadBindingFile(path);
+            const auto *had = joy ? deviceBindings(file, name, joystickGuid(joy)) : nullptr;
+            if (!joy && file.sections.count(section))
+                had = &file.sections.at(section);
+            std::map<Action, std::vector<Source>> merged = had ? *had : std::map<Action, std::vector<Source>>{};
             for (auto &[action, sources] : bound)
                 merged[action] = std::move(sources);
             if (writeSection(path, section, merged))

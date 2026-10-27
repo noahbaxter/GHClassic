@@ -195,9 +195,30 @@ namespace gh2::input
         return "keyboard";
     }
 
+    std::string deviceSection(const std::string &name, const std::string &guid)
+    {
+        return deviceSection(name) + " " + guid;
+    }
+
     std::string deviceSection(const std::string &name)
     {
         return "device \"" + name + "\"";
+    }
+
+    std::string joystickGuid(SDL_Joystick *joystick)
+    {
+        char guid[33];
+        SDL_GUIDToString(SDL_GetJoystickGUID(joystick), guid, sizeof guid);
+        return guid;
+    }
+
+    const std::map<Action, std::vector<Source>> *deviceBindings(const BindingFile &file, const std::string &name,
+                                                                 const std::string &guid)
+    {
+        for (const std::string &section : {deviceSection(name, guid), deviceSection(name)})
+            if (const auto found = file.sections.find(section); found != file.sections.end())
+                return &found->second;
+        return nullptr;
     }
 
     BindingFile loadBindingFile(const std::string &path)

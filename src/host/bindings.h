@@ -19,6 +19,8 @@
 
 #include "host/input.h"
 
+#include <SDL3/SDL.h>
+
 #include <array>
 #include <cstdint>
 #include <map>
@@ -99,16 +101,26 @@ namespace gh2::input
     // Each action's sources. An action with none is unbound.
     using Profile = std::array<std::vector<Source>, kActionCount>;
 
-    // input.ini: [keyboard], then one [device "<SDL joystick name>"] per
-    // controller. A section lists only the actions it changes; the rest keep
-    // the built-in profile's. Comments take whole lines, starting ; or #.
+    // input.ini: [keyboard], then one [device "<SDL joystick name>" <GUID>]
+    // per kind of controller; older files name a device without its GUID. A
+    // section lists only the actions it changes; the rest keep the built-in
+    // profile's. Comments take whole lines, starting ; or #.
     struct BindingFile
     {
         std::map<std::string, std::map<Action, std::vector<Source>>> sections; // by section name
     };
 
     std::string keyboardSection();
-    std::string deviceSection(const std::string &name);
+    std::string deviceSection(const std::string &name, const std::string &guid);
+    std::string deviceSection(const std::string &name); // an older file's
+    // SDL's GUID for a controller, as the sections write it: the same for
+    // every one of its kind on one system.
+    std::string joystickGuid(SDL_Joystick *joystick);
+
+    // A device's section: its GUID's, else one naming it alone; none if
+    // the file has neither.
+    const std::map<Action, std::vector<Source>> *deviceBindings(const BindingFile &file, const std::string &name,
+                                                                 const std::string &guid);
 
     // Missing is empty; a line that does not parse is reported and skipped.
     BindingFile loadBindingFile(const std::string &path);

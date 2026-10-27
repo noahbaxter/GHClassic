@@ -78,8 +78,11 @@ namespace gh2
         readSdlDevices();
         std::array<float, kActionCount> held{};
         play(keyboardLayout(), Snapshot{}, keys, held);
-        for (const Device &d : devices())
+        for (Device &d : devices())
+        {
+            nameControls(d);
             play(d.profile, d.now, keys, held);
+        }
         HostPad pad = padOf(held);
 
         // Read every poll, so the travel from before a flight is not its

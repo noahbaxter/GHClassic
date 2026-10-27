@@ -1,12 +1,12 @@
-// Which built-in layout each controller gets, and sources read back as
-// written. tools/ghc.py ci builds and runs it; it exits 1 on any failed
-// check.
+// Which built-in layout each controller gets, and input.ini's sections by
+// GUID. tools/ghc.py ci builds and runs it; it exits 1 on any failed check.
 
 #include "host/bindings.h"
 #include "host/profiles.h"
 #include "settings/settings.h"
 
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <string>
 
@@ -116,6 +116,31 @@ int main()
     }
     CHECK(!parseSource("pad accel w 0 1"));
     CHECK(!parseSource("pad accel x 1 1"));
+
+    // A device's section: its GUID's, else its name's (older files).
+    const std::string path = bindingFilePath();
+    {
+        std::ofstream out(path, std::ios::trunc);
+        out << "[keyboard]\ngreen = key 1\n\n"
+               "[device \"Guitar\"]\nred = button 1\n\n"
+               "[device \"Guitar\" 0300aaaa]\nred = button 2\n";
+    }
+    BindingFile file = loadBindingFile(path);
+    const auto *own = deviceBindings(file, "Guitar", "0300aaaa");
+    CHECK(own && formatSource(own->at(kRed).at(0)) == "button 2");
+    own = deviceBindings(file, "Guitar", "0300bbbb");
+    CHECK(own && formatSource(own->at(kRed).at(0)) == "button 1");
+    CHECK(!deviceBindings(file, "Pad", "0300cccc"));
+    CHECK(deviceSection("Guitar", "0300aaaa") == "device \"Guitar\" 0300aaaa");
+
+    // Writing one section keeps every other.
+    CHECK(writeSection(path, deviceSection("Guitar", "0300bbbb"), {{kGreen, {*parseSource("button 9")}}}));
+    file = loadBindingFile(path);
+    CHECK(file.sections.size() == 4);
+    CHECK(formatSource(deviceBindings(file, "Guitar", "0300bbbb")->at(kGreen).at(0)) == "button 9");
+    CHECK(formatSource(deviceBindings(file, "Guitar", "0300aaaa")->at(kRed).at(0)) == "button 2");
+    CHECK(formatSource(file.sections.at("keyboard").at(kGreen).at(0)) == "key 1");
+    std::filesystem::remove(path);
 
     if (s_failed)
         std::cerr << s_failed << " failed" << std::endl;
