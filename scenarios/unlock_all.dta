@@ -1,0 +1,71 @@
+; Game Settings' unlock all: off at first, the last row, and on opens every
+; song in quickplay's list. A save with it on is written, where the
+; unlock-all cheat's writes nothing. It is off in a career, whose unlocks are
+; earned there, and on again out of one.
+#include common/first_boot.dta
+(expect {campaigns unlock_all} 0)
+(expect {campaign all_access} 0)
+
+; A high score saved with it on, and loaded back.
+{campaigns unlock_all 1}
+(expect {campaign all_access} 1)
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty expert}
+{highscores add UNLOCKED 654321}
+{campaign mark_needs_save}
+{autosave_goto main_screen}
+(wait_screen autosave)
+(wait_screen main_screen)
+(expect {campaign all_access} 1)
+{ui goto_screen bootup_load}
+(wait_screen guitar_help_screen)
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty expert}
+{highscores get_highscore 0 $name $score}
+(expect $name UNLOCKED)
+(expect $score 654321)
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+{campaigns unlock_all 0}
+(expect {campaign all_access} 0)
+
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 2)
+; Down past the first two tiers, all a first boot opens.
+(press down) (press down) (press down) (press down) (press down) (press down) (press down)
+(press down) (press down) (press down) (press down) (press down) (press down) (press down)
+(wait 1)
+(shot songs_locked)
+
+{ui goto_screen game_settings_screen}
+(wait_screen game_settings_screen)
+(wait 1)
+(press up)
+(expect {game_settings_screen focus_name} gm_unlock.btn)
+(wait 1)
+(shot settings_off)
+(press green)
+(wait 1)
+(expect {campaigns unlock_all} 1)
+(expect {campaign all_access} 1)
+(shot settings_on)
+
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 2)
+(press down) (press down) (press down) (press down) (press down) (press down) (press down)
+(press down) (press down) (press down) (press down) (press down) (press down) (press down)
+(wait 1)
+(shot songs_unlocked)
+
+; Into a career and out.
+{campaigns switch gh2 main_screen career}
+(wait 1)
+(expect {campaign all_access} 0)
+{campaigns switch gh2 main_screen menus}
+(wait 1)
+(expect {campaign all_access} 1)
+(quit)

@@ -234,6 +234,7 @@ namespace gh2
         uint32_t venueProviderInitData; // VenueProvider::InitData(RndDir *)
         uint32_t campaignCtor;
         uint32_t campaignDtor;
+        uint32_t campaignSave;             // Campaign::Save(BinStream &)
         uint32_t campaignIsItemUnlocked;   // Campaign::IsItemUnlocked(Symbol) const
         uint32_t campaignIsItemUnlockedOn; // Campaign::IsItemUnlocked(Symbol, Difficulty) const
         uint32_t selectGuitarProviderInitData; // SelectGuitarProvider::InitData(RndDir *)
@@ -531,6 +532,7 @@ namespace gh2
         .venueProviderInitData = 0x118a90u,
         .campaignCtor = 0x12cf00u,
         .campaignDtor = 0x12d0c0u,
+        .campaignSave = 0x12ec90u,
         .campaignIsItemUnlocked = 0x12d490u,
         .campaignIsItemUnlockedOn = 0x12d5a0u,
         .selectGuitarProviderInitData = 0x119060u,
