@@ -212,6 +212,9 @@ namespace gh2
         uint32_t songProviderGapSize;
         uint32_t songProviderIsActive;
         uint32_t songProviderGetSongData; // (Symbol)
+        uint32_t songProviderGetSong;     // (int row) const: the row's song Symbol
+        uint32_t songProviderMat;         // (UIListMesh *, int row, int slot) const
+        uint32_t dynamicCast;             // __dynamic_cast
         uint32_t campaignDataGetVenueForSong;
         uint32_t addLoadChar; // (list<Character *> &, const char *object, const char *character)
         uint32_t worldCrowdSetFullness; // (float flat, float whole)
@@ -511,6 +514,9 @@ namespace gh2
         .songProviderGapSize = 0x1181d8u,
         .songProviderIsActive = 0x117a50u,
         .songProviderGetSongData = 0x118318u,
+        .songProviderGetSong = 0x1182d8u,
+        .songProviderMat = 0x117870u,
+        .dynamicCast = 0x101ec0u,
         .campaignDataGetVenueForSong = 0x1312a0u,
         .addLoadChar = 0x128778u,
         .worldCrowdSetFullness = 0x26bdf0u,

@@ -1,0 +1,4 @@
+#pragma once
+
+// assets/crown/crown.bin (ui/song_crown.cpp): the full combo crown.
+inline constexpr unsigned char kCrown[] = {@GHC_CROWN@};

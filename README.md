@@ -101,6 +101,7 @@ This project is built on top of a lot of excellent work by others. Please give m
 - [Redump](http://redump.org/): disc hashes the images are checked against
 - ["Silent Hill 3 Ps2 Game cover"](https://skfb.ly/oR9ZT) by eyewideasca, [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/): the campaign picker's game case
 - [generalrose](https://www.steamgriddb.com/grid/681069) and [David0Mario](https://www.steamgriddb.com/logo/59969) on SteamGridDB: the icon's GH2 cover art and GH1 logo
+- [Staszek Szybki Jest](https://commons.wikimedia.org/wiki/File:Simple_gold_crown.svg) on Wikimedia Commons: the full combo crown (public domain)
 
 ## License
 

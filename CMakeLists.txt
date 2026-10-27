@@ -337,6 +337,7 @@ set(GHC_GAME_SOURCES
     src/ui/meta_music.cpp
     src/ui/photo_mode.cpp
     src/ui/slider_scale.cpp
+    src/ui/song_crown.cpp
     src/ui/song_progress.cpp
     src/ui/zebra_wall.cpp
     src/host/audio.cpp
@@ -488,6 +489,11 @@ file(READ assets/zebra/wall.bin GHC_ZEBRA_WALL HEX)
 string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_ZEBRA_WALL "${GHC_ZEBRA_WALL}")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/zebra/wall.bin)
 configure_file(src/ui/zebra_wall_bitmap.h.in "${GHC_DTA_DIR}/zebra_wall_bitmap.h" @ONLY)
+# The song lists' full combo crown (ui/song_crown.cpp), tools/procedural/crown.py's bitmap.
+file(READ assets/crown/crown.bin GHC_CROWN HEX)
+string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_CROWN "${GHC_CROWN}")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/crown/crown.bin)
+configure_file(src/ui/crown_bitmap.h.in "${GHC_DTA_DIR}/crown_bitmap.h" @ONLY)
 target_include_directories(GHClassic PRIVATE "${GHC_DTA_DIR}")
 
 # What the build is (src/build_info.h), from tools/ghc.py: the tag it was made
