@@ -1,7 +1,13 @@
 ; Face-off's streaks: a drawer under each player's meter and popups of
 ; their own. Player 1 on easy and player 2 on expert, so the two differ.
 #include common/first_boot.dta
-(pads 2)
+(device p1)
+(device p2)
+(press start p1)
+{ui goto_screen multi_screen}
+(wait_screen multi_screen)
+(press start p2)
+(wait 0.5)
 {gamecfg set mode multi_fo}
 {game set_num_players 2}
 {game set_song shoutatthedevil}

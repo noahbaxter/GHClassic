@@ -23,6 +23,7 @@ inline constexpr const char kInSongDta[] = R"dta(@GHC_IN_SONG_DTA@)dta";
 inline constexpr const char kGameSettingsDta[] = R"dta(@GHC_GAME_SETTINGS_DTA@)dta";
 inline constexpr const char kBoxDta[] = R"dta(@GHC_BOX_DTA@)dta";
 inline constexpr const char kPhotoModeDta[] = R"dta(@GHC_PHOTO_MODE_DTA@)dta";
+inline constexpr const char kPlayersDta[] = R"dta(@GHC_PLAYERS_DTA@)dta";
 inline constexpr const char kNoteStreakDta[] = R"dta(@GHC_NOTE_STREAK_DTA@)dta";
 inline constexpr const char kStreakCounterDta[] = R"dta(@GHC_STREAK_COUNTER_DTA@)dta";
 inline constexpr const char kSongProgressDta[] = R"dta(@GHC_SONG_PROGRESS_DTA@)dta";

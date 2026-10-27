@@ -44,9 +44,11 @@ namespace gh2
         bool s_open = false;
         Seats s_seats; // the host thread's own
         std::atomic<bool> s_locked{false};
+        std::atomic<bool> s_playersStep{false};
         // The seats as the last poll left them, for any thread.
         std::atomic<bool> s_away[kSeats] = {};   // a seated device not plugged in
         std::atomic<bool> s_filled[kSeats] = {}; // a device in it, for seatPlugged
+        std::atomic<uint32_t> s_trades{0};
 
         // A scenario's devices: name, a gamepad when its name says pad, and
         // the raw controls it holds: each action's button in its layout's
@@ -114,6 +116,7 @@ namespace gh2
         std::mutex s_mutex;
         HostPad s_pads[kSeats];
         std::string s_seatNames[kSeats]; // for seatHas
+        std::string s_seatLabels[kSeats];
         std::vector<Scripted> s_scriptedDevices;
         bool s_flying = false;
         HostFly s_fly, s_scriptedFly;
@@ -190,7 +193,10 @@ namespace gh2
             r.buttons = padOf(r.held).pressed;
 
         const bool locked = s_locked.load(std::memory_order_relaxed);
-        s_seats.seat(reads, locked ? Mode::kSong : Mode::kMenu, SDL_GetTicks());
+        const Mode mode = locked                                              ? Mode::kSong
+                          : s_playersStep.load(std::memory_order_relaxed) ? Mode::kPlayers
+                                                                          : Mode::kMenu;
+        s_seats.seat(reads, mode, SDL_GetTicks());
 
         // A window without the controllers reads none, and pauses for none.
         s_seats.follow(reads, s_open && !owner);
@@ -221,6 +227,7 @@ namespace gh2
             s_away[seat].store(s_seats.away(seat), std::memory_order_relaxed);
             s_filled[seat].store(!s_seats[seat].none(), std::memory_order_relaxed);
         }
+        s_trades.store(s_seats.trades(), std::memory_order_relaxed);
 
         // Read every poll, so the travel from before a flight is not its
         // first step.
@@ -229,7 +236,10 @@ namespace gh2
             SDL_GetRelativeMouseState(&mouseX, &mouseY);
         std::lock_guard<std::mutex> lock(s_mutex);
         for (int seat = 0; seat < kSeats; ++seat)
+        {
             s_seatNames[seat] = seated[seat] ? seated[seat]->name : "";
+            s_seatLabels[seat] = seated[seat] ? seated[seat]->label : "";
+        }
         HostPad &pad = pads[0];
         pad.pressCount = s_pads[0].pressCount;
         pad.pressEventNs = s_pads[0].pressEventNs;
@@ -287,7 +297,8 @@ namespace gh2
         if (s_locked.load(std::memory_order_relaxed) && s_away[seat].load(std::memory_order_relaxed))
             return false;
         // P1's port always reads a guitar, so a menu answers before anyone
-        // has pressed; the rest read one once a player sits there.
+        // has pressed; the rest read one once a player sits there, which is
+        // when GH2 offers Multiplayer.
         return seat == 0 || s_filled[seat].load(std::memory_order_relaxed);
     }
 
@@ -328,6 +339,22 @@ namespace gh2
     {
         std::lock_guard<std::mutex> lock(s_mutex);
         return seat >= 0 && seat < kSeats && !name.empty() && s_seatNames[seat] == name;
+    }
+
+    std::string seatLabel(int seat)
+    {
+        std::lock_guard<std::mutex> lock(s_mutex);
+        return seat >= 0 && seat < kSeats ? s_seatLabels[seat] : std::string();
+    }
+
+    void setPlayersStep(bool on)
+    {
+        s_playersStep.store(on, std::memory_order_relaxed);
+    }
+
+    uint32_t seatTrades()
+    {
+        return s_trades.load(std::memory_order_relaxed);
     }
 
     void setFlying(bool flying)

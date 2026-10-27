@@ -70,6 +70,16 @@ namespace gh2
     // Whether that seat reads the device of that name: a scripted one's, or
     // a real one's as the log names it. Callable from any thread.
     bool seatHas(int seat, const std::string &name);
+    // What a player is shown for it: its guitar's layout ("Wii guitar
+    // (raphnet)"), else its name; "" for none. Callable from any thread.
+    std::string seatLabel(int seat);
+
+    // Whether Multiplayer's screen is up, where a controller joins with
+    // Start and yellow moves a player up a seat. Callable from any thread.
+    void setPlayersStep(bool on);
+    // How many times P1 and P2 have traded places, by yellow there or by
+    // P2 moving up when P1's controller is let go. Callable from any thread.
+    uint32_t seatTrades();
 
     // The free camera's controls (ui/photo_mode.h): W A S D as how far it
     // is pushed right and forward, -1 to 1, the mouse's travel in pixels,

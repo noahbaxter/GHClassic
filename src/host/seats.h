@@ -22,7 +22,8 @@ namespace gh2::input
     enum class Mode
     {
         kMenu,
-        kSong, // a song is up and holds the seats
+        kPlayers, // Multiplayer's screen, where players join and reorder
+        kSong,    // a song is up and holds the seats
     };
     inline bool inSong(Mode mode)
     {
@@ -65,12 +66,15 @@ namespace gh2::input
         int seatOf(const DeviceId &id) const;
         // A seated device not plugged in.
         bool away(int seat) const { return m_away[seat]; }
+        // How many times P1 and P2 have traded places.
+        uint32_t trades() const { return m_trades; }
         // [seats] as they now are, once each time they change.
         std::optional<std::map<std::string, std::string>> takeSaved();
 
     private:
         // `joined`: by its Start, which the game never sees.
         void sit(int seat, const Read &r, bool joined);
+        void trade(int seat, int with, const Read &r);
 
         // The device each seat reads, by identity, so a replugged one finds
         // its seat; none for none.
@@ -86,5 +90,6 @@ namespace gh2::input
         bool m_away[kSeats] = {};
         // The devices there as each seat's went, none of which is it.
         std::vector<DeviceId> m_thereWhenAway[kSeats];
+        uint32_t m_trades = 0;
     };
 }

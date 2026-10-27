@@ -40,14 +40,26 @@ namespace gh2::input
         std::cerr << "[input] P" << seat + 1 << ": " << r.name << ", " << kindName(r.kind) << std::endl;
     }
 
+    void Seats::trade(int seat, int with, const Read &r)
+    {
+        std::swap(m_seats[seat], m_seats[with]);
+        if (seat == 0 || with == 0)
+            ++m_trades;
+        std::cerr << "[input] " << r.name << " is P" << with + 1 << std::endl;
+    }
+
     // With no seated device here, the first to press anything is P1, so one
     // player never has to join. While P1 plays alone, any fret, strum or
     // Start on another device takes P1 from whatever had it: the one player
-    // picking up another controller. Not off a press a seated device made in
-    // the same poll: Steam Input's mirror of a pad presses with it. P1 is
-    // never empty while another seat is not.
+    // picking up another controller. Otherwise only Start on a device with no
+    // seat does anything to the seats: on Multiplayer's screen it joins, into
+    // the first free seat, and anywhere else it takes P1. There, too, yellow
+    // moves a seated player up a seat, the first round to the last. Not off a
+    // press a seated device made in the same poll: Steam Input's mirror of a
+    // pad presses with it. P1 is never empty while P2 is not.
     void Seats::seat(const std::vector<Read> &reads, Mode mode, uint64_t nowMs)
     {
+        const bool playersStep = mode == Mode::kPlayers;
         // Only devices here are remembered, and a seat's while it is away.
         const auto here = [&](const DeviceId &id) {
             return std::any_of(reads.begin(), reads.end(), [&](const Read &r) { return r.id == id; });
@@ -125,18 +137,38 @@ namespace gh2::input
             {
                 if (seatOf(reads[i].id) >= 0)
                     continue;
-                if (started[i] && !seatedStart)
+                int free = -1;
+                for (int seat = 0; seat < kPlayers && free < 0; ++seat)
+                    if (m_seats[seat].none())
+                        free = seat;
+                if (started[i] && !seatedStart && playersStep && free >= 0)
+                    sit(free, reads[i], true);
+                else if (started[i] && !seatedStart && !playersStep)
                     sit(0, reads[i], true);
                 // One player: whatever they last pressed is theirs, the press
                 // playing as it would on it.
-                else if (solo && pressed[i] && !seatedPress)
+                else if (solo && !playersStep && pressed[i] && !seatedPress)
                     sit(0, reads[i], false);
+            }
+        }
+        if (playersStep)
+        {
+            int seated = 0;
+            while (seated < kPlayers && !m_seats[seated].none())
+                ++seated;
+            for (size_t i = 0; i < reads.size(); ++i)
+            {
+                const int seat = seatOf(reads[i].id);
+                if (seat >= 0 && seated > 1 && (down[i] & pad::kTriangle))
+                    trade(seat, (seat + seated - 1) % seated, reads[i]);
             }
         }
         for (int seat = 0; seat + 1 < kSeats; ++seat)
             if (m_seats[seat].none() && !m_seats[seat + 1].none())
             {
                 std::swap(m_seats[seat], m_seats[seat + 1]);
+                if (seat == 0)
+                    ++m_trades;
                 std::cerr << "[input] P" << seat + 2 << " is P" << seat + 1 << std::endl;
             }
 

@@ -342,6 +342,7 @@ set(GHC_GAME_SOURCES
     src/ui/fast_boot.cpp
     src/ui/locale.cpp
     src/ui/help_bar.cpp
+    src/ui/players.cpp
     src/ui/classic_scene.cpp
     src/ui/menus.cpp
     src/ui/meta_music.cpp
@@ -456,13 +457,14 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     src/ui/dta/campaigns.dta src/gh1/menus.dta src/gh1/scripts.dta src/ui/dta/picker.dta src/ui/dta/quickplay_pickers.dta
     src/ui/dta/quickplay_setup.dta src/ui/dta/preshow_guitarist.dta src/ui/dta/in_song.dta
     src/content/guitar_copy.dta src/hub/preshow_picks.dta src/ui/dta/game_settings.dta src/ui/dta/photo_mode.dta src/ui/dta/box.dta
-    src/ui/dta/note_streak.dta src/ui/dta/streak_counter.dta src/ui/dta/song_progress.dta)
+    src/ui/dta/note_streak.dta src/ui/dta/streak_counter.dta src/ui/dta/song_progress.dta src/ui/dta/players.dta)
 file(READ src/ui/dta/box.dta GHC_BOX_DTA)
 file(READ src/ui/dta/note_streak.dta GHC_NOTE_STREAK_DTA)
 file(READ src/ui/dta/streak_counter.dta GHC_STREAK_COUNTER_DTA)
 file(READ src/ui/dta/song_progress.dta GHC_SONG_PROGRESS_DTA)
 file(READ src/ui/dta/game_settings.dta GHC_GAME_SETTINGS_DTA)
 file(READ src/ui/dta/photo_mode.dta GHC_PHOTO_MODE_DTA)
+file(READ src/ui/dta/players.dta GHC_PLAYERS_DTA)
 configure_file(src/ui/dta/dta.h.in "${GHC_DTA_DIR}/dta.h" @ONLY)
 file(READ config/settings.template.ini GHC_SETTINGS_TEMPLATE)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS config/settings.template.ini)

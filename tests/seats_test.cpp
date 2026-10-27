@@ -51,7 +51,7 @@ namespace
 
 int main()
 {
-    const DeviceId a = sdl("guid-a", "/dev/a"), b = sdl("guid-b", "/dev/b");
+    const DeviceId a = sdl("guid-a", "/dev/a"), b = sdl("guid-b", "/dev/b"), c = sdl("guid-c", "/dev/c");
 
     // The first press takes P1; a resting whammy or star power does not.
     {
@@ -74,12 +74,51 @@ int main()
         CHECK(seats[1].none());
     }
 
+    // On Multiplayer's screen Start joins the next free seat, up to
+    // kPlayers; a fret there seats nobody.
+    {
+        Seats seats;
+        press(seats, {device(a, pad::kR2), device(b), device(c)}, Mode::kPlayers);
+        press(seats, {device(a), device(b, pad::kR2), device(c)}, Mode::kPlayers);
+        CHECK(seats[0] == a);
+        CHECK(seats[1].none());
+        press(seats, {device(a), device(b, pad::kStart), device(c)}, Mode::kPlayers);
+        CHECK(seats[1] == b);
+        press(seats, {device(a), device(b), device(c, pad::kStart)}, Mode::kPlayers);
+        for (int seat = 0; seat < kSeats; ++seat)
+            CHECK(seat < kPlayers || seats[seat].none());
+        CHECK(kPlayers > 2 || seats.seatOf(c) < 0);
+    }
+
+    // Yellow there moves a player up a seat, the first round to the last.
+    {
+        Seats seats;
+        press(seats, {device(a, pad::kR2), device(b)}, Mode::kPlayers);
+        press(seats, {device(a), device(b, pad::kStart)}, Mode::kPlayers);
+        const uint32_t trades = seats.trades();
+        press(seats, {device(a), device(b, pad::kTriangle)}, Mode::kPlayers);
+        CHECK(seats[0] == b && seats[1] == a);
+        CHECK(seats.trades() == trades + 1);
+        press(seats, {device(a), device(b, pad::kTriangle)}, Mode::kPlayers);
+        CHECK(seats[0] == a && seats[1] == b);
+    }
+
+    // Off that screen Start on another controller takes P1, the one that
+    // had it let go.
+    {
+        Seats seats;
+        press(seats, {device(a, pad::kR2), device(b), device(c)}, Mode::kPlayers);
+        press(seats, {device(a), device(b, pad::kStart), device(c)}, Mode::kPlayers);
+        press(seats, {device(a), device(b), device(c, pad::kStart)});
+        CHECK(seats[0] == c && seats[1] == b);
+        CHECK(seats.seatOf(a) < 0);
+    }
+
     // Start that seated a device plays nothing until it is let go.
     {
         Seats seats;
-        press(seats, {device(a, pad::kR2), device(b)});
-        seats.seat({device(a), device(b, pad::kStart)}, Mode::kMenu, 0);
-        CHECK(seats[0] == b);
+        press(seats, {device(a, pad::kR2), device(b)}, Mode::kPlayers);
+        seats.seat({device(a), device(b, pad::kStart)}, Mode::kPlayers, 0);
         CHECK(seats.holding(device(b, pad::kStart)));
         CHECK(!seats.holding(device(b)));
         CHECK(!seats.holding(device(b, pad::kStart)));
@@ -128,9 +167,9 @@ int main()
         seats.seat({device(twin), device(a), device(b)}, Mode::kMenu, 10);
         CHECK(seats[0] == b && seats[1] == a);
         CHECK(!seats.takeSaved());
-        press(seats, {device(b), device(twin, pad::kStart), device(a)});
+        press(seats, {device(a, pad::kTriangle), device(b)}, Mode::kPlayers);
         const auto saved = seats.takeSaved();
-        CHECK(saved && saved->at("p1") == "guid-a /dev/twin");
+        CHECK(saved && saved->at("p1") == "guid-a /dev/a");
         CHECK(!seats.takeSaved());
     }
 
