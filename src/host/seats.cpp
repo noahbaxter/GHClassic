@@ -18,6 +18,12 @@ namespace gh2::input
         return (buttons & kClaims) != 0;
     }
 
+    void Seats::restore(std::map<std::string, std::string> saved, uint64_t untilMs)
+    {
+        m_saved = std::move(saved);
+        m_restoreUntilMs = untilMs;
+    }
+
     int Seats::seatOf(const DeviceId &id) const
     {
         for (int seat = 0; seat < kSeats; ++seat)
@@ -40,7 +46,7 @@ namespace gh2::input
     // picking up another controller. Not off a press a seated device made in
     // the same poll: Steam Input's mirror of a pad presses with it. P1 is
     // never empty while another seat is not.
-    void Seats::seat(const std::vector<Read> &reads, Mode mode)
+    void Seats::seat(const std::vector<Read> &reads, Mode mode, uint64_t nowMs)
     {
         // Only devices here are remembered, and a seat's while it is away.
         const auto here = [&](const DeviceId &id) {
@@ -75,6 +81,24 @@ namespace gh2::input
                         }
             return;
         }
+
+        // Each seat's own device first, then one of its model, so two the
+        // same are not swapped by the order SDL lists them in.
+        if (nowMs < m_restoreUntilMs)
+            for (bool byModel : {false, true})
+                for (int seat = 0; seat < kPlayers; ++seat)
+                {
+                    const auto saved = m_saved.find("p" + std::to_string(seat + 1));
+                    if (saved == m_saved.end() || !m_seats[seat].none())
+                        continue;
+                    const DeviceId id = DeviceId::parse(saved->second);
+                    for (const Read &r : reads)
+                        if (seatOf(r.id) < 0 && (byModel ? r.id.sameModel(id) : r.id == id))
+                        {
+                            sit(seat, r, false);
+                            break;
+                        }
+                }
 
         const bool solo = m_seats[1].none();
         bool anyHere = false, seatedStart = false, seatedPress = false;
@@ -115,6 +139,17 @@ namespace gh2::input
                 std::swap(m_seats[seat], m_seats[seat + 1]);
                 std::cerr << "[input] P" << seat + 2 << " is P" << seat + 1 << std::endl;
             }
+
+        // A scenario's devices are not the player's to remember.
+        std::map<std::string, std::string> now;
+        for (int seat = 0; seat < kSeats; ++seat)
+            if (!m_seats[seat].none() && m_seats[seat].backend != DeviceId::kScripted)
+                now["p" + std::to_string(seat + 1)] = m_seats[seat].text();
+        if (!now.empty() && now != m_saved)
+        {
+            m_saved = now;
+            m_savedChanged = true;
+        }
     }
 
     // A seat's device back from a replug: the same identity, or on Linux,
@@ -157,5 +192,13 @@ namespace gh2::input
             return true;
         m_letGo.erase(r.id);
         return false;
+    }
+
+    std::optional<std::map<std::string, std::string>> Seats::takeSaved()
+    {
+        if (!m_savedChanged)
+            return std::nullopt;
+        m_savedChanged = false;
+        return m_saved;
     }
 }

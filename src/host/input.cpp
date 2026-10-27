@@ -149,6 +149,7 @@ namespace gh2
             return;
         }
         loadLayouts();
+        s_seats.restore(layoutFile().seats, SDL_GetTicks() + 3000u);
         s_open = true;
         openDevices();
         claimControllers();
@@ -189,7 +190,7 @@ namespace gh2
             r.buttons = padOf(r.held).pressed;
 
         const bool locked = s_locked.load(std::memory_order_relaxed);
-        s_seats.seat(reads, locked ? Mode::kSong : Mode::kMenu);
+        s_seats.seat(reads, locked ? Mode::kSong : Mode::kMenu, SDL_GetTicks());
 
         // A window without the controllers reads none, and pauses for none.
         s_seats.follow(reads, s_open && !owner);
@@ -212,6 +213,9 @@ namespace gh2
             if (seated[seat] && !s_seats.holding(*seated[seat]))
                 pads[seat] = padOf(seated[seat]->held);
 
+        if (s_open)
+            if (const auto saved = s_seats.takeSaved(); saved && !writeSeats(bindingFilePath(), *saved))
+                std::cerr << "[input] could not write " << bindingFilePath() << std::endl;
         for (int seat = 0; seat < kSeats; ++seat)
         {
             s_away[seat].store(s_seats.away(seat), std::memory_order_relaxed);

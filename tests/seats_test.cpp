@@ -42,10 +42,10 @@ namespace
     // a new one.
     void press(Seats &seats, std::vector<Read> reads, Mode mode = Mode::kMenu)
     {
-        seats.seat(reads, mode);
+        seats.seat(reads, mode, 0);
         for (Read &r : reads)
             r.buttons = 0;
-        seats.seat(reads, mode);
+        seats.seat(reads, mode, 0);
     }
 }
 
@@ -78,7 +78,7 @@ int main()
     {
         Seats seats;
         press(seats, {device(a, pad::kR2), device(b)});
-        seats.seat({device(a), device(b, pad::kStart)}, Mode::kMenu);
+        seats.seat({device(a), device(b, pad::kStart)}, Mode::kMenu, 0);
         CHECK(seats[0] == b);
         CHECK(seats.holding(device(b, pad::kStart)));
         CHECK(!seats.holding(device(b)));
@@ -118,6 +118,35 @@ int main()
         seats.follow({}, true);
         CHECK(!seats.away(0));
     }
+
+    // Last run's seats come back as their devices show up, each its own
+    // before one of its model, and are saved again only when they change.
+    {
+        Seats seats;
+        const DeviceId twin = sdl("guid-a", "/dev/twin");
+        seats.restore({{"p1", b.text()}, {"p2", a.text()}}, 1000);
+        seats.seat({device(twin), device(a), device(b)}, Mode::kMenu, 10);
+        CHECK(seats[0] == b && seats[1] == a);
+        CHECK(!seats.takeSaved());
+        press(seats, {device(b), device(twin, pad::kStart), device(a)});
+        const auto saved = seats.takeSaved();
+        CHECK(saved && saved->at("p1") == "guid-a /dev/twin");
+        CHECK(!seats.takeSaved());
+    }
+
+    // A scenario's devices are never saved.
+    {
+        Seats seats;
+        const DeviceId scripted{DeviceId::kScripted, "guitar", ""};
+        press(seats, {device(scripted, pad::kR2)});
+        CHECK(seats[0] == scripted);
+        CHECK(!seats.takeSaved());
+    }
+
+    // [seats] keeps each as text, read back the same.
+    for (const DeviceId &id : {a, DeviceId::keyboard(), DeviceId{DeviceId::kScripted, "pad", ""}, sdl("guid", "")})
+        CHECK(DeviceId::parse(id.text()) == id);
+    CHECK(DeviceId::parse("").none());
 
     if (s_failed)
     {

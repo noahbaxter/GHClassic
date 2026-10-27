@@ -11,6 +11,7 @@
 #include <array>
 #include <cstdint>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -48,7 +49,11 @@ namespace gh2::input
     class Seats
     {
     public:
-        void seat(const std::vector<Read> &reads, Mode mode);
+        // input.ini's [seats]: who sat where last time, put back as those
+        // devices show up until `untilMs`.
+        void restore(std::map<std::string, std::string> saved, uint64_t untilMs);
+
+        void seat(const std::vector<Read> &reads, Mode mode, uint64_t nowMs);
         // A seat's device gone or back. `readingNone` in a window without
         // the controllers, which pauses for none.
         void follow(const std::vector<Read> &reads, bool readingNone);
@@ -60,6 +65,8 @@ namespace gh2::input
         int seatOf(const DeviceId &id) const;
         // A seated device not plugged in.
         bool away(int seat) const { return m_away[seat]; }
+        // [seats] as they now are, once each time they change.
+        std::optional<std::map<std::string, std::string>> takeSaved();
 
     private:
         // `joined`: by its Start, which the game never sees.
@@ -73,6 +80,9 @@ namespace gh2::input
         // seated them.
         std::map<DeviceId, uint16_t> m_held;
         std::set<DeviceId> m_letGo;
+        std::map<std::string, std::string> m_saved; // as [seats] has it
+        bool m_savedChanged = false;
+        uint64_t m_restoreUntilMs = 0;
         bool m_away[kSeats] = {};
         // The devices there as each seat's went, none of which is it.
         std::vector<DeviceId> m_thereWhenAway[kSeats];

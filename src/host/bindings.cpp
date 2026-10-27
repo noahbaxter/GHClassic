@@ -51,6 +51,8 @@ namespace gh2::input
 
         const char *const kAccelAxes[] = {"x", "y", "z"};
 
+        constexpr const char *kSeatsSection = "seats";
+
         // SDL names the comma key ",", which the list would split on.
         constexpr const char *kCommaName = "comma";
 
@@ -238,10 +240,16 @@ namespace gh2::input
             if (const auto name = ini::sectionName(text))
             {
                 section = *name;
-                file.sections[section];
+                if (section != kSeatsSection)
+                    file.sections[section];
                 continue;
             }
             const size_t eq = text.find('=');
+            if (section == kSeatsSection && eq != std::string::npos)
+            {
+                file.seats[trim(text.substr(0, eq))] = trim(text.substr(eq + 1));
+                continue;
+            }
             const auto action = eq == std::string::npos ? std::nullopt : actionFromKey(trim(text.substr(0, eq)));
             if (section.empty() || !action)
             {
@@ -269,12 +277,13 @@ namespace gh2::input
         return file;
     }
 
-    bool writeSection(const std::string &path, const std::string &section,
-                      const std::map<Action, std::vector<Source>> &bindings)
+    namespace
     {
-        // Every line outside the section is kept as it was, comments included.
-        std::vector<std::string> kept;
+        // Every line outside `section` as it was, comments included, with
+        // no blank lines at the end.
+        std::vector<std::string> linesWithout(const std::string &path, const std::string &section)
         {
+            std::vector<std::string> kept;
             std::ifstream in(path);
             std::string line;
             bool inside = false;
@@ -289,10 +298,16 @@ namespace gh2::input
                 if (!inside)
                     kept.push_back(line);
             }
+            while (!kept.empty() && trim(kept.back()).empty())
+                kept.pop_back();
+            return kept;
         }
-        while (!kept.empty() && trim(kept.back()).empty())
-            kept.pop_back();
+    }
 
+    bool writeSection(const std::string &path, const std::string &section,
+                      const std::map<Action, std::vector<Source>> &bindings)
+    {
+        const std::vector<std::string> kept = linesWithout(path, section);
         return !ini::writeReplacing(path, [&](std::ofstream &out) {
             for (const std::string &line : kept)
                 out << line << "\n";
@@ -306,6 +321,20 @@ namespace gh2::input
                     out << (i == 0 ? " " : ", ") << formatSource(sources[i]);
                 out << "\n";
             }
+        });
+    }
+
+    bool writeSeats(const std::string &path, const std::map<std::string, std::string> &seats)
+    {
+        const std::vector<std::string> kept = linesWithout(path, kSeatsSection);
+        return !ini::writeReplacing(path, [&](std::ofstream &out) {
+            for (const std::string &line : kept)
+                out << line << "\n";
+            if (!kept.empty())
+                out << "\n";
+            out << "[" << kSeatsSection << "]\n";
+            for (const auto &[seat, device] : seats)
+                out << seat << " = " << device << "\n";
         });
     }
 

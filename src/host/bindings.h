@@ -108,7 +108,12 @@ namespace gh2::input
     struct BindingFile
     {
         std::map<std::string, std::map<Action, std::vector<Source>>> sections; // by section name
+        // [seats]: p1 = <device>, ... as the last run left them.
+        std::map<std::string, std::string> seats;
     };
+
+    // [seats] replaced, keeping the rest of the file as it was.
+    bool writeSeats(const std::string &path, const std::map<std::string, std::string> &seats);
 
     std::string keyboardSection();
     std::string deviceSection(const std::string &name, const std::string &guid);
