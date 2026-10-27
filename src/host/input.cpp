@@ -45,6 +45,7 @@ namespace gh2
         Seats s_seats; // the host thread's own
         std::atomic<bool> s_locked{false};
         std::atomic<bool> s_playersStep{false};
+        std::atomic<SongScreen> s_songScreen{SongScreen::kOther};
         // The seats as the last poll left them, for any thread.
         std::atomic<bool> s_away[kSeats] = {};   // a seated device not plugged in
         std::atomic<bool> s_filled[kSeats] = {}; // a device in it, for seatPlugged
@@ -118,10 +119,49 @@ namespace gh2
         std::string s_seatNames[kSeats]; // for seatHas
         std::string s_seatLabels[kSeats];
         std::vector<Scripted> s_scriptedDevices;
+        // A scenario's keys, down until let go.
+        std::array<bool, SDL_SCANCODE_COUNT> s_scriptedKeys{};
+        bool s_keysScripted = false;
         bool s_flying = false;
         HostFly s_fly, s_scriptedFly;
         uint64_t s_pressEventNs = 0; // the host thread's own
-        bool s_lockedWas = false;    // the host thread's
+
+        // The keyboard in a menu, whoever holds it: the arrows move, Enter
+        // picks and Esc backs out, as green and red. Unseated, these drive
+        // P1's port, so a guitar player always has the keyboard too.
+        struct MenuKey
+        {
+            SDL_Scancode key;
+            uint16_t bit;
+        };
+        const MenuKey kMenuKeys[] = {
+            {SDL_SCANCODE_UP, pad::kUp},       {SDL_SCANCODE_DOWN, pad::kDown},
+            {SDL_SCANCODE_LEFT, pad::kLeft},   {SDL_SCANCODE_RIGHT, pad::kRight},
+            {SDL_SCANCODE_RETURN, pad::kR2},   {SDL_SCANCODE_ESCAPE, pad::kCircle},
+        };
+        // The host thread's: Tab and the mode last poll, and the menu keys
+        // held as the mode changed, which do nothing until let go: the Enter
+        // that paused would pick Resume.
+        bool s_tabWas = false;
+        Mode s_modeWas = Mode::kMenu;
+        std::array<bool, SDL_SCANCODE_COUNT> s_keyWait{};
+
+        // What is up, from what each part of the game says of it: a song
+        // over Multiplayer's screen.
+        Mode currentMode()
+        {
+            if (s_locked.load(std::memory_order_relaxed))
+                switch (s_songScreen.load(std::memory_order_relaxed))
+                {
+                case SongScreen::kPlaying:
+                    return Mode::kPlaying;
+                case SongScreen::kPaused:
+                    return Mode::kPaused;
+                default:
+                    return Mode::kSong;
+                }
+            return s_playersStep.load(std::memory_order_relaxed) ? Mode::kPlayers : Mode::kMenu;
+        }
 
         HostPad padOf(const std::array<float, kActionCount> &held)
         {
@@ -137,6 +177,9 @@ namespace gh2
         {
             Read r{DeviceId::keyboard(), "keyboard", DeviceKind::kKeyboard, "keyboard"};
             play(keyboardLayout(), Snapshot{}, keys, r.held);
+            r.tab = keys[SDL_SCANCODE_TAB] && !s_tabWas;
+            s_tabWas = keys[SDL_SCANCODE_TAB];
+            r.escape = keys[SDL_SCANCODE_ESCAPE];
             return r;
         }
     }
@@ -160,16 +203,35 @@ namespace gh2
 
     void pollInput(bool devicesChanged)
     {
-        // A hidden run has no input open, but its scenario's devices play.
+        // A hidden run has no input open, but its scenario's devices play,
+        // and its keys, as the keyboard.
         const bool *keys = nullptr;
+        std::array<bool, SDL_SCANCODE_COUNT> scriptedKeys{};
+        bool keysScripted = false;
+        {
+            std::lock_guard<std::mutex> lock(s_mutex);
+            keysScripted = s_keysScripted;
+            scriptedKeys = s_scriptedKeys;
+        }
         std::vector<Read> reads;
         bool owner = false;
+        if (!s_open && keysScripted)
+        {
+            keys = scriptedKeys.data();
+            reads.push_back(keyboardRead(keys));
+        }
         if (s_open)
         {
             if (devicesChanged)
                 openDevices();
             owner = ownsControllers();
             keys = SDL_GetKeyboardState(nullptr);
+            if (keysScripted)
+            {
+                for (int k = 0; k < SDL_SCANCODE_COUNT; ++k)
+                    scriptedKeys[static_cast<size_t>(k)] = scriptedKeys[static_cast<size_t>(k)] || keys[k];
+                keys = scriptedKeys.data();
+            }
             if (owner)
             {
                 reads.push_back(keyboardRead(keys));
@@ -192,10 +254,7 @@ namespace gh2
         for (Read &r : reads)
             r.buttons = padOf(r.held).pressed;
 
-        const bool locked = s_locked.load(std::memory_order_relaxed);
-        const Mode mode = locked                                              ? Mode::kSong
-                          : s_playersStep.load(std::memory_order_relaxed) ? Mode::kPlayers
-                                                                          : Mode::kMenu;
+        const Mode mode = currentMode();
         s_seats.seat(reads, mode, SDL_GetTicks());
 
         // A window without the controllers reads none, and pauses for none.
@@ -207,17 +266,41 @@ namespace gh2
                 seated[seat] = &r;
 
         // What each player plays a song on, for scores filed by it later.
-        if (locked && !s_lockedWas)
+        if (inSong(mode) && !inSong(s_modeWas))
             for (int seat = 0; seat < kSeats; ++seat)
                 if (seated[seat])
                     std::cerr << "[input] song: P" << seat + 1 << " on " << kindName(seated[seat]->kind) << std::endl;
-        s_lockedWas = locked;
 
         // A device just seated plays from when it lets go of what it held.
         HostPad pads[kSeats];
         for (int seat = 0; seat < kSeats; ++seat)
             if (seated[seat] && !s_seats.holding(*seated[seat]))
                 pads[seat] = padOf(seated[seat]->held);
+
+        // The keyboard's menu keys, on its own seat's port or else P1's, its
+        // Enter there no Start. In a song playing only its Esc, as Start,
+        // and in the song's pause menu Esc is Start too.
+        for (const Read &r : reads)
+            if (r.keyboard() && !s_seats.waiting(r.id))
+            {
+                const int seat = s_seats.seatOf(r.id);
+                HostPad &to = pads[seat < 0 ? 0 : seat];
+                if (seat >= 0 && mode != Mode::kPlaying)
+                    to.pressed &= static_cast<uint16_t>(~pad::kStart);
+                for (const MenuKey &k : kMenuKeys)
+                {
+                    const bool esc = k.key == SDL_SCANCODE_ESCAPE;
+                    if (mode != s_modeWas && keys[k.key])
+                        s_keyWait[k.key] = true;
+                    if (mode == Mode::kPlaying && !esc)
+                        continue;
+                    if (!keys[k.key])
+                        s_keyWait[k.key] = false;
+                    else if (!s_keyWait[k.key])
+                        to.pressed |= esc && (mode == Mode::kPlaying || mode == Mode::kPaused) ? pad::kStart : k.bit;
+                }
+            }
+        s_modeWas = mode;
 
         if (s_open)
             if (const auto saved = s_seats.takeSaved(); saved && !writeSeats(bindingFilePath(), *saved))
@@ -307,6 +390,11 @@ namespace gh2
         s_locked.store(locked, std::memory_order_relaxed);
     }
 
+    void songScreen(SongScreen screen)
+    {
+        s_songScreen.store(screen, std::memory_order_relaxed);
+    }
+
     void addScriptedDevice(const std::string &name)
     {
         std::lock_guard<std::mutex> lock(s_mutex);
@@ -333,6 +421,15 @@ namespace gh2
                 for (int a = 0; a < kActionCount; ++a)
                     d.raw.buttons[static_cast<size_t>(a)] = (pressed & kActions[a].button) != 0u;
             }
+    }
+
+    void setScriptedKey(int scancode, bool down)
+    {
+        std::lock_guard<std::mutex> lock(s_mutex);
+        if (scancode <= SDL_SCANCODE_UNKNOWN || scancode >= SDL_SCANCODE_COUNT)
+            return;
+        s_scriptedKeys[static_cast<size_t>(scancode)] = down;
+        s_keysScripted = true;
     }
 
     bool seatHas(int seat, const std::string &name)

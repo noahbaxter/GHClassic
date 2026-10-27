@@ -58,6 +58,17 @@ namespace gh2
     // While a song plays, a press on another device takes no seat.
     // Callable from any thread.
     void lockSeats(bool locked);
+    // Which screen of a song is up: in one playing, the keyboard's menu
+    // keys would be a guitar's frets and strums, so only its Esc works,
+    // as Start; in its pause menu Esc is Start too, to resume. Callable
+    // from any thread.
+    enum class SongScreen
+    {
+        kOther,
+        kPlaying,
+        kPaused,
+    };
+    void songScreen(SongScreen screen);
 
     // A scenario's controllers that are not plugged in, by name. Each plays
     // as a real one does, through its layout and the seat rules, in a
@@ -67,6 +78,10 @@ namespace gh2
     void addScriptedDevice(const std::string &name);
     void removeScriptedDevice(const std::string &name); // unplugged
     void setScriptedDevice(const std::string &name, uint16_t pressed);
+    // A scenario's key, SDL's scancode, held on the keyboard until let go;
+    // in a hidden run, from the first, the keyboard is there. Callable from
+    // any thread.
+    void setScriptedKey(int scancode, bool down);
     // Whether that seat reads the device of that name: a scripted one's, or
     // a real one's as the log names it. Callable from any thread.
     bool seatHas(int seat, const std::string &name);

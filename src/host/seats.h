@@ -23,11 +23,15 @@ namespace gh2::input
     {
         kMenu,
         kPlayers, // Multiplayer's screen, where players join and reorder
-        kSong,    // a song is up and holds the seats
+        // A song is up and holds the seats: on a screen of its own besides
+        // these two (loading, results), played, or paused.
+        kSong,
+        kPlaying,
+        kPaused,
     };
     inline bool inSong(Mode mode)
     {
-        return mode == Mode::kSong;
+        return mode == Mode::kSong || mode == Mode::kPlaying || mode == Mode::kPaused;
     }
 
     // One device this poll.
@@ -41,6 +45,11 @@ namespace gh2::input
         // they press, which is all the seats read, whatever the instrument.
         std::array<float, kActionCount> held{};
         uint16_t buttons = 0;
+        // The keyboard's: Tab gone down, its Start for joining (Enter
+        // being taken), and Escape held.
+        bool tab = false, escape = false;
+
+        bool keyboard() const { return id.backend == DeviceId::kKeyboard; }
     };
 
     // A fret, pad, strum or Start: what claims a seat. Whammy, tilt and
@@ -61,6 +70,7 @@ namespace gh2::input
         // Whether a seated device still holds what seated it, playing
         // nothing; false once it lets go, for good.
         bool holding(const Read &r);
+        bool waiting(const DeviceId &id) const { return m_letGo.count(id) != 0; }
 
         const DeviceId &operator[](int seat) const { return m_seats[seat]; }
         int seatOf(const DeviceId &id) const;

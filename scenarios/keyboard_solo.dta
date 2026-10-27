@@ -1,0 +1,21 @@
+; The keyboard alone: its first key makes it P1 and Enter picks in a menu;
+; in a song Enter is Start and pauses.
+#include common/first_boot.dta
+(key Down)
+(expect {seat_has 0 keyboard} 1)
+(expect {main_screen focus_name} main_options.btn)
+(key Return)
+(wait_screen options_screen 10)
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty easy}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 2)
+(key Return)
+(wait_screen pause_screen 10)
+; The Enter that paused is not then the pause menu's, picking Resume.
+(wait 1)
+(expect {== {ui current_screen} pause_screen} 1)
+(quit)

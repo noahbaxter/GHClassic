@@ -30,11 +30,21 @@ namespace
         return {DeviceId::kSdl, guid, path};
     }
 
+    const DeviceId kKeyboard = DeviceId::keyboard();
+
     // A device holding these libpad buttons.
     Read device(const DeviceId &id, uint16_t buttons = 0)
     {
         Read r{id, id.text(), DeviceKind::kGuitar, id.text()};
         r.buttons = buttons;
+        return r;
+    }
+
+    Read keyboard(bool tab = false, bool escape = false)
+    {
+        Read r{kKeyboard, "keyboard", DeviceKind::kKeyboard, "keyboard"};
+        r.tab = tab;
+        r.escape = escape;
         return r;
     }
 
@@ -44,7 +54,7 @@ namespace
     {
         seats.seat(reads, mode, 0);
         for (Read &r : reads)
-            r.buttons = 0;
+            r.buttons = 0, r.tab = false, r.escape = false;
         seats.seat(reads, mode, 0);
     }
 }
@@ -72,6 +82,27 @@ int main()
         press(seats, {device(a), device(b, pad::kR2)});
         CHECK(seats[0] == b);
         CHECK(seats[1].none());
+    }
+
+    // Alone, the keyboard's arrows and Enter only move P1's menus; a fret
+    // key takes P1. First, any key does.
+    {
+        Seats seats;
+        Read down = keyboard();
+        down.buttons = pad::kDown;
+        press(seats, {down});
+        CHECK(seats[0] == kKeyboard);
+        press(seats, {keyboard(), device(a, pad::kR2)});
+        CHECK(seats[0] == a);
+        Read enter = keyboard();
+        enter.buttons = pad::kStart;
+        press(seats, {down, device(a)});
+        press(seats, {enter, device(a)});
+        CHECK(seats[0] == a);
+        Read fret = keyboard();
+        fret.buttons = pad::kCircle;
+        press(seats, {fret, device(a)});
+        CHECK(seats[0] == kKeyboard);
     }
 
     // On Multiplayer's screen Start joins the next free seat, up to
@@ -114,6 +145,18 @@ int main()
         CHECK(seats.seatOf(a) < 0);
     }
 
+    // The keyboard joins with Tab, never its Enter.
+    {
+        Seats seats;
+        press(seats, {device(a, pad::kR2), keyboard()}, Mode::kPlayers);
+        Read enter = keyboard();
+        enter.buttons = pad::kStart;
+        press(seats, {device(a), enter}, Mode::kPlayers);
+        CHECK(seats[1].none());
+        press(seats, {device(a), keyboard(true)}, Mode::kPlayers);
+        CHECK(seats[1] == kKeyboard);
+    }
+
     // Start that seated a device plays nothing until it is let go.
     {
         Seats seats;
@@ -125,16 +168,16 @@ int main()
     }
 
     // In a song nothing seats, but a seat whose device is gone is taken by
-    // Start on any device without one.
+    // Start, or the keyboard's Esc, on any device without one.
     {
         Seats seats;
         press(seats, {device(a, pad::kR2), device(b)});
-        press(seats, {device(b, pad::kStart)}, Mode::kSong);
+        press(seats, {device(b, pad::kStart)}, Mode::kPlaying);
         CHECK(seats[0] == a);
         seats.follow({device(b)}, false);
         CHECK(seats.away(0));
-        press(seats, {device(b, pad::kStart)}, Mode::kSong);
-        CHECK(seats[0] == b);
+        press(seats, {device(b), keyboard(false, true)}, Mode::kPlaying);
+        CHECK(seats[0] == kKeyboard);
     }
 
     // A replug back on another path is its seat's again, by GUID.
@@ -183,7 +226,7 @@ int main()
     }
 
     // [seats] keeps each as text, read back the same.
-    for (const DeviceId &id : {a, DeviceId::keyboard(), DeviceId{DeviceId::kScripted, "pad", ""}, sdl("guid", "")})
+    for (const DeviceId &id : {a, kKeyboard, DeviceId{DeviceId::kScripted, "pad", ""}, sdl("guid", "")})
         CHECK(DeviceId::parse(id.text()) == id);
     CHECK(DeviceId::parse("").none());
 

@@ -14,12 +14,16 @@
 #include "script.h"
 
 #include "dev/timing.h"
+#include "guest.h"
+#include "hook.h"
 #include "host/bindings.h"
 #include "host/input.h"
+#include "milo/layout.h"
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
 
 #include <atomic>
+#include <string>
 
 namespace ps2_stubs
 {
@@ -119,12 +123,26 @@ namespace gh2
         {
             return {seatHas(static_cast<int>(call.number(1)), call.symbol(2)) ? 1u : 0u, script::kInt};
         }
+
+        // A song's screens, by name, for the keyboard's keys in it (input.h):
+        // the two it is played on and the two pause menus.
+        struct GotoScreenTag;
+        void onGotoScreen(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
+        {
+            const uint32_t screen = GPR_U32(ctx, 5);
+            const uint32_t text = screen != 0u ? load<uint32_t>(rdram, screen + milo::object::kName) : 0u;
+            const std::string name = text != 0u ? reinterpret_cast<const char *>(getMemPtr(rdram, text)) : "";
+            songScreen(name == "game_screen" || name == "practice_game_screen"  ? SongScreen::kPlaying
+                       : name == "pause_screen" || name == "pract_pause_screen" ? SongScreen::kPaused
+                                                                                : SongScreen::kOther);
+        }
     }
 
     void installPad(PS2Runtime &runtime, const Addresses &addresses)
     {
         script::addCommand("pad_held", padHeld);
         script::addCommand("seat_has", seatHasCommand);
+        EntryHook<GotoScreenTag>::install(runtime, addresses.uiGotoScreen, onGotoScreen);
         runtime.replaceFunction(addresses.scePadRead, padRead);
         runtime.replaceFunction(addresses.scePadInfoAct, padInfoAct);
     }

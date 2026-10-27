@@ -1,0 +1,34 @@
+; A guitar plays P1 and the keyboard sits in no seat: in the song its Esc
+; pauses and resumes, and in the pause menu its arrows and Enter pick, so
+; Restart puts the song back to playing with Esc pausing it again.
+#include common/first_boot.dta
+(device guitar)
+(press down guitar)
+(expect {seat_has 0 guitar} 1)
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty easy}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 2)
+; Enter while it plays is nothing, not green.
+(key Return)
+(wait 0.5)
+(expect {== {ui current_screen} game_screen} 1)
+(key Escape)
+(wait_screen pause_screen 10)
+(key Escape)
+(wait_screen game_screen 10)
+(expect {seat_has 0 guitar} 1)
+; Down to Restart, Enter picks it.
+(key Escape)
+(wait_screen pause_screen 10)
+(key Down)
+(wait 0.3)
+(key Return)
+(wait 3)
+(expect {== {ui current_screen} game_screen} 1)
+(key Escape)
+(wait_screen pause_screen 10)
+(quit)
