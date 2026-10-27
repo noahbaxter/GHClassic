@@ -14,8 +14,8 @@
 
 namespace gh2::input
 {
-    // SDL reports every joystick already plugged in as added, so the first
-    // pump would reopen the ones just opened; only a changed set reopens.
+    // Each joystick that came opened and each that went closed, the rest
+    // left as they are: SDL reports every one already plugged in as added.
     void openDevices();
     void closeDevices();
     // Each one's raw controls into its snapshot.
