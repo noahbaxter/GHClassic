@@ -51,20 +51,30 @@ namespace gh2
         constexpr const char *kTutorialScene = "ui/gen/tut_script.milo_ps2";
 
         // The Rat Cellar's TV in the corner (small1_geom: the PS2's channels
-        // the venue's TV never shows but one of), its frame and each
-        // channel's frames, flipped through while it plays, and Harmonix's
-        // full-size colour bars (bars.milo) while a control is awaited. Left
-        // out: the channels of photos of people.
+        // the venue's TV never shows but one of, Amplitude's, Frequency's
+        // and the trippy one never shown at all), its frame, and Harmonix's
+        // full-size colour bars (bars.milo) while a control is awaited. Each
+        // control has a channel of its own, both strums one, flipped through
+        // while it plays; snow before any is pressed. Left out: the
+        // channels of photos of people.
         constexpr const char *kTvScene = "world/small1/og/gen/small1_geom.milo_ps2";
         constexpr const char *kBarsScene = "ui/gen/bars.milo_ps2";
-        const std::vector<std::vector<const char *>> kChannels = {
-            {"tv_good_rocker_1.tex", "tv_good_rocker_2.tex"},
-            {"tv_good_city_fire_1.tex", "tv_good_city_fire_2.tex"},
-            {"tv_good_anarchy.tex"},
-            {"tv_good_bomb_big.tex", "tv_good_bomb_small.tex"},
-            {"tv_bad_skull1.tex", "tv_bad_skull2.tex"},
-            {"tv_good_equalizer.tex"},
-        };
+        using Channel = std::vector<const char *>;
+        const std::array<Channel, kActionCount> kChannels = [] {
+            std::array<Channel, kActionCount> c;
+            c[kGreen] = {"tv_good_rocker_1.tex", "tv_good_rocker_2.tex"};
+            c[kRed] = {"tv_good_city_fire_1.tex", "tv_good_city_fire_2.tex"};
+            c[kYellow] = {"tv_good_caution_1.tex", "tv_good_caution_2.tex"};
+            c[kBlue] = {"tv_freq.tex"};
+            c[kOrange] = {"tv_amplitude.tex"};
+            c[kStrumUp] = c[kStrumDown] = {"tv_good_equalizer.tex"};
+            c[kStarPower] = {"tv_good_nuke.tex"};
+            c[kStart] = {"tv_good_anarchy.tex"};
+            c[kWhammy] = {"tv_trippy.tex"};
+            c[kTilt] = {"tv_bad_skull1.tex", "tv_bad_skull2.tex"};
+            return c;
+        }();
+        const Channel kSnow = {"tv_bad_snow_1.tex", "tv_bad_snow_2.tex"};
         constexpr const char *kTvFrame = "tv_border.tex";
         constexpr const char *kTestCard = "harmonix_splash.tex";
         constexpr uint64_t kFrameMs = 250;
@@ -75,9 +85,9 @@ namespace gh2
         DeviceView s_shown;
         bool s_rebinding = false;
         int s_first = 0;     // the device in the first chip: the row scrolls to keep the one shown in view
-        // The TV: its channel, and what was held last poll, for each new
-        // press to change channel.
-        size_t s_channel = 0;
+        // The TV: the channel of the control last pressed, none for snow,
+        // and what was held last poll, for each new press to change it.
+        const Channel *s_channel = &kSnow;
         std::array<bool, kActionCount> s_wasHeld{};
         DeviceId s_heldOn; // the device those were read from
         std::string s_drawn; // what was last painted, to paint only on a change
@@ -258,20 +268,17 @@ namespace gh2
             return all;
         }
 
-        // Each new press on the device shown changes the TV's channel.
+        // Each new press on the device shown puts its control's channel on.
         void watchPresses()
         {
-            bool pressed = false;
             for (size_t a = 0; a < s_wasHeld.size(); ++a)
             {
                 const bool held = s_shown.amount[a] > kHeld;
-                pressed = pressed || (held && !s_wasHeld[a] && s_heldOn == s_shown.id);
+                if (held && !s_wasHeld[a] && s_heldOn == s_shown.id)
+                    s_channel = &kChannels[a];
                 s_wasHeld[a] = held;
             }
             s_heldOn = s_shown.id;
-            if (!pressed)
-                return;
-            s_channel = (s_channel + 1 + SDL_rand(static_cast<Sint32>(kChannels.size() - 1))) % kChannels.size();
         }
 
         // The texture the TV shows now.
@@ -279,8 +286,7 @@ namespace gh2
         {
             if (s_rebinding)
                 return kTestCard;
-            const auto &frames = kChannels[s_channel];
-            return frames[(SDL_GetTicks() / kFrameMs) % frames.size()];
+            return (*s_channel)[(SDL_GetTicks() / kFrameMs) % s_channel->size()];
         }
 
         // {ghc_controllers poll}: the keyboard's keys acted on, and red held
@@ -378,6 +384,7 @@ namespace gh2
         // {campaigns live}.
         // {ghc_controllers seat}: the seat of the device shown, -1 for none.
         // {ghc_controllers tv}: the texture the corner's TV shows now.
+        // {ghc_controllers channel}: its channel's first texture.
         // {ghc_controllers blink}: 0 to 1 and back twice a second while a
         // control is awaited, else 0.
         // {ghc_controllers leaving}: how far red is held toward leaving, 0
@@ -392,6 +399,7 @@ namespace gh2
                 if (on)
                 {
                     s_focus = 0;
+                    s_channel = &kSnow;
                     s_drawn.clear();
                 }
                 return {};
@@ -430,6 +438,8 @@ namespace gh2
                 return {keyboard(s_shown) ? 1u : 0u, script::kInt};
             if (op == "tv")
                 return symbolNode(call, tv());
+            if (op == "channel")
+                return symbolNode(call, s_channel->front());
             if (op == "blink")
                 return script::floatNode(
                     s_rebinding ? 0.5f - 0.5f * std::cos(static_cast<float>(SDL_GetTicks() % 500u) / 500.0f * 6.2831853f)
@@ -481,7 +491,7 @@ namespace gh2
                             auto scene = milo::read(file);
                             if (!scene)
                                 return;
-                            std::vector<const char *> wanted = {kTvFrame, kTestCard};
+                            std::vector<const char *> wanted = {kTvFrame, kTestCard, kSnow[0], kSnow[1]};
                             for (const auto &frames : kChannels)
                                 wanted.insert(wanted.end(), frames.begin(), frames.end());
                             for (const char *from : {kTvScene, kBarsScene})
