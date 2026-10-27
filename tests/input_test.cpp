@@ -140,6 +140,14 @@ int main()
     CHECK(formatSource(deviceBindings(file, "Guitar", "0300bbbb")->at(kGreen).at(0)) == "button 9");
     CHECK(formatSource(deviceBindings(file, "Guitar", "0300aaaa")->at(kRed).at(0)) == "button 2");
     CHECK(formatSource(file.sections.at("keyboard").at(kGreen).at(0)) == "key 1");
+
+    // [seats] is who sat where, beside the bindings and none of them.
+    CHECK(writeSeats(path, {{"p1", "0300aaaa /dev/a"}, {"p2", "keyboard"}}));
+    CHECK(writeSeats(path, {{"p1", "0300bbbb /dev/b"}}));
+    file = loadBindingFile(path);
+    CHECK(file.seats.size() == 1 && file.seats.at("p1") == "0300bbbb /dev/b");
+    CHECK(!file.sections.count("seats"));
+    CHECK(formatSource(deviceBindings(file, "Guitar", "0300aaaa")->at(kRed).at(0)) == "button 2");
     std::filesystem::remove(path);
 
     if (s_failed)

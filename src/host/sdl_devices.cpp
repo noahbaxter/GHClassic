@@ -43,18 +43,25 @@ namespace gh2::input
                 s.accel = {accel[0], accel[1], accel[2]};
             return s;
         }
+
+        bool sdl(const Device &d)
+        {
+            return d.id.backend == DeviceId::kSdl;
+        }
     }
 
     void closeDevices()
     {
         for (Device &d : devices())
         {
+            if (!sdl(d))
+                continue;
             if (d.gamepad)
                 SDL_CloseGamepad(d.gamepad); // closes its joystick too
             else
                 SDL_CloseJoystick(d.joystick);
         }
-        devices().clear();
+        std::erase_if(devices(), sdl);
     }
 
     void openDevices()
@@ -64,13 +71,15 @@ namespace gh2::input
         std::vector<SDL_JoystickID> now(ids, ids + (ids ? count : 0));
         std::vector<SDL_JoystickID> open;
         for (const Device &d : devices())
-            open.push_back(SDL_GetJoystickID(d.joystick));
+            if (sdl(d))
+                open.push_back(SDL_GetJoystickID(d.joystick));
         if (now == open)
         {
             SDL_free(ids);
             return;
         }
         closeDevices();
+        std::vector<Device> opened;
         for (int i = 0; i < count && ids; ++i)
         {
             Device d;
@@ -90,14 +99,20 @@ namespace gh2::input
             }
             const std::string name = SDL_GetJoystickName(d.joystick) ? SDL_GetJoystickName(d.joystick) : "";
             d.name = name;
+            // Its GUID and path: the same controller in the same port after
+            // a replug, where SDL's instance ID is new.
             const std::string guid = joystickGuid(d.joystick);
             const char *path = SDL_GetJoystickPath(d.joystick);
+            d.id = {DeviceId::kSdl, guid, path ? path : ""};
             // Two of the same controller share a name; the log tells them
             // apart by where they are plugged in.
             if (path)
                 d.name += std::string(" (") + path + ")";
             const DeviceInfo info = deviceInfo(d.joystick, d.gamepad);
             const auto builtin = builtinProfile(info);
+            if (builtin)
+                d.kind = builtin->gamepad ? DeviceKind::kGamepad : DeviceKind::kGuitar;
+            d.label = builtin && !builtin->gamepad ? builtin->label : name;
             const Section *own = sectionOf(name, guid);
             d.sectionName = name;
             d.sectionGuid = guid;
@@ -133,14 +148,17 @@ namespace gh2::input
                 std::cerr << "[input]   no accelerometer: " << SDL_GetError() << std::endl;
             d.now = read(d);
             d.openedMs = SDL_GetTicks();
-            devices().push_back(d);
+            opened.push_back(d);
         }
         SDL_free(ids);
+        // Ahead of a scenario's, as SDL lists them.
+        devices().insert(devices().begin(), opened.begin(), opened.end());
     }
 
     void readSdlDevices()
     {
         for (Device &d : devices())
-            d.now = read(d);
+            if (sdl(d))
+                d.now = read(d);
     }
 }

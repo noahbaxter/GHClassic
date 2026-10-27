@@ -1,0 +1,28 @@
+; The first device to press anything is P1; playing alone, whatever is
+; pressed next takes P1, the one player picking up another controller. A
+; song holds the seats. Strum down only moves the main menu's cursor.
+#include common/first_boot.dta
+(device pad)
+(device guitar)
+(press down pad)
+(expect {seat_has 0 pad} 1)
+(press down guitar)
+(expect {seat_has 0 guitar} 1)
+(expect {seat_has 0 pad} 0)
+(expect {seat_has 1 pad} 0)
+(press down pad)
+(expect {seat_has 0 pad} 1)
+(expect {seat_has 1 guitar} 0)
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty easy}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 1)
+; In the song neither a fret nor Start takes the seat.
+(press green guitar)
+(press start guitar)
+(expect {seat_has 0 pad} 1)
+(expect {seat_has 1 guitar} 0)
+(quit)

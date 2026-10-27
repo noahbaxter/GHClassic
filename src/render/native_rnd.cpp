@@ -7,6 +7,7 @@
 #include "dev/timing.h"
 #include "guest.h"
 #include "hook.h"
+#include "host/input.h"
 #include "milo/layout.h"
 #include "ps2_runtime_macros.h"
 #include "render/camera.h"
@@ -191,6 +192,8 @@ namespace gh2
             addDepthOfField(rdram, GPR_U32(ctx, 4), building());
             settings::rereadGraphics();
             look::setInVenue(building().venue);
+            // A venue is drawn only while a song is up: its seats hold.
+            lockSeats(building().venue);
             building().hdLighting = settings::hd(settings::kLookLighting);
             building().luminance = look::luminance();
             if (timing::on())

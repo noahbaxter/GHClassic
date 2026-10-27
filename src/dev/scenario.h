@@ -12,8 +12,13 @@
 //   (expect {taskmgr seconds} 33.47 0.1)  or, numbers, is within the third
 //   (press green)                      a fret's colour, up, down, left or right,
 //                                      pressed and let go as a player would
-//   (pads 2)                           a second guitar plugged in, idle, for two
-//                                      players (each on autoplay)
+//   (device pad)                       a controller of that name plugged in, from
+//                                      the start, playing through the seat rules;
+//                                      a name with pad in it is a gamepad
+//   (unplug pad)                       that controller pulled out
+//   (press green pad)                  pressed and let go on that controller
+//   (hold pad green down)              held on it until its next hold; none lets go
+//   (key Tab)                          a key by SDL's name, pressed and let go
 //   (star_power player0 {player0 star_power_ready})  from here on, that player's
 //                                      guitar tilted each poll the condition holds,
 //                                      deploying star power when ready; (star_power) stops

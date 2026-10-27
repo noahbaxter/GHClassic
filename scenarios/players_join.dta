@@ -1,0 +1,39 @@
+; Multiplayer is always there; its screen is where P2 joins, with Start, and
+; no mode starts until someone has. Yellow moves a player up a seat, lefty
+; going with them. Outside it, Start on another controller takes P1.
+#include common/first_boot.dta
+(device pad)
+(device guitar)
+(press down pad)
+(expect {seat_has 0 pad} 1)
+; On the main menu the guitar's Start makes it P1: one player switching.
+(press start guitar)
+(wait 0.3)
+(expect {seat_has 0 guitar} 1)
+(expect {seat_has 1 pad} 0)
+{ui goto_screen multi_screen}
+(wait_screen multi_screen)
+(wait 1)
+(shot alone)
+; No mode with one player.
+(press green guitar)
+(wait 1)
+(expect {{ui current_screen} name} multi_screen)
+(press start pad)
+(wait 0.5)
+(expect {seat_has 1 pad} 1)
+(expect {game is_missing_multi_controller} 0)
+(expect {{ui current_screen} name} multi_screen)
+(shot joined)
+; The pad's player plays left handed, and moves up to P1.
+{options set_lefty 1 TRUE}
+(press yellow pad)
+(wait 0.5)
+(expect {seat_has 0 pad} 1)
+(expect {seat_has 1 guitar} 1)
+(expect {options get_lefty 0} 1)
+(expect {options get_lefty 1} 0)
+(shot reordered)
+(press green pad)
+(wait_screen multi_coop_venue_screen 10)
+(quit)

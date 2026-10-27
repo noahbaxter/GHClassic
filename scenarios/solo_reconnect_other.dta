@@ -1,0 +1,38 @@
+; P1's controller gone mid-song and not coming back as itself (a pad on
+; another cable or by Bluetooth has another GUID): Start on another device
+; takes the seat, and the keyboard's Esc does too.
+#include common/first_boot.dta
+(device pad)
+(device guitar)
+(press down pad)
+(expect {seat_has 0 pad} 1)
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty easy}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 1)
+(unplug pad)
+(wait_screen pause_controller_screen 10)
+; A fret takes nothing; Start does.
+(press green guitar)
+(wait 0.5)
+(expect {seat_has 0 guitar} 0)
+(press start guitar)
+(wait 0.5)
+(expect {seat_has 0 guitar} 1)
+(press green guitar)
+(wait_screen game_screen 10)
+; The guitar gone too: the keyboard's Esc takes it, Enter goes on to the
+; pause menu, and Esc resumes.
+(unplug guitar)
+(wait_screen pause_controller_screen 10)
+(key Escape)
+(wait 0.5)
+(expect {seat_has 0 keyboard} 1)
+(key Return)
+(wait_screen pause_screen 10)
+(key Escape)
+(wait_screen game_screen 10)
+(quit)

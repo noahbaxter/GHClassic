@@ -178,10 +178,9 @@
          }
       )
       (poll
-         {if_else {game is_missing_multi_controller}
-            {$this disable main_multiplayer.btn}
-            {$this enable main_multiplayer.btn}
-         }
+         ; Always: Multiplayer's screen is where the second player joins
+         ; (players.dta).
+         {$this enable main_multiplayer.btn}
          {main_msg.view set_showing
             {< {taskmgr ui_seconds} {$this get msg_last_frame}}
          }

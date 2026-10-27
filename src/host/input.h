@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 namespace gh2
 {
@@ -45,8 +46,55 @@ namespace gh2
     // controllers alone. Before openInput.
     void leaveControllers();
 
-    // The state the last poll saw. Callable from any thread.
-    HostPad hostPad();
+    // Up to four players; GH2 has two ports' worth of screens, so two join.
+    constexpr int kSeats = 4;
+    constexpr int kPlayers = 2;
+
+    // A seat's controller as the last poll saw it, idle when no device is
+    // in it. Seat N is libpad's port N. Callable from any thread.
+    HostPad hostPad(int seat = 0);
+    // Whether the game sees a controller in that seat's port.
+    bool seatPlugged(int seat);
+    // While a song plays, a press on another device takes no seat.
+    // Callable from any thread.
+    void lockSeats(bool locked);
+    // Which screen of a song is up: in one playing, the keyboard's menu
+    // keys would be a guitar's frets and strums, so only its Esc works,
+    // as Start; in its pause menu Esc is Start too, to resume. Callable
+    // from any thread.
+    enum class SongScreen
+    {
+        kOther,
+        kPlaying,
+        kPaused,
+    };
+    void songScreen(SongScreen screen);
+
+    // A scenario's controllers that are not plugged in, by name. Each plays
+    // as a real one does, through its layout and the seat rules, in a
+    // hidden run too. Held until the next set, none to let go: the controls
+    // its layout gives the actions of those libpad bits. Callable from any
+    // thread.
+    void addScriptedDevice(const std::string &name);
+    void removeScriptedDevice(const std::string &name); // unplugged
+    void setScriptedDevice(const std::string &name, uint16_t pressed);
+    // A scenario's key, SDL's scancode, held on the keyboard until let go;
+    // in a hidden run, from the first, the keyboard is there. Callable from
+    // any thread.
+    void setScriptedKey(int scancode, bool down);
+    // Whether that seat reads the device of that name: a scripted one's, or
+    // a real one's as the log names it. Callable from any thread.
+    bool seatHas(int seat, const std::string &name);
+    // What a player is shown for it: its guitar's layout ("Wii guitar
+    // (raphnet)"), else its name; "" for none. Callable from any thread.
+    std::string seatLabel(int seat);
+
+    // Whether Multiplayer's screen is up, where a controller joins with
+    // Start and yellow moves a player up a seat. Callable from any thread.
+    void setPlayersStep(bool on);
+    // How many times P1 and P2 have traded places, by yellow there or by
+    // P2 moving up when P1's controller is let go. Callable from any thread.
+    uint32_t seatTrades();
 
     // The free camera's controls (ui/photo_mode.h): W A S D as how far it
     // is pushed right and forward, -1 to 1, the mouse's travel in pixels,

@@ -28,6 +28,14 @@ namespace gh2::input
         return s_devices;
     }
 
+    Device *deviceById(const DeviceId &id)
+    {
+        for (Device &d : s_devices)
+            if (d.id == id)
+                return &d;
+        return nullptr;
+    }
+
     void nameControls(Device &d)
     {
         // A gamepad's controls by its layout, as it binds them.
