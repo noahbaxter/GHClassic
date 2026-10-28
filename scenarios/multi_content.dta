@@ -1,0 +1,234 @@
+; Face-Off's pickers offer what quickplay's do (multiplayer.dta): another
+; game's outfit, up to four to a character, each player's HD or SD of their
+; own for characters and guitars, a guitar from another game, another game's
+; venue map (GH1's small club being its multiplayer room, and the basement
+; with its two guitarists apart) and setlist, and Pro Face-Off its song in
+; that venue. On a new save.
+(needs gh1 gh2x gh80s)
+#include common/first_boot.dta
+(device p1)
+(device p2)
+(press start p1)
+{ui goto_screen multi_screen}
+(wait_screen multi_screen)
+(press start p2)
+(wait 0.5)
+{gamecfg set mode multi_vs}
+{game set_num_players 2}
+{ui goto_screen multi_sel_character_screen}
+(wait_screen multi_sel_character_screen)
+(wait 3)
+
+; HD or SD, the pressing player's own: each has one the 360 has its own of
+; (Johnny Napalm's and Eddie Knox's first outfits), and the help bar shows
+; both, the first player's first.
+(expect {quickplay characters} hd)
+(expect $ghc_multi_hb 15)
+(shot hd_hd)
+(press blue p1)
+(wait 1.5)
+(expect {elem $ghc_multi_hdc 0} 0)
+(expect $ghc_multi_hb 11)
+(shot sd_hd)
+(press blue p2)
+(wait 1.5)
+(expect {elem $ghc_multi_hdc 1} 0)
+(expect $ghc_multi_hb 3)
+(shot sd_sd)
+(press blue p1)
+(wait 1.5)
+(expect $ghc_multi_hb 7)
+(shot hd_sd)
+(press blue p2)
+(wait 1.5)
+(expect $ghc_multi_hb 15)
+
+; Johnny Napalm has three outfits to the picker's rows, GH1's the third.
+(press green p1)
+(wait 1)
+(expect {size {elem $ghc_multi_outfits 0}} 3)
+(expect {elem {elem $ghc_multi_outfits 0} 2} punkgh1)
+(shot outfits_three)
+(press down p1)
+(wait 0.7)
+(expect {multi_char_outfit0 focus_name} outfit2.btn)
+(press down p1)
+(wait 2)
+(expect {{game get_player_config 0} get_character_outfit} punkgh1)
+(expect {elem {find $syscfg characters punk punkgh1 extra} 1} gh1)
+(shot outfit_gh1)
+; Past the last round to the first, and back up to GH1's.
+(press down p1)
+(wait 0.7)
+(expect {{game get_player_config 0} get_character_outfit} punk1)
+(press up p1)
+(wait 0.7)
+(expect {{game get_player_config 0} get_character_outfit} punkgh1)
+
+; GH1's has no HD of its own, so its label reads SD where there was none to
+; turn.
+(expect {ghc_multi_has_chars 0} 0)
+(expect $ghc_multi_hb 10)
+
+; With every outfit open, four rows: the box grows to hold them, each
+; strum goes one, round both ways, and the black is whole across.
+{campaign set_all_access 1}
+{ghc_multi_outfits 0}
+(wait 1.5)
+(expect {size {elem $ghc_multi_outfits 0}} 4)
+(shot outfits_four)
+(expect {multi_char_outfit0 focus_name} ghc_p1_outfit4.btn)
+(expect {{game get_player_config 0} get_character_outfit} punkgh1)
+(press down p1)
+(wait 1)
+(expect {multi_char_outfit0 focus_name} outfit1.btn)
+(expect {{game get_player_config 0} get_character_outfit} punk1)
+(press up p1)
+(wait 1)
+(expect {multi_char_outfit0 focus_name} ghc_p1_outfit4.btn)
+(press down p1)
+(wait 0.7)
+(press down p1)
+(wait 0.7)
+(press down p1)
+(wait 1)
+(expect {multi_char_outfit0 focus_name} ghc_p1_outfit3.btn)
+(expect {{game get_player_config 0} get_character_outfit} punk3)
+(shot outfits_four_third)
+; Back to what a new save has open, which the picker lists again, three.
+{campaign set_all_access 0}
+{ghc_multi_outfits 0}
+(wait 1)
+(expect {size {elem $ghc_multi_outfits 0}} 3)
+(press green p1)
+(wait 1)
+; Eddie Knox has one outfit on a new save, no picker: ready on select, and
+; on to the guitars.
+(press green p2)
+
+; Both players' guitars: one finish between them the 360 has its own of, so
+; blue turns both, and the help bar says so.
+(wait_screen multi_sel_guitar_screen)
+(wait 2)
+(expect {multi_sel_guitar_panel get_selected_guitar 0} lespaul)
+(expect {ghc_multi_has_guitar 0} 1)
+(expect $ghc_multi_hb 15)
+(press blue p1)
+(wait 1.5)
+(expect {elem $ghc_multi_hdg 0} 0)
+(expect {elem $ghc_multi_hdg 1} 0)
+(expect {quickplay model guitar lespaull sd} 0)
+(expect $ghc_multi_hb 3)
+(shot guitars_sd_sd)
+(press blue p2)
+(wait 1.5)
+(expect {quickplay model guitar lespaull hd} 1)
+(expect $ghc_multi_hb 15)
+; Each their own once they hold different ones: the first player's SG SD,
+; the second's Les Paul HD.
+(press down p1)
+(wait 2)
+(expect {ghc_multi_guitar_file 0} guitar_sg)
+(press blue p1)
+(wait 2)
+(expect {quickplay model guitar guitar_sg sd} 0)
+(expect {quickplay model guitar lespaull hd} 1)
+(expect $ghc_multi_hb 11)
+(shot guitars_sd_hd)
+(press blue p2)
+(wait 2)
+(expect {quickplay model guitar lespaull sd} 0)
+(expect $ghc_multi_hb 3)
+(press blue p1)
+(wait 2)
+(expect {quickplay model guitar guitar_sg hd} 1)
+(expect $ghc_multi_hb 7)
+(shot guitars_hd_sd)
+; GH1's tobacco guitar, which GH2 has none of, a band's from the start.
+(press down p1)
+(wait 0.5)
+(press down p1)
+(wait 2)
+(expect {multi_sel_guitar_panel get_selected_guitar 0} tobac)
+(expect {ghc_multi_has_guitar 0} 0)
+(shot guitar_gh1)
+
+; The map opens on GH2's, yellow's list takes GH1's, and its small club is
+; the multiplayer room GH1 had, the one the songs play in.
+; (Only each game's first venue is open on a new save.)
+{campaign set_all_access 1}
+{multi_sel_guitar_panel set_select_done 0 TRUE}
+{multi_sel_guitar_panel set_select_done 1 TRUE}
+{multi_sel_guitar_screen check_guitars_selected}
+(wait_screen multi_vs_venue_screen)
+(wait 2)
+(expect $ghc_qp_venues gh2)
+{multi_vs_venue_screen ghc_picked gh1}
+(wait_screen ghc_qp_venue_twin_screen)
+(wait 2)
+(expect $ghc_qp_venues gh1)
+(expect {game get_venue} small1)
+(shot venue_gh1)
+(press green p1)
+(wait_screen multi_vs_selsong_screen)
+(wait 1)
+(expect {game get_venue} small2)
+(expect {campaigns venue_game} gh1)
+
+; GH1's setlist, on its twin screen.
+{multi_vs_selsong_screen ghc_picked gh1}
+(wait_screen ghc_multi_selsong_twin_screen)
+(wait 2)
+(expect {setlist shown} gh1)
+(shot setlist_gh1)
+(press green p1)
+(wait_screen multi_vs_seldiff_screen)
+(expect {gamecfg get_song} iloverockandroll)
+
+; Pro Face-Off has the same, and plays GH1's song in that room, the two
+; guitarists apart.
+{gamecfg set mode multi_fo}
+{ui goto_screen multi_fo_selsong_screen}
+(wait_screen multi_fo_selsong_screen)
+(wait 2)
+(expect {setlist shown} gh1)
+(press green p1)
+(wait_screen multi_fo_seldiff_screen)
+{{game get_player_config 0} set autoplay TRUE}
+{{game get_player_config 1} set autoplay TRUE}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(expect {gamecfg get_song} iloverockandroll)
+(expect {campaigns venue_game} gh1)
+(expect {game get_venue} small2)
+(wait 3)
+(shot song_small_club_multi_3s)
+(wait 12)
+(shot song_small_club_multi_15s)
+
+; Every look let go at the main menu, which would show in quickplay's.
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+(expect {quickplay model outfit punk1 default} 1)
+
+; The basement has two walk spots 20 apart, which stacked two guitarists:
+; the second steps aside across the stage.
+{campaigns venues_from gh1}
+{gamecfg set mode multi_fo}
+{game set_num_players 2}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set autoplay TRUE}
+{{game get_player_config 1} set autoplay TRUE}
+{game set_venue battle}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(expect {game get_venue} battle)
+(wait 3)
+{world do_force_shot flr_far_lft01}
+(wait 0.4)
+(shot basement_3s)
+(wait 12)
+{world do_force_shot flr_far_lft01}
+(wait 0.4)
+(shot basement_15s)
+(quit)

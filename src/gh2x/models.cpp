@@ -222,9 +222,20 @@ namespace gh2
             }
         }
 
+        // The look set for the paths under a prefix, whatever the graphics
+        // say (setGh2xLook), read by the game and the worker both.
+        std::mutex s_looksLock;
+        std::map<std::string, bool> s_looks;
+
         // Whether the 360's scene is the one served at a PS2 path now.
         bool wanted(const std::string &path)
         {
+            {
+                const std::lock_guard lock(s_looksLock);
+                for (const auto &[prefix, hd] : s_looks)
+                    if (path.starts_with(prefix))
+                        return hd;
+            }
             // A band member is the band setting's first: the 360's or the
             // PS2's whatever the graphics, when it names either.
             for (const char *member : kBand)
@@ -384,4 +395,25 @@ namespace gh2
         const auto at = std::lower_bound(s_twinned.begin(), s_twinned.end(), prefix);
         return at != s_twinned.end() && at->starts_with(prefix);
     }
+
+    bool setGh2xLook(const std::string &prefix, std::optional<bool> hd)
+    {
+        const std::lock_guard lock(s_looksLock);
+        const bool had = s_looks.count(prefix) != 0u;
+        if (hd)
+            s_looks[prefix] = *hd;
+        else
+            s_looks.erase(prefix);
+        return had;
+    }
+
+    bool clearGh2xLooks()
+    {
+        const std::lock_guard lock(s_looksLock);
+        const bool any = !s_looks.empty();
+        s_looks.clear();
+        return any;
+    }
+
+    bool gh2xServes(const std::string &path) { return wanted(path); }
 }

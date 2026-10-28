@@ -241,6 +241,8 @@
       ; this one has none and sets its own.
       (enter
          {$this turn_off_ambient}
+         ; Face-Off's looks, one outfit's and finish's each (multiplayer.dta).
+         {ghc_multi_forget}
          {do
             ($array)
             {set $array ()}

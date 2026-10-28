@@ -46,6 +46,9 @@ namespace gh2::gh1
         const std::map<std::string, std::string> kVenues = {
             {"basement", "battle"}, {"small_club", "small1"}, {"big_club", "big"},
             {"theatre", "theatre"}, {"fest", "fest"},         {"arena", "arena"},
+            // Multiplayer's room (multi_only in arena/venues.dta), at the
+            // slot GH1's map has no button for.
+            {"small_club_multi", "small2"},
         };
 
         // A GH1 EVENTS text as GH2's track and text, or no track to drop it.

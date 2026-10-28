@@ -28,6 +28,7 @@
 #include "milo/milo.h"
 
 #include <algorithm>
+#include <cmath>
 #include <iostream>
 #include <optional>
 #include <set>
@@ -184,6 +185,28 @@ namespace gh2::gh1
             return out;
         }
 
+        // How far apart two guitarists stand: the walk spots of
+        // small_club_multi, the one room GH1 played two in, are 53 apart.
+        constexpr float kApart = 53.0f;
+
+        // The second guitarist's start. GH1 has two walk spots in its small
+        // rooms; in the basement they are 20 apart, which with two guitarists
+        // stacks them, so the one on 01 steps aside across the stage (x, in
+        // every room), away from the singer, to kApart from 02.
+        Bytes secondStart(const Spots &at)
+        {
+            Bytes out = at.walk[0];
+            if (at.walk.size() < 2u)
+                return out;
+            const float other = f32(at.walk[1], 36u), mine = f32(out, 36u);
+            if (std::fabs(mine - other) >= kApart)
+                return out;
+            Bytes put;
+            putF32(put, other + (other >= f32(at.stage[0], 36u) ? kApart : -kApart));
+            std::copy(put.begin(), put.end(), out.begin() + 36);
+            return out;
+        }
+
         // GH2's chars dir with its waypoints replaced by GH1's (flags in
         // macros.dta). The band starts on GH1's stage spots and the
         // guitarist on walk spot 01. GH1 has no second guitarist, so with two
@@ -214,6 +237,7 @@ namespace gh2::gh1
             milo::Dir out = gh2;
             out.entries.clear();
             out.bodies.clear();
+            const Bytes second = secondStart(at);
             std::optional<std::pair<Bytes, size_t>> start; // the guitarist's, and its Trans
             for (size_t i = 0; i < gh2.entries.size(); ++i)
             {
@@ -240,7 +264,7 @@ namespace gh2::gh1
                 else if (flags & kStartGuitarist0Mp)
                     spot = &at.walk[at.walk.size() > 1u ? 1u : 0u];
                 else if (flags & kStartGuitarist1Mp)
-                    spot = &at.walk[0];
+                    spot = &second;
                 if (!spot)
                     continue;
                 out.entries.push_back(gh2.entries[i]);
@@ -278,6 +302,7 @@ namespace gh2::gh1
         static const std::pair<const char *, const char *> kVenues[] = {
             {"basement", "drum_kit.view"}, {"small_club", "drumkit.view"}, {"big_club", "drum_kit.view"},
             {"theatre", "drum_kit.view"},  {"fest", "drum_kit.view"},      {"arena", "drum kit 00.view"},
+            {"small_club_multi", "drum_kit.view"},
         };
         dtb::Macros none;
         const dtb::Files files = [disc](const std::string &path) { return ark::readFile(disc, path); };
@@ -349,7 +374,9 @@ namespace gh2::gh1
             // two more outside the festival, and five more again in the
             // basement and the small club.
             const std::string venueName = name;
-            const size_t whole = venueName == "fest" ? 10u : venueName == "basement" || venueName == "small_club" ? 17u : 12u;
+            const size_t whole = venueName == "fest" ? 10u
+                                 : venueName == "basement" || venueName == "small_club" || venueName == "small_club_multi" ? 17u
+                                                                                                                            : 12u;
             stage.regions = crowdRegions(crowdScenes, places, flatHeight, whole);
             ark::addFile(layer, geomPath, milo::write(*madeGeom));
             ark::addFile(layer, lightsPath, milo::write(lights(*gh2Lights)));

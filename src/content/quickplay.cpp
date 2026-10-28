@@ -232,6 +232,35 @@ namespace gh2::quickplay
                                                                     : "char/" + call.symbol(3) + "/";
                 return {gh2xHasModel(path) ? 1u : 0u, script::kInt};
             }
+            // One outfit's or finish's look by itself, the 360's or the PS2's
+            // whatever the setting says, for one player of two; what is on
+            // show of it is loaded again only if that changes it.
+            if (op == "model" && call.size() > 2)
+            {
+                const std::string what = call.symbol(2);
+                if (what == "clear")
+                {
+                    if (clearGh2xLooks())
+                    {
+                        reloadCharacters(call);
+                        reloadGuitars(call);
+                    }
+                    return {1u, script::kInt};
+                }
+                if (call.size() > 4)
+                {
+                    const bool guitar = what == "guitar";
+                    const std::string path = guitar ? "char/og/guitars/gen/" + call.symbol(3) + ".milo_ps2"
+                                                    : "char/" + call.symbol(3) + "/";
+                    const std::string look = call.symbol(4);
+                    const bool was = gh2xServes(path);
+                    setGh2xLook(path, look == "default" ? std::nullopt : std::optional<bool>(look == "hd"));
+                    const bool now = gh2xServes(path);
+                    if (now != was)
+                        (guitar ? reloadGuitars : reloadCharacters)(call);
+                    return {(now ? 1u : 0u) | (now != was ? 2u : 0u), script::kInt};
+                }
+            }
             if (op == "outfit" && call.size() > 2)
             {
                 // Another game's outfit is in the config under the name it was

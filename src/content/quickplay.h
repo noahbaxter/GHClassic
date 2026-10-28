@@ -31,6 +31,13 @@
 //   {quickplay has_hd outfit <outfit>}  TRUE if the 360 has its own of that
 //                                    outfit, by the game disc's name for it
 //   {quickplay has_hd guitar <file>}  or of that finish, by its (outfit ...)
+//   {quickplay model <outfit|guitar> <name> <sd|hd|default>}  that outfit's or
+//                                    finish's look by itself, whatever the
+//                                    setting says, for one player of two
+//                                    (ui/dta/multiplayer.dta); 1 if it is the
+//                                    360's now, and 2 more if that changed it
+//                                    (what is on show is loaded again)
+//   {quickplay model clear}          every one of those let go
 //
 // Outside a career (content/campaigns.h) an item is unlocked where any
 // game's career has it. The guitars are GH2's with every game's finishes of
