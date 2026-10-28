@@ -42,7 +42,7 @@
       (file
          {switch {gamecfg get mode}
             ((career multi_coop) ui/sel_song.milo)
-            (quickplay {setlist look})
+            ((quickplay multi_vs multi_fo) {setlist look})
             ui/sel_song_quickplay.milo
          }
       )
