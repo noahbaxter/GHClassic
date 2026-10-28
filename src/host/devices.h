@@ -31,6 +31,17 @@ namespace gh2::input
 
     // Every device, controllers in the order SDL lists them, the keyboard last.
     std::vector<DeviceView> deviceViews();
+
+    // What P1's menus are read from, for the help bar's glyphs: P1's
+    // controller while it is here, else the keyboard, and each action's
+    // first control as the screen names it ("LT", "1"; "" for none).
+    struct MenuControls
+    {
+        DeviceKind kind = DeviceKind::kKeyboard;
+        std::array<std::string, kActionCount> shown{};
+        bool operator==(const MenuControls &) const = default;
+    };
+    MenuControls menuControls();
     // The device last pressed while the screen is up: the one it shows. The
     // keyboard runs the screen, so it is never pressed into it.
     DeviceId touchedDevice();

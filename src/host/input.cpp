@@ -21,6 +21,7 @@
 #include "host/bindings.h"
 #include "host/device.h"
 #include "host/device_screen.h"
+#include "host/devices.h"
 #include "host/layouts.h"
 #include "host/owner.h"
 #include "host/scripted_devices.h"
@@ -69,6 +70,7 @@ namespace gh2
         HostPad s_pads[kSeats];
         std::string s_seatNames[kSeats]; // for seatHas
         std::string s_seatLabels[kSeats];
+        MenuControls s_menu;
         bool s_flying = false;
         HostFly s_fly, s_scriptedFly;
         uint64_t s_pressEventNs = 0; // the host thread's own
@@ -357,7 +359,17 @@ namespace gh2
         float mouseX = 0.0f, mouseY = 0.0f;
         if (s_open)
             SDL_GetRelativeMouseState(&mouseX, &mouseY);
+        MenuControls menu;
+        const Device *p1 = seated[0] ? deviceById(seated[0]->id) : nullptr;
+        if (p1)
+            menu.kind = p1->kind;
+        const Profile &profile = p1 ? p1->profile : keyboardLayout();
+        for (int a = 0; a < kActionCount; ++a)
+            if (!profile[static_cast<size_t>(a)].empty())
+                menu.shown[static_cast<size_t>(a)] =
+                    shown(p1 ? p1->gamepad : nullptr, profile[static_cast<size_t>(a)].front());
         std::lock_guard<std::mutex> lock(s_mutex);
+        s_menu = menu;
         for (int seat = 0; seat < kSeats; ++seat)
         {
             const bool keyboard = !seated[seat] && (s_standIn[seat].load(std::memory_order_relaxed) ||
@@ -448,6 +460,12 @@ namespace gh2
     {
         std::lock_guard<std::mutex> lock(s_mutex);
         return seat >= 0 && seat < kSeats && !name.empty() && s_seatNames[seat] == name;
+    }
+
+    input::MenuControls input::menuControls()
+    {
+        std::lock_guard<std::mutex> lock(s_mutex);
+        return s_menu;
     }
 
     std::string seatLabel(int seat)

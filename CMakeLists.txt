@@ -524,6 +524,11 @@ file(READ assets/crown/crown.bin GHC_CROWN HEX)
 string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_CROWN "${GHC_CROWN}")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/crown/crown.bin)
 configure_file(src/ui/crown_bitmap.h.in "${GHC_DTA_DIR}/crown_bitmap.h" @ONLY)
+# The help bar's glyphs (ui/help_bar.cpp), tools/procedural/helpbar_glyphs.py's sheet.
+file(READ assets/helpbar/glyphs.bin GHC_HELPBAR_GLYPHS HEX)
+string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_HELPBAR_GLYPHS "${GHC_HELPBAR_GLYPHS}")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/helpbar/glyphs.bin)
+configure_file(src/ui/helpbar_glyphs.h.in "${GHC_DTA_DIR}/helpbar_glyphs.h" @ONLY)
 target_include_directories(GHClassic PRIVATE "${GHC_DTA_DIR}")
 
 # What the build is (src/build_info.h), from tools/ghc.py: the tag it was made
