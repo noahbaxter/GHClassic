@@ -1,0 +1,34 @@
+; A gamepad as P1 drives GH2's menus and then GH1's: its seat is in pad
+; mode, but the menus answer it as a guitar, green picking and red backing
+; out.
+(needs gh1)
+#include common/first_boot.dta
+(device pad)
+(press down pad)
+(expect {seat_has 0 pad} 1)
+(wait 1)
+(expect {game get_controller 0} guitar)
+(press green pad)
+(wait 2)
+(expect {!= {{ui current_screen} name} main_screen} 1)
+(press red pad)
+(wait_screen main_screen 10)
+(wait 1)
+{set $ghc_switch gh1}
+{set $ghc_switch_next main_screen}
+{ui goto_screen ghc_switch_screen}
+(wait 3)
+(wait_screen main_screen)
+(expect {campaigns active} gh1)
+(wait 2)
+(expect {seat_has 0 pad} 1)
+(press down pad)
+(wait 0.5)
+(press up pad)
+(wait 0.5)
+(press green pad)
+(wait 2)
+(expect {!= {{ui current_screen} name} main_screen} 1)
+(press red pad)
+(wait_screen main_screen 10)
+(quit)

@@ -503,6 +503,9 @@ def review_set(name):
     if name in _review_sets:
         return _review_sets[name]
     branch = git_out("branch", "--show-current")
+    # A chunk of a bigger branch shares that one's folder: git config
+    # branch.<chunk>.review <bigger branch>.
+    branch = (branch and git_out("config", f"branch.{branch}.review")) or branch
     folder = branch_folder(branch) if branch else f"detached-{git_out('rev-parse', '--short', 'HEAD') or 'tree'}"
     if SERIES:
         found = sorted((REVIEW / folder).glob(f"*_{SERIES}")) if (REVIEW / folder).is_dir() else []
@@ -791,9 +794,11 @@ def cmd_ci(argv):
     run(["cmake", "-S", ROOT, "-B", ci, "-DCMAKE_BUILD_TYPE=Release", f"-DGHC_GENERATED_DIR={ci / 'none'}"],
         env, quiet=True)
     run(["cmake", "--build", ci, "-j", jobs, "--target", "ps2_runtime", "chdr-static", "SDL3-static", "volk",
-         "vk-bootstrap", "glslang-standalone", "mpeg2", "save_test", "releases_test"], env)
+         "vk-bootstrap", "glslang-standalone", "mpeg2", "save_test", "releases_test", "input_test", "seats_test"], env)
     run([ci / f"save_test{EXE}"], env)
     run([ci / f"releases_test{EXE}"], env)
+    run([ci / f"input_test{EXE}"], env)
+    run([ci / f"seats_test{EXE}"], env)
 
 
 def cmd_bind(argv):

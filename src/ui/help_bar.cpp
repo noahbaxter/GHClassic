@@ -2,18 +2,25 @@
 
 #include "disc/ark.h"
 #include "dta.h"
+#include "gh1/scene.h"
 #include "guest.h"
+#include "helpbar_glyphs.h"
 #include "hook.h"
+#include "host/devices.h"
 #include "milo/milo.h"
+#include "render/texture_store.h"
 #include "script.h"
 
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
 
 #include <algorithm>
+#include <array>
+#include <cctype>
 #include <cmath>
 #include <cstring>
 #include <iostream>
+#include <map>
 
 namespace gh2
 {
@@ -66,6 +73,198 @@ namespace gh2
                 return true;
             }
             return false;
+        }
+
+        // The labels' sheet (tools/procedural/helpbar_glyphs.py, whose
+        // layout this is): kCell-pixel cells, kCols to a row, each label in
+        // kLabels' order, white to lay over a gem; then a row holding the
+        // strum bar's stand-ins, a pad's d-pad and the keyboard's arrow
+        // keys, each kStrumWide by kCell / 2.
+        constexpr int kCell = 96, kCols = 16, kStrumWide = 192;
+        const char *const kLabels[] = {
+            "A",     "B",      "X",     "Y",     "LB",   "RB",       "LT",     "RT",    "LS",      "RS",  "L1",
+            "R1",    "L2",     "R2",    "L3",    "R3",   "CROSS",    "CIRCLE", "SQUARE", "TRIANGLE", "UP", "DOWN",
+            "LEFT",  "RIGHT",  "START", "BACK",  "SELECT", "OPTIONS", "ENTER", "ESC",   "TAB",     "SPACE", "SHIFT",
+            "0",     "1",      "2",     "3",     "4",    "5",        "6",      "7",     "8",       "9",   "C",
+            "D",     "E",      "F",     "G",     "H",    "I",        "J",      "K",     "L",       "M",   "N",
+            "O",     "P",      "Q",     "R",     "S",    "T",        "U",      "V",     "W",       "Z",
+        };
+        constexpr int kLabelCount = static_cast<int>(sizeof kLabels / sizeof kLabels[0]);
+        constexpr int kStrumRow = (kLabelCount + kCols - 1) / kCols;
+
+        // Each glyph the help bar can show in a slot: the disc's own fret
+        // gem or start button with a label on it, as Tex
+        // ghc_hb_<slot>_<label>.tex. The strum bar's are
+        // ghc_hb_strum_pad.tex and _keys.tex.
+        struct Slot
+        {
+            const char *name; // its Mat and Tex are hb_<name>
+            input::Action action;
+        };
+        constexpr Slot kSlots[] = {
+            {"fret1", input::kGreen}, {"fret2", input::kRed},    {"fret3", input::kYellow},
+            {"fret4", input::kBlue},  {"fret5", input::kOrange}, {"start", input::kStart},
+        };
+
+        // A control as the Controllers screen names it (host/devices.h), as
+        // a label's index; -1 for one with none, which shows the plain gem.
+        int labelOf(const std::string &shown)
+        {
+            static const std::map<std::string, std::string> kNamed = {
+                {"Cross", "CROSS"},       {"Circle", "CIRCLE"},     {"Square", "SQUARE"},   {"Triangle", "TRIANGLE"},
+                {"D-pad Up", "UP"},       {"D-pad Down", "DOWN"},   {"D-pad Left", "LEFT"}, {"D-pad Right", "RIGHT"},
+                {"L Stick Press", "LS"},  {"R Stick Press", "RS"},  {"Return", "ENTER"},    {"Keypad Enter", "ENTER"},
+                {"Escape", "ESC"},        {"Left Shift", "SHIFT"},  {"Right Shift", "SHIFT"},
+            };
+            const auto named = kNamed.find(shown);
+            std::string label = named != kNamed.end() ? named->second : shown;
+            for (char &c : label)
+                c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+            for (int i = 0; i < kLabelCount; ++i)
+                if (label == kLabels[i])
+                    return i;
+            return -1;
+        }
+
+        // `data`, the sheet, as one glyph: the disc's gem brought up to
+        // kCell, sampled between its pixels as the GPU draws it at its own
+        // size, and the label in cell `label` laid over it, `down` pixels
+        // lower, `dark` with its colours turned for the white start button.
+        void glyph(TextureData &data, const TextureData &gem, int label, int down, bool dark)
+        {
+            std::vector<uint8_t> out(static_cast<size_t>(kCell) * kCell * 4u);
+            const auto texel = [&](int x, int y, int c)
+            {
+                x = std::clamp(x, 0, static_cast<int>(gem.width) - 1);
+                y = std::clamp(y, 0, static_cast<int>(gem.height) - 1);
+                return static_cast<float>(gem.rgba[(static_cast<size_t>(y) * gem.width + x) * 4u + c]);
+            };
+            for (int y = 0; y < kCell; ++y)
+                for (int x = 0; x < kCell; ++x)
+                {
+                    uint8_t *to = out.data() + (static_cast<size_t>(y) * kCell + x) * 4u;
+                    const float u = (x + 0.5f) * gem.width / kCell - 0.5f, v = (y + 0.5f) * gem.height / kCell - 0.5f;
+                    const int u0 = static_cast<int>(std::floor(u)), v0 = static_cast<int>(std::floor(v));
+                    const float fu = u - u0, fv = v - v0;
+                    for (int c = 0; c < 4; ++c)
+                        to[c] = static_cast<uint8_t>(std::lround(
+                            (texel(u0, v0, c) * (1 - fu) + texel(u0 + 1, v0, c) * fu) * (1 - fv) +
+                            (texel(u0, v0 + 1, c) * (1 - fu) + texel(u0 + 1, v0 + 1, c) * fu) * fv));
+                    const int ly = y - down;
+                    if (ly < 0 || ly >= kCell)
+                        continue;
+                    const size_t at = (static_cast<size_t>(label / kCols * kCell + ly) * data.width +
+                                       static_cast<size_t>(label % kCols * kCell + x)) *
+                                      4u;
+                    const uint8_t *top = data.rgba.data() + at;
+                    const float a = top[3] / 255.0f, under = to[3] / 255.0f * (1.0f - a), both = a + under;
+                    for (int c = 0; c < 3 && both > 0.0f; ++c)
+                        to[c] = static_cast<uint8_t>(
+                            std::lround(((dark ? 255 - top[c] : top[c]) * a + to[c] * under) / both));
+                    to[3] = static_cast<uint8_t>(std::lround(both * 255.0f));
+                }
+            data.width = data.height = static_cast<uint32_t>(kCell);
+            data.rgba = std::move(out);
+            data.mips.clear();
+        }
+
+        // `data`, the sheet, as one of the strum bar's stand-ins.
+        void strum(TextureData &data, int which)
+        {
+            std::vector<uint8_t> out(static_cast<size_t>(kStrumWide) * (kCell / 2) * 4u);
+            for (int y = 0; y < kCell / 2; ++y)
+                std::memcpy(out.data() + static_cast<size_t>(y) * kStrumWide * 4u,
+                            data.rgba.data() +
+                                (static_cast<size_t>(kStrumRow * kCell + y) * data.width + which * kStrumWide) * 4u,
+                            static_cast<size_t>(kStrumWide) * 4u);
+            data.width = static_cast<uint32_t>(kStrumWide);
+            data.height = static_cast<uint32_t>(kCell / 2);
+            data.rgba = std::move(out);
+            data.mips.clear();
+        }
+
+        // Each slot's glyphs, and the strum bar's, into helpbar.milo: a Tex
+        // like the slot's own, a stand-in whose pixels are put together
+        // from its gem and the sheet when first drawn. A label sits on a
+        // fret's face, below its middle for the round top; on the start
+        // button's middle.
+        void addGlyphs(milo::Dir &dir)
+        {
+            textures::addBundled("helpbar/glyphs", kHelpbarGlyphs, sizeof kHelpbarGlyphs);
+            const auto add = [&](const std::string &like, const std::string &name, uint32_t wide, uint32_t tall,
+                                 std::function<void(TextureData &)> edit)
+            {
+                const milo::Bytes *own = milo::body(dir, "Tex", like);
+                if (!own || milo::body(dir, "Tex", name))
+                    return;
+                const uint32_t id = textures::add({textures::kBundled, "helpbar/glyphs", name, false});
+                textures::addEdit(id, std::move(edit));
+                milo::add(dir, "Tex", name, gh1::texWith(*own, textures::standIn(id, wide, tall), true));
+            };
+            for (const Slot &slot : kSlots)
+            {
+                const std::string own = std::string("hb_") + slot.name + ".tex";
+                const milo::Bytes *body = milo::body(dir, "Tex", own);
+                const std::shared_ptr<const TextureData> gem =
+                    body ? textures::decodeTex(*body, dir.version, true) : nullptr;
+                if (!gem)
+                {
+                    std::cerr << "[help_bar] cannot read " << own << std::endl;
+                    continue;
+                }
+                const bool start = slot.action == input::kStart;
+                for (int label = 0; label < kLabelCount; ++label)
+                    add(own, std::string("ghc_hb_") + slot.name + "_" + std::to_string(label) + ".tex", 32u, 32u,
+                        [gem, label, start](TextureData &data)
+                        { glyph(data, *gem, label, start ? 0 : kCell * 6 / 100, start); });
+            }
+            for (int i = 0; i < 2; ++i)
+                add("hb_strum.tex", i == 0 ? "ghc_hb_strum_pad.tex" : "ghc_hb_strum_keys.tex", 64u, 16u,
+                    [i](TextureData &data) { strum(data, i); });
+        }
+
+        // Each slot's Tex for what P1's menus are read from: a pad's or the
+        // keyboard's controls on the gems, a guitar's own gems as GH2 drew
+        // them, every fret its colour.
+        std::array<std::string, 7> glyphsFor(const input::MenuControls &menu)
+        {
+            std::array<std::string, 7> tex;
+            const bool labelled = menu.kind == input::DeviceKind::kGamepad || menu.kind == input::DeviceKind::kKeyboard;
+            for (size_t i = 0; i < std::size(kSlots); ++i)
+            {
+                const int label = labelled ? labelOf(menu.shown[kSlots[i].action]) : -1;
+                tex[i] = label < 0 ? std::string("hb_") + kSlots[i].name + ".tex"
+                                   : std::string("ghc_hb_") + kSlots[i].name + "_" + std::to_string(label) + ".tex";
+            }
+            tex[6] = menu.kind == input::DeviceKind::kGamepad    ? "ghc_hb_strum_pad.tex"
+                     : menu.kind == input::DeviceKind::kKeyboard ? "ghc_hb_strum_keys.tex"
+                                                                  : "hb_strum.tex";
+            return tex;
+        }
+
+        // The slots' Mats set to them, when they change or `again` (the bar
+        // laid out anew, which a scene loaded again would put back).
+        std::array<std::string, 7> s_shown;
+        void showGlyphs(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, bool again)
+        {
+            const std::array<std::string, 7> tex = glyphsFor(input::menuControls());
+            if (tex == s_shown && !again)
+                return;
+            s_shown = tex;
+            std::string set = "{if {exists helpbar} {do";
+            for (size_t i = 0; i < tex.size(); ++i)
+                set += std::string(" {{helpbar find hb_") + (i < std::size(kSlots) ? kSlots[i].name : "strum") +
+                       ".mat} set diffuse_tex {helpbar find " + tex[i] + "}}";
+            set += "}}";
+            const R5900Context saved = *ctx;
+            script::run(rdram, ctx, runtime, set);
+            *ctx = saved;
+        }
+
+        struct PollTag;
+        void onUiPoll(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            showGlyphs(rdram, ctx, runtime, false);
         }
 
         void buildIcons()
@@ -155,6 +354,7 @@ namespace gh2
                     milo::add(*dir, "Mat", to + ".mat", std::move(mat));
                 }
             }
+            addGlyphs(*dir);
             ark::addFile(path, milo::write(*dir));
         }
 
@@ -219,6 +419,7 @@ namespace gh2
                 addElement(element(panel + 0x50u, labels++), 0x40u, 1u, entry);
             }
             SET_GPR_U32(ctx, 29, sp);
+            showGlyphs(rdram, ctx, runtime, true);
             ctx->pc = returnTo;
         }
     }
@@ -229,6 +430,7 @@ namespace gh2
         buildIcons();
         script::patchUi(kBoxDta);
         EntryHook<FinishLoadTag>::install(runtime, addresses.helpBarFinishLoad, onFinishLoad);
+        EntryHook<PollTag>::install(runtime, addresses.uiManagerPoll, onUiPoll);
         runtime.replaceFunction(addresses.helpBarSetDisplay, &setDisplay);
     }
 }

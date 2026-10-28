@@ -11,13 +11,10 @@ namespace gh2
 {
     void installPad(PS2Runtime &runtime, const Addresses &addresses);
 
-    // Buttons a scripted run holds (libpad bits, active high), pressed on top
-    // of the host controller's.
+    // Buttons a scripted run holds on P1's port (libpad bits, active high),
+    // pressed on top of its seat's. Another seat's are a scenario's device
+    // in it (input.h).
     void setScriptedPad(uint16_t pressed);
-
-    // How many ports have a guitar in: 1, the host controller's, or more for
-    // a two-player run, the rest idle.
-    void setPads(int count);
 
     // The bit for an action by its name (host/bindings.h), or for up, down,
     // left or right; 0 for anything else.

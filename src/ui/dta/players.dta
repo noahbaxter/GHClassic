@@ -1,0 +1,123 @@
+; Multiplayer's screen is where players join: under its mode buttons, who
+; holds each seat, the help bar's own text on its round box (box.dta). A
+; controller with no seat joins with Start (the keyboard with Tab), yellow
+; moves a player up a seat, and a mode starts only once both seats are
+; taken. The seats are the host's (host/input.cpp); this only shows them.
+{if {! {exists ghc_players_panel}} {new GHPanel ghc_players_panel}}
+{retype ghc_players_panel
+   (
+      ; From the ARK root: a path resolves against the file its array came
+      ; from, and this one comes from no file.
+      (file ui/helpbar.milo)
+      (rows (pr0.txt pr1.txt))
+      ; The list's left edge, its first row's height and each row's, its
+      ; width, and text's size against the help bar's (x right, z up, the
+      ; screen's middle 0).
+      (x 58)
+      (z 8)
+      (row_tall 26)
+      (wide 215)
+      (size 1.1)
+      (end 10)
+      ; How many times P1 and P2 had traded places when last looked.
+      (trades -1)
+      (enter
+         {$this build}
+         {ghc_players step 1}
+         {ghc_players changed}
+         {if {< [trades] 0} {set [trades] {ghc_players trades}}}
+         {$this paint}
+      )
+      (exit {ghc_players step 0})
+      (poll
+         {if {ghc_players changed} {$this paint}}
+         {$this follow_trades}
+      )
+      ; The rows, each the help bar's text copied, and the box; the help
+      ; bar's own stays out of sight.
+      (build
+         {if {! {exists pr0.txt}}
+            {foreach $o
+               (
+                  help_bar_strum.mesh help_bar_starting.mesh help_bar_strumbar.mesh help_bar.mesh help_bar.txt
+                  help_box_left.mesh help_box_mid.mesh help_box_right.mesh
+               )
+               {{$this find $o} set_showing FALSE}
+            }
+            {ghc_box_make $this pr_bg {help_box_mid.mesh get trans_parent} 0}
+            {ghc_box_color $this pr_bg 0 0 0 0.8}
+            {foreach $part ("_left.mesh" "_mid.mesh" "_right.mesh")
+               {helpbar.view insert (objects 0) {$this find {sprint pr_bg $part}}}
+            }
+            {foreach $row [rows]
+               {new Text $row}
+               {{$this find $row} copy help_bar.txt 0}
+               {{$this find $row} set_local_scale [size] [size] [size]}
+               {{$this find $row} set draw_order 2}
+               {helpbar.view insert (objects 0) {$this find $row}}
+            }
+            {helpbar.view sort_draws}
+            {{$this loaded_dir} sync_objects}
+         }
+      )
+      (paint
+         {foreach_int $i 0 {size [rows]}
+            {do
+               ($row {$this find {elem [rows] $i}})
+               {$row set_text {ghc_players row $i}}
+               {$row set_local_pos {'+' [x] [end]} 0 {'-' [z] {'*' [row_tall] $i}}}
+               {$row set_showing TRUE}
+            }
+         }
+         {ghc_box_put $this pr_bg
+            [x] 0 {'-' [z] {'*' [row_tall] {/ {'-' {size [rows]} 1} 2.0}}}
+            [wide] {'+' {'*' [row_tall] {size [rows]}} 8} [end] [end]
+         }
+         {ghc_box_show $this pr_bg TRUE}
+      )
+      ; Lefty is the port's, so when the players trade places it trades
+      ; with them.
+      (follow_trades
+         {do
+            ($now {ghc_players trades})
+            {if {== {mod {'-' $now [trades]} 2} 1}
+               {do
+                  ($lefty {options get_lefty 0})
+                  {options set_lefty 0 {options get_lefty 1}}
+                  {options set_lefty 1 $lefty}
+               }
+            }
+            {set [trades] $now}
+         }
+      )
+   )
+}
+; GH2's own (multiplayer.dta), but a mode only with both seats taken.
+{retype multi_panel
+   (
+      (file ui/multi.milo)
+      (focus coop.btn)
+      (enter
+         {if_else {campaign is_unlocked multi_fo}
+            {do {$this enable faceoff.btn} {faceoff.btn set_showing TRUE}}
+            {do {$this disable faceoff.btn} {faceoff.btn set_showing FALSE}}
+         }
+      )
+      (SELECT_START_MSG
+         {if {! {game is_missing_multi_controller}}
+            {switch $component
+               (coop.btn {gamecfg set mode multi_coop} {ui goto_screen multi_coop_venue_screen})
+               (versus.btn {gamecfg set mode multi_vs} {ui goto_screen multi_sel_character_screen})
+               (faceoff.btn {gamecfg set mode multi_fo} {ui goto_screen multi_sel_character_screen})
+            }
+         }
+      )
+   )
+}
+{retype multi_screen
+   (
+      (panels meta multi_panel ghc_players_panel helpbar)
+      (focus multi_panel)
+      (helpbar (default ((fret1 help_continue) (fret2 help_back) (fret3 ghc_players_reorder) (strum help_updown))))
+   )
+}

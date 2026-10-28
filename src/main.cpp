@@ -40,6 +40,7 @@
 #include "disc/disc.h"
 #include "ui/fast_boot.h"
 #include "host/bind.h"
+#include "host/input.h"
 #include "host/perf.h"
 #include "host/record.h"
 #include "host/update.h"
@@ -181,6 +182,7 @@ int main(int argc, char *argv[])
         {
             if (!gh2::scenario::load(argv[++i]))
                 return 1;
+            gh2::leaveControllers();
         }
         else if (arg == "--settings" && hasValue)
             gh2::settings::usePath(argv[++i]);

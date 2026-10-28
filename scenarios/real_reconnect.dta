@@ -1,0 +1,17 @@
+; By hand, or with Bazzite's uinput pads: P1's real controller pulled out
+; mid-song and plugged back in, maybe at another /dev/input node. Windowed,
+; so it reads the controllers. A pad presses before the song to take P1.
+#include common/first_boot.dta
+(wait 8)
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty easy}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(print SONG_UP)
+(wait_screen pause_controller_screen 60)
+(print PAUSED)
+(wait_screen game_screen 60)
+(print RESUMED)
+(quit)

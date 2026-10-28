@@ -1,0 +1,26 @@
+; On Multiplayer's screen, frets and strum on a controller with no seat do
+; nothing, and with both seats taken a third controller's Start takes none.
+#include common/first_boot.dta
+(device pad)
+(device guitar)
+(device spare)
+(press green pad)
+(expect {seat_has 0 pad} 1)
+{ui goto_screen multi_screen}
+(wait_screen multi_screen)
+(wait 1)
+(press green guitar)
+(press down spare)
+(expect {seat_has 1 guitar} 0)
+(expect {seat_has 1 spare} 0)
+(expect {{ui current_screen} name} multi_screen)
+(press start spare)
+(wait 0.5)
+(expect {seat_has 1 spare} 1)
+(press start guitar)
+(wait 0.5)
+(expect {seat_has 0 pad} 1)
+(expect {seat_has 1 spare} 1)
+(expect {seat_has 0 guitar} 0)
+(expect {seat_has 2 guitar} 0)
+(quit)

@@ -41,8 +41,8 @@
 (shot status)
 (expect {{status_panel loaded_dir} exists status_char1.tex} 1)
 
-; In a song: pause's settings menu, up from its first row to its last, and
-; back, its five rows round, the lost
+; In a song: pause's settings menu, up from its first row round to Game,
+; above its last, Controllers, and back, its five rows round, the lost
 ; controller's screen, then
 ; song failed and its Quit to the main menu.
 {ui goto_screen career_screen}
@@ -67,6 +67,20 @@
 (wait 1)
 (shot pause_settings)
 (press up)
+(wait 0.5)
+(expect {pause_settings_panel focus_name} quit.btn)
+(press up)
+(wait 0.5)
+(expect {pause_settings_panel focus_name} audio_options.btn)
+(press down)
+(wait 0.5)
+(press down)
+(wait 0.5)
+(expect {pause_settings_panel focus_name} resume.btn)
+(press up)
+(wait 0.5)
+(press up)
+(wait 0.5)
 (press green)
 (wait_screen pause_game_settings_screen 5)
 (press red)

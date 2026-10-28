@@ -1,0 +1,556 @@
+; The Controllers screen, under Options: every device along the top, and for
+; the one last pressed the tutorial's guitar lit as it is played, a meter for
+; its whammy and tilt, and every action it has to rebind. The devices, the
+; keys and the rows are the host's (host/devices.h, ui/controllers.cpp); this
+; only shows them. Positions are the screen's, x right and z up from its
+; middle, 480 tall, all within 4:3's 640 wide.
+
+; A text in panel $ct_dir, the tutorial's own copied in one of GH2's label
+; fonts (ui_objects.dta's BandLabel types): where, its alignment (33 left, 34
+; centred, 36 right, each on its middle) and size against the tutorial's. An
+; argument is read after the ones before it are set, so these are named
+; apart from a caller's own.
+{func ghc_ct_label ($ct_dir $ct_name $ct_x $ct_z $ct_align $ct_size $ct_font)
+   {new BandLabel $ct_name}
+   {{$ct_dir find $ct_name} copy {$ct_dir find tut_info.lbl} 0}
+   {{$ct_dir find $ct_name} set_type $ct_font}
+   {{$ct_dir find $ct_name} set trans_parent {$ct_dir find ghc_ct.grp}}
+   {{$ct_dir find $ct_name} set_local_rot 0 0 0}
+   {{$ct_dir find $ct_name} set_local_scale $ct_size 1 $ct_size}
+   {{$ct_dir find $ct_name} set_local_pos $ct_x 0 $ct_z}
+   {{$ct_dir find $ct_name} set fit_text 0}
+   {{$ct_dir find $ct_name} set wrap_width 4000}
+   {{$ct_dir find $ct_name} set alignment $ct_align}
+   {{$ct_dir find $ct_name} set draw_order 2}
+   {{$ct_dir find $ct_name} set_showing TRUE}
+}
+
+; Its text, in a colour (r g b). A label given a colour goes back to its
+; token's text, so the text is set after.
+{func ghc_ct_say ($ct_dir $ct_name $ct_rgb $ct_text)
+   {{$ct_dir find $ct_name} set color {pack_color {elem $ct_rgb 0} {elem $ct_rgb 1} {elem $ct_rgb 2}}}
+   {{$ct_dir find $ct_name} set_localized_text $ct_text}
+}
+
+; A row's middle, $ct_row rows down from the first at $ct_top.
+{func ghc_ct_row_z ($ct_top $ct_gap $ct_row)
+   {'-' $ct_top {'*' $ct_gap $ct_row}}
+}
+
+; A box $ct_full wide filled $ct_part of the way from its left, in a colour
+; (r g b a), hidden when empty; its ends never rounder than it is wide.
+{func ghc_ct_fill ($ct_dir $ct_box $ct_x $ct_z $ct_full $ct_tall $ct_part $ct_rgba)
+   {do
+      ($ct_w {'*' $ct_full {max 0 {min $ct_part 1}}})
+      ($ct_r {min {/ $ct_tall 2} {/ $ct_w 2}})
+      {ghc_box_show $ct_dir $ct_box {> $ct_w 1}}
+      {if {> $ct_w 1}
+         {ghc_box_put $ct_dir $ct_box $ct_x 0 $ct_z $ct_w $ct_tall $ct_r $ct_r}
+         {ghc_box_color $ct_dir $ct_box {elem $ct_rgba 0} {elem $ct_rgba 1} {elem $ct_rgba 2} {elem $ct_rgba 3}}
+      }
+   }
+}
+
+; The tutorial's blue arrow, pointing down, as <name>.mesh with its own
+; <name>.mat for its alpha: on a help bar end's quad, 0 to 16 across and 16
+; tall about its middle, which shows its whole picture.
+{func ghc_ct_arrow ($ct_dir $ct_name $ct_parent)
+   {do
+      ($ct_mesh {symbol {sprint $ct_name ".mesh"}})
+      ($ct_mat {symbol {sprint $ct_name ".mat"}})
+      {new Mat $ct_mat}
+      {{$ct_dir find $ct_mat} copy {$ct_dir find tut_arrow.mat} 1}
+      {{$ct_dir find $ct_mat} set blend 3}
+      {{$ct_dir find $ct_mat} set z_mode 3}
+      {new {{helpbar find help_box_right.mesh} class_name} $ct_mesh}
+      {{$ct_dir find $ct_mesh} copy {helpbar find help_box_right.mesh} 1}
+      {{$ct_dir find $ct_mesh} set_mat {$ct_dir find $ct_mat}}
+      {{$ct_dir find $ct_mesh} set trans_parent $ct_parent}
+      {{$ct_dir find $ct_mesh} set draw_order 2.2}
+      {{$ct_dir find $ct_mesh} set_local_rot 0 0 0}
+      {{$ct_dir find $ct_mesh} set_showing TRUE}
+   }
+}
+
+; A picture on the same quad, <name>.mesh, $ct_wide by $ct_tall with its
+; left edge at $ct_x and its middle at $ct_z, drawn at $ct_order. The quad
+; shows its picture mirrored across, so it is turned back.
+{func ghc_ct_picture ($ct_dir $ct_name $ct_tex $ct_x $ct_z $ct_wide $ct_tall $ct_order)
+   {ghc_ct_arrow $ct_dir $ct_name {$ct_dir find ghc_ct.grp}}
+   {{$ct_dir find {symbol {sprint $ct_name ".mat"}}} set diffuse_tex {$ct_dir find $ct_tex}}
+   {{$ct_dir find {symbol {sprint $ct_name ".mesh"}}} set draw_order $ct_order}
+   {{$ct_dir find {symbol {sprint $ct_name ".mesh"}}} set_local_scale {/ $ct_wide -16.0} 1 {/ $ct_tall 16.0}}
+   {{$ct_dir find {symbol {sprint $ct_name ".mesh"}}} set_local_pos {'+' $ct_x $ct_wide} 0 $ct_z}
+}
+
+{if {! {exists ghc_controllers_screen}}
+   {new GHPanel ghc_controllers_panel}
+   {new GHScreen ghc_controllers_screen}
+}
+{retype ghc_controllers_panel
+   (
+      ; From the ARK root: a path resolves against the file its array came
+      ; from, and this one comes from no file. The right-handed scene for
+      ; everyone: a lefty player's guitar is it mirrored (light).
+      (file ui/tut_script.milo)
+      ; All of it inside the poster's black, x -287 to 287 and z 211 to
+      ; -182, with a margin, but the keys along the bottom.
+      (labels
+         (
+            (ghc_ct_before.lbl -262 172 34 0.32 helveticablack)
+            (ghc_ct_after.lbl 264 172 34 0.32 helveticablack)
+         )
+      )
+      ; Every device's name along the top, the one shown in a faint box as
+      ; the row picked is. The row holds five and scrolls to keep the one
+      ; shown in it, a < or > at an end with more past it.
+      (chip_x -250)
+      (chip_gap 101)
+      (chip_z 172)
+      (chip_wide 92)
+      (chip_size 0.26)
+      ; The rows down the right, the first level with the devices: their
+      ; names' left edge, what each reads as against the right edge, the
+      ; first's middle, the gap between, and the more before the last two,
+      ; the device's mode and Reset. The row picked has a faint box behind
+      ; it; a row held has it filled in its colour.
+      (row_x 127)
+      (read_x 268)
+      (row_top 134)
+      (row_gap 23)
+      (reset_gap 16)
+      (row_size 0.42)
+      (read_size 0.28)
+      ; Each row's name in its fret's colour, green to orange, else white.
+      (row_colors ((0.16 0.75 0.24) (0.86 0.2 0.2) (0.94 0.82 0.16) (0.2 0.43 0.9) (0.94 0.51 0.12) (0.9 0.9 0.9)))
+      ; The guitar's view: where it stands, either art's outline as far
+      ; below the devices' boxes as above the TV, and its size, the
+      ; tutorial's 0.35 being 600 wide; and the art's middle across, which a
+      ; lefty player's is mirrored about.
+      (guitar (-180 44 0.21))
+      ; The X-plorer's neck sits lower in its outline than the SG's, so it
+      ; is lifted by this and the SG lowered, their necks level.
+      (neck_lift 4.5)
+      (guitar_mid -89)
+      ; Its frets in its own units: each one's middle across, the two arts'
+      ; middles up (the 360's X-plorer sits lower in the PS2's scene than
+      ; the SG it was drawn for), and a fret's size, measured off the art;
+      ; then each fret's colour lit.
+      (fret_x (-106.4 -36.1 27.7 93 159.8))
+      (fret_z_explorer 71)
+      (fret_z_sg 109)
+      (fret_wide 44)
+      (fret_tall 78)
+      (fret_turn 90)
+      ; The strum bar's middle on screen, and each arrow's size and how far
+      ; its middle sits above or below it.
+      (strum_x -1)
+      (strum_z 60)
+      (arrow_wide 26)
+      (arrow_tall 52)
+      (arrow_off 40)
+      (fret_lit ((0.5 1 0.5) (1 0.45 0.45) (1 0.97 0.5) (0.5 0.72 1) (1 0.72 0.36)))
+      ; Select and Start on each art, in the guitar's units: the middle
+      ; across and up, and the glow's width and height. The X-plorer's are
+      ; the Back and Start pills under its d-pad; the SG's its two knobs,
+      ; the upper taken for Select (which is which is not confirmed).
+      (buttons
+         (
+            (star_power (1075 82 28 28) (1167 61 80 80))
+            (start (1105 79 28 28) (1211 -18 80 80))
+         )
+      )
+      ; Whammy's and tilt's meters just left of their rows, each level with
+      ; its own: the bar's left edge and width. Tilt's is marked half way,
+      ; where it counts as tilted.
+      (meter_x -50)
+      (meter_wide 152)
+      (meters (whammy tilt))
+      (meter_fill (1.0 1.0 1.0 1.0))
+      ; The Rat Cellar's TV in the corner, as far in from the poster's black
+      ; at the left as at the bottom (x -286, z -183): its middle and size,
+      ; then where its frame's screen is open, left, top, right and bottom as
+      ; shares of it from its top left, the channel showing a little past it.
+      (tv (-168 -97 134))
+      (tv_screen (0.06 0.06 0.94 0.84))
+      ; The keys along the bottom, only what is not plain from the screen:
+      ; each key, what it does, its left edge and width; all but the last
+      ; while browsing, the last while a control is awaited. Up and Down,
+      ; Left and Right, and Delete work unnamed.
+      (keys_z -216)
+      (keys
+         (
+            ("ENTER" "REMAP" -150 44)
+            ("ESC" "BACK" -40 30)
+            ("ESC" "CANCEL" -40 30)
+         )
+      )
+      ; A controller's red, held: it fills, and full it leaves.
+      (hold_x 60)
+      (hold_wide 46)
+      (accent (0.82 0.19 0.16))
+      (leaving FALSE)
+      (enter
+         {set [leaving] FALSE}
+         {ghc_controllers step 1}
+         ; The help bar is only where the round boxes come from.
+         {{helpbar find helpbar.view} set_showing FALSE}
+         {helpbar set_display ()}
+         {$this build}
+         {$this paint}
+      )
+      (exit
+         {ghc_controllers step 0}
+         {{helpbar find helpbar.view} set_showing TRUE}
+      )
+      (poll
+         {if {! [leaving]}
+            {switch {ghc_controllers poll}
+               (leave
+                  {set [leaving] TRUE}
+                  {ui goto_screen
+                     {if_else {== {ui current_screen} ghc_pause_controllers_screen} pause_settings_screen options_screen}}
+               )
+               (paint {$this paint})
+            }
+         }
+         {$this light}
+      )
+      ; Of the tutorial's scene, only its guitar; then the texts and boxes,
+      ; once each time the scene loads.
+      (build
+         {foreach $o
+            (
+               t1_highlights.view t1_stamps.view t1_lets_rock.view tut_top_text.view
+               tut_box_left.view tut_box_right.view tut_highlights.view tut_screen_dim.view t2_pictures.view
+               t3_hopo_anim.view tutorial2.view
+               tut_banner.lbl tut_header.lbl tut_info.lbl tut_lets_rock.lbl tut_part.lbl tut_score.lbl tut_task.lbl
+            )
+            {{$this find $o} set_showing FALSE}
+         }
+         {t1_guitar_3.mat set diffuse_tex t1_guitar_3_blank.tex}
+         {t1_guitar_1.mat set diffuse_tex t1_guitar_1.tex}
+         ; The frets' own views stand on them in either guitar's art, and
+         ; carry a glow each; the rest of what they hold stays away.
+         {t1_frets.view set_showing TRUE}
+         {foreach $o
+            (
+               t1_fret1.mesh t1_fret2.mesh t1_fret3.mesh t1_fret4.mesh t1_fret5.mesh
+               fret_check1.mesh fret_check2.mesh fret_check3.mesh fret_check4.mesh fret_check5.mesh
+               t1_frethit1.view t1_frethit2.view t1_frethit3.view t1_frethit4.view t1_frethit5.view
+               t1_fretcheck1.view t1_fretcheck2.view t1_fretcheck3.view t1_fretcheck4.view t1_fretcheck5.view
+               t1_fret_green.mesh t1_fret_red.mesh t1_fret_yellow.mesh t1_fret_blue.mesh t1_fret_orange.mesh
+            )
+            {{$this find $o} set_showing FALSE}
+         }
+         {if {! {exists ghc_ct.grp}}
+            {new Group ghc_ct.grp}
+            {new Group ghc_ct_guitar.grp}
+            {{$this find ghc_ct_guitar.grp} set trans_parent {$this find ghc_ct.grp}}
+            {$this ghc_make}
+            {{$this loaded_dir} sync_objects}
+         }
+         ; The guitar on a group at the art's middle, which a lefty player's
+         ; mirrors.
+         {{$this find ghc_ct_guitar.grp} set_local_pos [guitar_mid] 0
+            {'+' {elem [guitar] 1} {if_else {ghc_controllers explorer {campaigns live}} [neck_lift] {'-' 0 [neck_lift]}}}}
+         {t1_guitar.view set trans_parent {$this find ghc_ct_guitar.grp}}
+         {t1_guitar.view set_showing TRUE}
+         {t1_guitar.view set_frame 0}
+         {t1_guitar.view set_local_pos {'-' {elem [guitar] 0} [guitar_mid]} 0 0}
+         {t1_guitar.view set_local_scale {elem [guitar] 2} 1 {elem [guitar] 2}}
+      )
+      (ghc_make
+         {foreach $l [labels]
+            {ghc_ct_label $this {elem $l 0} {elem $l 1} {elem $l 2} {elem $l 3} {elem $l 4} {elem $l 5}}
+         }
+         {foreach_int $i 0 {ghc_controllers rows}
+            {do
+               ($z {'-' {ghc_ct_row_z [row_top] [row_gap] $i}
+                  {if_else {>= $i {'-' {ghc_controllers rows} 2}} [reset_gap] 0}})
+               {ghc_box_make $this {symbol {sprint ghc_ct_rowbox $i}} {$this find ghc_ct.grp} 0.9}
+               {ghc_box_put $this {symbol {sprint ghc_ct_rowbox $i}} {'-' [row_x] 10} 0 {'-' $z 2}
+                  {'+' {'-' [read_x] [row_x]} 20} 26 4 4}
+               {ghc_ct_label $this {symbol {sprint ghc_ct_row $i ".lbl"}} [row_x] $z 33 [row_size] dyingmarker}
+               {ghc_ct_label $this {symbol {sprint ghc_ct_read $i ".lbl"}} [read_x] $z 36 [read_size] helveticablack}
+            }
+         }
+         {foreach_int $i 0 {ghc_controllers chips}
+            {do
+               ($x {'+' [chip_x] {'*' [chip_gap] $i}})
+               {ghc_ct_label $this {symbol {sprint ghc_ct_chip $i ".lbl"}} {'+' $x {/ [chip_wide] 2}} [chip_z] 34 [chip_size] helveticablack}
+            }
+         }
+         {ghc_box_make $this ghc_ct_chipbox {$this find ghc_ct.grp} 0.9}
+         {ghc_box_color $this ghc_ct_chipbox 1 1 1 0.13}
+         ; Each fret lit: a halo round it and the fret itself in its colour
+         ; brightened, on the guitar's own frame. A box rounds only its two
+         ; ends, so each stands on a group turned a quarter, its ends the
+         ; fret's top and bottom: the SG's frets are round at the bottom.
+         {foreach_int $f 0 5
+            {do
+               ($sg {! {ghc_controllers explorer {campaigns live}}})
+               ($grp {symbol {sprint ghc_ct_fret $f ".grp"}})
+               ($lit {elem [fret_lit] $f})
+               ($halo {symbol {sprint ghc_ct_halo $f}})
+               ($glow {symbol {sprint ghc_ct_glow $f}})
+               ($long {/ [fret_tall] 2})
+               {new Group $grp}
+               {{$this find $grp} set trans_parent {$this find t1_guitar.view}}
+               {{$this find $grp} set_local_pos {elem [fret_x] $f} 0 {if_else $sg [fret_z_sg] [fret_z_explorer]}}
+               {{$this find $grp} set_local_rot 0 [fret_turn] 0}
+               {ghc_box_make $this $halo {$this find $grp} 2}
+               {ghc_box_put $this $halo {'-' 0 {'+' $long 14}} 0 0 {'+' [fret_tall] 28} {'+' [fret_wide] 28} 22 22}
+               {ghc_box_color $this $halo {elem $lit 0} {elem $lit 1} {elem $lit 2} 0.4}
+               {ghc_box_make $this $glow {$this find $grp} 2.1}
+               {ghc_box_put $this $glow {'-' 0 $long} 0 0 [fret_tall] [fret_wide] 4 {if_else $sg {/ [fret_wide] 2} 4}}
+               {ghc_box_color $this $glow {elem $lit 0} {elem $lit 1} {elem $lit 2} 1}
+            }
+         }
+         ; Select's and Start's glow, round over each, on the guitar's frame.
+         {foreach $b [buttons]
+            {do
+               ($at {if_else {ghc_controllers explorer {campaigns live}} {elem $b 1} {elem $b 2}})
+               ($w {elem $at 2})
+               ($h {elem $at 3})
+               ($box {symbol {sprint ghc_ct_btn_ {elem $b 0}}})
+               {ghc_box_make $this $box {$this find t1_guitar.view} 2.1}
+               {ghc_box_put $this $box {'-' {elem $at 0} {/ $w 2}} 0 {elem $at 1} $w $h
+                  {/ {min $w $h} 2} {/ {min $w $h} 2}}
+               {ghc_box_color $this $box 0.3 0.75 1 0.8}
+            }
+         }
+         {foreach $name [meters]
+            {do
+               ($z {ghc_ct_row_z [row_top] [row_gap] {ghc_controllers row_of $name}})
+               ($track {symbol {sprint ghc_ct_track_ $name}})
+               {ghc_box_make $this $track {$this find ghc_ct.grp} 1}
+               {ghc_box_put $this $track [meter_x] 0 $z [meter_wide] 14 7 7}
+               {ghc_box_color $this $track 0.22 0.22 0.22 0.95}
+               {ghc_box_show $this $track TRUE}
+               {ghc_box_make $this {symbol {sprint ghc_ct_fill_ $name}} {$this find ghc_ct.grp} 1.5}
+            }
+         }
+         ; Strum's two arrows by the strum bar, the tutorial's own arrow on a
+         ; help bar end's quad (0 to 16 across, 16 tall about its middle,
+         ; its whole picture), up's mirrored top to bottom so its lit side
+         ; matches; each shows only while strummed that way. On the guitar's
+         ; group, so they mirror with it.
+         {foreach $a ((up 180) (down 0))
+            {do
+               ($dir {elem $a 0})
+               ($mesh {symbol {sprint ghc_ct_arrow_ $dir ".mesh"}})
+               ($turned {== {elem $a 1} 180})
+               ($z {'-' [strum_z] {elem [guitar] 1}})
+               {ghc_ct_arrow $this {symbol {sprint ghc_ct_arrow_ $dir}} {$this find ghc_ct_guitar.grp}}
+               {{$this find $mesh} set_local_scale {/ [arrow_wide] 16.0} 1
+                  {'*' {/ [arrow_tall] 16.0} {if_else $turned -1 1}}
+               }
+               {{$this find $mesh} set_local_pos
+                  {'-' {'-' [strum_x] [guitar_mid]} {/ [arrow_wide] 2}}
+                  0
+                  {if_else $turned {'+' $z [arrow_off]} {'-' $z [arrow_off]}}
+               }
+            }
+         }
+         {ghc_box_make $this ghc_ct_tick {$this find ghc_ct.grp} 1.7}
+         {ghc_box_put $this ghc_ct_tick {'+' [meter_x] {/ [meter_wide] 2}} 0
+            {ghc_ct_row_z [row_top] [row_gap] {ghc_controllers row_of tilt}} 3 22 0 0}
+         {ghc_box_color $this ghc_ct_tick 0.5 0.5 0.5 1}
+         {ghc_box_show $this ghc_ct_tick TRUE}
+         ; The Rat Cellar's TV: its channel behind its frame, through the
+         ; frame's open screen.
+         {do
+            ($size {elem [tv] 2})
+            ($screen [tv_screen])
+            {ghc_ct_picture $this ghc_ct_tv_screen tv_good_rocker_1.tex
+               {'+' {elem [tv] 0} {'*' $size {'-' {elem $screen 0} 0.5}}}
+               {'-' {elem [tv] 1} {'*' $size {'-' {/ {'+' {elem $screen 1} {elem $screen 3}} 2} 0.5}}}
+               {'*' $size {'-' {elem $screen 2} {elem $screen 0}}}
+               {'*' $size {'-' {elem $screen 3} {elem $screen 1}}}
+               1.0}
+            {ghc_ct_picture $this ghc_ct_tv_frame tv_border.tex
+               {'-' {elem [tv] 0} {/ $size 2}} {elem [tv] 1} $size $size 1.2}
+         }
+         {foreach_int $i 0 {size [keys]}
+            {do
+               ($k {elem [keys] $i})
+               ($x {elem $k 2})
+               ($w {elem $k 3})
+               ($box {symbol {sprint ghc_ct_keybox $i}})
+               ($key {symbol {sprint ghc_ct_key $i ".lbl"}})
+               ($act {symbol {sprint ghc_ct_act $i ".lbl"}})
+               {ghc_box_make $this $box {$this find ghc_ct.grp} 1}
+               {ghc_box_put $this $box $x 0 [keys_z] $w 18 4 4}
+               {ghc_box_color $this $box 0.85 0.85 0.85 0.95}
+               {ghc_ct_label $this $key {'+' $x {/ $w 2}} [keys_z] 34 0.24 helveticablack}
+               {ghc_ct_say $this $key (0.1 0.1 0.1) {elem $k 0}}
+               {ghc_ct_label $this $act {'+' {'+' $x $w} 8} [keys_z] 33 0.3 helveticablack}
+               {ghc_ct_say $this $act (0.75 0.75 0.75) {elem $k 1}}
+            }
+         }
+         {ghc_box_make $this ghc_ct_holdbox {$this find ghc_ct.grp} 1}
+         {ghc_box_put $this ghc_ct_holdbox [hold_x] 0 [keys_z] [hold_wide] 18 9 9}
+         {ghc_box_color $this ghc_ct_holdbox 0.35 0.08 0.07 0.95}
+         {ghc_box_make $this ghc_ct_holdfill {$this find ghc_ct.grp} 1.5}
+         {ghc_ct_label $this ghc_ct_hold.lbl {'+' [hold_x] {/ [hold_wide] 2}} [keys_z] 34 0.24 helveticablack}
+         {ghc_ct_say $this ghc_ct_hold.lbl (1 1 1) "HOLD"}
+         {ghc_ct_label $this ghc_ct_holdact.lbl {'+' {'+' [hold_x] [hold_wide]} 8} [keys_z] 33 0.3 helveticablack}
+         {ghc_ct_say $this ghc_ct_holdact.lbl (0.75 0.75 0.75) "BACK"}
+      )
+      (paint
+         {ghc_ct_say $this ghc_ct_before.lbl (0.75 0.75 0.75) {ghc_controllers text before}}
+         {ghc_ct_say $this ghc_ct_after.lbl (0.75 0.75 0.75) {ghc_controllers text after}}
+         {foreach_int $i 0 {ghc_controllers rows}
+            {do
+               ($state {ghc_controllers state $i})
+               ($color {elem [row_colors] {ghc_controllers fret $i}})
+               ($box {symbol {sprint ghc_ct_rowbox $i}})
+               ; Held, a row's box is filled its colour and read dark on it;
+               ; picked, the box is faint.
+               {if_else {== $state held}
+                  {ghc_box_color $this $box {elem $color 0} {elem $color 1} {elem $color 2} 0.95}
+                  {ghc_box_color $this $box 1 1 1 0.13}
+               }
+               {ghc_box_show $this $box {|| {== $state held} {== $i {ghc_controllers focus}}}}
+               {ghc_ct_say $this {symbol {sprint ghc_ct_row $i ".lbl"}}
+                  {if_else {== $state held} (0.08 0.08 0.08) $color}
+                  {ghc_controllers text row $i}
+               }
+               {ghc_ct_say $this {symbol {sprint ghc_ct_read $i ".lbl"}}
+                  {cond
+                     ({== $state held} (0.08 0.08 0.08))
+                     ({|| {== $state waiting} {== $state unset}} [accent])
+                     (TRUE (0.55 0.55 0.55))
+                  }
+                  {ghc_controllers text read $i}
+               }
+            }
+         }
+         {foreach_int $i 0 {ghc_controllers chips}
+            {do
+               ($on {ghc_controllers chip_on $i})
+               ($x {'+' [chip_x] {'*' [chip_gap] $i}})
+               {ghc_ct_say $this {symbol {sprint ghc_ct_chip $i ".lbl"}} {if_else $on (1 1 1) (0.45 0.45 0.45)}
+                  {ghc_controllers text chip $i}
+               }
+               {if $on
+                  {ghc_box_put $this ghc_ct_chipbox $x 0 [chip_z] [chip_wide] 26 4 4}
+               }
+            }
+         }
+         {ghc_box_show $this ghc_ct_chipbox TRUE}
+         {foreach_int $i 0 {size [keys]}
+            {do
+               ($on {if_else {== $i {'-' {size [keys]} 1}} {ghc_controllers rebinding} {! {ghc_controllers rebinding}}})
+               {ghc_box_show $this {symbol {sprint ghc_ct_keybox $i}} $on}
+               {{$this find {symbol {sprint ghc_ct_key $i ".lbl"}}} set_showing $on}
+               {{$this find {symbol {sprint ghc_ct_act $i ".lbl"}}} set_showing $on}
+            }
+         }
+         {do
+            ($hold {&& {! {ghc_controllers rebinding}} {! {ghc_controllers keyboard}}})
+            {ghc_box_show $this ghc_ct_holdbox $hold}
+            {ghc_ct_hold.lbl set_showing $hold}
+            {ghc_ct_holdact.lbl set_showing $hold}
+         }
+      )
+      ; Every frame: each fret held glows its colour, strumming shows the
+      ; arrow, the meters fill white with whammy and tilt, and red held
+      ; fills.
+      (light
+         ; The TV's channel, or test card (ui/controllers.cpp).
+         {{$this find ghc_ct_tv_screen.mat} set diffuse_tex {$this find {ghc_controllers tv}}}
+         ; The guitar mirrored for a lefty player's device.
+         {do
+            ($seat {ghc_controllers seat})
+            {{$this find ghc_ct_guitar.grp} set_local_scale
+               {if_else {&& {>= $seat 0} {options get_lefty $seat}} -1 1} 1 1}
+         }
+         ; While a control is awaited its row's box fades in and out; once
+         ; bound, paint puts the box back.
+         {if {ghc_controllers rebinding}
+            {ghc_box_color $this {symbol {sprint ghc_ct_rowbox {ghc_controllers focus}}} 1 1 1
+               {'+' 0.13 {'*' 0.4 {ghc_controllers blink}}}
+            }
+         }
+         {foreach_int $f 0 5
+            {do
+               ($on {> {ghc_controllers fret_held $f} 0.5})
+               {ghc_box_show $this {symbol {sprint ghc_ct_halo $f}} $on}
+               {ghc_box_show $this {symbol {sprint ghc_ct_glow $f}} $on}
+            }
+         }
+         {foreach $b [buttons]
+            {ghc_box_show $this {symbol {sprint ghc_ct_btn_ {elem $b 0}}}
+               {> {ghc_controllers held {elem $b 0}} 0.5}
+            }
+         }
+         {foreach $dir (up down)
+            {{$this find {symbol {sprint ghc_ct_arrow_ $dir ".mesh"}}} set_showing
+               {> {ghc_controllers held {symbol {sprint strum_ $dir}}} 0.5}
+            }
+         }
+         {foreach $name [meters]
+            {ghc_ct_fill $this {symbol {sprint ghc_ct_fill_ $name}} [meter_x]
+               {ghc_ct_row_z [row_top] [row_gap] {ghc_controllers row_of $name}} [meter_wide] 14
+               {ghc_controllers held $name} [meter_fill]
+            }
+         }
+         {ghc_ct_fill $this ghc_ct_holdfill [hold_x] [keys_z] [hold_wide] 18 {ghc_controllers leaving} (0.86 0.2 0.2 1)}
+      )
+   )
+}
+; Behind it, a black poster taped to Options' wall: Calibrate Lag's, its art
+; painted out (ui/controllers.cpp adds ghc_ct_poster.tex) and its own
+; controls, gem and the hair over its edge hidden.
+{if {! {exists ghc_controllers_bg_panel}}
+   {new GHPanel ghc_controllers_bg_panel}
+}
+{retype ghc_controllers_bg_panel
+   (
+      (file ui/lag.milo)
+      (enter
+         {foreach $o
+            (
+               syncoff_mask.mesh syncoff_target.mesh syncoff_gem.mesh syncoff_gembar.mesh buttons.grp
+               setting.lbl instructions.lbl title.lbl instructions2.lbl countdown.lbl
+            )
+            {{$this find $o} set_showing FALSE}
+         }
+         {{$this find syncoff_backdrop.mat} set diffuse_tex {$this find ghc_ct_poster.tex}}
+         {$this ghc_swing}
+      )
+      (exit {$this ghc_swing})
+      (poll {$this ghc_swing})
+      ; A panel's scene with no camera draws with the UI's, which holds
+      ; still (PanelDir::DrawShowing); Options' poster swings in on
+      ; meta.cam, its scene's. While the screen comes or goes the poster
+      ; draws with the content's meta.cam, tut_script.milo's, so swings with
+      ; it; settled, with the UI's again, which meta.cam at rest matches but
+      ; for a level's rounding.
+      (ghc_swing
+         {{$this loaded_dir} set cam
+            {if_else {ui in_transition} {ghc_controllers_panel find meta.cam} ""}}
+      )
+   )
+}
+{retype ghc_controllers_screen
+   (
+      (panels meta ghc_controllers_bg_panel helpbar ghc_controllers_panel)
+      (focus ghc_controllers_panel)
+   )
+}
+; The same from a song's pause menu, its Settings (game_settings.dta), over
+; the paused song and back to that menu.
+{if {! {exists ghc_pause_controllers_screen}}
+   {new GHScreen ghc_pause_controllers_screen}
+}
+{retype ghc_pause_controllers_screen
+   (
+      (panels GAME_PANELS ghc_controllers_bg_panel helpbar ghc_controllers_panel)
+      (focus ghc_controllers_panel)
+      (in_game TRUE)
+      PAUSE_SCREEN_HANDLERS
+   )
+}

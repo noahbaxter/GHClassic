@@ -29,6 +29,8 @@
 #include "gh80s/install.h"
 #include "gh2x/install.h"
 #include "ui/help_bar.h"
+#include "ui/controllers.h"
+#include "ui/players.h"
 #include "ui/classic_scene.h"
 #include "ui/song_crown.h"
 #include "ui/zebra_wall.h"
@@ -152,6 +154,8 @@ namespace
         gh2::installPhotoMode(runtime, gh2::kSlus21447);
         gh2::installHelpBar(runtime, gh2::kSlus21447);
         gh2::menu_guitarist::install(runtime, gh2::kSlus21447);
+        gh2::installPlayers(runtime);
+        gh2::installControllers(runtime);
         // After the help bar, which recolours its scene's own pixels.
         gh2::installGh2xAssets(runtime, gh2::kSlus21447);
         // After the 360's scenes, the streak counter and the font bake: its

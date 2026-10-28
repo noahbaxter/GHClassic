@@ -31,6 +31,11 @@ namespace gh2::input
             return {Source::kPadAxis, a, 0, rest, full};
         }
 
+        Source padAccel(int axis, float rest, float full)
+        {
+            return {Source::kPadAccel, axis, 0, rest, full};
+        }
+
         Profile make(std::initializer_list<std::pair<Action, std::vector<Source>>> bindings)
         {
             Profile p;
@@ -40,7 +45,8 @@ namespace gh2::input
         }
 
         // A Wii guitar through a raphnet WUSBMote v2.2, as bound on real
-        // hardware. The adapter has no tilt sensor.
+        // hardware. A Wii guitar's tilt is the Wiimote's, so through the
+        // adapter there is none.
         Profile raphnetWiiGuitar()
         {
             return make({
@@ -77,14 +83,40 @@ namespace gh2::input
             });
         }
 
-        // The layout SDL gives most guitars it drives as gamepads: Xbox 360
-        // (XInput), PS3 and Wii Rock Band, PS4/PS5 and Xbox One RB4 (SDL
-        // 3.4.16's hidapi drivers; PlasticBand's report structs). Solo frets
-        // also set the main fret, so they play as it. RIGHT_SHOULDER is the
-        // RB tilt or the GH star power pedal, and XInput guitars tilt on RIGHTY,
-        // which SDL inverts: neck up is negative. Whammy rests at one end of
+        // Xbox 360 guitars, Guitar Hero and Rock Band, through XInput
+        // (PlasticBand's Xbox 360 docs). Frets A B Y X LB, star power on
+        // Back, whammy on RIGHTX from its rest at -1. Tilt is RIGHTY, positive
+        // with the neck up, but whether SDL flips it depends on the backend
+        // and its version (SDL #11002), so either way past half counts.
+        // RIGHT_SHOULDER is the GH star power pedal.
+        Profile xinputGuitar()
+        {
+            return make({
+                {kGreen, {padButton(SDL_GAMEPAD_BUTTON_SOUTH)}},
+                {kRed, {padButton(SDL_GAMEPAD_BUTTON_EAST)}},
+                {kYellow, {padButton(SDL_GAMEPAD_BUTTON_NORTH)}},
+                {kBlue, {padButton(SDL_GAMEPAD_BUTTON_WEST)}},
+                {kOrange, {padButton(SDL_GAMEPAD_BUTTON_LEFT_SHOULDER)}},
+                {kStrumUp, {padButton(SDL_GAMEPAD_BUTTON_DPAD_UP)}},
+                {kStrumDown, {padButton(SDL_GAMEPAD_BUTTON_DPAD_DOWN)}},
+                {kStart, {padButton(SDL_GAMEPAD_BUTTON_START)}},
+                {kStarPower, {padButton(SDL_GAMEPAD_BUTTON_BACK)}},
+                {kTilt,
+                 {padButton(SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER), padAxis(SDL_GAMEPAD_AXIS_RIGHTY, 0.0f, -1.0f),
+                  padAxis(SDL_GAMEPAD_AXIS_RIGHTY, 0.0f, 1.0f)}},
+                {kWhammy, {padAxis(SDL_GAMEPAD_AXIS_RIGHTX, -1.0f, 1.0f)}},
+            });
+        }
+
+        // Every other guitar SDL drives as a gamepad: PS3 and Wii Rock Band
+        // and PS3 Guitar Hero (SDL_hidapi_ps3.c), and Rock Band 4 on PS4, PS5
+        // and Xbox One, which SDL lines up with the PS3's (SDL_hidapi_ps4.c,
+        // _ps5.c, _gip.c). Tilt is RIGHT_SHOULDER. RIGHTY is never read: it
+        // is the slider on a Guitar Hero guitar and the pickup switch on a
+        // Rock Band one, so as tilt it would hold star power. Solo frets also
+        // set the main fret, so they play as it. Whammy rests at one end of
         // RIGHTX, or near the middle on a few families.
-        Profile sdlGuitar(float whammyRest, bool yellowBlueSwapped)
+        Profile ps3WayGuitar(float whammyRest, bool yellowBlueSwapped)
         {
             return make({
                 {kGreen, {padButton(SDL_GAMEPAD_BUTTON_SOUTH)}},
@@ -96,8 +128,7 @@ namespace gh2::input
                 {kStrumDown, {padButton(SDL_GAMEPAD_BUTTON_DPAD_DOWN)}},
                 {kStart, {padButton(SDL_GAMEPAD_BUTTON_START)}},
                 {kStarPower, {padButton(SDL_GAMEPAD_BUTTON_BACK)}},
-                {kTilt,
-                 {padButton(SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER), padAxis(SDL_GAMEPAD_AXIS_RIGHTY, 0.0f, -1.0f)}},
+                {kTilt, {padButton(SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER)}},
                 {kWhammy, {padAxis(SDL_GAMEPAD_AXIS_RIGHTX, whammyRest, 1.0f)}},
             });
         }
@@ -121,6 +152,28 @@ namespace gh2::input
             });
         }
 
+        // Its tilt is only the accelerometer's X, in m/s^2 (SDL turns the
+        // sensor on for it). Untested: either way past about 35 degrees.
+        Profile ps3GuitarHero()
+        {
+            Profile p = ps3WayGuitar(0.0f, true);
+            p[kTilt].push_back(padAccel(0, 0.0f, -12.0f));
+            p[kTilt].push_back(padAccel(0, 0.0f, 12.0f));
+            return p;
+        }
+
+        Profile rockBandDrifting() { return ps3WayGuitar(0.0f, false); } // PS3/Wii RB whammy settles mid-range when idle
+        Profile rockBand4() { return ps3WayGuitar(-1.0f, false); }
+
+        // Its star power button reads as the d-pad's left (Clone Hero's
+        // controller sheet), and SDL counts it tilted only near upright.
+        Profile riffmaster()
+        {
+            Profile p = rockBand4();
+            p[kStarPower].push_back(padButton(SDL_GAMEPAD_BUTTON_DPAD_LEFT));
+            return p;
+        }
+
         struct Known
         {
             uint16_t vendor;
@@ -129,10 +182,8 @@ namespace gh2::input
             Profile (*profile)();
         };
 
-        Profile ps3GuitarHero() { return sdlGuitar(0.0f, true); }
-        Profile rockBandDrifting() { return sdlGuitar(0.0f, false); } // PS3/Wii RB whammy settles mid-range when idle
-        Profile sdlGuitarDefault() { return sdlGuitar(-1.0f, false); }
-
+        // Rows nobody here has played are as PlasticBand and SDL's drivers
+        // describe them. Tested: the raphnet Wii guitar.
         const Known kKnown[] = {
             {0x12ba, 0x0100, "PS3 Guitar Hero guitar", ps3GuitarHero},
             {0x12ba, 0x0200, "PS3 Rock Band guitar", rockBandDrifting},
@@ -142,29 +193,30 @@ namespace gh2::input
             {0x289b, 0x0028, "Wii guitar (raphnet)", raphnetWiiGuitar},
             {0x289b, 0x002b, "Wii guitar (raphnet)", raphnetWiiGuitar},
             {0x289b, 0x0080, "Wii guitar (raphnet)", raphnetWiiGuitar},
-            // Xbox 360 guitars. macOS needs an SDL built with libusb to see them.
-            {0x1430, 0x4748, "Xbox 360 Guitar Hero guitar", sdlGuitarDefault},
-            {0x1430, 0x0705, "Xbox 360 Guitar Hero guitar", sdlGuitarDefault},
-            {0x1430, 0x4734, "Xbox 360 Guitar Hero guitar", sdlGuitarDefault},
-            {0x1430, 0x0706, "Xbox 360 Guitar Hero guitar", sdlGuitarDefault},
-            {0x1bad, 0x0002, "Xbox 360 Rock Band guitar", sdlGuitarDefault},
-            {0x0738, 0x9806, "Xbox 360 Rock Band guitar", sdlGuitarDefault},
+            // Xbox 360 guitars: X-plorer, World Tour, GH5, Warriors of Rock.
+            // macOS needs an SDL built with libusb to see them.
+            {0x1430, 0x4748, "Xbox 360 Guitar Hero guitar", xinputGuitar},
+            {0x1430, 0x0705, "Xbox 360 Guitar Hero guitar", xinputGuitar},
+            {0x1430, 0x4734, "Xbox 360 Guitar Hero guitar", xinputGuitar},
+            {0x1430, 0x0706, "Xbox 360 Guitar Hero guitar", xinputGuitar},
+            {0x1bad, 0x0002, "Xbox 360 Rock Band guitar", xinputGuitar},
+            {0x0738, 0x9806, "Xbox 360 Rock Band guitar", xinputGuitar},
             // Rock Band 4 guitars (Xbox One wired ones are Windows/Linux only).
-            {0x0738, 0x4161, "Rock Band 4 guitar", sdlGuitarDefault},
-            {0x0e6f, 0x0170, "Rock Band 4 guitar", sdlGuitarDefault},
-            {0x0e6f, 0x0248, "Rock Band 4 guitar", sdlGuitarDefault},
-            {0x3651, 0x4161, "Rock Band 4 guitar", sdlGuitarDefault},
-            {0x3958, 0x4161, "Rock Band 4 guitar", sdlGuitarDefault},
-            {0x0738, 0x8261, "Rock Band 4 guitar", sdlGuitarDefault},
-            {0x0e6f, 0x0173, "Rock Band 4 guitar", sdlGuitarDefault},
-            {0x0e6f, 0x024a, "Rock Band 4 guitar", sdlGuitarDefault},
-            {0x3651, 0x1500, "Rock Band 4 guitar", sdlGuitarDefault},
-            {0x3651, 0x5500, "Rock Band 4 guitar", sdlGuitarDefault},
-            {0x3958, 0x5500, "Rock Band 4 guitar", sdlGuitarDefault},
-            {0x0e6f, 0x0249, "Rock Band 4 guitar", sdlGuitarDefault},
-            {0x3651, 0x1600, "Rock Band 4 guitar", sdlGuitarDefault},
-            {0x3651, 0x5600, "Rock Band 4 guitar", sdlGuitarDefault},
-            {0x3958, 0x5600, "Rock Band 4 guitar", sdlGuitarDefault},
+            {0x0e6f, 0x0248, "Riffmaster", riffmaster},
+            {0x0e6f, 0x024a, "Riffmaster", riffmaster},
+            {0x0e6f, 0x0249, "Riffmaster", riffmaster},
+            {0x0738, 0x4161, "Rock Band 4 guitar", rockBand4},
+            {0x0e6f, 0x0170, "Rock Band 4 guitar", rockBand4},
+            {0x3651, 0x4161, "Rock Band 4 guitar", rockBand4},
+            {0x3958, 0x4161, "Rock Band 4 guitar", rockBand4},
+            {0x0738, 0x8261, "Rock Band 4 guitar", rockBand4},
+            {0x0e6f, 0x0173, "Rock Band 4 guitar", rockBand4},
+            {0x3651, 0x1500, "Rock Band 4 guitar", rockBand4},
+            {0x3651, 0x5500, "Rock Band 4 guitar", rockBand4},
+            {0x3958, 0x5500, "Rock Band 4 guitar", rockBand4},
+            {0x3651, 0x1600, "Rock Band 4 guitar", rockBand4},
+            {0x3651, 0x5600, "Rock Band 4 guitar", rockBand4},
+            {0x3958, 0x5600, "Rock Band 4 guitar", rockBand4},
         };
 
         // Six-fret Guitar Hero Live guitars have no five-fret layout to give.
@@ -190,21 +242,27 @@ namespace gh2::input
         });
     }
 
-    std::optional<BuiltinProfile> builtinProfile(SDL_Joystick *joystick, SDL_Gamepad *gamepad)
+    DeviceInfo deviceInfo(SDL_Joystick *joystick, SDL_Gamepad *gamepad)
     {
-        const uint16_t vendor = SDL_GetJoystickVendor(joystick);
-        const uint16_t product = SDL_GetJoystickProduct(joystick);
+        return {SDL_GetJoystickVendor(joystick), SDL_GetJoystickProduct(joystick), SDL_GetJoystickType(joystick),
+                gamepad ? SDL_GetGamepadType(gamepad) : SDL_GAMEPAD_TYPE_UNKNOWN, gamepad != nullptr};
+    }
+
+    std::optional<BuiltinProfile> builtinProfile(const DeviceInfo &info)
+    {
         for (const Known &k : kKnown)
-            if (k.vendor == vendor && k.product == product)
+            if (k.vendor == info.vendor && k.product == info.product)
                 return BuiltinProfile{k.label, k.profile()};
-        if (isGuitarHeroLive(vendor, product))
+        if (isGuitarHeroLive(info.vendor, info.product))
             return std::nullopt;
         // A guitar SDL recognises that is not listed above, Santroller builds
-        // in a console mode among them.
-        if (SDL_GetJoystickType(joystick) == SDL_JOYSTICK_TYPE_GUITAR)
-            return BuiltinProfile{"guitar", sdlGuitarDefault()};
-        if (gamepad)
-            return BuiltinProfile{"gamepad, GH2's joypad layout", joypadLayout()};
+        // in a console mode among them: through XInput the 360's way, else
+        // the PS3's.
+        if (info.type == SDL_JOYSTICK_TYPE_GUITAR)
+            return info.gamepadType == SDL_GAMEPAD_TYPE_XBOX360 ? BuiltinProfile{"Xbox 360 guitar", xinputGuitar()}
+                                                                : BuiltinProfile{"guitar", ps3WayGuitar(-1.0f, false)};
+        if (info.gamepad)
+            return BuiltinProfile{"gamepad, GH2's joypad layout", joypadLayout(), true};
         return std::nullopt;
     }
 }

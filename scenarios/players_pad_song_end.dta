@@ -1,0 +1,73 @@
+; A gamepad as P1 through a career song's screens after it, won and then
+; lost: its LT, green, goes on from each, results, cash and the next song,
+; and its LB, red, backs out of the song list; failed, LT retries. GH2
+; reads it as a DualShock from the song on, so these are its menus that way.
+#include common/first_boot.dta
+(controller dualsense "054c:0ce6" pad)
+(wait 1)
+(hold dualsense dpdown)
+(wait 0.3)
+(hold dualsense)
+(wait 0.5)
+(expect {seat_has 0 dualsense} 1)
+{set $pick gh2}
+#include common/career_start.dta
+(hold dualsense lefttrigger+)
+(wait 0.3)
+(hold dualsense)
+(wait_screen sel_venue_screen 40)
+(wait 1.5)
+(hold dualsense lefttrigger+)
+(wait 0.3)
+(hold dualsense)
+(wait_screen sel_song_screen)
+(wait 2)
+{{game get_player_config 0} set autoplay TRUE}
+(hold dualsense lefttrigger+)
+(wait 0.3)
+(hold dualsense)
+(wait_screen game_screen 60)
+(wait 3)
+(expect {game get_controller 0} joypad_guitar)
+{player0 win 5}
+(wait_screen endgame_screen 400)
+(wait 4)
+(shot results)
+(hold dualsense lefttrigger+)
+(wait 0.3)
+(hold dualsense)
+(wait_screen cashaward_screen 20)
+(wait 2)
+(hold dualsense lefttrigger+)
+(wait 0.3)
+(hold dualsense)
+(wait_screen complete_screen 20)
+(wait 1)
+(hold dualsense lefttrigger+)
+(wait 0.3)
+(hold dualsense)
+(wait_screen sel_song_screen 40)
+(wait 2)
+(shot songs_after)
+(hold dualsense leftshoulder)
+(wait 0.3)
+(hold dualsense)
+(wait 2)
+(expect {!= {{ui current_screen} name} sel_song_screen} 1)
+(shot backed_out)
+
+; Lost: no autoplay, so the song fails.
+{{game get_player_config 0} set autoplay FALSE}
+{gamecfg set mode quickplay}
+{game set_song shoutatthedevil}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait_screen lose_screen 120)
+(wait 3)
+(shot lose)
+(hold dualsense lefttrigger+)
+(wait 0.3)
+(hold dualsense)
+(wait_screen game_screen 60)
+(quit)

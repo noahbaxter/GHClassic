@@ -780,6 +780,8 @@ namespace gh2
                 s.applyFrameRate(runtime);
             if (event.type == SDL_EVENT_JOYSTICK_ADDED || event.type == SDL_EVENT_JOYSTICK_REMOVED)
                 devicesChanged = true;
+            if (event.type == SDL_EVENT_WINDOW_FOCUS_GAINED)
+                takeControllers();
             // Fullscreen: Cmd+F on macOS, F11 elsewhere. Not Alt+Enter, since
             // Enter is Start on the keyboard.
             if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && s.window)

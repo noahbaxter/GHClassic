@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
+#include <vector>
 
 namespace gh2
 {
@@ -10,6 +12,10 @@ namespace gh2
     {
         uint16_t pressed = 0;
         uint8_t lx = 0x80, ly = 0x80, rx = 0x80, ry = 0x80;
+        // A seat in pad mode in a song: GH2 reads it as a DualShock, a fret
+        // press strumming (pad.cpp), its frets L2 L1 R1 R2 X, whatever plays
+        // for the seat. A seat's mode is its controller's, set as it sits.
+        bool joypad = false;
         // --timing: the last poll that saw a button go down, counted, with
         // the OS's time for the press (0 if it gave none) and the poll's.
         uint32_t pressCount = 0;
@@ -35,8 +41,85 @@ namespace gh2
     void pollInput(bool devicesChanged);
     void closeInput();
 
-    // The state the last poll saw. Callable from any thread.
-    HostPad hostPad();
+    // Of the GHClassic windows open, the first up, or else the last focused,
+    // reads the controllers, focused or not; the others read nothing
+    // pressed. A hidden run opens no input at all. Call when this window
+    // gains focus.
+    void takeControllers();
+    // A scripted run never takes them, at launch or on focus: a window that
+    // opens over the player's (as a new one does on KDE) leaves their
+    // controllers alone. Before openInput.
+    void leaveControllers();
+
+    // Up to four players; GH2 has two ports' worth of screens, so two join.
+    constexpr int kSeats = 4;
+    constexpr int kPlayers = 2;
+
+    // A seat's controller as the last poll saw it, idle when no device is
+    // in it. Seat N is libpad's port N. Callable from any thread.
+    HostPad hostPad(int seat = 0);
+    // Whether the game sees a controller in that seat's port.
+    bool seatPlugged(int seat);
+    // While a song plays, a press on another device takes no seat.
+    // Callable from any thread.
+    void lockSeats(bool locked);
+    // Practice's song is up, holding the seats as a venue's song does.
+    void practicing(bool on);
+    // Which screen of a song is up: in one playing, the keyboard's menu
+    // keys would be a guitar's frets and strums, so only its Esc works,
+    // as Start; in its pause menu Esc is Start too, to resume. Callable
+    // from any thread.
+    enum class SongScreen
+    {
+        kOther,
+        kPlaying,
+        kPaused,
+    };
+    void songScreen(SongScreen screen);
+
+    // A scenario's controllers that are not plugged in, by name. Each plays
+    // as a real one does, through its layout, the seat rules and the
+    // Controllers screen, in a hidden run too. Held until the next set, none
+    // to let go: the controls its layout gives the actions of those libpad
+    // bits, and raw buttons by number. Callable from any thread.
+    void addScriptedDevice(const std::string &name);
+    void removeScriptedDevice(const std::string &name); // unplugged
+    void setScriptedDevice(const std::string &name, uint16_t pressed, const std::vector<int> &buttons = {});
+    // A scenario's controller plugged into SDL as a real one shows up: a
+    // virtual joystick with that USB vendor and product and SDL joystick
+    // type (SDL_JoystickType). A gamepad has SDL's gamepad buttons and axes
+    // and layout (SDL gives a virtual one a layout only typed so), the rest
+    // 16 buttons, 6 axes and a hat. It goes through everything a real one
+    // does (the catalogue, its layout, the seats, the Controllers screen, a
+    // replug) in a hidden run too, its input.ini section kept in memory.
+    // Callable from any thread; the next poll plugs it in or pulls it out.
+    void addVirtualController(const std::string &name, uint16_t vendor, uint16_t product, int type);
+    void removeVirtualController(const std::string &name);
+    // Its controls held until the next set, none to let go: a gamepad
+    // button by SDL's name (a, back, dpdown), "button<n>", "hat<n><up|
+    // down|left|right>", or an axis pushed all the way, by SDL's gamepad
+    // name or "axis<n>", then + or - (righty-, axis2+).
+    void setVirtualController(const std::string &name, const std::vector<std::string> &controls);
+    bool hasVirtualController(const std::string &name);
+    // A scenario's key, SDL's scancode, held on the keyboard until let go;
+    // in a hidden run, from the first, the keyboard is there. Callable from
+    // any thread.
+    void setScriptedKey(int scancode, bool down);
+    // Whether that seat reads the device of that name: a scripted one's, a
+    // real one's as the log names it, or "keyboard" for the keyboard
+    // standing in for it or for P1 with no controller. Callable from any
+    // thread.
+    bool seatHas(int seat, const std::string &name);
+    // What a player is shown for it: its guitar's layout ("Wii guitar
+    // (raphnet)"), else its name; "" for none. Callable from any thread.
+    std::string seatLabel(int seat);
+
+    // Whether Multiplayer's screen is up, where a controller joins with
+    // Start and yellow moves a player up a seat. Callable from any thread.
+    void setPlayersStep(bool on);
+    // How many times P1 and P2 have traded places, by yellow there or by
+    // P2 moving up when P1's controller is let go. Callable from any thread.
+    uint32_t seatTrades();
 
     // The free camera's controls (ui/photo_mode.h): W A S D as how far it
     // is pushed right and forward, -1 to 1, the mouse's travel in pixels,

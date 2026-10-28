@@ -1,0 +1,5 @@
+#pragma once
+
+// assets/helpbar/glyphs.bin (ui/help_bar.cpp): the help bar's gems, labels and
+// strum stand-ins.
+inline constexpr unsigned char kHelpbarGlyphs[] = {@GHC_HELPBAR_GLYPHS@};
