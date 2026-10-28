@@ -67,6 +67,10 @@ namespace gh2::timing
     void padRead();
     void clockRead();
     void gameFrame(uint64_t ns);
+    // The seconds TaskMgr was last given (SetSecondsBeat), which the track
+    // is drawn at: -1 before any. Game thread sets, host reads.
+    void songSeconds(float seconds);
+    float songSeconds();
     // One line, once.
     void note(const std::string &line);
     // Prints what was sampled, every two seconds. Host thread.

@@ -31,7 +31,12 @@ namespace gh2::timing
         uint64_t s_pressEventNs = 0, s_pressReadNs = 0, s_lastFrameNs = 0;
         int s_padReads = 0;
         uint64_t s_readNs = 0, s_clockNs = 0; // the last pad read, and the first song clock read after it
+        std::atomic<float> s_songSeconds{-1.0f};
     }
+
+    void songSeconds(float seconds) { s_songSeconds.store(seconds, std::memory_order_relaxed); }
+
+    float songSeconds() { return s_songSeconds.load(std::memory_order_relaxed); }
 
     void pressRead(uint64_t eventNs, uint64_t readNs)
     {

@@ -4,6 +4,7 @@
 #include "dev/transplant.h"
 #include "frame_step.h"
 #include "dev/draw_dump.h"
+#include "dev/timing.h"
 #include "ps2_runtime_macros.h"
 #include "guest.h"
 #include "hook.h"
@@ -640,6 +641,7 @@ namespace gh2::scenario
         struct SecondsBeatTag;
         void onSetSecondsBeat(uint8_t *, R5900Context *ctx, PS2Runtime *)
         {
+            timing::songSeconds(ctx->f[12]);
             if (!s_frozen)
                 return;
             ctx->f[12] = s_seconds;
