@@ -1,0 +1,588 @@
+; Face-Off and Pro Face-Off (multi_vs and multi_fo) as the game's own
+; (multiplayer.dta) but offering what quickplay does: every game's outfits
+; a career has opened, every game's venues on its own map, and every
+; setlist. The guitars are quickplay's already outside a career
+; (content/quickplay.cpp). Co-op keeps its own songs and venues, its
+; career's, and shares the character screen.
+
+; TRUE in Face-Off or Pro Face-Off.
+{func ghc_multi_mode {find_elem (multi_vs multi_fo) {gamecfg get mode}}}
+; That step's screen in the mode played: venue, selsong or seldiff.
+{func ghc_multi_screen ($step)
+   {symbol {sprint {gamecfg get mode} "_" $step "_screen"}}
+}
+
+; The outfits. A character has up to four it may wear (sel_character.dta
+; ghc_find_outfits), one button each in the player's panel. The panel has
+; two: outfit3 and outfit4 are outfit2 cloned into outfit.grp when the
+; panel loads, as sel_character.dta's, and the box grows to hold them. Its
+; black is two pieces, the top and a bottom that outfit.grp draws first
+; (selectionbox_*.mesh): the group they hang from moves up by what the
+; rows add, the bottom stays put, and a black box fills what is between.
+; Each player's outfits, and where the panel's pieces were, by player.
+{set $ghc_multi_outfits (() ())}
+{set $ghc_multi_x (0 0)}
+{set $ghc_multi_y (0 0)}
+{set $ghc_multi_z (0 0)}    ; outfit1's, in z (falls going down)
+{set $ghc_multi_step (0 0)} ; outfit1 to outfit2, in z
+{set $ghc_multi_gz (0 0)}   ; the group's
+{set $ghc_multi_bz (0 0)}   ; the bottom's, under the top
+{func ghc_multi_outfit_panel ($player) {if_else {== $player 0} multi_char_outfit0 multi_char_outfit1}}
+; The player's button $i, by name: the panel's own two, then the clones.
+{func ghc_multi_button_name ($player $i)
+   {if_else {< $i 2}
+      {sprint "outfit" {'+' $i 1} ".btn"}
+      {sprint "ghc_p" {'+' $player 1} "_outfit" {'+' $i 1} ".btn"}
+   }
+}
+{func ghc_multi_button ($player $i) {{ghc_multi_outfit_panel $player} find {ghc_multi_button_name $player $i}}}
+; Which button a focus message names.
+{func ghc_multi_button_index ($player $focus)
+   {do
+      ($index 0)
+      {foreach_int $i 0 4
+         {if {== $focus {ghc_multi_button_name $player $i}} {set $index $i}}
+      }
+      $index
+   }
+}
+{func ghc_multi_outfit_index ($character $outfit)
+   {do
+      ($entry {find $syscfg characters $character})
+      ($index 0)
+      {foreach_int $i 1 {size $entry}
+         {if {== {elem {elem $entry $i} 0} $outfit} {set $index {'-' $i 1}}}
+      }
+      $index
+   }
+}
+; The clones, once for a panel as it loads, and where its pieces are.
+{func ghc_multi_build ($player)
+   {do
+      ($panel {ghc_multi_outfit_panel $player})
+      ($dir {$panel loaded_dir})
+      {if {! {$dir exists {ghc_multi_button_name $player 2}}}
+         {do
+            ($o1 {$panel find outfit1.btn})
+            ($o2 {$panel find outfit2.btn})
+            ($group {$o1 get trans_parent})
+            ($frame {$panel find outfit.grp})
+            ($bottom {$panel find selectionbox_bottom.mesh})
+            ($x1 0) ($y1 0) ($z1 0) ($x2 0) ($y2 0) ($z2 0)
+            ($gx 0) ($gy 0) ($gz 0) ($bx 0) ($by 0) ($bz 0)
+            {$o1 get_local_pos $x1 $y1 $z1}
+            {$o2 get_local_pos $x2 $y2 $z2}
+            {$group get_local_pos $gx $gy $gz}
+            {$bottom get_local_pos $bx $by $bz}
+            {set_elem $ghc_multi_x $player $x1}
+            {set_elem $ghc_multi_y $player $y1}
+            {set_elem $ghc_multi_z $player $z1}
+            {set_elem $ghc_multi_step $player {'-' $z2 $z1}}
+            {set_elem $ghc_multi_gz $player $gz}
+            {set_elem $ghc_multi_bz $player $bz}
+            ; After outfit2 and before the title, which draws last.
+            {do
+               ($b3 {new {$o2 class_name} {ghc_multi_button_name $player 2}})
+               {$b3 copy $o2 0}
+               {$b3 set trans_parent $group}
+               {$frame insert (objects 4) $b3}
+            }
+            {do
+               ($b4 {new {$o2 class_name} {ghc_multi_button_name $player 3}})
+               {$b4 copy $o2 0}
+               {$b4 set trans_parent $group}
+               {$frame insert (objects 5) $b4}
+            }
+            {ghc_box_make $panel {sprint "ghc_p" {'+' $player 1} "_fill"} $group -2}
+            {ghc_box_color $panel {sprint "ghc_p" {'+' $player 1} "_fill"} 0 0 0 1}
+            {$dir sync_objects}
+         }
+      }
+   }
+}
+; The player's panel shown or hidden ($on) as outfit.grp is, and its box
+; with it where the rows have grown it past the art's (it is no part of
+; outfit.grp, and not built for a character with one outfit or none).
+{func ghc_multi_show ($player $on)
+   {do
+      ($panel {ghc_multi_outfit_panel $player})
+      ($fill {sprint "ghc_p" {'+' $player 1} "_fill"})
+      {{$panel find outfit.grp} set_showing $on}
+      {if {{$panel loaded_dir} exists {sprint $fill "_mid.mesh"}}
+         {ghc_box_show $panel $fill {&& $on {> {size {elem $ghc_multi_outfits $player}} 2}}}
+      }
+   }
+}
+; The box for as many rows as the character has: a button each, the group
+; up and the bottom held, and black (ghc_box, box.dta) from inside the
+; top's to inside the bottom's, drawn under both, for what is between.
+{func ghc_multi_layout ($player)
+   {do
+      ($panel {ghc_multi_outfit_panel $player})
+      ($count {size {elem $ghc_multi_outfits $player}})
+      ($step {elem $ghc_multi_step $player})
+      ($grow {if_else {> $count 2} {'*' {'-' $count 2} {'-' 0 $step}} 0})
+      ($group {{$panel find outfit1.btn} get trans_parent})
+      ($bottom {$panel find selectionbox_bottom.mesh})
+      ($fill {sprint "ghc_p" {'+' $player 1} "_fill"})
+      ; Measured (2.25 px a unit): the top's black ends 40 under the group
+      ; and the bottom's starts 40 over its own place, each box 6 into them.
+      ($from -34)
+      ($to {'-' {'-' {'+' {elem $ghc_multi_bz $player} 40} $grow} 6})
+      ($gx 0) ($gy 0) ($gz 0) ($bx 0) ($by 0) ($bz 0)
+      {$group get_local_pos $gx $gy $gz}
+      {$bottom get_local_pos $bx $by $bz}
+      {$group set_local_pos $gx $gy {'+' {elem $ghc_multi_gz $player} $grow}}
+      {$bottom set_local_pos $bx $by {'-' {elem $ghc_multi_bz $player} $grow}}
+      ; Its x is the frame's middle, and z the box's own. Only where it
+      ; has height: a negative one (two rows or fewer, which it is not
+      ; shown for) turns the meshes over, and every put after hangs them a
+      ; width to the left of where they are put.
+      {if {> $grow 0}
+         {ghc_box_put $panel $fill -75.09 $by {/ {'+' $from $to} 2} 150.07 {'-' $from $to} 0.05 0.05}
+      }
+      {foreach_int $i 0 4
+         {do
+            ($btn {ghc_multi_button $player $i})
+            {if_else {< $i $count}
+               {do
+                  {$btn set_showing TRUE}
+                  {$btn set_local_pos {elem $ghc_multi_x $player} {elem $ghc_multi_y $player}
+                     {'+' {elem $ghc_multi_z $player} {'*' $i $step}}}
+               }
+               {$btn set_showing FALSE}
+            }
+         }
+      }
+   }
+}
+{func ghc_multi_label_outfits ($player)
+   {do
+      ($character {{game get_player_config $player} get_character})
+      ($outfits {elem $ghc_multi_outfits $player})
+      {foreach_int $i 0 {size $outfits}
+         {ghc_label_outfit {ghc_multi_button $player $i} $character {elem $outfits $i}}
+      }
+   }
+}
+; The player's outfit the one at $i, shown as the game's FOCUS_MSG does
+; (MULTISELECT_OUTFIT_HANDLERS), but its playing clips carried over only
+; between outfits on one clip set, as sel_character.dta's: carried onto
+; another game's outfit, leaving the screen stalled.
+{func ghc_multi_wear ($player $i)
+   {do
+      ($config {game get_player_config $player})
+      ($outfits {elem $ghc_multi_outfits $player})
+      ($old_char {char_multi get_char $player})
+      {if {< $i {size $outfits}}
+         {$config set_outfit_index {ghc_multi_outfit_index {$config get_character} {elem $outfits $i}}}
+         {if {ghc_multi_look_char $player} {char_multi char_event {'-' 1 $player} animate}}
+         {if {char_multi show_char $player {$config get_character_outfit}}
+            {do
+               ($new_char {char_multi get_char $player})
+               {if_else {&& $old_char $new_char
+                     {== {{$old_char find main.drv} get_clips} {{$new_char find main.drv} get_clips}}}
+                  {do {reset_hair $new_char} {{$new_char find main.drv} transfer {$old_char find main.drv}}}
+                  {char_multi char_event $player select}
+               }
+            }
+         }
+      }
+   }
+}
+; A character picked: its outfits listed, the one worn focused, or with
+; one the picker skipped.
+{func ghc_multi_outfits ($player)
+   {do
+      ($panel {ghc_multi_outfit_panel $player})
+      ($config {game get_player_config $player})
+      ($outfits {elem $ghc_multi_outfits $player})
+      ($at 0)
+      {$panel set_active TRUE}
+      {ghc_find_outfits $outfits {$config get_character}}
+      {if {> {size $outfits} 4} {resize $outfits 4}}
+      {foreach_int $i 0 {size $outfits}
+         {if {== {elem $outfits $i} {$config get_character_outfit}} {set $at $i}}
+      }
+      {if_else {> {size $outfits} 1}
+         {do
+            {$panel ghc_build}
+            {ghc_multi_layout $player}
+            {ghc_multi_label_outfits $player}
+            {ghc_multi_show $player TRUE}
+            {$panel set_focus {ghc_multi_button $player $at}}
+            {ghc_multi_wear $player $at}
+         }
+         {do
+            {ghc_multi_wear $player 0}
+            {ghc_multi_show $player FALSE}
+            {$panel force_select outfit1.btn}
+         }
+      }
+   }
+}
+; Strummed: the next or last of the rows, round past either end, one a
+; strum (see ghc_multi_outfit_press).
+{func ghc_multi_outfit_button ($player $button)
+   {do
+      ($panel {ghc_multi_outfit_panel $player})
+      ($count {size {elem $ghc_multi_outfits $player}})
+      ($at {ghc_multi_button_index $player {$panel focus_name}})
+      {cond
+         ({|| {< $count 2} {! {{$panel find outfit.grp} showing}} {ui in_transition}} kDataUnhandled)
+         ({== $button kPad_DDown}
+            {$panel set_focus {ghc_multi_button $player {mod {'+' $at 1} $count}}}
+            {synth play_sequence button_toggle}
+            TRUE
+         )
+         ({== $button kPad_DUp}
+            {$panel set_focus {ghc_multi_button $player {mod {'+' $at {'-' $count 1}} $count}}}
+            {synth play_sequence button_toggle}
+            TRUE
+         )
+         (TRUE kDataUnhandled)
+      }
+   }
+}
+; The outfit panel gets two BUTTON_DOWN_MSGs a strum, and so moved two
+; buttons on one: the second is dropped, any until the panel's next poll.
+{set $ghc_multi_pressed (FALSE FALSE)}
+{func ghc_multi_outfit_press ($player $button)
+   {if_else {elem $ghc_multi_pressed $player}
+      TRUE
+      {do
+         {set_elem $ghc_multi_pressed $player TRUE}
+         {ghc_multi_outfit_button $player $button}
+      }
+   }
+}
+{amend multi_char_outfit0
+   (FOCUS_MSG
+      {if {== {$this loaded_dir} $panel_dir}
+         {ghc_multi_wear 0 {ghc_multi_button_index 0 $new_focus}}
+      }
+   )
+   (BUTTON_DOWN_MSG {ghc_multi_outfit_press 0 $button})
+   (poll {set_elem $ghc_multi_pressed 0 FALSE})
+   ; A handler of the panel's own, so that what it makes is in its dir.
+   (ghc_build {ghc_multi_build 0})
+}
+{amend multi_char_outfit1
+   (FOCUS_MSG
+      {if {== {$this loaded_dir} $panel_dir}
+         {ghc_multi_wear 1 {ghc_multi_button_index 1 $new_focus}}
+      }
+   )
+   (BUTTON_DOWN_MSG {ghc_multi_outfit_press 1 $button})
+   (poll {set_elem $ghc_multi_pressed 1 FALSE})
+   (ghc_build {ghc_multi_build 1})
+}
+{amend multi_sel_character_screen
+   (BUTTON_DOWN_MSG {ghc_multi_char_blue $player_num $button})
+   (multi_char_selected
+      ($player)
+      {synth play_sequence button_select}
+      {ghc_multi_outfits $player}
+   )
+   ; As the game's, by the outfits listed.
+   (multi_select
+      ($part $panel $selected)
+      {do
+         ($player {if_else {== $panel multi_char_outfit0} 0 1})
+         {ghc_multi_show $player {! $selected}}
+         {if {&& {! $selected} {< {size {elem $ghc_multi_outfits $player}} 2}}
+            {synth play_sequence button_back.cue}
+            {{ghc_multi_outfit_panel $player} set_active FALSE}
+            {multi_sel_character_panel set_frozen $player FALSE}
+         }
+      }
+   )
+}
+
+; HD or SD, each player's own, as if they chose among characters and guitars
+; of their own: quickplay's blue (quickplay_pickers.dta) turns every one at
+; once, here it turns the pressing player's, where the 360 has its own of
+; what they have, and the help bar shows both, the first player's first.
+; -1 until a player turns theirs: the setting's.
+{set $ghc_multi_hdc (-1 -1)}
+{set $ghc_multi_hdg (-1 -1)}
+; The outfit and the guitar finish each player's look is set for, which a
+; change lets go (and the other player's own, if the same).
+{set $ghc_multi_lc (none none)}
+{set $ghc_multi_lg (none none)}
+; The label put up last, as its two looks and whether it is there, -1 for
+; none; and a blue the panel and the screen both get once a press.
+{set $ghc_multi_hb -1}
+{set $ghc_multi_blue (FALSE FALSE)}
+; Every look let go, as the main menu does: outfits are by path, so one set
+; here would show in quickplay's.
+; (Each element, not the array again: a literal is one array wherever it is
+; written, and set_elem has changed it.)
+{func ghc_multi_fill ($array $value)
+   {foreach_int $i 0 2 {set_elem $array $i $value}}
+}
+{func ghc_multi_forget
+   {quickplay model clear}
+   {ghc_multi_fill $ghc_multi_hdc -1}
+   {ghc_multi_fill $ghc_multi_hdg -1}
+   {ghc_multi_fill $ghc_multi_lc none}
+   {ghc_multi_fill $ghc_multi_lg none}
+   {ghc_multi_fill $ghc_multi_blue FALSE}
+   {set $ghc_multi_hb -1}
+}
+{func ghc_multi_hd_chars ($player)
+   {if_else {< {elem $ghc_multi_hdc $player} 0} {== {quickplay characters} hd} {elem $ghc_multi_hdc $player}}
+}
+{func ghc_multi_hd_guitar ($player)
+   {if_else {< {elem $ghc_multi_hdg $player} 0} {== {quickplay guitars} hd} {elem $ghc_multi_hdg $player}}
+}
+{func ghc_multi_outfit_of ($player) {{game get_player_config $player} get_character_outfit}}
+; The finish's file of the guitar the player has now, or none.
+{func ghc_multi_guitar_file ($player)
+   {do
+      ($guitar {multi_sel_guitar_panel get_selected_guitar $player})
+      ($skin {multi_sel_guitar_panel get_selected_skin $player})
+      {if_else {find_exists $syscfg guitars $guitar skins $skin outfit}
+         {elem {find $syscfg guitars $guitar skins $skin outfit} 1}
+         none
+      }
+   }
+}
+; The player's outfit in the look they picked, where the 360 has one of it,
+; and the last one's let go; TRUE if that changed what was on show (it is
+; loaded again, and so is everyone's, which move once theirs has).
+{func ghc_multi_animate
+   {char_multi char_event 0 animate}
+   {char_multi char_event 1 animate}
+}
+{func ghc_multi_look_char ($player)
+   {do
+      ($outfit {ghc_multi_outfit_of $player})
+      ($was {elem $ghc_multi_lc $player})
+      ($moved FALSE)
+      ; One path has one look: with both in the same outfit, the one
+      ; turned last is both's.
+      {if {== $outfit {ghc_multi_outfit_of {'-' 1 $player}}}
+         {set_elem $ghc_multi_hdc {'-' 1 $player} {ghc_multi_hd_chars $player}}
+      }
+      {if {&& {!= $was none} {!= $was $outfit} {!= $was {elem $ghc_multi_lc {'-' 1 $player}}}}
+         {if {>= {quickplay model outfit $was default} 2} {set $moved TRUE}}
+      }
+      {set_elem $ghc_multi_lc $player $outfit}
+      {if_else {quickplay has_hd outfit $outfit}
+         {if {>= {quickplay model outfit $outfit {if_else {ghc_multi_hd_chars $player} hd sd}} 2} {set $moved TRUE}}
+         {if {>= {quickplay model outfit $outfit default} 2} {set $moved TRUE}}
+      }
+      $moved
+   }
+}
+{func ghc_multi_look_guitar ($player)
+   {do
+      ($file {ghc_multi_guitar_file $player})
+      ($was {elem $ghc_multi_lg $player})
+      ($moved FALSE)
+      {if {&& {!= $file none} {== $file {ghc_multi_guitar_file {'-' 1 $player}}}}
+         {set_elem $ghc_multi_hdg {'-' 1 $player} {ghc_multi_hd_guitar $player}}
+      }
+      {if {&& {!= $was none} {!= $was $file} {!= $was {elem $ghc_multi_lg {'-' 1 $player}}}}
+         {if {>= {quickplay model guitar $was default} 2} {set $moved TRUE}}
+      }
+      {set_elem $ghc_multi_lg $player $file}
+      {if_else {&& {!= $file none} {quickplay has_hd guitar $file}}
+         {if {>= {quickplay model guitar $file {if_else {ghc_multi_hd_guitar $player} hd sd}} 2} {set $moved TRUE}}
+         {if {&& {!= $file none} {>= {quickplay model guitar $file default} 2}} {set $moved TRUE}}
+      }
+      $moved
+   }
+}
+; Whether each player has one the 360 has its own of, and which they show.
+{func ghc_multi_has_chars ($player) {quickplay has_hd outfit {ghc_multi_outfit_of $player}}}
+{func ghc_multi_has_guitar ($player)
+   {do ($file {ghc_multi_guitar_file $player}) {&& {!= $file none} {quickplay has_hd guitar $file}}}
+}
+; The help bar of the screen's own (fret1 and fret2, strum), and the blue
+; label where either player has one: both looks, as the pickers show them.
+{func ghc_multi_hd_bar ($any $h0 $h1)
+   {do
+      ($array)
+      {set $array ()}
+      {resize $array 0}
+      {push_back $array (fret1 help_continue)}
+      {push_back $array (fret2 help_back)}
+      {if $any
+         {push_back $array
+            {if_else $h0
+               {if_else $h1 (fret4 ghc_hd_hd) (fret4 ghc_hd_sd)}
+               {if_else $h1 (fret4 ghc_sd_hd) (fret4 ghc_sd_sd)}
+            }
+         }
+      }
+      {push_back $array (strum help_updown)}
+      {helpbar set_display $array}
+   }
+}
+; Put up when it is not what is up: nothing changes of itself, and the
+; screen's own bar comes back after a transition.
+{func ghc_multi_hd_sync ($guitars)
+   {do
+      ($has0 {if_else $guitars {ghc_multi_has_guitar 0} {ghc_multi_has_chars 0}})
+      ($has1 {if_else $guitars {ghc_multi_has_guitar 1} {ghc_multi_has_chars 1}})
+      ($h0 {&& $has0 {if_else $guitars {ghc_multi_hd_guitar 0} {ghc_multi_hd_chars 0}}})
+      ($h1 {&& $has1 {if_else $guitars {ghc_multi_hd_guitar 1} {ghc_multi_hd_chars 1}}})
+      ($sig {'+' {'+' $has0 {'*' 2 $has1}} {'+' {'*' 4 $h0} {'*' 8 $h1}}})
+      {if {ui in_transition} {set $ghc_multi_hb -1}}
+      {if {&& {! {ui in_transition}} {!= $sig $ghc_multi_hb}}
+         {ghc_multi_hd_bar {|| $has0 $has1} $h0 $h1}
+         {set $ghc_multi_hb $sig}
+      }
+   }
+}
+; The character screen's, once a poll: each player's outfit in their look
+; as they move over it, then the bar.
+{func ghc_multi_sync_chars
+   {foreach_int $p 0 2
+      {if {&& {!= {ghc_multi_outfit_of $p} {elem $ghc_multi_lc $p}} {ghc_multi_look_char $p}}
+         {ghc_multi_animate}
+      }
+   }
+   {ghc_multi_hd_sync FALSE}
+}
+{func ghc_multi_sync_guitars
+   {foreach_int $p 0 2
+      {if {&& {!= {ghc_multi_guitar_file $p} {elem $ghc_multi_lg $p}} {ghc_multi_look_guitar $p}}
+         {multi_sel_guitar_panel update_display $p FALSE}
+      }
+   }
+   {ghc_multi_hd_sync TRUE}
+}
+; Blue, from the player who pressed it, once: the screen and the panel
+; both hear it. Turns that player's look where they have one the 360 has.
+{func ghc_multi_char_blue ($player $button)
+   {cond
+      ({|| {!= $button kPad_Square} {elem $ghc_multi_blue $player} {ui in_transition}} kDataUnhandled)
+      ({! {ghc_multi_has_chars $player}} kDataUnhandled)
+      (TRUE
+         {set_elem $ghc_multi_blue $player TRUE}
+         {set_elem $ghc_multi_hdc $player {if_else {ghc_multi_hd_chars $player} 0 1}}
+         {ghc_multi_look_char $player}
+         {synth play_sequence button_toggle}
+         ; The ones on show load again, and move once they have.
+         {ghc_multi_animate}
+         {set $ghc_multi_hb -1}
+         TRUE
+      )
+   }
+}
+{func ghc_multi_guitar_blue ($player $button)
+   {cond
+      ({|| {!= $button kPad_Square} {elem $ghc_multi_blue $player} {ui in_transition}} kDataUnhandled)
+      ({! {ghc_multi_has_guitar $player}} kDataUnhandled)
+      (TRUE
+         {set_elem $ghc_multi_blue $player TRUE}
+         {set_elem $ghc_multi_hdg $player {if_else {ghc_multi_hd_guitar $player} 0 1}}
+         {ghc_multi_look_guitar $player}
+         {synth play_sequence button_toggle}
+         ; Shown again as the screen's own does for a scroll: the guitar
+         ; is loaded again once its look has changed.
+         {multi_sel_guitar_panel update_display $player FALSE}
+         {if {== {ghc_multi_guitar_file 0} {ghc_multi_guitar_file 1}}
+            {multi_sel_guitar_panel update_display {'-' 1 $player} FALSE}
+         }
+         {set $ghc_multi_hb -1}
+         TRUE
+      )
+   }
+}
+{amend multi_sel_character_panel
+   (poll {ghc_multi_sync_chars} {ghc_multi_fill $ghc_multi_blue FALSE})
+}
+{amend multi_sel_guitar_panel
+   (poll {ghc_multi_sync_guitars} {ghc_multi_fill $ghc_multi_blue FALSE})
+}
+
+; The venue: quickplay's maps (quickplay_pickers.dta), opening on the game's
+; whose venue was last picked, else the menus' game's.
+{amend multi_sel_guitar_screen
+   (BUTTON_DOWN_MSG {ghc_multi_guitar_blue $player_num $button})
+   (check_guitars_selected
+      {if_else {&& {multi_sel_guitar_panel is_select_done 0} {multi_sel_guitar_panel is_select_done 1}}
+         {do
+            {$this set_guitar 0}
+            {$this set_guitar 1}
+            {if_else {ghc_multi_mode}
+               {do
+                  {set $ghc_qp_venues
+                     {if_else {!= {campaigns venue_game} {campaigns live}}
+                        {campaigns venue_game}
+                        {ghc_venue_game {campaigns active}}
+                     }
+                  }
+                  {campaigns text_venues $ghc_qp_venues}
+                  {ui goto_screen {ghc_multi_screen venue}}
+               }
+               {ui goto_screen loading_screen}
+            }
+            TRUE
+         }
+         FALSE
+      }
+   )
+}
+{retype multi_vs_venue_screen $ghc_qp_venue_screen}
+{retype multi_fo_venue_screen $ghc_qp_venue_screen}
+
+; The songs: any setlist, picked as quickplay's (quickplay.dta), its twin
+; screen loading another.
+{func ghc_multi_selsong_helpbar
+   {do
+      ($array)
+      {set $array ()}
+      {resize $array 0}
+      {push_back $array (fret1 help_continue)}
+      {push_back $array (fret2 help_back)}
+      {if {> {size {ghc_setlists}} 1} {push_back $array (fret3 ghc_setlist)}}
+      {push_back $array (strum help_updown)}
+      {helpbar set_display $array}
+   }
+}
+{func ghc_multi_selsong_button ($button)
+   {cond
+      ({ghc_pick_button $button} TRUE)
+      ({== $button kPad_Tri}
+         {{ui current_screen} backwards_anim}
+         {synth play_sequence button_back.cue}
+         {ui goto_screen {ghc_multi_screen venue}}
+         TRUE
+      )
+      ({&& {== $button kPad_Circle} {> {size {ghc_setlists}} 1} {! {ui in_transition}}}
+         {ghc_pick_panel open_with {ghc_setlists} {setlist shown}}
+         TRUE
+      )
+      (TRUE kDataUnhandled)
+   }
+}
+{set $ghc_multi_selsong_screen
+   (
+      (panels meta sel_song_panel helpbar ghc_pick_panel)
+      (focus sel_song_panel)
+      (sel_song_career FALSE)
+      (enter {ghc_multi_selsong_helpbar})
+      (SELECT_START_MSG {ui goto_screen {ghc_multi_screen seldiff}} kDataUnhandled)
+      (BUTTON_DOWN_MSG {ghc_multi_selsong_button $button})
+      (ghc_picked ($game) {ghc_qp_picked sel_song_panel ghc_multi_selsong_twin_screen $game})
+   )
+}
+{retype multi_vs_selsong_screen $ghc_multi_selsong_screen}
+{retype multi_fo_selsong_screen $ghc_multi_selsong_screen}
+{if {! {exists ghc_multi_selsong_twin_screen}} {new GHScreen ghc_multi_selsong_twin_screen}}
+{retype ghc_multi_selsong_twin_screen
+   (
+      (panels meta sel_song_twin_panel helpbar ghc_pick_panel)
+      (focus sel_song_twin_panel)
+      (sel_song_career FALSE)
+      (enter {ghc_multi_selsong_helpbar})
+      (SELECT_START_MSG {ui goto_screen {ghc_multi_screen seldiff}} kDataUnhandled)
+      (BUTTON_DOWN_MSG {ghc_multi_selsong_button $button})
+      (ghc_picked ($game) {ghc_qp_picked sel_song_twin_panel {ghc_multi_screen selsong} $game})
+   )
+}

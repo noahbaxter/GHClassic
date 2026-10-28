@@ -5,6 +5,51 @@
 ; button each, up to four: outfit3 and outfit4 are outfit2 cloned on entry,
 ; and all are stepped down by outfit1 to outfit2's spacing, four starting a
 ; step higher.
+;
+; Face-Off and Pro Face-Off's outfits are quickplay's (multiplayer.dta).
+{func ghc_free_mode {find_elem (quickplay multi_vs multi_fo) {gamecfg get mode}}}
+; A character's outfits that are unlocked, in config's order, into $into.
+{func ghc_find_outfits ($into $character)
+   {resize $into 0}
+   {do
+      ($entry {find $syscfg characters $character})
+      {foreach_int $i 1 {size $entry}
+         {do
+            ($outfit {elem {elem $entry $i} 0})
+            {if {&& {campaign is_unlocked $outfit} {ghc_may_wear {elem $entry $i}}}
+               {push_back $into $outfit}
+            }
+         }
+      }
+   }
+}
+; Another game's outfit ((extra <game> <its name there>), content/outfits.h)
+; is no part of a career, which is its own game's alone. In the other modes
+; it is there once its own game's career has it, or with all access.
+; Config's own outfit in quickplay's modes is GH2's, whose unlock answers
+; for any game's item of that name, so GH1's grim would open GH2's: GH2's
+; career alone does.
+{func ghc_may_wear ($entry)
+   {if_else {find_exists $entry extra}
+      {&& {!= {gamecfg get mode} career}
+         {|| {campaign all_access}
+            {campaigns owns {elem {find $entry extra} 1} {elem {find $entry extra} 2}}}}
+      {|| {! {ghc_free_mode}}
+         {campaign all_access}
+         {campaigns owns gh2 {elem $entry 0}}}
+   }
+}
+; An outfit's (name "...") in config, else its locale token, as the game's
+; own outfits have.
+{func ghc_label_outfit ($btn $character $outfit)
+   {do
+      ($entry {find $syscfg characters $character $outfit})
+      {if_else {find_exists $entry name}
+         {$btn set_localized_text {elem {find $entry name} 1}}
+         {$btn set_text {sprint $outfit _outfit}}
+      }
+   }
+}
 {retype sel_character_panel
    (
       ; From the ARK root: a path resolves against the file its array came
@@ -204,49 +249,9 @@
       )
       ; char_focus's outfits that are unlocked, in config's order, into
       ; outfits' own array (the game has no new_array).
-      (find_outfits
-         {resize [outfits] 0}
-         {do
-            ($entry {find $syscfg characters [char_focus]})
-            {foreach_int $i 1 {size $entry}
-               {do
-                  ($outfit {elem {elem $entry $i} 0})
-                  {if {&& {campaign is_unlocked $outfit} {$this may_wear {elem $entry $i}}}
-                     {push_back [outfits] $outfit}
-                  }
-               }
-            }
-         }
-      )
-      ; Another game's outfit ((extra <game> <its name there>),
-      ; content/outfits.h) is no part of a career, which is its own game's
-      ; alone. In the other modes it is there once its own game's career
-      ; has it, or with all access. Config's own outfit outside a career is
-      ; GH2's, whose unlock answers for any game's item of that name, so
-      ; GH1's grim would open GH2's: GH2's career alone does.
-      (may_wear
-         ($entry)
-         {if_else {find_exists $entry extra}
-            {&& {!= {gamecfg get mode} career}
-               {|| {campaign all_access}
-                  {campaigns owns {elem {find $entry extra} 1} {elem {find $entry extra} 2}}}}
-            {|| {!= {gamecfg get mode} quickplay}
-               {campaign all_access}
-               {campaigns owns gh2 {elem $entry 0}}}
-         }
-      )
-      ; An outfit's (name "...") in config, else its locale token, as the
-      ; game's own outfits have.
-      (label_outfit_button
-         ($btn $outfit)
-         {do
-            ($entry {find $syscfg characters [char_focus] $outfit})
-            {if_else {find_exists $entry name}
-               {$btn set_localized_text {elem {find $entry name} 1}}
-               {$btn set_text {sprint $outfit _outfit}}
-            }
-         }
-      )
+      (find_outfits {ghc_find_outfits [outfits] [char_focus]})
+      (may_wear ($entry) {ghc_may_wear $entry})
+      (label_outfit_button ($btn $outfit) {ghc_label_outfit $btn [char_focus] $outfit})
       (choose_skins
          {$this find_outfits}
          {set [skin_select] TRUE}

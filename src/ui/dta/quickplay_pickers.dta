@@ -241,6 +241,8 @@
    {do
       ($venues {campaigns venues $ghc_qp_venues})
       ($index 0)
+      ; Back from Face-Off's choice of GH1's small club (ghc_qp_venue_select).
+      {if {&& {== $ghc_qp_venues gh1} {== {game get_venue} small2}} {game set_venue small1}}
       {foreach $venue $venues
          {if_else {ghc_qp_venue_open $venue}
             {$screen enable {$panel find {sprint "sv_" $venue ".btn"}}}
@@ -286,11 +288,23 @@
    }
 }
 ; A venue picked, and its game's map, which the song plays it from
-; (ghc_qp_play).
+; (ghc_qp_play). Face-Off's go on to their songs (multiplayer.dta), there
+; from now on.
 {func ghc_qp_venue_select
-   {quickplay pick venue {game get_venue}}
-   {quickplay pick venue_game $ghc_qp_venues}
-   {ui goto_screen ghc_qp_setup_screen}
+   {if_else {ghc_multi_mode}
+      {do
+         ; GH1's multiplayer is played in its own small club, small_club_multi
+         ; (at small2, which its map has no button for).
+         {if {&& {== $ghc_qp_venues gh1} {== {game get_venue} small1}} {game set_venue small2}}
+         {campaigns venues_from $ghc_qp_venues}
+         {ui goto_screen {ghc_multi_screen selsong}}
+      }
+      {do
+         {quickplay pick venue {game get_venue}}
+         {quickplay pick venue_game $ghc_qp_venues}
+         {ui goto_screen ghc_qp_setup_screen}
+      }
+   }
 }
 {func ghc_qp_venue_button ($button)
    {cond
@@ -298,7 +312,7 @@
       ({== $button kPad_Tri}
          {{ui current_screen} backwards_anim}
          {synth play_sequence button_back.cue}
-         {ui goto_screen ghc_qp_setup_screen}
+         {ui goto_screen {if_else {ghc_multi_mode} multi_sel_guitar_screen ghc_qp_setup_screen}}
          TRUE
       )
       ({&& {== $button kPad_Circle} {> {size {ghc_venue_games}} 1} {! {ui in_transition}}}
@@ -316,7 +330,8 @@
 }
 {if {! {exists ghc_qp_venue_screen}} {new GHScreen ghc_qp_venue_screen}}
 {if {! {exists ghc_qp_venue_twin_screen}} {new GHScreen ghc_qp_venue_twin_screen}}
-{retype ghc_qp_venue_screen
+; Face-Off's maps are this one too (multiplayer.dta).
+{set $ghc_qp_venue_screen
    (
       (panels meta ghc_qp_venue_panel helpbar ghc_pick_panel)
       (focus ghc_qp_venue_panel)
@@ -333,6 +348,7 @@
       )
    )
 }
+{retype ghc_qp_venue_screen $ghc_qp_venue_screen}
 {retype ghc_qp_venue_twin_screen
    (
       (panels meta ghc_qp_venue_twin_panel helpbar ghc_pick_panel)
@@ -346,7 +362,7 @@
          {synth play_sequence button_select}
          {set $ghc_qp_venues $game}
          {campaigns text_venues $game}
-         {ui goto_screen ghc_qp_venue_screen}
+         {ui goto_screen {if_else {ghc_multi_mode} {ghc_multi_screen venue} ghc_qp_venue_screen}}
       )
    )
 }

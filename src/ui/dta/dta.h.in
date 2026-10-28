@@ -18,6 +18,7 @@ inline constexpr const char kPreshowPicksDta[] = R"dta(@GHC_PRESHOW_PICKS_DTA@)d
 inline constexpr const char kGh1ScriptsDta[] = R"dta(@GHC_GH1_SCRIPTS_DTA@)dta";
 inline constexpr const char kQuickplayPickersDta[] = R"dta(@GHC_QUICKPLAY_PICKERS_DTA@)dta";
 inline constexpr const char kQuickplaySetupDta[] = R"dta(@GHC_QUICKPLAY_SETUP_DTA@)dta";
+inline constexpr const char kMultiplayerDta[] = R"dta(@GHC_MULTIPLAYER_DTA@)dta";
 inline constexpr const char kPreshowGuitaristDta[] = R"dta(@GHC_PRESHOW_GUITARIST_DTA@)dta";
 inline constexpr const char kInSongDta[] = R"dta(@GHC_IN_SONG_DTA@)dta";
 inline constexpr const char kGameSettingsDta[] = R"dta(@GHC_GAME_SETTINGS_DTA@)dta";
