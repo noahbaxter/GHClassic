@@ -1,6 +1,6 @@
 ; P1's controller pulled out mid-song: GH2's own controller pause, which
 ; holds until a controller is back in the seat, here the same one, and then
-; its X resumes, the pad playing as a DualShock (its orange, Cross or A).
+; its green resumes, as X: a song's menus take a DualShock's.
 ; Another device taking the seat is solo_reconnect_other.
 #include common/first_boot.dta
 (device pad)
@@ -20,6 +20,6 @@
 (device pad)
 (wait 0.5)
 (expect {seat_has 0 pad} 1)
-(press orange pad)
+(press green pad)
 (wait_screen game_screen 10)
 (quit)
