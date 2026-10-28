@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.8.5
+
+**THIS IS UNFINISHED.** Expect bugs, missing features and things changing between releases.
+
+### New
+- **Local multiplayer is back!** Just press start to join as P2 on the Multiplayer screen, and yellow to reorder. Controllers are now matched by GUID from a catalogue of guitar families. Hotplug, replug and last run's seats should be remembered in input.ini, and keyboard controls should ALWAYS be available to P1 as a last resort.
+- **Face-Off and Pro Face-Off** now show all unlocked content from all games including outfits, guitars, venues and setlists
+- **Controllers screen** under Options > Settings, or the pause menu's Settings. Lets you easily check mappings and rebind controls for individual gamepads, guitar controllers, and keyboards. Gamepad mode is now a toggle defaulted on for gamepads, and the help bar shows glyphs for gamepads and keyboard controls now
+- **PLAY A SHOW Hub** Quickplay now starts on a hub where you can pick your character, guitar, and venue more conveniently, with some nifty menu animations.
+- **Quickplay songs unlocked** in any difficulty or note engine are available for everyone
+- Added **crowns** to indicate FCs beside stars on career and quickplay. FCs done in quickplay are kept for progression. **Streak counter digits** are purple now to indicate a run is still a FC
+- **Song map tube** under the rock meter to see roughly how much longer the song is
+- **"Unlock all"** added to game settings if you don't wanna have to unlock shit
+
+### Bugs
+- Song caption shows again on restart
+- Main menu's Quit readjusted to fit in each theme
+- 80s finale flagged as a special encore, as retail does for Play With Me
+- Campaign progress counts each song by the hardest difficulty passed instead of starting at 75% after beating a single song on expert
+- Score and rock meters in the HUD slide-in at their correct height
+- Setlists longer than the song list paper scroll a window at a time
+- Track fade-out follows longer highways, so far gems and tails stay lit, and held, let-go and missed sustains survive note speed, highway length or lefty remaking the track
+
 ## v0.8
 
 **THIS IS UNFINISHED.** Expect bugs, missing features and things changing between releases.
