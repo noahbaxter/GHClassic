@@ -1,8 +1,9 @@
 #pragma once
 
-// Who sits where: which device each seat reads, as the presses of each poll
-// move them. Only the host thread's poll (input.cpp) drives it; it reads no
-// device and writes no file, so tests can run it.
+// Who sits where: which controller each seat reads, as the presses of each
+// poll move them. The keyboard is never a seat's (input.cpp drives a port
+// with it). Only the host thread's poll drives it; it reads no device and
+// writes no file, so tests can run it.
 
 #include "host/bindings.h"
 #include "host/device_id.h"
@@ -47,9 +48,6 @@ namespace gh2::input
         // read, whatever the instrument.
         std::array<float, kActionCount> held{};
         uint16_t buttons = 0;
-        // The keyboard's: Tab gone down, its Start for joining (Enter
-        // being taken), and Escape held.
-        bool tab = false, escape = false;
 
         bool keyboard() const { return id.backend == DeviceId::kKeyboard; }
     };
@@ -70,6 +68,13 @@ namespace gh2::input
         // A seat's device gone or back. `readingNone` in a window without
         // the controllers, which pauses for none.
         void follow(const std::vector<Read> &reads, bool readingNone);
+        // Each seat's mode from its controller, a gamepad's pad and the
+        // rest guitar (the kind input.ini's mode line makes it): set as it
+        // sits and kept while it is away, guitar with none, the keyboard's.
+        // Not while `songUp`, so nothing standing in or coming back changes
+        // how a song plays.
+        void setModes(const std::vector<Read> &reads, bool songUp);
+        bool pad(int seat) const { return m_pad[seat]; }
         // Every seated device plays nothing until it lets go of what it
         // holds: leaving the Controllers screen.
         void letGoAll();
@@ -104,6 +109,7 @@ namespace gh2::input
         bool m_savedChanged = false;
         uint64_t m_restoreUntilMs = 0;
         bool m_away[kSeats] = {};
+        bool m_pad[kSeats] = {};
         // The devices there as each seat's went, none of which is it.
         std::vector<DeviceId> m_thereWhenAway[kSeats];
         uint32_t m_trades = 0;

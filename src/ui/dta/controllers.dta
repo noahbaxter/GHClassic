@@ -111,13 +111,13 @@
       (chip_size 0.26)
       ; The rows down the right, the first level with the devices: their
       ; names' left edge, what each reads as against the right edge, the
-      ; first's middle, the gap between, and the more before the last,
-      ; Reset. The row picked has a faint box behind it; a row held has it
-      ; filled in its colour.
+      ; first's middle, the gap between, and the more before the last two,
+      ; the device's mode and Reset. The row picked has a faint box behind
+      ; it; a row held has it filled in its colour.
       (row_x 127)
-      (read_x 255)
+      (read_x 268)
       (row_top 134)
-      (row_gap 25)
+      (row_gap 23)
       (reset_gap 16)
       (row_size 0.42)
       (read_size 0.28)
@@ -206,7 +206,11 @@
       (poll
          {if {! [leaving]}
             {switch {ghc_controllers poll}
-               (leave {set [leaving] TRUE} {ui goto_screen options_screen})
+               (leave
+                  {set [leaving] TRUE}
+                  {ui goto_screen
+                     {if_else {== {ui current_screen} ghc_pause_controllers_screen} pause_settings_screen options_screen}}
+               )
                (paint {$this paint})
             }
          }
@@ -263,7 +267,7 @@
          {foreach_int $i 0 {ghc_controllers rows}
             {do
                ($z {'-' {ghc_ct_row_z [row_top] [row_gap] $i}
-                  {if_else {== $i {'-' {ghc_controllers rows} 1}} [reset_gap] 0}})
+                  {if_else {>= $i {'-' {ghc_controllers rows} 2}} [reset_gap] 0}})
                {ghc_box_make $this {symbol {sprint ghc_ct_rowbox $i}} {$this find ghc_ct.grp} 0.9}
                {ghc_box_put $this {symbol {sprint ghc_ct_rowbox $i}} {'-' [row_x] 10} 0 {'-' $z 2}
                   {'+' {'-' [read_x] [row_x]} 20} 26 4 4}
@@ -535,5 +539,18 @@
    (
       (panels meta ghc_controllers_bg_panel helpbar ghc_controllers_panel)
       (focus ghc_controllers_panel)
+   )
+}
+; The same from a song's pause menu, its Settings (game_settings.dta), over
+; the paused song and back to that menu.
+{if {! {exists ghc_pause_controllers_screen}}
+   {new GHScreen ghc_pause_controllers_screen}
+}
+{retype ghc_pause_controllers_screen
+   (
+      (panels GAME_PANELS ghc_controllers_bg_panel helpbar ghc_controllers_panel)
+      (focus ghc_controllers_panel)
+      (in_game TRUE)
+      PAUSE_SCREEN_HANDLERS
    )
 }

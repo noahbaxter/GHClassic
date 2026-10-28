@@ -65,9 +65,11 @@ namespace gh2
             const int port = static_cast<int>(getRegU32(ctx, 4));
             if (port >= 0 && port < kSeats && seatPlugged(port))
             {
-                // Its seat's guitar, idle until a device sits in it.
+                // Its seat's guitar, idle until a device sits in it; a
+                // gamepad in a song lets go of D-Left, so GH2 reads it as
+                // the analog pad it is and plays it as one.
                 const HostPad pad = hostPad(port);
-                uint16_t pressed = pad.pressed | pad::kLeft;
+                uint16_t pressed = static_cast<uint16_t>(pad.pressed | (pad.joypad ? 0u : pad::kLeft));
                 if (port == 0)
                 {
                     if (timing::on())
@@ -135,6 +137,12 @@ namespace gh2
             songScreen(name == "game_screen" || name == "practice_game_screen"  ? SongScreen::kPlaying
                        : name == "pause_screen" || name == "pract_pause_screen" ? SongScreen::kPaused
                                                                                 : SongScreen::kOther);
+            // Practice draws no venue, which holds the seats in a song
+            // (native_rnd.cpp), so its song's own screens do, from its
+            // loading on.
+            practicing(name == "practice_loading_screen" || name == "practice_game_screen" ||
+                       name == "pract_pause_screen" || name == "practice_pause_controller_screen" ||
+                       name == "practice_change_speed_screen" || name == "practice_end_screen");
         }
     }
 

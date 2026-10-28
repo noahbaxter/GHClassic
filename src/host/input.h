@@ -12,6 +12,10 @@ namespace gh2
     {
         uint16_t pressed = 0;
         uint8_t lx = 0x80, ly = 0x80, rx = 0x80, ry = 0x80;
+        // A seat in pad mode in a song: GH2 reads it as a DualShock, a fret
+        // press strumming (pad.cpp), its frets L2 L1 R1 R2 X, whatever plays
+        // for the seat. A seat's mode is its controller's, set as it sits.
+        bool joypad = false;
         // --timing: the last poll that saw a button go down, counted, with
         // the OS's time for the press (0 if it gave none) and the poll's.
         uint32_t pressCount = 0;
@@ -59,6 +63,8 @@ namespace gh2
     // While a song plays, a press on another device takes no seat.
     // Callable from any thread.
     void lockSeats(bool locked);
+    // Practice's song is up, holding the seats as a venue's song does.
+    void practicing(bool on);
     // Which screen of a song is up: in one playing, the keyboard's menu
     // keys would be a guitar's frets and strums, so only its Esc works,
     // as Start; in its pause menu Esc is Start too, to resume. Callable
@@ -79,12 +85,30 @@ namespace gh2
     void addScriptedDevice(const std::string &name);
     void removeScriptedDevice(const std::string &name); // unplugged
     void setScriptedDevice(const std::string &name, uint16_t pressed, const std::vector<int> &buttons = {});
+    // A scenario's controller plugged into SDL as a real one shows up: a
+    // virtual joystick with that USB vendor and product and SDL joystick
+    // type (SDL_JoystickType). A gamepad has SDL's gamepad buttons and axes
+    // and layout (SDL gives a virtual one a layout only typed so), the rest
+    // 16 buttons, 6 axes and a hat. It goes through everything a real one
+    // does (the catalogue, its layout, the seats, the Controllers screen, a
+    // replug) in a hidden run too, its input.ini section kept in memory.
+    // Callable from any thread; the next poll plugs it in or pulls it out.
+    void addVirtualController(const std::string &name, uint16_t vendor, uint16_t product, int type);
+    void removeVirtualController(const std::string &name);
+    // Its controls held until the next set, none to let go: a gamepad
+    // button by SDL's name (a, back, dpdown), "button<n>", "hat<n><up|
+    // down|left|right>", or an axis pushed all the way, by SDL's gamepad
+    // name or "axis<n>", then + or - (righty-, axis2+).
+    void setVirtualController(const std::string &name, const std::vector<std::string> &controls);
+    bool hasVirtualController(const std::string &name);
     // A scenario's key, SDL's scancode, held on the keyboard until let go;
     // in a hidden run, from the first, the keyboard is there. Callable from
     // any thread.
     void setScriptedKey(int scancode, bool down);
-    // Whether that seat reads the device of that name: a scripted one's, or
-    // a real one's as the log names it. Callable from any thread.
+    // Whether that seat reads the device of that name: a scripted one's, a
+    // real one's as the log names it, or "keyboard" for the keyboard
+    // standing in for it or for P1 with no controller. Callable from any
+    // thread.
     bool seatHas(int seat, const std::string &name);
     // What a player is shown for it: its guitar's layout ("Wii guitar
     // (raphnet)"), else its name; "" for none. Callable from any thread.

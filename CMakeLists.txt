@@ -367,6 +367,7 @@ set(GHC_GAME_SOURCES
     src/host/profiles.cpp
     src/host/record.cpp
     src/host/releases.cpp
+    src/host/scripted_devices.cpp
     src/host/sdl_devices.cpp
     src/host/seats.cpp
     src/host/update.cpp

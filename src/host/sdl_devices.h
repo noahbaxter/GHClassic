@@ -14,19 +14,18 @@
 
 namespace gh2::input
 {
-    // SDL reports every joystick already plugged in as added, so the first
-    // pump would reopen the ones just opened; only a changed set reopens.
-    void openDevices();
+    // Each joystick that came opened and each that went closed, the rest
+    // left as they are: SDL reports every one already plugged in as added.
+    // `virtualOnly`, a scenario's alone (input.h), never the player's.
+    void openDevices(bool virtualOnly = false);
     void closeDevices();
-    // Each one's raw controls into its snapshot.
-    void readSdlDevices();
+    // Each one's raw controls into its snapshot, or a scenario's alone.
+    void readSdlDevices(bool virtualOnly = false);
     // Its accelerometer turned on, which sends nothing until it is.
     void enableAccel(Device &d);
 
     // A control as a player calls it, for the Controllers screen: a
     // gamepad's by its own labels (Cross and L1 on a PlayStation pad, A and
-    // LB on the rest), a stick by its direction, a key by its name; several
-    // joined with " / ".
+    // LB on the rest), a stick by its direction, a key by its name.
     std::string shown(const SDL_Gamepad *gamepad, const Source &s);
-    std::string joined(const SDL_Gamepad *gamepad, const std::vector<Source> &sources);
 }

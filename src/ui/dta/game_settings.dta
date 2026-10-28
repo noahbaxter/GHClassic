@@ -192,8 +192,9 @@
 ; it has one for audio and one for video, and Video Settings' row as Photo
 ; Mode (photo_mode.dta): Resume, Restart, Settings, Photo Mode, Quit.
 ; Settings leads to a menu of its own, the same scene again with its rows
-; named Audio, Video, Game and Back, and each settings screen leads back to
-; that (the screens take the selects and the buttons, so each is retyped).
+; named Audio, Video, Game and Controllers (controllers.dta), and each
+; settings screen leads back to that (the screens take the selects and the
+; buttons, so each is retyped).
 ;
 ; That menu has the scene's five rows as four: Video Settings' put away,
 ; Quit in its place, and every row half a row lower to keep them centred.
@@ -296,30 +297,18 @@
       (reset_focus TRUE)
       (enter
          {$this four_rows}
-         ; Three of the four: the last put away, and the rest half a row
-         ; lower. Red leads back, as the help bar says. Up goes to the row
-         ; whose down leads here, which in GH1's scene is still the last
-         ; one's too: it leads nowhere now.
-         {if {quit.btn showing}
-            {do
-               ($x 0) ($y 0) ($z 0) ($row 0)
-               {resume.btn get_local_pos $x $y $z}
-               {restart.btn get_local_pos $x $y $row}
-               {set $row {'-' $row $z}}
-               {quit.btn set_showing FALSE}
-               {quit.btn set_state kDisabled}
-               {quit.btn set nav_down quit.btn}
-               {audio_options.btn set nav_down resume.btn}
-               {foreach $btn (resume.btn restart.btn audio_options.btn)
-                  {$btn get_local_pos $x $y $z}
-                  {$btn set_local_pos $x $y {'+' $z {'/' $row 2.0}}}
-               }
-            }
+         ; Up goes to the row whose down leads here: Video Settings' put
+         ; away points at itself, or up from Controllers would find it.
+         {if {&& {exists video_options.btn} {! {video_options.btn showing}}}
+            {video_options.btn set nav_down video_options.btn}
          }
          {pause_title.lbl set_localized "SETTINGS"}
          {resume.btn set text_token "AUDIO"}
          {restart.btn set text_token "VIDEO"}
          {audio_options.btn set text_token "GAME"}
+         {quit.btn set text_token "CONTROLLERS"}
+         ; Not drawn in to QUIT's width: its own, as the other rows.
+         {quit.btn set fit_text 0}
       )
       PAUSE_FOUR_ROWS
    )
@@ -336,6 +325,7 @@
             (resume.btn {ui goto_screen pause_audio_settings_screen})
             (restart.btn {ui goto_screen pause_video_settings_screen})
             (audio_options.btn {ui goto_screen pause_game_settings_screen})
+            (quit.btn {ui goto_screen ghc_pause_controllers_screen})
          }
       )
       (BUTTON_DOWN_MSG

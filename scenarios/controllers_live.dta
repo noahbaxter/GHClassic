@@ -77,11 +77,12 @@
 (key Up)
 (key Up)
 (key Up)
-(expect {ghc_controllers focus} 11)
+(expect {ghc_controllers focus} 12)
 (key Return)
 (wait 0.3)
 (expect {ghc_controllers text read 2} "3")
 ; The keyboard's whammy takes a key too.
+(key Up)
 (key Up)
 (key Up)
 (expect {ghc_controllers focus} 9)

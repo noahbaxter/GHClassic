@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <iostream>
+#include <optional>
 
 namespace gh2::input
 {
@@ -48,55 +49,35 @@ namespace gh2::input
         {
             return d.id.backend == DeviceId::kSdl;
         }
-    }
 
-    void closeDevices()
-    {
-        for (Device &d : devices())
+        void close(Device &d)
         {
-            if (!sdl(d))
-                continue;
             if (d.gamepad)
                 SDL_CloseGamepad(d.gamepad); // closes its joystick too
             else
                 SDL_CloseJoystick(d.joystick);
         }
-        std::erase_if(devices(), sdl);
-    }
 
-    void openDevices()
-    {
-        int count = 0;
-        SDL_JoystickID *ids = SDL_GetJoysticks(&count);
-        std::vector<SDL_JoystickID> now(ids, ids + (ids ? count : 0));
-        std::vector<SDL_JoystickID> open;
-        for (const Device &d : devices())
-            if (sdl(d))
-                open.push_back(SDL_GetJoystickID(d.joystick));
-        if (now == open)
-        {
-            SDL_free(ids);
-            return;
-        }
-        closeDevices();
-        std::vector<Device> opened;
-        for (int i = 0; i < count && ids; ++i)
+        // One joystick opened, named in the log with what it plays.
+        std::optional<Device> open(SDL_JoystickID joystick)
         {
             Device d;
-            if (SDL_IsGamepad(ids[i]))
+            if (SDL_IsGamepad(joystick))
             {
-                d.gamepad = SDL_OpenGamepad(ids[i]);
+                d.gamepad = SDL_OpenGamepad(joystick);
                 d.joystick = d.gamepad ? SDL_GetGamepadJoystick(d.gamepad) : nullptr;
             }
             else
             {
-                d.joystick = SDL_OpenJoystick(ids[i]);
+                d.joystick = SDL_OpenJoystick(joystick);
             }
             if (!d.joystick)
             {
                 std::cerr << "[input] open: " << SDL_GetError() << std::endl;
-                continue;
+                return std::nullopt;
             }
+            d.isVirtual = SDL_IsJoystickVirtual(joystick);
+            d.keepInMemory = d.isVirtual;
             const std::string name = SDL_GetJoystickName(d.joystick) ? SDL_GetJoystickName(d.joystick) : "";
             d.name = name;
             // Its GUID and path: the same controller in the same port after
@@ -111,7 +92,8 @@ namespace gh2::input
             const DeviceInfo info = deviceInfo(d.joystick, d.gamepad);
             const auto builtin = builtinProfile(info);
             if (builtin)
-                d.kind = builtin->gamepad ? DeviceKind::kGamepad : DeviceKind::kGuitar;
+                d.detected = builtin->gamepad ? DeviceKind::kGamepad : DeviceKind::kGuitar;
+            d.kind = kindOf(name, guid, d.detected);
             d.label = builtin && !builtin->gamepad ? builtin->label : name;
             const Section *own = sectionOf(name, guid);
             d.sectionName = name;
@@ -137,7 +119,7 @@ namespace gh2::input
             }
             if (!builtin && !bound)
                 std::cerr << "[input]   unbound; run GHClassic --bind to set it up" << std::endl;
-            if (!own)
+            if (!own && !d.isVirtual)
                 listInFile(name, guid, d.builtin);
             // One read off the accelerometer needs SDL to send it.
             const bool accel = std::any_of(d.profile.begin(), d.profile.end(), [](const auto &sources) {
@@ -148,17 +130,55 @@ namespace gh2::input
                 std::cerr << "[input]   no accelerometer: " << SDL_GetError() << std::endl;
             d.now = d.rest = read(d);
             d.openedMs = SDL_GetTicks();
-            opened.push_back(d);
+            return d;
         }
-        SDL_free(ids);
-        // Ahead of a scenario's, as SDL lists them.
-        devices().insert(devices().begin(), opened.begin(), opened.end());
     }
 
-    void readSdlDevices()
+    void closeDevices()
     {
         for (Device &d : devices())
             if (sdl(d))
+                close(d);
+        std::erase_if(devices(), sdl);
+    }
+
+    void openDevices(bool virtualOnly)
+    {
+        int count = 0;
+        SDL_JoystickID *ids = SDL_GetJoysticks(&count);
+        std::vector<SDL_JoystickID> now;
+        for (int i = 0; i < count && ids; ++i)
+            if (!virtualOnly || SDL_IsJoystickVirtual(ids[i]))
+                now.push_back(ids[i]);
+        SDL_free(ids);
+        // Only what came or went: one still plugged in keeps its rest, its
+        // accelerometer and what its log has named.
+        std::erase_if(devices(), [&](Device &d) {
+            if (!sdl(d) || std::find(now.begin(), now.end(), SDL_GetJoystickID(d.joystick)) != now.end())
+                return false;
+            close(d);
+            return true;
+        });
+        // Ahead of a scenario's, as SDL lists them.
+        std::vector<Device> listed;
+        for (SDL_JoystickID id : now)
+        {
+            const auto kept = std::find_if(devices().begin(), devices().end(), [&](const Device &d) {
+                return sdl(d) && SDL_GetJoystickID(d.joystick) == id;
+            });
+            if (kept != devices().end())
+                listed.push_back(std::move(*kept));
+            else if (auto d = open(id))
+                listed.push_back(std::move(*d));
+        }
+        std::erase_if(devices(), sdl);
+        devices().insert(devices().begin(), listed.begin(), listed.end());
+    }
+
+    void readSdlDevices(bool virtualOnly)
+    {
+        for (Device &d : devices())
+            if (sdl(d) && (!virtualOnly || d.isVirtual))
                 d.now = read(d);
     }
 
@@ -278,13 +298,5 @@ namespace gh2::input
             return "Tilt Sensor";
         }
         return "";
-    }
-
-    std::string joined(const SDL_Gamepad *gamepad, const std::vector<Source> &sources)
-    {
-        std::string text;
-        for (const Source &s : sources)
-            text += (text.empty() ? "" : " / ") + shown(gamepad, s);
-        return text;
     }
 }

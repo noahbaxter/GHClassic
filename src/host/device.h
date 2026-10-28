@@ -1,9 +1,10 @@
 #pragma once
 
 // Every device a player can hold but the keyboard, whatever reads it: SDL's
-// controllers (sdl_devices.cpp) and a scenario's (input.cpp). Each backend
-// opens its own into the one list and fills their raw controls each poll;
-// what they play, log and show reads only those. The host thread's own.
+// controllers (sdl_devices.cpp) and a scenario's (scripted_devices.cpp).
+// Each backend opens its own into the one list and fills their raw controls
+// each poll; what they play, log and show reads only those. The host
+// thread's own.
 
 #include "host/bindings.h"
 #include "host/capture.h"
@@ -23,7 +24,9 @@ namespace gh2::input
         DeviceId id;
         std::string name;  // as the log names it
         std::string label; // what a player is shown: its layout's, else its name
-        DeviceKind kind = DeviceKind::kController;
+        // What it plays as, its section's mode line over what it was
+        // detected as.
+        DeviceKind kind = DeviceKind::kController, detected = DeviceKind::kController;
         // Its input.ini section, by SDL's name and GUID, and whether a
         // change to it stays in memory: a scenario's is not the player's.
         std::string sectionName, sectionGuid;
@@ -37,6 +40,9 @@ namespace gh2::input
         std::vector<float> logRest;
         std::set<std::string> named;
         uint64_t openedMs = 0;
+        // A scenario's controller attached to SDL as a virtual joystick
+        // (input.h), its section kept in memory.
+        bool isVirtual = false;
         // SDL's, for one it opened.
         SDL_Joystick *joystick = nullptr;
         SDL_Gamepad *gamepad = nullptr; // when SDL knows its layout

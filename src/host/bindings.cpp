@@ -250,6 +250,16 @@ namespace gh2::input
                 file.seats[trim(text.substr(0, eq))] = trim(text.substr(eq + 1));
                 continue;
             }
+            if (!section.empty() && eq != std::string::npos && trim(text.substr(0, eq)) == "mode")
+            {
+                const std::string mode = trim(text.substr(eq + 1));
+                if (mode == "pad" || mode == "guitar")
+                    file.modes[section] = mode;
+                else
+                    std::cerr << "[input] " << path << ":" << number << ": mode is pad or guitar, line skipped"
+                              << std::endl;
+                continue;
+            }
             const auto action = eq == std::string::npos ? std::nullopt : actionFromKey(trim(text.substr(0, eq)));
             if (section.empty() || !action)
             {
@@ -305,7 +315,7 @@ namespace gh2::input
     }
 
     bool writeSection(const std::string &path, const std::string &section,
-                      const std::map<Action, std::vector<Source>> &bindings)
+                      const std::map<Action, std::vector<Source>> &bindings, const std::string &mode)
     {
         const std::vector<std::string> kept = linesWithout(path, section);
         return !ini::writeReplacing(path, [&](std::ofstream &out) {
@@ -314,6 +324,8 @@ namespace gh2::input
             if (!kept.empty())
                 out << "\n";
             out << "[" << section << "]\n";
+            if (!mode.empty())
+                out << "mode = " << mode << "\n";
             for (const auto &[action, sources] : bindings)
             {
                 out << actionKey(action) << " =";
@@ -338,7 +350,8 @@ namespace gh2::input
         });
     }
 
-    bool writeTemplate(const std::string &path, const std::string &section, const Profile &profile)
+    bool writeTemplate(const std::string &path, const std::string &section, const Profile &profile,
+                       const std::string &mode)
     {
         std::vector<std::string> kept = linesWithout(path, section);
 
@@ -356,10 +369,14 @@ namespace gh2::input
                        ";   pad axis righty 0 -1   a gamepad axis (leftx ... righttrigger), rest then full\n"
                        ";   pad accel x 0 12       a gamepad's accelerometer (x, y or z), rest then full\n"
                        ";\n"
-                       "; An action takes several controls, comma separated, and none unbinds it.\n";
+                       "; An action takes several controls, comma separated, and none unbinds it.\n"
+                       "; A controller's mode = pad or mode = guitar sets how it plays, if it\n"
+                       "; was taken for the other.\n";
             for (const std::string &line : kept)
                 out << line << "\n";
             out << "\n[" << section << "]\n";
+            if (!mode.empty())
+                out << "mode = " << mode << "\n";
             for (int a = 0; a < kActionCount; ++a)
             {
                 out << "; " << kActions[a].name << " =";

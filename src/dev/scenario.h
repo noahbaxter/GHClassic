@@ -15,6 +15,12 @@
 //   (device pad)                       a controller of that name plugged in, from
 //                                      the start, playing through the seat rules;
 //                                      a name with pad in it is a gamepad
+//   (controller xplorer "1430:4748" pad)  one plugged into SDL as a real one
+//                                      is (input.h): USB vendor and product in
+//                                      hex, then pad (SDL's gamepad layout),
+//                                      guitar or joystick; it presses and holds
+//                                      raw controls, (hold xplorer a righty-),
+//                                      (press dpdown xplorer)
 //   (unplug pad)                       that controller pulled out
 //   (press green pad)                  pressed and let go on that controller
 //   (hold pad green down)              held on it until its next hold; none lets go;
@@ -22,6 +28,8 @@
 //                                      layout may not bind
 //   (key Tab)                          a key by SDL's name, pressed and let go;
 //                                      (key Down 1) holds it a second first
+//   (keys 1 Down)                      those keys held until the next (keys);
+//                                      none lets go
 //   (star_power player0 {player0 star_power_ready})  from here on, that player's
 //                                      guitar tilted each poll the condition holds,
 //                                      deploying star power when ready; (star_power) stops

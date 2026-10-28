@@ -26,7 +26,7 @@ namespace gh2::input
         int seat = -1;           // the seat it holds, -1 for none
         int number = 0;          // 1, 2... among devices of one model, 0 when alone
         std::array<float, kActionCount> amount{}; // each action now, 0 to 1
-        std::array<std::string, kActionCount> bound{}; // what each is bound to as a player calls it, "" for nothing
+        std::array<std::vector<std::string>, kActionCount> bound{}; // each one's controls as a player calls them
     };
 
     // Every device, controllers in the order SDL lists them, the keyboard last.
@@ -49,7 +49,11 @@ namespace gh2::input
     void cancelRebind();
     bool rebinding();
     // The action unbound in the device's section, or the section's own
-    // lines dropped so its built-in layout is all it plays.
+    // lines dropped so its built-in layout and detected mode are all it
+    // plays.
     void clearBinding(const DeviceId &id, Action action);
     void resetBindings(const DeviceId &id);
+    // A controller's mode swapped, pad for guitar or back, in its section of
+    // input.ini: how a seat it sits in plays (input.cpp). Its kind shows it.
+    void swapMode(const DeviceId &id);
 }

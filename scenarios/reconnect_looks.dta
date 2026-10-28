@@ -1,0 +1,66 @@
+; solo_reconnect_other's gamepad gone mid-song, the keyboard standing in,
+; in GH2's quickplay and then GH1's career, each with its own controller
+; pause: shot before and after the keyboard's press, which lets Resume
+; take the song on in the seat's pad mode.
+(needs gh1)
+#include common/first_boot.dta
+(device pad)
+(press down pad)
+(expect {seat_has 0 pad} 1)
+{quickplay song_defaults 0}
+{{game get_player_config 0} set_difficulty easy}
+{{game get_player_config 0} set autoplay TRUE}
+{quickplay in_song_ui gh2}
+{gamecfg set mode quickplay}
+{game set_song shoutatthedevil}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 1)
+(unplug pad)
+(wait_screen pause_controller_screen 10)
+(wait 0.5)
+(shot gh2_controller_pause)
+(key Down)
+(wait 0.5)
+(expect {seat_has 0 keyboard} 1)
+(shot gh2_keyboard_standing_in)
+(key Return)
+(wait_screen game_screen 10)
+(wait 1)
+(expect {game get_controller 0} joypad_guitar)
+(device pad)
+(wait 0.5)
+(expect {seat_has 0 pad} 1)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+
+(press down pad)
+(expect {seat_has 0 pad} 1)
+{set $pick gh1}
+#include common/career_start.dta
+{ui goto_screen career_screen}
+(wait_screen career_screen 40)
+(press green)
+(wait_screen sel_venue_screen 40)
+(wait 1.5)
+(press green)
+(wait_screen sel_song_screen)
+(wait 2)
+(press green)
+(wait_screen game_screen 60)
+(wait 1)
+(expect {game get_controller 0} joypad_guitar)
+(unplug pad)
+(wait_screen pause_controller_screen 10)
+(wait 0.5)
+(shot gh1_controller_pause)
+(key Down)
+(wait 0.5)
+(expect {seat_has 0 keyboard} 1)
+(shot gh1_keyboard_standing_in)
+(key Return)
+(wait_screen game_screen 10)
+(wait 1)
+(expect {game get_controller 0} joypad_guitar)
+(quit)
