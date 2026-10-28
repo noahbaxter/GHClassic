@@ -32,10 +32,18 @@
 ; A song stands its guitarist on a stage mark (Character::Teleport,
 ; 0x162b30), which its walks and turns are measured from; without one it
 ; walks off. This one is the size of the venues' start marks
-; (start_guitarist0.way), where the placer puts it.
+; (start_guitarist0.way), where the placer puts it. It is flagged 1 as
+; those are only while the figure stands (ghc_preshow_mark, and
+; ghc_preshow_unmark from ghc_qp_setup_screen's exit): flagged, it is a
+; start mark to the waypoint search every song's guitarist is placed by,
+; and left so it took a song's guitarist to the origin whenever it came
+; last. It is made here, at load: made from the panel's poll instead, the
+; figure was teleported to nothing.
 {if {! {exists ghc_preshow.way}} {new Waypoint ghc_preshow.way}}
-{ghc_preshow.way set flags 1}
 {ghc_preshow.way set radius 12}
+{ghc_preshow.way set flags 0}
+{func ghc_preshow_mark {ghc_preshow.way set flags 1}}
+{func ghc_preshow_unmark {ghc_preshow.way set flags 0}}
 ; Once it is placed and loaded ({ghc_preshow_char are_chars_loaded}): on its
 ; mark, in one of its walk-ons or wins (hub/menu_guitarist.h), then its
 ; idle for $ghc_preshow_idle_secs, then the next walk-on, and round again.
@@ -59,6 +67,7 @@
 {func ghc_preshow_guitarist
    {do
       ($char {ghc_preshow_char get_char 0})
+      {ghc_preshow_mark}
       {$char start_at ghc_preshow.way}
       {ghc_preshow_ready $char}
       {ghc_preshow_walk_on $char 1}

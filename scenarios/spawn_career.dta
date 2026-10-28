@@ -1,0 +1,16 @@
+; A song started from a new GH2 career's song list, by the buttons: the
+; guitarist is on the venue's start mark, not the origin.
+#include common/first_boot.dta
+{set $pick gh2}
+#include common/career_start.dta
+(press green)
+(wait_screen sel_venue_screen 40)
+(wait 1)
+(press green)
+(wait_screen sel_song_screen)
+(wait 1)
+{set $index 0}
+#include common/career_song.dta
+(wait 0.5)
+#include common/spawn_read.dta
+(quit)

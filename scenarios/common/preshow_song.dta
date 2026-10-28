@@ -1,0 +1,30 @@
+; Quickplay's hub with its pre-show guitarist up, then a song from it: the
+; pre-show's start mark stands while the figure does and is gone by the song,
+; whose guitarist is on the venue's start mark.
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 1)
+(press red)
+(wait_screen ghc_qp_setup_screen)
+(wait 4)
+(expect {ghc_preshow.way get flags} 1)
+(shot preshow_hub)
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 1)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+{{game get_player_config 0} set autoplay TRUE}
+(press green)
+(wait_screen game_screen 60)
+(expect {ghc_preshow.way get flags} 0)
+{set $ghc_x 0}
+{set $ghc_y 0}
+{set $ghc_z 0}
+{{world find guitarist0} get_local_pos $ghc_x $ghc_y $ghc_z}
+(print spawn0 $ghc_x $ghc_y $ghc_z)
+(expect {|| {> $ghc_x 10} {< $ghc_x -10}} 1)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)

@@ -1,0 +1,22 @@
+; One song start, the venue picked by the includer: the guitarist's position
+; and facing the moment the game screen is up, and again 3 s on, then back
+; to the menu.
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+{set $ghc_x 0}
+{set $ghc_y 0}
+{set $ghc_z 0}
+{set $ghc_fx 0}
+{set $ghc_fy 0}
+{set $ghc_fz 0}
+{{world find guitarist0} get_local_pos $ghc_x $ghc_y $ghc_z}
+{{world find guitarist0} get_world_forward $ghc_fx $ghc_fy $ghc_fz}
+(print spawn0 $ghc_x $ghc_y $ghc_z fwd $ghc_fx $ghc_fy $ghc_fz venue {campaigns venue_game} {game get_venue})
+; On the venue's start mark, not at the origin a guitarist never placed stands at.
+(expect {|| {|| {> $ghc_x 0.5} {< $ghc_x -0.5}} {|| {> $ghc_y 0.5} {< $ghc_y -0.5}}} 1)
+(wait 3)
+{{world find guitarist0} get_local_pos $ghc_x $ghc_y $ghc_z}
+{{world find guitarist0} get_world_forward $ghc_fx $ghc_fy $ghc_fz}
+(print spawn3 $ghc_x $ghc_y $ghc_z fwd $ghc_fx $ghc_fy $ghc_fz)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)

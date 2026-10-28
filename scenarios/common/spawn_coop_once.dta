@@ -1,0 +1,22 @@
+; One co-op song start: both guitarists on their marks, neither at the origin.
+(pads 2)
+{gamecfg set mode multi_coop}
+{game set_num_players 2}
+{game set_song iloverockandroll}
+{{game get_player_config 0} set autoplay TRUE}
+{{game get_player_config 1} set autoplay TRUE}
+{game set_quickplay}
+{game set_venue small1}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 0.5)
+(expect {world exists guitarist1} 1)
+#include spawn_read.dta
+{set $ghc_x 0}
+{set $ghc_y 0}
+{set $ghc_z 0}
+{{world find guitarist1} get_local_pos $ghc_x $ghc_y $ghc_z}
+(print spawn1 $ghc_x $ghc_y $ghc_z)
+(expect {|| {|| {> $ghc_x 0.5} {< $ghc_x -0.5}} {|| {> $ghc_y 0.5} {< $ghc_y -0.5}}} 1)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)

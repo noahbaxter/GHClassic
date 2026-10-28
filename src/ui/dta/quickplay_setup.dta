@@ -544,6 +544,7 @@
       (exit
          {ghc_qp_unpark sel_character_panel}
          {ghc_preshow_char set_placer 0}
+         {ghc_preshow_unmark}
       )
       (SELECT_START_MSG
          {switch $component
