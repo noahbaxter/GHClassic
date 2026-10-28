@@ -678,7 +678,7 @@ namespace gh2::gh1
             milo::Dir out = withoutShots(*world);
             milo::add(out, "Trans", kSpot, trans(stage.spot));
 
-            std::set<std::string> taken;
+            std::set<std::string> taken, have;
             size_t made = 0u;
             const auto add = [&](const Shot &shot, const std::string &category, std::string name, bool ended)
             {
@@ -687,6 +687,7 @@ namespace gh2::gh1
                 if (auto body = camShot(shot, category, ended, two, byName, *camPaths, stage))
                 {
                     milo::add(out, "CamShot", name, std::move(*body));
+                    have.insert(category);
                     ++made;
                 }
             };
@@ -727,6 +728,18 @@ namespace gh2::gh1
                 far = first({"flr_far_lft", "flr_far_rt"}, true);
             if (far)
                 add(*far, "LIGHTER", far->name + "_lighter", false);
+
+            // Multiplayer's room has no shots to cut between: its one fixed
+            // shot for both players (MULTIPLAYER, small_club_multi's
+            // camera.dta) is held from the intro on, so it stands for each
+            // category GH2 picks from that GH1 has none for. (The shots for
+            // one player alone, MULTIPLAYER_0 and _1, are GH1's for when the
+            // other has left; GH2 has no category for those.)
+            if (const Shot *both = first({"MULTIPLAYER"}, true))
+                for (const char *category : {"flr_near_lft", "flr_near_rt", "flr_far_lft", "flr_far_rt", "SOLO_NEAR",
+                                             "SOLO_FAR", "LOSE", "WIN", "WIN_ENCORE", "WIN_ENCORE_SONG", "WIN_GAME", "LIGHTER"})
+                    if (!have.count(category))
+                        add(*both, category, both->name + "_" + category, false);
 
             if (made == 0u)
             {

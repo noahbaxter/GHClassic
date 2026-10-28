@@ -1,0 +1,103 @@
+; Every venue of every game, a song started twice in each: the guitarist is
+; on the venue's start mark, never the origin a guitarist never placed stands
+; at. Each start prints the game whose room it is and the venue. A song left
+; puts the venues back to GH2's, so another game's are set before each start.
+(needs gh1 gh80s)
+#include common/first_boot.dta
+{func ghc_spawn_set ($v)
+   {game set_song iloverockandroll}
+   {{game get_player_config 0} set autoplay TRUE}
+   {game set_quickplay}
+   {game set_venue $v}
+}
+{func ghc_spawn_from ($g $v)
+   {campaigns venues_from $g}
+   {ghc_spawn_set $v}
+}
+
+; GH2's own.
+{ghc_spawn_set battle}
+#include common/spawn_once.dta
+{ghc_spawn_set battle}
+#include common/spawn_once.dta
+{ghc_spawn_set small1}
+#include common/spawn_once.dta
+{ghc_spawn_set small1}
+#include common/spawn_once.dta
+{ghc_spawn_set small2}
+#include common/spawn_once.dta
+{ghc_spawn_set small2}
+#include common/spawn_once.dta
+{ghc_spawn_set big}
+#include common/spawn_once.dta
+{ghc_spawn_set big}
+#include common/spawn_once.dta
+{ghc_spawn_set theatre}
+#include common/spawn_once.dta
+{ghc_spawn_set theatre}
+#include common/spawn_once.dta
+{ghc_spawn_set fest}
+#include common/spawn_once.dta
+{ghc_spawn_set fest}
+#include common/spawn_once.dta
+{ghc_spawn_set arena}
+#include common/spawn_once.dta
+{ghc_spawn_set arena}
+#include common/spawn_once.dta
+{ghc_spawn_set stone}
+#include common/spawn_once.dta
+{ghc_spawn_set stone}
+#include common/spawn_once.dta
+
+; GH1's, standing in at GH2's.
+{ghc_spawn_from gh1 battle}
+#include common/spawn_once.dta
+{ghc_spawn_from gh1 battle}
+#include common/spawn_once.dta
+{ghc_spawn_from gh1 small1}
+#include common/spawn_once.dta
+{ghc_spawn_from gh1 small1}
+#include common/spawn_once.dta
+{ghc_spawn_from gh1 big}
+#include common/spawn_once.dta
+{ghc_spawn_from gh1 big}
+#include common/spawn_once.dta
+{ghc_spawn_from gh1 theatre}
+#include common/spawn_once.dta
+{ghc_spawn_from gh1 theatre}
+#include common/spawn_once.dta
+{ghc_spawn_from gh1 fest}
+#include common/spawn_once.dta
+{ghc_spawn_from gh1 fest}
+#include common/spawn_once.dta
+{ghc_spawn_from gh1 arena}
+#include common/spawn_once.dta
+{ghc_spawn_from gh1 arena}
+#include common/spawn_once.dta
+
+; The 80s'.
+{ghc_spawn_from gh80s battle}
+#include common/spawn_once.dta
+{ghc_spawn_from gh80s battle}
+#include common/spawn_once.dta
+{ghc_spawn_from gh80s small1}
+#include common/spawn_once.dta
+{ghc_spawn_from gh80s small1}
+#include common/spawn_once.dta
+{ghc_spawn_from gh80s small2}
+#include common/spawn_once.dta
+{ghc_spawn_from gh80s small2}
+#include common/spawn_once.dta
+{ghc_spawn_from gh80s theatre}
+#include common/spawn_once.dta
+{ghc_spawn_from gh80s theatre}
+#include common/spawn_once.dta
+{ghc_spawn_from gh80s fest}
+#include common/spawn_once.dta
+{ghc_spawn_from gh80s fest}
+#include common/spawn_once.dta
+{ghc_spawn_from gh80s arena}
+#include common/spawn_once.dta
+{ghc_spawn_from gh80s arena}
+#include common/spawn_once.dta
+(quit)

@@ -31,6 +31,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <vector>
 
 namespace gh2::scenario
 {
@@ -41,6 +42,17 @@ namespace gh2::scenario
         constexpr uint32_t kString = 0x12u;
         constexpr int kTimeout = 30; // seconds
 
+        // A control a press or hold names: an action (green, strum's up and
+        // down, start, tilt...) as its libpad bit, or a raw button by number
+        // on a (device), button6.
+        void control(const std::string &name, uint16_t &bits, std::vector<int> &buttons)
+        {
+            if (name.size() > 6 && name.rfind("button", 0) == 0)
+                buttons.push_back(std::atoi(name.c_str() + 6));
+            else
+                bits |= padButton(name);
+        }
+
         std::string s_text;
         uint32_t s_steps = 0u; // the parsed file, a DataArray
         int s_next = 0;
@@ -48,6 +60,9 @@ namespace gh2::scenario
         Clock::time_point s_until;    // a wait's end
         bool s_pressed = false;       // a press's button still held
         Clock::time_point s_release;  // and when it lets go
+        std::string s_pressDevice;    // on that (device), when named, else P1's port,
+        int s_pressKey = 0;           // or that key, a (key) step's
+        std::vector<int> s_heldKeys;  // a (keys) step's, held until the next
         std::string s_screen;         // a wait_screen's screen
         uint32_t s_condition = 0u;    // a wait_until's step array
         uint32_t s_starPower = 0u;    // a star_power's step array, checked each poll
@@ -210,7 +225,14 @@ namespace gh2::scenario
             }
             if (s_pressed && now() >= s_release)
             {
-                setScriptedPad(0u);
+                if (s_pressKey != 0)
+                    setScriptedKey(s_pressKey, false);
+                else if (s_pressDevice.empty())
+                    setScriptedPad(0u);
+                else if (hasVirtualController(s_pressDevice))
+                    setVirtualController(s_pressDevice, {});
+                else
+                    setScriptedDevice(s_pressDevice, 0u);
                 s_pressed = false;
             }
             if (now() < s_until)
@@ -230,14 +252,87 @@ namespace gh2::scenario
                     s_until = now() + std::chrono::milliseconds(static_cast<int>(array.number(1) * 1000.0f));
                     return;
                 }
+                if (verb == "key")
+                {
+                    // A key by SDL's name (Tab, Return, Escape, Up), held
+                    // as a press is.
+                    s_pressKey = SDL_GetScancodeFromName(array.symbol(1).c_str());
+                    if (s_pressKey == SDL_SCANCODE_UNKNOWN)
+                    {
+                        std::cerr << "[scenario] FAIL: no key " << array.symbol(1) << std::endl;
+                        quit();
+                        return;
+                    }
+                    setScriptedKey(s_pressKey, true);
+                    s_pressed = true;
+                    // Held that many seconds, else let go as a tap is.
+                    const int heldMs = array.size() > 2 ? static_cast<int>(array.number(2) * 1000.0f) : 150;
+                    s_release = now() + std::chrono::milliseconds(heldMs);
+                    s_until = now() + std::chrono::milliseconds(heldMs + 250);
+                    return;
+                }
+                if (verb == "keys")
+                {
+                    for (int key : s_heldKeys)
+                        setScriptedKey(key, false);
+                    s_heldKeys.clear();
+                    for (int k = 1; k < array.size(); ++k)
+                    {
+                        // A digit's key reads as its number.
+                        const std::string name = array.symbol(k).empty()
+                                                     ? std::to_string(static_cast<int>(array.number(k)))
+                                                     : array.symbol(k);
+                        const int key = SDL_GetScancodeFromName(name.c_str());
+                        if (key == SDL_SCANCODE_UNKNOWN)
+                        {
+                            std::cerr << "[scenario] FAIL: no key " << name << std::endl;
+                            quit();
+                            return;
+                        }
+                        setScriptedKey(key, true);
+                        s_heldKeys.push_back(key);
+                    }
+                    s_until = now() + std::chrono::milliseconds(100);
+                    return;
+                }
                 if (verb == "press")
                 {
+                    s_pressKey = 0;
                     // Held long enough for the pad to be read, then let go
-                    // before the next step.
-                    setScriptedPad(padButton(array.symbol(1)));
+                    // before the next step. On P1's port, or by a (device)
+                    // named, through its layout and the seat rules.
+                    uint16_t bits = 0;
+                    std::vector<int> buttons;
+                    control(array.symbol(1), bits, buttons);
+                    s_pressDevice = array.size() > 2 ? array.symbol(2) : "";
+                    if (s_pressDevice.empty())
+                        setScriptedPad(bits);
+                    else if (hasVirtualController(s_pressDevice))
+                        setVirtualController(s_pressDevice, {array.symbol(1)});
+                    else
+                        setScriptedDevice(s_pressDevice, bits, buttons);
                     s_pressed = true;
                     s_release = now() + std::chrono::milliseconds(150);
                     s_until = now() + std::chrono::milliseconds(400);
+                    return;
+                }
+                if (verb == "hold" && !array.symbol(1).empty())
+                {
+                    // A (device), by name, holding those controls until its
+                    // next hold; none lets go. (hold <libpad bits>) is P1's.
+                    uint16_t bits = 0;
+                    std::vector<int> buttons;
+                    std::vector<std::string> raw;
+                    for (int j = 2; j < array.size(); ++j)
+                    {
+                        control(array.symbol(j), bits, buttons);
+                        raw.push_back(array.symbol(j));
+                    }
+                    if (hasVirtualController(array.symbol(1)))
+                        setVirtualController(array.symbol(1), raw);
+                    else
+                        setScriptedDevice(array.symbol(1), bits, buttons);
+                    s_until = now() + std::chrono::milliseconds(200);
                     return;
                 }
                 if (verb == "wait_screen" || verb == "wait_until")
@@ -320,8 +415,31 @@ namespace gh2::scenario
                     s_shooting = true;
                     return;
                 }
-                else if (verb == "pads")
-                    setPads(static_cast<int>(array.number(1)));
+                else if (verb == "device")
+                    // A controller that is not there, by name; its presses go
+                    // through the seat rules. Read from the file at boot too.
+                    addScriptedDevice(array.symbol(1));
+                else if (verb == "controller")
+                {
+                    // One plugged into SDL as a real one is: "vendor:product"
+                    // in hex, then pad (SDL's gamepad layout), guitar or
+                    // joystick.
+                    const std::string ids = text(rdram, array.arg(2));
+                    const std::string type = array.symbol(3);
+                    addVirtualController(array.symbol(1),
+                                         static_cast<uint16_t>(std::strtoul(ids.c_str(), nullptr, 16)),
+                                         static_cast<uint16_t>(std::strtoul(ids.c_str() + ids.find(':') + 1, nullptr, 16)),
+                                         type == "pad"      ? SDL_JOYSTICK_TYPE_GAMEPAD
+                                         : type == "guitar" ? SDL_JOYSTICK_TYPE_GUITAR
+                                                            : SDL_JOYSTICK_TYPE_UNKNOWN);
+                }
+                else if (verb == "unplug")
+                {
+                    // That (device) or (controller) pulled out; the same step
+                    // again plugs it back.
+                    removeScriptedDevice(array.symbol(1));
+                    removeVirtualController(array.symbol(1));
+                }
                 else if (verb == "record")
                 {
                     const std::string state = array.symbol(1);
@@ -582,16 +700,26 @@ namespace gh2::scenario
         // One with (record) steps records only their clips: none until the
         // first. Its steps are parsed later, by the game, so it is found here
         // by the text, outside ; comments.
+        // Its (device) controllers are plugged in from the start too, as the
+        // game looks for its pads at boot.
         std::istringstream lines(s_text);
+        bool recording = false;
         for (std::string line; std::getline(lines, line);)
-            if (line.substr(0, line.find(';')).find("(record ") != std::string::npos)
+        {
+            const std::string code = line.substr(0, line.find(';'));
+            if (!recording && code.find("(record ") != std::string::npos)
             {
                 record::stop();
-                break;
+                recording = true;
             }
-        // Its guitars are in from the start, as the game looks for them at boot.
-        if (s_text.find("(pads 2)") != std::string::npos)
-            setPads(2);
+            for (size_t at = code.find("(device "); at != std::string::npos; at = code.find("(device ", at + 1))
+            {
+                std::istringstream words(code.substr(at + 8));
+                std::string name;
+                if (words >> name)
+                    addScriptedDevice(name.substr(0, name.find(')')));
+            }
+        }
         return true;
     }
 

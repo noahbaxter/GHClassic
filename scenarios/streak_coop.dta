@@ -1,7 +1,13 @@
 ; Co-op's streak: one drawer, the band's, under the middle meter, and the
 ; band's popups, counting a note either player hits. Both on autoplay.
 #include common/first_boot.dta
-(pads 2)
+(device p1)
+(device p2)
+(press start p1)
+{ui goto_screen multi_screen}
+(wait_screen multi_screen)
+(press start p2)
+(wait 0.5)
 {gamecfg set mode multi_coop}
 {game set_num_players 2}
 {game set_song shoutatthedevil}

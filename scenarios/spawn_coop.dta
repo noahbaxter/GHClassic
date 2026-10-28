@@ -1,0 +1,11 @@
+; Co-op song starts, the same song again and again: both guitarists stand on
+; their marks each time, neither at the origin a guitarist never placed
+; stands at.
+#include common/first_boot.dta
+#include common/spawn_coop_once.dta
+#include common/spawn_coop_once.dta
+#include common/spawn_coop_once.dta
+#include common/spawn_coop_once.dta
+#include common/spawn_coop_once.dta
+#include common/spawn_coop_once.dta
+(quit)

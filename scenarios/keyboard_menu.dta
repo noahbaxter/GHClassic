@@ -1,0 +1,25 @@
+; With a guitar as P1, the keyboard still moves menus as P1's: its arrows
+; and Enter. On Multiplayer's screen it joins nobody: it is never a seat's.
+#include common/first_boot.dta
+(device guitar)
+(press down guitar)
+(expect {seat_has 0 guitar} 1)
+(expect {main_screen focus_name} main_options.btn)
+(key Down)
+(expect {main_screen focus_name} quit.btn)
+(key Up)
+(expect {main_screen focus_name} main_options.btn)
+(expect {seat_has 1 keyboard} 0)
+(expect {seat_has 0 guitar} 1)
+{ui goto_screen multi_screen}
+(wait_screen multi_screen)
+(wait 1)
+(key Tab)
+(wait 0.3)
+(expect {seat_has 1 keyboard} 0)
+(expect {seat_has 0 guitar} 1)
+(expect {{ui current_screen} name} multi_screen)
+; Its Escape backs out, as P1's.
+(key Escape)
+(wait_screen main_screen 10)
+(quit)

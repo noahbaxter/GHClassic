@@ -34,7 +34,13 @@ namespace gh2
         script::patchUi(kSelCharacterDta);
         script::patchUi(kQuickplayDta);
         script::patchUi(kCampaignsDta);
+        // Before the pickers, whose character screen keeps its panel loaded.
+        script::patchUi(kPreshowGuitaristDta);
         script::patchUi(kQuickplayPickersDta);
+        script::patchUi(kQuickplaySetupDta);
+        // After the pickers, whose venue screen Face-Off's maps take.
+        script::patchUi(kMultiplayerDta);
+        script::patchUi(kInSongDta);
         locale::add("ghc_select_campaign", "select campaign");
         locale::add("campaign_gh1", "GUITAR HERO");
         locale::add("campaign_gh2", "GUITAR HERO II");
@@ -45,6 +51,11 @@ namespace gh2
         locale::add("ghc_map", "MAP");
         locale::add("ghc_hd", "HD");
         locale::add("ghc_sd", "SD");
+        // Face-Off's, each player's look in turn (ui/dta/multiplayer.dta).
+        locale::add("ghc_hd_hd", "HD / HD");
+        locale::add("ghc_hd_sd", "HD / SD");
+        locale::add("ghc_sd_hd", "SD / HD");
+        locale::add("ghc_sd_sd", "SD / SD");
         locale::add("setlist_gh1", "GH1");
         locale::add("setlist_gh2", "GH2");
         locale::add("setlist_gh2x", "GH2X");

@@ -1,0 +1,14 @@
+; The 80s on expert ends at its encore, Play With Me.
+(needs gh80s)
+{set $d1 down}
+{set $d2 down}
+{set $d3 down}
+{set $pick gh80s}
+{set $b1 electriceye}
+{set $b2 policetruck}
+{set $b3 seventeen}
+{set $b4 seventeen}
+{set $idx 3}
+{set $offer caughtinamosh}
+{set $final playwithme}
+#include common/finale_encore.dta

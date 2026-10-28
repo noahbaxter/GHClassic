@@ -259,7 +259,10 @@ namespace gh2::ark
             {
                 const auto changes = std::move(fix->second);
                 disc.fixes.erase(fix);
-                if (auto bytes = read(&own->second))
+                // A fix added once the file was read and changed goes on top
+                // of those changes.
+                const auto before = disc.fixed.find(name);
+                if (auto bytes = read(before != disc.fixed.end() ? &before->second : &own->second))
                 {
                     for (const auto &change : changes)
                         change(*bytes);
@@ -636,6 +639,8 @@ namespace gh2::ark
         }
         return std::nullopt;
     }
+
+    const std::string &serial(size_t disc) { return s_discs[disc].serial; }
 
     void front(std::optional<size_t> layer) { s_front = layer; }
 

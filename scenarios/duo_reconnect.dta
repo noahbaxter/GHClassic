@@ -1,0 +1,45 @@
+; Two players, P2's gamepad gone mid-song: no controller takes its seat,
+; P1's included, and the keyboard drives P2's pause, standing in for it in
+; P2's pad mode, so the song resumes as it was. P2's gamepad back is P2's
+; again.
+#include common/first_boot.dta
+(device guitar)
+(device pad)
+(press start guitar)
+{ui goto_screen multi_screen}
+(wait_screen multi_screen)
+(press start pad)
+(wait 0.5)
+(expect {seat_has 0 guitar} 1)
+(expect {seat_has 1 pad} 1)
+{gamecfg set mode multi_fo}
+{game set_num_players 2}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty easy}
+{{game get_player_config 1} set_difficulty easy}
+{{game get_player_config 0} set autoplay TRUE}
+{{game get_player_config 1} set autoplay TRUE}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 1)
+(expect {game get_controller 1} joypad_guitar)
+(unplug pad)
+(wait_screen multi_pause_controller_screen 10)
+(press start guitar)
+(wait 0.5)
+(expect {seat_has 1 guitar} 0)
+(key Down)
+(wait 0.5)
+(expect {seat_has 1 keyboard} 1)
+; P2's seat read again, GH2 puts Resume up.
+(expect {multi_pause_controller_panel focus_name} resume.btn)
+(key Return)
+(wait_screen game_screen 10)
+(wait 1)
+(expect {game get_controller 1} joypad_guitar)
+(device pad)
+(wait 1)
+(expect {seat_has 1 pad} 1)
+(expect {seat_has 0 guitar} 1)
+(expect {{ui current_screen} name} game_screen)
+(quit)

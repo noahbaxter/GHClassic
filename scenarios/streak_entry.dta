@@ -1,0 +1,16 @@
+; A song's start, its HUD sliding in: the score and rock meters come in at
+; their raised height, room for the streak counter under the score, not
+; below it and then up. For record.
+#include common/first_boot.dta
+{gamecfg set mode quickplay}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(record on hud_enter)
+(wait_until {>= {player0 gems_hit} 10} 60)
+(wait 2)
+(record off)
+(quit)

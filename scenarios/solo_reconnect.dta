@@ -1,0 +1,25 @@
+; P1's controller pulled out mid-song: GH2's own controller pause, which
+; holds until a controller is back in the seat, here the same one, and then
+; its green resumes, as X: a song's menus take a DualShock's.
+; Another device taking the seat is solo_reconnect_other.
+#include common/first_boot.dta
+(device pad)
+(device guitar)
+(press down pad)
+(expect {seat_has 0 pad} 1)
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty easy}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 1)
+(unplug pad)
+(wait_screen pause_controller_screen 10)
+(wait 1)
+(device pad)
+(wait 0.5)
+(expect {seat_has 0 pad} 1)
+(press green pad)
+(wait_screen game_screen 10)
+(quit)

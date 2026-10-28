@@ -1,0 +1,36 @@
+; Each guitarist's pre-show clips, picked by hand (hub/menu_guitarist.cpp),
+; by clip set as the clip page names them: sd_<set> for GH2's, also the 80s'
+; and HD, gh1_<set> for GH1's. The walk-on plays once as it appears, then the
+; idle, and every $ghc_preshow_idle_secs the loop's next clip, a flourish;
+; with no walk-on the loop's first starts it. A clip is any of the set's by
+; name; (fret <clip>) holds the fretting hand to the neck, (hold <clip>) both
+; hands to their grips; (idle <clip>) plays that as the idle over the set's
+; own. An empty loop only idles. A set not here (a custom character's own)
+; has default's, clips every set has that keep to the spot.
+; Picked from clips that end near where they start: one that walks off is
+; slid back to its mark, which shows as skating.
+(default (walk_on intro_02) (loop stand_medium_04))
+(sd_punk1 (walk_on intro_03) (loop extreme_fast_02))
+(sd_alterna (walk_on intro_03) (loop extreme_fast_07))
+(sd_classic (walk_on win_04) (loop extreme_medium_02))
+; intro_03: an arm goes through him.
+(sd_deathmetal1 (walk_on intro_03) (loop intro_01))
+; win_02 walks 25 off its mark: slid back, it skates.
+(sd_funk1 (walk_on win_idle_1) (loop win_02))
+; win_01 walks 10 off its mark: slid back, it may skate.
+(sd_glam1 (walk_on intro_03) (loop win_01))
+; Or walk_on extreme_fast_02.
+(sd_goth1 (walk_on win_03) (loop win_idle_1))
+(sd_grim (walk_on win_01) (loop win_idle_1))
+(sd_metal1 (walk_on win_01) (loop win_02))
+(sd_rock1 (walk_on intro_03) (loop (fret win_idle_1)))
+(sd_rockabill (walk_on intro_03) (loop win_idle_1))
+(gh1_punk1 (walk_on win_02) (loop extreme_fast_02))
+(gh1_alterna (walk_on win_01) (loop extreme_fast_01))
+(gh1_classic (walk_on extreme_fast_04) (loop extreme_fast_02))
+(gh1_funk1 (walk_on win_02) (loop win_01))
+; extreme_medium_02: maybe a bit much.
+(gh1_glam1 (walk_on intro_03) (loop extreme_medium_02))
+(gh1_goth1 (walk_on win_01) (loop extreme_fast_06))
+(gh1_grim (walk_on intro_01) (loop win_01))
+(gh1_metal1 (walk_on win_01) (loop extreme_medium_03))

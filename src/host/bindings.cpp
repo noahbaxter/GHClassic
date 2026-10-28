@@ -49,6 +49,10 @@ namespace gh2::input
             return buf;
         }
 
+        const char *const kAccelAxes[] = {"x", "y", "z"};
+
+        constexpr const char *kSeatsSection = "seats";
+
         // SDL names the comma key ",", which the list would split on.
         constexpr const char *kCommaName = "comma";
 
@@ -137,6 +141,20 @@ namespace gh2::input
                     return std::nullopt;
                 return s;
             }
+            if (name == "accel")
+            {
+                std::string axis;
+                if (!(in >> axis))
+                    return std::nullopt;
+                s.kind = Source::kPadAccel;
+                s.index = -1;
+                for (int i = 0; i < 3; ++i)
+                    if (axis == kAccelAxes[i])
+                        s.index = i;
+                if (s.index < 0 || !parseAxisRange(in, s))
+                    return std::nullopt;
+                return s;
+            }
             s.kind = Source::kPadButton;
             s.index = SDL_GetGamepadButtonFromString(name.c_str());
             if (s.index == SDL_GAMEPAD_BUTTON_INVALID)
@@ -167,6 +185,9 @@ namespace gh2::input
         case Source::kPadAxis:
             return std::string("pad axis ") + SDL_GetGamepadStringForAxis(static_cast<SDL_GamepadAxis>(s.index)) +
                    " " + formatFloat(s.rest) + " " + formatFloat(s.full);
+        case Source::kPadAccel:
+            return std::string("pad accel ") + kAccelAxes[s.index] + " " + formatFloat(s.rest) + " " +
+                   formatFloat(s.full);
         }
         return "";
     }
@@ -176,9 +197,30 @@ namespace gh2::input
         return "keyboard";
     }
 
+    std::string deviceSection(const std::string &name, const std::string &guid)
+    {
+        return deviceSection(name) + " " + guid;
+    }
+
     std::string deviceSection(const std::string &name)
     {
         return "device \"" + name + "\"";
+    }
+
+    std::string joystickGuid(SDL_Joystick *joystick)
+    {
+        char guid[33];
+        SDL_GUIDToString(SDL_GetJoystickGUID(joystick), guid, sizeof guid);
+        return guid;
+    }
+
+    const std::map<Action, std::vector<Source>> *deviceBindings(const BindingFile &file, const std::string &name,
+                                                                 const std::string &guid)
+    {
+        for (const std::string &section : {deviceSection(name, guid), deviceSection(name)})
+            if (const auto found = file.sections.find(section); found != file.sections.end())
+                return &found->second;
+        return nullptr;
     }
 
     BindingFile loadBindingFile(const std::string &path)
@@ -198,10 +240,26 @@ namespace gh2::input
             if (const auto name = ini::sectionName(text))
             {
                 section = *name;
-                file.sections[section];
+                if (section != kSeatsSection)
+                    file.sections[section];
                 continue;
             }
             const size_t eq = text.find('=');
+            if (section == kSeatsSection && eq != std::string::npos)
+            {
+                file.seats[trim(text.substr(0, eq))] = trim(text.substr(eq + 1));
+                continue;
+            }
+            if (!section.empty() && eq != std::string::npos && trim(text.substr(0, eq)) == "mode")
+            {
+                const std::string mode = trim(text.substr(eq + 1));
+                if (mode == "pad" || mode == "guitar")
+                    file.modes[section] = mode;
+                else
+                    std::cerr << "[input] " << path << ":" << number << ": mode is pad or guitar, line skipped"
+                              << std::endl;
+                continue;
+            }
             const auto action = eq == std::string::npos ? std::nullopt : actionFromKey(trim(text.substr(0, eq)));
             if (section.empty() || !action)
             {
@@ -229,12 +287,13 @@ namespace gh2::input
         return file;
     }
 
-    bool writeSection(const std::string &path, const std::string &section,
-                      const std::map<Action, std::vector<Source>> &bindings)
+    namespace
     {
-        // Every line outside the section is kept as it was, comments included.
-        std::vector<std::string> kept;
+        // Every line outside `section` as it was, comments included, with
+        // no blank lines at the end.
+        std::vector<std::string> linesWithout(const std::string &path, const std::string &section)
         {
+            std::vector<std::string> kept;
             std::ifstream in(path);
             std::string line;
             bool inside = false;
@@ -249,16 +308,24 @@ namespace gh2::input
                 if (!inside)
                     kept.push_back(line);
             }
+            while (!kept.empty() && trim(kept.back()).empty())
+                kept.pop_back();
+            return kept;
         }
-        while (!kept.empty() && trim(kept.back()).empty())
-            kept.pop_back();
+    }
 
+    bool writeSection(const std::string &path, const std::string &section,
+                      const std::map<Action, std::vector<Source>> &bindings, const std::string &mode)
+    {
+        const std::vector<std::string> kept = linesWithout(path, section);
         return !ini::writeReplacing(path, [&](std::ofstream &out) {
             for (const std::string &line : kept)
                 out << line << "\n";
             if (!kept.empty())
                 out << "\n";
             out << "[" << section << "]\n";
+            if (!mode.empty())
+                out << "mode = " << mode << "\n";
             for (const auto &[action, sources] : bindings)
             {
                 out << actionKey(action) << " =";
@@ -269,16 +336,24 @@ namespace gh2::input
         });
     }
 
-    bool writeTemplate(const std::string &path, const std::string &section, const Profile &profile)
+    bool writeSeats(const std::string &path, const std::map<std::string, std::string> &seats)
     {
-        std::vector<std::string> kept;
-        {
-            std::ifstream in(path);
-            for (std::string line; std::getline(in, line);)
-                kept.push_back(line);
-        }
-        while (!kept.empty() && trim(kept.back()).empty())
-            kept.pop_back();
+        const std::vector<std::string> kept = linesWithout(path, kSeatsSection);
+        return !ini::writeReplacing(path, [&](std::ofstream &out) {
+            for (const std::string &line : kept)
+                out << line << "\n";
+            if (!kept.empty())
+                out << "\n";
+            out << "[" << kSeatsSection << "]\n";
+            for (const auto &[seat, device] : seats)
+                out << seat << " = " << device << "\n";
+        });
+    }
+
+    bool writeTemplate(const std::string &path, const std::string &section, const Profile &profile,
+                       const std::string &mode)
+    {
+        std::vector<std::string> kept = linesWithout(path, section);
 
         return !ini::writeReplacing(path, [&](std::ofstream &out) {
             if (kept.empty())
@@ -292,11 +367,16 @@ namespace gh2::input
                        ";   axis 2 -0.11 0.70      a controller axis, from its rest value to its full one\n"
                        ";   pad a                  a gamepad button (a, b, x, y, back, start, leftshoulder, dpup...)\n"
                        ";   pad axis righty 0 -1   a gamepad axis (leftx ... righttrigger), rest then full\n"
+                       ";   pad accel x 0 12       a gamepad's accelerometer (x, y or z), rest then full\n"
                        ";\n"
-                       "; An action takes several controls, comma separated, and none unbinds it.\n";
+                       "; An action takes several controls, comma separated, and none unbinds it.\n"
+                       "; A controller's mode = pad or mode = guitar sets how it plays, if it\n"
+                       "; was taken for the other.\n";
             for (const std::string &line : kept)
                 out << line << "\n";
             out << "\n[" << section << "]\n";
+            if (!mode.empty())
+                out << "mode = " << mode << "\n";
             for (int a = 0; a < kActionCount; ++a)
             {
                 out << "; " << kActions[a].name << " =";

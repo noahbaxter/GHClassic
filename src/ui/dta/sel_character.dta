@@ -5,6 +5,51 @@
 ; button each, up to four: outfit3 and outfit4 are outfit2 cloned on entry,
 ; and all are stepped down by outfit1 to outfit2's spacing, four starting a
 ; step higher.
+;
+; Face-Off and Pro Face-Off's outfits are quickplay's (multiplayer.dta).
+{func ghc_free_mode {find_elem (quickplay multi_vs multi_fo) {gamecfg get mode}}}
+; A character's outfits that are unlocked, in config's order, into $into.
+{func ghc_find_outfits ($into $character)
+   {resize $into 0}
+   {do
+      ($entry {find $syscfg characters $character})
+      {foreach_int $i 1 {size $entry}
+         {do
+            ($outfit {elem {elem $entry $i} 0})
+            {if {&& {campaign is_unlocked $outfit} {ghc_may_wear {elem $entry $i}}}
+               {push_back $into $outfit}
+            }
+         }
+      }
+   }
+}
+; Another game's outfit ((extra <game> <its name there>), content/outfits.h)
+; is no part of a career, which is its own game's alone. In the other modes
+; it is there once its own game's career has it, or with all access.
+; Config's own outfit in quickplay's modes is GH2's, whose unlock answers
+; for any game's item of that name, so GH1's grim would open GH2's: GH2's
+; career alone does.
+{func ghc_may_wear ($entry)
+   {if_else {find_exists $entry extra}
+      {&& {!= {gamecfg get mode} career}
+         {|| {campaign all_access}
+            {campaigns owns {elem {find $entry extra} 1} {elem {find $entry extra} 2}}}}
+      {|| {! {ghc_free_mode}}
+         {campaign all_access}
+         {campaigns owns gh2 {elem $entry 0}}}
+   }
+}
+; An outfit's (name "...") in config, else its locale token, as the game's
+; own outfits have.
+{func ghc_label_outfit ($btn $character $outfit)
+   {do
+      ($entry {find $syscfg characters $character $outfit})
+      {if_else {find_exists $entry name}
+         {$btn set_localized_text {elem {find $entry name} 1}}
+         {$btn set_text {sprint $outfit _outfit}}
+      }
+   }
+}
 {retype sel_character_panel
    (
       ; From the ARK root: a path resolves against the file its array came
@@ -23,12 +68,26 @@
       (outfit_lift 0)  ; the list's start above outfit1's place: half a step for four
       (outfit_space 0) ; between buttons: a step, closer for four
       (blurb_z 0)      ; sc_char_outfit_blurb.lbl's own z, under two buttons
+      (hub FALSE)      ; showing quickplay's hub (quickplay_setup.dta)
       (enter
          {$this add_outfit_buttons}
          {character.lst set_provider character_provider}
-         {animate_forever_30fps $this sel_character.view}
-         {sel_skin.tnm set_frame 0}
+         ; As animate_forever_30fps (a week's frames at 30 a second), but in
+         ; quickplay from frame 10: the back room's slide in through the
+         ; door (cs_posters.tnm, frames 0 to 10) already done. The hub fades
+         ; in on a still room.
+         {if_else {== {gamecfg get mode} quickplay}
+            {sel_character.view animate (range 10 18144000) (period 604799.667) (units kTaskUISeconds)}
+            {animate_forever_30fps $this sel_character.view}
+         }
          {char_highlight.mnm animate (loop 0 3) (period 0.25) (units kTaskUISeconds)}
+         {$this pick}
+      )
+      ; The picker as it opens, on the game's character. Also from the
+      ; screen's enter where another screen had this panel up already, which
+      ; enters it no more (UIScreen::Enter, 0x212f40): quickplay's hub.
+      (pick
+         {sel_skin.tnm set_frame 0}
          {set [skin_select] FALSE}
          {$this set_focus character.lst}
          {text_character.grp set_showing TRUE}
@@ -36,8 +95,13 @@
          {do
             ($character {game get_character})
             ($outfit {game get_character_outfit})
-            {char_single show_char 0 $outfit}
-            {char_single char_event 0 animate}
+            ; Not on quickplay's hub, whose guitarist is its own.
+            {if {!= {{ui current_screen} name} ghc_qp_setup_screen}
+               {char_single show_char 0 $outfit}
+               ; Through the door, or from the hub, whose doorway it is,
+               ; already standing there.
+               {char_single char_event 0 {if_else $ghc_qp_same_scene store animate}}
+            }
             ; The name and blurb its outfit's game's.
             {campaigns text_outfit $outfit}
             {sc_char_nm.lbl set_text $character}
@@ -50,6 +114,8 @@
             {$this show_portraits}
             {$this light_portraits}
          }
+         ; Quickplay's hub is this scene too (quickplay_setup.dta).
+         {if {== {gamecfg get mode} quickplay} {ghc_qp_hub_enter $this}}
       )
       ; Config's characters, which in quickplay are GH2's whatever the menus.
       ; Each shows its shown_outfit's own portrait where the scene has one:
@@ -134,8 +200,18 @@
             }
          }
       )
-      (poll {scl_loading.lbl set_showing {! {char_single are_chars_loaded}}})
-      (exit {set [skin_select] FALSE})
+      (poll
+         {if_else [hub]
+            {ghc_qp_hub_poll $this}
+            {scl_loading.lbl set_showing
+               {|| {! {char_single are_chars_loaded}}
+                  {&& {== {gamecfg get mode} quickplay} {!= $ghc_qp_view $ghc_qp_view_goal}}
+               }
+            }
+         }
+         {if {== {gamecfg get mode} quickplay} {ghc_qp_view_poll $this}}
+      )
+      (exit {set [skin_select] FALSE} {set [hub] FALSE})
       (add_outfit_buttons
          {if {! {exists outfit3.btn}}
             {do
@@ -173,49 +249,9 @@
       )
       ; char_focus's outfits that are unlocked, in config's order, into
       ; outfits' own array (the game has no new_array).
-      (find_outfits
-         {resize [outfits] 0}
-         {do
-            ($entry {find $syscfg characters [char_focus]})
-            {foreach_int $i 1 {size $entry}
-               {do
-                  ($outfit {elem {elem $entry $i} 0})
-                  {if {&& {campaign is_unlocked $outfit} {$this may_wear {elem $entry $i}}}
-                     {push_back [outfits] $outfit}
-                  }
-               }
-            }
-         }
-      )
-      ; Another game's outfit ((extra <game> <its name there>),
-      ; content/outfits.h) is no part of a career, which is its own game's
-      ; alone. In the other modes it is there once its own game's career
-      ; has it, or with all access. Config's own outfit outside a career is
-      ; GH2's, whose unlock answers for any game's item of that name, so
-      ; GH1's grim would open GH2's: GH2's career alone does.
-      (may_wear
-         ($entry)
-         {if_else {find_exists $entry extra}
-            {&& {!= {gamecfg get mode} career}
-               {|| {campaign all_access}
-                  {campaigns owns {elem {find $entry extra} 1} {elem {find $entry extra} 2}}}}
-            {|| {!= {gamecfg get mode} quickplay}
-               {campaign all_access}
-               {campaigns owns gh2 {elem $entry 0}}}
-         }
-      )
-      ; An outfit's (name "...") in config, else its locale token, as the
-      ; game's own outfits have.
-      (label_outfit_button
-         ($btn $outfit)
-         {do
-            ($entry {find $syscfg characters [char_focus] $outfit})
-            {if_else {find_exists $entry name}
-               {$btn set_localized_text {elem {find $entry name} 1}}
-               {$btn set_text {sprint $outfit _outfit}}
-            }
-         }
-      )
+      (find_outfits {ghc_find_outfits [outfits] [char_focus]})
+      (may_wear ($entry) {ghc_may_wear $entry})
+      (label_outfit_button ($btn $outfit) {ghc_label_outfit $btn [char_focus] $outfit})
       (choose_skins
          {$this find_outfits}
          {set [skin_select] TRUE}
@@ -305,6 +341,11 @@
          }
       )
       (FOCUS_MSG
+         ; Only onto a row: not a reloaded scene's own focus, taken back
+         ; before the hub's rows are made again.
+         {if {&& [hub] {exists ghc_play.btn} {find_exists $ghc_qp_rows {symbol {$new_focus name}}}}
+            {set $ghc_qp_row {symbol {$new_focus name}}}
+            {ghc_qp_point {$new_focus name}}}
          {if [skin_select]
             {do
                ($idx -1)
@@ -365,6 +406,15 @@
 ; that the picker opens for a character with more than one outfit it would
 ; list (find_outfits), where the game's counts config's: another game's
 ; outfit is no part of a career, and a locked one is not listed.
+; Quickplay's keeps the outfit picked for its songs to come
+; (quickplay_setup.dta).
+{func ghc_sel_character_done ($screen)
+   {if {== {$screen name} ghc_qp_character_screen}
+      {quickplay pick outfit {game get_character_outfit}}
+      {set $ghc_qp_same_scene TRUE}
+   }
+   {ui goto_screen {$screen get done_screen}}
+}
 {func ghc_sel_character
    ($screen)
    {if_else {sel_character_panel get skin_select}
@@ -373,7 +423,7 @@
          {if {&& $sel_outfit {!= {game get_character_outfit} $sel_outfit}}
             {game set_character $sel_outfit}
          }
-         {ui goto_screen {$screen get done_screen}}
+         {ghc_sel_character_done $screen}
       }
       {do
          {sel_character_panel find_outfits}
@@ -385,7 +435,7 @@
                   {sel_character_panel set char_outfit {elem {sel_character_panel get outfits} 0}}
                }
                {game set_character {sel_character_panel get char_outfit} TRUE}
-               {ui goto_screen {$screen get done_screen}}
+               {ghc_sel_character_done $screen}
             }
          }
       }

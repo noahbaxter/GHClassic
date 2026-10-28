@@ -1,0 +1,20 @@
+; The animation sandbox (tools/ghc.py sandbox). The game runs this file each
+; time it is saved: edit, save, watch the hub. Its terminal prints each clip
+; as it starts ([script] sandbox <clip>).
+;
+; Outfits: punk1 alterna1 glam1 goth1 metal1 rockabill1 rock1 deathmetal1
+; classic funk1 grim; the 80s' punk3 alterna3 metal3 glam3 goth3 grim2; GH1's
+; punkgh1 alternagh1 glamgh1 gothgh1 metalgh1 classicgh1 funk1gh1 grimgh1.
+;
+; Clips: any of the song set's by name (intro_02, stand_fast_01,
+; extreme_medium_03, win_01, ...), shown as the pre-show would (back on its
+; mark when it hands over); idle for the pre-show's idle; preshow_pick_1..
+; for its picks (preshow_picks.dta). A clip the set lacks is skipped and
+; named.
+
+{sandbox_outfit glam1}
+{sandbox_idle_secs 4}
+{sandbox_loop (intro_03 idle stand_fast_01 idle stand_medium_04 idle)}
+
+; {sandbox_characters hd}       HD models (sd back)
+; {sandbox_auto}                the pre-show's own loop again

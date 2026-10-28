@@ -1,0 +1,15 @@
+; The 80s on easy has no encore: it ends at fest's fourth song.
+(needs gh80s)
+{set $pick gh80s}
+{set $d1 none}
+{set $d2 none}
+{set $d3 none}
+{set $v1 down}
+{set $finale_venue fest}
+{set $b1 aintnothinbut}
+{set $b2 lonelyisthenight}
+{set $b3 bathroomwall}
+{set $b4 bathroomwall}
+{set $idx 3}
+{set $play losangeles}
+#include common/finale_direct.dta

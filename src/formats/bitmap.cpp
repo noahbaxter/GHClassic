@@ -51,4 +51,13 @@ namespace gh2::bitmap
     {
         return header.bpp <= 8u && (header.encoding & 0x38u) == 0u ? size_t{4u} << header.bpp : 0u;
     }
+
+    size_t paletteSlot(size_t index, uint8_t bpp)
+    {
+        if (bpp == 8u && (index & 0x18u) == 0x08u)
+            return index + 8u;
+        if (bpp == 8u && (index & 0x18u) == 0x10u)
+            return index - 8u;
+        return index;
+    }
 }

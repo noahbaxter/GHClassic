@@ -1,22 +1,15 @@
-// The campaign picker's poster and cases (content/campaign_case.h).
-//
-// Each Mesh is GH2's Mesh 28 as its loader reads it (RndMesh::Load,
-// 0x3d5420): the speed poster's own up to its Mat's name, which keeps its
-// Object, Trans and Draw, then the case's Mat, its own name as the
-// geometry's owner, the poster's mutable and volume words and no BSP, the
-// verts (position, normal, colour, uv), the faces, their groups of up to 255
-// and no bones, then their PS2 strips (milo::strips).
+// The campaign picker's poster and cases (content/campaign_case.h), each
+// Mesh made from the speed poster's (hub/poster_meshes.h).
 
 #include "content/campaign_case.h"
 
 #include "campaign_pack.h"
 #include "content/games.h"
 #include "disc/ark.h"
-#include "gh1/scene.h"
+#include "hub/poster_meshes.h"
 #include "milo/milo.h"
 #include "render/texture_store.h"
 
-#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstring>
@@ -31,22 +24,16 @@ namespace gh2::campaign_case
     namespace
     {
         using milo::Bytes;
+        using poster_meshes::Mesh;
+        using milo::body;
+        using poster_meshes::meshBody;
 
         constexpr const char *kScene = "ui/gen/sel_speed.milo_ps2";
         constexpr const char *kPoster = "speed_poster";
-        // The guest's stand-in for a picture the host draws: its size only
-        // counts in the guest's memory.
-        constexpr uint32_t kStandIn = 64u;
         // The plastic's light, toward it in the case's own axes, of length
         // 1: mostly from the opening side, so that edge's flat face is
         // bright and its grip and seam, curved away, fall dark.
-        constexpr float kLight[3] = {0.8f, -0.48f, 0.36f};
-
-        struct Mesh
-        {
-            std::vector<float> verts; // 8 a vert: position, normal, uv
-            std::vector<uint16_t> faces;
-        };
+        constexpr std::array kLight = {0.8f, -0.48f, 0.36f};
 
         struct Pack
         {
@@ -107,88 +94,12 @@ namespace gh2::campaign_case
             return pack;
         }
 
-        void putF32(Bytes &out, float v)
-        {
-            uint32_t u = 0u;
-            std::memcpy(&u, &v, 4u);
-            milo::putU32(out, u);
-        }
-
-        // Where a body holds `name` as a string, its length word's offset.
-        std::optional<size_t> stringAt(const Bytes &body, const std::string &name)
-        {
-            for (size_t o = 0u; o + 4u + name.size() <= body.size(); ++o)
-                if (milo::u32(body, o) == name.size() && std::memcmp(body.data() + o + 4u, name.data(), name.size()) == 0)
-                    return o;
-            return std::nullopt;
-        }
-
-        // A mesh's body made from the poster's (`poster`), lit by kLight or,
-        // flat, not at all.
-        std::optional<Bytes> meshBody(const Bytes &poster, const Mesh &mesh, const std::string &name,
-                                      const std::string &mat, bool lit = true,
-                                      const std::array<float, 3> &tint = {1.0f, 1.0f, 1.0f})
-        {
-            const auto at = stringAt(poster, std::string(kPoster) + ".mat");
-            if (!at || *at < 20u)
-                return std::nullopt;
-            size_t o = *at;
-            milo::str(poster, o); // the poster's Mat
-            milo::str(poster, o); // its geometry's owner
-            const size_t words = o;
-            Bytes out(poster.begin(), poster.begin() + static_cast<std::ptrdiff_t>(*at));
-            milo::putStr(out, mat);
-            milo::putStr(out, name);
-            out.insert(out.end(), poster.begin() + static_cast<std::ptrdiff_t>(words),
-                       poster.begin() + static_cast<std::ptrdiff_t>(words + 8u));
-            out.push_back(0u); // no BSP tree
-            const uint32_t verts = static_cast<uint32_t>(mesh.verts.size() / 8u);
-            milo::putU32(out, verts);
-            for (uint32_t v = 0u; v < verts; ++v)
-            {
-                const float *f = mesh.verts.data() + v * 8u;
-                for (int i = 0; i < 6; ++i)
-                    putF32(out, f[i]);
-                // No light reaches a menu: a light baked in, from above and
-                // to the right of the front, and as much from the back, so
-                // the plastic's edges and the grip on the opening side read
-                // as the case turns.
-                const float toward = std::fabs(kLight[0] * f[3] + kLight[1] * f[4] + kLight[2] * f[5]);
-                const float shade = lit ? 0.15f + 0.85f * toward : 1.0f;
-                for (int i = 0; i < 3; ++i)
-                    putF32(out, shade * tint[i]);
-                putF32(out, 1.0f);
-                putF32(out, f[6]);
-                putF32(out, f[7]);
-            }
-            const uint32_t faces = static_cast<uint32_t>(mesh.faces.size() / 3u);
-            const auto *faceBytes = reinterpret_cast<const uint8_t *>(mesh.faces.data());
-            milo::putU32(out, faces);
-            out.insert(out.end(), faceBytes, faceBytes + 6u * faces);
-            std::vector<uint32_t> groups;
-            for (uint32_t left = faces; left > 0u; left -= std::min(left, 255u))
-                groups.push_back(std::min(left, 255u));
-            milo::putU32(out, static_cast<uint32_t>(groups.size()));
-            for (const uint32_t g : groups)
-                out.push_back(static_cast<uint8_t>(g));
-            milo::putStr(out, ""); // no bones
-            const Bytes strips = milo::strips(faceBytes, groups);
-            out.insert(out.end(), strips.begin(), strips.end());
-            return out;
-        }
-
         // A game's front cover alone, flat, the case's size: the wrap's
         // right part from where the front starts (x 1700 of a 3225 scan,
         // the spine before it).
         Mesh cover()
         {
-            constexpr float kFront = 1700.0f / 3225.0f;
-            constexpr float kW = 1.195f, kH = 1.69f;
-            Mesh quad;
-            quad.verts = {-kW, 0, -kH, 0, -1, 0, kFront, 1, kW, 0, -kH, 0, -1, 0, 1, 1,
-                          kW,  0, kH,  0, -1, 0, 1,      0, -kW, 0, kH, 0, -1, 0, kFront, 0};
-            quad.faces = {0, 1, 2, 0, 2, 3};
-            return quad;
+            return poster_meshes::quad(1.195f, 1.69f, 1700.0f / 3225.0f, 1.0f);
         }
 
         // A flat ring, 1 across its outside, facing front.
@@ -208,17 +119,10 @@ namespace gh2::campaign_case
             return ring;
         }
 
-        Bytes *body(milo::Dir &dir, const std::string &cls, const std::string &name)
-        {
-            const auto it = std::find(dir.entries.begin(), dir.entries.end(), std::make_pair(cls, name));
-            return it == dir.entries.end() ? nullptr : &dir.bodies[static_cast<size_t>(it - dir.entries.begin())];
-        }
-
-        // A Tex like `from` whose bitmap names that picture.
+        // A Tex like `from` whose bitmap names that bundled picture.
         Bytes texOf(const Bytes &from, const std::string &picture)
         {
-            const uint32_t id = textures::add({textures::kBundled, picture, ""});
-            return gh1::texWith(from, textures::standIn(id, kStandIn, kStandIn), true);
+            return poster_meshes::texOf(from, {textures::kBundled, picture, ""});
         }
 
         bool addCases(milo::Dir &dir, const Pack &pack)
@@ -250,16 +154,16 @@ namespace gh2::campaign_case
                 milo::replaceStr(sleeve, std::string(kPoster) + ".tex", texName);
                 milo::replaceStr(shell, std::string(kPoster) + ".tex", "");
                 // The sleeve is printed card: its own colours, unlit.
-                const auto sleeveMesh =
-                    meshBody(mesh, pack.sleeve, "ghc_case_" + game + "_sleeve.mesh", sleeveMat, false);
+                const std::string posterMat = std::string(kPoster) + ".mat";
+                const auto sleeveMesh = meshBody(mesh, posterMat, pack.sleeve, "ghc_case_" + game + "_sleeve.mesh", sleeveMat);
                 // The plastic's colour is in its verts too, the 360's green,
                 // a PS2's black: its Mat is prelit (campaigns.dta), which
                 // draws the vertex colour alone.
                 const std::array<float, 3> plastic =
                     game == "gh2x" ? std::array{0.3f, 0.75f, 0.2f} : std::array{0.32f, 0.32f, 0.35f};
                 const auto shellMesh =
-                    meshBody(mesh, pack.shell, "ghc_case_" + game + "_shell.mesh", shellMat, true, plastic);
-                const auto coverMesh = meshBody(mesh, cover(), "ghc_cover_" + game + ".mesh", sleeveMat, false);
+                    meshBody(mesh, posterMat, pack.shell, "ghc_case_" + game + "_shell.mesh", shellMat, &kLight, plastic);
+                const auto coverMesh = meshBody(mesh, posterMat, cover(), "ghc_cover_" + game + ".mesh", sleeveMat);
                 if (!sleeveMesh || !shellMesh || !coverMesh)
                     return false;
                 milo::add(dir, "Tex", texName, texOf(tex, "campaign/" + game));
@@ -283,7 +187,8 @@ namespace gh2::campaign_case
             // the engine's numeral over it in the title's own font.
             Bytes ringMat = mat;
             milo::replaceStr(ringMat, std::string(kPoster) + ".tex", "");
-            const auto ringMesh = meshBody(mesh, ring(), "ghc_engine.mesh", "ghc_engine.mat", false, {0.56f, 0.66f, 0.76f});
+            const auto ringMesh = meshBody(mesh, std::string(kPoster) + ".mat", ring(), "ghc_engine.mesh", "ghc_engine.mat",
+                                           nullptr, {0.56f, 0.66f, 0.76f});
             if (!ringMesh)
                 return false;
             milo::add(dir, "Mat", "ghc_engine.mat", std::move(ringMat));

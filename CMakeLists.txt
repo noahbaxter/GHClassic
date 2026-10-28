@@ -90,7 +90,7 @@ set(GLSLANG_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
 # SYSTEM: their headers' warnings are not ours to fix.
 FetchContent_Declare(SDL3
     GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-    GIT_TAG release-3.4.16
+    GIT_TAG release-3.4.18
     GIT_SHALLOW TRUE
     SYSTEM)
 FetchContent_Declare(VulkanHeaders
@@ -144,6 +144,13 @@ target_include_directories(mpeg2 SYSTEM PUBLIC "${libmpeg2_SOURCE_DIR}/include")
 target_include_directories(mpeg2 PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/libmpeg2")
 set_target_properties(mpeg2 PROPERTIES C_STANDARD 99)
 
+# stb_truetype, the venue posters' lettering (hub/venue_posters.cpp).
+# Public domain, headers only.
+FetchContent_Declare(stb
+    GIT_REPOSITORY https://github.com/nothings/stb.git
+    GIT_TAG 2c980bb59875b0d32144a71867fbdebb2f77cd20)
+FetchContent_MakeAvailable(stb)
+
 # The save code's round trips, which need no disc and no game.
 add_executable(save_test EXCLUDE_FROM_ALL
     tests/save_test.cpp
@@ -158,6 +165,17 @@ target_link_libraries(save_test PRIVATE miniz)
 # Which release the game offers as an update.
 add_executable(releases_test EXCLUDE_FROM_ALL tests/releases_test.cpp src/host/releases.cpp)
 target_include_directories(releases_test PRIVATE src)
+
+# Which layout each controller gets, and input.ini's sections.
+add_executable(input_test EXCLUDE_FROM_ALL tests/input_test.cpp src/host/bindings.cpp src/host/capture.cpp
+                                          src/host/profiles.cpp)
+target_include_directories(input_test PRIVATE src)
+target_link_libraries(input_test PRIVATE SDL3::SDL3)
+
+# Who sits where as devices press.
+add_executable(seats_test EXCLUDE_FROM_ALL tests/seats_test.cpp src/host/seats.cpp)
+target_include_directories(seats_test PRIVATE src)
+target_link_libraries(seats_test PRIVATE SDL3::SDL3)
 
 # Ogg Vorbis for 360 GH2's .mogg audio: libogg and libvorbis (BSD-3-Clause),
 # the decoder and vorbisfile only. Their own CMake wants an older CMake and
@@ -241,6 +259,7 @@ set(GHC_GAME_SOURCES
     src/disc/ark.cpp
     src/disc/crypt.cpp
     src/disc/disc.cpp
+    src/disc/made_cache.cpp
     src/disc/sha1.cpp
     src/disc/volume.cpp
     src/formats/bitmap.cpp
@@ -254,6 +273,7 @@ set(GHC_GAME_SOURCES
     src/gameplay/note_engine/gh1_watcher.cpp
     src/gameplay/note_engine/note_engine.cpp
     src/gameplay/note_speed.cpp
+    src/gameplay/retrack.cpp
     src/gameplay/strum_limit.cpp
     src/gameplay/sustain_release.cpp
     src/gameplay/track_start.cpp
@@ -292,6 +312,11 @@ set(GHC_GAME_SOURCES
     src/gh2x/textures.cpp
     src/gh2x/track.cpp
     src/gh80s/install.cpp
+    src/hub/hub_scene.cpp
+    src/hub/menu_guitarist.cpp
+    src/hub/picture.cpp
+    src/hub/poster_meshes.cpp
+    src/hub/venue_posters.cpp
     src/milo/milo.cpp
     src/milo/objects.cpp
     src/movie/movie.cpp
@@ -318,21 +343,33 @@ set(GHC_GAME_SOURCES
     src/ui/fast_boot.cpp
     src/ui/locale.cpp
     src/ui/help_bar.cpp
+    src/ui/players.cpp
+    src/ui/controllers.cpp
     src/ui/classic_scene.cpp
     src/ui/menus.cpp
     src/ui/meta_music.cpp
     src/ui/photo_mode.cpp
     src/ui/slider_scale.cpp
+    src/ui/song_crown.cpp
+    src/ui/song_progress.cpp
     src/ui/zebra_wall.cpp
     src/host/audio.cpp
     src/host/bind.cpp
     src/host/bindings.cpp
+    src/host/capture.cpp
+    src/host/device.cpp
+    src/host/device_screen.cpp
     src/host/input.cpp
+    src/host/layouts.cpp
+    src/host/owner.cpp
     src/host/pad.cpp
     src/host/perf.cpp
     src/host/profiles.cpp
     src/host/record.cpp
     src/host/releases.cpp
+    src/host/scripted_devices.cpp
+    src/host/sdl_devices.cpp
+    src/host/seats.cpp
     src/host/update.cpp
     src/host/vulkan_frontend.cpp
     src/host/vma.cpp
@@ -412,19 +449,29 @@ file(READ src/ui/dta/campaigns.dta GHC_CAMPAIGNS_DTA)
 file(READ src/gh1/menus.dta GHC_GH1_MENUS_DTA)
 file(READ src/gh1/scripts.dta GHC_GH1_SCRIPTS_DTA)
 file(READ src/content/guitar_copy.dta GHC_GUITAR_COPY_DTA)
+file(READ src/hub/preshow_picks.dta GHC_PRESHOW_PICKS_DTA)
 file(READ src/ui/dta/picker.dta GHC_PICKER_DTA)
 file(READ src/ui/dta/quickplay_pickers.dta GHC_QUICKPLAY_PICKERS_DTA)
+file(READ src/ui/dta/quickplay_setup.dta GHC_QUICKPLAY_SETUP_DTA)
+file(READ src/ui/dta/multiplayer.dta GHC_MULTIPLAYER_DTA)
+file(READ src/ui/dta/preshow_guitarist.dta GHC_PRESHOW_GUITARIST_DTA)
+file(READ src/ui/dta/in_song.dta GHC_IN_SONG_DTA)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     src/ui/dta/lag_panel.dta src/ui/dta/highscore_panel.dta src/ui/dta/main_menu.dta src/ui/dta/fast_boot.dta
     src/ui/dta/locale.dta src/ui/dta/crowd.dta src/ui/dta/sel_character.dta src/ui/dta/quickplay.dta
     src/ui/dta/campaigns.dta src/gh1/menus.dta src/gh1/scripts.dta src/ui/dta/picker.dta src/ui/dta/quickplay_pickers.dta
-    src/content/guitar_copy.dta src/ui/dta/game_settings.dta src/ui/dta/photo_mode.dta src/ui/dta/box.dta
-    src/ui/dta/note_streak.dta src/ui/dta/streak_counter.dta)
+    src/ui/dta/quickplay_setup.dta src/ui/dta/multiplayer.dta src/ui/dta/preshow_guitarist.dta src/ui/dta/in_song.dta
+    src/content/guitar_copy.dta src/hub/preshow_picks.dta src/ui/dta/game_settings.dta src/ui/dta/photo_mode.dta src/ui/dta/box.dta
+    src/ui/dta/note_streak.dta src/ui/dta/streak_counter.dta src/ui/dta/song_progress.dta src/ui/dta/players.dta
+    src/ui/dta/controllers.dta)
 file(READ src/ui/dta/box.dta GHC_BOX_DTA)
 file(READ src/ui/dta/note_streak.dta GHC_NOTE_STREAK_DTA)
 file(READ src/ui/dta/streak_counter.dta GHC_STREAK_COUNTER_DTA)
+file(READ src/ui/dta/song_progress.dta GHC_SONG_PROGRESS_DTA)
 file(READ src/ui/dta/game_settings.dta GHC_GAME_SETTINGS_DTA)
 file(READ src/ui/dta/photo_mode.dta GHC_PHOTO_MODE_DTA)
+file(READ src/ui/dta/players.dta GHC_PLAYERS_DTA)
+file(READ src/ui/dta/controllers.dta GHC_CONTROLLERS_DTA)
 configure_file(src/ui/dta/dta.h.in "${GHC_DTA_DIR}/dta.h" @ONLY)
 file(READ config/settings.template.ini GHC_SETTINGS_TEMPLATE)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS config/settings.template.ini)
@@ -446,6 +493,20 @@ file(READ assets/campaign_select.bin GHC_CAMPAIGN_PACK HEX)
 string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_CAMPAIGN_PACK "${GHC_CAMPAIGN_PACK}")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/campaign_select.bin)
 configure_file(src/content/campaign_pack.h.in "${GHC_DTA_DIR}/campaign_pack.h" @ONLY)
+# The Controllers screen's black poster (ui/controllers.cpp), a 360 bitmap.
+file(READ assets/controllers_poster.bin GHC_CONTROLLERS_POSTER HEX)
+string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_CONTROLLERS_POSTER "${GHC_CONTROLLERS_POSTER}")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/controllers_poster.bin)
+configure_file(src/ui/controllers_poster.h.in "${GHC_DTA_DIR}/controllers_poster.h" @ONLY)
+# The faces the pre-show's venue posters are lettered in (hub/venue_posters.h).
+foreach(GHC_FACE rokk/Rokk helveticablackcondensed/Helveticablackcondensed)
+    get_filename_component(GHC_FACE_NAME "${GHC_FACE}" NAME)
+    string(TOUPPER "${GHC_FACE_NAME}" GHC_FACE_UPPER)
+    file(READ fonts/${GHC_FACE}.otf GHC_POSTER_FACE_${GHC_FACE_UPPER} HEX)
+    string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_POSTER_FACE_${GHC_FACE_UPPER} "${GHC_POSTER_FACE_${GHC_FACE_UPPER}}")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS fonts/${GHC_FACE}.otf)
+endforeach()
+configure_file(src/hub/poster_faces.h.in "${GHC_DTA_DIR}/poster_faces.h" @ONLY)
 # Each game's "Classic" under its menus' logo (ui/classic_scene.cpp), tools/procedural/classic_logo.py's bitmaps.
 foreach(GHC_GAME gh1 gh2 gh80s)
     string(TOUPPER "${GHC_GAME}" GHC_GAME_UPPER)
@@ -459,6 +520,16 @@ file(READ assets/zebra/wall.bin GHC_ZEBRA_WALL HEX)
 string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_ZEBRA_WALL "${GHC_ZEBRA_WALL}")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/zebra/wall.bin)
 configure_file(src/ui/zebra_wall_bitmap.h.in "${GHC_DTA_DIR}/zebra_wall_bitmap.h" @ONLY)
+# The song lists' full combo crown (ui/song_crown.cpp), tools/procedural/crown.py's bitmap.
+file(READ assets/crown/crown.bin GHC_CROWN HEX)
+string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_CROWN "${GHC_CROWN}")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/crown/crown.bin)
+configure_file(src/ui/crown_bitmap.h.in "${GHC_DTA_DIR}/crown_bitmap.h" @ONLY)
+# The help bar's glyphs (ui/help_bar.cpp), tools/procedural/helpbar_glyphs.py's sheet.
+file(READ assets/helpbar/glyphs.bin GHC_HELPBAR_GLYPHS HEX)
+string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_HELPBAR_GLYPHS "${GHC_HELPBAR_GLYPHS}")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/helpbar/glyphs.bin)
+configure_file(src/ui/helpbar_glyphs.h.in "${GHC_DTA_DIR}/helpbar_glyphs.h" @ONLY)
 target_include_directories(GHClassic PRIVATE "${GHC_DTA_DIR}")
 
 # What the build is (src/build_info.h), from tools/ghc.py: the tag it was made
@@ -533,6 +604,7 @@ set_source_files_properties(${GHC_GAME_SOURCES} PROPERTIES SKIP_UNITY_BUILD_INCL
 
 # miniz comes with libchdr; its target leaves out its own include path.
 target_include_directories(GHClassic PRIVATE "${GHC_GENERATED_DIR}" src lib/libchdr/deps/miniz-3.1.2)
+target_include_directories(GHClassic SYSTEM PRIVATE "${stb_SOURCE_DIR}")
 target_link_libraries(GHClassic PRIVATE
     miniz
     ps2_runtime

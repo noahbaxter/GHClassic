@@ -1,0 +1,49 @@
+; The full combo crown on the song lists: a song full combo'd on medium in
+; quickplay wears it on quickplay's list with medium last picked, and on a
+; medium career's; one full combo'd in that career wears it by its stars and
+; score; the songs round them do not.
+#include common/first_boot.dta
+{gamecfg set mode quickplay}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty medium}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait_screen endgame_screen 900)
+(expect {campaigns full_combo shoutatthedevil 1} 1)
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 2)
+(shot quickplay_list)
+
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+{set $pick gh2}
+#include common/career_start.dta
+(wait_screen career_screen 40)
+(wait 1)
+(press green)
+(wait_screen sel_venue_screen 40)
+(wait 1)
+(press green)
+(wait_screen sel_song_screen)
+(wait 2)
+(shot career_list)
+
+; The next song played whole in the career: its stars and score, and the
+; crown by them.
+{{game get_player_config 0} set autoplay TRUE}
+(press down)
+(press green)
+(wait_screen game_screen 60)
+(expect {gamecfg get_song} mother)
+#include common/career_song_done.dta
+(wait 2)
+(expect {campaigns full_combo mother 1} 1)
+(shot career_list_played)
+(quit)

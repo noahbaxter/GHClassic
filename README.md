@@ -14,6 +14,7 @@
 - Fully playable campaigns for Guitar Hero, Guitar Hero 2 (both on PS2 and Xbox 360) and GH80s
 - Swap between the note engine of GH2, or GH1 if you really hate yourself
 - Quickplay mixing featuring every song from every game, for every character skin, with every guitar, in every venue
+- Local multiplayer
 - Custom Vulkan rendering engine lets you play with the PS2's original look, the Xbox 360's, or anything in between
 - Any resolution, uncapped frame rate, plus MSAA, TAA, and mipmaps
 - Modern QOL improvements like note streaks, custom note speed and highway lengths, independent A/V sync, and more!
@@ -59,7 +60,9 @@ Everything GHC needs is stored in one folder. Windows and Linux are portable ins
 | Star power | Right Shift         | Select            |
 | Whammy     |                     | Left stick up     |
 
-Certain guitars with built-in profiles should auto detect: PS3, Wii (through a raphnet adapter), Xbox 360, Rock Band 4 and World Tour PC. Anything else can be remapped by editing `input.ini`, which lists every device's current bindings. It sits beside the game on Windows and Linux, and in `~/Library/Application Support/GHClassic` on macOS.
+Certain guitars with built-in profiles should auto detect: PS3, Wii (through a raphnet adapter), Xbox 360, Rock Band 4 and World Tour PC. Anything else can be remapped in-game.
+
+There's also `input.ini` that lists every device's current bindings, which sits beside the game on Windows and Linux, and in `~/Library/Application Support/GHClassic` on macOS.
 Fullscreen is `Cmd+F` on macOS, `F11` elsewhere.
 
 ## Building from source
@@ -101,6 +104,7 @@ This project is built on top of a lot of excellent work by others. Please give m
 - [Redump](http://redump.org/): disc hashes the images are checked against
 - ["Silent Hill 3 Ps2 Game cover"](https://skfb.ly/oR9ZT) by eyewideasca, [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/): the campaign picker's game case
 - [generalrose](https://www.steamgriddb.com/grid/681069) and [David0Mario](https://www.steamgriddb.com/logo/59969) on SteamGridDB: the icon's GH2 cover art and GH1 logo
+- [Staszek Szybki Jest](https://commons.wikimedia.org/wiki/File:Simple_gold_crown.svg) on Wikimedia Commons: the full combo crown (public domain)
 
 ## License
 

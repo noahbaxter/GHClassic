@@ -27,6 +27,7 @@ namespace gh2::script
         // Hmx::Object's vtable entry for SetTypeDef: a this adjustment (s16),
         // then the function (Hmx::Object::SetType, 0x3c8c80).
         constexpr uint32_t kSetTypeDefSlot = 0x58u;
+        constexpr uint32_t kTypeDef = 0x4u; // Hmx::Object's DataArray*
 
         const Addresses *s_addresses = nullptr;
 
@@ -190,6 +191,17 @@ namespace gh2::script
             readyUi(rdram, ctx, runtime);
         }
 
+        // Virtual, as Hmx::Object::SetType calls it, so a class's own
+        // override (UIPanel's reads file and focus) runs.
+        void setTypeDef(const Call &call, uint32_t object, uint32_t def)
+        {
+            const uint32_t vtable = load<uint32_t>(call.rdram, object);
+            const int16_t delta = load<int16_t>(call.rdram, vtable + kSetTypeDefSlot);
+            const uint32_t function = load<uint32_t>(call.rdram, vtable + kSetTypeDefSlot + 4u);
+            call.runtime->callGuestFunction(call.rdram, call.ctx, function,
+                                            {object + static_cast<uint32_t>(static_cast<int32_t>(delta)), def});
+        }
+
         // {retype <object> (<type def>)}: the object's handlers and
         // properties become the array's, as `{new Class name ...}` sets them.
         Node retype(const Call &call)
@@ -201,13 +213,52 @@ namespace gh2::script
                 std::cerr << "[script] retype: no such object, or no array" << std::endl;
                 return {};
             }
-            // Virtual, as Hmx::Object::SetType calls it, so a class's own
-            // override (UIPanel's reads file and focus) runs.
-            const uint32_t vtable = load<uint32_t>(call.rdram, object);
-            const int16_t delta = load<int16_t>(call.rdram, vtable + kSetTypeDefSlot);
-            const uint32_t function = load<uint32_t>(call.rdram, vtable + kSetTypeDefSlot + 4u);
-            call.runtime->callGuestFunction(call.rdram, call.ctx, function,
-                                            {object + static_cast<uint32_t>(static_cast<int32_t>(delta)), def.value});
+            setTypeDef(call, object, def.value);
+            return {};
+        }
+
+        // {amend <object> (<handler>) ...}: each array takes the place of the
+        // one in the object's type definition that starts on the same
+        // symbol, or is added, and the rest stays. For an object whose type
+        // definition is the game's own and too big to restate, as the game
+        // panel's.
+        Node amend(const Call &call)
+        {
+            const uint32_t object = call.object(1);
+            const uint32_t def = object != 0u ? load<uint32_t>(call.rdram, object + kTypeDef) : 0u;
+            if (def == 0u)
+            {
+                std::cerr << "[script] amend: no such object, or no type definition" << std::endl;
+                return {};
+            }
+            const auto node = [&](uint32_t array, int i) { return load<uint32_t>(call.rdram, array) + 8u * i; };
+            const auto key = [&](uint32_t array)
+            {
+                return load<int16_t>(call.rdram, array + 8u) > 0 && load<uint32_t>(call.rdram, node(array, 0) + 4u) == kSymbol
+                           ? load<uint32_t>(call.rdram, node(array, 0))
+                           : 0u;
+            };
+            // Each node shared with the old one, which the object lets go.
+            const uint32_t copy =
+                static_cast<uint32_t>(call.runtime->callGuestFunction(call.rdram, call.ctx, s_addresses->dataArrayClone, {def, 0u}));
+            for (int i = 2; i < call.size(); ++i)
+            {
+                const uint32_t from = node(call.args, i);
+                if (load<uint32_t>(call.rdram, from + 4u) != kArray)
+                    continue;
+                const uint32_t name = key(load<uint32_t>(call.rdram, from));
+                const int count = load<int16_t>(call.rdram, copy + 8u);
+                int at = count;
+                for (int j = 0; j < count && name != 0u; ++j)
+                    if (load<uint32_t>(call.rdram, node(copy, j) + 4u) == kArray && key(load<uint32_t>(call.rdram, node(copy, j))) == name)
+                        at = j;
+                if (at == count)
+                    call.runtime->callGuestFunction(call.rdram, call.ctx, s_addresses->dataArrayResize,
+                                                    {copy, static_cast<uint32_t>(count + 1)});
+                call.runtime->callGuestFunction(call.rdram, call.ctx, s_addresses->dataNodeAssign, {node(copy, at), from});
+            }
+            setTypeDef(call, object, copy);
+            release(call.rdram, call.ctx, call.runtime, copy);
             return {};
         }
     }
@@ -434,6 +485,7 @@ namespace gh2::script
     {
         s_addresses = &addresses;
         addCommand("retype", retype);
+        addCommand("amend", amend);
         EntryHook<InitTag>::install(runtime, addresses.ghUtlInit, onDataReady);
         EntryHook<GotoScreenTag>::install(runtime, addresses.uiGotoScreen, onGotoScreen);
         EntryHook<DebugModalTag>::install(runtime, addresses.debugModal, onDebugModal);

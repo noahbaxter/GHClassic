@@ -48,50 +48,108 @@
    }
 }
 
-; The options menu, as the game's own (options.dta) with a Game Settings row
-; under Video Settings. options.milo has six rows, each button in a group of
-; its own that fans it about the poster's corner; the seventh is Video
-; Settings cloned on entry into a group turned between its neighbours', and
-; the three rows under it moved down to keep the gaps even (x right, z up, in
-; op_buttons.view).
+; The options menu, as the game's own (options.dta) with its Audio and Video
+; rows folded into one Settings row, as the pause menu has: Settings, Manage
+; Band, Data Settings, Bonus Videos, Credits. Settings shows the same poster
+; with the rows Audio, Video, Controllers (controllers.dta) and Game Settings,
+; and red goes back to the first rows. $ghc_options_settings is which shows,
+; so each of those screens, going back to options_screen, comes back to it.
+;
+; options.milo has six rows, each button in a group of its own that fans it
+; about the poster's corner. Each row's place is kept as a group where its
+; button stands, and the rows shown are put in the places from the top; the
+; last, Credits', is left empty. Game Settings and Controllers are Video
+; Settings cloned on entry. GH1's scene (gh1/screens.cpp) has Game Settings
+; already and its seven rows evenly down the poster, so its places are its
+; first five.
 {retype options_panel
    (
       ; From the ARK root: a path resolves against the file its array came
       ; from, and this one comes from no file.
       (file ui/options.milo)
       (focus op_audio.btn)
-      (enter {$this add_game})
-      (add_game
-         {if {! {exists game_settings.btn}}
+      (enter {$this add_rows} {$this show_rows})
+      (add_rows
+         {if {! {exists ghc_op_place1.grp}}
             {do
-               ($x 0) ($y 0) ($z 0)
+               ($x 0) ($y 0) ($z 0) ($place 0)
                ($draw {video_settings.btn get trans_parent})
-               {new Group game_settings.grp}
-               {game_settings.grp set trans_parent op_buttons.view}
-               {game_settings.grp set_local_rot 0 8 0}
-               {new {video_settings.btn class_name} game_settings.btn}
-               {game_settings.btn copy video_settings.btn 0}
-               {game_settings.btn set trans_parent game_settings.grp}
-               {game_settings.btn set_local_pos 24 0 -14}
+               ($from
+                  {if_else {exists game_settings.btn}
+                     (op_audio.btn video_settings.btn game_settings.btn op_data.btn memory_card.btn)
+                     (op_audio.btn video_settings.btn op_data.btn memory_card.btn op_bonus.btn)
+                  }
+               )
+               {foreach $btn $from
+                  {set $place {'+' $place 1}}
+                  {do
+                     ($grp {symbol {sprint "ghc_op_place" $place ".grp"}})
+                     {new Group $grp}
+                     {$grp set trans_parent {$btn get trans_parent}}
+                     {$btn get_local_pos $x $y $z}
+                     {$grp set_local_pos $x $y $z}
+                  }
+               }
+               {foreach $btn (game_settings.btn controllers.btn)
+                  {if {! {exists $btn}}
+                     {new {video_settings.btn class_name} $btn}
+                     {$btn copy video_settings.btn 0}
+                     {$draw insert (objects {$draw size objects}) $btn}
+                  }
+               }
                ; A token with no string reads as itself.
                {game_settings.btn set text_token "Game Settings"}
-               {video_settings.btn set nav_down game_settings.btn}
-               {game_settings.btn set nav_down op_data.btn}
-               {foreach $row ((op_data.view -15) (op_memory_card.grp -9) (op_bonus.view -5))
-                  {{elem $row 0} get_local_pos $x $y $z}
-                  {{elem $row 0} set_local_pos $x $y {'+' $z {elem $row 1}}}
-               }
-               {$draw insert (objects {$draw size objects}) game_settings.btn}
+               {controllers.btn set text_token "Controllers"}
                {{$this loaded_dir} sync_objects}
             }
+         }
+      )
+      (show_rows
+         {do
+            ($rows
+               {if_else $ghc_options_settings
+                  (op_audio.btn video_settings.btn controllers.btn game_settings.btn)
+                  (op_audio.btn op_data.btn memory_card.btn op_bonus.btn op_credit.btn)
+               }
+            )
+            ($place 0)
+            ($last {elem $rows {'-' {size $rows} 1}})
+            ; The row focused, coming back to the menu, keeps its focus. Up
+            ; goes to the row whose nav_down is this one, so a hidden row's
+            ; points at itself: the stock scene's and the other set's would
+            ; be found first and lead nowhere.
+            {foreach $btn (video_settings.btn controllers.btn game_settings.btn op_data.btn memory_card.btn
+                  op_bonus.btn op_credit.btn)
+               {if {! {find_elem $rows $btn}}
+                  {$btn set_showing FALSE}
+                  {$btn set_state kDisabled}
+                  {$btn set nav_down $btn}
+               }
+            }
+            {foreach $btn $rows
+               {set $place {'+' $place 1}}
+               {$btn set trans_parent {$this find {sprint "ghc_op_place" $place ".grp"}}}
+               {$btn set_local_pos 0 0 0}
+               {$btn set_showing TRUE}
+               {if {== {$btn get_state} kDisabled} {$btn set_state kNormal}}
+               {$last set nav_down $btn}
+               {set $last $btn}
+            }
+            {op_audio.btn set text_token {if_else $ghc_options_settings op_game_settings "Settings"}}
          }
       )
       (poll {if $disable_save {op_data.btn set_state kDisabled} {memory_card.btn set_state kDisabled}})
       (SELECT_START_MSG
          {switch $component
-            (op_audio.btn {ui goto_screen audio_settings_screen})
+            (op_audio.btn
+               {if_else $ghc_options_settings
+                  {ui goto_screen audio_settings_screen}
+                  {do {set $ghc_options_settings TRUE} {$this show_rows}}
+               }
+            )
             (video_settings.btn {ui goto_screen video_settings_screen})
             (game_settings.btn {ui goto_screen game_settings_screen})
+            (controllers.btn {ui goto_screen ghc_controllers_screen})
             (op_data.btn {ui goto_screen options_chooseprof_screen})
             (memory_card.btn {ui goto_screen mem_card_screen})
             (op_bonus.btn {ui goto_screen bonus_material_screen})
@@ -101,13 +159,42 @@
       )
    )
 }
+{retype options_screen
+   (
+      (panels meta options_panel helpbar)
+      (focus options_panel)
+      (helpbar (default ((fret1 help_continue) (fret2 help_back) (strum help_updown))))
+      ; Settings opens its rows on the same screen, so it is taken here,
+      ; before its button's pressed pop starts: the screen changing would
+      ; hide that, and here it would play on over the new rows.
+      (BUTTON_DOWN_MSG
+         {cond
+            ({&& $ghc_options_settings {== $button kPad_Tri}}
+               {synth play_sequence button_back.cue}
+               {set $ghc_options_settings FALSE}
+               {options_panel show_rows}
+               {options_panel set_focus {options_panel find op_audio.btn}}
+               TRUE
+            )
+            ({&& {! $ghc_options_settings} {== $button kPad_X} {== {options_panel focus_name} op_audio.btn}}
+               {synth play_sequence button_select}
+               {set $ghc_options_settings TRUE}
+               {options_panel show_rows}
+               TRUE
+            )
+            (TRUE kDataUnhandled)
+         }
+      )
+   )
+}
 
 ; The pause menu, as the game's own (pause.dta) with one Settings row where
 ; it has one for audio and one for video, and Video Settings' row as Photo
 ; Mode (photo_mode.dta): Resume, Restart, Settings, Photo Mode, Quit.
 ; Settings leads to a menu of its own, the same scene again with its rows
-; named Audio, Video, Game and Back, and each settings screen leads back to
-; that (the screens take the selects and the buttons, so each is retyped).
+; named Audio, Video, Game and Controllers (controllers.dta), and each
+; settings screen leads back to that (the screens take the selects and the
+; buttons, so each is retyped).
 ;
 ; That menu has the scene's five rows as four: Video Settings' put away,
 ; Quit in its place, and every row half a row lower to keep them centred.
@@ -210,30 +297,18 @@
       (reset_focus TRUE)
       (enter
          {$this four_rows}
-         ; Three of the four: the last put away, and the rest half a row
-         ; lower. Red leads back, as the help bar says. Up goes to the row
-         ; whose down leads here, which in GH1's scene is still the last
-         ; one's too: it leads nowhere now.
-         {if {quit.btn showing}
-            {do
-               ($x 0) ($y 0) ($z 0) ($row 0)
-               {resume.btn get_local_pos $x $y $z}
-               {restart.btn get_local_pos $x $y $row}
-               {set $row {'-' $row $z}}
-               {quit.btn set_showing FALSE}
-               {quit.btn set_state kDisabled}
-               {quit.btn set nav_down quit.btn}
-               {audio_options.btn set nav_down resume.btn}
-               {foreach $btn (resume.btn restart.btn audio_options.btn)
-                  {$btn get_local_pos $x $y $z}
-                  {$btn set_local_pos $x $y {'+' $z {'/' $row 2.0}}}
-               }
-            }
+         ; Up goes to the row whose down leads here: Video Settings' put
+         ; away points at itself, or up from Controllers would find it.
+         {if {&& {exists video_options.btn} {! {video_options.btn showing}}}
+            {video_options.btn set nav_down video_options.btn}
          }
          {pause_title.lbl set_localized "SETTINGS"}
          {resume.btn set text_token "AUDIO"}
          {restart.btn set text_token "VIDEO"}
          {audio_options.btn set text_token "GAME"}
+         {quit.btn set text_token "CONTROLLERS"}
+         ; Not drawn in to QUIT's width: its own, as the other rows.
+         {quit.btn set fit_text 0}
       )
       PAUSE_FOUR_ROWS
    )
@@ -250,6 +325,7 @@
             (resume.btn {ui goto_screen pause_audio_settings_screen})
             (restart.btn {ui goto_screen pause_video_settings_screen})
             (audio_options.btn {ui goto_screen pause_game_settings_screen})
+            (quit.btn {ui goto_screen ghc_pause_controllers_screen})
          }
       )
       (BUTTON_DOWN_MSG
@@ -621,6 +697,7 @@
          (gm_p2.btn 3 "P2" gm_p2.lbl)
          (gm_lag.btn 4 "CALIBRATE LAG" gm_lag.lbl)
          (gm_engine.btn 5 "ENGINE GH2" gm_engine.lbl)
+         (gm_unlock.btn 6 "UNLOCK ALL OFF" gm_unlock.lbl)
       )
    )
    ; What a row does when it is lit. A button's text swells and its letters
@@ -694,19 +771,26 @@
       }
       ; P2 off leads to itself, so up from the lag row finds P1.
       {gm_p2.btn set nav_down {if_else {$this two_players} gm_lag.btn gm_p2.btn}}
-      ; The note engine's row is off in a career, whose engine is picked
-      ; with it, and with no other to pick (GH1's needs its disc), and
-      ; leads to itself, so down from the lag row is round.
-      {if_else {|| {note_engine locked} {< {note_engine choices} 2}}
-         {do
-            {gm_engine.btn set_state kDisabled}
-            {gm_engine.btn set nav_down gm_engine.btn}
-            {gm_lag.btn set nav_down gs_band.sld}
-         }
-         {do
-            {gm_engine.btn set_state kNormal}
-            {gm_lag.btn set nav_down gm_engine.btn}
-            {gm_engine.btn set nav_down gs_band.sld}
+      ; Unlock all is out of a song, where the lists it opens are: in one it
+      ; is put away (sync_rows) and leads to itself.
+      {do
+         ($last {if_else {$this in_song} gs_band.sld gm_unlock.btn})
+         {gm_unlock.btn set_state {if_else {$this in_song} kDisabled kNormal}}
+         {gm_unlock.btn set nav_down {if_else {$this in_song} gm_unlock.btn gs_band.sld}}
+         ; The note engine's row is off in a career, whose engine is picked
+         ; with it, and with no other to pick (GH1's needs its disc), and
+         ; leads to itself, so down from the lag row is past it.
+         {if_else {|| {note_engine locked} {< {note_engine choices} 2}}
+            {do
+               {gm_engine.btn set_state kDisabled}
+               {gm_engine.btn set nav_down gm_engine.btn}
+               {gm_lag.btn set nav_down $last}
+            }
+            {do
+               {gm_engine.btn set_state kNormal}
+               {gm_lag.btn set nav_down gm_engine.btn}
+               {gm_engine.btn set nav_down $last}
+            }
          }
       }
       {foreach $row
@@ -927,13 +1011,16 @@
       {if {exists gm_engine.btn}
          {gm_engine.btn set text_token {if_else {== gh1 {note_engine}} "ENGINE GH1" "ENGINE GH2"}}
       }
+      {if {exists gm_unlock.btn}
+         {gm_unlock.btn set text_token {if_else {campaigns unlock_all} "UNLOCK ALL ON" "UNLOCK ALL OFF"}}
+      }
       {$this sync_rows}
       {helpbar set_display
          {if_else {$this slider_selected}
             ((fret1 help_confirm) (fret2 help_cancel) (fret3 help_reset) (strum help_updown))
             {if_else {$this on_slider}
                ((fret1 help_select) (fret2 help_back) (fret3 help_reset) (strum help_updown))
-               {if_else {|| {== [at] "gm_lag.btn"} {== [at] "gm_engine.btn"}}
+               {if_else {|| {== [at] "gm_lag.btn"} {== [at] "gm_engine.btn"} {== [at] "gm_unlock.btn"}}
                   ((fret1 help_select) (fret2 help_back) (strum help_updown))
                   ((fret1 help_onoff) (fret2 help_back) (strum help_updown))
                }
@@ -956,7 +1043,8 @@
             ($steady FALSE)
             ($dir {$this loaded_dir})
             {foreach $s [steady] {if {== $s $b} {set $steady TRUE}}}
-            {{$this find $b} set_showing {&& {! $steady} {! [tuning]}}}
+            {{$this find $b} set_showing
+               {&& {! $steady} {! [tuning]} {! {&& {== $b gm_unlock.btn} {$this in_song}}}}}
             {{$this find $l} set_showing {&& $steady {! [tuning]}}}
             {if $steady
                {{$this find $l} set color
@@ -1112,6 +1200,9 @@
                      {pause_screen restart}
                   }
                )
+               ; Every song, venue, guitarist and guitar open outside a
+               ; career, from the next list shown (campaigns.cpp).
+               (gm_unlock.btn {campaigns unlock_all {! {campaigns unlock_all}}})
             }
             {synth play_sequence button_toggle}
             {$this sync_look}
@@ -1147,16 +1238,18 @@
    (value_shrink 0.72)
    (value_dip 1)
    (value_tilt 4)
-   (pitch 0.75)
-   (block (0.88 0 30))
-   (text_x (-124 54 132 35 35))
+   ; Closer, and its button rows smaller, than the pause menu's: out of a
+   ; song it has unlock all's row too.
+   (pitch 0.65)
+   (block (0.88 0 38))
+   (text_x (-124 54 132 35 35 35))
    (box_x (26 104))
    (text_dz 0)
    (box_dz 0)
    (lefty_size 21)
-   (lag_size 30)
-   (fit (0 0 0 0 0))
-   (gh1 ((block (0.88 0 12)) (lefty_size 29) (lag_size 44) (fit (0 24 24 250 250)) (text_x (-132 74 142 35 35)) (box_x (52 120))))
+   (lag_size 24)
+   (fit (0 0 0 0 0 0))
+   (gh1 ((block (0.88 0 12)) (lefty_size 29) (lag_size 36) (fit (0 24 24 250 250 250)) (text_x (-132 74 142 35 35 35)) (box_x (52 120))))
    (lag_screen lag_screen)
    ; As the main menu has it for its two-player row (main.dta).
    (two_players {! {game is_missing_multi_controller}})
@@ -1187,14 +1280,14 @@
    (value_tilt 4)
    (pitch 0.75)
    (block (0.88 0 30))
-   (text_x (-124 54 132 35 35))
+   (text_x (-124 54 132 35 35 35))
    (box_x (26 104))
    (text_dz 0)
    (box_dz 0)
    (lefty_size 21)
    (lag_size 30)
-   (fit (0 0 0 0 0))
-   (gh1 ((block (0.88 16 -2)) (lefty_size 29) (lag_size 44) (fit (0 24 24 250 250)) (text_x (-132 74 148 35 35)) (box_x (52 126)) (tune_bg (-183 -5 26.4 1.4))))
+   (fit (0 0 0 0 0 0))
+   (gh1 ((block (0.88 16 -2)) (lefty_size 29) (lag_size 44) (fit (0 24 24 250 250 250)) (text_x (-132 74 148 35 35 35)) (box_x (52 126)) (tune_bg (-183 -5 26.4 1.4))))
    (lag_screen pause_lag_screen)
    (two_players {> {game num_players} 1})
    GAME_SETTINGS_HANDLERS

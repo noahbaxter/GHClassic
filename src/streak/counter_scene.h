@@ -30,4 +30,11 @@ namespace gh2::streak_counter
     // after it. One for single player and co-op, two for face-off. False when
     // the scene has none.
     bool addCounter(milo::Dir &scene);
+
+    // Single player's score and rock meters kLift higher, to make room for
+    // the counter under the score, the two kept level: every place their
+    // TransAnims (the slide in, the shake) put them, so they come in at that
+    // height. False when the scene has neither.
+    inline constexpr float kLift = 20.0f;
+    bool raiseMeters(milo::Dir &scene);
 }

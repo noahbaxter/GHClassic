@@ -42,7 +42,7 @@
       (file
          {switch {gamecfg get mode}
             ((career multi_coop) ui/sel_song.milo)
-            (quickplay {setlist look})
+            ((quickplay multi_vs multi_fo) {setlist look})
             ui/sel_song_quickplay.milo
          }
       )
@@ -76,10 +76,20 @@
       (update_pos
          {do
             ($pos {ss_song.lst selected_pos})
-            ($frame {+ $pos {song_provider num_headers $pos} {switch {setlist shown} (gh1 1) 0}})
+            ($moved {setlist scroll $pos})
+            ; A setlist held a window at a time moved along under the
+            ; highlight (content/setlists.h): the same song, its row the
+            ; window's.
+            {if {>= $moved 0}
+               {ss_song.lst set_provider song_provider}
+               {ss_song.lst set_selected $moved}
+               {set $pos $moved}
+            }
             {game set_song_index $pos}
             {song_preview {game get_song}}
-            {sel_song.view set_frame $frame}
+            {sel_song.view set_frame
+               {+ $pos {song_provider num_headers $pos} {switch {setlist shown} (gh1 1) 0}}
+            }
          }
       )
       ; The debug actions' cheats look the song up in the active campaign's
@@ -117,9 +127,10 @@
 {func ghc_qp_button ($button)
    {cond
       ({ghc_pick_button $button} TRUE)
+      ; Back to the show's setup (quickplay_setup.dta).
       ({== $button kPad_Tri}
          {synth play_sequence button_back.cue}
-         {ui goto_screen main_screen FALSE TRUE}
+         {ui goto_screen ghc_qp_setup_screen}
          TRUE
       )
       ({&& {== $button kPad_Circle} {> {size {ghc_setlists}} 1} {! {ui in_transition}}}

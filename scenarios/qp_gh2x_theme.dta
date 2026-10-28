@@ -1,6 +1,6 @@
-; Quickplay under the 360's menus: its setlist first, GH2's pickers, and GH2's
-; venue map, the 360's venues being GH2's; a song plays there. Out at the
-; main menu the 360's characters are its own again.
+; Quickplay under the 360's menus: GH2's pickers, GH2's venue map, the
+; 360's venues being GH2's, and its setlist first; a song plays there. Out
+; at the main menu the 360's characters are its own again.
 #include common/first_boot.dta
 (needs gh2x)
 {quickplay song_defaults 0}
@@ -13,14 +13,10 @@
 {set $own_characters {size {find $syscfg characters}}}
 {gamecfg set mode quickplay}
 {setlist select {campaigns active}}
-{ui goto_screen qp_selsong_screen}
-(wait_screen qp_selsong_screen)
+{ui goto_screen ghc_qp_setup_screen}
+(wait_screen ghc_qp_setup_screen)
 (wait 1)
-(expect {setlist shown} gh2x)
-(press green)
-(wait_screen qp_diff_screen)
-(wait 1)
-(press green)
+{ui goto_screen ghc_qp_character_screen}
 (wait_screen ghc_qp_character_screen)
 (wait_until {char_single are_chars_loaded})
 (wait 2)
@@ -30,10 +26,23 @@
 (wait 3)
 (shot guitar)
 {ghc_qp_guitar_screen goto_career}
+(wait_screen ghc_qp_setup_screen)
+(wait 1)
+{ghc_qp_to_venues}
 (wait_screen ghc_qp_venue_screen)
 (wait 2)
 (expect $ghc_qp_venues gh2)
 (shot venue)
+(press green)
+(wait_screen ghc_qp_setup_screen)
+(wait 1)
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 1)
+(expect {setlist shown} gh2x)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
 {{game get_player_config 0} set autoplay TRUE}
 (press green)
 (wait_screen game_screen 60)

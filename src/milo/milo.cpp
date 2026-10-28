@@ -416,6 +416,17 @@ namespace gh2::milo
         return std::nullopt;
     }
 
+    const Bytes *body(const Dir &dir, const std::string &className, const std::string &name)
+    {
+        const auto it = std::find(dir.entries.begin(), dir.entries.end(), std::make_pair(className, name));
+        return it == dir.entries.end() ? nullptr : &dir.bodies[static_cast<size_t>(it - dir.entries.begin())];
+    }
+
+    Bytes *body(Dir &dir, const std::string &className, const std::string &name)
+    {
+        return const_cast<Bytes *>(body(static_cast<const Dir &>(dir), className, name));
+    }
+
     Bytes write(const Dir &dir)
     {
         Bytes raw;

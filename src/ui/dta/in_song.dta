@@ -1,0 +1,18 @@
+; In a song: the song's caption ("as made famous by", mtv_overlay.milo) on
+; a restart too. The game's own (game.dta) shows it only on a song's first
+; start, a restart being a fast one ($fast); here it is as the first start
+; has it either way.
+{amend game
+   (intro_start_msg
+      ($fast $encore)
+      {track_panel intro_start_msg}
+      ; GH1's in-song screens may have none.
+      {if {exists mtv_overlay_panel}
+         {mtv_overlay_panel show_overlay FALSE}
+         {script_task (delay 1) (units kTaskSeconds) (script {mtv_overlay_panel show_overlay TRUE})}
+         {script_task (delay 6) (units kTaskSeconds) (script {mtv_overlay_panel show_overlay FALSE})}
+      }
+      {set [intro_complete] FALSE}
+      kDataUnhandled
+   )
+}

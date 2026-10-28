@@ -1,0 +1,50 @@
+; The help bar shows the controls P1's menus are read from on its gems: with
+; none seated the keyboard's 1, 2 and arrow keys; a guitar's own gems; an
+; Xbox pad's LT, LB and d-pad; a DualSense's L2 and L1; in GH2's menus and
+; then GH1's. Each label is its index in ui/help_bar.cpp's kLabels.
+(needs gh1)
+#include common/first_boot.dta
+{ui goto_screen options_screen}
+(wait_screen options_screen)
+(wait 1)
+(expect {{{helpbar find hb_fret1.mat} get diffuse_tex} name} ghc_hb_fret1_34.tex)
+(expect {{{helpbar find hb_fret2.mat} get diffuse_tex} name} ghc_hb_fret2_35.tex)
+(expect {{{helpbar find hb_strum.mat} get diffuse_tex} name} ghc_hb_strum_keys.tex)
+(shot keyboard)
+(device guitar)
+(press down guitar)
+(wait 0.5)
+(expect {seat_has 0 guitar} 1)
+(expect {{{helpbar find hb_fret1.mat} get diffuse_tex} name} hb_fret1.tex)
+(expect {{{helpbar find hb_strum.mat} get diffuse_tex} name} hb_strum.tex)
+(shot guitar)
+(controller xbox "045e:028e" pad)
+(wait 1)
+(hold xbox dpdown)
+(wait 0.3)
+(hold xbox)
+(wait 0.5)
+(expect {seat_has 0 xbox} 1)
+(expect {{{helpbar find hb_fret1.mat} get diffuse_tex} name} ghc_hb_fret1_6.tex)
+(expect {{{helpbar find hb_fret2.mat} get diffuse_tex} name} ghc_hb_fret2_4.tex)
+(expect {{{helpbar find hb_strum.mat} get diffuse_tex} name} ghc_hb_strum_pad.tex)
+(shot xbox)
+(controller dualsense "054c:0ce6" pad)
+(wait 1)
+(hold dualsense dpdown)
+(wait 0.3)
+(hold dualsense)
+(wait 0.5)
+(expect {seat_has 0 dualsense} 1)
+(expect {{{helpbar find hb_fret1.mat} get diffuse_tex} name} ghc_hb_fret1_12.tex)
+(expect {{{helpbar find hb_fret2.mat} get diffuse_tex} name} ghc_hb_fret2_10.tex)
+(shot dualsense)
+{set $ghc_switch gh1}
+{set $ghc_switch_next main_screen}
+{ui goto_screen ghc_switch_screen}
+(wait 3)
+(wait_screen main_screen)
+(wait 2)
+(expect {{{helpbar find hb_fret1.mat} get diffuse_tex} name} ghc_hb_fret1_12.tex)
+(shot gh1_dualsense)
+(quit)

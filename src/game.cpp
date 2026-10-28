@@ -15,6 +15,8 @@
 #include "content/locale.h"
 #include "content/outfits.h"
 #include "content/campaign_case.h"
+#include "hub/hub_scene.h"
+#include "hub/menu_guitarist.h"
 #include "content/campaigns.h"
 #include "content/setlists.h"
 #include "content/songs.h"
@@ -27,7 +29,10 @@
 #include "gh80s/install.h"
 #include "gh2x/install.h"
 #include "ui/help_bar.h"
+#include "ui/controllers.h"
+#include "ui/players.h"
 #include "ui/classic_scene.h"
+#include "ui/song_crown.h"
 #include "ui/zebra_wall.h"
 #include "settings/latency.h"
 #include "settings/settings.h"
@@ -35,6 +40,7 @@
 #include "ui/menus.h"
 #include "ui/meta_music.h"
 #include "ui/photo_mode.h"
+#include "ui/song_progress.h"
 #include "ui/slider_scale.h"
 #include "movie/movie.h"
 #include "dev/cheats.h"
@@ -42,6 +48,7 @@
 #include "lefty_guitarist.h"
 #include "gameplay/note_speed.h"
 #include "gameplay/note_engine/note_engine.h"
+#include "gameplay/retrack.h"
 #include "streak/counter.h"
 #include "streak/note_streak.h"
 #include "dev/null_rnd.h"
@@ -79,6 +86,8 @@ namespace
         gh2::ark::install(runtime, gh2::kSlus21447);
         gh2::installHeaps();
         gh2::installGuitarCopy();
+        // Before GH1's lists, built from GH2's song list and its type.
+        gh2::installSongCrown(runtime, gh2::kSlus21447);
         // Before the 80s, whose setlist reads its song list scene.
         gh2::installZebraWall();
         gh2::installEighties();
@@ -121,6 +130,8 @@ namespace
             gh2::installNoteStreak(runtime, gh2::kSlus21447);
             gh2::installStreakCounter(runtime, gh2::kSlus21447);
         }
+        if (gh2::settings::get(gh2::settings::kSongProgress))
+            gh2::installSongProgress(runtime, gh2::kSlus21447);
         gh2::installFontBake();
         gh2::installNoteEngine(runtime, gh2::kSlus21447);
         // After the note engine, whose hook on BeatMatcher::Swing it wraps:
@@ -128,6 +139,7 @@ namespace
         gh2::installStrumLimit(runtime, gh2::kSlus21447);
         gh2::installTourOrHigher(runtime, gh2::kSlus21447);
         gh2::installNoteSpeed(runtime, gh2::kSlus21447);
+        gh2::installRetrack(runtime, gh2::kSlus21447);
         gh2::slider_scale::install(runtime, gh2::kSlus21447);
         gh2::installMovies(runtime, gh2::kSlus21447);
         gh2::installVideoOptions(runtime, gh2::kSlus21447);
@@ -141,6 +153,9 @@ namespace
         gh2::installMenus(runtime);
         gh2::installPhotoMode(runtime, gh2::kSlus21447);
         gh2::installHelpBar(runtime, gh2::kSlus21447);
+        gh2::menu_guitarist::install(runtime, gh2::kSlus21447);
+        gh2::installPlayers(runtime);
+        gh2::installControllers(runtime);
         // After the help bar, which recolours its scene's own pixels.
         gh2::installGh2xAssets(runtime, gh2::kSlus21447);
         // After the 360's scenes, the streak counter and the font bake: its
@@ -148,6 +163,7 @@ namespace
         gh2::installGh1Highway();
         // After the 360's menu art, whose speed poster it puts the amp over.
         gh2::campaign_case::install();
+        gh2::hub_scene::install();
         gh2::setlists::install(runtime, gh2::kSlus21447);
         gh2::encores::install(runtime, gh2::kSlus21447);
         gh2::status_line::install(runtime, gh2::kSlus21447);

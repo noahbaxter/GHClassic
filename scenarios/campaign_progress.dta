@@ -1,8 +1,8 @@
 ; The campaign picker's number for a GH2 expert career: a song played whole
 ; by autoplay is a full combo (its longest streak every gem hit, a chord one
 ; of each), a song won by the cheat is passed but none, and both hold
-; through a load. One career song passed on expert is expert's quarter
-; floor, 75.
+; through a load. One career song passed on expert is that song's whole
+; share of the career, a few percent: no difficulty floor.
 #include common/first_boot.dta
 {gamecfg set mode career}
 {campaign set_profile_name "The Testers" 0}
@@ -55,7 +55,9 @@
 (press green)
 (wait_screen complete_screen)
 (wait 1)
-(expect {campaigns progress gh2 0} 75)
+{set $progress {campaigns progress gh2 0}}
+(expect {> $progress 0} 1)
+(expect {< $progress 10} 1)
 (expect {> {campaigns full_combos gh2 0} 0} 1)
 {set $combos {campaigns full_combos gh2 0}}
 
@@ -98,7 +100,7 @@
 ; Saved and loaded back.
 {ui goto_screen bootup_load}
 (wait_screen main_screen 40)
-(expect {campaigns progress gh2 0} 75)
+(expect {campaigns progress gh2 0} $progress)
 (expect {campaigns full_combos gh2 0} $combos)
 {gamecfg set mode career}
 {campaign set_profile_slot 0}

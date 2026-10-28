@@ -41,16 +41,7 @@ namespace gh2::streak_counter
                 std::memcpy(mat.data() + o + 4u * ch, &white, 4u);
         }
 
-        // Where a palette's entry for an index is: an 8-bit one is stored
-        // in the GS's CSM1 order.
-        size_t slot(size_t index, uint8_t bpp)
-        {
-            if (bpp == 8u && (index & 0x18u) == 0x08u)
-                return index + 8u;
-            if (bpp == 8u && (index & 0x18u) == 0x10u)
-                return index - 8u;
-            return index;
-        }
+        using bitmap::paletteSlot;
 
         // A Tex's colours turned over. The pixels `keep` names (by place and
         // whether they were light) stay as they were, each the nearest
@@ -75,7 +66,7 @@ namespace gh2::streak_counter
                 for (size_t x = 0; x < header->width; ++x)
                 {
                     uint8_t &index = pixels[y * header->rowBytes + x];
-                    const uint8_t *old = was.data() + slot(index, 8u) * 4u;
+                    const uint8_t *old = was.data() + paletteSlot(index, 8u) * 4u;
                     if (!keep(x, y, old[0] + old[1] + old[2] >= 3u * 128u))
                         continue;
                     uint32_t best = UINT32_MAX;
@@ -84,7 +75,7 @@ namespace gh2::streak_counter
                         uint32_t d = 0u;
                         for (size_t ch = 0; ch < 4u; ++ch)
                         {
-                            const int v = int(palette[slot(k, 8u) * 4u + ch]) - int(old[ch]);
+                            const int v = int(palette[paletteSlot(k, 8u) * 4u + ch]) - int(old[ch]);
                             d += static_cast<uint32_t>(v * v);
                         }
                         if (d < best)
@@ -122,7 +113,7 @@ namespace gh2::streak_counter
                 return;
             const uint8_t *palette = body.data() + tex->bitmap + bitmap::kHeaderBytes;
             const size_t entries = bitmap::paletteBytes(*header) / 4u;
-            const auto colour = [&](size_t index) { return palette + slot(index, 8u) * 4u; };
+            const auto colour = [&](size_t index) { return palette + paletteSlot(index, 8u) * 4u; };
             std::optional<uint8_t> black;
             for (size_t k = 0; k < entries; ++k)
                 if (const uint8_t *c = colour(k); c[3] >= 0x80u &&
@@ -254,7 +245,7 @@ namespace gh2::streak_counter
             };
             const auto light = [&](size_t k)
             {
-                const uint8_t *c = colours + 4u * slot(k, static_cast<uint8_t>(bpp));
+                const uint8_t *c = colours + 4u * paletteSlot(k, static_cast<uint8_t>(bpp));
                 return c[0] + c[1] + c[2];
             };
             size_t black = 0u;
@@ -464,5 +455,38 @@ namespace gh2::streak_counter
             added = true;
         }
         return added;
+    }
+
+    bool raiseMeters(milo::Dir &scene)
+    {
+        bool raised = false;
+        for (size_t i = 0; i < scene.entries.size(); ++i)
+        {
+            if (scene.entries[i].first != "TransAnim")
+                continue;
+            // A TransAnim 6: Hmx::Object's header, an Anim 4, the Trans it
+            // moves, its turning keys (a quaternion and a frame each), then
+            // its places (a position and a frame each), z up the screen.
+            milo::Bytes &body = scene.bodies[i];
+            size_t o = 8u;
+            milo::str(body, o);
+            o += 13u;
+            const std::string moved = milo::str(body, o);
+            if (moved != "hud1_score_meter0.view" && moved != "hud1_rock_meter.view")
+                continue;
+            const size_t places = o + 4u + 20u * milo::u32(body, o);
+            const size_t end = places + 4u + 16u * milo::u32(body, places);
+            if (end > body.size())
+                continue;
+            for (size_t key = places + 4u; key < end; key += 16u)
+            {
+                float z;
+                std::memcpy(&z, body.data() + key + 8u, 4u);
+                z += kLift;
+                std::memcpy(body.data() + key + 8u, &z, 4u);
+                raised = true;
+            }
+        }
+        return raised;
     }
 }

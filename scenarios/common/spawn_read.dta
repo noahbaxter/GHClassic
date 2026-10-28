@@ -1,0 +1,8 @@
+; Where the first guitarist stands as the game screen is up: printed, and not
+; the origin a guitarist never placed stands at.
+{set $ghc_x 0}
+{set $ghc_y 0}
+{set $ghc_z 0}
+{{world find guitarist0} get_local_pos $ghc_x $ghc_y $ghc_z}
+(print spawn0 $ghc_x $ghc_y $ghc_z venue {campaigns venue_game} {game get_venue})
+(expect {|| {|| {> $ghc_x 0.5} {< $ghc_x -0.5}} {|| {> $ghc_y 0.5} {< $ghc_y -0.5}}} 1)

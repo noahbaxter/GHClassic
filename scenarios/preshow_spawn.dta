@@ -1,0 +1,15 @@
+; A song started from quickplay's hub, its pre-show guitarist up first (the
+; pre-show's start mark is flagged only while it is): the song's guitarist
+; stands on the venue's start mark each time. Left flagged, a start ended
+; with the guitarist at the origin about two times in three.
+#include common/first_boot.dta
+{quickplay song_defaults 0}
+{game set_song iloverockandroll}
+{game set_venue small1}
+#include common/preshow_song.dta
+#include common/preshow_song.dta
+#include common/preshow_song.dta
+#include common/preshow_song.dta
+#include common/preshow_song.dta
+#include common/preshow_song.dta
+(quit)
