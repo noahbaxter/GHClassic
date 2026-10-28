@@ -1,0 +1,43 @@
+; Quickplay opens a song unlocked in its game's career under either note
+; engine, while each career keeps its own: a bonus song bought in GH2's
+; career under GH2's engine is on GH2's quickplay list with GH1's judging
+; too, and GH1's career has not bought it.
+(needs gh1)
+#include common/first_boot.dta
+{set $pick gh2}
+#include common/career_start.dta
+{set $bonus {elem {elem {find $syscfg store song} 1} 0}}
+(expect {campaign is_unlocked $bonus} 0)
+{campaign buy_item $bonus 0}
+(expect {campaign is_unlocked $bonus} 1)
+{autosave_goto career_screen}
+(wait_screen career_screen 40)
+(wait 1)
+{ui goto_screen main_screen}
+(wait_screen main_screen 60)
+
+; Under GH2's engine the list has it: the song's row
+; (GameConfig::GetSongIndex, 0x1262b8), -1 for none.
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 2)
+{game set_song $bonus}
+(expect {>= {game get_song_index} 0} 1)
+(expect {song_provider get_symbol {game get_song_index}} $bonus)
+
+; Under GH1's, still.
+{ui goto_screen main_screen}
+(wait_screen main_screen 60)
+(expect {note_engine set gh1} 1)
+(expect {note_engine} gh1)
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 2)
+{game set_song $bonus}
+(expect {>= {game get_song_index} 0} 1)
+(expect {song_provider get_symbol {game get_song_index}} $bonus)
+; GH1's career has not bought it.
+(expect {campaign is_unlocked $bonus} 0)
+(quit)

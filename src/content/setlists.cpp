@@ -120,10 +120,11 @@ namespace gh2::setlists
 
         // The selected setlist when the provider fills quickplay's list
         // (its +0x30, set_quickplay, is also set for practice and
-        // multiplayer) and it is not GH2's.
+        // multiplayer). The game played's too: GH2's own list reads the
+        // Campaign, which holds only the careers of the note engine judging.
         const Setlist *ours(uint8_t *rdram, uint32_t provider)
         {
-            if (selected() == campaigns::active() || load<uint32_t>(rdram, provider + 0x30u) == 0u)
+            if (load<uint32_t>(rdram, provider + 0x30u) == 0u)
                 return nullptr;
             if (!modeIs(rdram, "quickplay"))
                 return nullptr;
@@ -154,12 +155,15 @@ namespace gh2::setlists
             store<uint32_t>(rdram, headers + 4u, load<uint32_t>(rdram, headers));
             // As Campaign::GetQuickplaySongs (0x12db78): the first two
             // tiers, and every song a band has unlocked in the game's career
-            // on any difficulty, which the save's sections say for a game
-            // not being played: its later tiers, its encores (each venue's
-            // last song, CampaignState::GetEncoreForVenue 0x132ce0) and the
-            // store songs bought. All access (+0x80, the unlock-all cheat)
-            // opens every one. A game with no career yet has its store's
-            // songs open.
+            // on any difficulty, under either note engine, as the save's
+            // sections say: its later tiers, its encores (each venue's last
+            // song, CampaignState::GetEncoreForVenue 0x132ce0) and the store
+            // songs bought. The game played's career goes into them first,
+            // as it stands, unsaved or not. All access (+0x80, the
+            // unlock-all cheat) opens every one. A game with no career yet
+            // has its store's songs open.
+            if (selected() == campaigns::active())
+                save::leaveGame(rdram, ctx, runtime);
             const uint32_t campaign = load<uint32_t>(rdram, s_addresses->theCampaign);
             const bool allAccess = campaign != 0u && load<uint32_t>(rdram, campaign + 0x80u) != 0u;
             const std::vector<std::string> careers = campaigns::games();
@@ -209,11 +213,15 @@ namespace gh2::setlists
             for (size_t t = 0; t < s_shown->tiers.size(); ++t)
             {
                 const Tier &tier = s_shown->tiers[t];
+                bool any = false;
+                for (size_t s = 0; s < tier.songs.size(); ++s)
+                    any = any || open(t, s);
                 for (size_t s = 0; s < tier.songs.size(); ++s)
                     // A song not open has no row, as the game's own list
                     // has none for a store song not bought: but an encore
-                    // still to earn, whose row is there blank.
-                    if (open(t, s) || (gated && tier.encore && s + 1u == tier.songs.size()))
+                    // still to earn in a tier with songs open, whose row
+                    // is there blank.
+                    if (open(t, s) || (any && gated && tier.encore && s + 1u == tier.songs.size()))
                         rows.push_back({t, s});
             }
             Window &window = s_windows[selected()];
