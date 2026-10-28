@@ -3,6 +3,7 @@
 #include "milo/milo.h"
 
 #include <functional>
+#include <optional>
 #include <string>
 
 namespace gh2
@@ -24,4 +25,14 @@ namespace gh2
     // Whether the 360 has its own of a game disc scene whose path starts
     // `prefix`: "char/punk1/", an outfit's.
     bool gh2xHasModel(const std::string &prefix);
+
+    // The 360's scene (true) or the PS2's (false) served at the paths that
+    // start `prefix` whatever settings::hd says of them, or what it says
+    // (nullopt): one player's outfit or guitar of two. True if there was
+    // one set before.
+    bool setGh2xLook(const std::string &prefix, std::optional<bool> hd);
+    // Every one of those let go; true if there were any.
+    bool clearGh2xLooks();
+    // Whether the 360's scene is served at that path now.
+    bool gh2xServes(const std::string &path);
 }
