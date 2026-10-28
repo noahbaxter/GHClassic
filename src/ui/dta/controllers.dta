@@ -206,7 +206,11 @@
       (poll
          {if {! [leaving]}
             {switch {ghc_controllers poll}
-               (leave {set [leaving] TRUE} {ui goto_screen options_screen})
+               (leave
+                  {set [leaving] TRUE}
+                  {ui goto_screen
+                     {if_else {== {ui current_screen} ghc_pause_controllers_screen} pause_settings_screen options_screen}}
+               )
                (paint {$this paint})
             }
          }
@@ -535,5 +539,18 @@
    (
       (panels meta ghc_controllers_bg_panel helpbar ghc_controllers_panel)
       (focus ghc_controllers_panel)
+   )
+}
+; The same from a song's pause menu, its Settings (game_settings.dta), over
+; the paused song and back to that menu.
+{if {! {exists ghc_pause_controllers_screen}}
+   {new GHScreen ghc_pause_controllers_screen}
+}
+{retype ghc_pause_controllers_screen
+   (
+      (panels GAME_PANELS ghc_controllers_bg_panel helpbar ghc_controllers_panel)
+      (focus ghc_controllers_panel)
+      (in_game TRUE)
+      PAUSE_SCREEN_HANDLERS
    )
 }
