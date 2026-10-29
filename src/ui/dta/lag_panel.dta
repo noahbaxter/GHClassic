@@ -1,12 +1,17 @@
 ; The lag screen, replaced: video and audio latency set by number, in 5 ms
-; steps, over a preview that keeps running. The layout, the hit animation and
-; the click are the game's own (lag.milo); the values live in settings.ini,
-; through {latency ...}.
+; steps, over a preview that keeps running, under the game's own calibration.
+; The layout, the hit animation and the click are the game's own (lag.milo);
+; the values live in settings.ini, through {latency ...}.
 ;
 ; A beat comes once a [period]. The disc starts early by the video value and
 ; the click plays early by the audio value, so on a screen and speakers that
 ; late they reach the player together. The preview can show only whether the
 ; two agree; how both sit against your strums is felt in a song.
+;
+; Calibrate is retail's: four hats to count in, eleven clicks to strum on, and
+; LagPanel's calculate_lag over them. Strumming to a click heard measures the
+; sound's lateness, so it sets audio. The clicks play on time, not early by
+; the audio value, so what it measures is the whole of it.
 {retype lag_panel
    (
       ; From the ARK root: a path resolves against the file its array came
@@ -15,6 +20,15 @@
       (focus autocalibrate.btn)
       (from_panel "")
       (state browse)
+      ; The last calibration's: none, success or failure.
+      (result none)
+      (beat 0)
+      (hits ())
+      (seconds ())
+      (window 50)
+      (min_hits 7)
+      (min_avg -100)
+      (max_avg 250)
       (impact 0.6) ; the animation lands this long after it starts
       (period 0.733)
       (previewing FALSE)
@@ -28,16 +42,37 @@
       (hold_running FALSE)
       (update_text
          ; Buttons redraw from their token; one with no string reads as itself.
+         {calibrate.btn set text_token
+            {if_else {== [result] none} lag_button_calibrate lag_button_recalibrate}
+         }
          {autocalibrate.btn set text_token {sprintf "Video: %d ms" {latency get video}}}
          {reset_to_zero.btn set text_token {sprintf "Audio: %d ms" {latency get audio}}}
-         {countdown.lbl set_localized ""}
+         {if {!= [state] calibrating}
+            {countdown.lbl set_localized ""}
+         }
          {setting.lbl set_localized ""}
          {switch [state]
             ; In the game's own voice: its lag_info_why, then lines written to
             ; match (two spaces between sentences, the disc called a note).
             (browse
-               {instructions.lbl set text_token lag_info_why}
-               {instructions2.lbl set_localized "Set Video and Audio so the note and the click land together."}
+               {switch [result]
+                  (success
+                     {instructions.lbl set text_token lag_success}
+                     {instructions2.lbl set_localized {sprintf "Audio set to %d ms." {latency get audio}}}
+                  )
+                  (failure
+                     {instructions.lbl set text_token lag_info_failure}
+                     {instructions2.lbl set text_token lag_info_howto}
+                  )
+                  (none
+                     {instructions.lbl set text_token lag_info_why}
+                     {instructions2.lbl set_localized "Calibrate, or set Video and Audio so the note and the click land together."}
+                  )
+               }
+            )
+            (calibrating
+               {instructions.lbl set text_token lag_measuring}
+               {instructions2.lbl set_localized ""}
             )
             (video
                {instructions.lbl set_localized "How late your TV shows the picture."}
@@ -54,20 +89,26 @@
             ($array)
             {set $array ()}
             {resize $array 0}
-            ; Frets first, the strum last: the help bar lays them out left to
-            ; right in that order, the strum on the far right.
-            {if {== [state] browse}
-               {push_back $array (fret1 help_select)}
-            }
-            {push_back $array (fret2 help_back)}
-            {if {!= [state] browse}
-               {push_back $array (fret3 help_reset)}
-            }
-            ; Help bar labels must be locale tokens; unknown ones draw blank.
-            {push_back $array
-               {if_else {== [state] browse}
-                  (strum help_updown)
-                  (strum help_adjsync)
+            {if_else {== [state] calibrating}
+               {push_back $array (strum help_hitonchange)}
+               {do
+                  ; Frets first, the strum last: the help bar lays them out
+                  ; left to right in that order, the strum on the far right.
+                  {if {== [state] browse}
+                     {push_back $array (fret1 help_select)}
+                  }
+                  {push_back $array (fret2 help_back)}
+                  {if {!= [state] browse}
+                     {push_back $array (fret3 help_reset)}
+                  }
+                  ; Help bar labels must be locale tokens; unknown ones draw
+                  ; blank.
+                  {push_back $array
+                     {if_else {== [state] browse}
+                        (strum help_updown)
+                        (strum help_adjsync)
+                     }
+                  }
                }
             }
             {helpbar set_display $array}
@@ -76,12 +117,45 @@
       (set_state
          ($s)
          {set [state] $s}
+         ; Retail hides the buttons while it measures.
+         {buttons.grp set showing {!= $s calibrating}}
+         {calibrate.btn set showing {!= $s calibrating}}
          {$this update_helpbar}
          {$this update_text}
       )
+      ; Calibrate, a copy of the Video button in its place, as the main menu
+      ; makes its Quit (main_menu.dta), drawn and hidden with the other two
+      ; in buttons.grp. Their trans_parent is handed on, never sent a
+      ; message: it is no object a message can reach, and one stops the game.
+      (add_calibrate
+         {if {! {exists calibrate.btn}}
+            {do
+               ($vx 0) ($vy 0) ($vz 0) ($ax 0) ($ay 0) ($az 0)
+               {autocalibrate.btn get_local_pos $vx $vy $vz}
+               {reset_to_zero.btn get_local_pos $ax $ay $az}
+               {new {autocalibrate.btn class_name} calibrate.btn}
+               {calibrate.btn copy autocalibrate.btn 0}
+               {calibrate.btn set trans_parent {autocalibrate.btn get trans_parent}}
+               ; Calibrate where Video was, Video and Audio a row down each.
+               {calibrate.btn set_local_pos $vx $vy $vz}
+               {autocalibrate.btn set_local_pos $ax $ay $az}
+               {reset_to_zero.btn set_local_pos {'-' {'*' 2 $ax} $vx} {'-' {'*' 2 $ay} $vy} {'-' {'*' 2 $az} $vz}}
+               {calibrate.btn set nav_down autocalibrate.btn}
+               {autocalibrate.btn set nav_up calibrate.btn}
+               {buttons.grp insert (objects {buttons.grp size objects}) calibrate.btn}
+               {{$this loaded_dir} sync_objects}
+            }
+         }
+      )
       (enter
+         {$this add_calibrate}
+         {$this set_focus calibrate.btn}
          {set [hold_running] FALSE}
+         {set [result] none}
          {$this set_state browse}
+         {$this resume_preview}
+      )
+      (resume_preview
          {set [previewing] TRUE}
          {if {> {- {taskmgr ui_seconds} [last_tick]} {* 2 [period]}}
             {$this start_preview}
@@ -132,36 +206,109 @@
          }
       )
       (SELECT_START_MSG
-         {if_else {== [state] browse}
-            {switch $component
-               (autocalibrate.btn {$this set_state video})
-               (reset_to_zero.btn {$this set_state audio})
-            }
-            {$this set_state browse}
+         {cond
+            ({== [state] calibrating} kDataUnhandled)
+            ({== [state] browse}
+               {switch $component
+                  (calibrate.btn {$this start_calibrating})
+                  (autocalibrate.btn {$this set_state video})
+                  (reset_to_zero.btn {$this set_state audio})
+               }
+            )
+            (TRUE {$this set_state browse})
          }
       )
+      ; Measuring: a strum is a hit, and nothing else does anything.
       ; Setting: strum steps, yellow zeroes, red goes back to the rows, green
       ; falls through to SELECT_START_MSG.
       (BUTTON_DOWN_MSG
-         {if_else {== [state] browse}
-            {if_else {== $button kPad_Tri}
-               {do
-                  {synth play_sequence button_back.cue}
-                  {if_else {== [from_panel] game_settings_panel}
-                     {ui goto_screen game_settings_screen}
-                     {ui goto_screen pause_game_settings_screen}
+         {cond
+            ({== [state] calibrating}
+               {if {'||' {== $button kPad_DDown} {== $button kPad_DUp}}
+                  {push_back [hits] {taskmgr ui_seconds}}
+               }
+            )
+            ({== [state] browse}
+               {if_else {== $button kPad_Tri}
+                  {do
+                     {synth play_sequence button_back.cue}
+                     {if_else {== [from_panel] game_settings_panel}
+                        {ui goto_screen game_settings_screen}
+                        {ui goto_screen pause_game_settings_screen}
+                     }
+                  }
+                  kDataUnhandled
+               }
+            )
+            ({== $button kPad_DUp} {$this strum_step up 5})
+            ({== $button kPad_DDown} {$this strum_step down -5})
+            ({== $button kPad_Circle} {$this reset_value})
+            ({== $button kPad_Tri} {synth play_sequence button_back.cue} {$this set_state browse})
+            (TRUE kDataUnhandled)
+         }
+      )
+      ; Retail's start_countdown, a beat a pass: beats 0 to 3 a hat to count
+      ; in, 4 to 14 a click, its time kept against the strums, each after the
+      ; animation set off 0.6 before it, and at 15 the measure. The preview
+      ; stops meanwhile, its own clicks would be heard as these.
+      (start_calibrating
+         {set [previewing] FALSE}
+         {set [beat] 0}
+         {$this set_state calibrating}
+         {thread_task
+            (units kTaskUISeconds)
+            (script
+               {if {!= [state] calibrating}
+                  {$task exit}
+               }
+               {if {== [beat] 15}
+                  {do
+                     {$this finish_calibrating}
+                     {$task exit}
                   }
                }
-               kDataUnhandled
-            }
-            {cond
-               ({== $button kPad_DUp} {$this strum_step up 5})
-               ({== $button kPad_DDown} {$this strum_step down -5})
-               ({== $button kPad_Circle} {$this reset_value})
-               ({== $button kPad_Tri} {synth play_sequence button_back.cue} {$this set_state browse})
-               (TRUE kDataUnhandled)
+               {if_else {< [beat] 4}
+                  {do
+                     {countdown.lbl set text_token {elem (lag_3 lag_2 lag_1 lag_go) [beat]}}
+                     {practice_hat play}
+                  }
+                  {do
+                     {sync_click.cue play}
+                     {push_back [seconds] {taskmgr ui_seconds}}
+                  }
+               }
+               {$task sleep 0.133}
+               {if {== [beat] 3}
+                  {do
+                     {resize [hits] 0}
+                     {resize [seconds] 0}
+                  }
+               }
+               {if {== [beat] 14}
+                  {countdown.lbl set_localized ""}
+               }
+               {if {&& {>= [beat] 3} {< [beat] 14}}
+                  {$this play_sync_animation}
+               }
+               {$task sleep 0.6}
+               {set [beat] {'+' [beat] 1}}
+               {$task loop}
+            )
+         }
+      )
+      (finish_calibrating
+         {do
+            ($lag {$this calculate_lag [window] [min_hits] [hits] [seconds]})
+            {if_else {&& {> $lag [min_avg]} {< $lag [max_avg]}}
+               {do
+                  {latency set audio {int {if_else {< $lag 0} 0 $lag}}}
+                  {set [result] success}
+               }
+               {set [result] failure}
             }
          }
+         {$this set_state browse}
+         {$this resume_preview}
       )
       (play_sync_animation {lag animate})
       ; Both events of a beat, in the order they fall. Sleeps stay at the top
@@ -183,15 +330,21 @@
                {set $lag_disc_first {< $lag_disc $lag_click}}
                {set $lag_first {if_else $lag_disc_first $lag_disc $lag_click}}
                {set $lag_second {if_else $lag_disc_first $lag_click $lag_disc}}
+               ; Each event checks again: calibrating stops the preview
+               ; mid-beat, and its clicks must be the only ones heard.
                {$task sleep $lag_first}
-               {if_else $lag_disc_first
-                  {$this play_sync_animation}
-                  {sync_click.cue play}
+               {if [previewing]
+                  {if_else $lag_disc_first
+                     {$this play_sync_animation}
+                     {sync_click.cue play}
+                  }
                }
                {$task sleep {- $lag_second $lag_first}}
-               {if_else $lag_disc_first
-                  {sync_click.cue play}
-                  {$this play_sync_animation}
+               {if [previewing]
+                  {if_else $lag_disc_first
+                     {sync_click.cue play}
+                     {$this play_sync_animation}
+                  }
                }
                {$task sleep {- [period] $lag_second}}
                {$task loop}
