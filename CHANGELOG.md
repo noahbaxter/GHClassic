@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.8.6
+
+### New
+- Brought back calibration due to popular demand, right above separate video and audio latency controls
+
+### Bugs
+- Render engine issues on some AMD cards (fuck off black squares!)
+- Frame rate cap defaults to 60, as above 60 can stutter on some setups (existing installs: set `frame_rate_cap = 60` in settings.ini)
+
 ## v0.8.5
 
 **THIS IS UNFINISHED.** Expect bugs, missing features and things changing between releases.
