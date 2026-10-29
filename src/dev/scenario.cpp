@@ -254,12 +254,15 @@ namespace gh2::scenario
                 }
                 if (verb == "key")
                 {
-                    // A key by SDL's name (Tab, Return, Escape, Up), held
-                    // as a press is.
-                    s_pressKey = SDL_GetScancodeFromName(array.symbol(1).c_str());
+                    // A key by SDL's name (Tab, Return, Escape, Up, a digit),
+                    // held as a press is.
+                    const std::string name = array.symbol(1).empty()
+                                                 ? std::to_string(static_cast<int>(array.number(1)))
+                                                 : array.symbol(1);
+                    s_pressKey = SDL_GetScancodeFromName(name.c_str());
                     if (s_pressKey == SDL_SCANCODE_UNKNOWN)
                     {
-                        std::cerr << "[scenario] FAIL: no key " << array.symbol(1) << std::endl;
+                        std::cerr << "[scenario] FAIL: no key " << name << std::endl;
                         quit();
                         return;
                     }

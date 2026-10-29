@@ -33,7 +33,7 @@
 (expect {seat_has 1 keyboard} 1)
 ; P2's seat read again, GH2 puts Resume up.
 (expect {multi_pause_controller_panel focus_name} resume.btn)
-(key Return)
+(key 1)
 (wait_screen game_screen 10)
 (wait 1)
 (expect {game get_controller 1} joypad_guitar)

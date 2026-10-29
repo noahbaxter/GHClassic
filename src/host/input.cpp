@@ -75,24 +75,8 @@ namespace gh2
         HostFly s_fly, s_scriptedFly;
         uint64_t s_pressEventNs = 0; // the host thread's own
 
-        // The keyboard in a menu, on the port it drives: the arrows move,
-        // Enter picks and Esc backs out, as green and red.
-        struct MenuKey
-        {
-            SDL_Scancode key;
-            uint16_t bit;
-        };
-        const MenuKey kMenuKeys[] = {
-            {SDL_SCANCODE_UP, pad::kUp},       {SDL_SCANCODE_DOWN, pad::kDown},
-            {SDL_SCANCODE_LEFT, pad::kLeft},   {SDL_SCANCODE_RIGHT, pad::kRight},
-            {SDL_SCANCODE_RETURN, pad::kR2},   {SDL_SCANCODE_ESCAPE, pad::kCircle},
-        };
-        // The host thread's: the mode last poll, and the menu keys held as
-        // the mode changed, which do nothing until let go: the Enter that
-        // paused would pick Resume, the Escape that left the Controllers
-        // screen would back out of the menu under it.
+        // The host thread's: the mode last poll.
         Mode s_modeWas = Mode::kMenu;
-        std::array<bool, SDL_SCANCODE_COUNT> s_keyWait{};
         // The keyboard: anything of its held last poll, and whether it plays
         // nothing until it lets go, the press that stood it in for a seat or
         // what it held as the mode changed.
@@ -294,8 +278,6 @@ namespace gh2
             if (r.keyboard())
             {
                 bool any = std::any_of(r.held.begin(), r.held.end(), [](float h) { return h > kHeld; });
-                for (const MenuKey &k : kMenuKeys)
-                    any = any || keys[k.key];
                 if (any && !s_keyboardWas && inSong(mode) && s_seats.away(to) &&
                     !s_standIn[to].load(std::memory_order_relaxed))
                 {
@@ -314,28 +296,10 @@ namespace gh2
                     break;
 
                 // Its keys as the seat's mode plays them, in a menu as a
-                // menu takes them, its Enter Start only in a song playing.
+                // menu takes them: only what its layout binds.
                 HostPad &port = pads[to];
-                port.pressed |= mode == Mode::kPlaying
-                                    ? padOf(r.held, port.joypad).pressed
-                                    : static_cast<uint16_t>(menuButtons(padOf(r.held).pressed, port.joypad) &
-                                                            ~pad::kStart);
-                // Its menu keys. In a song playing only its Esc, as Start,
-                // and in the song's pause menu Esc is Start too.
-                for (const MenuKey &k : kMenuKeys)
-                {
-                    const bool esc = k.key == SDL_SCANCODE_ESCAPE;
-                    if (mode != s_modeWas && keys[k.key])
-                        s_keyWait[k.key] = true;
-                    if (mode == Mode::kPlaying && !esc)
-                        continue;
-                    if (!keys[k.key])
-                        s_keyWait[k.key] = false;
-                    else if (!s_keyWait[k.key])
-                        port.pressed |= esc && (mode == Mode::kPlaying || mode == Mode::kPaused)
-                                            ? pad::kStart
-                                            : menuButtons(k.bit, port.joypad);
-                }
+                port.pressed |= mode == Mode::kPlaying ? padOf(r.held, port.joypad).pressed
+                                                       : menuButtons(padOf(r.held).pressed, port.joypad);
             }
         s_modeWas = mode;
         if (mode == Mode::kControllers)

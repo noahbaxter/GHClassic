@@ -11,7 +11,7 @@
 ; Controllers leads here, from the keyboard as from a guitar.
 (expect {options_screen focus_name} op_audio.btn)
 (record on options)
-(key Return)
+(key 1)
 (wait 0.5)
 (expect {{ui current_screen} name} options_screen)
 (expect {{options_panel find op_data.btn} showing} 0)
@@ -20,7 +20,7 @@
 (key Down)
 (key Down)
 (expect {options_screen focus_name} controllers.btn)
-(key Return)
+(key 1)
 (wait_screen ghc_controllers_screen)
 (record off)
 (wait 1)
@@ -59,7 +59,7 @@
 (expect {ghc_controllers text title} KEYBOARD)
 (shot keys)
 ; Enter waits for yellow's key, and the next key pressed is it, written to
-; input.ini.
+; input.ini. This screen reads the keys itself, Enter its pick.
 (key Return)
 (wait 0.3)
 (shot rebind)
@@ -109,15 +109,15 @@
 (expect {options_screen focus_name} controllers.btn)
 (expect {{options_panel find controllers.btn} showing} 1)
 (shot options_back)
-; Another goes back to the first rows, on Settings, and one more to the main
+; Red goes back to the first rows, on Settings, and once more to the main
 ; menu.
-(key Escape)
+(key 2)
 (wait 0.5)
 (expect {{ui current_screen} name} options_screen)
 (expect {options_screen focus_name} op_audio.btn)
 (expect {{options_panel find op_data.btn} showing} 1)
 (expect {{options_panel find controllers.btn} showing} 0)
-(key Escape)
+(key 2)
 (wait_screen main_screen)
 (wait 1)
 {ui goto_screen options_screen}

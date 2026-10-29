@@ -88,7 +88,7 @@
 (expect {!= {{ui current_screen} focus_name} $was} 1)
 (expect {== {{ui current_screen} focus_name} $start} 1)
 ; Its Settings rows.
-(key Return)
+(key 1)
 (wait 0.5)
 (expect {options_screen focus_name} op_audio.btn)
 {set $start {{ui current_screen} focus_name}}
@@ -265,7 +265,7 @@
 {ui goto_screen loading_screen}
 (wait_screen game_screen 60)
 (wait 2)
-(key Escape)
+(key Return)
 (wait_screen pause_screen 10)
 (wait 1)
 {set $start {{ui current_screen} focus_name}}

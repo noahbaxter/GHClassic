@@ -1,0 +1,16 @@
+; Naming a band asks for Start, and the keyboard's Enter is Start: a screen
+; that wants it gets it, as from a pad. Space only picks.
+#include common/first_boot.dta
+(key Down)
+(expect {seat_has 0 keyboard} 1)
+{nameprof_screen set back_screen main_screen}
+{nameprof_screen set is_editing FALSE}
+{nameprof_screen set profile_slot 0}
+{nameprof_screen set next_screen sel_difficulty_screen}
+{ui goto_screen nameprof_screen}
+(wait_screen nameprof_screen 10)
+(wait 1)
+(key Return)
+(wait 1.5)
+(expect {!= {{ui current_screen} name} nameprof_screen} 1)
+(quit)
