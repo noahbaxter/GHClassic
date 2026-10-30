@@ -915,8 +915,12 @@ namespace gh2::synth
 
         if (s.state >= kStreamReady && s.state <= kStreamPaused)
         {
+            // None once the first channel has played its data out: its read
+            // position stops there while the rest finish, and the song clock,
+            // held to it, would be pulled back the whole time.
             const uint32_t pos = s.channels.empty() || s.channels[0].reference < 0 ? 0u : position(s.channels[0]);
-            queue(kReplyStreamPosition, {s.id, pos});
+            if (s.channels.empty() || s.channels[0].state != kEnded)
+                queue(kReplyStreamPosition, {s.id, pos});
             // Slip offsets in samples, the heard voice against the reference
             // (0x3644), wrapped to half the ring either way. Taken only while
             // the heard voice plays inside the ring (0x2c54): one keyed on
