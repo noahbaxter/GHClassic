@@ -26,6 +26,7 @@
 #include "game_overrides.h"
 #include "gh1/face.h"
 #include "custom/install.h"
+#include "gameplay/extended/guitar/gem_kinds.h"
 #include "gh1/install.h"
 #include "gh80s/install.h"
 #include "gh2x/install.h"
@@ -125,6 +126,7 @@ namespace
         gh2::installMetaMusic(runtime, gh2::kSlus21447);
         gh2::installTrackStart(runtime, gh2::kSlus21447);
         gh2::installSustainRelease(runtime, gh2::kSlus21447);
+        gh2::guitar::installGemKinds(runtime, gh2::kSlus21447);
         gh2::installWhammyHold(runtime, gh2::kSlus21447);
         gh2::installHopoLock(runtime, gh2::kSlus21447);
         // Off, neither is installed: the score and rock meters stay where

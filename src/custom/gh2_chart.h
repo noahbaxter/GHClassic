@@ -4,13 +4,20 @@
 // ticks a beat, PART GUITAR's gems on 60 to 64, 72 to 76, 84 to 88 and 96 to
 // 100, each difficulty's star power on the note past its frets (67, 79, 91,
 // 103), big notes on 110, [solo_on] and [solo_off], and EVENTS' [section],
-// [music_start] and [end]. Every gem's kind is GH2's natural one, a chord
-// holds as long as its longest lane, a sustain ends where the next gem
-// starts, and opens are left out.
+// [music_start] and [end].
+//
+// What GH2's parser cannot say is given beside it (Gh2Chart::gems), each gem's
+// kind where the chart decides it or flips the engine's, and the song's HOPO
+// threshold, for the engine to put in as the gems load
+// (gameplay/extended/guitar/gem_kinds.h). Not yet said at all: a chord holds as
+// long as its longest lane, a sustain ends where the next gem starts, and opens
+// are left out.
 
 #include "custom/chart.h"
 
+#include <array>
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -18,9 +25,24 @@ namespace gh2::custom
 {
     constexpr uint32_t kGh2Resolution = 480u;
 
+    // A gem as GH2's parser reads it from the MIDI (its frets), and what the
+    // parser cannot read: whether it is strummed or hammered on.
+    struct Gh2Gem
+    {
+        uint8_t frets = 0u; // bit 0 green
+        bool hopo = false;
+        // Its kind the chart's (forced), else the running engine's natural
+        // one, flipped where `flip`.
+        bool decided = false;
+        bool flip = false;
+    };
+
     struct Gh2Chart
     {
         std::vector<uint8_t> mid;
+        // Each difficulty's gems by tick, easy first.
+        std::array<std::map<uint32_t, Gh2Gem>, 4> gems;
+        std::optional<uint32_t> hopoThreshold; // Chart's
     };
 
     // The part PART GUITAR is of a chart with `parts` (a bit each Part):

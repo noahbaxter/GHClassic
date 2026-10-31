@@ -46,6 +46,7 @@ namespace gh2::custom
     std::optional<Gh2Chart> toGh2(const Chart &chart, double lengthSeconds, std::optional<Part> want)
     {
         Gh2Chart out;
+        out.hopoThreshold = chart.hopoThreshold;
         uint8_t parts = 0u;
         for (const auto &[part, difficulties] : chart.parts)
             parts |= static_cast<uint8_t>(1u << int(part));
@@ -94,6 +95,14 @@ namespace gh2::custom
                     length = std::min(length, next - start);
                 length = std::max(length, 1u);
                 last = std::max(last, start + length);
+                // A chord is strummed: GH2 hammers on single notes alone
+                // (GuitarTrackWatcherImpl::TryToHopo, 0x24dc20).
+                const uint8_t frets = static_cast<uint8_t>(g.lanes & 0x1fu);
+                const bool single = (frets & (frets - 1u)) == 0u;
+                out.gems[d][start] = {.frets = frets,
+                                      .hopo = single && g.kind != Kind::Strum,
+                                      .decided = g.forced,
+                                      .flip = single && g.flip};
                 for (int lane = 0; lane < 5; ++lane)
                     if (g.lanes & (1u << lane))
                     {

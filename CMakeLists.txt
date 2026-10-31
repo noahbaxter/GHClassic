@@ -337,6 +337,7 @@ set(GHC_GAME_SOURCES
     src/gameplay/engine/sustain_release.cpp
     src/gameplay/engine/track_start.cpp
     src/gameplay/engine/whammy_hold.cpp
+    src/gameplay/extended/guitar/gem_kinds.cpp
     src/highway/note_speed.cpp
     src/highway/retrack.cpp
     src/gh1/band.cpp

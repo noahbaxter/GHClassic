@@ -242,6 +242,13 @@ namespace
         CHECK(ons[97] == (std::vector<uint32_t>{120u, 240u}));
         CHECK(ons[103] == (std::vector<uint32_t>{1920u}));
         CHECK(ons.size() == 6u); // five frets and star power: no open
+        // Each gem's kind beside it, at 480 a beat: the tap hammers on, the
+        // chord is strummed.
+        const auto &kinds = gh2->gems[3];
+        const auto hopo = [&](uint32_t tick) { return kinds.count(tick) && kinds.at(tick).hopo; };
+        CHECK(kinds.size() == 7u);
+        CHECK(!hopo(0) && hopo(120) && !hopo(240) && !hopo(360) && hopo(960) && hopo(1080) && !hopo(1920));
+        CHECK(kinds.count(1920) && kinds.at(1920).frets == 0x5u);
         bool end = false, section = false;
         for (const midi::Event &e : back->tracks[2].events)
         {

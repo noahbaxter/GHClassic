@@ -64,6 +64,9 @@ namespace gh2
         uint32_t muteTrack;      // MasterAudio::MuteTrack
         uint32_t unmuteTrack;    // MasterAudio::UnmuteTrack
         uint32_t masterAudioReleaseGem;
+        uint32_t songDataLoad;             // SongData::Load(BinStream &, const DataArray *, ...)
+        uint32_t songDataAddMultiGem;      // SongData::AddMultiGem(int, const MultiGemInfo &)
+        uint32_t songParserOnGemEnd;       // SongParser::OnGemEnd(int tick, unsigned char pitch)
         uint32_t checkForPitchBend; // TrackWatcherImpl::CheckForPitchBend
         uint32_t sendWhammy;        // TrackWatcherImpl::SendWhammy
         uint32_t playerSetWhammyBar; // Player::SetWhammyBar
@@ -375,6 +378,9 @@ namespace gh2
         .muteTrack = 0x23a2c0u,
         .unmuteTrack = 0x23a370u,
         .masterAudioReleaseGem = 0x239ec8u,
+        .songDataLoad = 0x243da8u,
+        .songDataAddMultiGem = 0x244890u,
+        .songParserOnGemEnd = 0x245ee8u,
         .checkForPitchBend = 0x248e38u,
         .sendWhammy = 0x249b98u,
         .playerSetWhammyBar = 0x111d88u,
