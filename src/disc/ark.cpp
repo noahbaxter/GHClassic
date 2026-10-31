@@ -86,6 +86,7 @@ namespace gh2::ark
         std::vector<Rename> s_renames;
         std::unordered_map<std::string, Entry> s_loose; // searched before all else
         std::unordered_map<std::string, std::function<std::optional<Made>()>> s_made; // loose once made
+        std::vector<std::pair<std::string, std::function<std::optional<Made>(const std::string &)>>> s_makers;
         uint32_t s_blockSizeAddress = 0u;
         struct Layer
         {
@@ -352,6 +353,13 @@ namespace gh2::ark
                     return &(s_loose[name] = addPart({std::move(file->read), size, size}));
                 }
             }
+            for (const auto &[prefix, make] : s_makers)
+                if (name.compare(0u, prefix.size(), prefix) == 0)
+                    if (auto file = make(name))
+                    {
+                        const uint32_t size = file->size;
+                        return &(s_loose[name] = addPart({std::move(file->read), size, size}));
+                    }
             if (const Entry *entry = routed(name))
                 return entry;
             if (s_boot && s_bootFiles.count(name) != 0u)
@@ -505,6 +513,11 @@ namespace gh2::ark
     void addMade(const std::string &path, std::function<std::optional<Made>()> make)
     {
         s_made[key(path.c_str())] = std::move(make);
+    }
+
+    void addMaker(const std::string &prefix, std::function<std::optional<Made>(const std::string &path)> make)
+    {
+        s_makers.emplace_back(prefix, std::move(make));
     }
 
     void addMade(size_t disc, const std::string &path, std::function<std::optional<Made>()> make,
