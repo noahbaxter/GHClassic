@@ -31,6 +31,7 @@
 #include "save/gh1_stream.h"
 #include "save/gh2_text.h"
 #include "save/ps2_card.h"
+#include "save/results.h"
 #include "save/store.h"
 #include "script.h"
 #include "settings/ini.h"
@@ -303,6 +304,22 @@ namespace gh2::save
         {
             const auto it = s_songGames.find(song);
             return it == s_songGames.end() ? s_game : it->second;
+        }
+
+        // The [best] section as kept: the disk's, taken once where no save
+        // has been loaded yet, so a best kept before the load adds to it.
+        Section &bests()
+        {
+            static bool s_read = false;
+            if (!s_read && s_loaded == Loaded::kNothing && !s_store.find(kBestSection))
+            {
+                s_read = true;
+                Store disk;
+                if (readFile(path(), disk) == ReadResult::kOk)
+                    if (const Section *section = disk.find(kBestSection))
+                        s_store.sections.push_back(*section);
+            }
+            return s_store.section(kBestSection);
         }
 
         // A game's save folder as each game writes it: the marker file named
@@ -872,6 +889,40 @@ namespace gh2::save
             worker::run(write);
     }
 
+    std::string gameOfSong(const std::string &song)
+    {
+        return gameOf(song);
+    }
+
+    std::optional<Best> keptBest(const std::string &key)
+    {
+        const std::string *kept = bests().get(key);
+        return kept ? parseBest(*kept) : std::nullopt;
+    }
+
+    void keepBest(const std::string &key, const Best &best)
+    {
+        // Into the save on disk as it is there, its careers as the game last
+        // saved them; where there is none yet the game's first save carries it.
+        Store disk;
+        const bool onDisk = !s_inMemory && readFile(path(), disk) == ReadResult::kOk;
+        // The best of the disk's, this run's own (a write that failed may
+        // have left the disk's behind) and the new one.
+        Best now = best;
+        for (const std::string *was : {bests().get(key), onDisk ? disk.section(kBestSection).get(key) : nullptr})
+            if (const auto old = was ? parseBest(*was) : std::nullopt)
+                now = better(*old, now);
+        const auto keep = [&](Section &section)
+        {
+            section.set("version", std::to_string(kBestVersion));
+            section.set(key, bestText(now));
+        };
+        keep(bests());
+        if (!onDisk)
+            return;
+        keep(disk.section(kBestSection));
+        if (!writeFile(path(), disk))
+            std::cerr << "[save] could not write " << path() << std::endl;
     }
 
     std::string keptEngine()
@@ -948,5 +999,6 @@ namespace gh2::save
         runtime.replaceFunction(addresses.loadData1, loadData1);
         EntryHook<LoadData2Tag>::install(runtime, addresses.loadData2, onLoadData2);
         EntryHook<HighScoreDbTag>::install(runtime, addresses.highScoreDbCtor, onHighScoreDb);
+        installResults(runtime, addresses);
     }
 }

@@ -10,6 +10,7 @@
 #include <fstream>
 #include <iterator>
 #include <sstream>
+#include <unordered_map>
 
 namespace gh2::save
 {
@@ -82,6 +83,10 @@ namespace gh2::save
     {
         Store store;
         Section *current = nullptr;
+        // Each section's keys to their place, as set's own search is linear
+        // and [best] holds tens of thousands.
+        std::unordered_map<std::string, std::unordered_map<std::string, size_t>> places;
+        std::unordered_map<std::string, size_t> *place = nullptr;
         std::istringstream in(text);
         std::string line;
         while (std::getline(in, line))
@@ -92,12 +97,18 @@ namespace gh2::save
             if (const auto name = ini::sectionName(line))
             {
                 current = &store.section(*name);
+                place = &places[*name];
                 continue;
             }
             const size_t eq = line.find('=');
             if (eq == std::string::npos || !current)
                 continue;
-            current->set(ini::trim(line.substr(0, eq)), ini::trim(line.substr(eq + 1)));
+            std::string key = ini::trim(line.substr(0, eq)), value = ini::trim(line.substr(eq + 1));
+            const auto [at, added] = place->try_emplace(key, current->values.size());
+            if (added)
+                current->values.emplace_back(std::move(key), std::move(value));
+            else
+                current->values[at->second].second = std::move(value);
         }
         return store;
     }

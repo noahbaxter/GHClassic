@@ -154,6 +154,7 @@ FetchContent_MakeAvailable(stb)
 # The save code's round trips, which need no disc and no game.
 add_executable(save_test EXCLUDE_FROM_ALL
     tests/save_test.cpp
+    src/save/best.cpp
     src/save/gh2_stream.cpp
     src/save/gh2_text.cpp
     src/save/ps2_card.cpp
@@ -382,11 +383,13 @@ set(GHC_GAME_SOURCES
     src/movie/movie.cpp
     src/movie/pss.cpp
     src/movie/screen.cpp
+    src/save/best.cpp
     src/save/card.cpp
     src/save/gh1_stream.cpp
     src/save/gh2_stream.cpp
     src/save/gh2_text.cpp
     src/save/ps2_card.cpp
+    src/save/results.cpp
     src/save/save.cpp
     src/save/store.cpp
     src/settings/latency.cpp

@@ -2,6 +2,7 @@
 
 #include "addresses.h"
 #include "gameplay/note_engine/note_engine.h"
+#include "save/best.h"
 
 #include <array>
 #include <cstdint>
@@ -103,6 +104,16 @@ namespace gh2::save
     // the next boot to open on: empty when it holds none.
     std::string state(const std::string &section, const std::string &key);
     void keepState(const std::string &section, const std::string &key, const std::string &value);
+
+    // Every song's best (save/best.h), in save.bin apart from the careers.
+    // A best kept is the better of it and the one there, written into the
+    // save on disk at once; where there is none yet, the game's first save
+    // carries it.
+    std::optional<Best> keptBest(const std::string &key);
+    void keepBest(const std::string &key, const Best &best);
+    // The game a song is from, as addScoreSongs named it; the career's own
+    // where none did.
+    std::string gameOfSong(const std::string &song);
 
     void leaveGame(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
     void enterGame(const std::string &game, uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
