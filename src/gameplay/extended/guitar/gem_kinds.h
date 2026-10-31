@@ -3,8 +3,8 @@
 // A custom song's gems as its chart has them, put into GH2's as they load: each
 // strummed or hammered on as the engine judging decides it (GH2's or GH1's
 // rule, GameGemList::WillBeNoStrum) under the song's own threshold where it has
-// one, unless the chart forces it, flips it, or it is an open; and each open a
-// gem with no fret. How they are played is
+// one, unless the chart forces it, flips it, or it is a tap or an open; and
+// each open a gem with no fret. How they are played is
 // gameplay/extended/guitar/hammer_ons'. Only for a song whose midi_file is one
 // of ours; every other song loads as ever.
 
@@ -33,6 +33,10 @@ namespace gh2::guitar
 
     // The lane an open is hammered on as, and drawn on.
     constexpr uint32_t kOpenLane = 2u;
+
+    // Whether the song playing's gem on that track, at that tick (GH2's,
+    // 480 a beat) on those frets, is a tap. Never for a song not ours.
+    bool isTap(uint32_t track, uint32_t tick, uint8_t frets);
 
     void installGemKinds(PS2Runtime &runtime, const Addresses &addresses);
 }

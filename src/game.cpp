@@ -32,6 +32,7 @@
 #include "highway/extended/guitar/open_gems.h"
 #include "highway/extended/guitar/open_bursts.h"
 #include "highway/extended/guitar/open_tails.h"
+#include "highway/extended/guitar/tap_gems.h"
 #include "highway/gem_looks.h"
 #include "gh1/install.h"
 #include "gh80s/install.h"
@@ -142,6 +143,8 @@ namespace
         gh2::installWhammyHold(runtime, gh2::kSlus21447);
         gh2::installStarPowerOverlap(runtime, gh2::kSlus21447);
         gh2::guitar::installCyanStars(runtime, gh2::kSlus21447);
+        // After the cyan stars, which it copies.
+        gh2::guitar::installTapGems(runtime, gh2::kSlus21447);
         gh2::installHopoLock(runtime, gh2::kSlus21447);
         // Off, neither is installed: the score and rock meters stay where
         // retail has them.

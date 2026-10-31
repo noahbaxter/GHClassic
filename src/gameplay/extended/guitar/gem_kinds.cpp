@@ -137,6 +137,26 @@ namespace gh2::guitar
             if (decided & kFlip)
                 SET_GPR_U32(ctx, 2, GPR_U32(ctx, 2) ^ 1u);
         }
+
+        // An open HOPO is hit by letting go of the last fret held. GH2 tries
+        // a hammer-on or pull-off (GuitarTrackWatcherImpl::TryToHopo,
+        // 0x24dc20, by way of NonStrumSwing, 0x24d828) for a fret pressed
+        // or one left held, never for none, and matches the gem's frets to
+        // that one alone. So with every fret let go and an open HOPO next,
+        // it is tried as the middle lane's, that gem one fret for the try.
+        //
+        // GuitarTrackWatcherImpl: its gems (+0x04, GameGemList, theirs at
+        // +0x08, 0x10 each), its clock (+0x0c, a virtual at +0x10 its now in
+        // ms) and the frets held (+0x84). GameGem: slots +0x0c, flags +0x0d
+        // (bit 0 HOPO).
+        constexpr uint32_t kWatcherGems = 0x04u, kWatcherClock = 0x0cu, kWatcherHeld = 0x84u;
+        constexpr uint32_t kListGems = 0x08u, kGemSize = 0x10u, kGemSlots = 0x0cu, kGemFlags = 0x0du;
+
+        uint32_t watcherGem(uint8_t *rdram, uint32_t watcher, int32_t index)
+        {
+            return load<uint32_t>(rdram, load<uint32_t>(rdram, watcher + kWatcherGems) + kListGems) +
+                   static_cast<uint32_t>(index) * kGemSize;
+        }
     }
 
     void setGems(const std::string &midi, const std::array<std::map<uint32_t, Gh2Gem>, 4> &gems,
@@ -148,6 +168,25 @@ namespace gh2::guitar
     bool playingCustom()
     {
         return s_loading != nullptr;
+    }
+
+    bool isTap(uint32_t track, uint32_t tick, uint8_t frets)
+    {
+        if (!s_loading)
+            return false;
+        const auto tapAt = [&](int d)
+        {
+            const auto it = s_loading->gems[d].find(tick);
+            // An open's frets are none once loaded (onAddMultiGem).
+            return it != s_loading->gems[d].end() && it->second.tap &&
+                   (it->second.open ? frets == 0u : it->second.frets == frets);
+        };
+        if (const auto known = s_difficultyOf.find(track); known != s_difficultyOf.end())
+            return tapAt(known->second);
+        for (int d = 0; d < 4; ++d)
+            if (tapAt(d))
+                return true;
+        return false;
     }
 
     void installGemKinds(PS2Runtime &runtime, const Addresses &addresses)

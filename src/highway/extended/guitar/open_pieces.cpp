@@ -75,7 +75,21 @@ namespace gh2::guitar
              .across = true},
             {.from = "top.mesh", .as = "open_bonus_hopo_star.mesh", .mat = "top.mat", .openMat = "open_on_streak_hopo.mat",
              .across = true, .raised = true},
+            // A tap's (highway/extended/guitar/tap_gems) cap, raised as a
+            // HOPO's, its top its gem's colour, as a lane tap's is.
+            {.from = "top.mesh", .as = "open_tap.mesh", .mat = "top.mat", .openMat = "open_tap.mat", .across = true,
+             .raised = true},
+            {.from = "top.mesh", .as = "open_tap_star.mesh", .mat = "top.mat", .openMat = "open_tap_streak.mat",
+             .across = true, .raised = true},
+            {.from = "top.mesh", .as = "open_bonus_tap.mesh", .mat = "top.mat", .openMat = "open_on_tap.mat", .across = true,
+             .raised = true},
+            {.from = "top.mesh", .as = "open_bonus_tap_star.mesh", .mat = "top.mat", .openMat = "open_on_tap_streak.mat",
+             .across = true, .raised = true},
         };
+
+        // A tap's glass gem bodies, tap_ and their open_ name, made by
+        // highway/extended/guitar/tap_pieces.
+        constexpr const char *kTapBodies[] = {"open_gem.mesh", "open_star.mesh", "open_gem_bonus.mesh"};
 
 
         // A cap (top.mesh) is bands: a shadow flat on the track, the lip
@@ -195,6 +209,11 @@ namespace gh2::guitar
             {"open_on_hopo.tex", "open_on_hopo.mat", kStreakWhite, nullptr, kStreakCyan, kStreakCyan},
             {"open_on_streak.tex", "open_on_streak.mat", kStreakCyan, kStreakWhite, kStreakBlack, kStreakCyan},
             {"open_on_streak_hopo.tex", "open_on_streak_hopo.mat", kStreakWhite, kStreakCyan, kStreakCyan, kStreakCyan},
+            // A tap's: its top and ring its gem's colour.
+            {"open_tap.tex", "open_tap.mat", kStreakPurple, nullptr, kStreakPurple, kStreakWhite},
+            {"open_tap_streak.tex", "open_tap_streak.mat", kStreakPurple, kStreakCyan, kStreakPurple, kStreakCyan},
+            {"open_on_tap.tex", "open_on_tap.mat", kStreakCyan, nullptr, kStreakCyan, kStreakCyan},
+            {"open_on_tap_streak.tex", "open_on_tap_streak.mat", kStreakCyan, kStreakWhite, kStreakCyan, kStreakCyan},
         };
         void streakColor(float u, const Streak &s, uint8_t *rgba)
         {
@@ -245,14 +264,24 @@ namespace gh2::guitar
     }
 
     // The wide mesh drawn for a part of the middle lane's, of a rep of
-    // `type`, its gem in a star phrase or not.
-    std::string openName(const std::string &mesh, uint32_t type, bool phrase)
+    // `type`, its gem in a star phrase or not, a tap or not.
+    std::string openName(const std::string &mesh, uint32_t type, bool phrase, bool tap)
     {
+        if (mesh == "blue_hopo.mesh" && tap)
+            return phrase ? "open_bonus_tap_star.mesh" : "open_bonus_tap.mesh";
         if (mesh == "blue_hopo.mesh")
             return phrase ? "open_bonus_hopo_star.mesh" : "open_bonus_hopo.mesh";
         if (mesh == "top.mesh" && type == gemRep::kTypeBonus)
             return phrase ? "open_bonus_top_star.mesh" : "open_bonus_top.mesh";
-        return "open_" + (mesh.rfind(kLaneColour, 0u) == 0u ? mesh.substr(std::strlen(kLaneColour)) : mesh);
+        const std::string open =
+            "open_" + (mesh.rfind(kLaneColour, 0u) == 0u ? mesh.substr(std::strlen(kLaneColour)) : mesh);
+        if (!tap)
+            return open;
+        if (open == "open_hopo.mesh")
+            return "open_tap.mesh";
+        if (open == "open_top_star.mesh")
+            return "open_tap_star.mesh";
+        return std::find(std::begin(kTapBodies), std::end(kTapBodies), open) != std::end(kTapBodies) ? "tap_" + open : open;
     }
 
     std::vector<std::string> openStreakMats()

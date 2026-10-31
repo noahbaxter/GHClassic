@@ -25,17 +25,19 @@ namespace gh2::custom
     constexpr uint32_t kGh2Resolution = 480u;
 
     // A gem as GH2's parser reads it from the MIDI (its frets), and what the
-    // parser cannot read: whether it is strummed or hammered on, and whether
-    // it is an open, written as kOpenFrets.
+    // parser cannot read: whether it is strummed or hammered on, whether it
+    // is an open, written as kOpenFrets, and whether it is a tap (played as
+    // a HOPO, drawn as a tap).
     struct Gh2Gem
     {
         uint8_t frets = 0u; // bit 0 green
         bool hopo = false;
-        // Its kind the chart's (forced, or an open), else the running
+        // Its kind the chart's (forced, a tap or an open), else the running
         // engine's natural one, flipped where `flip`.
         bool decided = false;
         bool flip = false;
         bool open = false;
+        bool tap = false;
     };
     constexpr uint8_t kOpenFrets = 0x1fu;
 

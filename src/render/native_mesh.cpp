@@ -30,7 +30,7 @@ namespace gh2
     namespace
     {
         const Addresses *s_addresses = nullptr;
-        MeshRider s_rider = nullptr;
+        std::vector<MeshRider> s_riders;
 
         // The name of the Hmx::Object an object's first word points to.
         std::string objectName(uint8_t *rdram, uint32_t address)
@@ -249,10 +249,12 @@ namespace gh2
                     if (frame.lit >= 0 && static_cast<size_t>(frame.lit) < frame.shadows.size())
                         draw.shadow = static_cast<uint32_t>(frame.lit) + 1u;
                     pushPasses(rdram, ctx, runtime, mesh, draw);
-                    if (s_rider != nullptr)
+                    if (!s_riders.empty())
                     {
                         std::vector<std::shared_ptr<const MeshData>> more;
-                        s_rider(rdram, mesh, *draw.mesh, more);
+                        const auto geometry = draw.mesh;
+                        for (const MeshRider rider : s_riders)
+                            rider(rdram, mesh, *geometry, more);
                         for (auto &extra : more)
                         {
                             draw.mesh = std::move(extra);
@@ -315,5 +317,5 @@ namespace gh2
         runtime.replaceFunction(addresses.psMultiMeshDrawShowing, drawMultiShowing);
     }
 
-    void setMeshRider(MeshRider rider) { s_rider = rider; }
+    void addMeshRider(MeshRider rider) { s_riders.push_back(rider); }
 }

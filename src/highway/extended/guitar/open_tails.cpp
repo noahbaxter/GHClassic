@@ -503,16 +503,14 @@ namespace gh2::guitar
     void installOpenTails(PS2Runtime &runtime, const Addresses &addresses)
     {
         s_addresses = &addresses;
-        setMeshRider(rideTail);
-        s_enableDuration = runtime.lookupFunction(addresses.gemRepEnableDuration);
-        runtime.replaceFunction(addresses.gemRepEnableDuration, &enableDuration);
-        s_setDuration = runtime.lookupFunction(addresses.gemRepSetDuration);
-        runtime.replaceFunction(addresses.gemRepSetDuration, &setDuration);
+        addMeshRider(rideTail);
+        replaceKeeping(runtime, addresses.gemRepEnableDuration, &enableDuration, s_enableDuration);
+        replaceKeeping(runtime, addresses.gemRepSetDuration, &setDuration, s_setDuration);
         // After the mesh capture's, so a tail is pulled apart before it is
         // taken.
         EntryHook<TailSyncTag>::install(runtime, addresses.psMeshSync, onTailSync);
         EntryHook<GlowColorTag>::install(runtime, addresses.rndLineSetPointColor, onGlowColor);
         EntryHook<GlowDrawTag>::install(runtime, addresses.rndLineDrawShowing, onGlowDraw);
-        EntryHook<PoolGoneTag>::install(runtime, addresses.gemRepPoolDtor, onPoolGone);
+        onTrackGone(trackGone);
     }
 }

@@ -11,6 +11,7 @@
 #include "highway/cyan_stars.h"
 #include "highway/extended/guitar/open_pieces.h"
 #include "highway/extended/guitar/open_tails.h"
+#include "highway/extended/guitar/tap_gems.h"
 #include "highway/gem_looks.h"
 #include "hook.h"
 #include "milo/layout.h"
@@ -80,6 +81,7 @@ namespace gh2::guitar
             const uint32_t type = load<uint32_t>(rdram, rep + gemRep::kType);
             const auto open = s_openReps.find(rep);
             const bool phrase = open != s_openReps.end() && inStarPhrase(open->second);
+            const bool tap = open != s_openReps.end() && isTapGem(open->second);
             for (const uint32_t part : gemRep::kParts)
             {
                 const uint32_t object = partObject(rdram, rep, part);
@@ -94,7 +96,7 @@ namespace gh2::guitar
                     continue;
                 }
                 const uint32_t scene = load<uint32_t>(rdram, object + ::milo::object::kDir);
-                const uint32_t found = findObject(rdram, ctx, runtime, scene, openName(name, type, phrase));
+                const uint32_t found = findObject(rdram, ctx, runtime, scene, openName(name, type, phrase, tap));
                 if (found == 0u)
                     continue;
                 setUpStreaks(rdram, ctx, runtime, scene);
