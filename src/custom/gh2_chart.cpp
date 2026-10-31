@@ -107,7 +107,8 @@ namespace gh2::custom
                                       .hopo = (single || open) && g.kind != Kind::Strum,
                                       .decided = g.forced || open,
                                       .flip = single && g.flip,
-                                      .open = open};
+                                      .open = open,
+                                      .tap = (single || open) && g.kind == Kind::Tap};
                 for (int lane = 0; lane < 5; ++lane)
                     if (frets & (1u << lane))
                     {

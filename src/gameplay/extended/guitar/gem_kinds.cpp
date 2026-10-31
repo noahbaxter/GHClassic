@@ -150,6 +150,25 @@ namespace gh2::guitar
         return s_loading != nullptr;
     }
 
+    bool isTap(uint32_t track, uint32_t tick, uint8_t frets)
+    {
+        if (!s_loading)
+            return false;
+        const auto tapAt = [&](int d)
+        {
+            const auto it = s_loading->gems[d].find(tick);
+            // An open's frets are none once loaded (onAddMultiGem).
+            return it != s_loading->gems[d].end() && it->second.tap &&
+                   (it->second.open ? frets == 0u : it->second.frets == frets);
+        };
+        if (const auto known = s_difficultyOf.find(track); known != s_difficultyOf.end())
+            return tapAt(known->second);
+        for (int d = 0; d < 4; ++d)
+            if (tapAt(d))
+                return true;
+        return false;
+    }
+
     void installGemKinds(PS2Runtime &runtime, const Addresses &addresses)
     {
         s_addresses = &addresses;
