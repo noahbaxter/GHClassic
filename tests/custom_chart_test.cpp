@@ -6,6 +6,8 @@
 
 #include "custom/chart.h"
 #include "custom/gh2_chart.h"
+#include "custom/index.h"
+#include "custom/library.h"
 #include "custom/song_ini.h"
 #include "formats/md5.h"
 #include "formats/midi.h"
@@ -16,7 +18,9 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <map>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -39,6 +43,11 @@ namespace
             ++s_failed; \
         } \
     } while (0)
+
+    // The least a song folder needs: a one-gem chart, and the head of an Ogg
+    // page that names Vorbis for its stem.
+    const std::string kOneGem = "[Song]\n{\n  Resolution = 192\n}\n[ExpertSingle]\n{\n  0 = N 0 0\n}\n";
+    const std::string kVorbisHead = "OggS" + std::string(24, '\0') + "\x01vorbis";
 
     const Gem *at(const Difficulty &d, uint32_t tick)
     {
@@ -219,6 +228,98 @@ namespace
         CHECK(gh2 && midi::parse(gh2->mid));
     }
 
+    // A song with no art and no tags ends its index line on an empty field,
+    // and is read back all the same.
+    void indexBare()
+    {
+        const fs::path file = fs::temp_directory_path() / "ghc_index_bare_test.txt";
+        Song bare = song("/c/a/bare", "");
+        bare.tags.clear();
+        bare.why = "no audio";
+        writeIndex(file, {song("/c/a/one", "One"), bare, song("/c/a/two", "Two")});
+        const std::vector<Song> back = readIndex(file);
+        CHECK(back.size() == 3u && back[1].dir == "/c/a/bare" && back[1].art.empty() && back[2].dir == "/c/a/two");
+        fs::remove(file);
+    }
+
+    // Every stem name Clone Hero and YARG play, any case and format, in
+    // kStems' order; what else charts carry (a preview, a Mac's ._ files,
+    // a download's second copy, censored takes) left out. Then which
+    // stems go with the played part.
+    void stems()
+    {
+        const fs::path dir = fs::temp_directory_path() / "ghc_stems_test";
+        fs::remove_all(dir);
+        fs::create_directories(dir);
+        std::ofstream(dir / "song.ini") << "[Song]\nName = Stems\n";
+        std::ofstream(dir / "notes.chart") << kOneGem;
+        const std::map<std::string, std::string> heads = {
+            {".ogg", kVorbisHead},
+        bare.reject = Reject::NoAudio;
+            {".opus", "OggS" + std::string(24, '\0') + "OpusHead"},
+            {".mp3", "ID3"},
+            {".wav", "RIFF" + std::string(4, '\0') + "WAVE"},
+        CHECK(back.size() == 3u && back[1].reject == Reject::NoAudio && back[0].reject == Reject::None);
+        fs::remove(file);
+    }
+
+    // badsongs.txt: the songs that don't play under their kind's heading,
+    // in Reject's order, the why only where the heading doesn't say it;
+    // no song that plays, nor a copy.
+    void badSongs()
+    {
+        const fs::path file = fs::temp_directory_path() / "ghc_badsongs_test.txt";
+        Song audio = song("/c/a/audio", ""), chart = song("/c/a/chart", ""), drums = song("/c/a/drums", "");
+        audio.why = "song.mp3 is MPEG-4 audio", audio.reject = Reject::BadAudio;
+        chart.why = "notes.mid: not a MIDI file", chart.reject = Reject::BadChart;
+        drums.why = "no 5-fret guitar or bass part", drums.reject = Reject::NoPart;
+        writeBadSongs(file, {audio, song("/c/a/one", "One", "7"), drums, chart, song("/c/b/one", "One", "7")});
+        std::ifstream in(file);
+        const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        in.close(); // Windows removes no file held open
+        const std::string want = "\nThese charts are corrupted and can't be read.\n/c/a/chart\n    notes.mid: not a MIDI file\n"
+                                 "\nThese charts have no part GH Classic plays (guitar, co-op guitar, rhythm or bass).\n/c/a/drums\n"
+                                 "\nThese songs' audio is corrupted or in a format GH Classic can't play.\n/c/a/audio\n"
+                                 "    song.mp3 is MPEG-4 audio\n";
+        CHECK(text.size() > want.size() && text.compare(text.size() - want.size(), want.size(), want) == 0);
+        CHECK(text.find("/c/a/one") == std::string::npos && text.find("/c/b/one") == std::string::npos);
+            {".aiff", "FORM" + std::string(4, '\0') + "AIFF"},
+        };
+        const std::vector<std::string> played = {
+            "song.ogg",       "Guitar.opus",          "rhythm.mp3",         "bass.wav",      "keys.aiff",
+            "vocals.ogg",     "vocals_1.ogg",         "VOCALS_2.ogg",       "drums.ogg",     "drums_1.ogg",
+            "drums_2.opus",   "drums_3.mp3",          "Drums_4.wav",        "crowd.ogg",     "vocals_explicit.ogg",
+            "vocals_1_explicit.ogg", "vocals_2_explicit.ogg", "crowd_explicit.ogg",
+        };
+        for (const std::string &file : played)
+            std::ofstream(dir / file, std::ios::binary) << heads.at(file.substr(file.rfind('.')));
+        for (const char *file : {"preview.ogg", "._drums_1.ogg", "song (1).ogg", "song_clean.ogg", "center.ogg"})
+            std::ofstream(dir / file, std::ios::binary) << kVorbisHead;
+        const Song song = read(dir, "notes.chart");
+        CHECK(song.why.empty());
+        CHECK(song.stems == played);
+        fs::remove_all(dir);
+
+        CHECK(partStem("drums.ogg", "drums") && partStem("drums_1.ogg", "drums") && partStem("DRUMS_4.Opus", "drums"));
+        CHECK(partStem("vocals_2.ogg", "vocals") && partStem("vocals_1_explicit.ogg", "vocals"));
+        CHECK(partStem("guitar.ogg", "guitar") && !partStem("song.ogg", "guitar") && !partStem("bass.ogg", "guitar"));
+        CHECK(!partStem("drumsx.ogg", "drums") && !partStem("rhythm.ogg", "drums"));
+    }
+
+    // Folders that hold one another are walked once, so no song is found twice.
+    void overlappingRoots()
+    {
+        const fs::path root = fs::temp_directory_path() / "ghc_overlap_test";
+        fs::remove_all(root);
+        fs::create_directories(root / "rock" / "Song");
+        std::ofstream(root / "rock" / "Song" / "song.ini") << "[Song]\nName = Once\n";
+        std::ofstream(root / "rock" / "Song" / "notes.chart") << kOneGem;
+        std::ofstream(root / "rock" / "Song" / "guitar.ogg", std::ios::binary) << kVorbisHead;
+        const std::vector<Song> scanned = scan({root, root / "rock", root / "rock" / "", root}, {});
+        CHECK(scanned.size() == 1u && copies(scanned).empty());
+        fs::remove_all(root);
+    }
+
     // `files` written as an .sng, as SngFileFormat's packer does: song.ini's
     // tags as its metadata, each other file after the index, masked.
     void pack(const fs::path &out, const Tags &tags, const std::map<std::string, std::string> &files)
@@ -353,6 +454,81 @@ namespace
         fs::remove_all(root);
     }
 
+    // Every song folder under `root`, read and tallied.
+    void library(const fs::path &root)
+    {
+        std::map<std::string, int> tally;
+        std::error_code error;
+        for (fs::recursive_directory_iterator it(root, fs::directory_options::skip_permission_denied, error), end;
+             it != end; it.increment(error))
+        {
+            if (error || !it->is_regular_file() || it->path().filename() != "song.ini")
+                continue;
+            const fs::path dir = it->path().parent_path();
+            const Tags tags = parseIni(songFile(it->path()));
+            std::optional<Chart> chart;
+            std::string why = "no notes.mid or notes.chart";
+            for (const char *name : {"notes.mid", "notes.chart"})
+                if (fs::exists(dir / name))
+                {
+                    chart = parseSongChart(name, songFile(dir / name), options(tags), why);
+                    ++tally[fs::path(name).extension().string().substr(1u)];
+                    break;
+                }
+            ++tally["songs"];
+            if (chart && !chart->parts.count(Part::Guitar))
+                why = "no guitar part";
+            if (!chart || !chart->parts.count(Part::Guitar))
+            {
+                ++tally["unreadable"];
+                std::cout << "  " << fs::relative(dir, root).string() << ": " << why << "\n";
+                continue;
+            }
+            const Difficulty &x = chart->parts.at(Part::Guitar)[3];
+            if (x.gems.empty())
+                ++tally["no expert"];
+            // Held past the next gem's start.
+            bool extended = false;
+            for (size_t i = 0; i + 1u < x.gems.size(); ++i)
+                extended |= x.gems[i].tick + x.gems[i].length > x.gems[i + 1u].tick;
+            tally["with extended sustains"] += extended;
+        }
+        std::cout << root.string() << "\n";
+        for (const auto &[what, n] : tally)
+            std::cout << "  " << what << ": " << n << "\n";
+    }
+
+    // The scan of `root`, its index read back as written, and a rescan from
+    // it, which reads nothing again.
+    void scanned(const fs::path &root, const fs::path &out, unsigned workers)
+    {
+        using clock = std::chrono::steady_clock;
+        const auto start = clock::now();
+        const std::vector<Song> songs = scan({root}, {}, workers);
+        const auto first = clock::now();
+        std::map<std::string, int> why;
+        for (const Song &s : songs)
+            ++why[s.why.empty() ? "plays" : s.why.substr(0, s.why.find(':') == std::string::npos ? s.why.size() : s.why.find(':') + 1u)];
+        std::cout << "scan " << root.string() << ": " << songs.size() << " songs, "
+                  << std::chrono::duration<double>(first - start).count() << " s\n";
+        for (const auto &[what, n] : why)
+            std::cout << "  " << what << ": " << n << "\n";
+        const fs::path index = out / "index.txt";
+        writeIndex(index, songs);
+        writeBadSongs(out / "badsongs.txt", songs);
+        writeSongList(out / "songs.csv", songs, copies(songs));
+        const std::vector<Song> back = readIndex(index);
+        CHECK(back.size() == songs.size());
+        for (size_t i = 0; i < std::min(back.size(), songs.size()); ++i)
+        {
+            CHECK(back[i].dir == songs[i].dir);
+            CHECK(back[i].why == songs[i].why && back[i].parts == songs[i].parts && back[i].stems == songs[i].stems);
+            CHECK(back[i].tags == songs[i].tags && back[i].chartMd5 == songs[i].chartMd5);
+        }
+        const std::vector<Song> again = scan({root}, back, workers);
+        std::cout << "  rescan: " << std::chrono::duration<double>(clock::now() - first).count() << " s\n";
+        CHECK(again.size() == songs.size());
+    }
 }
 
 int main(int argc, char **argv)
@@ -360,10 +536,34 @@ int main(int argc, char **argv)
     chartTypes();
     midTypes();
     chartEdges();
+    stems();
+    overlappingRoots();
+    indexBare();
     md5Vectors();
     package();
     spelled();
     offsetLead();
+    // --out <dir>: where each scan's index and badsongs.txt go. --scan:
+    // only the scan, each chart read once, as the game would (a network
+    // drive's library is slow enough to read once). --workers <n>: folders
+    // scanned at once. Each applies to the folders named after it.
+    fs::path out = fs::temp_directory_path();
+    bool scanOnly = false;
+    unsigned workers = 32u;
+    for (int i = 1; i < argc; ++i)
+        if (std::string(argv[i]) == "--out" && i + 1 < argc)
+            out = argv[++i];
+        else if (std::string(argv[i]) == "--workers" && i + 1 < argc)
+            workers = static_cast<unsigned>(std::strtoul(argv[++i], nullptr, 10));
+        else if (std::string(argv[i]) == "--scan")
+            scanOnly = true;
+    badSongs();
+        else
+        {
+            if (!scanOnly)
+                library(argv[i]);
+            scanned(argv[i], out, workers);
+        }
     if (s_failed)
         std::cerr << s_failed << " failed" << std::endl;
     else

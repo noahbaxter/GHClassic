@@ -167,6 +167,8 @@ add_executable(custom_chart_test EXCLUDE_FROM_ALL
     tests/custom_chart_test.cpp
     src/custom/chart.cpp
     src/custom/gh2_chart.cpp
+    src/custom/index.cpp
+    src/custom/library.cpp
     src/custom/song_ini.cpp
     src/custom/text.cpp
     src/formats/md5.cpp
@@ -264,6 +266,8 @@ set(GHC_GAME_SOURCES
     src/content/vorbis.cpp
     src/custom/chart.cpp
     src/custom/gh2_chart.cpp
+    src/custom/index.cpp
+    src/custom/library.cpp
     src/custom/song_ini.cpp
     src/custom/text.cpp
     src/dev/cheats.cpp
