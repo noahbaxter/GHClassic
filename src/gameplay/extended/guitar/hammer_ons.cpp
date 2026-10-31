@@ -91,13 +91,13 @@ namespace gh2::guitar
                    static_cast<int32_t>(load<uint32_t>(rdram, watcher + kWatcherLastHit)) == index - 1;
         }
 
-        // A HOPO or tap chord hammered on once a fret pressed makes the frets
-        // held its own (those held for a sustain aside,
-        // gameplay/extended/guitar/sustain_hold.h): shown to GH2 as its highest
-        // fret alone (the others held below it, which a hammer-on allows) for
-        // NonStrumSwing, which times and hits it, scored as its frets
-        // (scoredSlots). A tap's whatever is before it, a HOPO's after the last
-        // hit.
+        // A HOPO or tap chord hammered on, or pulled off to, once a fret
+        // pressed or let go makes the frets held its own (those held for a
+        // sustain aside, gameplay/extended/guitar/sustain_hold.h): shown to GH2
+        // as its highest fret alone (the others held below it, which a
+        // hammer-on allows) for NonStrumSwing, which times and hits it, scored
+        // as its frets (scoredSlots). A tap's whatever is before it, a HOPO's
+        // after the last hit.
         void hammerChord(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t watcher, int32_t index)
         {
             const uint32_t gem = watcherGem(rdram, watcher, index);
@@ -117,8 +117,9 @@ namespace gh2::guitar
         PS2Runtime::RecompiledFunction s_fretButtonUp = nullptr;
         uint32_t s_hammeredOpen = 0u;
 
-        // GuitarTrackWatcherImpl::FretButtonUp(int slot), 0x24d938: an open
-        // with every fret let go (those held for sustains aside).
+        // GuitarTrackWatcherImpl::FretButtonUp(int slot), 0x24d938: a chord
+        // pulled off to, or an open with every fret let go (those held for
+        // sustains aside).
         void fretButtonUp(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
             const uint32_t watcher = GPR_U32(ctx, 4);
@@ -131,7 +132,7 @@ namespace gh2::guitar
             const uint32_t gem = watcherGem(rdram, watcher, index);
             const uint8_t slots = load<uint8_t>(rdram, gem + kGemSlots);
             if (load<uint32_t>(rdram, watcher + kWatcherHeld) & ~sustainedLanes(rdram, watcher, slots))
-                return;
+                return hammerChord(rdram, ctx, runtime, watcher, index);
             if (slots != 0u || !(load<uint8_t>(rdram, gem + kGemFlags) & 1u))
                 return;
             store<uint8_t>(rdram, gem + kGemSlots, static_cast<uint8_t>(1u << kOpenLane));

@@ -3,8 +3,8 @@
 // A custom song's gems (gameplay/extended/guitar/gem_kinds.h) played as Clone
 // Hero plays them: an open strummed with no fret held, hit as a HOPO too by
 // letting go of the last fret, scored as one fret; a tap hammered on whatever
-// is before it; and a HOPO or tap chord hammered on once its frets are held, as
-// one. A sustain's frets held are left out
+// is before it; and a HOPO or tap chord hammered on or pulled off to once its
+// frets are held, as one. A sustain's frets held are left out
 // (gameplay/extended/guitar/sustain_hold.h).
 
 #include "addresses.h"
