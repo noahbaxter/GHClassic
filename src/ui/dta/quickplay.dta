@@ -171,9 +171,40 @@
       }
    }
 }
+; The song the list is on previewed. A custom song's waits, silent, for its
+; audio to be read off its disk ({custom ready}), so scrolling never does;
+; this song's preview is the one playing once it starts. None starts until
+; the list has rested on a song a few frames, so a held strum going by
+; plays none. The list goes on being polled once it is left, so none starts
+; then either.
+{set $ghc_preview_live FALSE}
+{set $ghc_preview_on ''}
+{set $ghc_preview_rest 0}
+{set $ghc_preview_frames 9}
 ; Up or down held long enough to speed up, and the paper waiting for it.
 {set $ghc_scroll_rushing FALSE}
 {set $ghc_info_due FALSE}
+{func ghc_preview ($p_song)
+   {set $ghc_preview_rest 0}
+   {if_else {custom ours $p_song}
+      {if {!= $p_song $ghc_preview_on}
+         {song_preview ''}
+         {set $ghc_preview_on ''}
+      }
+      {song_preview $p_song}
+   }
+}
+{func ghc_preview_poll
+   {do
+      ($song {game get_song})
+      {set $ghc_preview_rest {'+' $ghc_preview_rest 1}}
+      {if {&& $ghc_preview_live {>= $ghc_preview_rest $ghc_preview_frames} {custom ours $song} {!= $song $ghc_preview_on}
+            {custom ready $song}}
+         {song_preview $song}
+         {set $ghc_preview_on $song}
+      }
+   }
+}
 ; The paper's lines for the song the list is on; hidden on another setlist.
 {func ghc_info_show ($s_dir)
    {if {$s_dir find ghc_info_0.lbl FALSE}
@@ -341,6 +372,7 @@
       (focus ss_song.lst)
       (joypad (hold_ms 500) (repeat_ms 80))
       (enter
+         {set $ghc_preview_live TRUE}
          {{ui current_screen} turn_off_ambient}
          {if {! {{ui current_screen} sel_song_career}} {song_provider set_quickplay TRUE}}
          {ss_song.lst set_provider song_provider}
@@ -377,7 +409,9 @@
          {$this update_pos}
       )
       (exit
+         {set $ghc_preview_live FALSE}
          {song_preview ''}
+         {set $ghc_preview_on ''}
          {if [metamusic_on_exit] {meta_music start}}
          {set [metamusic_on_exit] TRUE}
          {song_provider set_quickplay FALSE}
@@ -388,6 +422,7 @@
          {ghc_scan_update $this}
          ; Up or down held speeds up (ui/list_scroll.h).
          {set $ghc_scroll_rushing {list_scroll_fast}}
+         {ghc_preview_poll}
          {if {&& $ghc_info_due {! $ghc_scroll_rushing}}
             {set $ghc_info_due FALSE}
             {ghc_info_show $this}
@@ -423,7 +458,7 @@
                {set $pos $moved}
             }
             {game set_song_index $pos}
-            {song_preview {game get_song}}
+            {ghc_preview {game get_song}}
             ; Laying out the paper takes longer than a frame: while the list
             ; rushes by, only once it slows (poll).
             {if_else $ghc_scroll_rushing {set $ghc_info_due TRUE} {ghc_info_show $this}}
