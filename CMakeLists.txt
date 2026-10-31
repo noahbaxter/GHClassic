@@ -169,7 +169,9 @@ add_executable(custom_chart_test EXCLUDE_FROM_ALL
     src/custom/gh2_chart.cpp
     src/custom/song_ini.cpp
     src/custom/text.cpp
+    src/formats/md5.cpp
     src/formats/midi.cpp
+    src/formats/sng.cpp
 )
 target_include_directories(custom_chart_test PRIVATE src)
 
@@ -283,7 +285,9 @@ set(GHC_GAME_SOURCES
     src/formats/dtb.cpp
     src/formats/dtb_text.cpp
     src/formats/dxt.cpp
+    src/formats/md5.cpp
     src/formats/midi.cpp
+    src/formats/sng.cpp
     src/gameplay/hopo_lock.cpp
     src/gameplay/note_engine/gh1_scoring.cpp
     src/gameplay/note_engine/gh1_star_power.cpp

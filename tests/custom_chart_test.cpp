@@ -7,7 +7,9 @@
 #include "custom/chart.h"
 #include "custom/gh2_chart.h"
 #include "custom/song_ini.h"
+#include "formats/md5.h"
 #include "formats/midi.h"
+#include "formats/sng.h"
 
 #include <algorithm>
 #include <chrono>
@@ -217,6 +219,120 @@ namespace
         CHECK(gh2 && midi::parse(gh2->mid));
     }
 
+    // `files` written as an .sng, as SngFileFormat's packer does: song.ini's
+    // tags as its metadata, each other file after the index, masked.
+    void pack(const fs::path &out, const Tags &tags, const std::map<std::string, std::string> &files)
+    {
+        std::string b = "SNGPKG", meta;
+        // `v` little-endian, `bytes` long, onto `to` (b unless named).
+        const auto u = [&](uint64_t v, int bytes, std::string *to = nullptr)
+        {
+            for (int i = 0; i < bytes; ++i)
+                (to ? *to : b) += static_cast<char>((v >> (8 * i)) & 0xffu);
+        };
+        const uint8_t mask[16] = {0x13, 0x37, 0xa5, 0x5a, 0x01, 0xfe, 0x80, 0x7f, 9, 8, 7, 6, 5, 4, 3, 2};
+        u(1, 4);
+        b.append(reinterpret_cast<const char *>(mask), 16);
+        for (const auto &[key, value] : tags)
+            for (const std::string *s : {&key, &value})
+            {
+                u(s->size(), 4, &meta);
+                meta += *s;
+            }
+        u(meta.size() + 8u, 8);
+        u(tags.size(), 8);
+        b += meta;
+        size_t index = 8u;
+        for (const auto &[name, contents] : files)
+            index += 17u + name.size();
+        u(index, 8);
+        u(files.size(), 8);
+        // The data's start: past the index and the data's own length.
+        uint64_t at = b.size() + (index - 8u) + 8u;
+        std::string data;
+        for (const auto &[name, contents] : files)
+        {
+            b += static_cast<char>(name.size());
+            b += name;
+            u(contents.size(), 8);
+            u(at, 8);
+            at += contents.size();
+            for (size_t i = 0; i < contents.size(); ++i)
+                data += static_cast<char>(contents[i] ^ mask[i & 15u] ^ static_cast<uint8_t>(i & 0xffu));
+        }
+        u(data.size(), 8);
+        b += data;
+        std::ofstream(out, std::ios::binary) << b;
+    }
+
+    // A song as a folder and as an .sng read the same, and its files come
+    // out of the package as they went in.
+    void package()
+    {
+        const fs::path root = fs::temp_directory_path() / "ghc_sng_test";
+        fs::remove_all(root);
+        fs::create_directories(root / "Folder");
+        const std::string ini = "[song]\nname = Packed\nartist = Someone\ndelay = 0\n";
+        const std::string chart = "[Song]\n{\n  Resolution = 192\n}\n[SyncTrack]\n{\n  0 = B 120000\n}\n"
+                                  "[ExpertSingle]\n{\n  0 = N 0 0\n  192 = N 1 0\n  384 = N 7 0\n}\n";
+        // An Ogg page that names Vorbis, long enough to cross the mask's
+        // 16 and 256.
+        std::string ogg = kVorbisHead;
+        for (int i = 0; ogg.size() < 700u; ++i)
+            ogg += static_cast<char>(i * 31);
+        std::ofstream(root / "Folder" / "song.ini") << ini;
+        std::ofstream(root / "Folder" / "notes.chart", std::ios::binary) << chart;
+        std::ofstream(root / "Folder" / "song.ogg", std::ios::binary) << ogg;
+        pack(root / "Packed.sng", parseIni(ini), {{"notes.chart", chart}, {"song.ogg", ogg}});
+
+        const Song folder = read(root / "Folder", "notes.chart"), packed = read(root / "Packed.sng", "");
+        CHECK(folder.why.empty() && packed.why.empty());
+        CHECK(packed.tags == folder.tags && packed.stems == folder.stems && packed.parts == folder.parts);
+        CHECK(packed.chart == "notes.chart" && packed.chartMd5 == folder.chartMd5 && packed.chartMd5 == md5::hex(chart));
+        CHECK(songFile(root / "Packed.sng" / "song.ogg") == ogg && songFile(root / "Folder" / "song.ogg") == ogg);
+        CHECK(title(packed) == "Packed");
+        const std::vector<Song> scanned = scan({root}, {});
+        CHECK(scanned.size() == 2u && copies(scanned).size() == 1u);
+        fs::remove_all(root);
+    }
+
+    // RFC 1321's own examples, and one past a block's padding.
+    void md5Vectors()
+    {
+        CHECK(md5::hex("") == "d41d8cd98f00b204e9800998ecf8427e");
+        CHECK(md5::hex("abc") == "900150983cd24fb0d6963f7d28e17f72");
+        CHECK(md5::hex("message digest") == "f96b697d7cb7938d525a2f31aaf161d0");
+        CHECK(md5::hex("12345678901234567890123456789012345678901234567890123456789012345678901234567890") ==
+              "57edf4a22be3c955ac49da2e2107b67a");
+    }
+
+    // A folder as chart sites spell it, its files in any case; an .sng that
+    // claims a file past its end is none.
+    void spelled()
+    {
+        const fs::path root = fs::temp_directory_path() / "ghc_spelled_test";
+        fs::remove_all(root);
+        fs::create_directories(root / "Song");
+        std::ofstream(root / "Song" / "Song.ini") << "[Song]\nName = Spelled\n";
+        std::ofstream(root / "Song" / "NOTES.chart") << kOneGem;
+        std::ofstream(root / "Song" / "Guitar.ogg", std::ios::binary) << kVorbisHead;
+        std::ofstream(root / "Song" / "Album.PNG") << "png";
+        const std::vector<Song> scanned = scan({root}, {});
+        CHECK(scanned.size() == 1u);
+        if (scanned.size() == 1u)
+        {
+            const Song &s = scanned[0];
+            CHECK(s.why.empty() && s.chart == "NOTES.chart" && tag(s.tags, "name") == "Spelled" && s.iniTime != 0);
+            CHECK(s.stems == std::vector<std::string>{"Guitar.ogg"} && s.art == "Album.PNG");
+            CHECK(songFile(songPath(s, s.art)) == "png");
+        }
+        pack(root / "Cut.sng", {}, {{"notes.chart", "[Song]\n{\n}\n"}});
+        fs::resize_file(root / "Cut.sng", fs::file_size(root / "Cut.sng") - 4u);
+        std::string why;
+        CHECK(!sng::read(root / "Cut.sng", why) && !why.empty());
+        fs::remove_all(root);
+    }
+
     // .chart's Offset as song.ini's delay where it has none, never over it.
     void offsetLead()
     {
@@ -244,6 +360,9 @@ int main(int argc, char **argv)
     chartTypes();
     midTypes();
     chartEdges();
+    md5Vectors();
+    package();
+    spelled();
     offsetLead();
     if (s_failed)
         std::cerr << s_failed << " failed" << std::endl;
