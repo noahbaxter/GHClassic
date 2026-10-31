@@ -4,6 +4,7 @@
 //
 //   custom_chart_test [folder ...]
 
+#include "content/pcm_mix.h"
 #include "custom/chart.h"
 #include "custom/gh2_chart.h"
 #include "custom/index.h"
@@ -55,6 +56,63 @@ namespace
             if (g.tick == tick)
                 return &g;
         return nullptr;
+    }
+
+    // A stereo stem holding one level throughout.
+    class Level final : public vgs::Pcm
+    {
+    public:
+        Level(uint32_t at, uint64_t length, float level) : m_level(level)
+        {
+            channels = 2u;
+            rate = at;
+            frames = length;
+        }
+
+        bool seek(uint64_t frame) override
+        {
+            m_at = frame;
+            return true;
+        }
+
+        uint32_t read(float *const *out, uint32_t most) override
+        {
+            const auto n = static_cast<uint32_t>(std::min<uint64_t>(most, frames - std::min(m_at, frames)));
+            for (uint32_t c = 0; c < channels; ++c)
+                std::fill(out[c], out[c] + n, m_level);
+            m_at += n;
+            return n;
+        }
+
+    private:
+        float m_level;
+        uint64_t m_at = 0u;
+    };
+
+    // A stem at 48 kHz (as Opus always is) beside one at 44.1 (as MP3 and
+    // Vorbis mostly are), a second of each: both heard through the whole
+    // mix, the 44.1 one read to 48.
+    void mixedRates()
+    {
+        vgs::Mixer mix;
+        mix.inputs.push_back({std::make_unique<Level>(48000u, 48000u, 0.25f), 0u});
+        mix.inputs.push_back(
+            {std::make_unique<vgs::Resampled>(std::make_unique<Level>(44100u, 44100u, 0.5f), 48000u), 1u});
+        mix.channels = 4u;
+        mix.rate = 48000u;
+        mix.frames = 48000u;
+        CHECK(mix.inputs[1].pcm->frames >= 47999u);
+        std::vector<std::vector<float>> out(4u, std::vector<float>(48000u));
+        std::vector<float *> to;
+        for (auto &channel : out)
+            to.push_back(channel.data());
+        mix.seek(0u);
+        CHECK(mix.fill(to.data(), 48000u) == 48000u);
+        for (const uint32_t frame : {0u, 24000u, 47990u})
+        {
+            CHECK(out[0][frame] == 0.25f && out[1][frame] == 0.25f);
+            CHECK(out[2][frame] == 0.5f && out[3][frame] == 0.5f);
+        }
     }
 
     void chartTypes()
@@ -533,6 +591,7 @@ namespace
 
 int main(int argc, char **argv)
 {
+    mixedRates();
     chartTypes();
     midTypes();
     chartEdges();

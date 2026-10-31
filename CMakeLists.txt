@@ -222,6 +222,29 @@ target_include_directories(vorbisfile SYSTEM PUBLIC
 target_include_directories(vorbisfile PRIVATE "${vorbis_SOURCE_DIR}/lib")
 set_target_properties(vorbisfile PROPERTIES C_STANDARD 99)
 
+# The rest of the audio custom songs come in. Opus: libopus and opusfile
+# (BSD-3-Clause), opusfile's sources built here on the Ogg above, as its own
+# CMake wants an installed Ogg and Opus. MP3 and WAV: dr_mp3 and dr_wav
+# (public domain or MIT-0), as the runtime's raylib already builds them into
+# raudio: its copies' headers, so the two agree.
+FetchContent_Declare(opus
+    GIT_REPOSITORY https://github.com/xiph/opus.git
+    GIT_TAG 5ec2f3c915d0529b94a3a302969c673531654824) # v1.5.2
+FetchContent_Declare(opusfile
+    GIT_REPOSITORY https://github.com/xiph/opusfile.git
+    GIT_TAG a55c164e9891a9326188b7d4d216ec9a88373739 # v0.12
+    SOURCE_SUBDIR none)
+set(OPUS_INSTALL_PKG_CONFIG_MODULE OFF CACHE BOOL "" FORCE)
+set(OPUS_INSTALL_CMAKE_CONFIG_MODULE OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(opus opusfile)
+add_library(opusfile STATIC)
+foreach(OPUSFILE_SOURCE info internal opusfile stream)
+    target_sources(opusfile PRIVATE "${opusfile_SOURCE_DIR}/src/${OPUSFILE_SOURCE}.c")
+endforeach()
+target_include_directories(opusfile SYSTEM PUBLIC "${opusfile_SOURCE_DIR}/include")
+target_link_libraries(opusfile PUBLIC opus vorbisfile)
+set_target_properties(opusfile PROPERTIES C_STANDARD 99)
+
 # Without a disc's generated code, everything above still builds: what CI
 # checks (tools/ghc.py ci).
 file(GLOB GHC_GENERATED_SOURCES CONFIGURE_DEPENDS
@@ -264,6 +287,7 @@ set(GHC_GAME_SOURCES
     src/content/tour_or_higher.cpp
     src/content/vgs.cpp
     src/content/vorbis.cpp
+    src/content/audio_file.cpp
     src/custom/chart.cpp
     src/custom/gh2_chart.cpp
     src/custom/index.cpp
@@ -631,6 +655,8 @@ set_source_files_properties(${GHC_GAME_SOURCES} PROPERTIES SKIP_UNITY_BUILD_INCL
 # miniz comes with libchdr; its target leaves out its own include path.
 target_include_directories(GHClassic PRIVATE "${GHC_GENERATED_DIR}" src lib/libchdr/deps/miniz-3.1.2)
 target_include_directories(GHClassic SYSTEM PRIVATE "${stb_SOURCE_DIR}")
+FetchContent_GetProperties(raylib)
+target_include_directories(GHClassic SYSTEM PRIVATE "${raylib_SOURCE_DIR}/src/external")
 target_link_libraries(GHClassic PRIVATE
     miniz
     ps2_runtime
@@ -640,6 +666,7 @@ target_link_libraries(GHClassic PRIVATE
     GPUOpen::VulkanMemoryAllocator
     mpeg2
     vorbisfile
+    opusfile
     miniz # libchdr's, for save.bin
 )
 # Calls go through volk's pointers, never a linked loader.
