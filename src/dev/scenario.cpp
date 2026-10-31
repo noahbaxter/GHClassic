@@ -4,6 +4,7 @@
 #include "dev/transplant.h"
 #include "frame_step.h"
 #include "dev/draw_dump.h"
+#include "dev/timing.h"
 #include "ps2_runtime_macros.h"
 #include "guest.h"
 #include "hook.h"
@@ -254,12 +255,15 @@ namespace gh2::scenario
                 }
                 if (verb == "key")
                 {
-                    // A key by SDL's name (Tab, Return, Escape, Up), held
-                    // as a press is.
-                    s_pressKey = SDL_GetScancodeFromName(array.symbol(1).c_str());
+                    // A key by SDL's name (Tab, Return, Escape, Up, a digit),
+                    // held as a press is.
+                    const std::string name = array.symbol(1).empty()
+                                                 ? std::to_string(static_cast<int>(array.number(1)))
+                                                 : array.symbol(1);
+                    s_pressKey = SDL_GetScancodeFromName(name.c_str());
                     if (s_pressKey == SDL_SCANCODE_UNKNOWN)
                     {
-                        std::cerr << "[scenario] FAIL: no key " << array.symbol(1) << std::endl;
+                        std::cerr << "[scenario] FAIL: no key " << name << std::endl;
                         quit();
                         return;
                     }
@@ -637,6 +641,7 @@ namespace gh2::scenario
         struct SecondsBeatTag;
         void onSetSecondsBeat(uint8_t *, R5900Context *ctx, PS2Runtime *)
         {
+            timing::songSeconds(ctx->f[12]);
             if (!s_frozen)
                 return;
             ctx->f[12] = s_seconds;

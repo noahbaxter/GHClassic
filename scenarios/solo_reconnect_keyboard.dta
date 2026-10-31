@@ -21,14 +21,14 @@
 (expect {{ui current_screen} name} pause_controller_screen)
 ; Enter on Resume resumes, held into the song no Start; Esc pauses and
 ; resumes it.
-(key Return 0.5)
+(key 1 0.5)
 (wait_screen game_screen 10)
 (wait 1)
 (expect {{ui current_screen} name} game_screen)
 (wait 1)
-(key Escape)
+(key Return)
 (wait_screen pause_screen 10)
-(key Escape)
+(key Return)
 (wait_screen game_screen 10)
 (device guitar)
 (wait 0.5)

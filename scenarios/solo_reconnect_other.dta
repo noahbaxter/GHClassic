@@ -26,7 +26,7 @@
 (key Down)
 (wait 0.5)
 (expect {seat_has 0 keyboard} 1)
-(key Return)
+(key 1)
 (wait_screen game_screen 10)
 (wait 1)
 (expect {game get_controller 0} joypad_guitar)

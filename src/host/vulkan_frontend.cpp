@@ -200,7 +200,7 @@ namespace gh2
                        "tex_reads,tex_read_ms,gpu_ms";
                 for (const char *span : kGpuSpans)
                     out << ",gpu_" << span << "_ms";
-                out << "\n";
+                out << ",song_s\n";
                 start = lastPresent = lastFlush = Clock::now();
                 std::cerr << "[frame] logging to " << path << std::endl;
             }
@@ -236,7 +236,9 @@ namespace gh2
                     std::snprintf(row, sizeof(row), ",%.2f", span);
                     out << row;
                 }
-                out << "\n";
+                // The song's seconds as the track was last drawn at.
+                std::snprintf(row, sizeof(row), ",%.4f\n", timing::songSeconds());
+                out << row;
                 if (dtMs > kSlowMs)
                     std::cerr << "[frame] " << static_cast<int>(dtMs) << " ms: wait " << static_cast<int>(waitMs)
                               << ", acq " << static_cast<int>(acqMs) << ", rec " << static_cast<int>(recMs)
@@ -277,11 +279,13 @@ namespace gh2
                 for (size_t i = 0; i < pixels.size(); i += 4)
                     std::swap(mapped[i], mapped[i + 2]);
             vmaFlushAllocation(allocator, into.uploadMemory, 0, pixels.size());
-            // The window's image is being written already.
-            if (!windows)
-                imageBarrier(cmd, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                             VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+            // The window's image is being written already, by the blit this
+            // goes over.
+            imageBarrier(cmd, image,
+                         windows ? VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                         windows ? VK_ACCESS_TRANSFER_WRITE_BIT : VK_ACCESS_TRANSFER_READ_BIT,
+                         VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
             VkBufferImageCopy copy{};
             copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
             copy.imageOffset = {picture.offset.x + static_cast<int32_t>(edge),
@@ -494,6 +498,11 @@ namespace gh2
             const VkClearColorValue black{{0.0f, 0.0f, 0.0f, 1.0f}};
             const VkImageSubresourceRange range{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
             vkCmdClearColorImage(cmd, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &black, 1, &range);
+            // Two writes to one image run in any order without a barrier
+            // between: the clear can land over parts of the blit after it.
+            imageBarrier(cmd, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                         VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT);
 
             const VkRect2D rect = pictureRect(displayAspect);
             VkImageBlit blit{};
@@ -672,6 +681,19 @@ namespace gh2
             return false;
         }
         s.device = device.value();
+        {
+            // Which GPU and driver drew it: a player's log says what to test on.
+            const VkPhysicalDeviceProperties &p = s.device.physical_device.properties;
+            const uint32_t v = p.driverVersion;
+            char line[256];
+            std::snprintf(line, sizeof(line),
+                          "[video] gpu %s, vendor 0x%04x, device 0x%04x, api %u.%u.%u, driver 0x%08x (%u.%u.%u, or "
+                          "NVIDIA's %u.%u)",
+                          p.deviceName, p.vendorID, p.deviceID, VK_VERSION_MAJOR(p.apiVersion),
+                          VK_VERSION_MINOR(p.apiVersion), VK_VERSION_PATCH(p.apiVersion), v, VK_VERSION_MAJOR(v),
+                          VK_VERSION_MINOR(v), VK_VERSION_PATCH(v), (v >> 22) & 0x3ffu, (v >> 14) & 0xffu);
+            std::cerr << line << std::endl;
+        }
 #if defined(__APPLE__) || defined(__linux__)
         if (displayTiming)
         {

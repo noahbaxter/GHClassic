@@ -1,0 +1,30 @@
+; The lag screen's Calibrate: strummed after each of retail's clicks it
+; measures (the value rides on when a scripted press lands, so only the shot
+; shows it), and with no strums it fails and keeps audio as it was.
+#include common/first_boot.dta
+{latency set audio 0}
+{ui goto_screen lag_screen}
+(wait_screen lag_screen)
+(wait 1)
+(shot browse)
+; A press holds about 0.416 s before the next step, its down at the start.
+(press green)
+(wait 1)
+(shot counting)
+; Beat 4's click falls 2.932 s after green; strum 0.1 s after each, a beat
+; (0.733 s) apart.
+(wait 1.616)
+(press strum_down) (wait 0.317) (press strum_down) (wait 0.317) (press strum_down) (wait 0.317)
+(press strum_down) (wait 0.317) (press strum_down) (wait 0.317) (press strum_down) (wait 0.317)
+(press strum_down) (wait 0.317) (press strum_down) (wait 0.317) (press strum_down) (wait 0.317)
+(press strum_down) (wait 0.317) (press strum_down)
+(wait 2)
+(shot measured)
+(print {latency get audio})
+{latency set audio 40}
+(press green)
+(wait 12)
+(shot failed)
+(expect {latency get audio} 40)
+(expect {lag_panel get result} failure)
+(quit)
