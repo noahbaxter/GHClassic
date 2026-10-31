@@ -109,9 +109,16 @@ namespace gh2
         uint32_t beatMatcherDtor;           // BeatMatcher::~BeatMatcher
         uint32_t guitarWatcherJumpHook; // GuitarTrackWatcherImpl::JumpHook
         uint32_t guitarWatcherFretButtonDown; // GuitarTrackWatcherImpl::FretButtonDown(int slot)
-        uint32_t trackWatcherKillSustain;     // TrackWatcherImpl::KillSustain(int gem)
         uint32_t guitarWatcherNonStrumSwing;  // GuitarTrackWatcherImpl::NonStrumSwing(int slot, bool)
         uint32_t trackWatcherClosestUnplayedGem; // TrackWatcherImpl::ClosestUnplayedGem(float ms)
+        uint32_t trackWatcherHitGem;          // TrackWatcherImpl::HitGem(float ms, int gem, bool)
+        uint32_t trackWatcherSendReleaseGem;  // TrackWatcherImpl::SendReleaseGem(float ms, int gem, float ms left)
+        uint32_t trackWatcherJump;            // TrackWatcherImpl::Jump(float ms)
+        uint32_t trackWatcherSustainTimeout;  // TrackWatcherImpl::CheckForSustainedNoteTimeout(float ms), each poll
+        uint32_t guitarWatcherTryToFinishSwing; // GuitarTrackWatcherImpl::TryToFinishSwing(float, int slot)
+        uint32_t playerCheckHeldNote;         // Player::CheckHeldNote(float ms)
+        uint32_t heldNoteCtor;                // HeldNote::HeldNote(int gem, const GameGem &)
+        uint32_t gemApplyDuration;            // Gem::ApplyDuration(float, float, float), each rep's tail
         uint32_t hudPanelEnter;      // HudPanel::Enter
         uint32_t hudPanelSetMetersShowing; // HudPanel::SetMetersShowing(bool)
         uint32_t hudPanelOnGameOver; // HudPanel::OnGameOver, as a song is won or lost
@@ -458,9 +465,16 @@ namespace gh2
         .beatMatcherDtor = 0x234b08u,
         .guitarWatcherJumpHook = 0x24d4e0u,
         .guitarWatcherFretButtonDown = 0x24d890u,
-        .trackWatcherKillSustain = 0x248ff8u,
         .guitarWatcherNonStrumSwing = 0x24d828u,
         .trackWatcherClosestUnplayedGem = 0x248768u,
+        .trackWatcherHitGem = 0x2488d0u,
+        .trackWatcherSendReleaseGem = 0x249990u,
+        .trackWatcherJump = 0x248558u,
+        .trackWatcherSustainTimeout = 0x248c40u,
+        .guitarWatcherTryToFinishSwing = 0x24dab0u,
+        .playerCheckHeldNote = 0x112280u,
+        .heldNoteCtor = 0x12a0e0u,
+        .gemApplyDuration = 0x157ce0u,
         .hudPanelEnter = 0x12ba00u,
         .hudPanelSetMetersShowing = 0x12c210u,
         .hudPanelOnGameOver = 0x12c340u,

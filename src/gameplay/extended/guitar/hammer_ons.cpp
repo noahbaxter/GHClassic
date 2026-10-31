@@ -1,6 +1,7 @@
 #include "gameplay/extended/guitar/hammer_ons.h"
 
 #include "gameplay/extended/guitar/gem_kinds.h"
+#include "gameplay/extended/guitar/sustain_hold.h"
 #include "guest.h"
 #include "hook.h"
 
@@ -66,45 +67,14 @@ namespace gh2::guitar
         // (bit 0 HOPO).
         constexpr uint32_t kWatcherGems = 0x04u, kWatcherClock = 0x0cu, kWatcherHeld = 0x84u;
         constexpr uint32_t kListGems = 0x08u, kGemSize = 0x10u, kGemSlots = 0x0cu, kGemFlags = 0x0du;
+        // The watcher's track at +0x44 (its constructor's first int; the
+        // second, at +0x00, is its player's, both 0 for one player); a
+        // GameGem's tick at +0x04; which gems were hit, words at +0x04 of the
+        // list at +0x08, and the last hit, +0x14.
+        constexpr uint32_t kWatcherTrack = 0x44u, kWatcherHits = 0x08u, kWatcherLastHit = 0x14u, kGemTick = 0x04u;
 
         const Addresses *s_addresses = nullptr;
-        PS2Runtime::RecompiledFunction s_fretButtonUp = nullptr;
-        uint32_t s_hammered = 0u;
 
-        // GuitarTrackWatcherImpl::FretButtonUp(int slot), 0x24d938.
-        void fretButtonUp(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
-        {
-            const uint32_t watcher = GPR_U32(ctx, 4);
-            callOriginal(rdram, ctx, runtime, s_addresses->guitarWatcherFretButtonUp, s_fretButtonUp);
-            if (!s_loading || load<uint32_t>(rdram, watcher + kWatcherHeld) != 0u)
-                return;
-            const uint32_t clock = load<uint32_t>(rdram, watcher + kWatcherClock);
-            const uint32_t vtable = load<uint32_t>(rdram, clock);
-            runtime->callGuestFunction(rdram, ctx, load<uint32_t>(rdram, vtable + 0x14u),
-                                       {clock + static_cast<uint32_t>(static_cast<int32_t>(load<int16_t>(rdram, vtable + 0x10u)))});
-            ctx->f[12] = ctx->f[0];
-            const auto index = static_cast<int32_t>(
-                runtime->callGuestFunction(rdram, ctx, s_addresses->trackWatcherClosestUnplayedGem, {watcher}));
-            if (index >= 0)
-            {
-                const uint32_t gem = load<uint32_t>(rdram, load<uint32_t>(rdram, watcher + kWatcherGems) + kListGems) +
-                                     static_cast<uint32_t>(index) * kGemSize;
-                if (load<uint8_t>(rdram, gem + kGemSlots) == 0u && (load<uint8_t>(rdram, gem + kGemFlags) & 1u))
-                {
-                    store<uint8_t>(rdram, gem + kGemSlots, static_cast<uint8_t>(1u << kOpenLane));
-                    s_hammered = gem;
-                    runtime->callGuestFunction(rdram, ctx, s_addresses->guitarWatcherNonStrumSwing, {watcher, kOpenLane, 0u});
-                    store<uint8_t>(rdram, gem + kGemSlots, 0u);
-                    s_hammered = 0u;
-                }
-            }
-        }
-
-        // A watcher's gem i; the watcher's track at +0x44 (its constructor's
-        // first int; the second, at +0x00, is its player's, both 0 for one
-        // player); a GameGem's tick at +0x04; which gems were hit, words at
-        // +0x04 of the list at +0x08, and the last hit, +0x14.
-        constexpr uint32_t kWatcherTrack = 0x44u, kWatcherHits = 0x08u, kWatcherLastHit = 0x14u, kGemTick = 0x04u;
         bool tapGem(uint8_t *rdram, uint32_t watcher, uint32_t gem)
         {
             return isTap(load<uint32_t>(rdram, watcher + kWatcherTrack), load<uint32_t>(rdram, gem + kGemTick),
@@ -122,25 +92,18 @@ namespace gh2::guitar
         }
 
         // A HOPO or tap chord hammered on once a fret pressed makes the frets
-        // held its own: shown to GH2 as its highest fret alone (the others
-        // held below it, which a hammer-on allows) for NonStrumSwing, which
-        // times and hits it, scored as its frets (scoredAsOne). A tap's
-        // whatever is before it, a HOPO's after the last hit.
-        void hammerChord(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t watcher)
+        // held its own (those held for a sustain aside,
+        // gameplay/extended/guitar/sustain_hold.h): shown to GH2 as its highest
+        // fret alone (the others held below it, which a hammer-on allows) for
+        // NonStrumSwing, which times and hits it, scored as its frets
+        // (scoredSlots). A tap's whatever is before it, a HOPO's after the last
+        // hit.
+        void hammerChord(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t watcher, int32_t index)
         {
-            const uint32_t clock = load<uint32_t>(rdram, watcher + kWatcherClock);
-            const uint32_t vtable = load<uint32_t>(rdram, clock);
-            runtime->callGuestFunction(rdram, ctx, load<uint32_t>(rdram, vtable + 0x14u),
-                                       {clock + static_cast<uint32_t>(static_cast<int32_t>(load<int16_t>(rdram, vtable + 0x10u)))});
-            ctx->f[12] = ctx->f[0];
-            const auto index = static_cast<int32_t>(
-                runtime->callGuestFunction(rdram, ctx, s_addresses->trackWatcherClosestUnplayedGem, {watcher}));
-            if (index < 0)
-                return;
             const uint32_t gem = watcherGem(rdram, watcher, index);
             const uint8_t slots = load<uint8_t>(rdram, gem + kGemSlots);
-            if (__builtin_popcount(slots) < 2 || !(load<uint8_t>(rdram, gem + kGemFlags) & 1u) ||
-                load<uint32_t>(rdram, watcher + kWatcherHeld) != slots ||
+            const uint32_t held = load<uint32_t>(rdram, watcher + kWatcherHeld) & ~sustainedLanes(rdram, watcher, slots);
+            if (__builtin_popcount(slots) < 2 || !(load<uint8_t>(rdram, gem + kGemFlags) & 1u) || held != slots ||
                 !(tapGem(rdram, watcher, gem) || hopoFollows(rdram, watcher, index)))
                 return;
             const uint32_t top = 31u - static_cast<uint32_t>(__builtin_clz(slots));
@@ -151,35 +114,46 @@ namespace gh2::guitar
             s_chordGem = 0u, s_chordFrets = 0u;
         }
 
-        // An open's sustain is held with no fret: pressing one lets it go.
-        // GH2 lets go of a sustain on a fret pressed only above its gem's
-        // (0x248f80), never for none. The sustained gem: watcher +0x20, -1
-        // for none.
-        constexpr uint32_t kWatcherSustained = 0x20u;
+        PS2Runtime::RecompiledFunction s_fretButtonUp = nullptr;
+        uint32_t s_hammeredOpen = 0u;
+
+        // GuitarTrackWatcherImpl::FretButtonUp(int slot), 0x24d938: an open
+        // with every fret let go (those held for sustains aside).
+        void fretButtonUp(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t watcher = GPR_U32(ctx, 4);
+            callOriginal(rdram, ctx, runtime, s_addresses->guitarWatcherFretButtonUp, s_fretButtonUp);
+            if (!s_loading)
+                return;
+            const int32_t index = closestUnplayed(rdram, ctx, runtime, watcher);
+            if (index < 0)
+                return;
+            const uint32_t gem = watcherGem(rdram, watcher, index);
+            const uint8_t slots = load<uint8_t>(rdram, gem + kGemSlots);
+            if (load<uint32_t>(rdram, watcher + kWatcherHeld) & ~sustainedLanes(rdram, watcher, slots))
+                return;
+            if (slots != 0u || !(load<uint8_t>(rdram, gem + kGemFlags) & 1u))
+                return;
+            store<uint8_t>(rdram, gem + kGemSlots, static_cast<uint8_t>(1u << kOpenLane));
+            s_hammeredOpen = gem;
+            runtime->callGuestFunction(rdram, ctx, s_addresses->guitarWatcherNonStrumSwing, {watcher, kOpenLane, 0u});
+            store<uint8_t>(rdram, gem + kGemSlots, 0u);
+            s_hammeredOpen = 0u;
+        }
+
         PS2Runtime::RecompiledFunction s_fretButtonDown = nullptr;
 
-        // GuitarTrackWatcherImpl::FretButtonDown(int slot), 0x24d890.
+        // GuitarTrackWatcherImpl::FretButtonDown(int slot), 0x24d890: a chord
+        // hammered on. (An open's sustain, let go by any fret, is
+        // gameplay/extended/guitar/sustain_hold'.)
         void fretButtonDown(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
-            const uint32_t watcher = GPR_U32(ctx, 4), slot = GPR_U32(ctx, 5);
-            const auto sustained = static_cast<int32_t>(load<uint32_t>(rdram, watcher + kWatcherSustained));
-            if (sustained >= 0)
-            {
-                const uint32_t gem = load<uint32_t>(rdram, load<uint32_t>(rdram, watcher + kWatcherGems) + kListGems) +
-                                     static_cast<uint32_t>(sustained) * kGemSize;
-                if (load<uint8_t>(rdram, gem + kGemSlots) == 0u)
-                {
-                    const uint32_t returnTo = ctx->pc;
-                    runtime->callGuestFunction(rdram, ctx, s_addresses->trackWatcherKillSustain,
-                                               {watcher, static_cast<uint32_t>(sustained)});
-                    SET_GPR_U32(ctx, 4, watcher);
-                    SET_GPR_U32(ctx, 5, slot);
-                    ctx->pc = returnTo;
-                }
-            }
+            const uint32_t watcher = GPR_U32(ctx, 4);
             callOriginal(rdram, ctx, runtime, s_addresses->guitarWatcherFretButtonDown, s_fretButtonDown);
-            if (s_loading)
-                hammerChord(rdram, ctx, runtime, watcher);
+            if (!s_loading)
+                return;
+            if (const int32_t index = closestUnplayed(rdram, ctx, runtime, watcher); index >= 0)
+                hammerChord(rdram, ctx, runtime, watcher, index);
         }
         // GuitarTrackWatcherImpl's gem i may be hammered on (0x24df30, from
         // TryToHopo): its HOPO flag, and the gem before it the last hit, so
@@ -225,8 +199,8 @@ namespace gh2::guitar
         s_fretButtonDown = runtime.lookupFunction(addresses.guitarWatcherFretButtonDown);
         runtime.replaceFunction(addresses.guitarWatcherFretButtonDown, &fretButtonDown);
         s_numSlots = runtime.lookupFunction(addresses.gameGemNumSlots);
-        runtime.replaceFunction(addresses.gameGemNumSlots, &scoredAsOne<&s_numSlots>);
+        runtime.replaceFunction(addresses.gameGemNumSlots, &scoredSlots<&s_numSlots>);
         s_gemNumSlots = runtime.lookupFunction(addresses.gemNumSlots);
-        runtime.replaceFunction(addresses.gemNumSlots, &scoredAsOne<&s_gemNumSlots>);
+        runtime.replaceFunction(addresses.gemNumSlots, &scoredSlots<&s_gemNumSlots>);
     }
 }

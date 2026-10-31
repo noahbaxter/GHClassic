@@ -8,9 +8,11 @@ namespace gh2::custom
 {
     namespace
     {
-        // A gem this short is no sustain to GH2 (SongParser, 0x245ff8, under
-        // 161 at 480), and a short note is written this long.
-        constexpr uint32_t kTap = 60u;
+        // A gem this short is no sustain to either engine (GH1's from 121 at
+        // 480, GH2's 161; each cuts its own as the song loads,
+        // gameplay/extended/guitar/gem_kinds.h), and a short note is written
+        // this long.
+        constexpr uint32_t kSustainFrom = 121u, kTap = 60u;
         // A big note (midi_parsers.dta's big_note_parser_guitar).
         constexpr uint8_t kBigNote = 110u;
 
@@ -102,12 +104,45 @@ namespace gh2::custom
                 // (gameplay/extended/guitar/hammer_ons.h).
                 const bool open = (g.lanes & 0x1fu) == 0u;
                 const uint8_t frets = open ? kOpenFrets : static_cast<uint8_t>(g.lanes & 0x1fu);
-                out.gems[d][start] = {.frets = frets,
-                                      .hopo = g.kind != Kind::Strum,
-                                      .decided = g.forced || open,
-                                      .flip = g.flip,
-                                      .open = open,
-                                      .tap = g.kind == Kind::Tap};
+                Gh2Gem &kept = out.gems[d][start] = {.frets = frets,
+                                                     .hopo = g.kind != Kind::Strum,
+                                                     .decided = g.forced || open,
+                                                     .flip = g.flip,
+                                                     .open = open,
+                                                     .tap = g.kind == Kind::Tap};
+                // Each lane held to its own end or the next gem on it, as
+                // Clone Hero's; the gem as long as the longest.
+                uint32_t held = g.tick;
+                std::array<uint32_t, 5> ends{};
+                for (int lane = 0; lane <= kOpen; ++lane)
+                    if (g.lanes & (1u << lane))
+                    {
+                        uint32_t end = g.tick + g.length[size_t(lane)];
+                        for (size_t k = i + 1u; k < gems.size() && gems[k]->tick < end; ++k)
+                            if (gems[k]->lanes & (1u << lane))
+                                end = gems[k]->tick;
+                        held = std::max(held, end);
+                        if (lane < 5)
+                            ends[size_t(lane)] = end;
+                    }
+                // The song ends past its sustains too, a held one past the
+                // last gem's end.
+                last = std::max(last, at(held));
+                if (at(held) - start > length && at(held) - start >= kSustainFrom)
+                {
+                    kept.sustain = at(held) - start;
+                    kept.sustainMs = static_cast<float>((chart.seconds(held) - chart.seconds(g.tick)) * 1000.0);
+                }
+                // A chord whose lanes end apart, each lane's.
+                uint32_t shortest = held;
+                for (size_t lane = 0; lane < 5u; ++lane)
+                    if (frets & (1u << lane))
+                        shortest = std::min(shortest, ends[lane]);
+                if (g.chord() && !open && at(shortest) < at(held) && at(held) - start >= kSustainFrom)
+                    for (size_t lane = 0; lane < 5u; ++lane)
+                        if (frets & (1u << lane))
+                            kept.laneMs[lane] =
+                                static_cast<float>((chart.seconds(ends[lane]) - chart.seconds(g.tick)) * 1000.0);
                 for (int lane = 0; lane < 5; ++lane)
                     if (frets & (1u << lane))
                     {
