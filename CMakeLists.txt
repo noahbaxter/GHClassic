@@ -162,6 +162,21 @@ add_executable(save_test EXCLUDE_FROM_ALL
 target_include_directories(save_test PRIVATE src)
 target_link_libraries(save_test PRIVATE miniz)
 
+# Custom songs' charts, and a tally of a folder of them.
+add_executable(custom_chart_test EXCLUDE_FROM_ALL
+    tests/custom_chart_test.cpp
+    src/custom/chart.cpp
+    src/custom/gh2_chart.cpp
+    src/custom/index.cpp
+    src/custom/library.cpp
+    src/custom/song_ini.cpp
+    src/custom/text.cpp
+    src/formats/md5.cpp
+    src/formats/midi.cpp
+    src/formats/sng.cpp
+)
+target_include_directories(custom_chart_test PRIVATE src)
+
 # Which release the game offers as an update.
 add_executable(releases_test EXCLUDE_FROM_ALL tests/releases_test.cpp src/host/releases.cpp)
 target_include_directories(releases_test PRIVATE src)
@@ -249,6 +264,12 @@ set(GHC_GAME_SOURCES
     src/content/tour_or_higher.cpp
     src/content/vgs.cpp
     src/content/vorbis.cpp
+    src/custom/chart.cpp
+    src/custom/gh2_chart.cpp
+    src/custom/index.cpp
+    src/custom/library.cpp
+    src/custom/song_ini.cpp
+    src/custom/text.cpp
     src/dev/cheats.cpp
     src/dev/draw_dump.cpp
     src/dev/mesh_packet.cpp
@@ -268,7 +289,9 @@ set(GHC_GAME_SOURCES
     src/formats/dtb.cpp
     src/formats/dtb_text.cpp
     src/formats/dxt.cpp
+    src/formats/md5.cpp
     src/formats/midi.cpp
+    src/formats/sng.cpp
     src/gameplay/hopo_lock.cpp
     src/gameplay/note_engine/gh1_scoring.cpp
     src/gameplay/note_engine/gh1_star_power.cpp

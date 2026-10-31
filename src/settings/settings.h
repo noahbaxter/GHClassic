@@ -59,6 +59,7 @@ namespace gh2::settings
         kLighting,   // kLastGen: the PS2's lighting wherever the 360's would be
         kPerfOverlay, // host/perf.h's Level: frame times in the picture's corner
         kVectorFonts, // text in the traced fonts drawn from their outlines (render/vector_fonts.h)
+        kSongFolders, // text: chart folders custom songs are read from, ';' between (custom/install.h)
         kKeyCount,
     };
 
@@ -149,6 +150,8 @@ namespace gh2::settings
     };
 
     int get(Key key);
+    // A text setting's words as written, empty when unset.
+    std::string text(Key key);
     // Whether that is the 360's now. A career is its own game's all through.
     // Outside one the models are the pickers' three, the lighting is the
     // venue's (the guitarist's or guitar's on a screen with no venue), and
