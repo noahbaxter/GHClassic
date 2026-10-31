@@ -48,6 +48,8 @@ namespace gh2
         locale::add("campaign_gh80s", "ROCKS THE 80S");
         locale::add("ghc_theme", "THEME");
         locale::add("ghc_setlist", "SETLIST");
+        locale::add("ghc_sort", "SORT");
+        locale::add("ghc_section", "SECTION");
         locale::add("ghc_map", "MAP");
         locale::add("ghc_hd", "HD");
         locale::add("ghc_sd", "SD");

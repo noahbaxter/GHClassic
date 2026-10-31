@@ -27,8 +27,9 @@
       doodle7.mesh doodle8.mesh doodle9.mesh doodle10.mesh doodle11.mesh doodle12.mesh)
 }
 ; The yellow fret shows only where there is another setlist; blue names the
-; note engine quickplay judges by, and changes it. Set from the screen's
-; enter, after the help bar's own has put up the screen's default.
+; note engine quickplay judges by, and changes it, but on custom songs is
+; their sort. Set from the screen's enter, after the help bar's own has put
+; up the screen's default.
 {func ghc_qp_helpbar
    {do
       ($array)
@@ -37,9 +38,12 @@
       {push_back $array (fret1 help_continue)}
       {push_back $array (fret2 help_back)}
       {if {> {size {ghc_setlists}} 1} {push_back $array (fret3 ghc_setlist)}}
-      {if {> {note_engine choices} 1}
-         {push_back $array {if_else {== gh1 {note_engine}} (fret4 ghc_engine_gh1) (fret4 ghc_engine_gh2)}}
+      {cond
+         ({== {setlist shown} custom} {push_back $array (fret4 ghc_sort)})
+         ({> {note_engine choices} 1}
+            {push_back $array {if_else {== gh1 {note_engine}} (fret4 ghc_engine_gh1) (fret4 ghc_engine_gh2)}})
       }
+      {if {&& {== {setlist shown} custom} {> {setlist tiers} 1}} {push_back $array (fret5 ghc_section)}}
       {push_back $array (strum help_updown)}
       {helpbar set_display $array}
    }
@@ -91,6 +95,19 @@
          {song_provider set_quickplay FALSE}
       )
       (SCROLL_MSG {$this update_pos})
+      ; To a tier's first song (orange, custom songs' sections), or to a
+      ; song at random (Select's menu).
+      (ghc_jump ($tier) {$this ghc_go {setlist jump $tier}})
+      (ghc_random {$this ghc_go {setlist random}})
+      (ghc_go
+         ($row)
+         {if {>= $row 0}
+            {synth play_sequence button_focus}
+            {ss_song.lst set_provider song_provider}
+            {ss_song.lst set_selected $row}
+            {$this update_pos}
+         }
+      )
       ; The songs ride the View, a frame a row, and a header takes a row of
       ; its own. GH1 frames its paper from its list's first header by two
       ; (gElementSpacing, debug 0x3132b0, SpacedSelectedPos 0x127240), so
@@ -172,7 +189,28 @@
          {ghc_pick_panel open_with {ghc_setlists} {setlist shown}}
          TRUE
       )
-      ({&& {== $button kPad_Square} {> {note_engine choices} 1} {! {ui in_transition}}}
+      ; Blue held, custom songs' sorts (custom/catalog.h); the UI gets
+      ; blue and orange both as kPad_Square.
+      ({&& {== $button kPad_Square} {! {pad_held orange}} {== {setlist shown} custom} {! {ui in_transition}}}
+         {ghc_pick_panel open_held
+            (sort_folder sort_artist sort_title sort_charter sort_length sort_difficulty) {custom sort} blue
+            ghc_option_text ghc_picked none}
+         TRUE
+      )
+      ; Orange held, every tier to jump to; tapped, the next one.
+      ({&& {== $button kPad_Square} {pad_held orange} {== {setlist shown} custom} {> {setlist tiers} 1}
+            {! {ui in_transition}}}
+         {do
+            ($tiers ())
+            {resize $tiers 0}
+            {foreach_int $t 0 {setlist tiers} {push_back $tiers $t}}
+            {ghc_pick_panel open_held $tiers {setlist tier_at} orange ghc_section_text ghc_section_picked
+               ghc_section_next}
+         }
+         TRUE
+      )
+      ; Blue on another setlist, the note engine.
+      ({&& {== $button kPad_Square} {!= {setlist shown} custom} {> {note_engine choices} 1} {! {ui in_transition}}}
          {synth play_sequence button_toggle}
          {note_engine set {note_engine next {note_engine}}}
          {ghc_qp_helpbar}
@@ -180,7 +218,12 @@
       )
       ({&& {== $button kPad_Select} {! {ui in_transition}}}
          {synth play_sequence button_select}
-         {ghc_pick_panel open_sticky (song_defaults) song_defaults}
+         ; A custom setlist's opens on RANDOM SONG, green straight away
+         ; jumping to one.
+         {if_else {== {setlist shown} custom}
+            {ghc_pick_panel open_sticky (random song_defaults instrument) random}
+            {ghc_pick_panel open_sticky (song_defaults instrument) song_defaults}
+         }
          TRUE
       )
       (TRUE kDataUnhandled)
@@ -189,25 +232,57 @@
 ; Select's menu (picker.dta): each row a setting, green flips it.
 {func ghc_qp_option_text ($option)
    {switch $option
+      (random "RANDOM SONG")
       (song_defaults
          {sprint "SONG DEFAULTS: " {if_else {quickplay song_defaults} "ON" "OFF"}})
+      ; The part a custom song plays (custom/songs.h); one without it
+      ; plays the part it has.
+      (instrument
+         {sprint "INSTRUMENT: " {if_else {== {custom instrument} bass} "BASS" "GUITAR"}})
+      (sort_folder "FOLDER")
+      (sort_artist "ARTIST")
+      (sort_title "TITLE")
+      (sort_charter "CHARTER")
+      (sort_length "LENGTH")
+      (sort_difficulty "DIFFICULTY")
       $option
    }
 }
-{func ghc_qp_chose ($option)
-   {switch $option
-      (song_defaults {quickplay song_defaults {! {quickplay song_defaults}}})
+{func ghc_qp_chose ($c_panel $option)
+   {if_else {== $option random}
+      {do
+         {ghc_pick_panel shut}
+         {$c_panel ghc_random}
+      }
+      {do
+         {switch $option
+            (song_defaults {quickplay song_defaults {! {quickplay song_defaults}}})
+            (instrument {custom instrument {if_else {== {custom instrument} bass} guitar bass}})
+         }
+         {synth play_sequence button_toggle}
+         {ghc_pick_panel relabel}
+      }
    }
-   {synth play_sequence button_toggle}
-   {ghc_pick_panel relabel}
 }
-; The setlist picked, shown by that screen.
+; Orange tapped, the next tier's first song.
+{func ghc_qp_section_next ($n_panel)
+   {$n_panel ghc_jump {mod {'+' {setlist tier_at} 1} {setlist tiers}}}
+}
+; The setlist or sort picked, shown by that screen: a new sort keeps the
+; song the list is on (content/setlists.cpp).
 {func ghc_qp_picked ($panel $twin $game)
-   {if {setlist select $game}
-      {synth play_sequence button_select}
-      {$panel set metamusic_on_exit FALSE}
-      {game set_song_index 0}
-      {ui goto_screen $twin}
+   {cond
+      ({custom sort $game}
+         {synth play_sequence button_select}
+         {$panel set metamusic_on_exit FALSE}
+         {ui goto_screen $twin}
+      )
+      ({setlist select $game}
+         {synth play_sequence button_select}
+         {$panel set metamusic_on_exit FALSE}
+         {game set_song_index 0}
+         {ui goto_screen $twin}
+      )
    }
 }
 {retype qp_selsong_screen
@@ -222,7 +297,10 @@
       (BUTTON_DOWN_MSG {ghc_qp_button $button})
       (ghc_picked ($game) {ghc_qp_picked sel_song_panel qp_selsong_twin_screen $game})
       (ghc_option_text ($option) {ghc_qp_option_text $option})
-      (ghc_chose ($option) {ghc_qp_chose $option})
+      (ghc_chose ($option) {ghc_qp_chose sel_song_panel $option})
+      (ghc_section_text ($tier) {setlist tier_name $tier})
+      (ghc_section_picked ($tier) {sel_song_panel ghc_jump $tier})
+      (ghc_section_next {ghc_qp_section_next sel_song_panel})
    )
 }
 {if {! {exists qp_selsong_twin_screen}} {new GHScreen qp_selsong_twin_screen}}
@@ -238,6 +316,9 @@
       (BUTTON_DOWN_MSG {ghc_qp_button $button})
       (ghc_picked ($game) {ghc_qp_picked sel_song_twin_panel qp_selsong_screen $game})
       (ghc_option_text ($option) {ghc_qp_option_text $option})
-      (ghc_chose ($option) {ghc_qp_chose $option})
+      (ghc_chose ($option) {ghc_qp_chose sel_song_twin_panel $option})
+      (ghc_section_text ($tier) {setlist tier_name $tier})
+      (ghc_section_picked ($tier) {sel_song_twin_panel ghc_jump $tier})
+      (ghc_section_next {ghc_qp_section_next sel_song_twin_panel})
    )
 }

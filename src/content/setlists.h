@@ -15,6 +15,14 @@
 //                            it, the provider to be filled again; -1 if it
 //                            has not moved
 //   {setlist header <n>}     the text of a live one's window's nth header
+//   {setlist tiers}          how many tiers a live one has (0 for the rest)
+//   {setlist tier_name <n>}  its nth tier's header text
+//   {setlist tier_at}        the tier its song last on is in
+//   {setlist jump <n>}       the list moved to the nth tier's first song: its
+//                            row in the window, the provider to be filled
+//                            again; -1 if there is no such tier
+//   {setlist random}         that, to a live one's song picked at random,
+//                            never the one on; -1 with fewer than two
 //   {setlist frame <row>}    the paper's frame for the list's row, from the
 //                            setlist's top
 //   {setlist paper_base <piece> <x> <z>}  where the scene put a piece of

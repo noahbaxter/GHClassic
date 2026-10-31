@@ -25,6 +25,9 @@
 //   {custom level <song> guitar|bass}     that instrument's difficulty
 //                                         in song.ini, "" if it has
 //                                         none or not the part
+//   {custom sort [sort_<name>]}           the list's sort (catalog.h's
+//                                         Sort); with one, TRUE if it
+//                                         is that now and was not
 //   {custom instrument [guitar|bass]}     the one played; with one, set
 //                                         to that
 //   {custom scan [<seen> <expected>]}     how far the scan of the song

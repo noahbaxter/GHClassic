@@ -437,6 +437,29 @@ namespace gh2::setlists
             // A row, -1 for none.
             const auto rowNode = [](std::optional<size_t> row) -> script::Node
             { return {row ? static_cast<uint32_t>(*row) : static_cast<uint32_t>(-1), script::kInt}; };
+            // A live one's tiers: how many, one's header text, the one the
+            // list is on, and the list moved to one's first song (its row
+            // in the window, the provider to be filled again).
+            if (op == "tiers")
+                return {static_cast<uint32_t>(window.tierNames.size()), script::kInt};
+            if (op == "tier_name")
+            {
+                const size_t n = call.index(2);
+                return {symbol(call.rdram, call.ctx, call.runtime, n < window.tierNames.size() ? window.tierNames[n] : ""),
+                        script::kSymbol};
+            }
+            if (op == "tier_at")
+            {
+                const auto at = rowOf(window, window.at);
+                return {static_cast<uint32_t>(at ? window.tiers[*at] : 0u), script::kInt};
+            }
+            if (op == "jump" || op == "random")
+            {
+                const auto row = op == "jump" ? jump(window, call.index(2)) : random(window);
+                if (row)
+                    save::keepState("song_at", selected(), window.at);
+                return rowNode(row);
+            }
             // The list's row now on: the row it is on once the window has
             // moved to keep it away from either end, -1 if it has not.
             if (op == "scroll")
