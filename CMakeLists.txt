@@ -162,8 +162,17 @@ add_executable(save_test EXCLUDE_FROM_ALL
 target_include_directories(save_test PRIVATE src)
 target_link_libraries(save_test PRIVATE miniz)
 
+# Custom songs' charts, and a tally of a folder of them.
+add_executable(custom_chart_test EXCLUDE_FROM_ALL
+    tests/custom_chart_test.cpp
+    src/custom/chart.cpp
+    src/custom/gh2_chart.cpp
     src/custom/song_ini.cpp
     src/custom/text.cpp
+    src/formats/midi.cpp
+)
+target_include_directories(custom_chart_test PRIVATE src)
+
 # Which release the game offers as an update.
 add_executable(releases_test EXCLUDE_FROM_ALL tests/releases_test.cpp src/host/releases.cpp)
 target_include_directories(releases_test PRIVATE src)
@@ -251,6 +260,8 @@ set(GHC_GAME_SOURCES
     src/content/tour_or_higher.cpp
     src/content/vgs.cpp
     src/content/vorbis.cpp
+    src/custom/chart.cpp
+    src/custom/gh2_chart.cpp
     src/custom/song_ini.cpp
     src/custom/text.cpp
     src/dev/cheats.cpp
