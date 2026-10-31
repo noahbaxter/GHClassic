@@ -1,0 +1,39 @@
+#pragma once
+
+// {custom ...}, the script's questions about custom songs and the list's
+// sort and instrument (ui/dta/quickplay*.dta), and the locale's names for
+// the playing song's sections.
+//
+//   {custom ours <song>}                  TRUE if it is a custom song
+//   {custom has <song> <difficulty>}      TRUE if charted in the part it
+//                                         plays; every one is for a song
+//                                         not ours
+//   {custom nearest <song> <difficulty>}  that one if charted, else the
+//                                         nearest that is, harder first
+//   {custom base <song>}                  its files for the part it
+//                                         plays, songs/<id>/<id>; it is
+//                                         the song being started
+//   {custom tag <song> <key>}             its song.ini's tag, rich text
+//                                         taken out; "" if it has none;
+//                                         name, as the list shows it
+//   {custom length <song>}                its length, m:ss
+//   {custom art <song>}                   TRUE if it has album art,
+//                                         ui/image/ghc_art_<song>.png
+//   {custom ready <song>}                 TRUE once its audio is read
+//                                         off its disk, which this
+//                                         starts (audio.h stemsReady)
+//   {custom level <song> guitar|bass}     that instrument's difficulty
+//                                         in song.ini, "" if it has
+//                                         none or not the part
+//   {custom instrument [guitar|bass]}     the one played; with one, set
+//                                         to that
+//   {custom scan [<seen> <expected>]}     how far the scan of the song
+//                                         folders is, "" once done; with
+//                                         two numbers, said to be that far
+//   {custom section <n>}                  the song being played's nth
+//                                         section's name
+
+namespace gh2::custom
+{
+    void installCommand();
+}

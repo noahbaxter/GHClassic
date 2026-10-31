@@ -60,6 +60,7 @@ namespace gh2::settings
         kPerfOverlay, // host/perf.h's Level: frame times in the picture's corner
         kVectorFonts, // text in the traced fonts drawn from their outlines (render/vector_fonts.h)
         kSongFolders, // text: chart folders custom songs are read from, ';' between (custom/install.h)
+        kShowDuplicates, // every copy of a custom chart listed, not just the first by folder
         kKeyCount,
     };
 

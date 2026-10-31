@@ -33,6 +33,12 @@
          {if {quickplay picked venue_game} {campaigns venues_from {quickplay pick venue_game}}}
       }
    }
+   ; A custom song's audio and chart for the instrument played, guitar or
+   ; bass (custom/song_files.h).
+   {if {custom ours {game get_song}}
+      {set_elem {find $syscfg songs {game get_song} song name} 1 {custom base {game get_song}}}
+      {set_elem {find $syscfg songs {game get_song} song midi_file} 1 {sprint {custom base {game get_song}} ".mid"}}
+   }
    {campaigns text_outfit {game get_character_outfit}}
    {ui goto_screen loading_screen}
 }

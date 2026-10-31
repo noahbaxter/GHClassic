@@ -4,8 +4,9 @@
 ; takes at load, so a switch goes to the twin screen, whose own panel loads
 ; the new one. Both leave for the main menu, never for each other.
 ;
-; The setlists there are to show: GH2's, and each other game's whose disc is
-; mounted ({mounted}, content/games.h).
+; The setlists there are to show: GH2's, each other game's whose disc is
+; mounted ({mounted}, content/games.h), and the player's own songs where
+; there are any (custom/install.h).
 {func ghc_setlists
    {do
       ($lists)
@@ -14,6 +15,7 @@
       {foreach $game (gh1 gh2 gh2x gh80s)
          {if {|| {== $game gh2} {mounted $game}} {push_back $lists $game}}
       }
+      {if {setlist has custom} {push_back $lists custom}}
       $lists
    }
 }

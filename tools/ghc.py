@@ -834,6 +834,8 @@ def notices():
         ("libmpeg2", src("libmpeg2") / "COPYING"),
         ("libogg", src("ogg") / "COPYING"),
         ("libvorbis", src("vorbis") / "COPYING"),
+        ("libopus", src("opus") / "COPYING"),
+        ("opusfile", src("opusfile") / "COPYING"),
         ("zstd", ROOT / "config" / "licenses" / "zstd.txt"),
         ("PS2Recomp", ROOT / "lib" / "PS2Recomp" / "LICENSE"),
     ]

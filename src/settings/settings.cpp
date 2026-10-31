@@ -133,6 +133,7 @@ namespace gh2::settings
             {"perf_overlay", Type::kChoice, 0, 3, 1, 0, "off fps graph full"},
             {"vector_fonts", Type::kBool, 0, 1, 1, 1},
             {"folders", Type::kText, 0, 0, 1, 0},
+            {"show_duplicates", Type::kBool, 0, 1, 1, 0},
         };
 
         const Entry *entryNamed(const std::string &name)

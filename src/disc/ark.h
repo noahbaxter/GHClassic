@@ -35,6 +35,10 @@ namespace gh2::ark
     void addMade(const std::string &path, std::function<std::optional<Made>()> make);
     // One that is those bytes, kept for as long as it is read.
     Made held(std::vector<uint8_t> bytes);
+    // Each file under `prefix` the same way, `make` given its path, for
+    // files too many to add one by one: none where it has nothing there,
+    // looked for again the next time.
+    void addMaker(const std::string &prefix, std::function<std::optional<Made>(const std::string &path)> make);
 
     // A file served in place of that disc's own copy of `path`, wherever its
     // copy would be (as a rename's source, under a layer over it, or in the
