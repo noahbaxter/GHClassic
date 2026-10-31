@@ -288,6 +288,7 @@ set(GHC_GAME_SOURCES
     src/content/vgs.cpp
     src/content/vorbis.cpp
     src/content/audio_file.cpp
+    src/custom/audio.cpp
     src/custom/chart.cpp
     src/custom/gh2_chart.cpp
     src/custom/index.cpp
