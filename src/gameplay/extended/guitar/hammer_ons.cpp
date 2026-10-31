@@ -109,6 +109,30 @@ namespace gh2::guitar
             }
             s_fretButtonDown(rdram, ctx, runtime);
         }
+        // GuitarTrackWatcherImpl's gem i may be hammered on (0x24df30, from
+        // TryToHopo): its HOPO flag, and the gem before it the last hit, so
+        // never the first nor one after a miss. A tap may, whatever is
+        // before it, as Clone Hero's. The watcher's track at +0x44 (its
+        // constructor's first int; the second, at +0x00, is its player's,
+        // both 0 for one player).
+        constexpr uint32_t kWatcherTrack = 0x44u, kGemTick = 0x04u;
+        PS2Runtime::RecompiledFunction s_canHopo = nullptr;
+        void canHopo(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t watcher = GPR_U32(ctx, 4);
+            const auto index = static_cast<int32_t>(GPR_U32(ctx, 5));
+            const uint32_t gem = load<uint32_t>(rdram, load<uint32_t>(rdram, watcher + kWatcherGems) + kListGems) +
+                                 static_cast<uint32_t>(index) * kGemSize;
+            if (index >= 0 && (load<uint8_t>(rdram, gem + kGemFlags) & 1u) &&
+                isTap(load<uint32_t>(rdram, watcher + kWatcherTrack), load<uint32_t>(rdram, gem + kGemTick),
+                      load<uint8_t>(rdram, gem + kGemSlots)))
+            {
+                SET_GPR_U32(ctx, 2, 1u);
+                ctx->pc = GPR_U32(ctx, 31);
+                return;
+            }
+            s_canHopo(rdram, ctx, runtime);
+        }
     }
 
     uint32_t hammeredOpen()
@@ -119,6 +143,8 @@ namespace gh2::guitar
     void installHammerOns(PS2Runtime &runtime, const Addresses &addresses)
     {
         s_addresses = &addresses;
+        s_canHopo = runtime.lookupFunction(addresses.guitarWatcherCanHopo);
+        runtime.replaceFunction(addresses.guitarWatcherCanHopo, &canHopo);
         s_fretButtonUp = runtime.lookupFunction(addresses.guitarWatcherFretButtonUp);
         runtime.replaceFunction(addresses.guitarWatcherFretButtonUp, &fretButtonUp);
         s_fretButtonDown = runtime.lookupFunction(addresses.guitarWatcherFretButtonDown);

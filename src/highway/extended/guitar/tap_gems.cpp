@@ -49,28 +49,21 @@ namespace gh2::guitar
         // The Gems on the track that are taps.
         std::set<uint32_t> s_taps;
 
-        constexpr uint32_t kManagerConfig = 0x00u, kManagerGems = 0x04u, kManagerNext = 0x24u, kManagerGemSize = 0x20u;
-        constexpr uint32_t kGameGemTick = 0x04u, kGameGemSlots = 0x0cu;
-
-        // GemManager::AdvanceEnd.
-        struct AdvanceEndTag;
-        void onAdvanceEnd(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        void gemAdded(uint8_t *rdram, R5900Context *, PS2Runtime *, const GemAdded &added)
         {
-            const EntryArgs args(ctx);
-            const uint32_t manager = args.a[0], next = load<uint32_t>(rdram, manager + kManagerNext);
-            const uint32_t gem = load<uint32_t>(rdram, manager + kManagerGems) + next * kManagerGemSize;
             if (!playingCustom())
-                return void(s_taps.erase(gem));
-            const uint32_t track = static_cast<uint32_t>(runtime->callGuestFunction(
-                rdram, ctx, s_addresses->trackConfigTrackNum, {load<uint32_t>(rdram, manager + kManagerConfig)}));
-            const uint32_t game = static_cast<uint32_t>(runtime->callGuestFunction(
-                rdram, ctx, s_addresses->songDbGetGem, {load<uint32_t>(rdram, s_addresses->theSongDb), track, next}));
-            if (game != 0u &&
-                isTap(track, load<uint32_t>(rdram, game + kGameGemTick), load<uint8_t>(rdram, game + kGameGemSlots)))
-                s_taps.insert(gem);
+                return void(s_taps.erase(added.gem));
+            const guest::GameGem game(rdram, added.game);
+            if (added.game != 0u && isTap(added.track, static_cast<uint32_t>(game.tick()), game.slots()))
+            {
+                s_taps.insert(added.gem);
+                // Drawn as a HOPO even first or after a gap, as it is played
+                // (gameplay/extended/guitar/hammer_ons): GemManager::SetupGems
+                // makes a Gem one only with a playable gem before it.
+                store<uint32_t>(rdram, added.gem + gem::kFrets, load<uint32_t>(rdram, added.gem + gem::kFrets) | gem::kHopo);
+            }
             else
-                s_taps.erase(gem);
-            args.restore(ctx);
+                s_taps.erase(added.gem);
         }
 
         // A tap_ material made glass, once each, as its scene is first
