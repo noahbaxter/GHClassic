@@ -225,7 +225,8 @@ namespace
             CHECK(f.faceOff[1].size() == 1u && f.faceOff[1][0].tick == 384u);
         }
 
-        // As GH2 takes it: 480 a beat, the open gone, star power on 103.
+        // As GH2 takes it: 480 a beat, the open as all five frets, star
+        // power on 103.
         const auto gh2 = toGh2(*chart, 0.0);
         CHECK(gh2);
         if (!gh2)
@@ -238,17 +239,18 @@ namespace
         for (const midi::Event &e : back->tracks[1].events)
             if (midi::kind(e) == midi::kNoteOn)
                 ons[e.data[0]].push_back(e.tick);
-        CHECK(ons[96] == (std::vector<uint32_t>{0u, 1920u}));
-        CHECK(ons[97] == (std::vector<uint32_t>{120u, 240u}));
+        CHECK(ons[96] == (std::vector<uint32_t>{0u, 1200u, 1920u}));
+        CHECK(ons[97] == (std::vector<uint32_t>{120u, 240u, 1200u}));
         CHECK(ons[103] == (std::vector<uint32_t>{1920u}));
-        CHECK(ons.size() == 6u); // five frets and star power: no open
-        // Each gem's kind beside it, at 480 a beat: the tap hammers on, the
-        // chord is strummed.
+        CHECK(ons.size() == 6u); // five frets and star power
+        // Each gem's kind beside it, at 480 a beat: the tap hammers on, and
+        // so does the open close after it; the chord is strummed.
         const auto &kinds = gh2->gems[3];
         const auto hopo = [&](uint32_t tick) { return kinds.count(tick) && kinds.at(tick).hopo; };
-        CHECK(kinds.size() == 7u);
+        CHECK(kinds.size() == 8u);
         CHECK(!hopo(0) && hopo(120) && !hopo(240) && !hopo(360) && hopo(960) && hopo(1080) && !hopo(1920));
         CHECK(kinds.count(1920) && kinds.at(1920).frets == 0x5u);
+        CHECK(kinds.count(1200) && kinds.at(1200).open && kinds.at(1200).frets == kOpenFrets && hopo(1200));
         bool end = false, section = false;
         for (const midi::Event &e : back->tracks[2].events)
         {

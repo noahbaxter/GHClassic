@@ -67,6 +67,32 @@ namespace gh2
         uint32_t songDataLoad;             // SongData::Load(BinStream &, const DataArray *, ...)
         uint32_t songDataAddMultiGem;      // SongData::AddMultiGem(int, const MultiGemInfo &)
         uint32_t songParserOnGemEnd;       // SongParser::OnGemEnd(int tick, unsigned char pitch)
+        uint32_t gameGemNumSlots;          // GameGem::NumSlots
+        uint32_t gemNumSlots;              // GemNumSlots(int), a mask's
+        uint32_t gemAddRep;                // Gem::AddRep(GemRepPool &, RndGroup *, GemRep::Type, const TrackConfig &)
+        uint32_t gemAddRepForSlot;         // Gem::AddRepForSlot(..., int slot, ...)
+        uint32_t gemRemoveRep;             // Gem::RemoveRep(GemRepPool &)
+        uint32_t gemRepPoolCreateGem;      // GemRepPool::CreateGem, a new GemRep
+        uint32_t gemRepPoolReturnGem;      // GemRepPool::ReturnGem(GemRep *), onto its free list
+        uint32_t gemRepPoolDtor;           // GemRepPool::~GemRepPool, which deletes its free list's
+        uint32_t gemRepSetType;            // GemRep::SetType(GemRep::Type)
+        uint32_t gemRepPartSetTemplate;    // GemRep::Part::SetTemplate(GemPartTemplate *)
+        uint32_t gemRepPartSetShowing;     // GemRep::Part::SetShowing(bool)
+        uint32_t gemPartTemplateCtor;      // GemPartTemplate::GemPartTemplate(RndMesh *, bool multimesh)
+        uint32_t gemPartTemplateDtor;      // GemPartTemplate::~GemPartTemplate
+        uint32_t gemPartTemplateDrawAllParts; // GemPartTemplate::DrawAllParts
+        uint32_t gemRepTemplateDrawShowing;   // GemRepTemplate::DrawShowing(RndDrawable::DrawType)
+        uint32_t gemRepTemplateDtor;          // GemRepTemplate::~GemRepTemplate
+        uint32_t gemRepEnableDuration;        // GemRep::EnableDuration, which takes a tail from the pool
+        uint32_t gemRepSetDuration;           // GemRep::SetDuration(float, float, float), which places the tail's glow
+        uint32_t rndMeshSetMat;               // RndMesh::SetMat(RndMat *)
+        uint32_t rndLineSetPointColor;        // RndLine::SetPointColor(int, const Color &)
+        uint32_t rndLineDrawShowing;          // RndLine::DrawShowing(RndDrawable::DrawType)
+        uint32_t slotViewsDrawShowing;        // SlotViews::DrawShowing(RndDrawable::DrawType)
+        uint32_t smashFxSetType;              // SmashFX::SetType(bool, bool, bool)
+        uint32_t nowBarHit;                   // NowBar::Hit(float, int gem, bool, PhraseState)
+        uint32_t trackConfigTrackNum;         // TrackConfig::TrackNum
+        uint32_t songDbGetGem;                // SongDB::GetGem(int track, int gem), a GameGem *
         uint32_t checkForPitchBend; // TrackWatcherImpl::CheckForPitchBend
         uint32_t sendWhammy;        // TrackWatcherImpl::SendWhammy
         uint32_t playerSetWhammyBar; // Player::SetWhammyBar
@@ -77,6 +103,10 @@ namespace gh2
         uint32_t beatMatcherPoll;           // BeatMatcher::Poll(float)
         uint32_t beatMatcherDtor;           // BeatMatcher::~BeatMatcher
         uint32_t guitarWatcherJumpHook; // GuitarTrackWatcherImpl::JumpHook
+        uint32_t guitarWatcherFretButtonDown; // GuitarTrackWatcherImpl::FretButtonDown(int slot)
+        uint32_t trackWatcherKillSustain;     // TrackWatcherImpl::KillSustain(int gem)
+        uint32_t guitarWatcherNonStrumSwing;  // GuitarTrackWatcherImpl::NonStrumSwing(int slot, bool)
+        uint32_t trackWatcherClosestUnplayedGem; // TrackWatcherImpl::ClosestUnplayedGem(float ms)
         uint32_t hudPanelEnter;      // HudPanel::Enter
         uint32_t hudPanelSetMetersShowing; // HudPanel::SetMetersShowing(bool)
         uint32_t hudPanelOnGameOver; // HudPanel::OnGameOver, as a song is won or lost
@@ -381,6 +411,32 @@ namespace gh2
         .songDataLoad = 0x243da8u,
         .songDataAddMultiGem = 0x244890u,
         .songParserOnGemEnd = 0x245ee8u,
+        .gameGemNumSlots = 0x236468u,
+        .gemNumSlots = 0x235ef8u,
+        .gemAddRep = 0x157960u,
+        .gemAddRepForSlot = 0x157a00u,
+        .gemRemoveRep = 0x157af8u,
+        .gemRepPoolCreateGem = 0x159a40u,
+        .gemRepPoolReturnGem = 0x1599e0u,
+        .gemRepPoolDtor = 0x159810u,
+        .gemRepSetType = 0x158820u,
+        .gemRepPartSetTemplate = 0x157fd0u,
+        .gemRepPartSetShowing = 0x158060u,
+        .gemPartTemplateCtor = 0x15f9c8u,
+        .gemPartTemplateDtor = 0x15fa98u,
+        .gemPartTemplateDrawAllParts = 0x15fb10u,
+        .gemRepTemplateDrawShowing = 0x15ba50u,
+        .gemRepTemplateDtor = 0x15b558u,
+        .gemRepEnableDuration = 0x158a78u,
+        .gemRepSetDuration = 0x158b60u,
+        .rndMeshSetMat = 0x1c6b88u,
+        .rndLineSetPointColor = 0x1bce70u,
+        .rndLineDrawShowing = 0x1bc1c0u,
+        .slotViewsDrawShowing = 0x15f038u,
+        .smashFxSetType = 0x15f650u,
+        .nowBarHit = 0x15d0b8u,
+        .trackConfigTrackNum = 0x152480u,
+        .songDbGetGem = 0x11cf78u,
         .checkForPitchBend = 0x248e38u,
         .sendWhammy = 0x249b98u,
         .playerSetWhammyBar = 0x111d88u,
@@ -391,6 +447,10 @@ namespace gh2
         .beatMatcherPoll = 0x235340u,
         .beatMatcherDtor = 0x234b08u,
         .guitarWatcherJumpHook = 0x24d4e0u,
+        .guitarWatcherFretButtonDown = 0x24d890u,
+        .trackWatcherKillSustain = 0x248ff8u,
+        .guitarWatcherNonStrumSwing = 0x24d828u,
+        .trackWatcherClosestUnplayedGem = 0x248768u,
         .hudPanelEnter = 0x12ba00u,
         .hudPanelSetMetersShowing = 0x12c210u,
         .hudPanelOnGameOver = 0x12c340u,

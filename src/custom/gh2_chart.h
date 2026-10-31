@@ -7,11 +7,10 @@
 // [music_start] and [end].
 //
 // What GH2's parser cannot say is given beside it (Gh2Chart::gems), each gem's
-// kind where the chart decides it or flips the engine's, and the song's HOPO
-// threshold, for the engine to put in as the gems load
+// kind where the chart decides it or flips the engine's, the song's HOPO
+// threshold, and which are opens, for the engine to put in as the gems load
 // (gameplay/extended/guitar/gem_kinds.h). Not yet said at all: a chord holds as
-// long as its longest lane, a sustain ends where the next gem starts, and opens
-// are left out.
+// long as its longest lane, and a sustain ends where the next gem starts.
 
 #include "custom/chart.h"
 
@@ -26,16 +25,19 @@ namespace gh2::custom
     constexpr uint32_t kGh2Resolution = 480u;
 
     // A gem as GH2's parser reads it from the MIDI (its frets), and what the
-    // parser cannot read: whether it is strummed or hammered on.
+    // parser cannot read: whether it is strummed or hammered on, and whether
+    // it is an open, written as kOpenFrets.
     struct Gh2Gem
     {
         uint8_t frets = 0u; // bit 0 green
         bool hopo = false;
-        // Its kind the chart's (forced), else the running engine's natural
-        // one, flipped where `flip`.
+        // Its kind the chart's (forced, or an open), else the running
+        // engine's natural one, flipped where `flip`.
         bool decided = false;
         bool flip = false;
+        bool open = false;
     };
+    constexpr uint8_t kOpenFrets = 0x1fu;
 
     struct Gh2Chart
     {
