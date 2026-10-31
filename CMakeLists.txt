@@ -333,6 +333,7 @@ set(GHC_GAME_SOURCES
     src/gameplay/engine/gh1/watcher.cpp
     src/gameplay/engine/hopo_lock.cpp
     src/gameplay/engine/note_engine.cpp
+    src/gameplay/engine/star_power_overlap.cpp
     src/gameplay/engine/strum_limit.cpp
     src/gameplay/engine/sustain_release.cpp
     src/gameplay/engine/track_start.cpp

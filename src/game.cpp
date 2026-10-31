@@ -78,6 +78,7 @@
 #include "dev/transplant.h"
 #include "synth/synth.h"
 #include "settings/video_options.h"
+#include "gameplay/engine/star_power_overlap.h"
 #include "gameplay/engine/strum_limit.h"
 #include "gameplay/engine/sustain_release.h"
 #include "gameplay/engine/track_start.h"
@@ -128,6 +129,7 @@ namespace
         gh2::installSustainRelease(runtime, gh2::kSlus21447);
         gh2::guitar::installGemKinds(runtime, gh2::kSlus21447);
         gh2::installWhammyHold(runtime, gh2::kSlus21447);
+        gh2::installStarPowerOverlap(runtime, gh2::kSlus21447);
         gh2::installHopoLock(runtime, gh2::kSlus21447);
         // Off, neither is installed: the score and rock meters stay where
         // retail has them.

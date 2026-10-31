@@ -29,6 +29,33 @@ namespace gh2
         }
     };
 
+    // A replaced function's original run to its end, with the arguments in
+    // its registers now ($a0-$a3, $t0-$t3; the FPU's as they are), its answer
+    // in $v0, set to return to its caller. Code after a direct call to the
+    // original may run before the original's end: the runtime may park it at
+    // any call inside it (ps2_runtime.cpp, dispatchGuestBranch) and resume it
+    // later from there. callGuestFunction never parks.
+    inline uint64_t callOriginal(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t address,
+                                 PS2Runtime::RecompiledFunction original)
+    {
+        const uint64_t answer = runtime->callGuestFunction(
+            rdram, ctx, address,
+            {GPR_U32(ctx, 4), GPR_U32(ctx, 5), GPR_U32(ctx, 6), GPR_U32(ctx, 7), GPR_U32(ctx, 8), GPR_U32(ctx, 9),
+             GPR_U32(ctx, 10), GPR_U32(ctx, 11)},
+            original);
+        ctx->pc = GPR_U32(ctx, 31);
+        return answer;
+    }
+
+    // The function at `address` replaced by `with`, the one it replaces kept
+    // in `original` for `with` to hand calls on to.
+    inline void replaceKeeping(PS2Runtime &runtime, uint32_t address, PS2Runtime::RecompiledFunction with,
+                               PS2Runtime::RecompiledFunction &original)
+    {
+        original = runtime.lookupFunction(address);
+        runtime.replaceFunction(address, with);
+    }
+
     // Runs native code on entry to a guest function, then the function itself.
     //
     // Only the entry is ours: when the guest function yields mid-body, the
