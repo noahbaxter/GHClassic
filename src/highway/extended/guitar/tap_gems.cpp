@@ -40,9 +40,7 @@ namespace gh2::guitar
 {
     namespace
     {
-        const Addresses *s_addresses = nullptr;
-
-        constexpr float kTapAlpha = 0.5f, kGlassValue = 0.3f, kCyanStarValue = 0.75f;
+        constexpr float kTapAlpha = 0.5f, kStarAlpha = 0.75f;
         // Every part but the gem's shine (glow.mesh): its cap, its gem, and
         // a star's base, top, body and shine.
         constexpr uint32_t kBodyParts[] = {gemRep::kCap,     gemRep::kGem,      gemRep::kStarBase,
@@ -61,6 +59,8 @@ namespace gh2::guitar
             const EntryArgs args(ctx);
             const uint32_t manager = args.a[0], next = load<uint32_t>(rdram, manager + kManagerNext);
             const uint32_t gem = load<uint32_t>(rdram, manager + kManagerGems) + next * kManagerGemSize;
+            if (!playingCustom())
+                return void(s_taps.erase(gem));
             const uint32_t track = static_cast<uint32_t>(runtime->callGuestFunction(
                 rdram, ctx, s_addresses->trackConfigTrackNum, {load<uint32_t>(rdram, manager + kManagerConfig)}));
             const uint32_t game = static_cast<uint32_t>(runtime->callGuestFunction(
@@ -80,20 +80,18 @@ namespace gh2::guitar
         {
             if (!s_glassed.insert(mat).second)
                 return;
-            store<uint32_t>(rdram, mat + ::milo::mat::kBlend, ::milo::mat::kBlendSrcAlpha);
-            if (s_caps.count(std::string(objectName(rdram, mat))))
-                return;
-            store<float>(rdram, mat + ::milo::mat::kColor + 12u, kTapAlpha);
+            // A star's shine (star2.mat) is drawn over everything (kZForce),
+            // white over GH2's white top; over a tap's coloured one it shows,
+            // so a tap's is hidden by what is in front of it.
+            if (std::string(objectName(rdram, mat)) == tapped("star2.mat"))
+                store<uint32_t>(rdram, mat + ::milo::mat::kZMode, ::milo::mat::kZTransparent);
+            // A cap and a star's top solid, unblended: top.mat blends by
+            // alpha, and over a coloured star its top would show the star.
             const std::string name(objectName(rdram, mat));
-            if (s_darkened.count(name))
-                for (int c = 0; c < 3; ++c)
-                {
-                    const uint32_t at = mat + ::milo::mat::kColor + 4u * c;
-                    // Star power's gem tinted its cyan as it darkens. A cyan
-                    // star kept lighter: as dark as a gem, it reads grey.
-                    const float dark = name == tapped("cyan_star.mat") ? kCyanStarValue : kGlassValue;
-                    store<float>(rdram, at, load<float>(rdram, at) * dark);
-                }
+            if (tapPieces().solid.count(name))
+                return store<uint32_t>(rdram, mat + ::milo::mat::kBlend, ::milo::mat::kBlendSrc);
+            store<uint32_t>(rdram, mat + ::milo::mat::kBlend, ::milo::mat::kBlendSrcAlpha);
+            store<float>(rdram, mat + ::milo::mat::kColor + 12u, tapPieces().starGlass.count(name) ? kStarAlpha : kTapAlpha);
         }
 
         // What a tap's rep had before its copies, to give back: each part's
@@ -225,6 +223,15 @@ namespace gh2::guitar
                 const Vertex &edge = at(*r, right);
                 line.push_back({edge.pos[0], edge.pos[1], top(*r), edge.pos[0] - band, edge.pos[1], &at(*r, from)});
             }
+            // Poll's colour for its lit edge, brighter; a star's or one
+            // under star power's in star power's cyan, at the brightness
+            // Poll gives a lane's (about half its colour).
+            const uint32_t type = load<uint32_t>(rdram, found->second + gemRep::kType);
+            float colour[3];
+            for (int c = 0; c < 3; ++c)
+                colour[c] = (type == gemRep::kTypeStar || type == gemRep::kTypeBonus ? kStarPowerCyan[c] * 0.5f
+                                                                                    : at(body.front(), 1u).color[c]) *
+                            kOutlineBright;
             auto outline = std::make_shared<MeshData>();
             outline->transient = true;
             for (const Point &p : line)
@@ -234,9 +241,7 @@ namespace gh2::guitar
                     v.pos[0] = inner ? p.ix : p.x;
                     v.pos[1] = inner ? p.iy : p.y;
                     v.pos[2] = p.z;
-                    // Poll's colour for its lit edge, brighter.
-                    for (int c = 0; c < 3; ++c)
-                        v.color[c] = at(body.front(), 1u).color[c] * kOutlineBright;
+                    std::copy(colour, colour + 3, v.color);
                     v.color[3] = 1.0f;
                     outline->verts.push_back(v);
                 }

@@ -15,16 +15,13 @@ namespace gh2::guitar
 {
     namespace
     {
-        const Addresses *s_addresses = nullptr;
+        TapPieces s_pieces;
 
-        constexpr float kTapAlpha = 0.5f, kGlassValue = 0.3f, kCyanStarValue = 0.75f;
-        // Star power's cyan.
-        constexpr float kCyan[3] = {0.3f, 1.0f, 1.0f};
         // A colour this pale (saturation) and light (value) is the lip's.
         constexpr float kLipSaturation = 0.25f, kLipValue = 0.5f;
         // A body colour's value this low stays glass, this high is the
-        // lane's colour, eased between.
-        constexpr float kRimFrom = 0.5f, kRimTo = 0.85f;
+        // lane's colour, eased between; glass is its colour this dark.
+        constexpr float kRimFrom = 0.5f, kRimTo = 0.85f, kGlassValue = 0.3f;
         struct Lane
         {
             const char *name;
@@ -32,20 +29,10 @@ namespace gh2::guitar
         };
         constexpr Lane kLanes[] = {{"green", 120.0f}, {"red", 0.0f}, {"yellow", 55.0f}, {"blue", 215.0f}, {"orange", 30.0f}};
 
-        // The materials whose colour is darkened at run time (every tap_
-        // one but the lane gems', whose texture is), and each tap_ mesh's
-        // material.
-        // ...and the banded caps', see-through by their texture alone, and
-        // those kept their colour, only see-through.
-        std::set<std::string> s_darkened, s_caps;
-        // An open's gem materials, glass.
-        std::set<std::string> s_openGlass;
-        std::map<std::string, std::string> s_meshMat;
-
         // A mesh copied as tap_<mesh>, on tap_<mat>.
         bool copyMesh(milo::Dir &scene, const std::string &mesh, const std::string &mat)
         {
-            s_meshMat[tapped(mesh)] = tapped(mat);
+            s_pieces.meshMat[tapped(mesh)] = tapped(mat);
             return addCopy(scene, mesh, tapped(mesh),
                            [&](milo::Bytes &body) { return milo::replaceStr(body, mesh, tapped(mesh)) && milo::replaceStr(body, mat, tapped(mat)); });
         }
@@ -124,31 +111,78 @@ namespace gh2::guitar
             ok = addCopy(scene, mesh, as,
                          [&](milo::Bytes &body) { return milo::replaceStr(body, mesh, as) && milo::replaceStr(body, "top.mat", mat) && banded(body); }) &&
                  ok;
-            s_meshMat[as] = mat;
-            s_caps.insert(mat);
+            s_pieces.meshMat[as] = mat;
+            s_pieces.solid.insert(mat);
             return ok;
         }
 
-        // gem.tex copied as `tex`, glass of a hue: its coloured body darkened
-        // (kGlassValue) and eased into the hue at its lit sides, its pale lip
-        // the hue; `glow`, the hue mixed through even its darkest glass.
-        bool glassTex(milo::Dir &scene, const std::string &tex, float hue, float glow)
+        bool lip(const Hsv &hsv)
         {
-            float colour[3];
-            fromHsv(hue / 60.0f, 1.0f, 1.0f, colour);
-            return addCopy(scene, "gem.tex", tex, [&](milo::Bytes &body)
+            return hsv.s < kLipSaturation && hsv.v > kLipValue;
+        }
+
+        // A star's HOPO top (<lane>_top_star), its mesh and uvs GH2's, as
+        // tap_<mesh> on a gem.tex of its own whose white is `colour`.
+        bool copyTopStar(milo::Dir &scene, const std::string &mesh, const float *colour)
+        {
+            const std::string stem = mesh.substr(0u, mesh.size() - std::strlen(".mesh"));
+            const std::string tex = tapped(stem + ".tex"), mat = tapped(stem + ".mat"), as = tapped(mesh);
+            bool ok = addCopy(scene, "gem.tex", tex, [&](milo::Bytes &body)
+                              {
+                                  return recolor(body, scene.version, [&](float *rgb)
+                                                 {
+                                                     if (lip(toHsv(rgb)))
+                                                         // As the PS2 draws a texture, at twice.
+                                                         for (int c = 0; c < 3; ++c)
+                                                             rgb[c] = colour[c] * 0.5f;
+                                                 });
+                              });
+            ok = addCopy(scene, "top.mat", mat, [&](milo::Bytes &body) { return milo::replaceStr(body, "gem.tex", tex); }) && ok;
+            ok = addCopy(scene, mesh, as, [&](milo::Bytes &body) { return milo::replaceStr(body, mesh, as) && milo::replaceStr(body, "top.mat", mat); }) &&
+                 ok;
+            s_pieces.meshMat[as] = mat;
+            s_pieces.solid.insert(mat);
+            return ok;
+        }
+
+        // A texture copied as `tex`, glass: its coloured body darkened
+        // (kGlassValue) and eased into `hue` (or, with none, each colour's
+        // own) at its lit sides, its pale lip `lip`; `glow`, the hue mixed
+        // through even its darkest glass.
+        bool glass(milo::Dir &scene, const std::string &from, const std::string &tex, const float *hue, float lipHue,
+                   float glow)
+        {
+            float top[3];
+            fromHsv(lipHue / 60.0f, 1.0f, 1.0f, top);
+            return addCopy(scene, from, tex, [&](milo::Bytes &body)
                            {
                                return recolor(body, scene.version, [&](float *rgb)
                                               {
-                                                  const float v = std::max({rgb[0], rgb[1], rgb[2]});
-                                                  const float s = v > 0.0f ? (v - std::min({rgb[0], rgb[1], rgb[2]})) / v : 0.0f;
-                                                  if (s < kLipSaturation && v > kLipValue)
-                                                      return std::copy(colour, colour + 3, rgb), void();
-                                                  const float t = std::max(glow, std::clamp((v - kRimFrom) / (kRimTo - kRimFrom), 0.0f, 1.0f));
+                                                  const Hsv hsv = toHsv(rgb);
+                                                  if (lip(hsv))
+                                                      return std::copy(top, top + 3, rgb), void();
+                                                  float colour[3];
+                                                  fromHsv(hue ? *hue / 60.0f : hsv.sixths, 1.0f, 1.0f, colour);
+                                                  const float t = std::max(glow, std::clamp((hsv.v - kRimFrom) / (kRimTo - kRimFrom), 0.0f, 1.0f));
                                                   for (int c = 0; c < 3; ++c)
                                                       rgb[c] = rgb[c] * kGlassValue * (1.0f - t) + colour[c] * t;
                                               });
                            });
+        }
+
+        // gem.tex copied as `tex`, glass of a hue, its pale lip the hue.
+        bool glassTex(milo::Dir &scene, const std::string &tex, float hue, float glow)
+        {
+            return glass(scene, "gem.tex", tex, &hue, hue, glow);
+        }
+
+        // A star's texture (stargem.tex, every lane's star a block of it)
+        // copied as `tex`, glass as a gem's is, each colour of its own hue,
+        // and its pale top (shown inside its top's ring, as a gem's is
+        // inside its cap's) `hue`, as a tap gem's is its lane's.
+        bool glassStarTex(milo::Dir &scene, const std::string &from, const std::string &tex, float hue, float glow)
+        {
+            return glass(scene, from, tex, nullptr, hue, glow);
         }
 
         // A gem as glass of a hue: `mesh` copied as `as` (tap_<mesh> unless
@@ -170,24 +204,31 @@ namespace gh2::guitar
         {
             int made = 0, wanted = 0;
             const auto count = [&](bool ok) { made += ok, ++wanted; };
+            const bool cyanStars = milo::find(scene, "cyan_star.mat").has_value();
+            // Under star power every lane's cap is the blue lane's: a tap's
+            // star power's cyan, its base white as a lane's is.
+            Cap bonus{};
+            fromHsv(kStarPowerHue / 60.0f, kCapTopSaturation, 1.0f, bonus.top);
+            std::copy(std::begin(kStarPowerCyan), std::end(kStarPowerCyan), bonus.ring);
+            std::fill(std::begin(bonus.base), std::end(bonus.base), 1.0f);
             for (const Lane &lane : kLanes)
             {
                 // The lane's gem: a texture of its own.
                 count(glassGem(scene, lane.name + std::string("_gem.mesh"), lane.name, lane.hue));
-                // Its star, as a phrase's gem: cyan glass, on star power's cyan
-                // star (gameplay/engine/star_power_overlap) where that is made,
-                // and that one's under star power.
+                // Its star, as a phrase's gem: glass of its lane's colour, on a
+                // stargem.tex of its own; and star power's cyan one
+                // (highway/cyan_stars), under star power, cyan glass.
                 const std::string star = lane.name + std::string("_star.mesh");
-                if (milo::find(scene, "cyan_star.mat"))
-                {
-                    count(addCopy(scene, star, tapped(star), [&](milo::Bytes &body)
-                                  { return milo::replaceStr(body, star, tapped(star)) && milo::replaceStr(body, "star.mat", tapped("cyan_star.mat")); }));
-                    s_meshMat[tapped(star)] = tapped("cyan_star.mat");
-                }
-                else
-                    count(copyMesh(scene, star, "star.mat"));
+                const std::string starTex = kTapPrefix + std::string(lane.name) + "_stargem.tex",
+                                  starMat = kTapPrefix + std::string(lane.name) + "_star.mat";
+                count(glassStarTex(scene, "stargem.tex", starTex, lane.hue, 0.0f));
+                count(addCopy(scene, "star.mat", starMat, [&](milo::Bytes &body) { return milo::replaceStr(body, "stargem.tex", starTex); }));
+                count(addCopy(scene, star, tapped(star), [&](milo::Bytes &body)
+                              { return milo::replaceStr(body, star, tapped(star)) && milo::replaceStr(body, "star.mat", starMat); }));
+                s_pieces.meshMat[tapped(star)] = starMat;
+                s_pieces.starGlass.insert(starMat);
                 const std::string cyan = "cyan_" + std::string(lane.name) + "_star.mesh";
-                if (milo::find(scene, cyan))
+                if (cyanStars && milo::find(scene, cyan))
                     count(copyMesh(scene, cyan, "cyan_star.mat"));
                 // Its HOPO cap: its top glass of its colour, lit, its ring
                 // its colour, its base white.
@@ -196,35 +237,30 @@ namespace gh2::guitar
                 fromHsv(lane.hue / 60.0f, 1.0f, 1.0f, cap.ring);
                 std::fill(std::begin(cap.base), std::end(cap.base), 1.0f);
                 count(copyCap(scene, lane.name + std::string("_hopo.mesh"), lane.name, cap));
-                // A star's HOPO top, its colour kept, see-through.
-                count(copyMesh(scene, lane.name + std::string("_top_star.mesh"), "top.mat"));
+                // A star's HOPO top as GH2's, its white its lane's colour as a
+                // tap cap's top is, or star power's cyan on star power's
+                // cyan star.
+                count(copyTopStar(scene, lane.name + std::string("_top_star.mesh"), cap.top));
                 const std::string cyanTop = "cyan_" + std::string(lane.name) + "_top_star.mesh";
                 if (milo::find(scene, cyanTop))
-                    count(copyMesh(scene, cyanTop, "top.mat"));
+                    count(copyTopStar(scene, cyanTop, bonus.top));
             }
-            // Under star power every lane's cap is the blue lane's: a tap's
-            // star power's cyan.
-            Cap bonus{};
-            fromHsv(kStarPowerHue / 60.0f, kCapTopSaturation, 1.0f, bonus.top);
-            std::copy(std::begin(kCyan), std::end(kCyan), bonus.ring);
-            std::fill(std::begin(bonus.base), std::end(bonus.base), 1.0f);
             count(copyCap(scene, "blue_hopo.mesh", "bonus", bonus));
             // A star's base and shine, their colour kept, see-through.
-            for (const char *mat : {"top.mat", "star_base.mat", "star2.mat"})
+            for (const char *mat : {"star_base.mat", "star2.mat"})
                 count(copyMat(scene, mat));
             count(copyMesh(scene, "star_base.mesh", "star_base.mat"));
             count(copyMesh(scene, "star2.mesh", "star2.mat"));
             // Star power's gem, the same for every lane (gem_bonus.mesh, on
             // a flat blue of its own): a tap's the lanes' gem as cyan glass,
-            // as a lane's is its colour's. And the stars' materials.
+            // as a lane's is its colour's. And the stars' materials, glass.
             count(glassGem(scene, "blue_gem.mesh", "bonus", kStarPowerHue, tapped("gem_bonus.mesh"), kBonusGlow));
-            count(copyMat(scene, "star.mat"));
-            for (const char *mat : {"star.mat"})
-                s_darkened.insert(tapped(mat));
-            if (milo::find(scene, "cyan_star.mat"))
+            if (cyanStars)
             {
-                count(copyMat(scene, "cyan_star.mat"));
-                s_darkened.insert(tapped("cyan_star.mat"));
+                count(glassStarTex(scene, "cyan_stargem.tex", tapped("cyan_stargem.tex"), kStarPowerHue, kBonusGlow));
+                count(addCopy(scene, "cyan_star.mat", tapped("cyan_star.mat"),
+                              [&](milo::Bytes &body) { return milo::replaceStr(body, "cyan_stargem.tex", tapped("cyan_stargem.tex")); }));
+                s_pieces.starGlass.insert(tapped("cyan_star.mat"));
             }
             // An open tap's gem (highway/extended/guitar/open_gems: its body,
             // and its star's, on open_gem.mat, under star power
