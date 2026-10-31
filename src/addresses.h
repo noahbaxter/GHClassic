@@ -67,6 +67,8 @@ namespace gh2
         uint32_t songDataLoad;             // SongData::Load(BinStream &, const DataArray *, ...)
         uint32_t songDataAddMultiGem;      // SongData::AddMultiGem(int, const MultiGemInfo &)
         uint32_t songParserOnGemEnd;       // SongParser::OnGemEnd(int tick, unsigned char pitch)
+        uint32_t gameGemNumSlots;          // GameGem::NumSlots
+        uint32_t gemNumSlots;              // GemNumSlots(int), a mask's
         uint32_t checkForPitchBend; // TrackWatcherImpl::CheckForPitchBend
         uint32_t sendWhammy;        // TrackWatcherImpl::SendWhammy
         uint32_t playerSetWhammyBar; // Player::SetWhammyBar
@@ -77,6 +79,10 @@ namespace gh2
         uint32_t beatMatcherPoll;           // BeatMatcher::Poll(float)
         uint32_t beatMatcherDtor;           // BeatMatcher::~BeatMatcher
         uint32_t guitarWatcherJumpHook; // GuitarTrackWatcherImpl::JumpHook
+        uint32_t guitarWatcherFretButtonDown; // GuitarTrackWatcherImpl::FretButtonDown(int slot)
+        uint32_t trackWatcherKillSustain;     // TrackWatcherImpl::KillSustain(int gem)
+        uint32_t guitarWatcherNonStrumSwing;  // GuitarTrackWatcherImpl::NonStrumSwing(int slot, bool)
+        uint32_t trackWatcherClosestUnplayedGem; // TrackWatcherImpl::ClosestUnplayedGem(float ms)
         uint32_t hudPanelEnter;      // HudPanel::Enter
         uint32_t hudPanelSetMetersShowing; // HudPanel::SetMetersShowing(bool)
         uint32_t hudPanelOnGameOver; // HudPanel::OnGameOver, as a song is won or lost
@@ -381,6 +387,8 @@ namespace gh2
         .songDataLoad = 0x243da8u,
         .songDataAddMultiGem = 0x244890u,
         .songParserOnGemEnd = 0x245ee8u,
+        .gameGemNumSlots = 0x236468u,
+        .gemNumSlots = 0x235ef8u,
         .checkForPitchBend = 0x248e38u,
         .sendWhammy = 0x249b98u,
         .playerSetWhammyBar = 0x111d88u,
@@ -391,6 +399,10 @@ namespace gh2
         .beatMatcherPoll = 0x235340u,
         .beatMatcherDtor = 0x234b08u,
         .guitarWatcherJumpHook = 0x24d4e0u,
+        .guitarWatcherFretButtonDown = 0x24d890u,
+        .trackWatcherKillSustain = 0x248ff8u,
+        .guitarWatcherNonStrumSwing = 0x24d828u,
+        .trackWatcherClosestUnplayedGem = 0x248768u,
         .hudPanelEnter = 0x12ba00u,
         .hudPanelSetMetersShowing = 0x12c210u,
         .hudPanelOnGameOver = 0x12c340u,

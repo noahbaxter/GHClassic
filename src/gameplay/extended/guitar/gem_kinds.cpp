@@ -23,7 +23,6 @@
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
 
-#include <cstring>
 #include <memory>
 #include <utility>
 
@@ -114,6 +113,10 @@ namespace gh2::guitar
                 info.setNoStrum(static_cast<uint8_t>(kDecided | (gem->hopo ? 1u : 0u)));
             else if (gem->flip)
                 info.setNoStrum(kFlip);
+            // An open has no fret: GuitarTrackWatcherImpl::Swing (0x24d518)
+            // matches it as a chord, by the frets held, none.
+            if (gem->open)
+                info.setSlots(0u);
         }
 
         // GameGemList::WillBeNoStrum(const MultiGemInfo &), 0x24d360, GH1's
@@ -142,8 +145,14 @@ namespace gh2::guitar
         s_songs[midi] = std::make_shared<const Song>(Song{gems, hopoThreshold});
     }
 
+    bool playingCustom()
+    {
+        return s_loading != nullptr;
+    }
+
     void installGemKinds(PS2Runtime &runtime, const Addresses &addresses)
     {
+        s_addresses = &addresses;
         EntryHook<LoadTag>::install(runtime, addresses.songDataLoad, onLoad);
         EntryHook<OnGemEndTag>::install(runtime, addresses.songParserOnGemEnd, onGemEnd);
         EntryHook<AddMultiGemTag>::install(runtime, addresses.songDataAddMultiGem, onAddMultiGem);

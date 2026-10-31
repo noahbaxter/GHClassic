@@ -82,7 +82,7 @@ namespace gh2::custom
             const uint8_t base = static_cast<uint8_t>(60u + 12u * d);
             std::vector<const Gem *> gems;
             for (const Gem &g : diff.gems)
-                if (g.lanes & 0x1fu)
+                if (g.lanes & 0x3fu)
                     gems.push_back(&g);
             for (size_t i = 0; i < gems.size(); ++i)
             {
@@ -95,16 +95,21 @@ namespace gh2::custom
                     length = std::min(length, next - start);
                 length = std::max(length, 1u);
                 last = std::max(last, start + length);
-                // A chord is strummed: GH2 hammers on single notes alone
-                // (GuitarTrackWatcherImpl::TryToHopo, 0x24dc20).
-                const uint8_t frets = static_cast<uint8_t>(g.lanes & 0x1fu);
+                // An open, with no fret of its own, is written as all five
+                // frets, told from a chord of all five by Gh2Gem::open. A
+                // chord is strummed: GH2 hammers on single frets alone
+                // (GuitarTrackWatcherImpl::TryToHopo, 0x24dc20). An open
+                // hammers on as one (gameplay/extended/guitar/gem_kinds.h).
+                const bool open = (g.lanes & 0x1fu) == 0u;
+                const uint8_t frets = open ? kOpenFrets : static_cast<uint8_t>(g.lanes & 0x1fu);
                 const bool single = (frets & (frets - 1u)) == 0u;
                 out.gems[d][start] = {.frets = frets,
-                                      .hopo = single && g.kind != Kind::Strum,
-                                      .decided = g.forced,
-                                      .flip = single && g.flip};
+                                      .hopo = (single || open) && g.kind != Kind::Strum,
+                                      .decided = g.forced || open,
+                                      .flip = single && g.flip,
+                                      .open = open};
                 for (int lane = 0; lane < 5; ++lane)
-                    if (g.lanes & (1u << lane))
+                    if (frets & (1u << lane))
                     {
                         guitar.events.push_back(note(start, static_cast<uint8_t>(base + lane), true));
                         guitar.events.push_back(note(start + length, static_cast<uint8_t>(base + lane), false));
