@@ -38,11 +38,11 @@ namespace gh2::gh1
     {
         using dtb::array;
         using dtb::command;
+        using dtb::integer;
         using dtb::Node;
+        using dtb::real;
         using dtb::symbol;
 
-        Node real(float v) { return {dtb::kFloat, 0, v, {}, {}}; }
-        Node integer(int32_t v) { return {dtb::kInt, v, 0.0f, {}, {}}; }
         Node variable(const std::string &name) { return {dtb::kVar, 0, 0.0f, name, {}}; }
         Node self() { return variable("this"); }
         Node property(const std::string &name) { return {dtb::kProperty, 0, 0.0f, {}, {symbol(name)}}; }
@@ -451,7 +451,7 @@ namespace gh2::gh1
         // 1}}}), each spot's waypoint by its number.
         Node nearest(const std::vector<std::string> &spots)
         {
-            const Node who = variable("who"), at = variable("at"), none = {dtb::kString, 0, 0.0f, {}, {}};
+            const Node who = variable("who"), at = variable("at"), none = dtb::string("");
             Node spot = command({symbol("switch"), command({at, symbol("name")})});
             for (size_t i = 0; i < spots.size(); ++i)
                 spot.nodes.push_back(array({symbol(spots[i]), integer(static_cast<int32_t>(i + 1u))}));
@@ -484,7 +484,7 @@ namespace gh2::gh1
             }
             // {if {&& {exists <who>} {! {== {band shadows} gh2}}} {do ($group
             // {<who> get shadow}) {if {!= $group ""} {$group set_showing FALSE}}}}
-            const Node group = variable("group"), none = {dtb::kString, 0, 0.0f, {}, {}};
+            const Node group = variable("group"), none = dtb::string("");
             for (const char *who : {"guitarist0", "guitarist1"})
                 out.push_back(command(
                     {symbol("if"), command({symbol("&&"), command({symbol("exists"), symbol(who)}), command({symbol("!"), chosen("gh2")})}),

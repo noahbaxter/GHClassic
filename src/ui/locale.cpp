@@ -22,8 +22,6 @@ namespace gh2
 {
     namespace
     {
-        constexpr uint32_t kString = 0x12u;
-
         const Addresses *s_addresses = nullptr;
         PS2Runtime::RecompiledFunction s_original = nullptr;
         bool s_parsed = false;
@@ -45,7 +43,7 @@ namespace gh2
                 const uint32_t nodes = load<uint32_t>(rdram, entry);
                 if (load<uint32_t>(rdram, entries + 8u * static_cast<uint32_t>(i) + 4u) != script::kArray ||
                     load<int16_t>(rdram, entry + 8u) != 2 || load<uint32_t>(rdram, nodes + 4u) != script::kSymbol ||
-                    load<uint32_t>(rdram, nodes + 12u) != kString)
+                    load<uint32_t>(rdram, nodes + 12u) != script::kString)
                 {
                     std::cerr << "[locale] entry " << i << " is not (token \"text\")" << std::endl;
                     continue;
