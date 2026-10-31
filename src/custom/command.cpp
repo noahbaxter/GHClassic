@@ -7,6 +7,8 @@
 #include "custom/song_files.h"
 #include "custom/songs.h"
 #include "custom/text.h"
+#include "save/results.h"
+#include "save/save.h"
 #include "script.h"
 
 #include <algorithm>
@@ -18,6 +20,17 @@ namespace gh2::custom
     {
         // A chart's sections by name at most, each a locale token.
         constexpr size_t kMostSections = 200u;
+
+        // Its best on the hardest difficulty with one: score, stars, and percent
+        // or FC.
+        std::string bestLine(const std::string &id)
+        {
+            for (const char *difficulty : {"expert", "hard", "medium", "easy"})
+                if (const auto best = save::keptBest(save::playedKey(id, difficulty)))
+                    return std::to_string(best->score) + "  " + std::to_string(best->stars) + "*  " +
+                           (best->fullCombo ? std::string("FC") : std::to_string(best->percent) + "%");
+            return "NOT PLAYED";
+        }
 
         script::Node customCommand(const script::Call &call)
         {
@@ -90,6 +103,8 @@ namespace gh2::custom
             }
             if (op == "length")
                 return call.word(lengthText(song ? song->length : 0.0));
+            if (op == "best")
+                return call.word(bestLine(id));
             if (op == "base")
             {
                 if (!song)

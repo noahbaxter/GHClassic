@@ -755,7 +755,8 @@ namespace gh2::save
 
     void keepQuickplayFullCombo(int difficulty, const std::string &song)
     {
-        if (difficulty < 0 || difficulty >= gh2::kDifficulties)
+        // Named songs (save/results.h) keep theirs in [best], by chart.
+        if (difficulty < 0 || difficulty >= gh2::kDifficulties || isNamed(song))
             return;
         s_store.section("quickplay " + sectionGame(gameOf(song)) + " " + kDifficulties[difficulty]).set("fc." + song, "1");
     }
@@ -764,8 +765,13 @@ namespace gh2::save
     {
         if (difficulty < 0 || difficulty >= gh2::kDifficulties)
             return false;
-        const std::string game = gameOf(song), key = "fc." + song;
         const char *const name = kDifficulties[difficulty];
+        if (isNamed(song))
+        {
+            const auto best = keptBest(playedKey(song, name));
+            return best && best->fullCombo;
+        }
+        const std::string game = gameOf(song), key = "fc." + song;
         if (const Section *section = quickplaySection(game, noteEngine(), name); section && section->get(key))
             return true;
         for (int slot = 0; slot < gh2::kProfiles; ++slot)

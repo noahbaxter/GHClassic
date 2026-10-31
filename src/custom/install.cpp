@@ -8,6 +8,7 @@
 #include "custom/song_files.h"
 #include "custom/songs.h"
 #include "custom/text.h"
+#include "save/results.h"
 #include "save/save.h"
 #include "settings/ini.h"
 #include "settings/settings.h"
@@ -63,12 +64,22 @@ namespace gh2
             return s_rows;
         }
 
+        // A custom song as [best] keeps it (save/results.h): by its chart, so a
+        // moved folder or a copy keeps the one best, and the part it plays.
+        std::optional<save::NamedSong> bestName(const std::string &id)
+        {
+            const auto song = catalog().find(id);
+            if (!song)
+                return std::nullopt;
+            return save::NamedSong{"custom." + song->chartMd5, kPartNames[static_cast<int>(played(*song))]};
+        }
     }
 
     void installCustomSongs()
     {
         installCommand();
         installSongFiles();
+        save::nameSongs(bestName);
         const fs::path own = ownFolder(), index = own / "index.txt";
         const std::vector<fs::path> folders = roots();
         const bool showCopies = settings::get(settings::kShowDuplicates) != 0;

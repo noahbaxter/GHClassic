@@ -17,6 +17,10 @@
 //                                         taken out; "" if it has none;
 //                                         name, as the list shows it
 //   {custom length <song>}                its length, m:ss
+//   {custom best <song>}                  its best on its hardest
+//                                         difficulty played, as played
+//                                         now: score, stars, percent
+//                                         or FC; else NOT PLAYED
 //   {custom art <song>}                   TRUE if it has album art,
 //                                         ui/image/ghc_art_<song>.png
 //   {custom ready <song>}                 TRUE once its audio is read

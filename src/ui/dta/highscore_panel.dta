@@ -20,15 +20,19 @@
                {localize {game get_difficulty_sym 0}}
             }
          }
-         {do
-            ($score {player0 score})
-            ($index {get_highscore_index $score})
-            {$this fill_scores $index $score {$this get_default_name}}
-            {if_else {!= $index 0}
-               {$this enter_score $index}
-               {if_else [auto_add]
-                  {ui goto_screen complete_screen}
-                  {$this view_scores}
+         ; A custom song is in no table (its best is save.bin's), so on.
+         {if_else {custom ours {game get_song}}
+            {ui goto_screen complete_screen}
+            {do
+               ($score {player0 score})
+               ($index {get_highscore_index $score})
+               {$this fill_scores $index $score {$this get_default_name}}
+               {if_else {!= $index 0}
+                  {$this enter_score $index}
+                  {if_else [auto_add]
+                     {ui goto_screen complete_screen}
+                     {$this view_scores}
+                  }
                }
             }
          }
