@@ -284,6 +284,7 @@ set(GHC_GAME_SOURCES
     src/content/payouts.cpp
     src/content/setlist_look.cpp
     src/content/setlist_paper.cpp
+    src/content/setlist_printout.cpp
     src/content/setlist_window.cpp
     src/content/setlists.cpp
     src/content/songs.cpp
