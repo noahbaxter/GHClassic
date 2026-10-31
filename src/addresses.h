@@ -69,6 +69,20 @@ namespace gh2
         uint32_t songParserOnGemEnd;       // SongParser::OnGemEnd(int tick, unsigned char pitch)
         uint32_t gameGemNumSlots;          // GameGem::NumSlots
         uint32_t gemNumSlots;              // GemNumSlots(int), a mask's
+        uint32_t gemAddRep;                // Gem::AddRep(GemRepPool &, RndGroup *, GemRep::Type, const TrackConfig &)
+        uint32_t gemAddRepForSlot;         // Gem::AddRepForSlot(..., int slot, ...)
+        uint32_t gemRemoveRep;             // Gem::RemoveRep(GemRepPool &)
+        uint32_t gemRepPoolCreateGem;      // GemRepPool::CreateGem, a new GemRep
+        uint32_t gemRepPoolReturnGem;      // GemRepPool::ReturnGem(GemRep *), onto its free list
+        uint32_t gemRepPoolDtor;           // GemRepPool::~GemRepPool, which deletes its free list's
+        uint32_t gemRepSetType;            // GemRep::SetType(GemRep::Type)
+        uint32_t gemRepPartSetTemplate;    // GemRep::Part::SetTemplate(GemPartTemplate *)
+        uint32_t gemRepPartSetShowing;     // GemRep::Part::SetShowing(bool)
+        uint32_t gemPartTemplateCtor;      // GemPartTemplate::GemPartTemplate(RndMesh *, bool multimesh)
+        uint32_t gemPartTemplateDtor;      // GemPartTemplate::~GemPartTemplate
+        uint32_t gemPartTemplateDrawAllParts; // GemPartTemplate::DrawAllParts
+        uint32_t gemRepTemplateDrawShowing;   // GemRepTemplate::DrawShowing(RndDrawable::DrawType)
+        uint32_t gemRepTemplateDtor;          // GemRepTemplate::~GemRepTemplate
         uint32_t checkForPitchBend; // TrackWatcherImpl::CheckForPitchBend
         uint32_t sendWhammy;        // TrackWatcherImpl::SendWhammy
         uint32_t playerSetWhammyBar; // Player::SetWhammyBar
@@ -389,6 +403,20 @@ namespace gh2
         .songParserOnGemEnd = 0x245ee8u,
         .gameGemNumSlots = 0x236468u,
         .gemNumSlots = 0x235ef8u,
+        .gemAddRep = 0x157960u,
+        .gemAddRepForSlot = 0x157a00u,
+        .gemRemoveRep = 0x157af8u,
+        .gemRepPoolCreateGem = 0x159a40u,
+        .gemRepPoolReturnGem = 0x1599e0u,
+        .gemRepPoolDtor = 0x159810u,
+        .gemRepSetType = 0x158820u,
+        .gemRepPartSetTemplate = 0x157fd0u,
+        .gemRepPartSetShowing = 0x158060u,
+        .gemPartTemplateCtor = 0x15f9c8u,
+        .gemPartTemplateDtor = 0x15fa98u,
+        .gemPartTemplateDrawAllParts = 0x15fb10u,
+        .gemRepTemplateDrawShowing = 0x15ba50u,
+        .gemRepTemplateDtor = 0x15b558u,
         .checkForPitchBend = 0x248e38u,
         .sendWhammy = 0x249b98u,
         .playerSetWhammyBar = 0x111d88u,

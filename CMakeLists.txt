@@ -340,6 +340,9 @@ set(GHC_GAME_SOURCES
     src/gameplay/engine/whammy_hold.cpp
     src/gameplay/extended/guitar/gem_kinds.cpp
     src/gameplay/extended/guitar/hammer_ons.cpp
+    src/highway/extended/guitar/open_gems.cpp
+    src/highway/extended/guitar/open_pieces.cpp
+    src/highway/gem_looks.cpp
     src/highway/note_speed.cpp
     src/highway/retrack.cpp
     src/gh1/band.cpp
