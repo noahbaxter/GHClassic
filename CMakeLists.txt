@@ -247,6 +247,8 @@ set(GHC_GAME_SOURCES
     src/content/songs.cpp
     src/content/status_line.cpp
     src/content/tour_or_higher.cpp
+    src/content/vgs.cpp
+    src/content/vorbis.cpp
     src/dev/cheats.cpp
     src/dev/draw_dump.cpp
     src/dev/mesh_packet.cpp
