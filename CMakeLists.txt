@@ -165,6 +165,7 @@ target_link_libraries(save_test PRIVATE miniz)
 # Custom songs' charts, and a tally of a folder of them.
 add_executable(custom_chart_test EXCLUDE_FROM_ALL
     tests/custom_chart_test.cpp
+    src/custom/catalog.cpp
     src/custom/chart.cpp
     src/custom/gh2_chart.cpp
     src/custom/index.cpp
@@ -289,6 +290,7 @@ set(GHC_GAME_SOURCES
     src/content/vorbis.cpp
     src/content/audio_file.cpp
     src/custom/audio.cpp
+    src/custom/catalog.cpp
     src/custom/chart.cpp
     src/custom/gh2_chart.cpp
     src/custom/index.cpp

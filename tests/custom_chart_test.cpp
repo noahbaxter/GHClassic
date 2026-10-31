@@ -5,6 +5,7 @@
 //   custom_chart_test [folder ...]
 
 #include "content/pcm_mix.h"
+#include "custom/catalog.h"
 #include "custom/chart.h"
 #include "custom/gh2_chart.h"
 #include "custom/index.h"
@@ -286,6 +287,97 @@ namespace
         CHECK(gh2 && midi::parse(gh2->mid));
     }
 
+    // A song of `dir`, its chart its own unless `hash` is given.
+    Song song(const std::string &dir, const std::string &name, const std::string &hash = "")
+    {
+        Song s;
+        s.dir = dir;
+        s.chart = "notes.chart";
+        s.chartMd5 = hash.empty() ? md5::hex(dir) : hash;
+        s.tags["name"] = name;
+        return s;
+    }
+
+    // The catalog's list: by folder then name, a song changed in place, one
+    // that stops playing or that a scan did not find gone.
+    void catalogOrder()
+    {
+        Catalog catalog;
+        catalog.put(song("/c/b/two", "Zed"));
+        catalog.put(song("/c/a/one", "Mid"));
+        catalog.put(song("/c/b/three", "<b>Alpha</b>"));
+        Snapshot now = catalog.now();
+        CHECK(now->size() == 3u && (*now)[0].header == "a" && (*now)[1].name == "Alpha" && (*now)[2].name == "Zed");
+        CHECK(catalog.now() == now);
+        const std::string id = (*now)[2].id;
+        CHECK(id.rfind("cs_", 0u) == 0u && catalog.find(id) && catalog.find(id)->dir == "/c/b/two");
+        Song changed = song("/c/b/two", "Zed");
+        changed.chartTime = 1;
+        catalog.put(changed);
+        CHECK(catalog.now() != now && catalog.now()->size() == 3u && catalog.now()->at(2).id == id);
+        Song broken = song("/c/a/one", "Mid");
+        broken.why = "no audio";
+        catalog.put(broken);
+        CHECK(catalog.now()->size() == 2u);
+        catalog.keepOnly({song("/c/b/three", "Alpha")});
+        CHECK(catalog.now()->size() == 1u && !catalog.find(id));
+    }
+
+    // Copies of one chart: the first by folder listed, the next once it
+    // goes, and each other one a copy of it.
+    void catalogCopies()
+    {
+        const std::vector<Song> songs = {song("/c/x/x/one", "One", "7"), song("/c/x/one", "One", "7"),
+                                         song("/c/y/two", "Two")};
+        Catalog catalog;
+        for (const Song &s : songs)
+            catalog.put(s);
+        CHECK(catalog.now()->size() == 2u && catalog.now()->at(0).song->dir == "/c/x/one");
+        const auto copied = copies(songs);
+        CHECK(copied.size() == 1u && copied.count("/c/x/x/one") && copied.at("/c/x/x/one") == "/c/x/one");
+        catalog.showCopies(true);
+        CHECK(catalog.now()->size() == 3u);
+        catalog.showCopies(false);
+        CHECK(catalog.now()->size() == 2u);
+        catalog.keepOnly({songs[0], songs[2]});
+        CHECK(catalog.now()->size() == 2u && catalog.now()->at(0).song->dir == "/c/x/x/one");
+    }
+
+    // A copy sits in every folder it is in when listed by folder, so a
+    // folder shows all it holds, and once under any other sort.
+    void catalogCopiesByFolder()
+    {
+        Song a = song("/c/rock/one", "One", "7"), b = song("/c/mix/one", "One", "7"), c = song("/c/mix/other", "One", "8");
+        a.tags["artist"] = b.tags["artist"] = c.tags["artist"] = "Band";
+        Catalog catalog;
+        for (const Song &s : {a, b, c})
+            catalog.put(s);
+        CHECK(catalog.now()->size() == 3u);
+        catalog.sortBy(Sort::Artist);
+        CHECK(catalog.now()->size() == 2u);
+        catalog.sortBy(Sort::Folder);
+        CHECK(catalog.now()->size() == 3u);
+    }
+
+    // By folder, a section is the folder a song sits in and the one above,
+    // under its chart folder: the chart folder's own name for a song
+    // straight in it, the deepest of two that hold one another, and two
+    // packs' "Songs" kept apart.
+    void catalogSections()
+    {
+        Catalog catalog;
+        catalog.chartFolders({"/c/", "/c/rb", "/d"});
+        for (const char *dir : {"/c/top", "/c/Pack/one", "/c/Pack/Songs/two", "/c/Other/Songs/two", "/c/A/B/C/three",
+                                "/c/rb/Disc/four", "/e/x/five"})
+            catalog.put(song(dir, std::string(dir).substr(std::string(dir).rfind('/') + 1u)));
+        std::set<std::string> sections;
+        for (const Listed &l : *catalog.now())
+            sections.insert(l.header + ":" + l.name);
+        const std::set<std::string> want = {"c:top",     "Pack:one",  "Pack/Songs:two", "Other/Songs:two",
+                                            "B/C:three", "Disc:four", "x:five"};
+        CHECK(sections == want);
+    }
+
     // A song with no art and no tags ends its index line on an empty field,
     // and is read back all the same.
     void indexBare()
@@ -294,29 +386,10 @@ namespace
         Song bare = song("/c/a/bare", "");
         bare.tags.clear();
         bare.why = "no audio";
+        bare.reject = Reject::NoAudio;
         writeIndex(file, {song("/c/a/one", "One"), bare, song("/c/a/two", "Two")});
         const std::vector<Song> back = readIndex(file);
         CHECK(back.size() == 3u && back[1].dir == "/c/a/bare" && back[1].art.empty() && back[2].dir == "/c/a/two");
-        fs::remove(file);
-    }
-
-    // Every stem name Clone Hero and YARG play, any case and format, in
-    // kStems' order; what else charts carry (a preview, a Mac's ._ files,
-    // a download's second copy, censored takes) left out. Then which
-    // stems go with the played part.
-    void stems()
-    {
-        const fs::path dir = fs::temp_directory_path() / "ghc_stems_test";
-        fs::remove_all(dir);
-        fs::create_directories(dir);
-        std::ofstream(dir / "song.ini") << "[Song]\nName = Stems\n";
-        std::ofstream(dir / "notes.chart") << kOneGem;
-        const std::map<std::string, std::string> heads = {
-            {".ogg", kVorbisHead},
-        bare.reject = Reject::NoAudio;
-            {".opus", "OggS" + std::string(24, '\0') + "OpusHead"},
-            {".mp3", "ID3"},
-            {".wav", "RIFF" + std::string(4, '\0') + "WAVE"},
         CHECK(back.size() == 3u && back[1].reject == Reject::NoAudio && back[0].reject == Reject::None);
         fs::remove(file);
     }
@@ -341,6 +414,25 @@ namespace
                                  "    song.mp3 is MPEG-4 audio\n";
         CHECK(text.size() > want.size() && text.compare(text.size() - want.size(), want.size(), want) == 0);
         CHECK(text.find("/c/a/one") == std::string::npos && text.find("/c/b/one") == std::string::npos);
+        fs::remove(file);
+    }
+
+    // Every stem name Clone Hero and YARG play, any case and format, in
+    // kStems' order; what else charts carry (a preview, a Mac's ._ files,
+    // a download's second copy, censored takes) left out. Then which
+    // stems go with the played part.
+    void stems()
+    {
+        const fs::path dir = fs::temp_directory_path() / "ghc_stems_test";
+        fs::remove_all(dir);
+        fs::create_directories(dir);
+        std::ofstream(dir / "song.ini") << "[Song]\nName = Stems\n";
+        std::ofstream(dir / "notes.chart") << kOneGem;
+        const std::map<std::string, std::string> heads = {
+            {".ogg", kVorbisHead},
+            {".opus", "OggS" + std::string(24, '\0') + "OpusHead"},
+            {".mp3", "ID3"},
+            {".wav", "RIFF" + std::string(4, '\0') + "WAVE"},
             {".aiff", "FORM" + std::string(4, '\0') + "AIFF"},
         };
         const std::vector<std::string> played = {
@@ -424,6 +516,33 @@ namespace
         std::ofstream(out, std::ios::binary) << b;
     }
 
+    // Each sort's tiers: their headers, in rank then name order, the song
+    // without the tag last.
+    void catalogSort()
+    {
+        Song a = song("/c/one/a", "Beta"), b = song("/c/two/b", "alpha"), c = song("/c/one/c", "9 Lives");
+        a.tags["artist"] = "Zed", b.tags["artist"] = "abba";
+        a.length = 200.0, b.length = 61.0, c.length = 700.0;
+        a.tags["diff_guitar"] = "4", b.tags["diff_guitar"] = "2", c.tags["diff_guitar"] = "-1";
+        a.parts = b.parts = c.parts = 1u << int(Part::Guitar);
+        Catalog catalog;
+        for (const Song &s : {a, b, c})
+            catalog.put(s);
+        const auto headers = [&](Sort sort)
+        {
+            catalog.sortBy(sort);
+            std::string out;
+            for (const Listed &l : *catalog.now())
+                out += l.header + "/" + l.name + ";";
+            return out;
+        };
+        CHECK(headers(Sort::Folder) == "one/9 Lives;one/Beta;two/alpha;");
+        CHECK(headers(Sort::Artist) == "abba/alpha;Zed/Beta;UNKNOWN ARTIST/9 Lives;");
+        CHECK(headers(Sort::Title) == "#/9 Lives;A/alpha;B/Beta;");
+        CHECK(headers(Sort::Length) == "1:00 - 2:00/alpha;3:00 - 4:00/Beta;10:00+/9 Lives;");
+        CHECK(headers(Sort::Difficulty) == "DIFFICULTY 2/alpha;DIFFICULTY 4/Beta;NO DIFFICULTY/9 Lives;");
+    }
+
     // A song as a folder and as an .sng read the same, and its files come
     // out of the package as they went in.
     void package()
@@ -490,6 +609,21 @@ namespace
         std::string why;
         CHECK(!sng::read(root / "Cut.sng", why) && !why.empty());
         fs::remove_all(root);
+    }
+
+    // An artist spelled two ways is one section, as its first song spells
+    // it.
+    void catalogSpelling()
+    {
+        Song a = song("/c/x/a", "One"), b = song("/c/x/b", "Two"), c = song("/c/x/c", "Three");
+        a.tags["artist"] = "Metallica", b.tags["artist"] = "METALLICA", c.tags["artist"] = "metallica";
+        Catalog catalog;
+        for (const Song &s : {a, b, c})
+            catalog.put(s);
+        catalog.sortBy(Sort::Artist);
+        const Snapshot now = catalog.now();
+        CHECK(now->size() == 3u &&
+              std::all_of(now->begin(), now->end(), [&](const Listed &l) { return l.header == now->front().header; }));
     }
 
     // .chart's Offset as song.ini's delay where it has none, never over it.
@@ -595,12 +729,19 @@ int main(int argc, char **argv)
     chartTypes();
     midTypes();
     chartEdges();
+    catalogOrder();
+    catalogCopies();
+    catalogCopiesByFolder();
+    catalogSections();
     stems();
     overlappingRoots();
     indexBare();
+    badSongs();
     md5Vectors();
+    catalogSort();
     package();
     spelled();
+    catalogSpelling();
     offsetLead();
     // --out <dir>: where each scan's index and badsongs.txt go. --scan:
     // only the scan, each chart read once, as the game would (a network
@@ -616,7 +757,6 @@ int main(int argc, char **argv)
             workers = static_cast<unsigned>(std::strtoul(argv[++i], nullptr, 10));
         else if (std::string(argv[i]) == "--scan")
             scanOnly = true;
-    badSongs();
         else
         {
             if (!scanOnly)
