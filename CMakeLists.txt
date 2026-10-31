@@ -406,6 +406,7 @@ set(GHC_GAME_SOURCES
     src/ui/players.cpp
     src/ui/controllers.cpp
     src/ui/classic_scene.cpp
+    src/ui/list_scroll.cpp
     src/ui/text_fit.cpp
     src/ui/menus.cpp
     src/ui/meta_music.cpp

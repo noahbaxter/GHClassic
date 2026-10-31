@@ -171,6 +171,9 @@
       }
    }
 }
+; Up or down held long enough to speed up, and the paper waiting for it.
+{set $ghc_scroll_rushing FALSE}
+{set $ghc_info_due FALSE}
 ; The paper's lines for the song the list is on; hidden on another setlist.
 {func ghc_info_show ($s_dir)
    {if {$s_dir find ghc_info_0.lbl FALSE}
@@ -383,6 +386,12 @@
       (poll
          {ghc_info_make $this}
          {ghc_scan_update $this}
+         ; Up or down held speeds up (ui/list_scroll.h).
+         {set $ghc_scroll_rushing {list_scroll_fast}}
+         {if {&& $ghc_info_due {! $ghc_scroll_rushing}}
+            {set $ghc_info_due FALSE}
+            {ghc_info_show $this}
+         }
       )
       ; To a tier's first song (orange, custom songs' sections), or to a
       ; song at random (Select's menu).
@@ -415,6 +424,9 @@
             }
             {game set_song_index $pos}
             {song_preview {game get_song}}
+            ; Laying out the paper takes longer than a frame: while the list
+            ; rushes by, only once it slows (poll).
+            {if_else $ghc_scroll_rushing {set $ghc_info_due TRUE} {ghc_info_show $this}}
             ; Paper made endless (content/setlist_paper.cpp) is framed from the
             ; setlist's top, its sheets and doodles put on ahead.
             {if_else {> {sel_song.view end_frame} 100}

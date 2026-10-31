@@ -281,6 +281,9 @@ namespace gh2
         uint32_t rndFontCharAdvance;                  // (char before, char) const: in the size's units
         uint32_t makeStringInt;                       // MakeString(const char *, int)
         uint32_t playerSetMercurySwitch;              // (bool): the guitar tilted, star power deployed if ready
+        uint32_t joypadRepeatStart;                   // JoypadRepeat::Start(JoypadButton)
+        uint32_t joypadRepeatReset;                   // (JoypadButton): let go
+        uint32_t joypadRepeatPoll;                    // (float hold ms, float repeat ms, Hmx::Object *, int pad)
         // Data
         uint32_t rndCamCurrent;  // RndCam::sCurrent
         uint32_t defaultMat;     // the RndMat a mesh without one draws with
@@ -589,6 +592,9 @@ namespace gh2
         .rndFontCharAdvance = 0x1f9ef0u,
         .makeStringInt = 0x3147a8u,
         .playerSetMercurySwitch = 0x111940u,
+        .joypadRepeatStart = 0x2a5eb0u,
+        .joypadRepeatReset = 0x2a5f18u,
+        .joypadRepeatPoll = 0x2a5f58u,
         .rndCamCurrent = 0x3de348u,
         .defaultMat = 0x3da4f0u,
         .rndEnvironCurrent = 0x3de358u,
