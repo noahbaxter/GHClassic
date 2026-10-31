@@ -66,6 +66,11 @@ namespace gh2::custom
                 array({symbol("bank"), symbol("sfx/song_default")}),
                 array({symbol("anim_tempo"), symbol("kTempoMedium")}),
             });
+            // song.ini's vocal_gender, as Rock Band's: GH2's female singer
+            // in place of its default band's (gh2.dta's default_band).
+            if (lower(tag(song.tags, "vocal_gender").value_or("")) == "female")
+                out.nodes.push_back(
+                    array({symbol("band"), symbol("metal_bass"), symbol("metal_drummer"), symbol("female_singer")}));
             // Fifteen seconds from song.ini's start, 30 s in where it has
             // none, kept inside the song: GH2 waits forever on audio past
             // the end.
