@@ -3,6 +3,7 @@
 #include "content/campaigns.h"
 #include "content/encores.h"
 #include "content/locale.h"
+#include "content/setlist_window.h"
 #include "content/songs.h"
 #include "disc/ark.h"
 #include "formats/dtb.h"
@@ -15,6 +16,7 @@
 #include "ps2_runtime_macros.h"
 
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <iostream>
 #include <map>
@@ -29,46 +31,11 @@ namespace gh2::setlists
             std::vector<Tier> tiers; // none for GH2's, which the game lists
             std::string look;
             Required required;
+            Live live; // its rows, where they are kept elsewhere
         };
 
-        // The song list's paper (sel_song.view) is 70 frames, one a row and
-        // one a header, the last its foot: past that the rows scroll on
-        // with no paper or highlight under them. A setlist longer is held
-        // a window at a time, moved along as the highlight nears either
-        // end, far enough from each that the paper's head and foot stay
-        // off screen.
-        constexpr size_t kWindowFrames = 64u, kWindowEdge = 12u;
-        struct Window
-        {
-            size_t first = 0u, count = 0u; // its rows in the window
-            std::vector<size_t> tiers;     // every row's tier
-        };
+        using namespace setlist_window;
         std::map<std::string, Window> s_windows;
-
-        // Rows from `first`, as many as fit with their headers.
-        size_t windowFrom(const std::vector<size_t> &tiers, size_t first)
-        {
-            size_t frames = 0u, r = first;
-            for (; r < tiers.size(); ++r)
-            {
-                frames += r == first || tiers[r - 1u] != tiers[r] ? 2u : 1u;
-                if (frames > kWindowFrames)
-                    break;
-            }
-            return r - first;
-        }
-
-        // The first row of a window with `row` half way down it.
-        size_t windowAround(const std::vector<size_t> &tiers, size_t row)
-        {
-            size_t frames = 0u, r = row;
-            while (r > 0u && frames < kWindowFrames / 2u)
-            {
-                frames += tiers[r - 1u] != tiers[r] ? 2u : 1u;
-                --r;
-            }
-            return r;
-        }
 
         constexpr const char *kOwnLook = "ui/sel_song_quickplay.milo";
         constexpr const char *kOwnScene = "ui/gen/sel_song_quickplay.milo_ps2"; // that, as the disc keeps it
@@ -78,6 +45,13 @@ namespace gh2::setlists
         std::map<std::string, Setlist> s_setlists;
         std::string s_selected = "gh2";
         std::string s_campaign = "gh2"; // the game played when it was picked
+
+        // Whether there is such a setlist with songs to show.
+        bool has(const std::string &name)
+        {
+            const auto it = s_setlists.find(name);
+            return it != s_setlists.end() && (!it->second.live.rows || !it->second.live.rows()->empty());
+        }
 
         // The setlist shown: the one picked, or after a campaign switch the
         // game now played's own.
@@ -89,6 +63,7 @@ namespace gh2::setlists
         }
         std::map<std::string, uint32_t> s_symbols;
         std::set<std::string> s_zeroScores;
+        uint32_t s_provider = 0u; // song_provider, as InitData last had it
 
         // What the song list shows, when it is ours: each row's tier, and
         // whether it can be picked.
@@ -134,68 +109,52 @@ namespace gh2::setlists
             return it == s_setlists.end() ? nullptr : &it->second;
         }
 
-        // SongProvider::InitData(RndDir *) (0x117448) fills its songs
-        // (+0x4c, a vector of each song's config array) from the campaign
-        // and its headers (+0x38, {first row, Symbol} each, shown as
-        // song_header_<Symbol>). Ours fills both from the setlist, and the
-        // last row to +0x48, as it does with no bonus songs.
-        void initData(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        // A venue unlocked marks its encore unlocked with the rest. The
+        // encore opens once a band has passed one short of the songs the
+        // venue asks for on a difficulty (IsEncoreUnlocked, 0x132c10;
+        // GetRequiredSongs, 0x1313d8): each tier's, whether it has.
+        std::vector<bool> encoresOpen(const Setlist &shown)
         {
-            const uint32_t provider = GPR_U32(ctx, 4);
-            s_shown = ours(rdram, provider);
-            s_rowTiers.clear();
-            s_rowActive.clear();
-            if (!s_shown)
-                return s_initData(rdram, ctx, runtime);
-            const uint32_t returnTo = GPR_U32(ctx, 31);
-            const uint32_t sp = GPR_U32(ctx, 29);
-            const uint32_t scratch = sp - 0x20u;
-            SET_GPR_U32(ctx, 29, scratch - 0x10u);
-            store<uint32_t>(rdram, provider + 0x5cu, GPR_U32(ctx, 5));
-            const uint32_t songs = provider + 0x4cu, headers = provider + 0x38u;
-            store<uint32_t>(rdram, songs + 4u, load<uint32_t>(rdram, songs));
-            store<uint32_t>(rdram, headers + 4u, load<uint32_t>(rdram, headers));
-            // As Campaign::GetQuickplaySongs (0x12db78): the first two
-            // tiers, and every song a band has unlocked in the game's career
-            // on any difficulty, under either note engine, as the save's
-            // sections say: its later tiers, its encores (each venue's last
-            // song, CampaignState::GetEncoreForVenue 0x132ce0) and the store
-            // songs bought. The game played's career goes into them first,
-            // as it stands, unsaved or not. All access (+0x80, the
-            // unlock-all cheat) opens every one. A game with no career yet
-            // has its store's songs open.
-            if (selected() == campaigns::active())
-                save::leaveGame(rdram, ctx, runtime);
+            std::vector<bool> open(shown.tiers.size(), false);
+            for (int band = 0; band < kBands; ++band)
+            {
+                const auto passed = save::passedSongs(selected(), band);
+                for (size_t d = 0; d < passed.size() && d < shown.required.size(); ++d)
+                    for (size_t t = 0; t < shown.tiers.size(); ++t)
+                    {
+                        const Tier &tier = shown.tiers[t];
+                        const bool last = t + 1u == shown.tiers.size() || !shown.tiers[t + 1u].encore;
+                        int count = 0;
+                        for (const std::string &song : tier.songs)
+                            count += static_cast<int>(passed[d].count(song));
+                        if (tier.encore && count >= shown.required[d][last ? 1 : 0] - 1)
+                            open[t] = true;
+                    }
+            }
+            return open;
+        }
+
+        // A setlist's tiers' rows, as Campaign::GetQuickplaySongs
+        // (0x12db78): the first two tiers, and every song a band has
+        // unlocked in the game's career on any difficulty, under either
+        // note engine, as the save's sections say: its later tiers, its
+        // encores (each venue's last song, CampaignState::GetEncoreForVenue
+        // 0x132ce0) and the store songs bought. All access (+0x80, the
+        // unlock-all cheat) opens every one. A game with no career yet has
+        // its store's songs open. A game without encores has a tier's last
+        // song open with the rest.
+        void tierRows(uint8_t *rdram, Window &window, const Setlist &shown, std::vector<bool> &active)
+        {
             const uint32_t campaign = load<uint32_t>(rdram, s_addresses->theCampaign);
             const bool allAccess = campaign != 0u && load<uint32_t>(rdram, campaign + 0x80u) != 0u;
             const std::vector<std::string> careers = campaigns::games();
             const bool career = std::find(careers.begin(), careers.end(), selected()) != careers.end();
             const std::set<std::string> unlocked = save::unlockedSongs(selected());
-            // A venue unlocked marks its encore unlocked with the rest. The
-            // encore opens once a band has passed one short of the songs
-            // the venue asks for on a difficulty (IsEncoreUnlocked,
-            // 0x132c10; GetRequiredSongs, 0x1313d8). A game without encores
-            // has a tier's last song open with the rest.
-            const bool gated = encores::has(selected()) && !s_shown->required.empty();
-            std::vector<bool> encoreOpen(s_shown->tiers.size(), false);
-            for (int band = 0; band < kBands && gated; ++band)
-            {
-                const auto passed = save::passedSongs(selected(), band);
-                for (size_t d = 0; d < passed.size() && d < s_shown->required.size(); ++d)
-                    for (size_t t = 0; t < s_shown->tiers.size(); ++t)
-                    {
-                        const Tier &tier = s_shown->tiers[t];
-                        const bool last = t + 1u == s_shown->tiers.size() || !s_shown->tiers[t + 1u].encore;
-                        int count = 0;
-                        for (const std::string &song : tier.songs)
-                            count += static_cast<int>(passed[d].count(song));
-                        if (tier.encore && count >= s_shown->required[d][last ? 1 : 0] - 1)
-                            encoreOpen[t] = true;
-                    }
-            }
+            const bool gated = encores::has(selected()) && !shown.required.empty();
+            const std::vector<bool> encoreOpen = gated ? encoresOpen(shown) : std::vector<bool>(shown.tiers.size(), false);
             const auto open = [&](size_t t, size_t s)
             {
-                const Tier &tier = s_shown->tiers[t];
+                const Tier &tier = shown.tiers[t];
                 if (allAccess)
                     return true;
                 if (gated && tier.encore && s + 1u == tier.songs.size())
@@ -206,15 +165,9 @@ namespace gh2::setlists
                     return !career;
                 return t < 2u && (!gated || s + 1u < tier.songs.size());
             };
-            // Every row it has, then those of its window.
-            struct Row
+            for (size_t t = 0; t < shown.tiers.size(); ++t)
             {
-                size_t tier, song;
-            };
-            std::vector<Row> rows;
-            for (size_t t = 0; t < s_shown->tiers.size(); ++t)
-            {
-                const Tier &tier = s_shown->tiers[t];
+                const Tier &tier = shown.tiers[t];
                 bool any = false;
                 for (size_t s = 0; s < tier.songs.size(); ++s)
                     any = any || open(t, s);
@@ -224,30 +177,89 @@ namespace gh2::setlists
                     // still to earn in a tier with songs open, whose row
                     // is there blank.
                     if (open(t, s) || (any && gated && tier.encore && s + 1u == tier.songs.size()))
-                        rows.push_back({t, s});
+                    {
+                        window.tiers.push_back(t);
+                        window.songs.push_back(tier.songs[s]);
+                        active.push_back(open(t, s));
+                    }
             }
-            Window &window = s_windows[selected()];
-            window.tiers.clear();
-            for (const Row &row : rows)
-                window.tiers.push_back(row.tier);
-            window.first = std::min(window.first, rows.empty() ? size_t{0} : rows.size() - 1u);
-            window.count = windowFrom(window.tiers, window.first);
+        }
+
+        // The window's rows into the provider's songs and headers, its
+        // songs made ready first where the setlist is live. `scratch` is
+        // 16 free guest bytes.
+        void pushWindow(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t provider, uint32_t scratch,
+                        Window &window, const std::vector<bool> &active)
+        {
+            const uint32_t songs = provider + 0x4cu, headers = provider + 0x38u;
+            store<uint32_t>(rdram, songs + 4u, load<uint32_t>(rdram, songs));
+            store<uint32_t>(rdram, headers + 4u, load<uint32_t>(rdram, headers));
+            const Live &live = s_shown->live;
+            const auto begin = window.songs.begin() + static_cast<std::ptrdiff_t>(window.first);
+            if (live.ready)
+                live.ready(rdram, ctx, runtime, {begin, begin + static_cast<std::ptrdiff_t>(window.count)});
+            window.headers.clear();
             for (size_t r = window.first; r < window.first + window.count; ++r)
             {
-                const auto [t, s] = rows[r];
-                if (r == window.first || rows[r - 1u].tier != t)
+                const size_t t = window.tiers[r];
+                if (r == window.first || window.tiers[r - 1u] != t)
                 {
+                    // A live one's by the window's own headers' tokens,
+                    // song_header_<name>_<n>, each its text now.
+                    std::string token = live.rows ? selected() + "_" + std::to_string(window.headers.size())
+                                                  : s_shown->tiers[t].header;
+                    if (live.rows)
+                        window.headers.push_back(window.tierNames[t]);
                     const uint32_t header[2] = {static_cast<uint32_t>(s_rowTiers.size()),
-                                                symbol(rdram, ctx, runtime, s_shown->tiers[t].header)};
+                                                symbol(rdram, ctx, runtime, token)};
                     pushBack(rdram, ctx, runtime, headers, header, 8u, s_addresses->headersInsertOverflow, scratch);
                 }
                 const uint32_t data = static_cast<uint32_t>(
                     runtime->callGuestFunction(rdram, ctx, s_addresses->songProviderGetSongData,
-                                               {provider, symbol(rdram, ctx, runtime, s_shown->tiers[t].songs[s])}));
+                                               {provider, symbol(rdram, ctx, runtime, window.songs[r])}));
                 pushBack(rdram, ctx, runtime, songs, &data, 4u, s_addresses->songsInsertOverflow, scratch);
                 s_rowTiers.push_back(t);
-                s_rowActive.push_back(open(t, s));
+                s_rowActive.push_back(active[r]);
             }
+        }
+
+        // SongProvider::InitData(RndDir *) (0x117448) fills its songs
+        // (+0x4c, a vector of each song's config array) from the campaign
+        // and its headers (+0x38, {first row, Symbol} each, shown as
+        // song_header_<Symbol>). Ours fills both from the setlist, and the
+        // last row to +0x48, as it does with no bonus songs.
+        void initData(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t provider = GPR_U32(ctx, 4);
+            s_provider = provider;
+            s_shown = ours(rdram, provider);
+            s_rowTiers.clear();
+            s_rowActive.clear();
+            if (!s_shown)
+                return s_initData(rdram, ctx, runtime);
+            const uint32_t returnTo = GPR_U32(ctx, 31);
+            const uint32_t sp = GPR_U32(ctx, 29);
+            const uint32_t scratch = sp - 0x20u;
+            SET_GPR_U32(ctx, 29, scratch - 0x10u);
+            store<uint32_t>(rdram, provider + 0x5cu, GPR_U32(ctx, 5));
+            // Every row it has, then those of its window.
+            Window &window = s_windows[selected()];
+            window.tiers.clear();
+            window.songs.clear();
+            std::vector<bool> active;
+            if (s_shown->live.rows)
+                liveRows(window, s_shown->live, active);
+            else
+            {
+                // The game played's career goes into the save first, as it
+                // stands, unsaved or not.
+                if (selected() == campaigns::active())
+                    save::leaveGame(rdram, ctx, runtime);
+                tierRows(rdram, window, *s_shown, active);
+            }
+            window.first = std::min(window.first, window.songs.empty() ? size_t{0} : window.songs.size() - 1u);
+            window.count = windowFrom(window.tiers, window.first);
+            pushWindow(rdram, ctx, runtime, provider, scratch, window, active);
             store<int32_t>(rdram, provider + 0x48u, static_cast<int32_t>(s_rowTiers.size()) - 1);
             SET_GPR_U32(ctx, 29, sp);
             ctx->pc = returnTo;
@@ -294,6 +306,16 @@ namespace gh2::setlists
                 // stone), the venue as far into its own list.
                 const std::vector<std::string> venues = campaigns::venues(campaigns::venueGame());
                 for (const auto &[name, setlist] : s_setlists)
+                {
+                    // A live one's song is in its window, being played
+                    // from it.
+                    if (const auto w = s_windows.find(name); setlist.live.rows && w != s_windows.end())
+                    {
+                        const auto begin = w->second.songs.begin() + static_cast<std::ptrdiff_t>(w->second.first);
+                        if (std::find(begin, begin + static_cast<std::ptrdiff_t>(w->second.count), song) !=
+                            begin + static_cast<std::ptrdiff_t>(w->second.count))
+                            venue = symbol(rdram, ctx, runtime, setlist.live.venue);
+                    }
                     for (size_t t = 0; t < setlist.tiers.size(); ++t)
                     {
                         const Tier &tier = setlist.tiers[t];
@@ -304,6 +326,7 @@ namespace gh2::setlists
                         venue = symbol(rdram, ctx, runtime,
                                        here ? tier.venue : venues[std::min(t, venues.size() - 1u)]);
                     }
+                }
             }
             SET_GPR_U32(ctx, 2, venue);
             ctx->pc = returnTo;
@@ -326,6 +349,13 @@ namespace gh2::setlists
             ctx->pc = returnTo;
         }
 
+        // The shown one's song list scene. The game played's own list is in
+        // its own scene, at the game's path for it.
+        std::string shownLook()
+        {
+            return selected() == campaigns::active() ? kOwnLook : s_setlists.at(selected()).look;
+        }
+
         script::Node setlistCommand(const script::Call &call)
         {
             const std::string op = call.symbol(1);
@@ -340,30 +370,32 @@ namespace gh2::setlists
                     s_windows[name].first = 0u;
                 return {changed ? 1u : 0u, script::kInt};
             }
-            // The game played's own list is in its own scene, at the game's
-            // path for it.
             if (op == "look")
-                return {symbol(call.rdram, call.ctx, call.runtime,
-                               selected() == campaigns::active() ? kOwnLook : s_setlists.at(selected()).look),
-                        script::kSymbol};
+                return {symbol(call.rdram, call.ctx, call.runtime, shownLook()), script::kSymbol};
             if (op == "shown")
                 return {symbol(call.rdram, call.ctx, call.runtime, selected()), script::kSymbol};
+            if (op == "has")
+                return {has(call.symbol(2)) ? 1u : 0u, script::kInt};
+            // The text of the shown one's window's header (a live one's).
+            if (op == "header")
+            {
+                const Window &w = s_windows[selected()];
+                const size_t n = call.index(2);
+                return {symbol(call.rdram, call.ctx, call.runtime, n < w.headers.size() ? w.headers[n] : ""),
+                        script::kSymbol};
+            }
+            Window &window = s_windows[selected()];
+            // A row, -1 for none.
+            const auto rowNode = [](std::optional<size_t> row) -> script::Node
+            { return {row ? static_cast<uint32_t>(*row) : static_cast<uint32_t>(-1), script::kInt}; };
             // The list's row now on: the row it is on once the window has
             // moved to keep it away from either end, -1 if it has not.
             if (op == "scroll")
-            {
-                Window &w = s_windows[selected()];
-                const size_t row = static_cast<size_t>(std::max(0, static_cast<int>(call.number(2))));
-                const size_t at = w.first + row;
-                const bool nearTop = row < kWindowEdge && w.first > 0u;
-                const bool nearEnd = row + kWindowEdge >= w.count && w.first + w.count < w.tiers.size();
-                if (!s_shown || at >= w.tiers.size() || (!nearTop && !nearEnd))
-                    return {static_cast<uint32_t>(-1), script::kInt};
-                w.first = windowAround(w.tiers, at);
-                return {static_cast<uint32_t>(at - w.first), script::kInt};
-            }
-            std::cerr << "[setlist] usage: {setlist select <name>}, {setlist scroll <row>}, {setlist look|shown}"
-                      << std::endl;
+                return rowNode(s_shown ? scroll(window, call.index(2)) : std::nullopt);
+            std::cerr << "[setlist] usage: {setlist select|has <name>}, {setlist look|shown|tiers|tier_at|random}, "
+                      << "{setlist song [row]}, {setlist scroll|frame <row>}, {setlist header|tier_name|jump <n>}, "
+                      << "{setlist paper_base <piece> <x> <z>}, {setlist paper <piece> x|z}, "
+                      << "{setlist paper_pose <piece> <object>} (content/setlists.h)" << std::endl;
             return {};
         }
     }
@@ -382,6 +414,15 @@ namespace gh2::setlists
     // under <game>/ is another camera than the one the screens turn
     // (GHScreen::AnimateTransition, 0x145e18). From the ARK root it is the
     // same one.
+    void addLive(const std::string &name, const std::string &look, Live live)
+    {
+        for (size_t n = 0; n < kLiveHeaders; ++n)
+            locale::addExpression("song_header_" + name + "_" + std::to_string(n),
+                                  "{setlist header " + std::to_string(n) + "}");
+        const auto twoLines = live.under ? setlist_look::addTwoLineLook(name, look) : std::nullopt;
+        s_setlists[name] = {{}, twoLines.value_or(look), {}, std::move(live), twoLines.has_value()};
+    }
+
     void addLook(const std::string &game, milo::Dir scene)
     {
         milo::replacePrefix(scene, "../metacam.milo", "../../../ui/metacam.milo");

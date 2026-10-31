@@ -9,22 +9,29 @@
 //   {setlist select <name>}  TRUE if it exists and was not already shown
 //   {setlist look}           the shown one's song list scene
 //   {setlist shown}          the shown one's name
+//   {setlist has <name>}     TRUE if it exists
 //   {setlist scroll <row>}   the row the list is on once a setlist too long
 //                            for the paper has moved its window along under
 //                            it, the provider to be filled again; -1 if it
 //                            has not moved
+//   {setlist header <n>}     the text of a live one's window's nth header
 //
-// Each is named for its game: gh2, gh80s.
+// Each is named for its game: gh2, gh80s; and custom, the player's own
+// songs (custom/install.h).
 
 #include "addresses.h"
 #include "formats/dtb.h"
 #include "milo/milo.h"
 
 #include <array>
+#include <cstdint>
+#include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
 class PS2Runtime;
+struct R5900Context;
 
 namespace gh2::setlists
 {
@@ -49,6 +56,32 @@ namespace gh2::setlists
     // `required`, its career's, an encore opens as that career opens it.
     void add(const std::string &name, std::vector<Tier> tiers, const std::string &look,
              const std::array<std::string, 5> &scoreNames, Required required = {});
+
+    // One kept elsewhere and as long as it gets (custom/catalog.h): its rows
+    // asked for each time the list fills, and the songs of the window it
+    // fills with made ready in the config first, on the guest thread. A row
+    // is its song and its tier's header text, a tier being the rows in a
+    // run with the same. Its songs are not in GH2's high score table, which
+    // goes in its save, whose buffer holds a few hundred songs at most
+    // (save/save.cpp's kBufferSize); their bests are save.bin's [best]
+    // (save/best.h). Listed only while it has a row.
+    struct LiveRow
+    {
+        std::string song, header;
+    };
+    struct Live
+    {
+        std::function<std::shared_ptr<const std::vector<LiveRow>>()> rows;
+        std::function<void(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::vector<std::string> &songs)>
+            ready;
+        std::string venue; // where its songs play when their own is locked
+        // A line under each row's song name, its artist: with it, the
+        // setlist shows in a copy of GH2's scene of its own, beside `look`
+        // as sel_song_<name>.milo, whose rows have room for two lines
+        // (content/setlist_look.h). On the guest thread.
+        std::function<std::string(const std::string &song)> under;
+    };
+    void addLive(const std::string &name, const std::string &look, Live live);
 
     // That game's song list scene, served at <game>/ui/sel_song_quickplay.milo
     // and turning with the menus as the game's own does.
