@@ -26,8 +26,8 @@ namespace gh2::custom
 
     // A gem as GH2's parser reads it from the MIDI (its frets), and what the
     // parser cannot read: whether it is strummed or hammered on, whether it
-    // is an open, written as kOpenFrets, and whether it is a single fret's
-    // or an open's tap (played as a HOPO, drawn as a tap).
+    // is an open, written as kOpenFrets, and whether it is a tap (played as
+    // a HOPO, drawn as a tap).
     struct Gh2Gem
     {
         uint8_t frets = 0u; // bit 0 green

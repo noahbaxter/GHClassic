@@ -96,19 +96,18 @@ namespace gh2::custom
                 length = std::max(length, 1u);
                 last = std::max(last, start + length);
                 // An open, with no fret of its own, is written as all five
-                // frets, told from a chord of all five by Gh2Gem::open. A
-                // chord is strummed: GH2 hammers on single frets alone
-                // (GuitarTrackWatcherImpl::TryToHopo, 0x24dc20). An open
-                // hammers on as one (gameplay/extended/guitar/gem_kinds.h).
+                // frets, told from a chord of all five by Gh2Gem::open. GH2
+                // hammers on single frets alone (GuitarTrackWatcherImpl::
+                // TryToHopo, 0x24dc20); an open and a chord hammer on as one
+                // (gameplay/extended/guitar/hammer_ons.h).
                 const bool open = (g.lanes & 0x1fu) == 0u;
                 const uint8_t frets = open ? kOpenFrets : static_cast<uint8_t>(g.lanes & 0x1fu);
-                const bool single = (frets & (frets - 1u)) == 0u;
                 out.gems[d][start] = {.frets = frets,
-                                      .hopo = (single || open) && g.kind != Kind::Strum,
+                                      .hopo = g.kind != Kind::Strum,
                                       .decided = g.forced || open,
-                                      .flip = single && g.flip,
+                                      .flip = g.flip,
                                       .open = open,
-                                      .tap = (single || open) && g.kind == Kind::Tap};
+                                      .tap = g.kind == Kind::Tap};
                 for (int lane = 0; lane < 5; ++lane)
                     if (frets & (1u << lane))
                     {
