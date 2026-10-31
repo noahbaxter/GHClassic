@@ -1,14 +1,24 @@
 // notes.mid is Rock Band's form as Clone Hero reads it: each difficulty's
-// lanes from note 60, 72, 84 and 96 (easy to expert); 116 star power, 103 a
-// solo (or the star power, where nothing is on 116).
+// lanes from note 60, 72, 84 and 96 (easy to expert), the next two its
+// forced HOPO and forced strum, the one before its open where the track
+// says [ENHANCED_OPENS]; 104 taps, 116 star power, 103 a solo (or, where
+// nothing is on 116, star power: each difficulty's on the note past its
+// frets, 67 to 103, as GH1 and GH2's, where those are); 105 and 106 each
+// player's Face-Off phrases (or each difficulty's two past its star power,
+// 69 and 70 to 105 and 106, as GH2's), 110 GH2's big notes, 120 a big rock
+// ending. Phase Shift's sysex, F0 'P' 'S' 0 0
+// <difficulty, FF all> <1 open, 4 tap> <1 on, 0 off> F7, marks opens and
+// taps too.
 //
 // notes.chart is text: [Song], [SyncTrack] (B a tempo in thousandths of a
 // beat a minute, TS a signature), [Events], and a section a part and
 // difficulty, [ExpertSingle], each line "<tick> = N <lane> <length>": 0
-// to 4 the frets; "S 2 <length>" star power, "E solo" and "E soloend".
+// to 4 the frets, 5 its natural kind flipped, 6 a tap, 7 open; "S 2
+// <length>" star power, "S 0" and "S 1" each player's Face-Off phrases,
+// "E solo" and "E soloend".
 //
-// Opens (a .chart's 7, Phase Shift's over the green note), taps and forced
-// HOPOs and strums are left out: GH2 plays none.
+// Lengths are kept as written: each engine cuts its own short sustains as
+// the song loads (gameplay/extended/guitar/gem_kinds.h).
 
 #include "custom/chart.h"
 
@@ -23,22 +33,103 @@ namespace gh2::custom
 {
     namespace
     {
-        // Gems in tick order, those with no lane left out.
-        std::vector<Gem> gemsOf(const std::map<uint32_t, Gem> &at)
+        // A gem as read, before its kind is settled.
+        struct Raw
         {
+            Gem gem;
+            bool hopo = false, strum = false, flip = false, tap = false;
+        };
+
+        // A tick at GH2's 480 a beat, as the converter rounds it.
+        uint64_t at480(uint64_t tick, uint32_t resolution)
+        {
+            return (tick * 480u + resolution / 2u) / resolution;
+        }
+
+        // song.ini's threshold at 480, none where it is GH2's own.
+        std::optional<uint32_t> songThreshold(const Options &options, uint32_t resolution)
+        {
+            uint32_t at = 0u;
+            if (options.hopoFrequency)
+                at = static_cast<uint32_t>(std::min<uint64_t>(at480(*options.hopoFrequency, resolution), 1u << 24));
+            else if (options.eighthNoteHopo)
+                at = 240u;
+            if (at == 0u || at == kGh2HopoThreshold)
+                return std::nullopt;
+            return at;
+        }
+
+        // Notes starting within 10 ticks of a gem (at 480) are of it, as
+        // GH2's parser makes chords (SongParser::ComputeSlots, 0x246088).
+        std::vector<Raw> snapped(std::vector<Raw> raws, uint32_t resolution)
+        {
+            std::stable_sort(raws.begin(), raws.end(), [](const Raw &a, const Raw &b) { return a.gem.tick < b.gem.tick; });
+            std::vector<Raw> out;
+            out.reserve(raws.size());
+            for (const Raw &r : raws)
+            {
+                if (out.empty() || at480(r.gem.tick, resolution) - at480(out.back().gem.tick, resolution) > 10u)
+                {
+                    out.push_back(r);
+                    continue;
+                }
+                Raw &into = out.back();
+                into.gem.lanes |= r.gem.lanes;
+                for (size_t lane = 0; lane < into.gem.length.size(); ++lane)
+                    into.gem.length[lane] = std::max(into.gem.length[lane], r.gem.length[lane]);
+                into.hopo |= r.hopo, into.strum |= r.strum, into.flip |= r.flip, into.tap |= r.tap;
+            }
+            return out;
+        }
+
+        // Kinds, natural or forced, in order. Natural is GH2's (GameGemList::
+        // WillBeNoStrum, 0x24d360): a single note on no fret of the gem
+        // before, under the threshold after it. The engine judging decides
+        // the natural ones and flips again as the song loads; an open's is
+        // this one.
+        std::vector<Gem> settle(std::vector<Raw> raws, uint32_t resolution, std::optional<uint32_t> threshold)
+        {
+            const uint32_t hopoTicks = threshold.value_or(kGh2HopoThreshold);
             std::vector<Gem> out;
-            for (const auto &[tick, g] : at)
-                if (g.lanes)
-                    out.push_back(g);
+            raws = snapped(std::move(raws), resolution);
+            out.reserve(raws.size());
+            for (Raw &r : raws)
+            {
+                Gem &g = r.gem;
+                // An open with frets is the frets.
+                if ((g.lanes & 0x1fu) != 0u && (g.lanes & (1u << kOpen)) != 0u)
+                {
+                    g.lanes &= 0x1fu;
+                    g.length[kOpen] = 0u;
+                }
+                const Gem *last = out.empty() ? nullptr : &out.back();
+                const bool natural = last && !g.chord() && (g.lanes & last->lanes) == 0u &&
+                                     at480(g.tick, resolution) - at480(last->tick, resolution) < hopoTicks;
+                g.kind = natural ? Kind::Hopo : Kind::Strum;
+                if (r.tap)
+                    g.kind = Kind::Tap;
+                else if (r.hopo)
+                    g.kind = Kind::Hopo;
+                else if (r.strum)
+                    g.kind = Kind::Strum;
+                else if (r.flip)
+                    g.kind = natural ? Kind::Strum : Kind::Hopo;
+                g.forced = r.tap || r.hopo || r.strum;
+                g.flip = r.flip && !g.forced;
+                out.push_back(g);
+            }
             return out;
         }
 
         // [on, off) spans of one note number.
         using Spans = std::vector<Span>;
 
-        bool within(const Span &s, uint32_t tick)
+        bool within(const Spans &spans, uint32_t tick)
         {
-            return tick >= s.tick && tick < s.tick + std::max(s.length, 1u);
+            for (const Span &s : spans)
+                if (tick >= s.tick && tick < s.tick + std::max(s.length, 1u))
+                    return true;
+            return false;
         }
 
         const std::map<std::string, Part> kMidParts = {
@@ -51,24 +142,35 @@ namespace gh2::custom
             std::map<uint8_t, Spans> notes;
             std::map<uint8_t, uint32_t> held;
             std::map<uint8_t, uint32_t> endedAt; // where a note struck again ended the held one
-            // Phase Shift's opens by difficulty (4 all), sysex F0 'P' 'S' 0 0
-            // <difficulty, FF all> 1 <1 on, 0 off> F7 over the green note.
-            std::array<Spans, 5> opens;
-            std::array<std::optional<uint32_t>, 5> openOn;
+            // Sysex phrases by difficulty (4 all), opens then taps.
+            std::array<std::array<Spans, 5>, 2> phrases;
+            std::array<std::array<std::optional<uint32_t>, 5>, 2> phraseOn;
+            bool enhancedOpens = false;
             for (const midi::Event &e : track.events)
             {
+                if (e.status == midi::kMeta)
+                {
+                    const std::string text(e.data.begin(), e.data.end());
+                    if (e.meta == midi::kText && (text == "[ENHANCED_OPENS]" || text == "ENHANCED_OPENS"))
+                        enhancedOpens = true;
+                    continue;
+                }
                 if (e.status == midi::kSysex)
                 {
                     const midi::Bytes &d = e.data;
-                    const size_t diff = d.size() < 7u ? 5u : d[4] == 0xffu ? 4u : d[4];
-                    if (diff > 4u || d[0] != 'P' || d[1] != 'S' || d[2] != 0u || d[3] != 0u || d[5] != 1u)
+                    if (d.size() < 7u || d[0] != 'P' || d[1] != 'S' || d[2] != 0u || d[3] != 0u)
                         continue;
+                    const int which = d[5] == 1u ? 0 : d[5] == 4u ? 1 : -1;
+                    const size_t diff = d[4] == 0xffu ? 4u : d[4];
+                    if (which < 0 || diff > 4u)
+                        continue;
+                    auto &on = phraseOn[which][diff];
                     if (d[6] != 0u)
-                        openOn[diff] = e.tick;
-                    else if (openOn[diff])
+                        on = e.tick;
+                    else if (on)
                     {
-                        opens[diff].push_back({*openOn[diff], e.tick - *openOn[diff]});
-                        openOn[diff].reset();
+                        phrases[which][diff].push_back({*on, e.tick - *on});
+                        on.reset();
                     }
                     continue;
                 }
@@ -100,29 +202,61 @@ namespace gh2::custom
             for (const auto &[pitch, on] : held)
                 notes[pitch].push_back({on, 0u});
 
-            const uint32_t cutoff = options.sustainCutoff.value_or(resolution / 3u);
+            // Star power on 116 for all four (Rock Band's), else GH1 and
+            // GH2's note a difficulty past its frets (67, 79, 91, 103),
+            // else 103 for all four.
             const bool spOn103 = options.starPowerOn103 || notes[116].empty();
+            const bool spEach = spOn103 && !(notes[67].empty() && notes[79].empty() && notes[91].empty());
+            // Face-Off phrases, GH2's a difficulty (69 and 70 to 105 and
+            // 106), else Rock Band's 105 and 106 for all four.
+            const bool faceOffEach = !(notes[69].empty() && notes[70].empty() && notes[81].empty() &&
+                                       notes[82].empty() && notes[93].empty() && notes[94].empty());
             std::array<Difficulty, 4> out;
             for (size_t d = 0; d < 4u; ++d)
             {
                 const uint8_t base = static_cast<uint8_t>(60u + 12u * d);
-                std::map<uint32_t, Gem> at;
-                for (int i = 0; i < 5; ++i)
-                    for (const Span &s : notes[static_cast<uint8_t>(base + i)])
+                std::map<uint32_t, Raw> at;
+                const auto lane = [&](uint8_t pitch, int index)
+                {
+                    for (const Span &s : notes[pitch])
                     {
-                        Gem &g = at[s.tick];
+                        Gem &g = at[s.tick].gem;
                         g.tick = s.tick;
-                        g.lanes |= static_cast<uint8_t>(1u << i);
-                        if (s.length > cutoff)
-                            g.length = std::max(g.length, s.length);
+                        g.lanes |= static_cast<uint8_t>(1u << index);
+                        g.length[index] = s.length;
                     }
-                for (const size_t which : {d, size_t(4)})
-                    for (const Span &o : opens[which])
-                        std::erase_if(at, [&](const auto &g) { return within(o, g.first) && g.second.lanes == 1u; });
-                out[d].gems = gemsOf(at);
-                out[d].starPower = notes[spOn103 ? 103 : 116];
+                };
+                for (int i = 0; i < 5; ++i)
+                    lane(static_cast<uint8_t>(base + i), i);
+                if (enhancedOpens)
+                    lane(static_cast<uint8_t>(base - 1u), kOpen);
+                Spans opens = phrases[0][d], taps = phrases[1][d];
+                opens.insert(opens.end(), phrases[0][4].begin(), phrases[0][4].end());
+                taps.insert(taps.end(), phrases[1][4].begin(), phrases[1][4].end());
+                taps.insert(taps.end(), notes[104].begin(), notes[104].end());
+                std::vector<Raw> raws;
+                for (auto &[tick, r] : at)
+                {
+                    // Phase Shift's open is the green lane's note.
+                    if (within(opens, tick) && r.gem.lanes == 1u)
+                    {
+                        r.gem.lanes = 1u << kOpen;
+                        r.gem.length[kOpen] = r.gem.length[0];
+                        r.gem.length[0] = 0u;
+                    }
+                    r.hopo = within(notes[base + 5u], tick);
+                    r.strum = within(notes[base + 6u], tick);
+                    r.tap = within(taps, tick);
+                    raws.push_back(r);
+                }
+                out[d].gems = settle(std::move(raws), resolution, songThreshold(options, resolution));
+                out[d].starPower = notes[spEach ? base + 7u : spOn103 ? 103u : 116u];
                 if (!spOn103)
                     out[d].solos = notes[103];
+                for (uint8_t player = 0; player < 2u; ++player)
+                    out[d].faceOff[player] = notes[(faceOffEach ? base + 9u : 105u) + player];
+                out[d].bigNotes = notes[110];
+                out[d].rockEndings = notes[120];
             }
             return out;
         }
@@ -180,6 +314,21 @@ namespace gh2::custom
         }
     }
 
+    bool Gem::split() const
+    {
+        std::optional<uint32_t> first;
+        for (int i = 0; i < 6; ++i)
+            if (lanes & (1u << i))
+            {
+                if (first && *first != length[i])
+                    return true;
+                first = length[i];
+            }
+        return false;
+    }
+
+    uint32_t Gem::longest() const { return *std::max_element(length.begin(), length.end()); }
+
     double Chart::seconds(uint32_t tick) const
     {
         double at = 0.0;
@@ -215,6 +364,7 @@ namespace gh2::custom
         }
         Chart chart;
         chart.resolution = file->division;
+        chart.hopoThreshold = songThreshold(options, chart.resolution);
         for (const midi::Event &e : file->tracks[0].events)
             if (e.status == midi::kMeta && e.meta == midi::kTempo && e.data.size() >= 3u)
             {
@@ -246,7 +396,7 @@ namespace gh2::custom
     std::optional<Chart> parseChart(const std::string &text, const Options &options, std::string &why)
     {
         Chart chart;
-        std::map<std::pair<Part, size_t>, std::map<uint32_t, Gem>> gems;
+        std::map<std::pair<Part, size_t>, std::map<uint32_t, Raw>> raws;
         std::map<std::pair<Part, size_t>, std::optional<uint32_t>> soloOn;
         std::istringstream in(ini::withoutBom(text));
         std::string line, section;
@@ -315,23 +465,29 @@ namespace gh2::custom
                 const uint32_t length = lengthIn(fields);
                 if (lane < 0 || lane > 7)
                     continue;
-                // 5 to 7 (a kind flipped, a tap, an open) leave a gem
-                // with no lane, which gemsOf drops.
-                Gem &g = gems[*track][tick];
-                g.tick = tick;
-                if (lane > 4)
-                    continue;
-                g.lanes |= static_cast<uint8_t>(1u << lane);
-                if (length > options.sustainCutoff.value_or(0u))
-                    g.length = std::max(g.length, length);
+                Raw &r = raws[*track][tick];
+                r.gem.tick = tick;
+                if (lane == 5)
+                    r.flip = true;
+                else if (lane == 6)
+                    r.tap = true;
+                else
+                {
+                    const int index = lane == 7 ? kOpen : lane;
+                    r.gem.lanes |= static_cast<uint8_t>(1u << index);
+                    r.gem.length[index] = length;
+                }
             }
             else if (type == "S")
             {
                 int kind = -1;
                 fields >> kind;
                 const uint32_t length = lengthIn(fields);
+                Difficulty &diff = chart.parts[track->first][track->second];
                 if (kind == 2)
-                    chart.parts[track->first][track->second].starPower.push_back({tick, length});
+                    diff.starPower.push_back({tick, length});
+                else if (kind == 0 || kind == 1)
+                    diff.faceOff[size_t(kind)].push_back({tick, length});
             }
             else if (type == "E")
             {
@@ -352,10 +508,18 @@ namespace gh2::custom
                          [](const auto &a, const auto &b) { return a.first < b.first; });
         if (chart.tempos.empty() || chart.tempos.front().tick != 0u)
             chart.tempos.insert(chart.tempos.begin(), Tempo{});
-        for (const auto &[track, at] : gems)
-            chart.parts[track.first][track.second].gems = gemsOf(at);
+        chart.hopoThreshold = songThreshold(options, chart.resolution);
+        for (auto &[track, gems] : raws)
+        {
+            std::vector<Raw> list;
+            for (auto &[tick, r] : gems)
+                // A flag with no lane under it is nothing.
+                if (r.gem.lanes)
+                    list.push_back(r);
+            chart.parts[track.first][track.second].gems = settle(std::move(list), chart.resolution, chart.hopoThreshold);
+        }
         std::erase_if(chart.parts, [](const auto &p) { return !hasGems(p.second); });
-        if (gems.empty() && chart.sections.empty() && chart.tempos.size() == 1u)
+        if (raws.empty() && chart.sections.empty() && chart.tempos.size() == 1u)
         {
             why = "not a .chart";
             return std::nullopt;

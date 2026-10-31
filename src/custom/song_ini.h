@@ -1,6 +1,6 @@
 #pragma once
 
-// song.ini, the [song] section's tags (name, artist, delay, preview_start_time
+// song.ini, the [song] section's tags (name, artist, delay, hopo_frequency
 // ...), keys lowercased. A .sng carries the same tags as its metadata.
 
 #include "custom/chart.h"

@@ -11,6 +11,8 @@ namespace gh2::custom
         // A gem this short is no sustain to GH2 (SongParser, 0x245ff8, under
         // 161 at 480), and a short note is written this long.
         constexpr uint32_t kTap = 60u;
+        // A big note (midi_parsers.dta's big_note_parser_guitar).
+        constexpr uint8_t kBigNote = 110u;
 
         using midi::note;
 
@@ -77,13 +79,16 @@ namespace gh2::custom
         {
             const Difficulty &diff = lead[d];
             const uint8_t base = static_cast<uint8_t>(60u + 12u * d);
-            const std::vector<Gem> &gems = diff.gems;
+            std::vector<const Gem *> gems;
+            for (const Gem &g : diff.gems)
+                if (g.lanes & 0x1fu)
+                    gems.push_back(&g);
             for (size_t i = 0; i < gems.size(); ++i)
             {
-                const Gem &g = gems[i];
+                const Gem &g = *gems[i];
                 const uint32_t start = at(g.tick);
-                const uint32_t next = i + 1u < gems.size() ? at(gems[i + 1u].tick) : UINT32_MAX;
-                uint32_t length = at(uint64_t(g.tick) + g.length) - start;
+                const uint32_t next = i + 1u < gems.size() ? at(gems[i + 1u]->tick) : UINT32_MAX;
+                uint32_t length = at(uint64_t(g.tick) + g.longest()) - start;
                 length = std::max(length, kTap);
                 if (next != UINT32_MAX)
                     length = std::min(length, next - start);
@@ -108,6 +113,11 @@ namespace gh2::custom
         {
             guitar.events.push_back(midi::text(at(s.tick), "[solo_on]"));
             guitar.events.push_back(midi::text(at(uint64_t(s.tick) + s.length), "[solo_off]"));
+        }
+        for (const Span &s : lead[3].bigNotes)
+        {
+            guitar.events.push_back(note(at(s.tick), kBigNote, true));
+            guitar.events.push_back(note(std::max(at(uint64_t(s.tick) + s.length), at(s.tick) + 1u), kBigNote, false));
         }
         order(guitar);
 

@@ -202,7 +202,7 @@ namespace gh2::custom
                         if (gems.empty())
                             continue;
                         song.charted |= static_cast<uint16_t>(1u << (4 * static_cast<int>(part) + static_cast<int>(d)));
-                        song.length = std::max(song.length, chart->seconds(gems.back().tick + gems.back().length));
+                        song.length = std::max(song.length, chart->seconds(gems.back().tick + gems.back().longest()));
                     }
                 }
                 for (const auto &[tick, name] : chart->sections)

@@ -1,8 +1,10 @@
 #pragma once
 
-// A custom song's chart, from notes.mid or notes.chart, as far as GH2
-// plays one: each difficulty's fretted gems and sustains, star power and
-// solos, with its tempos, signatures and sections.
+// A custom song's chart, from notes.mid or notes.chart, with everything a
+// five-fret chart can say: open notes, a sustain per lane (so one held
+// through others, or chords whose lanes end apart), forced strums and
+// HOPOs, taps, star power and solos. GH2's parser takes only some of it;
+// the rest reaches the engine beside the MIDI (custom/gh2_chart.h).
 
 #include <array>
 #include <cstdint>
@@ -13,14 +15,31 @@
 
 namespace gh2::custom
 {
+    constexpr int kOpen = 5; // the lane past orange
+
+    enum class Kind : uint8_t
+    {
+        Strum,
+        Hopo,
+        Tap,
+    };
+
     // Every lane struck at one tick.
     struct Gem
     {
         uint32_t tick = 0u;
-        uint8_t lanes = 0u; // bit n lane n, green 0 to orange 4
-        uint32_t length = 0u; // its longest lane's sustain, 0 none
+        uint8_t lanes = 0u; // bit n lane n, green 0 to orange 4, open 5
+        std::array<uint32_t, 6> length{}; // each lane's note length, 0 none
+        // GH2's natural kind (a single note on no fret of the gem before,
+        // under the song's threshold), unless the chart forces or flips it.
+        Kind kind = Kind::Strum;
+        bool forced = false; // its kind is the chart's: a forced HOPO or strum, or a tap
+        bool flip = false;   // the running engine's natural kind flipped (.chart's 5)
 
         bool chord() const { return (lanes & (lanes - 1u)) != 0u; }
+        // Its lanes don't all end together.
+        bool split() const;
+        uint32_t longest() const;
     };
 
     struct Span
@@ -32,6 +51,8 @@ namespace gh2::custom
     {
         std::vector<Gem> gems; // by tick
         std::vector<Span> starPower, solos;
+        std::array<std::vector<Span>, 2> faceOff; // each player's phrases
+        std::vector<Span> bigNotes, rockEndings;  // GH2's note 110, Rock Band's big rock endings
     };
 
     enum class Part : uint8_t
@@ -59,16 +80,25 @@ namespace gh2::custom
         std::map<Part, std::array<Difficulty, 4>> parts; // easy first
         // .chart's [Song] Offset, in seconds: the audio's lead.
         double offset = 0.0;
+        // The song's own HOPO threshold at 480 a beat, as GH2's songs.dta
+        // (hopo_threshold N); none for the engine's own.
+        std::optional<uint32_t> hopoThreshold;
 
         double seconds(uint32_t tick) const;
     };
 
-    // song.ini's say in how a chart reads.
+    // GH2's own natural HOPO threshold, at 480 a beat (beatmatcher.dta).
+    constexpr uint32_t kGh2HopoThreshold = 170u;
+
+    // song.ini's say in how a chart reads. A sustain's cutoff is the
+    // running engine's, whatever the song says (sustain_cutoff_threshold).
     struct Options
     {
-        // A .mid sustain this short or shorter is none. Unset: a third
-        // of a beat for .mid, none for .chart.
-        std::optional<uint32_t> sustainCutoff;
+        // The song's natural HOPO threshold in its chart's ticks; half a
+        // beat with eighthnote_hopo. Rips stamp GH2's 170 on every song,
+        // GH1's too, so that is none: the engine's own.
+        std::optional<uint32_t> hopoFrequency;
+        bool eighthNoteHopo = false;
         // Star power on note 103 rather than 116 (multiplier_note).
         bool starPowerOn103 = false;
     };

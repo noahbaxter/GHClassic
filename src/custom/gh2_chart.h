@@ -3,9 +3,10 @@
 // A custom chart as GH2's parser takes one (config/midi_parsers.dta): 480
 // ticks a beat, PART GUITAR's gems on 60 to 64, 72 to 76, 84 to 88 and 96 to
 // 100, each difficulty's star power on the note past its frets (67, 79, 91,
-// 103), [solo_on] and [solo_off], and EVENTS' [section], [music_start] and
-// [end]. Every gem's kind is GH2's natural one, and a sustain ends where the
-// next gem starts.
+// 103), big notes on 110, [solo_on] and [solo_off], and EVENTS' [section],
+// [music_start] and [end]. Every gem's kind is GH2's natural one, a chord
+// holds as long as its longest lane, a sustain ends where the next gem
+// starts, and opens are left out.
 
 #include "custom/chart.h"
 
