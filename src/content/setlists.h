@@ -15,6 +15,14 @@
 //                            it, the provider to be filled again; -1 if it
 //                            has not moved
 //   {setlist header <n>}     the text of a live one's window's nth header
+//   {setlist frame <row>}    the paper's frame for the list's row, from the
+//                            setlist's top
+//   {setlist paper_base <piece> <x> <z>}  where the scene put a piece of
+//                            its paper, kept from the first time
+//   {setlist paper <piece> x|z}  where it goes now, for paper that goes on
+//                            past the scene's (setlist_paper.cpp's kSheet)
+//   {setlist paper_pose <piece> <object>}  a doodle sized and mirrored for
+//                            where it goes now, before it is put there
 //
 // Each is named for its game: gh2, gh80s; and custom, the player's own
 // songs (custom/install.h).

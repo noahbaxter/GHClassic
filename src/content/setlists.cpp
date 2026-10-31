@@ -3,6 +3,7 @@
 #include "content/campaigns.h"
 #include "content/encores.h"
 #include "content/locale.h"
+#include "content/setlist_paper.h"
 #include "content/setlist_window.h"
 #include "content/songs.h"
 #include "disc/ark.h"
@@ -385,6 +386,8 @@ namespace gh2::setlists
                         script::kSymbol};
             }
             Window &window = s_windows[selected()];
+            if (const auto paper = setlist_paper::command(call, shownLook(), window.tiers, window.first))
+                return *paper;
             // A row, -1 for none.
             const auto rowNode = [](std::optional<size_t> row) -> script::Node
             { return {row ? static_cast<uint32_t>(*row) : static_cast<uint32_t>(-1), script::kInt}; };

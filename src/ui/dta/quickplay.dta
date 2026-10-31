@@ -19,6 +19,13 @@
       $lists
    }
 }
+; The song list scene's paper, each piece put on again past where the scene
+; ends it (content/setlist_paper.cpp).
+{set $ghc_paper
+   (ss_songlist.view setlist1.mesh setlist2.mesh setlist3.mesh setlist4.mesh setlist5.mesh ss_bigwall.mesh
+      doodle1.mesh doodle2.mesh doodle3.mesh doodle4.mesh doodle5.mesh doodle6.mesh
+      doodle7.mesh doodle8.mesh doodle9.mesh doodle10.mesh doodle11.mesh doodle12.mesh)
+}
 ; The yellow fret shows only where there is another setlist; blue names the
 ; note engine quickplay judges by, and changes it. Set from the screen's
 ; enter, after the help bar's own has put up the screen's default.
@@ -56,6 +63,19 @@
          {if {! {{ui current_screen} sel_song_career}} {song_provider set_quickplay TRUE}}
          {ss_song.lst set_provider song_provider}
          {if {== {game get_song_index} -1} {game set_song_index 0}}
+         ; Where the scene put each piece of its paper, for the paper to
+         ; go on past them (content/setlist_paper.cpp).
+         {foreach $piece $ghc_paper
+            {if {$this find $piece FALSE}
+               {do
+                  ($x 0)
+                  ($y 0)
+                  ($z 0)
+                  {{$this find $piece} get_local_pos $x $y $z}
+                  {setlist paper_base $piece $x $z}
+               }
+            }
+         }
          {$this update_song_info}
       )
       (update_song_info
@@ -89,8 +109,21 @@
             }
             {game set_song_index $pos}
             {song_preview {game get_song}}
-            {sel_song.view set_frame
-               {+ $pos {song_provider num_headers $pos} {switch {setlist shown} (gh1 1) 0}}
+            ; Paper made endless (content/setlist_paper.cpp) is framed from the
+            ; setlist's top, its sheets and doodles put on ahead.
+            {if_else {> {sel_song.view end_frame} 100}
+               {do
+                  {sel_song.view set_frame {setlist frame $pos}}
+                  {foreach $piece $ghc_paper
+                     {if {$this find $piece FALSE}
+                        {setlist paper_pose $piece {$this find $piece}}
+                        {{$this find $piece} set_local_pos {setlist paper $piece x} 0 {setlist paper $piece z}}
+                     }
+                  }
+               }
+               {sel_song.view set_frame
+                  {+ $pos {song_provider num_headers $pos} {switch {setlist shown} (gh1 1) 0}}
+               }
             }
          }
       )
