@@ -162,6 +162,8 @@ add_executable(save_test EXCLUDE_FROM_ALL
 target_include_directories(save_test PRIVATE src)
 target_link_libraries(save_test PRIVATE miniz)
 
+    src/custom/song_ini.cpp
+    src/custom/text.cpp
 # Which release the game offers as an update.
 add_executable(releases_test EXCLUDE_FROM_ALL tests/releases_test.cpp src/host/releases.cpp)
 target_include_directories(releases_test PRIVATE src)
@@ -249,6 +251,8 @@ set(GHC_GAME_SOURCES
     src/content/tour_or_higher.cpp
     src/content/vgs.cpp
     src/content/vorbis.cpp
+    src/custom/song_ini.cpp
+    src/custom/text.cpp
     src/dev/cheats.cpp
     src/dev/draw_dump.cpp
     src/dev/mesh_packet.cpp
