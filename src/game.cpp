@@ -25,6 +25,7 @@
 #include "frame_step.h"
 #include "game_overrides.h"
 #include "gh1/face.h"
+#include "custom/install.h"
 #include "gh1/install.h"
 #include "gh80s/install.h"
 #include "gh2x/install.h"
@@ -94,6 +95,7 @@ namespace
         gh2::installGh1();
         gh2::installClassicLogo();
         gh2::installGh2x();
+        gh2::installCustomSongs();
         gh2::installHiddenGuitars();
         gh2::installGh1Face(runtime, gh2::kSlus21447);
         gh2::outfits::install(runtime, gh2::kSlus21447);

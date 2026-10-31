@@ -292,10 +292,14 @@ set(GHC_GAME_SOURCES
     src/custom/audio.cpp
     src/custom/catalog.cpp
     src/custom/chart.cpp
+    src/custom/command.cpp
     src/custom/gh2_chart.cpp
     src/custom/index.cpp
+    src/custom/install.cpp
     src/custom/library.cpp
+    src/custom/song_files.cpp
     src/custom/song_ini.cpp
+    src/custom/songs.cpp
     src/custom/text.cpp
     src/dev/cheats.cpp
     src/dev/draw_dump.cpp
