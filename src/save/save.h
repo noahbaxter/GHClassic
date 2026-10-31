@@ -99,6 +99,11 @@ namespace gh2::save
     // it); gh2 for neither. Kept in state.ini beside save.bin.
     std::string lastGame();
     void keepLastGame(const std::string &game);
+    // Where the menus were left, kept in state.ini by section and key for
+    // the next boot to open on: empty when it holds none.
+    std::string state(const std::string &section, const std::string &key);
+    void keepState(const std::string &section, const std::string &key, const std::string &value);
+
     void leaveGame(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
     void enterGame(const std::string &game, uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
     void reloadGame(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);

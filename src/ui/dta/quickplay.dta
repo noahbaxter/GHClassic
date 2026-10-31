@@ -376,6 +376,9 @@
          {{ui current_screen} turn_off_ambient}
          {if {! {{ui current_screen} sel_song_career}} {song_provider set_quickplay TRUE}}
          {ss_song.lst set_provider song_provider}
+         ; Back on the song last on in this setlist, from wherever: the main
+         ; menu puts the game's own on the first ({setlist song}).
+         {if {>= {setlist song} 0} {game set_song_index {setlist song}}}
          {if {== {game get_song_index} -1} {game set_song_index 0}}
          ; The printout out to the right again, to slide in once the screen
          ; is up. Its pieces are hidden until then: the scene has them where
@@ -458,6 +461,7 @@
                {set $pos $moved}
             }
             {game set_song_index $pos}
+            {setlist song $pos}
             {ghc_preview {game get_song}}
             ; Laying out the paper takes longer than a frame: while the list
             ; rushes by, only once it slows (poll).

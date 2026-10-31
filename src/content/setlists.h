@@ -4,12 +4,15 @@
 // (content/campaigns.h), which the game builds from its campaign, and every
 // other's, its songs in its tiers, shown in its own song list scene and
 // unlocked as the game's own are. Which is shown changes quickplay's list
-// and nothing else.
+// and nothing else. The one shown and each one's song last on are kept from
+// run to run (save::state).
 //
 //   {setlist select <name>}  TRUE if it exists and was not already shown
 //   {setlist look}           the shown one's song list scene
 //   {setlist shown}          the shown one's name
 //   {setlist has <name>}     TRUE if it exists
+//   {setlist song [row]}     the shown one's song row last on, -1 if none;
+//                            with a row, kept as that
 //   {setlist scroll <row>}   the row the list is on once a setlist too long
 //                            for the paper has moved its window along under
 //                            it, the provider to be filled again; -1 if it

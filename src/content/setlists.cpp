@@ -56,11 +56,27 @@ namespace gh2::setlists
         }
 
         // The setlist shown: the one picked, or after a campaign switch the
-        // game now played's own.
+        // game now played's own. The first asked, the one picked last run
+        // if its game is the one played. Kept in state.ini, [setlist].
         const std::string &selected()
         {
+            static bool restored = false;
+            if (!restored)
+            {
+                restored = true;
+                const std::string shown = save::state("setlist", "shown");
+                if (save::state("setlist", "game") == campaigns::active() && has(shown))
+                {
+                    s_campaign = campaigns::active();
+                    s_selected = shown;
+                }
+            }
             if (s_campaign != campaigns::active())
+            {
                 s_selected = s_campaign = campaigns::active();
+                save::keepState("setlist", "shown", s_selected);
+                save::keepState("setlist", "game", s_campaign);
+            }
             return s_selected;
         }
         std::map<std::string, uint32_t> s_symbols;
@@ -260,6 +276,14 @@ namespace gh2::setlists
                     save::leaveGame(rdram, ctx, runtime);
                 tierRows(rdram, window, *s_shown, active);
             }
+            // Not on a song yet this run: on the one it was on last, its
+            // window around it.
+            if (window.at.empty())
+            {
+                window.at = save::state("song_at", selected());
+                if (const auto at = rowOf(window, window.at))
+                    moveTo(window, *at);
+            }
             window.first = std::min(window.first, window.songs.empty() ? size_t{0} : window.songs.size() - 1u);
             window.count = windowFrom(window.tiers, window.first);
             pushWindow(rdram, ctx, runtime, provider, scratch, window, active);
@@ -411,10 +435,11 @@ namespace gh2::setlists
                 const std::string name = call.symbol(2);
                 const bool changed = s_setlists.count(name) != 0u && name != selected();
                 if (changed)
+                {
                     s_selected = name;
-                // The list opens on its first row, so its window does.
-                if (s_setlists.count(name) != 0u)
-                    s_windows[name].first = 0u;
+                    save::keepState("setlist", "shown", s_selected);
+                    save::keepState("setlist", "game", s_campaign);
+                }
                 return {changed ? 1u : 0u, script::kInt};
             }
             if (op == "look")
@@ -437,6 +462,44 @@ namespace gh2::setlists
             // A row, -1 for none.
             const auto rowNode = [](std::optional<size_t> row) -> script::Node
             { return {row ? static_cast<uint32_t>(*row) : static_cast<uint32_t>(-1), script::kInt}; };
+            // The shown one's song last on, its row in the list, -1 if none
+            // yet; with a row, that one's song. Kept by song, the list's
+            // rows being the window's.
+            if (op == "song")
+            {
+                // The game's own quickplay list, which it fills itself, by
+                // row ([row_at]); a career's is on its own song.
+                if (selected() == campaigns::active())
+                {
+                    if (!modeIs(call.rdram, "quickplay") || s_provider == 0u)
+                        return rowNode(std::nullopt);
+                    if (call.size() > 2)
+                        save::keepState("row_at", selected(), std::to_string(static_cast<int>(call.number(2))));
+                    const std::string kept = save::state("row_at", selected());
+                    const int last = load<int32_t>(call.rdram, s_provider + 0x48u);
+                    const int row = kept.empty() ? -1 : std::clamp(std::atoi(kept.c_str()), 0, std::max(0, last));
+                    return {static_cast<uint32_t>(row), script::kInt};
+                }
+                // Only on its own list: a career's or co-op's, on the same
+                // panel, neither reads nor moves it.
+                if (s_provider == 0u || !ours(call.rdram, s_provider))
+                    return rowNode(std::nullopt);
+                if (call.size() > 2)
+                {
+                    const size_t r = window.first + call.index(2);
+                    if (r < window.songs.size())
+                    {
+                        window.at = window.songs[r];
+                        save::keepState("song_at", selected(), window.at);
+                        window.atRow = r - window.first;
+                    }
+                }
+                const auto found = rowOf(window, save::state("song_at", selected()));
+                if (!found)
+                    return rowNode(std::nullopt);
+                const int row = static_cast<int>(*found) - static_cast<int>(window.first);
+                return {static_cast<uint32_t>(std::clamp(row, 0, static_cast<int>(window.count) - 1)), script::kInt};
+            }
             // A live one's tiers: how many, one's header text, the one the
             // list is on, and the list moved to one's first song (its row
             // in the window, the provider to be filled again).
