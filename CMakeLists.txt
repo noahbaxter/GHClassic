@@ -282,6 +282,7 @@ set(GHC_GAME_SOURCES
     src/content/hidden_guitars.cpp
     src/content/outfits.cpp
     src/content/payouts.cpp
+    src/content/setlist_look.cpp
     src/content/setlist_paper.cpp
     src/content/setlist_window.cpp
     src/content/setlists.cpp
@@ -404,6 +405,7 @@ set(GHC_GAME_SOURCES
     src/ui/players.cpp
     src/ui/controllers.cpp
     src/ui/classic_scene.cpp
+    src/ui/text_fit.cpp
     src/ui/menus.cpp
     src/ui/meta_music.cpp
     src/ui/photo_mode.cpp

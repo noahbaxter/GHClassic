@@ -3,6 +3,7 @@
 #include "content/campaigns.h"
 #include "content/encores.h"
 #include "content/locale.h"
+#include "content/setlist_look.h"
 #include "content/setlist_paper.h"
 #include "content/setlist_window.h"
 #include "content/songs.h"
@@ -33,13 +34,13 @@ namespace gh2::setlists
             std::string look;
             Required required;
             Live live; // its rows, where they are kept elsewhere
+            bool twoLines = false; // in rows of two lines, its Live's under the name
         };
 
         using namespace setlist_window;
         std::map<std::string, Window> s_windows;
 
         constexpr const char *kOwnLook = "ui/sel_song_quickplay.milo";
-        constexpr const char *kOwnScene = "ui/gen/sel_song_quickplay.milo_ps2"; // that, as the disc keeps it
         constexpr int kBands = 8; // the save's band slots
 
         const Addresses *s_addresses = nullptr;
@@ -77,6 +78,7 @@ namespace gh2::setlists
         PS2Runtime::RecompiledFunction s_isActive = nullptr;
         PS2Runtime::RecompiledFunction s_venueForSong = nullptr;
         PS2Runtime::RecompiledFunction s_getHighScore = nullptr;
+        PS2Runtime::RecompiledFunction s_textSlotFill = nullptr;
 
         uint32_t symbol(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &text)
         {
@@ -350,6 +352,50 @@ namespace gh2::setlists
             ctx->pc = returnTo;
         }
 
+        // TextSlot::Fill(const ListProvider &, int, int row, int element)
+        // (0x377db8) sets a row's Text to the provider's text for it
+        // (SongProvider::Text, 0x1177d8: element 1 the song's name, 6 its
+        // blurb, which GH2 has for the last row alone, 0 the tier's header
+        // over it). A two-line setlist's row has its header and name, and
+        // its Live's line under it, in capitals and cut where it would run
+        // under the printout.
+        void textSlotFill(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t slot = GPR_U32(ctx, 4), list = GPR_U32(ctx, 5), shown = GPR_U32(ctx, 6);
+            const int32_t row = static_cast<int32_t>(GPR_U32(ctx, 7));
+            const uint32_t element = GPR_U32(ctx, 8);
+            if (!s_shown || !s_shown->twoLines || (element != 0u && element != 1u && element != 6u))
+                return s_textSlotFill(rdram, ctx, runtime);
+            // The provider as its ListProvider's table puts it.
+            const uint32_t table = load<uint32_t>(rdram, list);
+            const uint32_t provider = list + static_cast<uint32_t>(static_cast<int32_t>(load<int16_t>(rdram, table + 0x10u)));
+            const Window &window = s_windows[selected()];
+            const size_t at = window.first + static_cast<size_t>(std::max(row, 0));
+            if (provider != s_provider || at >= window.songs.size())
+                return s_textSlotFill(rdram, ctx, runtime);
+            const uint32_t returnTo = GPR_U32(ctx, 31), sp = GPR_U32(ctx, 29);
+            std::string line;
+            if (element != 6u)
+            {
+                const uint32_t name = static_cast<uint32_t>(runtime->callGuestFunction(
+                    rdram, ctx, s_addresses->songProviderText, {provider, shown, static_cast<uint32_t>(row), element}));
+                line = name ? reinterpret_cast<const char *>(getMemPtr(rdram, name)) : "";
+            }
+            else
+                line = s_shown->live.under(window.songs[at]);
+            const uint32_t text = load<uint32_t>(rdram, slot + 4u);
+            line = setlist_look::rowText(rdram, ctx, runtime, text, line, element);
+            // On the guest's stack, below what it holds.
+            constexpr size_t kMost = 0x1f0u;
+            const uint32_t buffer = (sp - 0x200u) & ~0xfu;
+            line.resize(std::min(line.size(), kMost - 1u));
+            std::memcpy(getMemPtr(rdram, buffer), line.c_str(), line.size() + 1u);
+            SET_GPR_U32(ctx, 29, buffer - 0x10u);
+            runtime->callGuestFunction(rdram, ctx, s_addresses->rndTextSetText, {text, buffer});
+            SET_GPR_U32(ctx, 29, sp);
+            ctx->pc = returnTo;
+        }
+
         // The shown one's song list scene. The game played's own list is in
         // its own scene, at the game's path for it.
         std::string shownLook()
@@ -413,10 +459,6 @@ namespace gh2::setlists
         s_setlists[name] = {std::move(tiers), look, std::move(required)};
     }
 
-    // A scene names the menus' camera beside it (../metacam.milo), which
-    // under <game>/ is another camera than the one the screens turn
-    // (GHScreen::AnimateTransition, 0x145e18). From the ARK root it is the
-    // same one.
     void addLive(const std::string &name, const std::string &look, Live live)
     {
         for (size_t n = 0; n < kLiveHeaders; ++n)
@@ -428,8 +470,7 @@ namespace gh2::setlists
 
     void addLook(const std::string &game, milo::Dir scene)
     {
-        milo::replacePrefix(scene, "../metacam.milo", "../../../ui/metacam.milo");
-        ark::addFile(game + "/" + kOwnScene, milo::write(scene));
+        setlist_look::addScene(game + "/" + setlist_look::kOwnScene, std::move(scene));
     }
 
     Required required(const dtb::Node &campaign)
@@ -517,7 +558,7 @@ namespace gh2::setlists
         // Its archive whole under <game>/, so its song list scene finds what
         // it refers to on its own disc.
         ark::rename(game + "/", disc, "");
-        const auto file = ark::readFile(disc, kOwnScene);
+        const auto file = ark::readFile(disc, setlist_look::kOwnScene);
         if (const auto scene = file ? milo::read(*file) : std::nullopt)
             addLook(game, *scene);
         std::array<std::string, 5> scoreNames;
@@ -543,5 +584,7 @@ namespace gh2::setlists
         runtime.replaceFunction(addresses.campaignDataGetVenueForSong, &venueForSong);
         s_getHighScore = runtime.lookupFunction(addresses.songProviderGetHighScore);
         runtime.replaceFunction(addresses.songProviderGetHighScore, &getHighScore);
+        s_textSlotFill = runtime.lookupFunction(addresses.textSlotFill);
+        runtime.replaceFunction(addresses.textSlotFill, &textSlotFill);
     }
 }

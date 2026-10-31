@@ -275,6 +275,10 @@ namespace gh2
         uint32_t profileStateFinishSong;              // a career song passed, player 0's stats still up
         uint32_t songProviderGetBlurb;                // (int row)
         uint32_t songProviderGetHighScore;            // (int row)
+        uint32_t songProviderText;                    // (int, int row, int element) const
+        uint32_t textSlotFill;                        // TextSlot::Fill(const ListProvider &, int, int row, int element)
+        uint32_t rndTextSetText;                      // (const char *)
+        uint32_t rndFontCharAdvance;                  // (char before, char) const: in the size's units
         uint32_t makeStringInt;                       // MakeString(const char *, int)
         uint32_t playerSetMercurySwitch;              // (bool): the guitar tilted, star power deployed if ready
         // Data
@@ -579,6 +583,10 @@ namespace gh2
         .profileStateFinishSong = 0x13ba20u,
         .songProviderGetBlurb = 0x117df8u,
         .songProviderGetHighScore = 0x117b38u,
+        .songProviderText = 0x1177d8u,
+        .textSlotFill = 0x377db8u,
+        .rndTextSetText = 0x1dbb70u,
+        .rndFontCharAdvance = 0x1f9ef0u,
         .makeStringInt = 0x3147a8u,
         .playerSetMercurySwitch = 0x111940u,
         .rndCamCurrent = 0x3de348u,
