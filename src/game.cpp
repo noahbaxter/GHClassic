@@ -137,11 +137,6 @@ namespace
         gh2::installMetaMusic(runtime, gh2::kSlus21447);
         gh2::installTrackStart(runtime, gh2::kSlus21447);
         gh2::installSustainRelease(runtime, gh2::kSlus21447);
-        gh2::guitar::installGemKinds(runtime, gh2::kSlus21447);
-        gh2::guitar::installHammerOns(runtime, gh2::kSlus21447);
-        // Over hammer_ons' FretButtonUp.
-        gh2::guitar::installSustainHold(runtime, gh2::kSlus21447);
-        gh2::guitar::installSustainFlames(runtime, gh2::kSlus21447);
         gh2::installGemLooks(runtime, gh2::kSlus21447);
         gh2::guitar::installSustainTails(runtime, gh2::kSlus21447);
         gh2::guitar::installOpenGems(runtime, gh2::kSlus21447);
@@ -164,6 +159,14 @@ namespace
             gh2::installSongProgress(runtime, gh2::kSlus21447);
         gh2::installFontBake();
         gh2::installNoteEngine(runtime, gh2::kSlus21447);
+        // Over the note engine's: a custom chart's kinds answer before GH1's
+        // marking, its taps and opens before GH1's hammer-on rules, and the
+        // frets held for its sustains are left out of what either engine sees.
+        gh2::guitar::installGemKinds(runtime, gh2::kSlus21447);
+        gh2::guitar::installHammerOns(runtime, gh2::kSlus21447);
+        // Over hammer_ons' FretButtonUp.
+        gh2::guitar::installSustainHold(runtime, gh2::kSlus21447);
+        gh2::guitar::installSustainFlames(runtime, gh2::kSlus21447);
         // After the note engine, whose hook on BeatMatcher::Swing it wraps:
         // a strum it drops never reaches the engine.
         gh2::installStrumLimit(runtime, gh2::kSlus21447);

@@ -11,7 +11,7 @@
 // - Once every fret is let go, no hammer-on or pull-off counts until the
 //   next strum. A strum counts here even if BeatMatcher::Swing drops it
 //   inside its 52 ms limit. GH2 has no such lock (GuitarController::OnMsg,
-//   GH1 0x278120).
+//   GH1 0x278120). Gems GH1 never had come in as setStrumlessGems says.
 // - A hammer-on or pull-off may come at most 40 ms early (slop - 60) and
 //   aims at the nearest gem, played or not. GH2's may come 100 ms early
 //   (slop) and aims at the nearest unplayed gem. Both allow 160 ms late
@@ -66,6 +66,7 @@ namespace gh2::gh1_rules
         const Addresses *s_addresses = nullptr;
         // Each guitar watcher's: a strum since every fret was last let go.
         std::unordered_map<uint32_t, bool> s_strummed;
+        StrumlessGem s_strumless = nullptr;
 
         float nowOf(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const TrackWatcherImpl &watcher)
         {
@@ -134,7 +135,8 @@ namespace gh2::gh1_rules
             const float at = ctx->f[12] + watcher.sync();
             const int c = gems.closest(at);
             const float early = watcher.leniency() - watcher.slop();
-            if (!s_strummed[watcher.address] || watcher.done(c) || at - gems[c].ms() < early)
+            const bool strummed = s_strummed[watcher.address] || (s_strumless && s_strumless(rdram, watcher.address, c));
+            if (!strummed || watcher.done(c) || at - gems[c].ms() < early)
             {
                 leave(ctx);
                 return true;
@@ -249,5 +251,18 @@ namespace gh2::gh1_rules
         Override<GemCanBePassedTag>::install(runtime, addresses.guitarWatcherGemCanBePassed, gh1Only<onGemCanBePassed>);
         EntryHook<PollTag>::install(runtime, addresses.trackWatcherPoll, gh1Only<onPoll>);
         EntryHook<FretTimeoutTag>::install(runtime, addresses.guitarWatcherCheckForFretTimeout, gh1Only<onCheckForFretTimeout>);
+    }
+}
+
+namespace gh2
+{
+    void setStrumlessGems(StrumlessGem strumless)
+    {
+        gh1_rules::s_strumless = strumless;
+    }
+
+    void countAsStrum(uint32_t watcher)
+    {
+        gh1_rules::s_strummed[watcher] = true;
     }
 }
