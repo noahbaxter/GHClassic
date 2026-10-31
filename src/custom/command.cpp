@@ -31,6 +31,22 @@ namespace gh2::custom
                 }
                 return call.word(instrumentName());
             }
+            if (op == "sort")
+            {
+                // sort_<name>, as the picker lists them (ui/dta/quickplay.dta).
+                const std::string prefix = "sort_";
+                if (call.size() > 2)
+                {
+                    const std::string to = call.symbol(2);
+                    const auto sort = to.rfind(prefix, 0u) == 0u ? sortNamed(to.substr(prefix.size())) : std::nullopt;
+                    if (!sort || *sort == catalog().sort())
+                        return {0u, script::kInt};
+                    catalog().sortBy(*sort, instrumentName());
+                    keepListing();
+                    return {1u, script::kInt};
+                }
+                return call.word(prefix + kSortNames[static_cast<int>(catalog().sort())]);
+            }
             if (op == "scan")
             {
                 // With two numbers, the scan said to be that far along

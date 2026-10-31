@@ -74,6 +74,10 @@ namespace gh2
         const bool showCopies = settings::get(settings::kShowDuplicates) != 0;
         catalog().chartFolders(folders);
         catalog().showCopies(showCopies);
+        // As the last run left them.
+        setInstrument(save::state("custom", "instrument") == "bass" ? Part::Bass : Part::Guitar);
+        if (const auto sort = sortNamed(save::state("custom", "sort")))
+            catalog().sortBy(*sort, instrumentName());
 
         // The last scan's songs, then the scan, behind the game: each song
         // listed as it is found, the list's window taking it the next time

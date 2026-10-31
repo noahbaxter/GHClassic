@@ -88,6 +88,44 @@
       (SELECT_START_MSG {ghc_qp_play} kDataUnhandled)
    )
 }
+; Quickplay's and multiplayer's difficulties as the game's own
+; (career.dta's SEL_DIFFICULTY_COMMON), but only those the song has: a
+; custom song charted on expert alone shows expert alone, focused where
+; the last one picked is missing ({custom}, custom/command.h).
+{retype sel_difficulty_panel
+   (
+      (file ui/sel_difficulty.milo)
+      (buttons (sd_diff1.btn sd_diff2.btn sd_diff3.btn sd_diff4.btn))
+      (enter
+         {foreach_int $d 0 4
+            {do
+               ($button {elem [buttons] $d})
+               ($has {custom has {game get_song} $d})
+               {$button set_showing $has}
+               {if_else $has {$this enable $button} {$this disable $button}}
+            }
+         }
+         {$this set_focus {elem [buttons] {custom nearest {game get_song} {game get_difficulty 0}}}}
+      )
+      (set_difficulty
+         ($component $player_num)
+         {{game get_player_config $player_num}
+            set_difficulty
+            {switch $component
+               (sd_diff1.btn kDifficultyEasy)
+               (sd_diff2.btn kDifficultyMedium)
+               (sd_diff3.btn kDifficultyHard)
+               (sd_diff4.btn kDifficultyExpert)
+            }
+         }
+      )
+      (SELECT_START_MSG
+         {$this set_difficulty $component 0}
+         {if {> {game get_num_players} 1} {$this set_difficulty $component 1}}
+         kDataUnhandled
+      )
+   )
+}
 ; The guitar picker as GH2's, the 80s' and GH1's campaigns all have it
 ; (career.dta).
 {retype sel_guitar_panel

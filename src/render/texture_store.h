@@ -22,14 +22,18 @@ namespace gh2::textures
     // bitmap file there. Its 360 bitmap, or with `paletted` a PS2's 4- or
     // 8-bit one too: only for a picture drawn in a stand-in's place, as a
     // PS2 Tex the game draws itself may have been changed since (font bake,
-    // its own scripts).
+    // its own scripts). Or with `file`, a PNG or JPG of the host's own, its
+    // bytes from `file` when wanted (empty if it has gone), `path` its name
+    // for its id; at most kMostHostSide a side.
     struct Source
     {
         size_t disc = 0;
         std::string path;
         std::string tex;
         bool paletted = false;
+        std::function<std::string()> file;
     };
+    constexpr uint32_t kMostHostSide = 256u;
 
     // A source's disc for a picture bundled with the game: its path is the
     // name addBundled gave it.

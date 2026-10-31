@@ -37,6 +37,8 @@
 #include "ui/zebra_wall.h"
 #include "settings/latency.h"
 #include "settings/settings.h"
+#include "ui/list_scroll.h"
+#include "ui/text_fit.h"
 #include "ui/locale.h"
 #include "ui/menus.h"
 #include "ui/meta_music.h"
@@ -151,6 +153,8 @@ namespace
         gh2::installLocale(runtime, gh2::kSlus21447);
         gh2::installLatency(runtime, gh2::kSlus21447);
         gh2::installPad(runtime, gh2::kSlus21447);
+        gh2::list_scroll::install(runtime, gh2::kSlus21447);
+        gh2::text_fit::install(gh2::kSlus21447);
         gh2::installFrameStep(runtime, gh2::kSlus21447);
         gh2::installMenus(runtime);
         gh2::installPhotoMode(runtime, gh2::kSlus21447);
