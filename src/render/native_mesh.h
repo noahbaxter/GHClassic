@@ -18,7 +18,8 @@ namespace gh2
     // synced.
     using MeshRider = void (*)(uint8_t *rdram, uint32_t mesh, const MeshData &geometry,
                                std::vector<std::shared_ptr<const MeshData>> &out);
-    void setMeshRider(MeshRider rider);
+    // Each rider added, in turn.
+    void addMeshRider(MeshRider rider);
 
     // A Transform in guest memory: three 16-byte rows, then the position.
     Matrix readTransform(uint8_t *rdram, uint32_t address);
