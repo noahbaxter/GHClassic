@@ -385,6 +385,9 @@ namespace gh2::scenario
                 else if (verb == "hold")
                     // Pad buttons held until the next (hold), libpad bits: (hold 0) lets go.
                     setScriptedPad(static_cast<uint16_t>(array.number(1)));
+                else if (verb == "whammy")
+                    // The whammy held this far down, 0 to 1, until the next (whammy).
+                    setScriptedWhammy(array.number(1));
                 else if (verb == "fly")
                     // The free camera's keys held until the next (fly), right and forward
                     // from -1 to 1, and the mouse moved once, pixels right and down. Then,

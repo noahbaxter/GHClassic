@@ -22,6 +22,9 @@
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
 
+#include <algorithm>
+#include <cmath>
+
 #include <atomic>
 #include <string>
 
@@ -37,6 +40,7 @@ namespace gh2
     {
         std::atomic<uint16_t> s_scripted{0}; // a scenario's presses on P1's port
         std::atomic<uint64_t> s_scriptedAt{0}; // --timing: when a scripted press was set
+        std::atomic<uint8_t> s_scriptedLy{255}; // the left stick's Y a script pushes up to, the whammy
 
         // --timing: a press this read is the first to see, the player's or
         // a script's.
@@ -77,7 +81,8 @@ namespace gh2
                     pressed |= s_scripted.load(std::memory_order_relaxed);
                 }
                 // The stub wants buttons active low.
-                ps2_stubs::setPadOverrideState(static_cast<uint16_t>(~pressed), pad.lx, pad.ly, pad.rx, pad.ry);
+                const uint8_t ly = std::min(pad.ly, s_scriptedLy.load(std::memory_order_relaxed));
+                ps2_stubs::setPadOverrideState(static_cast<uint16_t>(~pressed), pad.lx, ly, pad.rx, pad.ry);
                 ps2_stubs::scePadRead(rdram, ctx, runtime);
             }
             else
@@ -156,6 +161,13 @@ namespace gh2
         EntryHook<GotoScreenTag>::install(runtime, addresses.uiGotoScreen, onGotoScreen);
         runtime.replaceFunction(addresses.scePadRead, padRead);
         runtime.replaceFunction(addresses.scePadInfoAct, padInfoAct);
+    }
+
+    void setScriptedWhammy(float down)
+    {
+        const float d = std::clamp(down, 0.0f, 1.0f);
+        s_scriptedLy.store(d > 0.0f ? static_cast<uint8_t>(std::lround(128.0f * (1.0f - d))) : 255u,
+                           std::memory_order_relaxed);
     }
 
     void setScriptedPad(uint16_t pressed)
