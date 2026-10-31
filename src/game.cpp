@@ -32,6 +32,9 @@
 #include "highway/extended/guitar/open_gems.h"
 #include "highway/extended/guitar/open_bursts.h"
 #include "highway/extended/guitar/open_tails.h"
+#include "highway/extended/guitar/sustain_tails.h"
+#include "highway/extended/guitar/sustain_flames.h"
+#include "gameplay/extended/guitar/sustain_hold.h"
 #include "highway/extended/guitar/tap_gems.h"
 #include "highway/gem_looks.h"
 #include "gh1/install.h"
@@ -136,7 +139,11 @@ namespace
         gh2::installSustainRelease(runtime, gh2::kSlus21447);
         gh2::guitar::installGemKinds(runtime, gh2::kSlus21447);
         gh2::guitar::installHammerOns(runtime, gh2::kSlus21447);
+        // Over hammer_ons' FretButtonUp.
+        gh2::guitar::installSustainHold(runtime, gh2::kSlus21447);
+        gh2::guitar::installSustainFlames(runtime, gh2::kSlus21447);
         gh2::installGemLooks(runtime, gh2::kSlus21447);
+        gh2::guitar::installSustainTails(runtime, gh2::kSlus21447);
         gh2::guitar::installOpenGems(runtime, gh2::kSlus21447);
         gh2::guitar::installOpenTails(runtime, gh2::kSlus21447);
         gh2::guitar::installOpenBursts(runtime, gh2::kSlus21447);

@@ -15,7 +15,10 @@
 
 #include "gameplay/extended/guitar/gem_kinds.h"
 
+#include "gameplay/engine/note_engine.h"
+#include "gameplay/extended/guitar/sustain_hold.h"
 #include "guest.h"
+#include "guest/beatmatch.h"
 #include "guest/data_array.h"
 #include "hook.h"
 #include "script.h"
@@ -78,6 +81,7 @@ namespace gh2::guitar
             s_loadingMidi = midiFile(rdram, GPR_U32(ctx, 6));
             s_loading.reset();
             s_difficultyOf.clear();
+            forgetSustains();
         }
 
         // SongParser::OnGemEnd(int tick, unsigned char pitch), 0x245ee8: a
@@ -117,6 +121,17 @@ namespace gh2::guitar
             // matches it as a chord, by the frets held, none.
             if (gem->open)
                 info.setSlots(0u);
+            // A sustain held past the next gem as long as the chart has it
+            // (gameplay/extended/guitar/sustain_hold.h), where the engine
+            // judging holds one that long: GH2's from 161 ticks (SongParser,
+            // 0x245ff8), GH1's from 121.
+            const uint32_t holds = noteEngine() == NoteEngine::kGh1 ? 121u : 161u;
+            if (gem->sustain >= holds)
+            {
+                info.setMs(gem->sustainMs);
+                info.setTicks(static_cast<int32_t>(gem->sustain));
+                info.setNoSustain(false);
+            }
         }
 
         // GameGemList::WillBeNoStrum(const MultiGemInfo &), 0x24d360, GH1's
@@ -137,26 +152,6 @@ namespace gh2::guitar
             if (decided & kFlip)
                 SET_GPR_U32(ctx, 2, GPR_U32(ctx, 2) ^ 1u);
         }
-
-        // An open HOPO is hit by letting go of the last fret held. GH2 tries
-        // a hammer-on or pull-off (GuitarTrackWatcherImpl::TryToHopo,
-        // 0x24dc20, by way of NonStrumSwing, 0x24d828) for a fret pressed
-        // or one left held, never for none, and matches the gem's frets to
-        // that one alone. So with every fret let go and an open HOPO next,
-        // it is tried as the middle lane's, that gem one fret for the try.
-        //
-        // GuitarTrackWatcherImpl: its gems (+0x04, GameGemList, theirs at
-        // +0x08, 0x10 each), its clock (+0x0c, a virtual at +0x10 its now in
-        // ms) and the frets held (+0x84). GameGem: slots +0x0c, flags +0x0d
-        // (bit 0 HOPO).
-        constexpr uint32_t kWatcherGems = 0x04u, kWatcherClock = 0x0cu, kWatcherHeld = 0x84u;
-        constexpr uint32_t kListGems = 0x08u, kGemSize = 0x10u, kGemSlots = 0x0cu, kGemFlags = 0x0du;
-
-        uint32_t watcherGem(uint8_t *rdram, uint32_t watcher, int32_t index)
-        {
-            return load<uint32_t>(rdram, load<uint32_t>(rdram, watcher + kWatcherGems) + kListGems) +
-                   static_cast<uint32_t>(index) * kGemSize;
-        }
     }
 
     void setGems(const std::string &midi, const std::array<std::map<uint32_t, Gh2Gem>, 4> &gems,
@@ -170,23 +165,56 @@ namespace gh2::guitar
         return s_loading != nullptr;
     }
 
-    bool isTap(uint32_t track, uint32_t tick, uint8_t frets)
+    const Gh2Gem *chartGem(uint32_t track, uint32_t tick, uint8_t frets)
     {
         if (!s_loading)
-            return false;
-        const auto tapAt = [&](int d)
+            return nullptr;
+        const auto at = [&](int d) -> const Gh2Gem *
         {
             const auto it = s_loading->gems[d].find(tick);
             // An open's frets are none once loaded (onAddMultiGem).
-            return it != s_loading->gems[d].end() && it->second.tap &&
-                   (it->second.open ? frets == 0u : it->second.frets == frets);
+            return it != s_loading->gems[d].end() && (it->second.open ? frets == 0u : it->second.frets == frets)
+                       ? &it->second
+                       : nullptr;
         };
         if (const auto known = s_difficultyOf.find(track); known != s_difficultyOf.end())
-            return tapAt(known->second);
+            return at(known->second);
         for (int d = 0; d < 4; ++d)
-            if (tapAt(d))
-                return true;
-        return false;
+            if (const Gh2Gem *gem = at(d))
+                return gem;
+        return nullptr;
+    }
+
+    bool isTap(uint32_t track, uint32_t tick, uint8_t frets)
+    {
+        const Gh2Gem *gem = chartGem(track, tick, frets);
+        return gem && gem->tap;
+    }
+
+    uint32_t watcherGem(uint8_t *rdram, uint32_t watcher, int32_t index)
+    {
+        return guest::TrackWatcherImpl(rdram, watcher).gems()[index].address;
+    }
+
+    const Gh2Gem *watcherChartGem(uint8_t *rdram, uint32_t watcher, int32_t index)
+    {
+        const guest::TrackWatcherImpl view(rdram, watcher);
+        const guest::GameGem gem = view.gems()[index];
+        return chartGem(view.track(), static_cast<uint32_t>(gem.tick()), gem.slots());
+    }
+
+    float watcherNow(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t watcher)
+    {
+        const guest::Object::Virtual getNow = guest::TrackWatcherImpl(rdram, watcher).parent().getNow();
+        runtime->callGuestFunction(rdram, ctx, getNow.function, {getNow.self});
+        return ctx->f[0];
+    }
+
+    int32_t closestUnplayed(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t watcher)
+    {
+        ctx->f[12] = watcherNow(rdram, ctx, runtime, watcher);
+        return static_cast<int32_t>(
+            runtime->callGuestFunction(rdram, ctx, s_addresses->trackWatcherClosestUnplayedGem, {watcher}));
     }
 
     void installGemKinds(PS2Runtime &runtime, const Addresses &addresses)

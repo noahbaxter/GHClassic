@@ -8,12 +8,16 @@
 //
 // What GH2's parser cannot say is given beside it (Gh2Chart::gems), each gem's
 // kind where the chart decides it or flips the engine's, the song's HOPO
-// threshold, and which are opens, for the engine to put in as the gems load
-// (gameplay/extended/guitar/gem_kinds.h). Not yet said at all: a chord holds as
-// long as its longest lane, and a sustain ends where the next gem starts.
+// threshold, which are opens, a sustain held past the next gem, and a chord's
+// lanes ending apart, for the engine to put in as the gems load
+// (gameplay/extended/guitar/gem_kinds.h, sustain_hold.h,
+// highway/extended/guitar/sustain_tails.h); in the MIDI a sustain ends where
+// the next gem starts, and a chord's every lane where its longest does, as
+// GH2's parser wants.
 
 #include "custom/chart.h"
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <map>
@@ -26,8 +30,10 @@ namespace gh2::custom
 
     // A gem as GH2's parser reads it from the MIDI (its frets), and what the
     // parser cannot read: whether it is strummed or hammered on, whether it
-    // is an open, written as kOpenFrets, and whether it is a tap (played as
-    // a HOPO, drawn as a tap).
+    // is an open, written as kOpenFrets, whether it is a tap (played as a
+    // HOPO, drawn as a tap), and a sustain held past the next gem (each lane
+    // to the next gem on that lane), its length in ticks and ms, 0 for one
+    // as the MIDI has it.
     struct Gh2Gem
     {
         uint8_t frets = 0u; // bit 0 green
@@ -38,6 +44,13 @@ namespace gh2::custom
         bool flip = false;
         bool open = false;
         bool tap = false;
+        uint32_t sustain = 0u;
+        float sustainMs = 0.0f;
+        // A chord whose lanes end apart: each lane's sustain in ms, by fret
+        // (0 for one with none); all 0 for a chord held as one.
+        std::array<float, 5> laneMs{};
+
+        bool split() const { return *std::max_element(laneMs.begin(), laneMs.end()) > 0.0f; }
     };
     constexpr uint8_t kOpenFrets = 0x1fu;
 

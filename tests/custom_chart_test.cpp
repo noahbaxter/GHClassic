@@ -250,6 +250,11 @@ namespace
         CHECK(kinds.size() == 8u);
         CHECK(!hopo(0) && hopo(120) && !hopo(240) && !hopo(360) && hopo(960) && hopo(1080) && !hopo(1920));
         CHECK(kinds.count(1920) && kinds.at(1920).frets == 0x5u);
+        // The chord's lanes apart, at 240 a minute from 768: green 500 ms,
+        // yellow 125.
+        CHECK(kinds.count(1920) && kinds.at(1920).split() && kinds.at(1920).laneMs[0] == 500.0f &&
+              kinds.at(1920).laneMs[2] == 125.0f && kinds.at(1920).laneMs[1] == 0.0f);
+        CHECK(kinds.count(0) && !kinds.at(0).split());
         CHECK(kinds.count(1200) && kinds.at(1200).open && kinds.at(1200).frets == kOpenFrets && hopo(1200));
         bool end = false, section = false;
         for (const midi::Event &e : back->tracks[2].events)
@@ -259,6 +264,69 @@ namespace
             section |= e.status == midi::kMeta && text == "[section custom_section_0]";
         }
         CHECK(end && section);
+    }
+
+    // Sustains held past the next gem: green under red and yellow, kept
+    // whole beside the MIDI's, cut where it starts the next; blue cut by the
+    // blue after it, as long as the MIDI's, so none beside it.
+    void heldPastNext()
+    {
+        const std::string text = "[Song]\n{\n  Resolution = 192\n}\n"
+                                 "[SyncTrack]\n{\n  0 = TS 4\n  0 = B 120000\n}\n"
+                                 "[ExpertSingle]\n{\n"
+                                 "  0 = N 0 768\n  192 = N 1 0\n  384 = N 2 0\n"
+                                 "  960 = N 3 768\n  1152 = N 3 0\n"
+                                 "}\n";
+        std::string why;
+        const auto chart = parseChart(text, {}, why);
+        const auto gh2 = chart ? toGh2(*chart, 0.0) : std::nullopt;
+        CHECK(gh2);
+        if (!gh2)
+            return;
+        const auto &gems = gh2->gems[3];
+        CHECK(gems.count(0) && gems.at(0).sustain == 1920u && gems.at(0).sustainMs == 2000.0f);
+        CHECK(gems.count(480) && gems.at(480).sustain == 0u);
+        CHECK(gems.count(2400) && gems.at(2400).sustain == 0u);
+        const auto back = midi::parse(gh2->mid);
+        std::set<uint32_t> greenOff;
+        if (back && back->tracks.size() > 1u)
+            for (const midi::Event &e : back->tracks[1].events)
+                if (midi::kind(e) == midi::kNoteOff && e.data[0] == 96u)
+                    greenOff.insert(e.tick);
+        CHECK(greenOff.count(480u));
+
+        // A chord whose lanes end apart: the longest in the MIDI, each lane
+        // its own beside it.
+        const auto apart = parseChart("[Song]\n{\n  Resolution = 192\n}\n[SyncTrack]\n{\n  0 = B 120000\n}\n"
+                                      "[ExpertSingle]\n{\n  0 = N 0 384\n  0 = N 1 96\n  960 = N 2 0\n}\n",
+                                      {}, why);
+        const auto offsOf = [](const std::optional<Gh2Chart> &c)
+        {
+            std::set<uint32_t> offs;
+            const auto m = c ? midi::parse(c->mid) : std::nullopt;
+            if (m && m->tracks.size() > 1u)
+                for (const midi::Event &e : m->tracks[1].events)
+                    if (midi::kind(e) == midi::kNoteOff && (e.data[0] == 96u || e.data[0] == 97u))
+                        offs.insert(e.tick);
+            return offs;
+        };
+        const auto longest = apart ? toGh2(*apart, 0.0) : std::nullopt;
+        CHECK(longest && offsOf(longest) == std::set<uint32_t>{960u} && longest->gems[3].at(0).split());
+
+        // A sustain held past the last gem: the song ends past it, not past
+        // the last gem (else GH2 tears the track down under the held one).
+        const auto past = parseChart("[Song]\n{\n  Resolution = 192\n}\n[SyncTrack]\n{\n  0 = B 120000\n}\n"
+                                     "[ExpertSingle]\n{\n  0 = N 0 768\n  192 = N 1 0\n}\n",
+                                     {}, why);
+        const auto pastGh2 = past ? toGh2(*past, 0.0) : std::nullopt;
+        const auto pastMid = pastGh2 ? midi::parse(pastGh2->mid) : std::nullopt;
+        uint32_t endAt = 0u;
+        if (pastMid && pastMid->tracks.size() > 2u)
+            for (const midi::Event &e : pastMid->tracks[2].events)
+                if (e.status == midi::kMeta && std::string(e.data.begin(), e.data.end()) == "[end]")
+                    endAt = e.tick;
+        CHECK(pastGh2 && pastGh2->gems[3].count(0) && pastGh2->gems[3].at(0).sustain == 1920u);
+        CHECK(endAt >= 1920u + 960u);
     }
 
     using midi::note;
@@ -878,6 +946,7 @@ int main(int argc, char **argv)
 {
     mixedRates();
     chartTypes();
+    heldPastNext();
     midTypes();
     midMarkers();
     chartEdges();
