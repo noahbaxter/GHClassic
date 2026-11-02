@@ -84,6 +84,10 @@ namespace gh2
     // bits, and raw buttons by number. Callable from any thread.
     void addScriptedDevice(const std::string &name);
     void removeScriptedDevice(const std::string &name); // unplugged
+    // A scenario's menu binding, as a line of [menu keyboard] or
+    // [menu gamepad] has it ("key F", "pad y, pad b"), for this run alone.
+    // Callable from any thread; the next poll sets it.
+    void bindScriptedMenu(bool keyboard, const std::string &action, const std::string &sources);
     void setScriptedDevice(const std::string &name, uint16_t pressed, const std::vector<int> &buttons = {});
     // A scenario's controller plugged into SDL as a real one shows up: a
     // virtual joystick with that USB vendor and product and SDL joystick

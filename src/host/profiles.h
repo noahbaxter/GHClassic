@@ -23,6 +23,11 @@ namespace gh2::input
     // strum on the D-pad, star power on Back or D-pad left, whammy on the left
     // trigger (as YARG's CRKD layouts have it).
     Profile guitarOnGamepad();
+    // What a menu reads with nothing in input.ini's [menu keyboard] or
+    // [menu gamepad] (menu_layer.h): the keyboard's Enter, Space, Esc, Tab, 3
+    // 4 5 and Shift, a gamepad's A B Y X LB, Start, Back and D-pad.
+    Profile keyboardMenuProfile();
+    Profile gamepadMenuProfile();
 
     // What a controller's layout is chosen by.
     struct DeviceInfo

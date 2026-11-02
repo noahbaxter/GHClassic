@@ -1,0 +1,14 @@
+; The same for the keyboard's Down: held 1 s on Video Settings' eight rows
+; it goes several rows on, where one press is one.
+#include common/first_boot.dta
+(key Down)
+(expect {seat_has 0 keyboard} 1)
+{ui goto_screen video_settings_screen}
+(wait_screen video_settings_screen)
+(wait 1.5)
+(expect {video_settings_screen focus_name} widescreen.btn)
+(key Down 1.0)
+(wait 1)
+(print key_held {video_settings_screen focus_name})
+(expect {|| {== {video_settings_screen focus_name} widescreen.btn} {== {video_settings_screen focus_name} vs_vfont.btn}} 0)
+(quit)

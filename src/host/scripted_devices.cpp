@@ -72,6 +72,14 @@ namespace gh2::input
         // Its keys, down until let go.
         std::array<bool, SDL_SCANCODE_COUNT> s_keys{};
         bool s_keysHeld = false;
+        // Its menu bindings not yet set: keyboard's or gamepads', action,
+        // controls.
+        struct MenuLine
+        {
+            bool keyboard;
+            std::string action, sources;
+        };
+        std::vector<MenuLine> s_menuLines;
 
         // Its controls as `controls` hold them, the rest at rest.
         void hold(SDL_Joystick *joystick, const Virtual &v)
@@ -199,6 +207,26 @@ namespace gh2::input
     void syncScriptedDevices()
     {
         std::lock_guard<std::mutex> lock(s_mutex);
+        for (const MenuLine &line : s_menuLines)
+        {
+            int action = 0;
+            while (action < kActionCount && line.action != kActions[action].name)
+                ++action;
+            std::vector<Source> sources;
+            size_t from = 0;
+            while (action < kActionCount && from < line.sources.size())
+            {
+                const size_t comma = std::min(line.sources.find(',', from), line.sources.size());
+                if (const auto s = parseSource(line.sources.substr(from, comma - from)))
+                    sources.push_back(*s);
+                from = comma + 1;
+            }
+            if (action < kActionCount)
+                setMenuBinding(line.keyboard, static_cast<Action>(action), sources);
+            else
+                std::cerr << "[input] scenario menu binding: no action " << line.action << std::endl;
+        }
+        s_menuLines.clear();
         std::erase_if(devices(), [&](const Device &d) {
             return d.id.backend == DeviceId::kScripted &&
                    std::none_of(s_scripted.begin(), s_scripted.end(),
@@ -251,6 +279,12 @@ namespace gh2
                 return;
         s_scripted.push_back(
             {name, name.find("pad") != std::string::npos ? DeviceKind::kGamepad : DeviceKind::kGuitar, scriptedRest()});
+    }
+
+    void bindScriptedMenu(bool keyboard, const std::string &action, const std::string &sources)
+    {
+        std::lock_guard<std::mutex> lock(s_mutex);
+        s_menuLines.push_back({keyboard, action, sources});
     }
 
     void removeScriptedDevice(const std::string &name)

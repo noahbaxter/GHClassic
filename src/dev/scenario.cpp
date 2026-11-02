@@ -282,10 +282,17 @@ namespace gh2::scenario
                     s_heldKeys.clear();
                     for (int k = 1; k < array.size(); ++k)
                     {
-                        // A digit's key reads as its number.
-                        const std::string name = array.symbol(k).empty()
-                                                     ? std::to_string(static_cast<int>(array.number(k)))
-                                                     : array.symbol(k);
+                        // A digit's key reads as its number, and a name with a
+                        // space ("Right Shift") as a string.
+                        std::string name = array.symbol(k);
+                        if (name.empty())
+                        {
+                            name = text(rdram, array.arg(k));
+                            char *end = nullptr;
+                            const double number = std::strtod(name.c_str(), &end);
+                            if (end != name.c_str() && *end == '\0')
+                                name = std::to_string(static_cast<int>(number));
+                        }
                         const int key = SDL_GetScancodeFromName(name.c_str());
                         if (key == SDL_SCANCODE_UNKNOWN)
                         {
@@ -423,6 +430,11 @@ namespace gh2::scenario
                     // A controller that is not there, by name; its presses go
                     // through the seat rules. Read from the file at boot too.
                     addScriptedDevice(array.symbol(1));
+                else if (verb == "menu_bind")
+                    // (menu_bind keyboard|gamepad <action> "<controls>"): a
+                    // line of input.ini's [menu keyboard] or [menu gamepad],
+                    // for this run alone.
+                    bindScriptedMenu(array.symbol(1) == "keyboard", array.symbol(2), text(rdram, array.arg(3)));
                 else if (verb == "controller")
                 {
                     // One plugged into SDL as a real one is: "vendor:product"

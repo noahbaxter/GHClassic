@@ -31,6 +31,14 @@ namespace gh2::input
     // device plays as, `detected` unless the line says otherwise.
     std::string sectionMode(const std::string &sdlName, const std::string &guid);
     DeviceKind kindOf(const std::string &sdlName, const std::string &guid, DeviceKind detected);
+    // What a menu reads: [menu keyboard] or [menu gamepad] over the fixed
+    // controls (menu_layer.h), the keyboard's keys only and a gamepad's
+    // controls only; tilt and whammy move nothing. A line with none of its
+    // kind keeps the default, as an empty one unbinds.
+    const Profile &menuLayout(bool keyboard);
+    Profile menuWith(bool keyboard, const Section *own);
+    // One action of it set for this run alone, a scenario's.
+    void setMenuBinding(bool keyboard, Action action, const std::vector<Source> &sources);
     // A device input.ini has no section for gets one, its built-in layout
     // as comments, so the file shows what there is to change.
     void listInFile(const std::string &sdlName, const std::string &guid, const Profile &builtin);

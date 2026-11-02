@@ -1,0 +1,15 @@
+; One menu screen in $walk, left by the keyboard's Escape and, on a second
+; visit, by a gamepad's B (pad). Needs a gamepad "pad" seated as P1, and says
+; which screen it is on in the log.
+(print walk $walk)
+{ui goto_screen $walk}
+(wait_until {== {{ui current_screen} name} $walk} 15)
+(wait 1.5)
+(shot $walk)
+(key Escape)
+(wait_until {!= {{ui current_screen} name} $walk} 10)
+{ui goto_screen $walk}
+(wait_until {== {{ui current_screen} name} $walk} 15)
+(wait 1.5)
+(press b pad)
+(wait_until {!= {{ui current_screen} name} $walk} 10)
