@@ -8,7 +8,7 @@
 ; A screen with this among its panels sends its presses here first
 ; ({ghc_pick_button}), opens it on yellow ({ghc_pick_panel open_with}), and
 ; is told the pick, where it is not the one the list opened on:
-; (ghc_picked ($option)).
+; (ghc_picked ($option)). Which fret is which is config/menus.toml's.
 ;
 ; Opened with open_held it is held on another fret instead, shows only once
 ; that has been held a moment, and names its rows, takes the pick and takes
@@ -45,7 +45,7 @@
       ; open_held's: the fret held, whether the screen names the rows, its
       ; messages for a row's text, the pick and a tap (none for none),
       ; whether it shows yet, and the polls it waits to.
-      (held yellow)
+      (held fret3)
       (labelled FALSE)
       (text_msg ghc_option_text)
       (picked_msg ghc_picked)
@@ -245,7 +245,7 @@
          {foreach $box [boxes] {ghc_box_show $this {elem $box 0} FALSE}}
          {set [open] FALSE}
          {set [sticky] FALSE}
-         {set [held] yellow}
+         {set [held] {ghc_held pick}}
          {set [labelled] FALSE}
          {set [text_msg] ghc_option_text}
          {set [picked_msg] ghc_picked}
@@ -340,7 +340,7 @@
                   {{ui current_screen} ghc_chose
                      {elem {ghc_pick_panel get options} {ghc_pick_panel get picked}}}
                )
-               ({|| {== $button kPad_Select} {== $button kPad_Tri}}
+               ({|| {ghc_pressed $button menu} {== $button kPad_Tri}}
                   {ghc_back}
                   {ghc_pick_panel shut}
                )

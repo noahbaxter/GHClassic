@@ -1609,12 +1609,10 @@
                {if_else {== [picking] {elem $row 2}} kFocused kNormal}}
          }
       }
-      {helpbar set_display
-         {cond
-            ({!= [picking] none} ((fret1 help_confirm) (fret2 help_cancel) (strum help_updown)))
-            ({$this lists [at]} ((fret1 help_select) (fret2 help_back) (strum help_updown)))
-            (TRUE ((fret1 help_onoff) (fret2 help_back) (strum help_updown)))
-         }
+      {cond
+         ({!= [picking] none} {ghc_helpbar help_confirm help_cancel {array 0} help_updown})
+         ({$this lists [at]} {ghc_helpbar help_select help_back {array 0} help_updown})
+         (TRUE {ghc_helpbar help_onoff help_back {array 0} help_updown})
       }
    )
    ; A row with a list of values for a box: green picks it, the strum goes
@@ -2084,16 +2082,14 @@
          {gm_unlock.btn set text_token {if_else {campaigns unlock_all} "UNLOCK ALL ON" "UNLOCK ALL OFF"}}
       }
       {$this sync_rows}
-      {helpbar set_display
-         {if_else {$this slider_selected}
-            ((fret1 help_confirm) (fret2 help_cancel) (fret3 help_reset) (strum help_updown))
-            {if_else {$this on_slider}
-               ((fret1 help_select) (fret2 help_back) (fret3 help_reset) (strum help_updown))
-               {if_else {|| {== [at] "gm_lag.btn"} {== [at] "gm_engine.btn"} {== [at] "gm_unlock.btn"}}
-                  ((fret1 help_select) (fret2 help_back) (strum help_updown))
-                  ((fret1 help_onoff) (fret2 help_back) (strum help_updown))
-               }
-            }
+      {do
+         ($actions {array 0})
+         {ghc_act $actions {|| {$this slider_selected} {$this on_slider}} reset help_reset}
+         {cond
+            ({$this slider_selected} {ghc_helpbar help_confirm help_cancel $actions help_updown})
+            ({|| {$this on_slider} {== [at] "gm_lag.btn"} {== [at] "gm_engine.btn"} {== [at] "gm_unlock.btn"}}
+               {ghc_helpbar help_select help_back $actions help_updown})
+            (TRUE {ghc_helpbar help_onoff help_back $actions help_updown})
          }
       }
    )
@@ -2278,7 +2274,7 @@
       }
    )
    (BUTTON_DOWN_MSG
-      {if_else {&& {== $button kPad_Circle} {$this on_slider}}
+      {if_else {&& {ghc_pressed $button reset} {$this on_slider}}
          {do
             ; The game's own: the length's is 110, its twelfth stop past 50.
             {cond

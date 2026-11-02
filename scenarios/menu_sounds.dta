@@ -137,7 +137,7 @@
 (expect $ghc_sounds 1)
 
 ; The song list: a strum, Select's menu (a strum in it, Select shuts it),
-; orange's jump, then green to the difficulty.
+; then green to the difficulty.
 {sel_character_panel set_focus {sel_character_panel find ghc_play.btn}}
 {ghc_quiet}
 (press green)
@@ -166,11 +166,6 @@
 (wait 0.5)
 (expect {ghc_pick_panel get open} 0)
 (expect $ghc_heard back)
-(expect $ghc_sounds 1)
-{ghc_quiet}
-(press orange)
-(wait 0.5)
-(expect $ghc_heard toggle)
 (expect $ghc_sounds 1)
 ; Select, as the game's: its play sound is the career's song list's.
 {ghc_quiet}

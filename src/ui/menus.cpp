@@ -31,6 +31,7 @@ namespace gh2
         // The menus' rules (config/menus.toml), then what applies them.
         script::patchUi(kMenuRulesDta);
         script::patchUi(kSfxDta);
+        script::patchUi(kFretsDta);
         script::patchUi(kPickerDta);
         // Before the screens that hold its panel (ui/players.h).
         script::patchUi(kProfilesDta);

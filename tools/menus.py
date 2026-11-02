@@ -6,14 +6,15 @@
 CMake runs this when the build configures, and src/ui/dta/shared/ reads what
 it writes: the menus' rules are kept in the TOML, the code that applies them
 in the shared scripts, and a screen in its own file. Anything the TOML gets
-wrong (a key missing or unknown, a name the scripts can't read) stops the
-build with where it is.
+wrong (a key missing or unknown, a fret that is not one) stops the build with
+where it is.
 """
 
 import re
 import sys
 import tomllib
 
+SLOTS = {"fret1", "fret2", "fret3", "fret4", "fret5", "select", "start"}
 NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_.]*$")
 PAD = re.compile(r"^kPad_[A-Za-z0-9]+$")
 SOUNDS = {
@@ -43,6 +44,19 @@ def name(value, where, pattern=NAME):
     return value
 
 
+def frets(table):
+    if not isinstance(table, dict) or not table:
+        raise Bad("frets: a table of actions")
+    rows = []
+    for action, slot in table.items():
+        where = f"frets.{action}"
+        name(action, where)
+        if slot not in SLOTS:
+            raise Bad(f"{where}: {slot!r}; one of {', '.join(sorted(SLOTS))}")
+        rows.append(f"({action} {slot})")
+    return [f"{{set $ghc_frets ({' '.join(rows)})}}"]
+
+
 def sounds(table):
     keys(table, "sounds", set(SOUNDS))
     lines = []
@@ -63,8 +77,9 @@ def sounds(table):
 def main(src, out):
     with open(src, "rb") as f:
         data = tomllib.load(f)
-    keys(data, "menus", {"sounds"})
+    keys(data, "menus", {"frets", "sounds"})
     lines = [f"; Made by tools/menus.py from {src}: change that, not this."]
+    lines += frets(data["frets"])
     lines += sounds(data["sounds"])
     with open(out, "w", newline="\n") as f:
         f.write("\n".join(lines) + "\n")

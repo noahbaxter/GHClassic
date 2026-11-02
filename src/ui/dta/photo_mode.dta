@@ -350,20 +350,21 @@
       ; away, and no list while the camera is free.
       (sync
          {helpbar set_showing {! [clean]}}
-         {helpbar set_display
+         {do
+            ($actions {array 0})
+            {ghc_act $actions TRUE hide ghc_photo_hide}
             {if_else {world free_cam_active}
-               ((fret1 ghc_photo_shots) (fret2 help_back) (fret5 ghc_photo_hide))
-               ((fret1 ghc_photo_fly) (fret2 help_back) (fret5 ghc_photo_hide) (strum ghc_photo_step))
+               {ghc_helpbar ghc_photo_shots help_back $actions none}
+               {ghc_helpbar ghc_photo_fly help_back $actions ghc_photo_step}
             }
          }
          {photo_panel list {&& {! [clean]} {! {world free_cam_active}}} [shots] [at] [was]}
       )
-      ; The UI gets blue and orange both as kPad_Square.
       (BUTTON_DOWN_MSG
          {cond
             ({== $button kPad_Tri} {ghc_back} {ui goto_screen pause_screen})
             ({== $button kPad_X} {ghc_select} {$this fly {! {world free_cam_active}}})
-            ({&& {== $button kPad_Square} {pad_held orange}}
+            ({ghc_pressed $button hide}
                {ghc_toggle}
                {set [clean] {! [clean]}}
                {$this sync}

@@ -803,7 +803,7 @@
                }
                TRUE
             )
-            ({&& {== $button kPad_Start} {! {ui in_transition}}}
+            ({ghc_pressed $button profile}
                {if {! {$this join}} {$this open $player}}
                TRUE
             )
@@ -1077,17 +1077,10 @@
       (help
          {do
             ($row {chooseprof_panel get button_idx})
-            ($array)
-            {set $array ()}
-            {resize $array 0}
-            {push_back $array (fret1 help_select)}
-            {push_back $array (fret2 help_back)}
-            {if {ghc_profile named $row}
-               {push_back $array (fret3 ghc_rename)}
-               {if {< {ghc_profile seat_of $row} 0} {push_back $array (fret4 ghc_delete)}}
-            }
-            {push_back $array (strum help_updown)}
-            {helpbar set_display $array}
+            ($actions {array 0})
+            {ghc_act $actions {ghc_profile named $row} rename ghc_rename}
+            {ghc_act $actions {&& {ghc_profile named $row} {< {ghc_profile seat_of $row} 0}} delete ghc_delete}
+            {ghc_helpbar help_select help_back $actions help_updown}
          }
       )
       ; After the panel's own, which keeps the row.
@@ -1131,13 +1124,13 @@
                   {ui goto_screen [back_screen]}
                   kDataUnhandled
                )
-               ({&& $named {== $button kPad_Circle}}
+               ({&& $named {ghc_pressed $button rename}}
                   {ghc_select}
                   {ghc_nameprofile_screen set row $row}
                   {ui goto_screen ghc_nameprofile_screen}
                   TRUE
                )
-               ({&& $idle {== $button kPad_Square}}
+               ({&& $idle {ghc_pressed $button delete}}
                   {ghc_select}
                   {ghc_delete_screen ask profile $row {ghc_profile name_of $row} $this}
                   TRUE

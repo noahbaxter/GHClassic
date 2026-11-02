@@ -582,6 +582,7 @@ endif()
 file(READ "${GHC_DTA_DIR}/menu_rules.dta" GHC_MENU_RULES_DTA)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS config/menus.toml tools/menus.py)
 file(READ src/ui/dta/shared/sfx.dta GHC_SFX_DTA)
+file(READ src/ui/dta/shared/frets.dta GHC_FRETS_DTA)
 file(READ src/ui/dta/shared/picker.dta GHC_PICKER_DTA)
 file(READ src/ui/dta/quickplay_pickers.dta GHC_QUICKPLAY_PICKERS_DTA)
 file(READ src/ui/dta/quickplay_setup.dta GHC_QUICKPLAY_SETUP_DTA)
@@ -589,7 +590,7 @@ file(READ src/ui/dta/multiplayer.dta GHC_MULTIPLAYER_DTA)
 file(READ src/ui/dta/preshow_guitarist.dta GHC_PRESHOW_GUITARIST_DTA)
 file(READ src/ui/dta/in_song.dta GHC_IN_SONG_DTA)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-    src/ui/dta/shared/sfx.dta src/ui/dta/shared/picker.dta src/ui/dta/shared/box.dta
+    src/ui/dta/shared/sfx.dta src/ui/dta/shared/frets.dta src/ui/dta/shared/picker.dta src/ui/dta/shared/box.dta
     src/ui/dta/lag_panel.dta src/ui/dta/highscore_panel.dta src/ui/dta/main_menu.dta src/ui/dta/fast_boot.dta
     src/ui/dta/locale.dta src/ui/dta/crowd.dta src/ui/dta/sel_character.dta src/ui/dta/quickplay.dta
     src/ui/dta/campaigns.dta src/gh1/menus.dta src/gh1/scripts.dta src/ui/dta/quickplay_pickers.dta

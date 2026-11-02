@@ -1,7 +1,22 @@
-# The menus' rules, each a list kept here once: the sound each press makes.
-# Screens never restate them. tools/menus.py checks this file and writes it
-# out for the game's scripts when the build configures (src/ui/dta/shared/
-# reads it).
+# The menus' rules, each a list kept here once: what each fret does past
+# green, red and the strum, and the sound each press makes. Screens never
+# restate them. tools/menus.py checks this file and writes it out for the
+# game's scripts when the build configures (src/ui/dta/shared/ reads it).
+
+# The fret for each thing a screen adds, by where it is on the neck (fret1
+# to fret5, green's end first, or select or start), never its colour: the
+# help bar and the held checks both go by place. Two actions may share a
+# fret where no screen has both.
+[frets]
+pick = "fret3"    # held, a list to pick another from; tapped, the next
+view = "fret4"    # how it shows: PS2 or 360 models, custom songs' sort
+jump = "fret5"    # to a section
+reset = "fret3"   # a value back to its default
+hide = "fret5"    # photo mode's help bar and list put away
+menu = "select"   # the screen's menu, open until pressed again
+profile = "start" # a seated player's menu, or another controller joining
+rename = "fret3"  # a profile or band, on its list
+delete = "fret4"  # a profile or band, on its list
 
 # Menu sounds, keyed on the press: green selects, red backs out, a strum
 # toggles, and a focus or scroll sounds only after a strum. The rest is the

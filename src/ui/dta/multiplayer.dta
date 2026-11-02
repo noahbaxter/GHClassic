@@ -402,21 +402,10 @@
 ; label where either player has one: both looks, as the pickers show them.
 {func ghc_multi_hd_bar ($any $h0 $h1)
    {do
-      ($array)
-      {set $array ()}
-      {resize $array 0}
-      {push_back $array (fret1 help_continue)}
-      {push_back $array (fret2 help_back)}
-      {if $any
-         {push_back $array
-            {if_else $h0
-               {if_else $h1 (fret4 ghc_hd_hd) (fret4 ghc_hd_sd)}
-               {if_else $h1 (fret4 ghc_sd_hd) (fret4 ghc_sd_sd)}
-            }
-         }
-      }
-      {push_back $array (strum help_updown)}
-      {helpbar set_display $array}
+      ($actions {array 0})
+      {ghc_act $actions $any view
+         {if_else $h0 {if_else $h1 ghc_hd_hd ghc_hd_sd} {if_else $h1 ghc_sd_hd ghc_sd_sd}}}
+      {ghc_helpbar help_continue help_back $actions help_updown}
    }
 }
 ; Put up when it is not what is up: nothing changes of itself, and the
@@ -457,7 +446,7 @@
 ; both hear it. Turns that player's look where they have one the 360 has.
 {func ghc_multi_char_blue ($player $button)
    {cond
-      ({|| {!= $button kPad_Square} {elem $ghc_multi_blue $player} {ui in_transition}} kDataUnhandled)
+      ({|| {! {ghc_pressed $button view}} {elem $ghc_multi_blue $player}} kDataUnhandled)
       ({! {ghc_multi_has_chars $player}} kDataUnhandled)
       (TRUE
          {set_elem $ghc_multi_blue $player TRUE}
@@ -473,7 +462,7 @@
 }
 {func ghc_multi_guitar_blue ($player $button)
    {cond
-      ({|| {!= $button kPad_Square} {elem $ghc_multi_blue $player} {ui in_transition}} kDataUnhandled)
+      ({|| {! {ghc_pressed $button view}} {elem $ghc_multi_blue $player}} kDataUnhandled)
       ({! {ghc_multi_has_guitar $player}} kDataUnhandled)
       (TRUE
          {set_elem $ghc_multi_blue $player TRUE}
@@ -535,14 +524,9 @@
 ; part whatever quickplay's instrument.
 {func ghc_multi_selsong_helpbar
    {do
-      ($array)
-      {set $array ()}
-      {resize $array 0}
-      {push_back $array (fret1 help_continue)}
-      {push_back $array (fret2 help_back)}
-      {if {> {size {ghc_setlists}} 1} {push_back $array (fret3 ghc_setlist)}}
-      {push_back $array (strum help_updown)}
-      {helpbar set_display $array}
+      ($actions {array 0})
+      {ghc_act $actions {> {size {ghc_setlists}} 1} pick ghc_setlist}
+      {ghc_helpbar help_continue help_back $actions help_updown}
    }
 }
 {func ghc_multi_selsong_button ($button)
@@ -554,12 +538,12 @@
          {ui goto_screen {ghc_multi_screen venue}}
          TRUE
       )
-      ({&& {== $button kPad_Circle} {> {size {ghc_setlists}} 1} {! {ui in_transition}}}
+      ({&& {ghc_pressed $button pick} {> {size {ghc_setlists}} 1}}
          {ghc_pick_panel open_with {ghc_setlists} {setlist shown}}
          TRUE
       )
       ; Select's menu, quickplay's speed (quickplay.dta).
-      ({&& {== $button kPad_Select} {! {ui in_transition}}}
+      ({ghc_pressed $button menu}
          {ghc_select}
          {ghc_pick_panel open_sticky (speed) speed}
          TRUE
