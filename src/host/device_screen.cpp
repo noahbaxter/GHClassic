@@ -72,8 +72,12 @@ namespace gh2::input
             for (Device &same : devices())
                 if (same.sectionName == name && same.sectionGuid == guid)
                 {
-                    same.profile = overlay(same.builtin, sectionOf(name, guid));
                     same.kind = kindOf(name, guid, same.detected);
+                    // A gamepad's layout follows its mode.
+                    if (same.joystick)
+                        if (const auto layout = builtinProfile(deviceInfo(same.joystick, same.gamepad), same.kind))
+                            same.builtin = layout->profile;
+                    same.profile = overlay(same.builtin, sectionOf(name, guid));
                 }
         }
 

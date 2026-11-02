@@ -1,0 +1,37 @@
+; A gamepad set to guitar mode plays by a guitar's layout, not the
+; DualShock's (YARG's CRKD guitar layout): as a pad its left trigger is green,
+; as a guitar it is the whammy bar, A is green, and star power is Back or
+; D-pad left.
+#include common/first_boot.dta
+(controller pad "045e:028e" pad)
+(wait 0.5)
+(press dpdown pad)
+(expect {seat_has 0 pad} 1)
+{ui goto_screen ghc_controllers_screen}
+(wait_screen ghc_controllers_screen)
+(wait 1)
+(hold pad lefttrigger+)
+(wait 0.3)
+(expect {ghc_controllers held green} 1 0.01)
+(expect {ghc_controllers held whammy} 0 0.01)
+(hold pad)
+(wait 0.3)
+(key Up)
+(key Up)
+(expect {ghc_controllers text row {ghc_controllers focus}} MODE)
+(key Return)
+(wait 0.5)
+(expect {ghc_controllers text read {ghc_controllers focus}} GUITAR)
+(hold pad lefttrigger+)
+(wait 0.3)
+(expect {ghc_controllers held whammy} 1 0.01)
+(expect {ghc_controllers held green} 0 0.01)
+(hold pad a)
+(wait 0.3)
+(expect {ghc_controllers held green} 1 0.01)
+(hold pad dpleft)
+(wait 0.3)
+(expect {ghc_controllers held star_power} 1 0.01)
+(shot gamepad_guitar)
+(hold pad)
+(quit)

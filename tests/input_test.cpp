@@ -85,6 +85,31 @@ int main()
     CHECK(label(device(0x1209, 0x2882, SDL_JOYSTICK_TYPE_GUITAR, SDL_GAMEPAD_TYPE_PS3)) == "guitar");
     CHECK(label(device(0x045e, 0x028e)) == "gamepad, GH2's joypad layout");
     CHECK(builtinProfile(device(0x045e, 0x028e))->gamepad);
+    // A guitar SDL takes for a pad is a guitar by its name (GitHub #3).
+    DeviceInfo lesPaul = device(0x3285, 0x0001, SDL_JOYSTICK_TYPE_GAMEPAD, SDL_GAMEPAD_TYPE_XBOX360);
+    lesPaul.name = "CRKD Les Paul Encore Edition";
+    CHECK(label(lesPaul) == "guitar (XInput)");
+    CHECK(!builtinProfile(lesPaul)->gamepad);
+    // Its frets are A B Y X LB, whammy the left trigger, star power Back or
+    // D-pad left (YARG's CRKD layouts).
+    CHECK(binds(lesPaul, kGreen, "pad a"));
+    CHECK(binds(lesPaul, kOrange, "pad leftshoulder"));
+    CHECK(binds(lesPaul, kWhammy, "pad axis lefttrigger 0.00 1.00"));
+    CHECK(binds(lesPaul, kStarPower, "pad back"));
+    CHECK(binds(lesPaul, kStarPower, "pad dpleft"));
+    CHECK(formatSource(guitarOnGamepad()[kStrumUp].front()) == "pad dpup");
+    // A joystick with no gamepad layout stays unbound, named or not.
+    DeviceInfo namedJoystick = lesPaul;
+    namedJoystick.gamepad = false;
+    CHECK(!builtinProfile(namedJoystick));
+    DeviceInfo pad = device(0x045e, 0x028e, SDL_JOYSTICK_TYPE_GAMEPAD, SDL_GAMEPAD_TYPE_XBOX360);
+    pad.name = "Xbox 360 Controller";
+    CHECK(builtinProfile(pad)->gamepad);
+    // A gamepad set to guitar plays by a guitar's layout, set to pad by its
+    // own, and a guitar is its own either way.
+    CHECK(builtinProfile(pad, DeviceKind::kGuitar)->profile[kWhammy].front().index == SDL_GAMEPAD_AXIS_LEFT_TRIGGER);
+    CHECK(builtinProfile(pad, DeviceKind::kGamepad)->profile[kWhammy].front().index == SDL_GAMEPAD_AXIS_LEFTY);
+    CHECK(builtinProfile(xplorer, DeviceKind::kGuitar)->label == "Xbox 360 Guitar Hero guitar");
     CHECK(!builtinProfile(device(0x12ba, 0x074b, SDL_JOYSTICK_TYPE_GUITAR)));
     DeviceInfo joystick = device(0x1234, 0x5678);
     joystick.gamepad = false;
