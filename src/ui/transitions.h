@@ -16,6 +16,10 @@
 // Which changes turn is the game's own but for config/menus.toml's
 // [transitions]: a screen named still never turns, nor two in one room
 // between each other.
+//
+// No screen holds its input meanwhile beyond its turn: a component's
+// animation (the store's grate, 1.2 s) plays on without holding it, and a
+// press left to the UI selects at the next poll, not a third of a second on.
 
 #include "addresses.h"
 

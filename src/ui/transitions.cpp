@@ -20,6 +20,10 @@ namespace gh2::transitions
         // GHScreen's: whether its Enter and Exit turn the camera, as
         // CheckAnimateTransition sets it.
         constexpr uint32_t kAnimate = 0x4cu;
+        // UITrigger's: block_transition, and the UI second its animation ends
+        // (Trigger, 0x21b3b8: its frames over 30 a second from the trigger).
+        constexpr uint32_t kBlocks = 0x150u;
+        constexpr uint32_t kBlockEnd = 0x154u;
 
         const Addresses *s_addresses = nullptr;
         // The screen the one entering came from, or the one exiting goes to.
@@ -85,6 +89,30 @@ namespace gh2::transitions
             return true;
         }
 
+        // UITrigger::IsBlocking: what PanelDir::Entering and Exiting
+        // (0x210720, 0x2107a0) ask of each component, holding a screen and
+        // its input while one's animation plays, the store's grate 1.2 s.
+        // The animation plays on; only the hold goes.
+        struct BlockingTag;
+        void onIsBlocking(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
+        {
+            const uint32_t trigger = GPR_U32(ctx, 4);
+            if (load<uint32_t>(rdram, trigger + kBlocks) != 0u)
+                store<float>(rdram, trigger + kBlockEnd, 0.0f);
+        }
+
+        // UIComponent::SendSelect: a press its screen leaves unhandled puts
+        // the component in kSelecting for the UI's select_frames polls (GH2's
+        // 10, a third of a second; ui/gen/ui_objects.dta, read once by
+        // UIComponent::Init into 0x473228), every press on its panel lost
+        // till Poll (0x20d550) counts it down and sends the select. One poll
+        // here: the next press is taken at once. Not 0, which Poll never
+        // counts down from.
+        struct SelectTag;
+        void onSendSelect(uint8_t *rdram, R5900Context *, PS2Runtime *)
+        {
+            store<uint32_t>(rdram, s_addresses->uiSelectFrames, 1u);
+        }
     }
 
     void install(PS2Runtime &runtime, const Addresses &addresses)
@@ -93,5 +121,7 @@ namespace gh2::transitions
         EntryHook<EnterTag>::install(runtime, addresses.ghScreenEnter, onEnter);
         EntryHook<ExitTag>::install(runtime, addresses.ghScreenExit, onExit);
         Override<CheckTag>::install(runtime, addresses.ghScreenCheckAnimateTransition, check);
+        EntryHook<BlockingTag>::install(runtime, addresses.uiTriggerIsBlocking, onIsBlocking);
+        EntryHook<SelectTag>::install(runtime, addresses.uiComponentSendSelect, onSendSelect);
     }
 }

@@ -222,6 +222,10 @@ namespace gh2
         uint32_t ghScreenExit;                   // GHScreen::Exit(UIScreen *to)
         uint32_t ghScreenCheckAnimateTransition; // GHScreen::CheckAnimateTransition
         uint32_t ghScreenForwards;               // bool: the turn on, not back
+        // What holds a screen's input (ui/transitions.h).
+        uint32_t uiTriggerIsBlocking;   // UITrigger::IsBlocking
+        uint32_t uiComponentSendSelect; // UIComponent::SendSelect(JoypadButton, int)
+        uint32_t uiSelectFrames;        // int: UIComponent's select_frames
         uint32_t uiManagerPoll;
         uint32_t debugModal; // DebugModal(bool &, char *)
         uint32_t abort;
@@ -612,6 +616,9 @@ namespace gh2
         .ghScreenExit = 0x145f80u,
         .ghScreenCheckAnimateTransition = 0x145dc8u,
         .ghScreenForwards = 0x3da34cu,
+        .uiTriggerIsBlocking = 0x21b2a0u,
+        .uiComponentSendSelect = 0x20d748u,
+        .uiSelectFrames = 0x473228u,
         .uiManagerPoll = 0x214510u,
         .debugModal = 0x105a88u,
         .abort = 0x307b80u,
