@@ -231,7 +231,7 @@
          {set [picked] {mod {'+' {'+' [picked] $by} {size [options]}} {size [options]}}}
          {if {< [picked] [top]} {set [top] [picked]}}
          {if {>= [picked] {'+' [top] {$this visible}}} {set [top] {'+' {'-' [picked] {$this visible}} 1}}}
-         {synth play_sequence button_focus}
+         {ghc_toggle}
          {if_else [shown] {do {$this fill} {$this paint}} {$this reveal}}
       )
       (shut
@@ -311,17 +311,17 @@
             {cond
                ({|| {== $button kPad_DUp} {== $button kPad_DDown}}
                   {ghc_option_step $editing {if_else {== $button kPad_DUp} 1 -1}}
-                  {synth play_sequence button_toggle}
+                  {ghc_toggle}
                   {ghc_pick_panel relabel}
                )
                ({== $button kPad_X}
                   {ghc_option_end $editing TRUE}
-                  {synth play_sequence button_select}
+                  {ghc_select}
                   {ghc_pick_edit FALSE}
                )
                ({|| {== $button kPad_Tri} {== $button kPad_Select}}
                   {ghc_option_end $editing FALSE}
-                  {synth play_sequence button_back.cue}
+                  {ghc_back}
                   {ghc_pick_edit FALSE}
                )
             }
@@ -333,7 +333,7 @@
          {if {&& {ghc_pick_panel get sticky} {! $editing}}
             {cond
                ({&& {== $button kPad_X} {ghc_option_edits {elem {ghc_pick_panel get options} {ghc_pick_panel get picked}}}}
-                  {synth play_sequence button_select}
+                  {ghc_select}
                   {ghc_pick_edit {elem {ghc_pick_panel get options} {ghc_pick_panel get picked}}}
                )
                ({== $button kPad_X}
@@ -341,7 +341,7 @@
                      {elem {ghc_pick_panel get options} {ghc_pick_panel get picked}}}
                )
                ({|| {== $button kPad_Select} {== $button kPad_Tri}}
-                  {synth play_sequence button_back.cue}
+                  {ghc_back}
                   {ghc_pick_panel shut}
                )
             }

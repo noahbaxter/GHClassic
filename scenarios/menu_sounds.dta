@@ -1,0 +1,238 @@
+; Menu sounds (config/menus.toml's [sounds]), through quickplay's hub, its pickers, the
+; song list and its menu: green selects, red backs out, a strum toggles,
+; whatever the press does to the focus, and each press sounds once. Each
+; sound is counted here in place of being played. Green on a guitarist with
+; outfits moves the focus to them, which sounded as a strum.
+#include common/first_boot.dta
+{func ghc_heard ($sound) {set $ghc_heard $sound} {set $ghc_sounds {'+' $ghc_sounds 1}}}
+{func ghc_select {ghc_heard select}}
+{func ghc_back {ghc_heard back}}
+{func ghc_toggle {ghc_heard toggle}}
+{func ghc_start {ghc_heard play}}
+{func ghc_quiet {set $ghc_heard none} {set $ghc_sounds 0}}
+{campaign set_all_access 1}
+; Every venue open, so a strum on the map has one to move to.
+{campaigns unlock_all TRUE}
+{quickplay song_defaults 0}
+{gamecfg set mode quickplay}
+{ui goto_screen ghc_qp_setup_screen}
+(wait_screen ghc_qp_setup_screen)
+(wait 1)
+
+; The hub: a strum to CHARACTER, green into it.
+(expect {sel_character_panel focus_name} ghc_play.btn)
+{ghc_quiet}
+(press down)
+(wait 0.5)
+(expect $ghc_heard toggle)
+(expect $ghc_sounds 1)
+(expect {sel_character_panel focus_name} ghc_character.btn)
+{ghc_quiet}
+(press green)
+(wait_screen ghc_qp_character_screen)
+(expect $ghc_heard select)
+(expect $ghc_sounds 1)
+(wait_until {char_single are_chars_loaded})
+(wait 1)
+
+; The guitarist: a strum, green to the outfits, a strum there, red twice.
+{ghc_quiet}
+(press down)
+(wait 0.5)
+(expect $ghc_heard toggle)
+(expect $ghc_sounds 1)
+{ghc_quiet}
+(press green)
+(wait 0.5)
+(expect {sel_character_panel get skin_select} 1)
+(expect $ghc_heard select)
+(expect $ghc_sounds 1)
+{ghc_quiet}
+(press down)
+(wait 0.5)
+(expect $ghc_heard toggle)
+(expect $ghc_sounds 1)
+{ghc_quiet}
+(press red)
+(wait 0.5)
+(expect {sel_character_panel get skin_select} 0)
+(expect $ghc_heard back)
+(expect $ghc_sounds 1)
+{ghc_quiet}
+(press red)
+(wait_screen ghc_qp_setup_screen)
+(wait 1)
+(expect $ghc_heard back)
+(expect $ghc_sounds 1)
+
+; The guitar: in, a strum, out.
+{sel_character_panel set_focus {sel_character_panel find ghc_guitar.btn}}
+{ghc_quiet}
+(press green)
+(wait_screen ghc_qp_guitar_screen)
+(wait 2)
+(expect $ghc_heard select)
+(expect $ghc_sounds 1)
+{ghc_quiet}
+(press down)
+(wait 0.5)
+(expect $ghc_heard toggle)
+(expect $ghc_sounds 1)
+{ghc_quiet}
+(press red)
+(wait_screen ghc_qp_setup_screen)
+(wait 1)
+(expect $ghc_heard back)
+(expect $ghc_sounds 1)
+
+; The venue: in, a strum, out. The map opens on the song's venue, open
+; with every venue (arena): on the battle instead, the map's lowest.
+{game set_venue battle}
+{sel_character_panel set_focus {sel_character_panel find ghc_venue.btn}}
+{ghc_quiet}
+(press green)
+(wait_screen ghc_qp_venue_screen)
+(wait 2)
+(expect $ghc_heard select)
+(expect $ghc_sounds 1)
+; Up from the battle, the map's lowest.
+{ghc_quiet}
+(press up)
+(wait 0.5)
+(expect {ghc_qp_venue_panel focus_name} sv_small1.btn)
+(expect $ghc_heard toggle)
+(expect $ghc_sounds 1)
+{ghc_quiet}
+(press red)
+(wait_screen ghc_qp_setup_screen)
+(wait 1)
+(expect $ghc_heard back)
+(expect $ghc_sounds 1)
+
+; The modifiers: in, a box ticked, a strum, out.
+{sel_character_panel set_focus {sel_character_panel find ghc_modifiers.btn}}
+{ghc_quiet}
+(press green)
+(wait_screen ghc_qp_extras_screen)
+(wait 1)
+(expect $ghc_heard select)
+(expect $ghc_sounds 1)
+{ghc_quiet}
+(press green)
+(wait 0.5)
+(expect $ghc_heard select)
+(expect $ghc_sounds 1)
+(press green)
+(wait 0.5)
+{ghc_quiet}
+(press up)
+(wait 0.5)
+(expect $ghc_heard toggle)
+(expect $ghc_sounds 1)
+{ghc_quiet}
+(press red)
+(wait_screen ghc_qp_setup_screen)
+(wait 1)
+(expect $ghc_heard back)
+(expect $ghc_sounds 1)
+
+; The song list: a strum, Select's menu (a strum in it, Select shuts it),
+; orange's jump, then green to the difficulty.
+{sel_character_panel set_focus {sel_character_panel find ghc_play.btn}}
+{ghc_quiet}
+(press green)
+(wait_screen qp_selsong_screen)
+(wait 1)
+(expect $ghc_heard select)
+(expect $ghc_sounds 1)
+{ghc_quiet}
+(press down)
+(wait 0.5)
+(expect $ghc_heard toggle)
+(expect $ghc_sounds 1)
+{ghc_quiet}
+(press star_power)
+(wait 0.5)
+(expect {ghc_pick_panel get open} 1)
+(expect $ghc_heard select)
+(expect $ghc_sounds 1)
+{ghc_quiet}
+(press down)
+(wait 0.5)
+(expect $ghc_heard toggle)
+(expect $ghc_sounds 1)
+{ghc_quiet}
+(press star_power)
+(wait 0.5)
+(expect {ghc_pick_panel get open} 0)
+(expect $ghc_heard back)
+(expect $ghc_sounds 1)
+{ghc_quiet}
+(press orange)
+(wait 0.5)
+(expect $ghc_heard toggle)
+(expect $ghc_sounds 1)
+; Select, as the game's: its play sound is the career's song list's.
+{ghc_quiet}
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+(expect $ghc_heard select)
+(expect $ghc_sounds 1)
+{ghc_quiet}
+(press red)
+(wait_screen qp_selsong_screen)
+(wait 1)
+(expect $ghc_heard back)
+(expect $ghc_sounds 1)
+{ghc_quiet}
+(press red)
+(wait_screen ghc_qp_setup_screen)
+(wait 1)
+(expect $ghc_heard back)
+(expect $ghc_sounds 1)
+
+; The settings: a strum on the video's rows and the game's.
+{ui goto_screen video_settings_screen}
+(wait_screen video_settings_screen)
+(wait 1)
+{ghc_quiet}
+(press down)
+(wait 0.5)
+(expect $ghc_heard toggle)
+(expect $ghc_sounds 1)
+{ui goto_screen game_settings_screen}
+(wait_screen game_settings_screen)
+(wait 1)
+{ghc_quiet}
+(press down)
+(wait 0.5)
+(expect $ghc_heard toggle)
+(expect $ghc_sounds 1)
+
+; Face-Off's outfits, as quickplay's: green to them, a strum there.
+(device p1)
+(device p2)
+(press start p1)
+{ui goto_screen multi_screen}
+(wait_screen multi_screen)
+(press start p2)
+(wait 0.5)
+{gamecfg set mode multi_vs}
+{game set_num_players 2}
+{ui goto_screen multi_sel_character_screen}
+(wait_screen multi_sel_character_screen)
+(wait 3)
+{ghc_quiet}
+(press green p1)
+(wait 1)
+(expect {> {size {elem $ghc_multi_outfits 0}} 1} 1)
+(expect $ghc_heard select)
+(expect $ghc_sounds 1)
+{ghc_quiet}
+(press down p1)
+(wait 0.7)
+(expect {multi_char_outfit0 focus_name} outfit2.btn)
+(expect $ghc_heard toggle)
+(expect $ghc_sounds 1)
+(quit)

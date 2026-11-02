@@ -232,12 +232,10 @@
          ({|| {< $count 2} {! {{$panel find outfit.grp} showing}} {ui in_transition}} kDataUnhandled)
          ({== $button kPad_DDown}
             {$panel set_focus {ghc_multi_button $player {mod {'+' $at 1} $count}}}
-            {synth play_sequence button_toggle}
             TRUE
          )
          ({== $button kPad_DUp}
             {$panel set_focus {ghc_multi_button $player {mod {'+' $at {'-' $count 1}} $count}}}
-            {synth play_sequence button_toggle}
             TRUE
          )
          (TRUE kDataUnhandled)
@@ -281,7 +279,7 @@
    (BUTTON_DOWN_MSG {ghc_multi_char_blue $player_num $button})
    (multi_char_selected
       ($player)
-      {synth play_sequence button_select}
+      {ghc_select}
       {ghc_multi_outfits $player}
    )
    ; As the game's, by the outfits listed.
@@ -291,7 +289,7 @@
          ($player {if_else {== $panel multi_char_outfit0} 0 1})
          {ghc_multi_show $player {! $selected}}
          {if {&& {! $selected} {< {size {elem $ghc_multi_outfits $player}} 2}}
-            {synth play_sequence button_back.cue}
+            {ghc_back}
             {{ghc_multi_outfit_panel $player} set_active FALSE}
             {multi_sel_character_panel set_frozen $player FALSE}
          }
@@ -465,7 +463,7 @@
          {set_elem $ghc_multi_blue $player TRUE}
          {set_elem $ghc_multi_hdc $player {if_else {ghc_multi_hd_chars $player} 0 1}}
          {ghc_multi_look_char $player}
-         {synth play_sequence button_toggle}
+         {ghc_toggle}
          ; The ones on show load again, and move once they have.
          {ghc_multi_animate}
          {set $ghc_multi_hb -1}
@@ -481,7 +479,7 @@
          {set_elem $ghc_multi_blue $player TRUE}
          {set_elem $ghc_multi_hdg $player {if_else {ghc_multi_hd_guitar $player} 0 1}}
          {ghc_multi_look_guitar $player}
-         {synth play_sequence button_toggle}
+         {ghc_toggle}
          ; Shown again as the screen's own does for a scroll: the guitar
          ; is loaded again once its look has changed.
          {multi_sel_guitar_panel update_display $player FALSE}
@@ -552,7 +550,7 @@
       ({ghc_pick_button $button} TRUE)
       ({== $button kPad_Tri}
          {{ui current_screen} backwards_anim}
-         {synth play_sequence button_back.cue}
+         {ghc_back}
          {ui goto_screen {ghc_multi_screen venue}}
          TRUE
       )
@@ -562,7 +560,7 @@
       )
       ; Select's menu, quickplay's speed (quickplay.dta).
       ({&& {== $button kPad_Select} {! {ui in_transition}}}
-         {synth play_sequence button_select}
+         {ghc_select}
          {ghc_pick_panel open_sticky (speed) speed}
          TRUE
       )

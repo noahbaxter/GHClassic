@@ -597,7 +597,7 @@
       (BUTTON_DOWN_MSG
          {if {== $button kPad_Tri}
             {$this backwards_anim}
-            {synth play_sequence button_back.cue}
+            {ghc_back}
             {ui goto_screen main_screen}
          }
          kDataUnhandled
@@ -719,7 +719,7 @@
       (BUTTON_DOWN_MSG
          {if {== $button kPad_Tri}
             {$this backwards_anim}
-            {synth play_sequence button_back.cue}
+            {ghc_back}
             {ui goto_screen ghc_qp_setup_screen}
          }
          kDataUnhandled

@@ -377,7 +377,7 @@
          {cond
             ({== $button kPad_Tri}
                {$this backwards_anim}
-               {synth play_sequence button_back.cue}
+               {ghc_back}
                {ui goto_screen chooseprof_screen}
                kDataUnhandled
             )
@@ -387,7 +387,7 @@
                {ghc_campaign_panel next_engine}
                {if_else {== gh1 {note_engine picked}}
                   {play_sfx slider_gtr}
-                  {synth play_sequence button_play}
+                  {ghc_start}
                }
                {ghc_campaign_helpbar}
                TRUE
@@ -479,12 +479,12 @@
             {cond
                ({== $button kPad_Tri}
                   {$this backwards_anim}
-                  {synth play_sequence button_back.cue}
+                  {ghc_back}
                   {ui goto_screen main_screen}
                   kDataUnhandled
                )
                ({&& $band {== $button kPad_Circle}}
-                  {synth play_sequence button_select}
+                  {ghc_select}
                   {nameprof_screen set profile_slot $index}
                   {nameprof_screen set back_screen chooseprof_screen}
                   {nameprof_screen set next_screen chooseprof_screen}
@@ -494,7 +494,7 @@
                   TRUE
                )
                ({&& $band {== $button kPad_Square}}
-                  {synth play_sequence button_select}
+                  {ghc_select}
                   {ghc_delete_screen ask band $index {campaign profile_name $index} chooseprof_screen}
                   TRUE
                )
@@ -533,7 +533,7 @@
       (BUTTON_DOWN_MSG
          {if {== $button kPad_Tri}
             {$this backwards_anim}
-            {synth play_sequence button_back.cue}
+            {ghc_back}
             {ui goto_screen {if_else {ghc_campaigns} ghc_campaign_screen chooseprof_screen}}
          }
          kDataUnhandled
@@ -637,7 +637,7 @@
                {store_panel update_index {if_else {== $button kPad_DDown} 1 -1}}
             )
             ({== $button kPad_Tri}
-               {synth play_sequence button_back.cue}
+               {ghc_back}
                {if_else {{store_panel find st_screen1.view} showing}
                   {do {store_screen backwards_anim} {autosave_goto career_screen}}
                   {do {store_panel hide_models} {store_panel show_store_screen_1}}

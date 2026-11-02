@@ -290,7 +290,7 @@
       )
       (ghc_picked
          ($game)
-         {synth play_sequence button_select}
+         {ghc_select}
          {set $ghc_switch $game}
          {set $ghc_switch_next main_screen}
          {set $ghc_switch_as menus}
@@ -340,7 +340,7 @@
       ; to here frees P1, for whichever controller presses Start next.
       (BUTTON_DOWN_MSG
          {if {== $button kPad_Start}
-            {synth play_sequence button_select}
+            {ghc_select}
             {ghc_profile_screen join 0 splash_screen main_screen}
          }
       )

@@ -258,14 +258,14 @@
       (BUTTON_DOWN_MSG
          {cond
             ({&& $ghc_options_settings {== $button kPad_Tri}}
-               {synth play_sequence button_back.cue}
+               {ghc_back}
                {set $ghc_options_settings FALSE}
                {options_panel show_rows}
                {options_panel set_focus {options_panel find op_audio.btn}}
                TRUE
             )
             ({&& {! $ghc_options_settings} {== $button kPad_X} {== {options_panel focus_name} op_audio.btn}}
-               {synth play_sequence button_select}
+               {ghc_select}
                {set $ghc_options_settings TRUE}
                {options_panel show_rows}
                TRUE
@@ -923,7 +923,7 @@
 {func ghc_practice_speed_by ($by $op)
    {song_speed $op {max 25 {min 200 {'+' {song_speed} {'*' 5 $by}}}}}
    {set $ghc_practice_pct {song_speed}}
-   {synth play_sequence button_toggle}
+   {ghc_toggle}
 }
 ; Green on the row: taken up, else kept.
 {func ghc_practice_speed_select ($panel)
@@ -941,7 +941,7 @@
       ({== $button kPad_Tri}
          {song_speed set $ghc_speed_before}
          {set $ghc_practice_pct {song_speed}}
-         {synth play_sequence button_back.cue}
+         {ghc_back}
          {ghc_practice_speed_edit $panel FALSE}
          TRUE
       )
@@ -1171,7 +1171,7 @@
                   {title.lbl set_text select_end_section}
                   ; Handled: the list's own select would hold it still as
                   ; it plays its select, the end not pickable for a moment.
-                  {synth play_sequence button_select}
+                  {ghc_select}
                   TRUE
                )
                ({< $idx [start]} {handle (ui BAD_SELECT_START_MSG)})
@@ -1182,7 +1182,7 @@
       (BUTTON_DOWN_MSG
          {if_else {&& {== $button kPad_Tri} {! {ui in_transition}}}
             {do
-               {synth play_sequence button_back.cue}
+               {ghc_back}
                {if_else [section]
                   {$this unmark}
                   {do {pract_pause_panel set from_sections TRUE} {ui goto_screen pract_pause_screen}}
@@ -1273,7 +1273,7 @@
       (toggle ($option)
          {practice_option $option {! {practice_option $option}}}
          {if {== $option solo_stems} {set $ghc_practice_reload TRUE}}
-         {synth play_sequence button_toggle}
+         {ghc_toggle}
          {$this sync}
       )
    )
@@ -1289,7 +1289,7 @@
          {cond
             ({== $button kPad_Start} {ghc_practice_resume $this} TRUE)
             ({== $button kPad_Tri}
-               {synth play_sequence button_back.cue}
+               {ghc_back}
                {ui goto_screen ghc_practice_settings_screen}
                TRUE
             )
@@ -1396,7 +1396,7 @@
    (BUTTON_DOWN_MSG
       {if {== $button kPad_Start} {ghc_pause_resume $this}}
       {if {== $button kPad_Tri}
-         {synth play_sequence button_back.cue}
+         {ghc_back}
          {ui goto_screen {ghc_pause_screen pause_screen}}
       }
       kDataUnhandled
@@ -1416,7 +1416,7 @@
    (BUTTON_DOWN_MSG
       {if {&& {! {pause_audio_settings_panel slider_selected}} {== $button kPad_Tri}}
          {$this set_volumes}
-         {synth play_sequence button_back.cue}
+         {ghc_back}
          {ui goto_screen {ghc_pause_screen pause_settings_screen}}
       }
       kDataUnhandled
@@ -1431,7 +1431,7 @@
    (animate_transition FALSE)
    (BUTTON_DOWN_MSG
       {if {&& {== $button kPad_Tri} {== {pause_video_settings_panel get picking} none}}
-         {synth play_sequence button_back.cue}
+         {ghc_back}
          {ui goto_screen {ghc_pause_screen pause_settings_screen}}
       }
       kDataUnhandled
@@ -1453,7 +1453,7 @@
       (BUTTON_DOWN_MSG
          {if {&& {== $button kPad_Tri} {== {video_settings_panel get picking} none}}
             {$this backwards_anim}
-            {synth play_sequence button_back.cue}
+            {ghc_back}
             {autosave_goto options_screen}
          }
          kDataUnhandled
@@ -1715,16 +1715,16 @@
          {cond
             ({== $button kPad_DDown}
                {video [picking] next}
-               {synth play_sequence button_toggle}
+               {ghc_toggle}
                {$this sync_rows}
             )
             ({== $button kPad_DUp}
                {video [picking] prev}
-               {synth play_sequence button_toggle}
+               {ghc_toggle}
                {$this sync_rows}
             )
             ({== $button kPad_Tri}
-               {synth play_sequence button_back.cue}
+               {ghc_back}
                {video [picking] set [picked_at]}
                {set [picking] none}
                {$this sync_rows}
@@ -2272,7 +2272,7 @@
                ; career, from the next list shown (campaigns.cpp).
                (gm_unlock.btn {campaigns unlock_all {! {campaigns unlock_all}}})
             }
-            {synth play_sequence button_toggle}
+            {ghc_toggle}
             {$this sync_look}
          }
       }
@@ -2286,7 +2286,7 @@
                ({== [at] "gs_guitar.sld"} {gs_guitar.sld set_current {note_speed reset hard}})
                (TRUE {gs_sfx.sld set_current 12} {$this keep gs_sfx.sld 12})
             }
-            {synth play_sequence button_toggle}
+            {ghc_toggle}
             {$this sync_look}
          }
          kDataUnhandled
@@ -2300,7 +2300,7 @@
    (animate_transition FALSE)
    (BUTTON_DOWN_MSG
       {if {&& {! {pause_game_settings_panel slider_selected}} {== $button kPad_Tri}}
-         {synth play_sequence button_back.cue}
+         {ghc_back}
          {ui goto_screen {ghc_pause_screen pause_settings_screen}}
       }
       kDataUnhandled
@@ -2343,7 +2343,7 @@
    (BUTTON_DOWN_MSG
       {if {&& {! {game_settings_panel slider_selected}} {== $button kPad_Tri}}
          {$this backwards_anim}
-         {synth play_sequence button_back.cue}
+         {ghc_back}
          {ui goto_screen options_screen}
       }
       kDataUnhandled

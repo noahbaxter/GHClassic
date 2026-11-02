@@ -28,6 +28,9 @@ namespace gh2
         script::addCommand("quit_app", quitApp);
         // The main menu's version line (main_menu.dta).
         script::patchUi("{set $ghc_version \"" + build::shownVersion() + "\"}");
+        // The menus' rules (config/menus.toml), then what applies them.
+        script::patchUi(kMenuRulesDta);
+        script::patchUi(kSfxDta);
         script::patchUi(kPickerDta);
         // Before the screens that hold its panel (ui/players.h).
         script::patchUi(kProfilesDta);

@@ -696,14 +696,14 @@
                         {min [tune_max]
                            {'+' {ghc_profile pref [seat] [tuning]}
                               {'*' [tune_step] {if_else {== $button kPad_DUp} 1 -1}}}}}}
-                  {synth play_sequence button_toggle}
+                  {ghc_toggle}
                   {$this show_row [pick]}
                )
                ({&& {!= [tuning] ""} {|| {== $button kPad_X} {== $button kPad_Tri}}}
                   {if_else {== $button kPad_X}
-                     {synth play_sequence button_select}
+                     {ghc_select}
                      {do
-                        {synth play_sequence button_back.cue}
+                        {ghc_back}
                         {ghc_profile set_pref [seat] [tuning] [tune_was]}
                      }
                   }
@@ -714,28 +714,28 @@
                   {do
                      ($k {$this next_row {if_else {== $button kPad_DUp} -1 1}})
                      {if {>= $k 0}
-                        {synth play_sequence button_toggle}
+                        {ghc_toggle}
                         {$this pick_row $k}
                      }
                   }
                )
                ({== $button kPad_Tri}
-                  {synth play_sequence button_back.cue}
+                  {ghc_back}
                   {$this shut}
                )
                ({&& {== $button kPad_X} {== $row ghc_profile_lefty}}
-                  {synth play_sequence button_select}
+                  {ghc_select}
                   {options set_lefty [seat] {! {options get_lefty [seat]}}}
                   {$this lefty_box}
                )
                ({&& {== $button kPad_X} {|| {== $row ghc_profile_speed} {== $row ghc_profile_length}}}
-                  {synth play_sequence button_select}
+                  {ghc_select}
                   {set [tuning] {if_else {== $row ghc_profile_speed} speed length}}
                   {set [tune_was] {ghc_profile pref [seat] [tuning]}}
                   {$this show_row [pick]}
                )
                ({== $button kPad_X}
-                  {synth play_sequence button_select}
+                  {ghc_select}
                   {do
                      ($seat [seat])
                      {$this shut}
@@ -776,7 +776,7 @@
          {set [seat] $seat}
          {ghc_profile hold 1}
          {ghc_profile seen}
-         {synth play_sequence button_select}
+         {ghc_select}
          {$this paint_badges}
          {ghc_dim_panel show TRUE}
       )
@@ -797,7 +797,7 @@
                   {cond
                      ({== $player [seat]} {$this poster_button $button})
                      ({== $button kPad_Tri}
-                        {synth play_sequence button_back.cue}
+                        {ghc_back}
                         {$this shut})
                   }
                }
@@ -1127,18 +1127,18 @@
                ({== $button kPad_Tri}
                   {if [joining] {ghc_profile drop [seat]}}
                   {$this backwards_anim}
-                  {synth play_sequence button_back.cue}
+                  {ghc_back}
                   {ui goto_screen [back_screen]}
                   kDataUnhandled
                )
                ({&& $named {== $button kPad_Circle}}
-                  {synth play_sequence button_select}
+                  {ghc_select}
                   {ghc_nameprofile_screen set row $row}
                   {ui goto_screen ghc_nameprofile_screen}
                   TRUE
                )
                ({&& $idle {== $button kPad_Square}}
-                  {synth play_sequence button_select}
+                  {ghc_select}
                   {ghc_delete_screen ask profile $row {ghc_profile name_of $row} $this}
                   TRUE
                )
@@ -1178,12 +1178,12 @@
                ({ghc_profile taken $name [row]} {ghc_profile_error_screen show ghc_duplicate_profile})
                ({>= [row] 0}
                   {ghc_profile rename [row] $name}
-                  {synth play_sequence button_select}
+                  {ghc_select}
                   {ui goto_screen ghc_profile_screen}
                )
                (TRUE
                   {ghc_profile make {ghc_profile_screen get seat} $name}
-                  {synth play_sequence button_select}
+                  {ghc_select}
                   {ui goto_screen {ghc_profile_screen get next_screen}}
                )
             }
@@ -1197,7 +1197,7 @@
                ({!= $player_num {ghc_profile_screen get seat}} TRUE)
                ({&& {== $button kPad_Tri} {$ten no_text_entered}}
                   {$this backwards_anim}
-                  {synth play_sequence button_back.cue}
+                  {ghc_back}
                   {ui goto_screen ghc_profile_screen}
                   kDataUnhandled
                )
@@ -1215,7 +1215,7 @@
          {helpbar set_display {nameprof_screen get_help_text ()}}
       )
       (SELECT_START_MSG {helpbar set_display {nameprof_screen get_help_text ()}} kDataUnhandled)
-      (SELECT_MSG {synth play_sequence button_select})
+      (SELECT_MSG {ghc_select})
       (SCREEN_BACK_MSG {helpbar set_display {nameprof_screen get_help_text ()}} kDataUnhandled)
    )
 }
@@ -1316,7 +1316,7 @@
          {cond
             ({&& {== [kind] profile} {!= $player_num {ghc_profile_screen get seat}}} TRUE)
             ({== $button kPad_Tri}
-               {synth play_sequence button_back.cue}
+               {ghc_back}
                {ui goto_screen [back]}
                TRUE
             )
