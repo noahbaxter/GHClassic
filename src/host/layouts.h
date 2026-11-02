@@ -31,6 +31,9 @@ namespace gh2::input
     // device plays as, `detected` unless the line says otherwise.
     std::string sectionMode(const std::string &sdlName, const std::string &guid);
     DeviceKind kindOf(const std::string &sdlName, const std::string &guid, DeviceKind detected);
+    // The keyboard's mode line says pad: with no controller in P1's seat it
+    // plays songs as a DualShock does, a fret press strumming.
+    bool keyboardPlaysPad();
     // What a menu reads: [menu keyboard] or [menu gamepad] over the fixed
     // controls (menu_layer.h), the keyboard's keys only and a gamepad's
     // controls only; tilt and whammy move nothing. A line with none of its

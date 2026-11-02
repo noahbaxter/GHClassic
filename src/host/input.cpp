@@ -105,6 +105,9 @@ namespace gh2
         // nothing until it lets go, the press that stood it in for a seat or
         // what it held as the mode changed.
         bool s_keyboardWas = false, s_keyboardQuiet = false;
+        // The keyboard's mode line says pad, as the last poll outside a song
+        // saw it.
+        bool s_keyboardPad = false;
 
         // What is up, from what each part of the game says of it: the
         // Controllers screen over a song, a song over Multiplayer's screen.
@@ -266,6 +269,13 @@ namespace gh2
         // GH2 reads a seat in pad mode as a DualShock only in a song: its
         // menus answer the guitar whatever holds it.
         s_seats.setModes(reads, songUp());
+        // The keyboard alone in P1's seat plays by its own mode line, kept
+        // through a song as a seat's is.
+        if (!songUp() && keyboardPlaysPad() != s_keyboardPad)
+        {
+            s_keyboardPad = !s_keyboardPad;
+            std::cerr << "[input] keyboard: " << (s_keyboardPad ? "pad" : "guitar") << " mode" << std::endl;
+        }
         // A device just seated, or just off the Controllers screen, plays
         // from when it lets go of what it held. Anywhere but a song playing
         // it is in a menu, where its green picks and red backs out, a song's
@@ -273,7 +283,8 @@ namespace gh2
         HostPad pads[kSeats];
         for (int seat = 0; seat < kSeats; ++seat)
         {
-            const bool joypad = s_seats.pad(seat) && songUp();
+            const bool keyboardAlone = seat == 0 && s_seats[0].none() && s_keyboardPad;
+            const bool joypad = (s_seats.pad(seat) || keyboardAlone) && songUp();
             if (seated[seat] && !s_seats.holding(*seated[seat]))
             {
                 pads[seat] = padOf(seated[seat]->held, joypad);

@@ -7,6 +7,7 @@
 #include "gh1/scene.h"
 #include "host/devices.h"
 #include "host/input.h"
+#include "host/layouts.h"
 #include "milo/milo.h"
 #include "render/texture_store.h"
 #include "script.h"
@@ -228,9 +229,10 @@ namespace gh2
 
         std::string read(int row)
         {
-            // The keyboard plays as a guitar.
+            // The keyboard plays as a guitar unless it is set to a pad.
             if (row == kModeRow)
-                return s_shown.kind == DeviceKind::kGamepad ? "PAD" : "GUITAR";
+                return s_shown.kind == DeviceKind::kGamepad || (keyboard(s_shown) && keyboardPlaysPad()) ? "PAD"
+                                                                                                          : "GUITAR";
             if (row >= kActionRows)
                 return "";
             if (s_rebinding && row == s_focus)
@@ -263,7 +265,8 @@ namespace gh2
         // Everything painted, so a poll paints only when something changed.
         std::string drawn()
         {
-            std::string all = std::to_string(s_focus) + (s_rebinding ? "r" : "") + (keyboard(s_shown) ? "k" : "");
+            std::string all = std::to_string(s_focus) + (s_rebinding ? "r" : "") +
+                              (keyboard(s_shown) ? (keyboardPlaysPad() ? "p" : "k") : "");
             for (const char *what : {"before", "after"})
                 all += text(what, 0) + "|";
             for (int i = 0; i < kChips; ++i)
@@ -325,7 +328,7 @@ namespace gh2
                 case SDL_SCANCODE_KP_ENTER:
                     if (s_focus == kModeRow)
                     {
-                        if (!keyboard(s_shown) && !s_shown.id.none())
+                        if (!s_shown.id.none())
                             swapMode(s_shown.id);
                     }
                     else if (s_focus > kModeRow)

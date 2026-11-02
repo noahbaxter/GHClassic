@@ -142,6 +142,11 @@ namespace gh2::input
         return mode == "pad" ? DeviceKind::kGamepad : mode == "guitar" ? DeviceKind::kGuitar : detected;
     }
 
+    bool keyboardPlaysPad()
+    {
+        return sectionMode("", "") == "pad";
+    }
+
     void listInFile(const std::string &sdlName, const std::string &guid, const Profile &builtin)
     {
         const std::string name = nameOf(sdlName, guid);
