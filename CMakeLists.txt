@@ -460,6 +460,7 @@ set(GHC_GAME_SOURCES
     src/ui/controllers.cpp
     src/ui/classic_scene.cpp
     src/ui/list_scroll.cpp
+    src/ui/transitions.cpp
     src/ui/text_fit.cpp
     src/ui/menus.cpp
     src/ui/meta_music.cpp
@@ -573,6 +574,7 @@ find_package(Python3 3.11 REQUIRED COMPONENTS Interpreter)
 file(MAKE_DIRECTORY "${GHC_DTA_DIR}")
 execute_process(
     COMMAND "${Python3_EXECUTABLE}" tools/menus.py config/menus.toml "${GHC_DTA_DIR}/menu_rules.dta"
+            "${GHC_DTA_DIR}/menu_rules.inc"
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     RESULT_VARIABLE GHC_MENUS_RESULT
     ERROR_VARIABLE GHC_MENUS_ERROR)

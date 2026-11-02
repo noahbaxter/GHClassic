@@ -4,7 +4,6 @@
 {retype cut_scene_screen
    (
       (allow_back FALSE)
-      (animate_transition FALSE)
       (TRANSITION_COMPLETE_MSG
          {if_else {> {campaign num_profiles} 0}
             {ui goto_screen splash_screen}

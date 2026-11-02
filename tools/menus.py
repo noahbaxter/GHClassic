@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Check config/menus.toml and write it out as the game's script variables.
+"""Check config/menus.toml and write it out for the game.
 
-    tools/menus.py config/menus.toml <out.dta>
+    tools/menus.py config/menus.toml <out.dta> <out.inc>
 
-CMake runs this when the build configures, and src/ui/dta/shared/ reads what
-it writes: the menus' rules are kept in the TOML, the code that applies them
-in the shared scripts, and a screen in its own file. Anything the TOML gets
-wrong (a key missing or unknown, a fret that is not one) stops the build with
-where it is.
+CMake runs this when the build configures. The .dta is script variables,
+read by src/ui/dta/shared/; the .inc is C++ tables, read by the host where
+the rule is the engine's to apply (ui/transitions.cpp). The menus' rules are
+kept in the TOML, the code that applies them there, and a screen in its own
+file. Anything the TOML gets wrong (a key missing or unknown, a fret that is
+not one) stops the build with where it is.
 """
 
 import re
@@ -74,21 +75,49 @@ def sounds(table):
     return lines
 
 
-def main(src, out):
+def names(value, where, pattern=NAME):
+    if not isinstance(value, list):
+        raise Bad(f"{where}: a list")
+    return [name(v, f"{where}[{i}]", pattern) for i, v in enumerate(value)]
+
+
+def transitions(table):
+    keys(table, "transitions", {"still", "same_room"})
+    still = names(table["still"], "transitions.still")
+    pairs = table["same_room"]
+    if not isinstance(pairs, list):
+        raise Bad("transitions.same_room: a list of pairs")
+    for i, pair in enumerate(pairs):
+        if len(names(pair, f"transitions.same_room[{i}]")) != 2:
+            raise Bad(f"transitions.same_room[{i}]: two screens")
+    if len(set(still)) != len(still):
+        raise Bad("transitions.still: a screen named twice")
+    inc = ["// Screens the camera never turns for.",
+           "constexpr const char *kStill[] = {" + ", ".join(f'"{s}"' for s in still) + "};",
+           "// Pairs of screens in one room, between which it stays.",
+           "constexpr const char *kSameRoom[][2] = {" + ", ".join(f'{{"{a}", "{b}"}}' for a, b in pairs) + "};"]
+    return inc
+
+
+def main(src, out, out_inc):
     with open(src, "rb") as f:
         data = tomllib.load(f)
-    keys(data, "menus", {"frets", "sounds"})
-    lines = [f"; Made by tools/menus.py from {src}: change that, not this."]
+    keys(data, "menus", {"frets", "sounds", "transitions"})
+    made = f"Made by tools/menus.py from {src}: change that, not this."
+    lines = [f"; {made}"]
     lines += frets(data["frets"])
     lines += sounds(data["sounds"])
+    inc = transitions(data["transitions"])
     with open(out, "w", newline="\n") as f:
         f.write("\n".join(lines) + "\n")
+    with open(out_inc, "w", newline="\n") as f:
+        f.write("\n".join([f"// {made}"] + inc) + "\n")
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
+    if len(sys.argv) != 4:
         sys.exit(__doc__)
     try:
-        main(sys.argv[1], sys.argv[2])
+        main(sys.argv[1], sys.argv[2], sys.argv[3])
     except (Bad, tomllib.TOMLDecodeError) as e:
         sys.exit(f"{sys.argv[1]}: {e}")

@@ -554,9 +554,6 @@
       (panels meta sel_character_panel helpbar ghc_preshow_char fade_panel)
       (focus sel_character_panel)
       (allow_back FALSE)
-      ; Never the scene's swoop: it fights the hub's own view (ghc_qp_view),
-      ; which is already in place as the screen fades in.
-      (animate_transition FALSE)
       (helpbar (default ((fret1 help_continue) (fret2 help_back) (strum help_updown))))
       (enter
          ; In from black, the room still: but not back from character
@@ -596,7 +593,6 @@
       )
       (BUTTON_DOWN_MSG
          {if {== $button kPad_Tri}
-            {$this backwards_anim}
             {ghc_back}
             {ui goto_screen main_screen}
          }
@@ -718,7 +714,6 @@
       (helpbar (default ((fret1 help_onoff) (fret2 help_back) (strum help_updown))))
       (BUTTON_DOWN_MSG
          {if {== $button kPad_Tri}
-            {$this backwards_anim}
             {ghc_back}
             {ui goto_screen ghc_qp_setup_screen}
          }

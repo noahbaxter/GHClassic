@@ -185,7 +185,6 @@
       ; transition. Its guitarist's preview panel is not up here: beside
       ; another, a preview panel's figure stands in its bind pose.
       (panels meta sel_character_panel char_single helpbar)
-      (animate_transition {! $ghc_qp_same_scene})
       ; As SEL_CHARACTER_COMMON's, the panel opened again first.
       (enter
          {sel_character_panel pick}
@@ -206,7 +205,6 @@
                {if_else {sel_character_panel get skin_select}
                   {sel_character_panel unchoose_skins}
                   {do
-                     {$this backwards_anim}
                      {ghc_back}
                      {set $ghc_qp_same_scene TRUE}
                      {ui goto_screen [back_screen]}
@@ -238,7 +236,6 @@
          {ui goto_screen ghc_qp_setup_screen}
       )
       (go_back
-         {$this backwards_anim}
          {ghc_back}
          {ui goto_screen ghc_qp_setup_screen}
       )
@@ -353,7 +350,6 @@
    {cond
       ({ghc_pick_button $button} TRUE)
       ({== $button kPad_Tri}
-         {{ui current_screen} backwards_anim}
          {ghc_back}
          {ui goto_screen {if_else {ghc_multi_mode} multi_sel_guitar_screen ghc_qp_setup_screen}}
          TRUE

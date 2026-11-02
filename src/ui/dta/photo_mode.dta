@@ -244,7 +244,6 @@
       (panels GAME_PANELS photo_panel helpbar)
       (in_game TRUE)
       (allow_back FALSE)
-      (animate_transition FALSE)
       (helpbar (default ((fret1 ghc_photo_fly) (fret2 help_back) (fret5 ghc_photo_hide) (strum ghc_photo_step))))
       ; The venue's shots and which of them is shown.
       (shots ())

@@ -1,5 +1,6 @@
 # The menus' rules, each a list kept here once: what each fret does past
-# green, red and the strum, and the sound each press makes. Screens never
+# green, red and the strum, the sound each press makes, and which screen
+# changes turn the camera. Screens never
 # restate them. tools/menus.py checks this file and writes it out for the
 # game's scripts when the build configures (src/ui/dta/shared/ reads it).
 
@@ -33,3 +34,27 @@ start_screens = ["sel_song_screen", "multi_seldiff_screen", "seldiff_screen"]
 start_buttons = ["pause_restart.btn", "pause_controller_resume.btn", "lose_restart.btn", "comp_restart.btn"]
 # Lists that scroll without a sound.
 quiet_scroll = ["credits_panel", "sel_character_panel"]
+
+# The camera's turn between screens (ui/metacam.milo's meta_cam_right_in and
+# _out). Which way needs no list: back into a screen still on the way that
+# led here (red, or a pick taking you home to quickplay's hub), on into any
+# other. A screen not named here turns as the game's own says (its
+# animate_transition).
+[transitions]
+# Screens it never turns for: each comes in its own way, a fade or a cut.
+still = [
+    "cut_scene_screen",              # --fast-boot's way past the intro
+    "ghc_switch_screen",             # a campaign switch, under its own fade
+    "ghc_qp_setup_screen",           # quickplay's hub: the turn fights its own view, in place as it fades in
+    "photo_screen",                  # in a song
+    "pause_game_settings_screen",    # in a song
+    "pause_audio_settings_screen",   # in a song
+    "pause_video_settings_screen",   # in a song
+    "ghc_practice_game_screen",      # in practice, the three above's twins
+    "ghc_practice_audio_screen",
+    "ghc_practice_video_screen",
+]
+# Screens in one room, between which the camera stays: it only moves.
+same_room = [
+    ["ghc_qp_setup_screen", "ghc_qp_character_screen"],
+]

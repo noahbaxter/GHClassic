@@ -383,7 +383,6 @@
          {cond
             ({ghc_pick_button $button} TRUE)
             ({== $button kPad_Tri}
-               {$this backwards_anim}
                {ghc_back}
                {ui goto_screen chooseprof_screen}
                kDataUnhandled
@@ -420,7 +419,6 @@
    (
       (panels)
       (allow_back FALSE)
-      (animate_transition FALSE)
       ; With no switch to make (that game's is what is up, or it is not
       ; there), straight on.
       (TRANSITION_COMPLETE_MSG
@@ -487,7 +485,6 @@
             ($band {&& {! {campaign is_empty_profile $index}} {! {ui in_transition}}})
             {cond
                ({== $button kPad_Tri}
-                  {$this backwards_anim}
                   {ghc_back}
                   {ui goto_screen main_screen}
                   kDataUnhandled
@@ -541,7 +538,6 @@
       )
       (BUTTON_DOWN_MSG
          {if {== $button kPad_Tri}
-            {$this backwards_anim}
             {ghc_back}
             {ui goto_screen {if_else {ghc_campaigns} ghc_campaign_screen chooseprof_screen}}
          }
@@ -648,7 +644,7 @@
             ({== $button kPad_Tri}
                {ghc_back}
                {if_else {{store_panel find st_screen1.view} showing}
-                  {do {store_screen backwards_anim} {autosave_goto career_screen}}
+                  {autosave_goto career_screen}
                   {do {store_panel hide_models} {store_panel show_store_screen_1}}
                }
                kDataUnhandled

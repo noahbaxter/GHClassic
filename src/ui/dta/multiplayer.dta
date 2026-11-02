@@ -533,7 +533,6 @@
    {cond
       ({ghc_pick_button $button} TRUE)
       ({== $button kPad_Tri}
-         {{ui current_screen} backwards_anim}
          {ghc_back}
          {ui goto_screen {ghc_multi_screen venue}}
          TRUE

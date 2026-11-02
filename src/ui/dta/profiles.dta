@@ -1119,7 +1119,6 @@
                ({!= $player_num [seat]} TRUE)
                ({== $button kPad_Tri}
                   {if [joining] {ghc_profile drop [seat]}}
-                  {$this backwards_anim}
                   {ghc_back}
                   {ui goto_screen [back_screen]}
                   kDataUnhandled
@@ -1189,7 +1188,6 @@
             {cond
                ({!= $player_num {ghc_profile_screen get seat}} TRUE)
                ({&& {== $button kPad_Tri} {$ten no_text_entered}}
-                  {$this backwards_anim}
                   {ghc_back}
                   {ui goto_screen ghc_profile_screen}
                   kDataUnhandled

@@ -217,6 +217,11 @@ namespace gh2
         uint32_t builtinDelete;
         uint32_t dataNodeGetObj;   // DataNode::GetObj
         uint32_t uiGotoScreen;     // UIManager::GotoScreen
+        // The menus' camera turn between screens (ui/transitions.h).
+        uint32_t ghScreenEnter;                  // GHScreen::Enter(UIScreen *from)
+        uint32_t ghScreenExit;                   // GHScreen::Exit(UIScreen *to)
+        uint32_t ghScreenCheckAnimateTransition; // GHScreen::CheckAnimateTransition
+        uint32_t ghScreenForwards;               // bool: the turn on, not back
         uint32_t uiManagerPoll;
         uint32_t debugModal; // DebugModal(bool &, char *)
         uint32_t abort;
@@ -603,6 +608,10 @@ namespace gh2
         .builtinDelete = 0x2cf160u,
         .dataNodeGetObj = 0x2b7f80u,
         .uiGotoScreen = 0x214d48u,
+        .ghScreenEnter = 0x145cf8u,
+        .ghScreenExit = 0x145f80u,
+        .ghScreenCheckAnimateTransition = 0x145dc8u,
+        .ghScreenForwards = 0x3da34cu,
         .uiManagerPoll = 0x214510u,
         .debugModal = 0x105a88u,
         .abort = 0x307b80u,
