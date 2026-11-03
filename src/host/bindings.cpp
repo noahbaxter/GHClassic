@@ -197,6 +197,11 @@ namespace gh2::input
         return "keyboard";
     }
 
+    std::string menuSection(bool keyboard)
+    {
+        return keyboard ? "menu keyboard" : "menu gamepad";
+    }
+
     std::string deviceSection(const std::string &name, const std::string &guid)
     {
         return deviceSection(name) + " " + guid;
@@ -351,7 +356,7 @@ namespace gh2::input
     }
 
     bool writeTemplate(const std::string &path, const std::string &section, const Profile &profile,
-                       const std::string &mode)
+                       const std::string &mode, bool listUnbound)
     {
         std::vector<std::string> kept = linesWithout(path, section);
 
@@ -379,6 +384,8 @@ namespace gh2::input
                 out << "mode = " << mode << "\n";
             for (int a = 0; a < kActionCount; ++a)
             {
+                if (!listUnbound && profile[a].empty())
+                    continue;
                 out << "; " << kActions[a].name << " =";
                 for (size_t i = 0; i < profile[a].size(); ++i)
                     out << (i == 0 ? " " : ", ") << formatSource(profile[a][i]);

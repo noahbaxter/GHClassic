@@ -1,0 +1,70 @@
+; A button held as the game goes from a song to a menu does nothing until it
+; is let go: the fret held as a song ends would pick on the results, and the
+; Start that paused would resume. A gamepad's A (a fret of its in a song, and
+; its pick in a menu), then the keyboard's Space (nothing in a song).
+#include common/first_boot.dta
+(controller dualsense "054c:0ce6" pad)
+(wait 1)
+(hold dualsense dpdown)
+(wait 0.3)
+(hold dualsense)
+(wait 0.5)
+(expect {seat_has 0 dualsense} 1)
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty easy}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 3)
+
+; Start held as it pauses: the pause menu stays up, then A resumes.
+(hold dualsense start)
+(wait_screen pause_screen 10)
+(wait 1.5)
+(expect {{ui current_screen} name} pause_screen)
+(hold dualsense)
+(wait 0.5)
+(expect {{ui current_screen} name} pause_screen)
+(press a dualsense)
+(wait_screen game_screen 10)
+(wait 2)
+
+; A held through the song's end: the results stay up, then A goes on.
+(hold dualsense a)
+(wait 0.5)
+{player0 win 5}
+(wait_screen endgame_screen 400)
+(wait 4)
+(expect {{ui current_screen} name} endgame_screen)
+(hold dualsense)
+(wait 0.5)
+(expect {{ui current_screen} name} endgame_screen)
+(press a dualsense)
+(wait 2)
+(expect {!= {{ui current_screen} name} endgame_screen} 1)
+
+; The keyboard's Space, held through a song's end as a pad's A was.
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+(wait 1)
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty easy}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 3)
+(keys Space)
+(wait 0.5)
+{player0 win 5}
+(wait_screen endgame_screen 400)
+(wait 4)
+(expect {{ui current_screen} name} endgame_screen)
+(keys)
+(wait 0.5)
+(expect {{ui current_screen} name} endgame_screen)
+(key Space)
+(wait 2)
+(expect {!= {{ui current_screen} name} endgame_screen} 1)
+(quit)

@@ -98,7 +98,8 @@ namespace gh2::input
             const Section *own = sectionOf(name, guid);
             d.sectionName = name;
             d.sectionGuid = guid;
-            d.builtin = builtin ? builtin->profile : Profile{};
+            const auto layout = builtinProfile(info, d.kind);
+            d.builtin = layout ? layout->profile : Profile{};
             d.profile = overlay(d.builtin, own);
             const bool bound = own && !own->empty();
             char vidPid[16];

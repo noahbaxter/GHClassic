@@ -1,7 +1,8 @@
-; A gamepad as P1 finds its way by its frets in every menu, as it plays a
-; song: LT green picks, LB red backs out, RB yellow and A orange held as
-; long as they are held. From a song's pause menu, in GH2's scenes and then
-; GH1's, Settings' fourth row is Controllers, which leads back there.
+; A gamepad as P1 finds its way by A, B and the D-pad in every menu, as on a
+; console, Y, X and LB are a menu's yellow, blue and orange, and its other
+; frets (RB) do nothing there. From a song's pause
+; menu, in GH2's scenes and then GH1's, Settings' fourth row is Controllers,
+; which leads back there.
 (needs gh1)
 #include common/first_boot.dta
 (controller dualsense "054c:0ce6" pad)
@@ -14,21 +15,31 @@
 {ui goto_screen options_screen}
 (wait_screen options_screen)
 (wait 1)
-(hold dualsense lefttrigger+)
+(hold dualsense a)
 (wait 0.3)
 (hold dualsense)
 (wait 0.5)
 (expect $ghc_options_settings TRUE)
-(hold dualsense leftshoulder)
+(hold dualsense b)
 (wait 0.3)
 (hold dualsense)
 (wait 0.5)
 (expect $ghc_options_settings FALSE)
-(hold dualsense rightshoulder a)
+(hold dualsense dpdown a)
+(wait 0.3)
+(expect {pad_held down} 1)
+(expect {pad_held green} 1)
+(expect {pad_held yellow} 0)
+(hold dualsense rightshoulder)
+(wait 0.3)
+(expect {pad_held yellow} 0)
+(expect {pad_held orange} 0)
+(expect {pad_held red} 0)
+(hold dualsense y x leftshoulder)
 (wait 0.3)
 (expect {pad_held yellow} 1)
+(expect {pad_held blue} 1)
 (expect {pad_held orange} 1)
-(expect {pad_held green} 0)
 (hold dualsense)
 (wait 0.3)
 
@@ -55,7 +66,7 @@
 (wait 0.3)
 (hold dualsense)
 (wait 0.3)
-(hold dualsense lefttrigger+)
+(hold dualsense a)
 (wait 0.3)
 (hold dualsense)
 (wait_screen pause_settings_screen 10)
@@ -77,7 +88,7 @@
 (hold dualsense)
 (wait 0.3)
 (expect {pause_settings_panel focus_name} quit.btn)
-(hold dualsense lefttrigger+)
+(hold dualsense a)
 (wait 0.3)
 (hold dualsense)
 (wait_screen ghc_pause_controllers_screen 10)
@@ -86,7 +97,7 @@
 (key Escape)
 (wait_screen pause_settings_screen 10)
 (wait 1)
-(hold dualsense leftshoulder)
+(hold dualsense b)
 (wait 0.3)
 (hold dualsense)
 (wait_screen pause_screen 10)
@@ -113,7 +124,7 @@
 (hold dualsense)
 (wait 0.3)
 (expect {pause_settings_panel focus_name} quit.btn)
-(hold dualsense lefttrigger+)
+(hold dualsense a)
 (wait 0.3)
 (hold dualsense)
 (wait_screen ghc_pause_controllers_screen 10)

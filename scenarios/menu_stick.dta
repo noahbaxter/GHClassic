@@ -1,0 +1,23 @@
+; A gamepad's left stick moves a menu one row a push, as its D-pad does: a
+; tap of it down then up from the first row is one row each way, and a pad
+; whose whammy is on the stick does not move it a second time.
+#include common/first_boot.dta
+(controller pad "045e:028e" pad)
+(wait 0.5)
+(press dpdown pad)
+(expect {seat_has 0 pad} 1)
+(wait 1)
+(expect {main_screen focus_name} main_options.btn)
+(hold pad lefty+)
+(wait 0.15)
+(hold pad)
+(wait 1)
+(print after_down {main_screen focus_name})
+(expect {main_screen focus_name} quit.btn)
+(hold pad lefty-)
+(wait 0.15)
+(hold pad)
+(wait 1)
+(print after_up {main_screen focus_name})
+(expect {main_screen focus_name} main_options.btn)
+(quit)
