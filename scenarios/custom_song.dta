@@ -1,0 +1,33 @@
+; A custom song from songs/ (a .chart and an Opus stem of silence): listed on
+; the custom setlist, played to its end on autoplay, its best kept and
+; shown back on the list's printout.
+(songs songs)
+#include common/first_boot.dta
+{gamecfg set mode quickplay}
+{setlist select custom}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(expect {best score {game get_song} expert} 0)
+(shot printout_before)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+{{game get_player_config 0} set autoplay TRUE}
+; Easy and Expert only, as charted.
+(press down)
+(press green)
+(wait_screen game_screen 60)
+(wait_screen endgame_screen 120)
+(wait 1)
+(expect {player0 gems_hit} 32)
+(expect {player0 gems_passed} 0)
+(expect {== {best score {game get_song} expert} {player0 score}} 1)
+(press green)
+(wait_screen complete_screen 30)
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(shot printout_after)
+(quit)

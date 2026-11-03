@@ -24,6 +24,7 @@ namespace gh2::script
     constexpr uint32_t kSymbol = 0x5u;
     constexpr uint32_t kArray = 0x10u;
     constexpr uint32_t kCommand = 0x11u;  // {...}
+    constexpr uint32_t kString = 0x12u;
     constexpr uint32_t kProperty = 0x13u; // [...]
 
     Node floatNode(float value);
@@ -39,8 +40,11 @@ namespace gh2::script
         int size() const;
         Node arg(int i) const; // evaluated
         std::string symbol(int i) const; // "" unless a symbol
+        std::string text(int i) const;   // a symbol's or a string's, else ""
         float number(int i) const;       // an int or a float
+        size_t index(int i) const;       // that as a count or place, 0 for one below
         uint32_t object(int i) const;    // Hmx::Object*, by name as script finds it
+        Node word(const std::string &text) const; // that as a symbol, to return
     };
 
     using Command = Node (*)(const Call &call);

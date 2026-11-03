@@ -531,6 +531,10 @@ namespace gh2::scenario
                     s_shooting = true;
                     return;
                 }
+                else if (verb == "songs")
+                {
+                    // Read by ghc.py before the run, as the folders setting.
+                }
                 else if (verb == "needs")
                 {
                     std::string missing;

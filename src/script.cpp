@@ -13,6 +13,7 @@
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
 
+#include <algorithm>
 #include <cstring>
 #include <iostream>
 #include <map>
@@ -291,6 +292,15 @@ namespace gh2::script
         return reinterpret_cast<const char *>(getMemPtr(rdram, node.value));
     }
 
+    // A string node's value holds its char* first (locale.cpp read).
+    std::string Call::text(int i) const
+    {
+        const Node node = arg(i);
+        if (node.type == kString && node.value != 0u)
+            return reinterpret_cast<const char *>(getMemPtr(rdram, load<uint32_t>(rdram, node.value)));
+        return symbol(i);
+    }
+
     float Call::number(int i) const
     {
         const Node node = arg(i);
@@ -302,11 +312,15 @@ namespace gh2::script
         return value;
     }
 
+    size_t Call::index(int i) const { return static_cast<size_t>(std::max(0, static_cast<int>(number(i)))); }
+
     uint32_t Call::object(int i) const
     {
         const uint32_t node = load<uint32_t>(rdram, args) + 8u * static_cast<uint32_t>(i);
         return static_cast<uint32_t>(runtime->callGuestFunction(rdram, ctx, s_addresses->dataNodeGetObj, {node, args}));
     }
+
+    Node Call::word(const std::string &text) const { return {script::symbol(rdram, ctx, runtime, text), kSymbol}; }
 
     void runWhenUiReady(std::string text)
     {

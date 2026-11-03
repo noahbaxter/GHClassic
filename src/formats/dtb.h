@@ -49,6 +49,9 @@ namespace gh2::dtb
 
     // Nodes for a script made on the host.
     inline Node symbol(const std::string &text) { return {kSymbol, 0, 0.0f, text, {}}; }
+    inline Node string(const std::string &text) { return {kString, 0, 0.0f, text, {}}; }
+    inline Node integer(int32_t value) { return {kInt, value, 0.0f, {}, {}}; }
+    inline Node real(float value) { return {kFloat, 0, value, {}, {}}; }
     inline Node array(std::vector<Node> nodes) { return {kArray, 0, 0.0f, {}, std::move(nodes)}; }
     inline Node command(std::vector<Node> nodes) { return {kCommand, 0, 0.0f, {}, std::move(nodes)}; }
 

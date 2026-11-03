@@ -538,6 +538,12 @@ def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=N
     out = Path(out)
     shutil.rmtree(out, ignore_errors=True)
     (out / "frames").mkdir(parents=True)
+    # A scenario's (songs <folder>) steps, beside it: custom songs are
+    # scanned at boot, before any step runs. --set's folders still wins.
+    if scenario:
+        if songs := re.findall(r"^\(songs ([^)]*)\)", Path(scenario).read_text(), re.M):
+            here = Path(scenario).resolve().parent
+            settings = ["folders=" + ";".join(str(here / s.strip()) for s in songs), *settings]
     # --set's lines, over the defaults.
     if settings:
         (out / "settings.ini").write_text("".join(f"{s.replace('=', ' = ', 1)}\n" for s in settings))
@@ -834,6 +840,8 @@ def notices():
         ("libmpeg2", src("libmpeg2") / "COPYING"),
         ("libogg", src("ogg") / "COPYING"),
         ("libvorbis", src("vorbis") / "COPYING"),
+        ("libopus", src("opus") / "COPYING"),
+        ("opusfile", src("opusfile") / "COPYING"),
         ("zstd", ROOT / "config" / "licenses" / "zstd.txt"),
         ("PS2Recomp", ROOT / "lib" / "PS2Recomp" / "LICENSE"),
     ]

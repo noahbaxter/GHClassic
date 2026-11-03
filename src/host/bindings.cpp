@@ -56,14 +56,6 @@ namespace gh2::input
         // SDL names the comma key ",", which the list would split on.
         constexpr const char *kCommaName = "comma";
 
-        // A UTF-8 byte order mark, which some editors put before the first line.
-        std::string withoutBom(std::string line)
-        {
-            if (line.rfind("\xEF\xBB\xBF", 0) == 0)
-                line.erase(0, 3);
-            return line;
-        }
-
         // The file key for an action: "green", "strum_up", ...
         const char *actionKey(Action action)
         {
@@ -239,7 +231,7 @@ namespace gh2::input
         {
             ++number;
             // Comments take whole lines: ';' and '#' are key names too.
-            const std::string text = trim(number == 1 ? withoutBom(line) : line);
+            const std::string text = trim(number == 1 ? ini::withoutBom(line) : line);
             if (ini::skipped(text))
                 continue;
             if (const auto name = ini::sectionName(text))
@@ -306,7 +298,7 @@ namespace gh2::input
             while (std::getline(in, line))
             {
                 if (first)
-                    line = withoutBom(line);
+                    line = ini::withoutBom(line);
                 first = false;
                 if (const auto name = ini::sectionName(trim(line)))
                     inside = *name == section;

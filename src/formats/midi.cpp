@@ -100,20 +100,20 @@ namespace gh2::midi
                 tick += r.vlq();
                 Event e{tick};
                 uint8_t status = r.u8();
-                if (status == 0xffu)
+                if (status == kMeta)
                 {
                     e.status = status;
                     e.meta = r.u8();
                     e.data = r.take(r.vlq());
-                    if (e.meta == 0x2fu)
+                    if (e.meta == kEndOfTrack)
                         continue;
-                    if (e.meta == 0x03u && track.name.empty())
+                    if (e.meta == kTrackName && track.name.empty())
                     {
                         track.name.assign(e.data.begin(), e.data.end());
                         continue;
                     }
                 }
-                else if (status == 0xf0u || status == 0xf7u)
+                else if (status == kSysex || status == kSysexEnd)
                 {
                     e.status = status;
                     e.data = r.take(r.vlq());
@@ -155,7 +155,7 @@ namespace gh2::midi
             if (!track.name.empty())
             {
                 putVlq(body, 0u);
-                body.insert(body.end(), {0xffu, 0x03u});
+                body.insert(body.end(), {kMeta, kTrackName});
                 putVlq(body, static_cast<uint32_t>(track.name.size()));
                 body.insert(body.end(), track.name.begin(), track.name.end());
             }
@@ -165,13 +165,13 @@ namespace gh2::midi
                 putVlq(body, e.tick - tick);
                 tick = e.tick;
                 body.push_back(e.status);
-                if (e.status == 0xffu)
+                if (e.status == kMeta)
                     body.push_back(e.meta);
-                if (e.status == 0xffu || e.status == 0xf0u || e.status == 0xf7u)
+                if (e.status == kMeta || e.status == kSysex || e.status == kSysexEnd)
                     putVlq(body, static_cast<uint32_t>(e.data.size()));
                 body.insert(body.end(), e.data.begin(), e.data.end());
             }
-            body.insert(body.end(), {0x00u, 0xffu, 0x2fu, 0x00u});
+            body.insert(body.end(), {0x00u, kMeta, kEndOfTrack, 0x00u});
             putBe(out, 0x4d54726bu, 4);
             putBe(out, static_cast<uint32_t>(body.size()), 4);
             out.insert(out.end(), body.begin(), body.end());
@@ -181,7 +181,12 @@ namespace gh2::midi
 
     Event text(uint32_t tick, const std::string &text)
     {
-        return {tick, 0xffu, 0x01u, Bytes(text.begin(), text.end())};
+        return {tick, kMeta, kText, Bytes(text.begin(), text.end())};
+    }
+
+    Event note(uint32_t tick, uint8_t pitch, bool on)
+    {
+        return {tick, on ? kNoteOn : kNoteOff, 0u, {pitch, static_cast<uint8_t>(on ? 100u : 0u)}};
     }
 
     TempoMap::TempoMap(const File &file) : m_spans{{0u, 0.0, 0.5 / file.division}}
@@ -190,7 +195,7 @@ namespace gh2::midi
             return;
         for (const Event &e : file.tracks[0].events)
         {
-            if (e.status != 0xffu || e.meta != 0x51u || e.data.size() < 3u)
+            if (e.status != kMeta || e.meta != kTempo || e.data.size() < 3u)
                 continue;
             const uint32_t perBeat = (e.data[0] << 16) | (e.data[1] << 8) | e.data[2];
             if (perBeat == 0u)

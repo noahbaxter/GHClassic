@@ -66,7 +66,7 @@ namespace gh2
 
         dtb::Node priced(const std::string &key, int32_t price)
         {
-            return array({symbol(key), array({symbol("price"), {dtb::kInt, price, 0.0f, {}, {}}})});
+            return array({symbol(key), array({symbol("price"), dtb::integer(price)})});
         }
 
         dtb::Node skin(const char *key, const char *outfit, const char *mat)
@@ -284,7 +284,7 @@ namespace gh2
         // 0x119a70).
         const std::vector<dtb::Node> terms = {
             array({symbol("require"), symbol("tour_passed")}),
-            array({symbol("difficulty"), {dtb::kInt, kControllerFrom | kOrHigher, 0.0f, {}, {}}})};
+            array({symbol("difficulty"), dtb::integer(kControllerFrom | kOrHigher)})};
         if (dtb::Node *type = child(*controller, "type"); type && type->nodes.size() > 1u)
             type->nodes[1] = symbol("guitar");
         else

@@ -29,6 +29,7 @@ namespace gh2::settings
             kBool,
             kInt,
             kChoice, // one of `choices`, its value the word's position
+            kText,   // any words, kept as they are; its value 0
         };
 
         // A setting's kind. Its default, section and place in the file, and
@@ -131,6 +132,8 @@ namespace gh2::settings
             {"lighting", Type::kChoice, 0, 1, 1, kLastGen, "last_gen next_gen"},
             {"perf_overlay", Type::kChoice, 0, 3, 1, 0, "off fps graph full"},
             {"vector_fonts", Type::kBool, 0, 1, 1, 1},
+            {"folders", Type::kText, 0, 0, 1, 0},
+            {"show_duplicates", Type::kBool, 0, 1, 1, 0},
         };
 
         const Entry *entryNamed(const std::string &name)
@@ -141,14 +144,17 @@ namespace gh2::settings
         }
 
         // A `key = value  # note` line's key and value, or none for any other
-        // line.
+        // line. A note's # follows a space, so a folder's (D:\#Charts) is
+        // the value's.
         std::optional<std::pair<std::string, std::string>> assignment(const std::string &line)
         {
             const std::string trimmed = ini::trim(line);
             const size_t eq = trimmed.find('=');
             if (ini::skipped(trimmed) || ini::sectionName(trimmed) || eq == std::string::npos)
                 return std::nullopt;
-            const size_t note = trimmed.find('#', eq);
+            size_t note = trimmed.find('#', eq);
+            while (note != std::string::npos && trimmed[note - 1u] != ' ' && trimmed[note - 1u] != '\t')
+                note = trimmed.find('#', note + 1u);
             return std::make_pair(ini::trim(trimmed.substr(0, eq)),
                                   ini::trim(trimmed.substr(eq + 1, note == std::string::npos ? std::string::npos : note - eq - 1)));
         }
@@ -163,6 +169,7 @@ namespace gh2::settings
         {
             std::array<int, kKeyCount> value{};
             std::array<bool, kKeyCount> set{};
+            std::array<std::string, kKeyCount> text; // kText's
         };
 
         std::string s_path;
@@ -174,6 +181,11 @@ namespace gh2::settings
 
         bool parse(const Entry &entry, const std::string &text, int &out)
         {
+            if (entry.type == Type::kText)
+            {
+                out = 0;
+                return true;
+            }
             if (entry.type == Type::kBool && (text == "true" || text == "false"))
             {
                 out = text == "true";
@@ -216,6 +228,7 @@ namespace gh2::settings
                     if (entry && parse(*entry, pair->second, value))
                     {
                         state.value[entry - kEntries] = value;
+                        state.text[entry - kEntries] = entry->type == Type::kText ? pair->second : "";
                         defaulted[entry - kEntries] = true;
                     }
                     else
@@ -247,6 +260,8 @@ namespace gh2::settings
                 }
                 state.value[entry - kEntries] = value;
                 state.set[entry - kEntries] = true;
+                if (entry->type == Type::kText)
+                    state.text[entry - kEntries] = pair->second;
             }
             return state;
         }
@@ -279,7 +294,8 @@ namespace gh2::settings
                         continue;
                     }
                     const size_t eq = line.find('='), note = line.find('#', eq);
-                    std::string value = text(*entry, state().value[entry - kEntries]);
+                    std::string value = entry->type == Type::kText ? state().text[entry - kEntries]
+                                                                   : text(*entry, state().value[entry - kEntries]);
                     if (note != std::string::npos)
                         value.resize(std::max(value.size() + 1u, note - eq - 2u), ' ');
                     out << line.substr(0, eq + 1) << " " << value
@@ -294,6 +310,11 @@ namespace gh2::settings
     int get(Key key)
     {
         return state().value[key];
+    }
+
+    std::string text(Key key)
+    {
+        return state().text[key];
     }
 
     namespace

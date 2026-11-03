@@ -31,15 +31,18 @@
 #include "save/gh1_stream.h"
 #include "save/gh2_text.h"
 #include "save/ps2_card.h"
+#include "save/results.h"
 #include "save/store.h"
 #include "script.h"
 #include "settings/ini.h"
 #include "settings/settings.h"
+#include "worker.h"
 
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -96,17 +99,24 @@ namespace gh2::save
 
         // state.ini, beside save.bin, or beside --save's file so a run keeps
         // its own: [game] last, the game last entered, and engine, the note
-        // engine picked. Written at every switch,
-        // where the save holds it only once the game saves again, and read
-        // before the boot loads the save.
+        // engine picked, and where the menus were left (state()). Written at
+        // every change, where the save holds the game only once it saves
+        // again, and read before the boot loads the save.
         std::string statePath()
         {
             return s_path.empty() ? settings::userDataPath("state.ini")
                                   : (std::filesystem::path(s_path).parent_path() / "state.ini").string();
         }
 
-        std::string readState(const std::string &key)
+        // Its values by section and key, read once.
+        using State = std::map<std::string, std::map<std::string, std::string>>;
+        std::optional<State> s_state;
+
+        State &readState()
         {
+            if (s_state)
+                return *s_state;
+            s_state.emplace();
             std::ifstream in(statePath());
             std::string line, section;
             while (std::getline(in, line))
@@ -116,25 +126,10 @@ namespace gh2::save
                     continue;
                 if (const auto name = ini::sectionName(line))
                     section = *name;
-                else if (const size_t eq = line.find('='); section == "game" && eq != std::string::npos &&
-                                                           ini::trim(line.substr(0, eq)) == key)
-                    return ini::trim(line.substr(eq + 1));
+                else if (const size_t eq = line.find('='); eq != std::string::npos)
+                    (*s_state)[section][ini::trim(line.substr(0, eq))] = ini::trim(line.substr(eq + 1));
             }
-            return "";
-        }
-
-        std::string s_lastGame, s_engine; // as state.ini has them, once read
-
-        void writeState()
-        {
-            if (s_inMemory)
-                return;
-            if (ini::writeReplacing(statePath(), [&](std::ofstream &out) {
-                    out << "[game]\nlast = " << s_lastGame << "\n";
-                    if (!s_engine.empty())
-                        out << "engine = " << s_engine << "\n";
-                }))
-                std::cerr << "[save] could not write " << statePath() << std::endl;
+            return *s_state;
         }
 
         // A game's sections under a note engine: its own name under GH2's,
@@ -309,6 +304,22 @@ namespace gh2::save
         {
             const auto it = s_songGames.find(song);
             return it == s_songGames.end() ? s_game : it->second;
+        }
+
+        // The [best] section as kept: the disk's, taken once where no save
+        // has been loaded yet, so a best kept before the load adds to it.
+        Section &bests()
+        {
+            static bool s_read = false;
+            if (!s_read && s_loaded == Loaded::kNothing && !s_store.find(kBestSection))
+            {
+                s_read = true;
+                Store disk;
+                if (readFile(path(), disk) == ReadResult::kOk)
+                    if (const Section *section = disk.find(kBestSection))
+                        s_store.sections.push_back(*section);
+            }
+            return s_store.section(kBestSection);
         }
 
         // A game's save folder as each game writes it: the marker file named
@@ -744,7 +755,8 @@ namespace gh2::save
 
     void keepQuickplayFullCombo(int difficulty, const std::string &song)
     {
-        if (difficulty < 0 || difficulty >= gh2::kDifficulties)
+        // Named songs (save/results.h) keep theirs in [best], by chart.
+        if (difficulty < 0 || difficulty >= gh2::kDifficulties || isNamed(song))
             return;
         s_store.section("quickplay " + sectionGame(gameOf(song)) + " " + kDifficulties[difficulty]).set("fc." + song, "1");
     }
@@ -753,8 +765,13 @@ namespace gh2::save
     {
         if (difficulty < 0 || difficulty >= gh2::kDifficulties)
             return false;
-        const std::string game = gameOf(song), key = "fc." + song;
         const char *const name = kDifficulties[difficulty];
+        if (isNamed(song))
+        {
+            const auto best = keptBest(playedKey(song, name));
+            return best && best->fullCombo;
+        }
+        const std::string game = gameOf(song), key = "fc." + song;
         if (const Section *section = quickplaySection(game, noteEngine(), name); section && section->get(key))
             return true;
         for (int slot = 0; slot < gh2::kProfiles; ++slot)
@@ -815,7 +832,7 @@ namespace gh2::save
 
     std::string lastGame()
     {
-        if (std::string game = readState("last"); !game.empty())
+        if (std::string game = state("game", "last"); !game.empty())
             return game;
         // Before the boot's load, the save as it is on disk.
         Store disk;
@@ -828,24 +845,100 @@ namespace gh2::save
     void keepLastGame(const std::string &game)
     {
         s_store.section(kOwnSection).set("campaign", game);
-        s_lastGame = game;
-        keptEngine();
-        writeState();
+        keepState("game", "last", game);
+    }
+
+    std::string state(const std::string &section, const std::string &key)
+    {
+        const State &state = readState();
+        const auto s = state.find(section);
+        if (s == state.end())
+            return "";
+        const auto k = s->second.find(key);
+        return k != s->second.end() ? k->second : "";
+    }
+
+    void keepState(const std::string &section, const std::string &key, const std::string &value)
+    {
+        std::string &kept = readState()[section][key];
+        if (kept == value)
+            return;
+        kept = value;
+        if (s_inMemory)
+            return;
+        // Of writes waiting, only the last.
+        static std::atomic<uint64_t> s_written{0u};
+        const uint64_t mine = ++s_written;
+        const auto write = [mine, state = *s_state, path = statePath()]
+        {
+            if (mine != s_written.load())
+                return;
+            const auto lines = [&](std::ofstream &out)
+            {
+                for (const auto &[name, keys] : state)
+                {
+                    out << "[" << name << "]\n";
+                    for (const auto &[k, v] : keys)
+                        out << k << " = " << v << "\n";
+                    out << "\n";
+                }
+            };
+            if (ini::writeReplacing(path, lines))
+                std::cerr << "[save] could not write " << path << std::endl;
+        };
+        // The game and engine at once, as a quit straight after must keep
+        // them; the rest off the game thread, as a list scrolled fast
+        // changes it every few frames.
+        if (section == "game")
+            write();
+        else
+            worker::run(write);
+    }
+
+    std::string gameOfSong(const std::string &song)
+    {
+        return gameOf(song);
+    }
+
+    std::optional<Best> keptBest(const std::string &key)
+    {
+        const std::string *kept = bests().get(key);
+        return kept ? parseBest(*kept) : std::nullopt;
+    }
+
+    void keepBest(const std::string &key, const Best &best)
+    {
+        // Into the save on disk as it is there, its careers as the game last
+        // saved them; where there is none yet the game's first save carries it.
+        Store disk;
+        const bool onDisk = !s_inMemory && readFile(path(), disk) == ReadResult::kOk;
+        // The best of the disk's, this run's own (a write that failed may
+        // have left the disk's behind) and the new one.
+        Best now = best;
+        for (const std::string *was : {bests().get(key), onDisk ? disk.section(kBestSection).get(key) : nullptr})
+            if (const auto old = was ? parseBest(*was) : std::nullopt)
+                now = better(*old, now);
+        const auto keep = [&](Section &section)
+        {
+            section.set("version", std::to_string(kBestVersion));
+            section.set(key, bestText(now));
+        };
+        keep(bests());
+        if (!onDisk)
+            return;
+        keep(disk.section(kBestSection));
+        if (!writeFile(path(), disk))
+            std::cerr << "[save] could not write " << path() << std::endl;
     }
 
     std::string keptEngine()
     {
-        if (s_engine.empty())
-            s_engine = readState("engine");
-        return s_engine;
+        return state("game", "engine");
     }
 
     void keepEngine(const std::string &engine)
     {
-        s_engine = engine;
-        if (s_lastGame.empty())
-            s_lastGame = lastGame();
-        writeState();
+        keepState("game", "engine", engine);
     }
 
     void enterGame(const std::string &game, uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
@@ -912,5 +1005,6 @@ namespace gh2::save
         runtime.replaceFunction(addresses.loadData1, loadData1);
         EntryHook<LoadData2Tag>::install(runtime, addresses.loadData2, onLoadData2);
         EntryHook<HighScoreDbTag>::install(runtime, addresses.highScoreDbCtor, onHighScoreDb);
+        installResults(runtime, addresses);
     }
 }

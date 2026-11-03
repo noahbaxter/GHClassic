@@ -110,7 +110,7 @@ namespace gh2::gh1
             uint32_t at = 0u, from = 0u, length = in.division * 4u;
             for (const midi::Event &e : in.tracks[0].events)
             {
-                if (e.status != 0xffu || e.meta != 0x58u || e.data.size() < 2u)
+                if (e.status != midi::kMeta || e.meta != midi::kSignature || e.data.size() < 2u)
                     continue;
                 const uint32_t next = e.data[1] < 32u ? in.division * 4u * e.data[0] >> e.data[1] : 0u;
                 if (next == 0u)
@@ -193,7 +193,7 @@ namespace gh2::gh1
                 return std::nullopt;
             const auto textOf = [](const midi::Event &e) -> std::optional<std::string>
             {
-                if (e.status != 0xffu || e.meta != 0x01u)
+                if (e.status != midi::kMeta || e.meta != midi::kText)
                     return std::nullopt;
                 std::string s(e.data.begin(), e.data.end());
                 s.erase(s.find_last_not_of(' ') + 1u);
@@ -215,7 +215,7 @@ namespace gh2::gh1
                     }
                     // The fret hand's places, 40 to 59. getready2rokk's four
                     // 60s (GH1's finger_powerchord_1) would be easy gems.
-                    else if (e.status != 0xffu && !e.data.empty() && e.data[0] >= 40u && e.data[0] <= 59u)
+                    else if (e.status != midi::kMeta && !e.data.empty() && e.data[0] >= 40u && e.data[0] <= 59u)
                         made["PART GUITAR"].events.push_back(e);
                 }
             std::vector<std::pair<uint32_t, std::string>> marks;
@@ -234,14 +234,14 @@ namespace gh2::gh1
                     {
                         const uint32_t at = e.tick > in->division ? e.tick - in->division : 0u;
                         const uint8_t note = *s == "drum_on" ? 60u : 61u;
-                        made[kUpcoming].events.push_back({at, 0x90u, 0u, {note, 100u}});
-                        made[kUpcoming].events.push_back({at + 1u, 0x80u, 0u, {note, 0u}});
+                        made[kUpcoming].events.push_back(midi::note(at, note, true));
+                        made[kUpcoming].events.push_back(midi::note(at + 1u, note, false));
                     }
                 }
             // GH1's gems are notes 60 to 100 of T1 GEMS, easy's to expert's.
             uint32_t firstGem = UINT32_MAX;
             for (const midi::Event &e : gems->events)
-                if ((e.status & 0xf0u) == 0x90u && e.data.size() > 1u && e.data[1] != 0u && e.data[0] >= 60u &&
+                if (midi::kind(e) == midi::kNoteOn && e.data.size() > 1u && e.data[1] != 0u && e.data[0] >= 60u &&
                     e.data[0] <= 100u)
                     firstGem = std::min(firstGem, e.tick);
             for (const auto &[tick, name] : sections(*in, marks, firstGem))
@@ -262,7 +262,7 @@ namespace gh2::gh1
             const midi::TempoMap tempos(*in);
             if (triggers)
                 for (midi::Event e : triggers->events)
-                    if (e.status != 0xffu && (e.status & 0xe0u) == 0x80u && !e.data.empty() &&
+                    if ((midi::kind(e) == midi::kNoteOn || midi::kind(e) == midi::kNoteOff) && !e.data.empty() &&
                         (e.data[0] == 60u || e.data[0] == 61u))
                     {
                         const bool kick = e.data[0] == 60u;
@@ -301,12 +301,12 @@ namespace gh2::gh1
                 std::optional<uint32_t> on;
                 for (const midi::Event &e : track.events)
                 {
-                    if (e.status == 0xffu || e.data.size() < 2u || e.data[0] != 108u)
+                    if (e.status == midi::kMeta || e.data.size() < 2u || e.data[0] != 108u)
                         continue;
-                    const bool down = (e.status & 0xf0u) == 0x90u && e.data[1] != 0u;
+                    const bool down = midi::kind(e) == midi::kNoteOn && e.data[1] != 0u;
                     if (down && !on)
                         on = e.tick;
-                    else if (!down && on && ((e.status & 0xf0u) == 0x80u || (e.status & 0xf0u) == 0x90u))
+                    else if (!down && on && (midi::kind(e) == midi::kNoteOff || midi::kind(e) == midi::kNoteOn))
                     {
                         out.emplace_back(seconds(*on), seconds(e.tick));
                         on.reset();
@@ -342,7 +342,7 @@ namespace gh2::gh1
             dtb::Node vols = array({symbol("vols"), array({})});
             for (const dtb::Node &gain : gains->nodes)
                 if (const auto g = dtb::number(gain))
-                    vols.nodes[1].nodes.push_back({dtb::kFloat, 0, *g > 0.0f ? 20.0f * std::log10(*g) : -96.0f});
+                    vols.nodes[1].nodes.push_back(dtb::real(*g > 0.0f ? 20.0f * std::log10(*g) : -96.0f));
             dtb::Node song = array({
                 symbol("song"),
                 array({symbol("name"), *path}),
@@ -455,7 +455,7 @@ namespace gh2::gh1
             if (store)
                 for (dtb::Node &list : store->nodes)
                     if (list.type == dtb::kArray && !list.nodes.empty() && list.nodes[0].text == "song")
-                        list.nodes.push_back(array({entry.nodes[0], array({symbol("price"), {dtb::kInt, 250, 0.0f, {}, {}}})}));
+                        list.nodes.push_back(array({entry.nodes[0], array({symbol("price"), dtb::integer(250)})}));
         }
     }
 

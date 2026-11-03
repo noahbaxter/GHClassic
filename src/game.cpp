@@ -25,6 +25,7 @@
 #include "frame_step.h"
 #include "game_overrides.h"
 #include "gh1/face.h"
+#include "custom/install.h"
 #include "gh1/install.h"
 #include "gh80s/install.h"
 #include "gh2x/install.h"
@@ -36,6 +37,8 @@
 #include "ui/zebra_wall.h"
 #include "settings/latency.h"
 #include "settings/settings.h"
+#include "ui/list_scroll.h"
+#include "ui/text_fit.h"
 #include "ui/locale.h"
 #include "ui/menus.h"
 #include "ui/meta_music.h"
@@ -94,6 +97,7 @@ namespace
         gh2::installGh1();
         gh2::installClassicLogo();
         gh2::installGh2x();
+        gh2::installCustomSongs();
         gh2::installHiddenGuitars();
         gh2::installGh1Face(runtime, gh2::kSlus21447);
         gh2::outfits::install(runtime, gh2::kSlus21447);
@@ -149,6 +153,8 @@ namespace
         gh2::installLocale(runtime, gh2::kSlus21447);
         gh2::installLatency(runtime, gh2::kSlus21447);
         gh2::installPad(runtime, gh2::kSlus21447);
+        gh2::list_scroll::install(runtime, gh2::kSlus21447);
+        gh2::text_fit::install(gh2::kSlus21447);
         gh2::installFrameStep(runtime, gh2::kSlus21447);
         gh2::installMenus(runtime);
         gh2::installPhotoMode(runtime, gh2::kSlus21447);

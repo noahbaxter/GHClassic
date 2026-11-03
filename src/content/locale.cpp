@@ -17,8 +17,6 @@ namespace gh2::locale
 {
     namespace
     {
-        constexpr uint32_t kString = 0x12u;
-
         const Addresses *s_addresses = nullptr;
         std::string s_added; // (token "text") or (token {expression}) for each
         std::string s_game = "gh2";
@@ -43,7 +41,7 @@ namespace gh2::locale
                 const uint32_t entry = load<uint32_t>(rdram, node);
                 const uint32_t nodes = load<uint32_t>(rdram, entry);
                 if (load<int16_t>(rdram, entry + 8u) < 2 || load<uint32_t>(rdram, nodes + 4u) != script::kSymbol ||
-                    load<uint32_t>(rdram, nodes + 12u) != kString)
+                    load<uint32_t>(rdram, nodes + 12u) != script::kString)
                     continue;
                 out.emplace(reinterpret_cast<const char *>(getMemPtr(rdram, load<uint32_t>(rdram, nodes))),
                             load<uint32_t>(rdram, load<uint32_t>(rdram, nodes + 8u)));
@@ -111,7 +109,7 @@ namespace gh2::locale
 
     void add(const std::string &token, const std::string &text)
     {
-        s_added += "(" + token + " " + dtb::text({dtb::kString, 0, 0.0f, text}) + ")\n";
+        s_added += "(" + token + " " + dtb::text(dtb::string(text)) + ")\n";
     }
 
     void addExpression(const std::string &token, const std::string &expression)
