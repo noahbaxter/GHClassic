@@ -1,0 +1,20 @@
+; Up and down held in a menu repeat after a moment for a gamepad, not after
+; GH2's couple of seconds: held about 1 s on Video Settings' eight rows it
+; goes several rows on (not round the list), where one press is one.
+#include common/first_boot.dta
+(controller pad "045e:028e" pad)
+(wait 0.5)
+(press dpdown pad)
+(expect {seat_has 0 pad} 1)
+(wait 1)
+{ui goto_screen video_settings_screen}
+(wait_screen video_settings_screen)
+(wait 1.5)
+(expect {video_settings_screen focus_name} widescreen.btn)
+(hold pad dpdown)
+(wait 0.8)
+(hold pad)
+(wait 1)
+(print pad_held {video_settings_screen focus_name})
+(expect {|| {== {video_settings_screen focus_name} widescreen.btn} {== {video_settings_screen focus_name} vs_vfont.btn}} 0)
+(quit)

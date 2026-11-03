@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.8.7
+
+### New
+- Gamepads and keyboard once again have a dedicated set of controls for traversing menus separate from in game mappings. This was removed due to inconsistencies with how menus handled buttons but has been reimplemented by request. They can be rebound in input.ini under `[menu keyboard]` and `[menu gamepad]`
+
+|            | Keyboard     | Gamepad           |
+| ---------- | ------------ | ----------------- |
+| Move       | Arrows       | D-pad, left stick |
+| Select     | Space, Enter | A                 |
+| Back       | Esc          | B                 |
+| Yellow     | 3            | Y                 |
+| Blue       | 4            | X                 |
+| Orange     | 5            | LB                |
+| Start      | Tab          | Start             |
+| Star power | Shift        | Back              |
+
+- Pad mode autostrumming is now available as a keyboard controller option (asjkl players rejoice!)
+- Holding up/down now begins scrolling after about half a second rather than 2
+- VSync can now be turned off with `vsync = false` in settings.ini, which in tandem with `frame_rate_cap = 0` now truly means as many frames as your gpu can spit out (Hazzah!)
+
+### Bugs
+- A controller set to guitar mode now gives the proper button mappings expected (A B Y X LB) for a guitar input, this should allow guitars that auto-detect as xinput gamepads (CRKD) to function properly
+- Songs would sometimes freeze momentarily as their audio ended
+- Game timings would drift when frames run late
+
 ## v0.8.6
 
 ### New

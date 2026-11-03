@@ -23,18 +23,22 @@
 #include "host/device_screen.h"
 #include "host/devices.h"
 #include "host/layouts.h"
+#include "host/menu_layer.h"
 #include "host/owner.h"
 #include "host/scripted_devices.h"
 #include "host/sdl_devices.h"
 #include "host/seats.h"
+#include "runtime/host_clock.h"
 
 #include <SDL3/SDL.h>
 
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <iostream>
+#include <map>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -75,12 +79,35 @@ namespace gh2
         HostFly s_fly, s_scriptedFly;
         uint64_t s_pressEventNs = 0; // the host thread's own
 
-        // The host thread's: the mode last poll.
+        // Each seat's menu buttons held as the game left a song playing for
+        // a menu, which do nothing until let go: a fret held as the song
+        // ended would pick on the results.
+        uint16_t s_menuWait[kSeats] = {};
+        // Each gamepad's left stick as a menu's up and down (menu_layer.h).
+        std::map<DeviceId, StickLatch> s_stick;
+        // Up and down held, as a seat's controller and the keyboard step on.
+        NavRepeat s_navSeat[kSeats], s_navKeys;
+        // On the game's clock, as GH2's own repeat is: a run at --speed
+        // steps as fast as the game does, and a player's is real time.
+        uint64_t gameMs()
+        {
+            return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                             ps2x::host_clock::now().time_since_epoch())
+                                             .count());
+        }
+        // The host thread's: the mode last poll, and the menu keys held as
+        // the mode changed, which do nothing until let go: the Enter that
+        // paused would pick Resume, the Escape that left the Controllers
+        // screen would back out of the menu under it.
         Mode s_modeWas = Mode::kMenu;
+        std::array<bool, SDL_SCANCODE_COUNT> s_keyWait{};
         // The keyboard: anything of its held last poll, and whether it plays
         // nothing until it lets go, the press that stood it in for a seat or
         // what it held as the mode changed.
         bool s_keyboardWas = false, s_keyboardQuiet = false;
+        // The keyboard's mode line says pad, as the last poll outside a song
+        // saw it.
+        bool s_keyboardPad = false;
 
         // What is up, from what each part of the game says of it: the
         // Controllers screen over a song, a song over Multiplayer's screen.
@@ -197,7 +224,9 @@ namespace gh2
         }
         syncScriptedDevices();
         // A window without the controllers reads none of SDL's, but a
-        // scenario's.
+        // scenario's. What each presses in a menu: a gamepad's fixed
+        // controls, anything else its layout's (menu_layer.h).
+        std::map<DeviceId, uint16_t> menuOf;
         for (Device &d : devices())
             if (d.id.backend != DeviceId::kSdl || owner || d.isVirtual)
             {
@@ -205,6 +234,9 @@ namespace gh2
                 Read r{d.id, d.name, d.kind, d.label};
                 play(d.profile, d.now, keys, r.held);
                 reads.push_back(r);
+                menuOf[d.id] = d.kind == DeviceKind::kGamepad && hasMenuLayer(d.now)
+                                   ? gamepadMenuButtons(d.now, s_stick[d.id])
+                                   : padOf(r.held).pressed;
             }
         for (Read &r : reads)
             r.buttons = padOf(r.held).pressed;
@@ -237,6 +269,13 @@ namespace gh2
         // GH2 reads a seat in pad mode as a DualShock only in a song: its
         // menus answer the guitar whatever holds it.
         s_seats.setModes(reads, songUp());
+        // The keyboard alone in P1's seat plays by its own mode line, kept
+        // through a song as a seat's is.
+        if (!songUp() && keyboardPlaysPad() != s_keyboardPad)
+        {
+            s_keyboardPad = !s_keyboardPad;
+            std::cerr << "[input] keyboard: " << (s_keyboardPad ? "pad" : "guitar") << " mode" << std::endl;
+        }
         // A device just seated, or just off the Controllers screen, plays
         // from when it lets go of what it held. Anywhere but a song playing
         // it is in a menu, where its green picks and red backs out, a song's
@@ -244,12 +283,20 @@ namespace gh2
         HostPad pads[kSeats];
         for (int seat = 0; seat < kSeats; ++seat)
         {
-            const bool joypad = s_seats.pad(seat) && songUp();
+            const bool keyboardAlone = seat == 0 && s_seats[0].none() && s_keyboardPad;
+            const bool joypad = (s_seats.pad(seat) || keyboardAlone) && songUp();
             if (seated[seat] && !s_seats.holding(*seated[seat]))
             {
                 pads[seat] = padOf(seated[seat]->held, joypad);
                 if (mode != Mode::kPlaying)
-                    pads[seat].pressed = menuButtons(padOf(seated[seat]->held).pressed, joypad);
+                {
+                    uint16_t menu = menuOf[seated[seat]->id];
+                    menu = navRepeat(menu, gameMs(), s_navSeat[seat]);
+                    if (s_modeWas == Mode::kPlaying)
+                        s_menuWait[seat] = menu;
+                    s_menuWait[seat] &= menu;
+                    pads[seat].pressed = menuButtons(static_cast<uint16_t>(menu & ~s_menuWait[seat]), joypad);
+                }
             }
             pads[seat].joypad = joypad;
         }
@@ -274,10 +321,16 @@ namespace gh2
             else if (s_goneBefore[seat].load(std::memory_order_relaxed))
                 s_standIn[seat].store(true, std::memory_order_relaxed);
         }
+        // The keyboard in a menu, on the port it drives, reads its menu keys
+        // and never its layout (menu_layer.h). In a song its layout plays and
+        // only Esc (as Start) is one of these.
+        const std::vector<MenuKey> menuKeys = keyboardMenuKeys();
         for (const Read &r : reads)
             if (r.keyboard())
             {
                 bool any = std::any_of(r.held.begin(), r.held.end(), [](float h) { return h > kHeld; });
+                for (const MenuKey &k : menuKeys)
+                    any = any || keys[k.key];
                 if (any && !s_keyboardWas && inSong(mode) && s_seats.away(to) &&
                     !s_standIn[to].load(std::memory_order_relaxed))
                 {
@@ -295,11 +348,32 @@ namespace gh2
                 if (s_keyboardQuiet)
                     break;
 
-                // Its keys as the seat's mode plays them, in a menu as a
-                // menu takes them: only what its layout binds.
+                // Its layout in a song playing; in a menu only its menu keys.
                 HostPad &port = pads[to];
-                port.pressed |= mode == Mode::kPlaying ? padOf(r.held, port.joypad).pressed
-                                                       : menuButtons(padOf(r.held).pressed, port.joypad);
+                if (mode == Mode::kPlaying)
+                    port.pressed |= padOf(r.held, port.joypad).pressed;
+                // Its menu keys. In a song playing only its Esc, as Start,
+                // and in the song's pause menu Esc is Start too. Up and down
+                // repeat sooner (menu_layer.h).
+                uint16_t nav = 0;
+                for (const MenuKey &k : menuKeys)
+                {
+                    const bool esc = k.key == SDL_SCANCODE_ESCAPE;
+                    if (mode != s_modeWas && keys[k.key])
+                        s_keyWait[k.key] = true;
+                    if (mode == Mode::kPlaying && !esc)
+                        continue;
+                    if (!keys[k.key])
+                        s_keyWait[k.key] = false;
+                    else if (!s_keyWait[k.key])
+                    {
+                        const uint16_t bit = esc && (mode == Mode::kPlaying || mode == Mode::kPaused)
+                                                 ? static_cast<uint16_t>(pad::kStart)
+                                                 : menuButtons(k.bit, port.joypad);
+                        (k.bit == pad::kUp || k.bit == pad::kDown ? nav : port.pressed) |= bit;
+                    }
+                }
+                port.pressed |= navRepeat(nav, gameMs(), s_navKeys);
             }
         s_modeWas = mode;
         if (mode == Mode::kControllers)
@@ -327,11 +401,16 @@ namespace gh2
         const Device *p1 = seated[0] ? deviceById(seated[0]->id) : nullptr;
         if (p1)
             menu.kind = p1->kind;
-        const Profile &profile = p1 ? p1->profile : keyboardLayout();
-        for (int a = 0; a < kActionCount; ++a)
-            if (!profile[static_cast<size_t>(a)].empty())
-                menu.shown[static_cast<size_t>(a)] =
-                    shown(p1 ? p1->gamepad : nullptr, profile[static_cast<size_t>(a)].front());
+        // The help bar names what a menu reads: the fixed controls of a
+        // gamepad or the keyboard, else the guitar's layout.
+        if (!p1)
+            menu.shown = keyboardMenuShown();
+        else if (p1->kind == DeviceKind::kGamepad && hasMenuLayer(p1->now))
+            menu.shown = gamepadMenuShown(p1->gamepad);
+        else
+            for (int a = 0; a < kActionCount; ++a)
+                if (!p1->profile[static_cast<size_t>(a)].empty())
+                    menu.shown[static_cast<size_t>(a)] = shown(p1->gamepad, p1->profile[static_cast<size_t>(a)].front());
         std::lock_guard<std::mutex> lock(s_mutex);
         s_menu = menu;
         for (int seat = 0; seat < kSeats; ++seat)

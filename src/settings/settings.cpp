@@ -52,6 +52,7 @@ namespace gh2::settings
         const Entry kEntries[kKeyCount] = {
             {"widescreen", Type::kBool, 0, 1, 1, 0},
             {"frame_rate_cap", Type::kInt, 0, 500, 1, 60},
+            {"vsync", Type::kBool, 0, 1, 1, 1},
             // Most of GH2's textures have no mip chain (443 of 470 loaded into
             // a song), so drawn small they shimmer: the highway's far end.
             {"mipmaps", Type::kBool, 0, 1, 1, 0},

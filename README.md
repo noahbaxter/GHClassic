@@ -60,6 +60,23 @@ Everything GHC needs is stored in one folder. Windows and Linux are portable ins
 | Star power | Right Shift         | Select            |
 | Whammy     |                     | Left stick up     |
 
+### Menus
+
+|                     | Keyboard     | Gamepad                    |
+| ------------------- | ------------ | -------------------------- |
+| Move                | Up, Down     | D-pad/left stick up, down  |
+| Select (green)      | Enter, Space | A                          |
+| Back (red)          | Esc          | B                          |
+| Yellow              | `3`          | Y                          |
+| Blue                | `4`          | X                          |
+| Orange              | `5`          | LB                         |
+| Start               | Tab          | Start                      |
+| Select (star power) | Shift        | Back                       |
+
+Menu controls can be rebound in `input.ini` under `[menu keyboard]` and `[menu gamepad]`.
+
+Any device can play in pad mode, where a fret press strums on its own, from the Controllers screen's MODE row (Options > Settings), keyboard included.
+
 Certain guitars with built-in profiles should auto detect: PS3, Wii (through a raphnet adapter), Xbox 360, Rock Band 4 and World Tour PC. Anything else can be remapped in-game.
 
 There's also `input.ini` that lists every device's current bindings, which sits beside the game on Windows and Linux, and in `~/Library/Application Support/GHClassic` on macOS.

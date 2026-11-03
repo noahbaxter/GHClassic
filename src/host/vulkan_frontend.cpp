@@ -149,9 +149,13 @@ namespace gh2
             if (!hidden)
                 if (const SDL_DisplayMode *mode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(window)))
                     displayHz = mode->refresh_rate;
+            // No cap is as fast as the game thread goes: the scheduler's
+            // shortest period. With vsync, never past what the display shows.
             float hz = static_cast<float>(settings::get(settings::kFrameRateCap));
             if (hz == 0.0f)
-                hz = displayHz > 0.0f ? displayHz : 60.0f;
+                hz = 1000.0f;
+            if (settings::get(settings::kVsync) && displayHz > 0.0f)
+                hz = std::min(hz, displayHz);
             // frame_step replays at most four PS2 frames in one of ours.
             hz = std::max(hz, 15.0f);
             gamePeriod = std::chrono::nanoseconds(static_cast<int64_t>(1e9 / hz));
@@ -305,9 +309,14 @@ namespace gh2
             SDL_GetWindowSizeInPixels(window, &width, &height);
             vkb::SwapchainBuilder builder(device);
             // UNORM, so the guest's display-referred colours pass through as is.
+            // Vsync off: immediate, else mailbox (no tearing, still not
+            // waiting), else FIFO, the one every driver has.
+            const bool vsync = settings::get(settings::kVsync) != 0;
             builder.set_desired_format({VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
                 .set_desired_present_mode(timing::presentMode >= 0 ? static_cast<VkPresentModeKHR>(timing::presentMode)
-                                                                   : VK_PRESENT_MODE_FIFO_KHR)
+                                          : vsync                  ? VK_PRESENT_MODE_FIFO_KHR
+                                                                   : VK_PRESENT_MODE_IMMEDIATE_KHR)
+                .add_fallback_present_mode(vsync ? VK_PRESENT_MODE_FIFO_KHR : VK_PRESENT_MODE_MAILBOX_KHR)
                 .set_desired_extent(static_cast<uint32_t>(width), static_cast<uint32_t>(height))
                 .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT)
                 .set_old_swapchain(swapchain);

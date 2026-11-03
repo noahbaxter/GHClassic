@@ -1,5 +1,6 @@
 #include "host/profiles.h"
 
+#include <cctype>
 #include <initializer_list>
 
 namespace gh2::input
@@ -242,10 +243,78 @@ namespace gh2::input
         });
     }
 
+    Profile guitarOnGamepad()
+    {
+        return make({
+            {kGreen, {padButton(SDL_GAMEPAD_BUTTON_SOUTH)}},
+            {kRed, {padButton(SDL_GAMEPAD_BUTTON_EAST)}},
+            {kYellow, {padButton(SDL_GAMEPAD_BUTTON_NORTH)}},
+            {kBlue, {padButton(SDL_GAMEPAD_BUTTON_WEST)}},
+            {kOrange, {padButton(SDL_GAMEPAD_BUTTON_LEFT_SHOULDER)}},
+            {kStrumUp, {padButton(SDL_GAMEPAD_BUTTON_DPAD_UP)}},
+            {kStrumDown, {padButton(SDL_GAMEPAD_BUTTON_DPAD_DOWN)}},
+            {kStart, {padButton(SDL_GAMEPAD_BUTTON_START)}},
+            {kStarPower, {padButton(SDL_GAMEPAD_BUTTON_BACK), padButton(SDL_GAMEPAD_BUTTON_DPAD_LEFT)}},
+            {kWhammy, {padAxis(SDL_GAMEPAD_AXIS_LEFT_TRIGGER, 0.0f, 1.0f)}},
+        });
+    }
+
+    Profile keyboardMenuProfile()
+    {
+        return make({
+            {kGreen, {key(SDL_SCANCODE_RETURN), key(SDL_SCANCODE_KP_ENTER), key(SDL_SCANCODE_SPACE)}},
+            {kRed, {key(SDL_SCANCODE_ESCAPE)}},
+            {kYellow, {key(SDL_SCANCODE_3)}},
+            {kBlue, {key(SDL_SCANCODE_4)}},
+            {kOrange, {key(SDL_SCANCODE_5)}},
+            {kStrumUp, {key(SDL_SCANCODE_UP)}},
+            {kStrumDown, {key(SDL_SCANCODE_DOWN)}},
+            {kStart, {key(SDL_SCANCODE_TAB)}},
+            {kStarPower, {key(SDL_SCANCODE_RSHIFT), key(SDL_SCANCODE_LSHIFT)}},
+        });
+    }
+
+    Profile gamepadMenuProfile()
+    {
+        return make({
+            {kGreen, {padButton(SDL_GAMEPAD_BUTTON_SOUTH)}},
+            {kRed, {padButton(SDL_GAMEPAD_BUTTON_EAST)}},
+            {kYellow, {padButton(SDL_GAMEPAD_BUTTON_NORTH)}},
+            {kBlue, {padButton(SDL_GAMEPAD_BUTTON_WEST)}},
+            {kOrange, {padButton(SDL_GAMEPAD_BUTTON_LEFT_SHOULDER)}},
+            {kStrumUp, {padButton(SDL_GAMEPAD_BUTTON_DPAD_UP)}},
+            {kStrumDown, {padButton(SDL_GAMEPAD_BUTTON_DPAD_DOWN)}},
+            {kStart, {padButton(SDL_GAMEPAD_BUTTON_START)}},
+            {kStarPower, {padButton(SDL_GAMEPAD_BUTTON_BACK)}},
+        });
+    }
+
     DeviceInfo deviceInfo(SDL_Joystick *joystick, SDL_Gamepad *gamepad)
     {
-        return {SDL_GetJoystickVendor(joystick), SDL_GetJoystickProduct(joystick), SDL_GetJoystickType(joystick),
-                gamepad ? SDL_GetGamepadType(gamepad) : SDL_GAMEPAD_TYPE_UNKNOWN, gamepad != nullptr};
+        const char *name = SDL_GetJoystickName(joystick);
+        return {SDL_GetJoystickVendor(joystick),
+                SDL_GetJoystickProduct(joystick),
+                SDL_GetJoystickType(joystick),
+                gamepad ? SDL_GetGamepadType(gamepad) : SDL_GAMEPAD_TYPE_UNKNOWN,
+                gamepad != nullptr,
+                name ? name : ""};
+    }
+
+    namespace
+    {
+        // An XInput guitar reports as a plain pad (the CRKD Les Paul's mode
+        // 1 has no guitar subtype, and Linux's xpad drops it anyway), so
+        // a guitar not listed above has only its name to go by. YARG asks
+        // the player instead; the Controllers screen's mode row is ours.
+        // GitHub #3: taken for a gamepad, frets strummed and the strum bar
+        // did nothing.
+        bool nameSaysGuitar(const std::string &name)
+        {
+            std::string lower = name;
+            for (char &c : lower)
+                c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            return lower.find("guitar") != std::string::npos || lower.find("les paul") != std::string::npos;
+        }
     }
 
     std::optional<BuiltinProfile> builtinProfile(const DeviceInfo &info)
@@ -255,6 +324,8 @@ namespace gh2::input
                 return BuiltinProfile{k.label, k.profile()};
         if (isGuitarHeroLive(info.vendor, info.product))
             return std::nullopt;
+        if (info.gamepad && info.type != SDL_JOYSTICK_TYPE_GUITAR && nameSaysGuitar(info.name))
+            return BuiltinProfile{"guitar (XInput)", guitarOnGamepad()};
         // A guitar SDL recognises that is not listed above, Santroller builds
         // in a console mode among them: through XInput the 360's way, else
         // the PS3's.
@@ -264,5 +335,13 @@ namespace gh2::input
         if (info.gamepad)
             return BuiltinProfile{"gamepad, GH2's joypad layout", joypadLayout(), true};
         return std::nullopt;
+    }
+
+    std::optional<BuiltinProfile> builtinProfile(const DeviceInfo &info, DeviceKind playsAs)
+    {
+        std::optional<BuiltinProfile> builtin = builtinProfile(info);
+        if (builtin && builtin->gamepad && playsAs == DeviceKind::kGuitar)
+            builtin->profile = guitarOnGamepad();
+        return builtin;
     }
 }

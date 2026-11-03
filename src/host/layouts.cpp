@@ -27,6 +27,56 @@ namespace gh2::input
             const auto found = s_file.sections.find(name);
             return found == s_file.sections.end() ? nullptr : &found->second;
         }
+
+        // The keyboard's layout with what input.ini binds, less Esc: it
+        // pauses a song and backs out of a menu whatever is bound, and the
+        // Controllers screen will not bind it, so a line in the file does
+        // not either (an action bound only to it keeps its default). The other
+        // menu keys are free to bind: a menu never reads the layout and a song
+        // ignores them.
+        Profile keyboardWith(const Section *own)
+        {
+            Section kept;
+            if (own)
+                for (const auto &[action, sources] : *own)
+                {
+                    std::vector<Source> allowed = sources;
+                    std::erase_if(allowed, [](const Source &s)
+                                  { return s.kind == Source::kKey && s.index == SDL_SCANCODE_ESCAPE; });
+                    if (!allowed.empty() || sources.empty())
+                        kept[action] = allowed;
+                }
+            return overlay(keyboardProfile(), &kept);
+        }
+
+        Profile &menu(bool keyboard)
+        {
+            static Profile profiles[2] = {gamepadMenuProfile(), keyboardMenuProfile()};
+            return profiles[keyboard];
+        }
+
+        void refresh()
+        {
+            keyboard() = keyboardWith(named(keyboardSection()));
+            for (const bool k : {false, true})
+                menu(k) = menuWith(k, named(menuSection(k)));
+        }
+    }
+
+    Profile menuWith(bool keyboard, const Section *own)
+    {
+        Section kept;
+        if (own)
+            for (const auto &[action, sources] : *own)
+            {
+                if (action == kTilt || action == kWhammy)
+                    continue;
+                std::vector<Source> allowed = sources;
+                std::erase_if(allowed, [&](const Source &s) { return (s.kind == Source::kKey) != keyboard; });
+                if (!allowed.empty() || sources.empty())
+                    kept[action] = allowed;
+            }
+        return overlay(keyboard ? keyboardMenuProfile() : gamepadMenuProfile(), &kept);
     }
 
     void loadLayouts()
@@ -34,9 +84,30 @@ namespace gh2::input
         const std::string path = bindingFilePath();
         s_file = loadBindingFile(path);
         s_writable = true;
-        keyboard() = overlay(keyboardProfile(), named(keyboardSection()));
+        refresh();
         std::cerr << "[input] bindings: " << path << (s_file.sections.empty() ? " (none yet)" : "") << std::endl;
         listInFile("", "", keyboardProfile());
+        for (const bool k : {true, false})
+            if (!named(menuSection(k)))
+            {
+                if (writeTemplate(path, menuSection(k), k ? keyboardMenuProfile() : gamepadMenuProfile(), "", false))
+                    s_file.sections[menuSection(k)];
+                else
+                    std::cerr << "[input] could not write " << path << std::endl;
+            }
+    }
+
+    const Profile &menuLayout(bool keyboard)
+    {
+        return menu(keyboard);
+    }
+
+    void setMenuBinding(bool keyboard, Action action, const std::vector<Source> &sources)
+    {
+        s_file.sections[menuSection(keyboard)][action] = sources;
+        refresh();
+        std::cerr << "[input] [" << menuSection(keyboard) << "] " << kActions[action].name << " set, in memory"
+                  << std::endl;
     }
 
     const BindingFile &layoutFile()
@@ -69,6 +140,11 @@ namespace gh2::input
     {
         const std::string mode = sectionMode(sdlName, guid);
         return mode == "pad" ? DeviceKind::kGamepad : mode == "guitar" ? DeviceKind::kGuitar : detected;
+    }
+
+    bool keyboardPlaysPad()
+    {
+        return sectionMode("", "") == "pad";
     }
 
     void listInFile(const std::string &sdlName, const std::string &guid, const Profile &builtin)
@@ -107,7 +183,7 @@ namespace gh2::input
         }
         else
             s_file = loadBindingFile(path);
-        keyboard() = overlay(keyboardProfile(), named(keyboardSection()));
+        refresh();
         std::cerr << "[input] [" << name << (inMemory ? "] set, in memory" : "] written") << std::endl;
         return true;
     }

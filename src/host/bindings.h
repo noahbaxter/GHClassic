@@ -119,6 +119,9 @@ namespace gh2::input
     bool writeSeats(const std::string &path, const std::map<std::string, std::string> &seats);
 
     std::string keyboardSection();
+    // [menu keyboard] and [menu gamepad]: what a menu reads, the keyboard's
+    // and every gamepad's (menu_layer.h), apart from what they play.
+    std::string menuSection(bool keyboard);
     std::string deviceSection(const std::string &name, const std::string &guid);
     std::string deviceSection(const std::string &name); // an older file's
     // SDL's GUID for a controller, as the sections write it: the same for
@@ -139,8 +142,10 @@ namespace gh2::input
 
     // The section as `profile` in comment lines, in place of any it had, for
     // the player to uncomment and change; a new file starts with how to.
+    // Without `listUnbound` an action bound to nothing is left out, as a
+    // menu's tilt and whammy are.
     bool writeTemplate(const std::string &path, const std::string &section, const Profile &profile,
-                       const std::string &mode = "");
+                       const std::string &mode = "", bool listUnbound = true);
 
     // `base` with every action the section names replaced.
     Profile overlay(Profile base, const std::map<Action, std::vector<Source>> *section);
