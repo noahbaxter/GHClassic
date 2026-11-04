@@ -35,6 +35,8 @@ namespace gh2::custom
         Kind kind = Kind::Strum;
         bool forced = false; // its kind is the chart's: a forced HOPO or strum, or a tap
         bool flip = false;   // the running engine's natural kind flipped (.chart's 5)
+        // A trill or tremolo lane's note, and its lane's first.
+        bool laned = false, laneStart = false;
 
         bool chord() const { return (lanes & (lanes - 1u)) != 0u; }
         // Its lanes don't all end together.
@@ -53,6 +55,16 @@ namespace gh2::custom
         std::vector<Span> starPower, solos;
         std::array<std::vector<Span>, 2> faceOff; // each player's phrases
         std::vector<Span> bigNotes, rockEndings;  // GH2's note 110, Rock Band's big rock endings
+        // Trill and tremolo lanes as marked (126 and 127, .chart's S 66 and
+        // S 65), and each lane's band, by lane: from its first note there to
+        // its last.
+        std::vector<Span> tremolos, trills;
+        struct Band
+        {
+            uint32_t tick = 0u, length = 0u;
+            int lane = 0;
+        };
+        std::vector<Band> bands; // by tick
     };
 
     enum class Part : uint8_t

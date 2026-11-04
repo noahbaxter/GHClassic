@@ -50,6 +50,10 @@ namespace gh2::custom
         // A chord whose lanes end apart: each lane's sustain in ms, by fret
         // (0 for one with none); all 0 for a chord held as one.
         std::array<float, 5> laneMs{};
+        // A trill or tremolo lane's note, its lane's first, and each band
+        // starting on it, by fret: its ms to the band's last note there.
+        bool laned = false, laneStart = false;
+        std::array<float, 5> bandMs{};
 
         bool split() const { return *std::max_element(laneMs.begin(), laneMs.end()) > 0.0f; }
     };

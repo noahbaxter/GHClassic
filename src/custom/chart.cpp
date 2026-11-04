@@ -6,7 +6,8 @@
 // frets, 67 to 103, as GH1 and GH2's, where those are); 105 and 106 each
 // player's Face-Off phrases (or each difficulty's two past its star power,
 // 69 and 70 to 105 and 106, as GH2's), 110 GH2's big notes, 120 a big rock
-// ending. Phase Shift's sysex, F0 'P' 'S' 0 0
+// ending, 126 and 127 tremolo and trill lanes (Expert's, Hard's too at
+// velocity 41 to 50). Phase Shift's sysex, F0 'P' 'S' 0 0
 // <difficulty, FF all> <1 open, 4 tap> <1 on, 0 off> F7, marks opens and
 // taps too.
 //
@@ -15,7 +16,7 @@
 // difficulty, [ExpertSingle], each line "<tick> = N <lane> <length>": 0
 // to 4 the frets, 5 its natural kind flipped, 6 a tap, 7 open; "S 2
 // <length>" star power, "S 0" and "S 1" each player's Face-Off phrases,
-// "E solo" and "E soloend".
+// "S 65" and "S 66" tremolo and trill lanes, "E solo" and "E soloend".
 //
 // Lengths are kept as written: each engine cuts its own short sustains as
 // the song loads (gameplay/extended/guitar/gem_kinds.h).
@@ -27,12 +28,15 @@
 #include "settings/ini.h"
 
 #include <algorithm>
+#include <set>
 #include <sstream>
 
 namespace gh2::custom
 {
     namespace
     {
+        constexpr uint8_t kTremoloNote = 126u, kTrillNote = 127u;
+
         // A gem as read, before its kind is settled.
         struct Raw
         {
@@ -121,6 +125,80 @@ namespace gh2::custom
             return out;
         }
 
+        // A lane's notes, as YARG picks them (MoonSongLoader.Guitar): a
+        // tremolo one mask struck at least twice, cut where it changes; a
+        // trill two single notes alternating, at least three, cut where
+        // they stop.
+        std::vector<Gem *> tremolo(const std::vector<Gem *> &notes)
+        {
+            if (notes.size() < 2u || notes[0]->lanes != notes[1]->lanes)
+                return {};
+            std::vector<Gem *> out;
+            for (Gem *g : notes)
+            {
+                if (g->lanes != notes[0]->lanes)
+                    break;
+                out.push_back(g);
+            }
+            return out;
+        }
+        std::vector<Gem *> trill(const std::vector<Gem *> &notes)
+        {
+            if (notes.size() < 3u || notes[0]->chord() || notes[1]->chord() || notes[0]->lanes == notes[1]->lanes ||
+                notes[2]->lanes != notes[0]->lanes)
+                return {};
+            std::vector<Gem *> out;
+            for (size_t i = 0; i < notes.size() && notes[i]->lanes == notes[i % 2u]->lanes; ++i)
+                out.push_back(notes[i]);
+            return out;
+        }
+
+        // A difficulty's lane notes and bands. A lane holds the notes from
+        // its start to its end, that tick too unless another lane starts
+        // there (MoonSongLoader.GetNotesInLanePhrase). Its notes hold no
+        // sustain but its last.
+        void markLanes(Difficulty &d)
+        {
+            std::vector<std::pair<Span, bool>> lanes;
+            for (const Span &s : d.tremolos)
+                lanes.emplace_back(s, false);
+            for (const Span &s : d.trills)
+                lanes.emplace_back(s, true);
+            std::stable_sort(lanes.begin(), lanes.end(), [](const auto &a, const auto &b) { return a.first.tick < b.first.tick; });
+            const auto starts = [&](uint64_t tick)
+            {
+                return std::any_of(lanes.begin(), lanes.end(), [&](const auto &l) { return l.first.tick == tick; });
+            };
+            for (const auto &[s, isTrill] : lanes)
+            {
+                const uint64_t end = uint64_t(s.tick) + s.length;
+                std::vector<Gem *> notes;
+                for (Gem &g : d.gems)
+                    if (g.tick >= s.tick && (g.tick < end || (g.tick == end && !starts(end))) && !g.laned)
+                        notes.push_back(&g);
+                const auto laned = isTrill ? trill(notes) : tremolo(notes);
+                if (laned.empty())
+                    continue;
+                laned.front()->laneStart = true;
+                std::map<int, std::pair<uint32_t, uint32_t>> reach;
+                for (Gem *g : laned)
+                {
+                    g->laned = true;
+                    if (g != laned.back())
+                        g->length = {};
+                    for (int lane = 0; lane <= kOpen; ++lane)
+                        if (g->lanes & (1u << lane))
+                        {
+                            auto [it, added] = reach.try_emplace(lane, g->tick, g->tick);
+                            it->second.second = g->tick;
+                        }
+                }
+                for (const auto &[lane, ticks] : reach)
+                    d.bands.push_back({ticks.first, ticks.second - ticks.first, lane});
+            }
+            std::stable_sort(d.bands.begin(), d.bands.end(), [](const auto &a, const auto &b) { return a.tick < b.tick; });
+        }
+
         // [on, off) spans of one note number.
         using Spans = std::vector<Span>;
 
@@ -142,6 +220,9 @@ namespace gh2::custom
             std::map<uint8_t, Spans> notes;
             std::map<uint8_t, uint32_t> held;
             std::map<uint8_t, uint32_t> endedAt; // where a note struck again ended the held one
+            // Lanes Hard has too: struck at velocity 41 to 50 (YARG's
+            // MidReader), by note and tick.
+            std::set<std::pair<uint8_t, uint32_t>> hardLanes;
             // Sysex phrases by difficulty (4 all), opens then taps.
             std::array<std::array<Spans, 5>, 2> phrases;
             std::array<std::array<std::optional<uint32_t>, 5>, 2> phraseOn;
@@ -197,7 +278,11 @@ namespace gh2::custom
                         endedAt[pitch] = e.tick;
                 }
                 if (down)
+                {
                     held[pitch] = e.tick;
+                    if ((pitch == kTremoloNote || pitch == kTrillNote) && e.data[1] >= 41u && e.data[1] <= 50u)
+                        hardLanes.insert({pitch, e.tick});
+                }
             }
             for (const auto &[pitch, on] : held)
                 notes[pitch].push_back({on, 0u});
@@ -257,6 +342,12 @@ namespace gh2::custom
                     out[d].faceOff[player] = notes[(faceOffEach ? base + 9u : 105u) + player];
                 out[d].bigNotes = notes[110];
                 out[d].rockEndings = notes[120];
+                // Lanes on Expert, and Hard where it has them too.
+                for (const auto &[pitch, into] : {std::pair{kTremoloNote, &out[d].tremolos}, std::pair{kTrillNote, &out[d].trills}})
+                    for (const Span &s : notes[pitch])
+                        if (d == 3u || (d == 2u && hardLanes.count({pitch, s.tick})))
+                            into->push_back(s);
+                markLanes(out[d]);
             }
             return out;
         }
@@ -488,6 +579,10 @@ namespace gh2::custom
                     diff.starPower.push_back({tick, length});
                 else if (kind == 0 || kind == 1)
                     diff.faceOff[size_t(kind)].push_back({tick, length});
+                else if (kind == 65)
+                    diff.tremolos.push_back({tick, length});
+                else if (kind == 66)
+                    diff.trills.push_back({tick, length});
             }
             else if (type == "E")
             {
@@ -516,7 +611,9 @@ namespace gh2::custom
                 // A flag with no lane under it is nothing.
                 if (r.gem.lanes)
                     list.push_back(r);
-            chart.parts[track.first][track.second].gems = settle(std::move(list), chart.resolution, chart.hopoThreshold);
+            Difficulty &diff = chart.parts[track.first][track.second];
+            diff.gems = settle(std::move(list), chart.resolution, chart.hopoThreshold);
+            markLanes(diff);
         }
         std::erase_if(chart.parts, [](const auto &p) { return !hasGems(p.second); });
         if (raws.empty() && chart.sections.empty() && chart.tempos.size() == 1u)

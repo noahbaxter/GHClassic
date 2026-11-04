@@ -476,6 +476,68 @@ namespace
         }
     }
 
+    // Trill and tremolo lanes, as YARG picks their notes: a tremolo's one
+    // mask, cut where it changes; a trill's two single notes alternating;
+    // one that never starts right, no lane. Sustains cut but the last's.
+    // Hard's only where struck at velocity 41 to 50.
+    void lanes()
+    {
+        std::string why;
+        const auto chart = parseChart("[ExpertSingle]\n{\n"
+                                      "  0 = S 65 300\n  0 = N 1 50\n  96 = N 1 50\n  192 = N 1 50\n  288 = N 2 0\n"
+                                      "  768 = S 66 400\n  768 = N 0 0\n  864 = N 2 0\n  960 = N 0 0\n  1056 = N 2 0\n"
+                                      "  1152 = N 3 300\n"
+                                      "  1536 = S 66 300\n  1536 = N 0 0\n  1632 = N 2 0\n  1728 = N 3 0\n}\n",
+                                      {}, why);
+        CHECK(chart && chart->parts.count(Part::Guitar));
+        if (!chart || !chart->parts.count(Part::Guitar))
+            return;
+        const Difficulty &x = chart->parts.at(Part::Guitar)[3];
+        CHECK(at(x, 0) && at(x, 0)->laned && at(x, 0)->laneStart && at(x, 0)->longest() == 0u);
+        CHECK(at(x, 192) && at(x, 192)->laned && !at(x, 192)->laneStart && at(x, 192)->longest() == 50u);
+        CHECK(at(x, 288) && !at(x, 288)->laned);
+        CHECK(at(x, 768) && at(x, 768)->laneStart && at(x, 1056) && at(x, 1056)->laned);
+        CHECK(at(x, 1152) && !at(x, 1152)->laned && at(x, 1152)->longest() == 300u);
+        CHECK(at(x, 1536) && !at(x, 1536)->laned);
+        // Red's band, then green's and yellow's.
+        CHECK(x.bands.size() == 3u);
+        if (x.bands.size() == 3u)
+        {
+            CHECK(x.bands[0].lane == 1 && x.bands[0].tick == 0u && x.bands[0].length == 192u);
+            CHECK(x.bands[1].lane == 0 && x.bands[1].tick == 768u && x.bands[1].length == 192u);
+            CHECK(x.bands[2].lane == 2 && x.bands[2].tick == 864u && x.bands[2].length == 192u);
+        }
+
+        const auto midOf = [&](uint8_t velocity)
+        {
+            midi::File file{1u, 480u, {midi::Track{}}};
+            midi::Track guitar;
+            guitar.name = "PART GUITAR";
+            guitar.events.push_back({0u, 0x90u, 0u, {126u, velocity}});
+            for (const uint8_t base : {84u, 96u})
+                for (uint32_t tick : {0u, 240u, 480u})
+                {
+                    guitar.events.push_back(note(tick, base, true));
+                    guitar.events.push_back(note(tick + 60u, base, false));
+                }
+            guitar.events.push_back(note(720u, 126u, false));
+            std::stable_sort(guitar.events.begin(), guitar.events.end(),
+                             [](const midi::Event &a, const midi::Event &b) { return a.tick < b.tick; });
+            file.tracks.push_back(guitar);
+            return parseMid(midi::write(file), {}, why);
+        };
+        for (const uint8_t velocity : {uint8_t(100u), uint8_t(45u)})
+        {
+            const auto mid = midOf(velocity);
+            CHECK(mid && mid->parts.count(Part::Guitar));
+            if (!mid || !mid->parts.count(Part::Guitar))
+                continue;
+            const auto &d = mid->parts.at(Part::Guitar);
+            CHECK(at(d[3], 240) && at(d[3], 240)->laned);
+            CHECK(at(d[2], 240) && at(d[2], 240)->laned == (velocity == 45u));
+        }
+    }
+
     // Charts as written in the wild: a note struck again before the last's
     // end on its tick, no ticks a beat, tempos out of MIDI's reach,
     // negative and wild lengths, a mark and a space before the first
@@ -967,6 +1029,7 @@ int main(int argc, char **argv)
     heldPastNext();
     midTypes();
     midMarkers();
+    lanes();
     chartEdges();
     catalogOrder();
     catalogCopies();
