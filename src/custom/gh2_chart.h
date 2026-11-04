@@ -3,7 +3,8 @@
 // A custom chart as GH2's parser takes one (config/midi_parsers.dta): 480
 // ticks a beat, PART GUITAR's gems on 60 to 64, 72 to 76, 84 to 88 and 96 to
 // 100, each difficulty's star power on the note past its frets (67, 79, 91,
-// 103), big notes on 110, [solo_on] and [solo_off], and EVENTS' [section],
+// 103) and each player's Face-Off phrases on the two past that (69 and 70 to
+// 105 and 106), big notes on 110, [solo_on] and [solo_off], and EVENTS' [section],
 // [music_start] and [end].
 //
 // What GH2's parser cannot say is given beside it (Gh2Chart::gems), each gem's

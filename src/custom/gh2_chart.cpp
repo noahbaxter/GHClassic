@@ -155,6 +155,16 @@ namespace gh2::custom
                 guitar.events.push_back(note(at(s.tick), static_cast<uint8_t>(base + 7u), true));
                 guitar.events.push_back(note(std::max(at(uint64_t(s.tick) + s.length), at(s.tick) + 1u), static_cast<uint8_t>(base + 7u), false));
             }
+            // Each player's Face-Off phrases on the two notes past it: GH2's
+            // parser gives a gem started under one to that player alone, one
+            // under neither to both (SongParser::SetActivePlayer, 0x246928).
+            for (uint8_t player = 0u; player < 2u; ++player)
+                for (const Span &s : diff.faceOff[player])
+                {
+                    const uint8_t pitch = static_cast<uint8_t>(base + 9u + player);
+                    guitar.events.push_back(note(at(s.tick), pitch, true));
+                    guitar.events.push_back(note(std::max(at(uint64_t(s.tick) + s.length), at(s.tick) + 1u), pitch, false));
+                }
         }
         if (last == 0u)
             return std::nullopt;

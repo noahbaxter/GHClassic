@@ -430,7 +430,8 @@ namespace
             CHECK(d[0].faceOff[0].size() == 1u && d[0].faceOff[1].empty());
             CHECK(d[3].faceOff[0].empty() && d[3].faceOff[1].size() == 1u);
             CHECK(d[3].bigNotes.size() == 1u && d[3].bigNotes[0].tick == 1920u);
-            // Written for GH2's own parsers: 67 Easy's star power, 110.
+            // Written for GH2's own parsers: 67 Easy's star power, 69 Easy's
+            // first player, 106 Expert's second, 110.
             const auto gh2 = toGh2(*gh, 0.0);
             const auto back = gh2 ? gh2::midi::parse(gh2->mid) : std::nullopt;
             CHECK(back && back->tracks.size() == 3u);
@@ -445,6 +446,7 @@ namespace
                                        });
                 };
                 CHECK(has(67u, 0u) && has(103u, 960u) && !has(79u, 0u) && has(110u, 1920u));
+                CHECK(has(69u, 0u) && has(106u, 480u) && !has(70u, 0u) && !has(105u, 0u));
             }
         }
         const auto rb = chartOf({{96u, 0u}, {116u, 0u}, {103u, 480u}, {105u, 0u}, {106u, 960u}, {120u, 1920u}});
@@ -455,6 +457,22 @@ namespace
             CHECK(d[0].starPower.size() == 1u && d[0].starPower[0].tick == 0u && d[3].solos.size() == 1u);
             CHECK(d[0].faceOff[0].size() == 1u && d[0].faceOff[1].size() == 1u && d[0].faceOff[1][0].tick == 960u);
             CHECK(d[3].rockEndings.size() == 1u && d[3].rockEndings[0].tick == 1920u);
+            // Rock Band's 105 and 106 written onto every difficulty.
+            const auto gh2 = toGh2(*rb, 0.0);
+            const auto back = gh2 ? gh2::midi::parse(gh2->mid) : std::nullopt;
+            CHECK(back && back->tracks.size() == 3u);
+            if (back && back->tracks.size() == 3u)
+                for (const uint8_t base : {60u, 72u, 84u, 96u})
+                {
+                    const auto count = std::count_if(back->tracks[1].events.begin(), back->tracks[1].events.end(),
+                                                     [&](const midi::Event &e) {
+                                                         return midi::kind(e) == midi::kNoteOn && e.data.size() >= 2u &&
+                                                                e.data[1] != 0u &&
+                                                                ((e.data[0] == base + 9u && e.tick == 0u) ||
+                                                                 (e.data[0] == base + 10u && e.tick == 960u));
+                                                     });
+                    CHECK(count == 2);
+                }
         }
     }
 
