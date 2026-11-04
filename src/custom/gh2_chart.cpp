@@ -113,9 +113,15 @@ namespace gh2::custom
                                                      .laned = g.laned,
                                                      .laneStart = g.laneStart};
                 for (const Difficulty::Band &b : diff.bands)
-                    if (b.tick == g.tick && b.lane < 5)
+                    if (b.tick == g.tick)
+                    {
                         kept.bandMs[size_t(b.lane)] =
                             static_cast<float>((chart.seconds(b.tick + b.length) - chart.seconds(b.tick)) * 1000.0);
+                        if (b.lane == kOpen)
+                            for (const Difficulty::Band &other : diff.bands)
+                                if (other.lane < kOpen && other.tick <= b.tick + b.length && b.tick <= other.tick + other.length)
+                                    kept.openBandGap = static_cast<int8_t>(other.lane);
+                    }
                 // Each lane held to its own end or the next gem on it, as
                 // Clone Hero's; the gem as long as the longest.
                 uint32_t held = g.tick;

@@ -51,9 +51,13 @@ namespace gh2::custom
         // (0 for one with none); all 0 for a chord held as one.
         std::array<float, 5> laneMs{};
         // A trill or tremolo lane's note, its lane's first, and each band
-        // starting on it, by fret: its ms to the band's last note there.
+        // starting on it, by fret (an open's last): its ms to the band's
+        // last note there.
         bool laned = false, laneStart = false;
-        std::array<float, 5> bandMs{};
+        std::array<float, 6> bandMs{};
+        // An open's band run beside a fret's (a trill of the two): that
+        // fret, its lane left out of the open's band; else -1.
+        int8_t openBandGap = -1;
 
         bool split() const { return *std::max_element(laneMs.begin(), laneMs.end()) > 0.0f; }
     };

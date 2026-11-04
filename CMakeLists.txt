@@ -343,6 +343,7 @@ set(GHC_GAME_SOURCES
     src/gameplay/extended/guitar/lane_hits.cpp
     src/gameplay/extended/guitar/sustain_hold.cpp
     src/highway/cyan_stars.cpp
+    src/highway/extended/guitar/lane_bands.cpp
     src/highway/extended/guitar/open_bursts.cpp
     src/highway/extended/guitar/open_gems.cpp
     src/highway/extended/guitar/open_pieces.cpp

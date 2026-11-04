@@ -487,7 +487,9 @@ namespace
                                       "  0 = S 65 300\n  0 = N 1 50\n  96 = N 1 50\n  192 = N 1 50\n  288 = N 2 0\n"
                                       "  768 = S 66 400\n  768 = N 0 0\n  864 = N 2 0\n  960 = N 0 0\n  1056 = N 2 0\n"
                                       "  1152 = N 3 300\n"
-                                      "  1536 = S 66 300\n  1536 = N 0 0\n  1632 = N 2 0\n  1728 = N 3 0\n}\n",
+                                      "  1536 = S 66 300\n  1536 = N 0 0\n  1632 = N 2 0\n  1728 = N 3 0\n"
+                                      "  2304 = S 65 200\n  2304 = N 7 0\n  2400 = N 7 0\n  2496 = N 7 0\n"
+                                      "  3072 = S 66 300\n  3072 = N 7 0\n  3168 = N 0 0\n  3264 = N 7 0\n  3360 = N 0 0\n}\n",
                                       {}, why);
         CHECK(chart && chart->parts.count(Part::Guitar));
         if (!chart || !chart->parts.count(Part::Guitar))
@@ -499,14 +501,19 @@ namespace
         CHECK(at(x, 768) && at(x, 768)->laneStart && at(x, 1056) && at(x, 1056)->laned);
         CHECK(at(x, 1152) && !at(x, 1152)->laned && at(x, 1152)->longest() == 300u);
         CHECK(at(x, 1536) && !at(x, 1536)->laned);
-        // Red's band, then green's and yellow's.
-        CHECK(x.bands.size() == 3u);
-        if (x.bands.size() == 3u)
+        // Red's band, then green's and yellow's, then the opens', then a
+        // trill of an open and green's, one band each.
+        CHECK(x.bands.size() == 6u);
+        if (x.bands.size() == 6u)
         {
             CHECK(x.bands[0].lane == 1 && x.bands[0].tick == 0u && x.bands[0].length == 192u);
             CHECK(x.bands[1].lane == 0 && x.bands[1].tick == 768u && x.bands[1].length == 192u);
             CHECK(x.bands[2].lane == 2 && x.bands[2].tick == 864u && x.bands[2].length == 192u);
+            CHECK(x.bands[3].lane == kOpen && x.bands[3].tick == 2304u && x.bands[3].length == 192u);
+            CHECK(x.bands[4].lane == kOpen && x.bands[4].tick == 3072u && x.bands[4].length == 192u);
+            CHECK(x.bands[5].lane == 0 && x.bands[5].tick == 3168u && x.bands[5].length == 192u);
         }
+        CHECK(at(x, 3072) && at(x, 3072)->laneStart && at(x, 3360) && at(x, 3360)->laned);
 
         const auto midOf = [&](uint8_t velocity)
         {

@@ -19,6 +19,7 @@
 #include "highway/extended/guitar/open_tails.h"
 
 #include "guest.h"
+#include "highway/extended/guitar/lane_bands.h"
 #include "highway/extended/guitar/open_gems.h"
 #include "highway/gem_looks.h"
 #include "hook.h"
@@ -377,6 +378,8 @@ namespace gh2::guitar
         void onTailSync(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
             const uint32_t self = GPR_U32(ctx, 4);
+            if (isBandTail(rdram, self))
+                return;
             if (const Lent *tail = stillOpen(rdram, s_tailReps, self, gemRep::kTail))
                 return pullApart(rdram, tail->rep, tail->object);
             const auto glow = s_glowMeshes.find(self);
