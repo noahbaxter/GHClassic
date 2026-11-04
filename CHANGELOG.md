@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.8
+
+### Bugs
+- Whammy did nothing when bound to a keyboard key
+
 ## v0.8.7
 
 ### New

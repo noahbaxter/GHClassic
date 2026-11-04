@@ -351,7 +351,11 @@ namespace gh2
                 // Its layout in a song playing; in a menu only its menu keys.
                 HostPad &port = pads[to];
                 if (mode == Mode::kPlaying)
-                    port.pressed |= padOf(r.held, port.joypad).pressed;
+                {
+                    const HostPad own = padOf(r.held, port.joypad);
+                    port.pressed |= own.pressed;
+                    port.ly = std::min(port.ly, own.ly);
+                }
                 // Its menu keys. In a song playing only its Esc, as Start,
                 // and in the song's pause menu Esc is Start too. Up and down
                 // repeat sooner (menu_layer.h).
