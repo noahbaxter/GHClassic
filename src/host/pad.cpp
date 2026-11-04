@@ -114,6 +114,9 @@ namespace gh2
         // gets blue and orange both as kPad_Square.
         script::Node padHeld(const script::Call &call)
         {
+            // {pad_held whammy}: 1 while P1's whammy is past halfway.
+            if (call.symbol(1) == "whammy")
+                return {hostPad().ly < 0x40 ? 1u : 0u, script::kInt};
             const uint16_t bit = padButton(call.symbol(1));
             const uint16_t pressed = hostPad().pressed | s_scripted.load(std::memory_order_relaxed);
             return {bit != 0u && (pressed & bit) != 0u ? 1u : 0u, script::kInt};
