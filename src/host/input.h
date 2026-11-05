@@ -122,6 +122,13 @@ namespace gh2
     // What a player is shown for it: its guitar's layout ("Wii guitar
     // (raphnet)"), else its name; "" for none. Callable from any thread.
     std::string seatLabel(int seat);
+    // Who holds it, as input.ini's [seats] has it (DeviceId::text), while
+    // away too; the keyboard for P1 with no controller, else "". Callable
+    // from any thread.
+    std::string seatDevice(int seat);
+    // Whether it plays in pad mode, a gamepad's (as HostPad::joypad, but
+    // outside a song too). Callable from any thread.
+    bool seatPad(int seat);
 
     // Whether Multiplayer's screen is up, where a controller joins with
     // Start and yellow moves a player up a seat. Callable from any thread.

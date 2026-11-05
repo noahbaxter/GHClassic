@@ -76,6 +76,8 @@ namespace gh2
         HostPad s_pads[kSeats];
         std::string s_seatNames[kSeats]; // for seatHas
         std::string s_seatLabels[kSeats];
+        std::string s_seatDevices[kSeats]; // for seatDevice
+        bool s_seatPads[kSeats] = {};
         MenuControls s_menu;
         bool s_flying = false;
         HostFly s_fly, s_scriptedFly;
@@ -436,6 +438,10 @@ namespace gh2
                                                     (seat == 0 && s_seats[0].none()));
             s_seatNames[seat] = seated[seat] ? seated[seat]->name : keyboard ? "keyboard" : "";
             s_seatLabels[seat] = seated[seat] ? seated[seat]->label : keyboard ? "keyboard" : "";
+            s_seatDevices[seat] = !s_seats[seat].none() ? s_seats[seat].text()
+                                  : seat == 0         ? DeviceId::keyboard().text()
+                                                      : "";
+            s_seatPads[seat] = s_seats.pad(seat);
         }
         HostPad &pad = pads[0];
         pad.pressCount = s_pads[0].pressCount;
@@ -547,6 +553,18 @@ namespace gh2
     {
         std::lock_guard<std::mutex> lock(s_mutex);
         return seat >= 0 && seat < kSeats ? s_seatLabels[seat] : std::string();
+    }
+
+    std::string seatDevice(int seat)
+    {
+        std::lock_guard<std::mutex> lock(s_mutex);
+        return seat >= 0 && seat < kSeats ? s_seatDevices[seat] : std::string();
+    }
+
+    bool seatPad(int seat)
+    {
+        std::lock_guard<std::mutex> lock(s_mutex);
+        return seat >= 0 && seat < kSeats && s_seatPads[seat];
     }
 
     void setPlayersStep(bool on)
