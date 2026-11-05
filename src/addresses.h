@@ -154,6 +154,7 @@ namespace gh2
         uint32_t guitarWatcherTryToHopo;
         uint32_t guitarWatcherCheckForFretTimeout;
         uint32_t guitarWatcherCanHopo;
+        uint32_t controllerTypeToTrackWatcherType; // ControllerTypeToTrackWatcherType(Symbol)
         uint32_t theSongDb;              // SongDB *
         uint32_t songDbGetGems;          // SongDB::GetGems(track)
         uint32_t songDbSetupStarPhrases; // SongDB::SetupStarPhrasesForTrack
@@ -539,6 +540,7 @@ namespace gh2
         .guitarWatcherTryToHopo = 0x24dc20u,
         .guitarWatcherCheckForFretTimeout = 0x24de48u,
         .guitarWatcherCanHopo = 0x24df30u,
+        .controllerTypeToTrackWatcherType = 0x247900u,
         .theSongDb = 0x3da2f8u,
         .songDbGetGems = 0x11cf58u,
         .songDbSetupStarPhrases = 0x11d850u,

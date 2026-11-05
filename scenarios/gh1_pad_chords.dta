@@ -1,0 +1,44 @@
+; A gamepad under GH1's engine plays as GH1's DualShock did: on the guitar's
+; watcher, so a chord is the frets held. Hold one fret of a chord and press
+; the other, and it plays again. Cochise on expert, by ghc_play's pad presses
+; (dev/scripted_play.h), which only play a guitar's watcher.
+(needs gh1)
+#include common/first_boot.dta
+(device pad)
+(press down pad)
+(expect {seat_has 0 pad} 1)
+{note_engine set gh1}
+{gamecfg set mode quickplay}
+{quickplay song_defaults 0}
+{{game get_player_config 0} set_difficulty expert}
+{game set_song cochise}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 1)
+(expect {game get_controller 0} joypad_guitar)
+(wait_until {> {ghc_play gems} 0} 10)
+{player0 set_crowd_rating_active FALSE}
+
+; Both frets pressed, the lower let go, then pressed again with the higher
+; still held: both chords hit.
+{set $chord {ghc_play find repeat 15000}}
+(expect {>= $chord 0} 1)
+{set $low {ghc_play gem $chord low}}
+{ghc_play pad_tap $chord 0}
+{ghc_play pad_lift {+ {ghc_play gem $chord ms} 100} $low}
+{ghc_play pad_tap {+ $chord 1} 0 $low}
+{ghc_play pad_lift {+ {ghc_play gem {+ $chord 1} ms} 100} 31}
+
+; A lone gem pressed on its fret alone hits, as in GH2.
+{set $lone {ghc_play find lone {+ {ghc_play gem {+ $chord 1} ms} 1000}}}
+{ghc_play pad_tap $lone 0}
+{ghc_play pad_lift {+ {ghc_play gem $lone ms} 100} 31}
+
+(wait_until {ghc_play idle} 120)
+(wait 0.5)
+(expect {< {ghc_play worst} 20} 1)
+(expect {ghc_play gem $chord played} 1)
+(expect {ghc_play gem {+ $chord 1} played} 1)
+(expect {ghc_play gem $lone played} 1)
+(quit)

@@ -34,6 +34,13 @@
 // - A strum waiting on its frets misses when its 60 ms run out, before the
 //   poll passes gems, and after a hammered gem too. GH2 lets that one go
 //   (TrackBeatMatcher::Poll, GH1 0x280a10).
+// - A DualShock plays on the guitar's watcher, each fret press held then
+//   swung (JoypadController::OnMsg, GH1 0x2787e0), so a chord is the frets
+//   held: hold one and press the other to play it again. GH2 gives it a
+//   watcher of its own that adds up presses and reads nothing held. GH2's
+//   guitar watcher keeps GH1's press rules: a wrong fret on a single
+//   misses at once, a chord waits 60 ms for its frets, and a press in the
+//   frame a chord was hit does nothing (Swing 0x24d518).
 //
 // Kept GH2's: the song's sync offset in every window.
 
@@ -41,6 +48,7 @@
 
 #include "guest/beatmatch.h"
 #include "hook.h"
+#include "script.h"
 
 #include "ps2_runtime_macros.h"
 
@@ -112,6 +120,27 @@ namespace gh2::gh1_rules
         {
             if (GPR_U32(ctx, 6) != 0u)
                 s_strummed[BeatMatcher(rdram, GPR_U32(ctx, 4)).swingWatcher()] = true;
+        }
+
+        // A DualShock's fret press, the only Swing that is no strum: held
+        // first, as GH1's controller does.
+        struct PadPressTag;
+        void onPadPress(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            if (GPR_U32(ctx, 6) != 0u)
+                return;
+            const EntryArgs args(ctx);
+            runtime->callGuestFunction(rdram, ctx, s_addresses->beatMatcherFretButtonDown, {args.a[0], args.a[1]});
+            args.restore(ctx);
+        }
+
+        // A DualShock gets the guitar's watcher.
+        struct WatcherTypeTag;
+        bool onWatcherType(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t guitar = script::symbol(rdram, ctx, runtime, "guitar");
+            SET_GPR_U32(ctx, 4, guitar);
+            return false;
         }
 
         struct FretButtonUpTag;
@@ -242,6 +271,8 @@ namespace gh2::gh1_rules
         EntryHook<CtorTag>::install(runtime, addresses.guitarWatcherCtor, onCtor);
         EntryHook<BeatMatcherSwingTag>::install(runtime, addresses.beatMatcherSwing, onBeatMatcherSwing);
         EntryHook<FretButtonUpTag>::install(runtime, addresses.guitarWatcherFretButtonUp, onFretButtonUp);
+        EntryHook<PadPressTag>::install(runtime, addresses.beatMatcherSwing, gh1Only<onPadPress>);
+        Override<WatcherTypeTag>::install(runtime, addresses.controllerTypeToTrackWatcherType, gh1Only<onWatcherType>);
         Override<WillBeNoStrumTag>::install(runtime, addresses.willBeNoStrum, gh1Only<onWillBeNoStrum>);
         Override<TryToHopoTag>::install(runtime, addresses.guitarWatcherTryToHopo, gh1Only<onTryToHopo>);
         Override<CanHopoTag>::install(runtime, addresses.guitarWatcherCanHopo, gh1Only<onCanHopo>);
