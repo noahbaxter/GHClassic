@@ -1,0 +1,55 @@
+; A controller's whammy rebound to a button, for a guitar whose adapter drops
+; its bar: it bends in a song as the bar does. A button pressed with an axis
+; still leaves the axis the whammy. A plain joystick, as a PS2 adapter is.
+#include common/first_boot.dta
+(controller adapter "289b:0080" joystick)
+(wait 0.5)
+(press button5 adapter)
+(expect {seat_has 0 adapter} 1)
+{ui goto_screen ghc_controllers_screen}
+(wait_screen ghc_controllers_screen)
+(wait 1)
+(key Up)
+(key Up)
+(key Up)
+(key Up)
+(expect {ghc_controllers text row {ghc_controllers focus}} WHAMMY)
+; A button and an axis together: the axis.
+(key Return)
+(wait 0.3)
+(hold adapter button12)
+(wait 0.1)
+(hold adapter button12 axis1+)
+(wait 0.3)
+(hold adapter)
+(wait 0.3)
+(expect {ghc_controllers rebinding} 0)
+(expect {ghc_controllers text read {ghc_controllers focus}} "Axis 2 +")
+; A button alone.
+(key Return)
+(wait 0.3)
+(hold adapter button12)
+(wait 0.3)
+(hold adapter)
+(wait 0.3)
+(expect {ghc_controllers rebinding} 0)
+(expect {ghc_controllers text read {ghc_controllers focus}} "Button 13")
+(key Escape)
+(wait_screen options_screen)
+(wait 1)
+{gamecfg set mode quickplay}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty easy}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 1)
+(expect {pad_held whammy} 0)
+(hold adapter button12)
+(wait 0.3)
+(expect {pad_held whammy} 1)
+(hold adapter)
+(wait 0.3)
+(expect {pad_held whammy} 0)
+(quit)

@@ -54,7 +54,11 @@ namespace gh2::input
         enum Mode
         {
             kAny,
-            kAxisOnly, // whammy, which a button cannot be
+            // Whammy: an axis, else a button or hat (a guitar whose bar
+            // its adapter drops). An axis that moves before the button is
+            // let go wins: a stick's click or a pad's touch sensor pressed
+            // with the bar is not it.
+            kWhammy,
             // Tilt, which is often a sensor that moves only part of its
             // travel: a button still counts, else whichever axis or
             // accelerometer axis moved furthest, once it comes back.

@@ -198,7 +198,7 @@ namespace gh2::input
                 // Tilt may be the accelerometer.
                 if (ask.action == kTilt)
                     enableAccel(*d);
-                s_capture.emplace(d->now, ask.action == kWhammy ? Capture::kAxisOnly
+                s_capture.emplace(d->now, ask.action == kWhammy ? Capture::kWhammy
                                           : ask.action == kTilt ? Capture::kTilt
                                                                 : Capture::kAny);
                 s_caughtNamed = false;
