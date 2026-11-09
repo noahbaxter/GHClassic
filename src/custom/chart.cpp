@@ -100,12 +100,6 @@ namespace gh2::custom
             for (Raw &r : raws)
             {
                 Gem &g = r.gem;
-                // An open with frets is the frets.
-                if ((g.lanes & 0x1fu) != 0u && (g.lanes & (1u << kOpen)) != 0u)
-                {
-                    g.lanes &= 0x1fu;
-                    g.length[kOpen] = 0u;
-                }
                 const Gem *last = out.empty() ? nullptr : &out.back();
                 const bool natural = last && !g.chord() && (g.lanes & last->lanes) == 0u &&
                                      at480(g.tick, resolution) - at480(last->tick, resolution) < hopoTicks;

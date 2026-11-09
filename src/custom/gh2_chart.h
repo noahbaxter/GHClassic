@@ -44,6 +44,10 @@ namespace gh2::custom
         bool decided = false;
         bool flip = false;
         bool open = false;
+        // Its frets struck with an open (an open chord): drawn over an
+        // open's bar and played with exactly its frets, none below them
+        // (gameplay/extended/guitar/open_chord_hits.h).
+        bool openChord = false;
         bool tap = false;
         uint32_t sustain = 0u;
         float sustainMs = 0.0f;

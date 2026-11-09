@@ -101,14 +101,19 @@ namespace gh2::custom
                 // frets, told from a chord of all five by Gh2Gem::open. GH2
                 // hammers on single frets alone (GuitarTrackWatcherImpl::
                 // TryToHopo, 0x24dc20); an open and a chord hammer on as one
-                // (gameplay/extended/guitar/hammer_ons.h).
+                // (gameplay/extended/guitar/hammer_ons.h). An open chord is its
+                // frets, a chord to the reader, so never a natural HOPO: its
+                // kind the chart's, which GH2's rule, seeing one fret, could
+                // not say.
                 const bool open = (g.lanes & 0x1fu) == 0u;
+                const bool openChord = !open && (g.lanes & (1u << kOpen)) != 0u;
                 const uint8_t frets = open ? kOpenFrets : static_cast<uint8_t>(g.lanes & 0x1fu);
                 Gh2Gem &kept = out.gems[d][start] = {.frets = frets,
                                                      .hopo = g.kind != Kind::Strum,
-                                                     .decided = g.forced || open,
+                                                     .decided = g.forced || open || openChord,
                                                      .flip = g.flip,
                                                      .open = open,
+                                                     .openChord = openChord,
                                                      .tap = g.kind == Kind::Tap,
                                                      .laned = g.laned,
                                                      .laneStart = g.laneStart};

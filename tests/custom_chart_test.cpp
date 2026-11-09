@@ -215,6 +215,29 @@ namespace
             CHECK(n.gems.size() == 2u && at(n, 0) && at(n, 0)->lanes == 0x3u && at(n, 9));
         }
 
+        // An open with frets is an open chord: the frets and the open, a
+        // chord, so never a natural HOPO. GH2 is given its frets, the open
+        // beside them, its kind the chart's.
+        const auto openChord = parseChart(
+            "[ExpertSingle]\n{\n  0 = N 0 0\n  48 = N 2 0\n  48 = N 7 0\n  96 = N 0 0\n  96 = N 1 0\n  96 = N 7 0\n}\n", {}, why);
+        CHECK(openChord && openChord->parts.count(Part::Guitar));
+        if (openChord && openChord->parts.count(Part::Guitar))
+        {
+            const Difficulty &o = openChord->parts.at(Part::Guitar)[3];
+            CHECK(at(o, 48) && at(o, 48)->lanes == ((1u << 2) | (1u << kOpen)) && at(o, 48)->kind == Kind::Strum);
+            CHECK(at(o, 96) && at(o, 96)->lanes == (0x3u | (1u << kOpen)));
+            const auto converted = toGh2(*openChord, 0.0);
+            CHECK(converted);
+            if (converted)
+            {
+                const auto &k = converted->gems[3];
+                CHECK(k.count(0) && !k.at(0).openChord);
+                CHECK(k.count(120) && k.at(120).openChord && !k.at(120).open && k.at(120).frets == 0x4u &&
+                      k.at(120).decided && !k.at(120).hopo);
+                CHECK(k.count(240) && k.at(240).openChord && k.at(240).frets == 0x3u);
+            }
+        }
+
         // Each player's Face-Off phrases.
         const auto faceOff = parseChart("[ExpertSingle]\n{\n  0 = N 0 0\n  0 = S 0 192\n  384 = S 1 96\n}\n", {}, why);
         CHECK(faceOff && faceOff->parts.count(Part::Guitar));
