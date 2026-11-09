@@ -190,6 +190,11 @@ namespace gh2::guitar
         return s_hammeredOpen;
     }
 
+    uint8_t gemFrets(uint8_t *rdram, uint32_t gem)
+    {
+        return gem != 0u && gem == s_chordGem ? s_chordFrets : load<uint8_t>(rdram, gem + kGemSlots);
+    }
+
     void installHammerOns(PS2Runtime &runtime, const Addresses &addresses)
     {
         s_addresses = &addresses;

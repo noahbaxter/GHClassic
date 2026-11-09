@@ -1,7 +1,9 @@
 #include "gameplay/extended/guitar/sustain_hold.h"
 
 #include "gameplay/extended/guitar/gem_kinds.h"
+#include "gameplay/extended/guitar/hammer_ons.h"
 #include "guest.h"
+#include "guest/beatmatch.h"
 #include "hook.h"
 #include "settings/settings.h"
 
@@ -148,7 +150,7 @@ namespace gh2::guitar
             const uint32_t game = watcherGem(rdram, watcher.address, gem);
             if (!GameGem(rdram, game).noSustain())
             {
-                Held held{gem, GameGem(rdram, game).slots(), watcher.sustainHit(), watcher.sustainEnd(), {}};
+                Held held{gem, gemFrets(rdram, game), watcher.sustainHit(), watcher.sustainEnd(), {}};
                 if (const uint32_t player = playerOf(rdram, watcher.address))
                     if (const HeldNote note = heldNote(rdram, player);
                         note[0] != 0u && static_cast<int32_t>(note[1]) == gem)
@@ -268,15 +270,16 @@ namespace gh2::guitar
         {
             const uint32_t note = GPR_U32(ctx, 4), game = GPR_U32(ctx, 6);
             callOriginal(rdram, ctx, runtime, s_addresses->heldNoteCtor, s_heldNoteCtor);
-            const Gh2Gem *chart = playingCustom() ? chartGem(s_hitTrack, load<uint32_t>(rdram, game + kGemTick),
-                                                             load<uint8_t>(rdram, game + kGemSlots))
-                                                  : nullptr;
+            const Gh2Gem *chart =
+                playingCustom()
+                    ? chartGem(s_hitTrack, static_cast<uint32_t>(GameGem(rdram, game).tick()), gemFrets(rdram, game))
+                    : nullptr;
             if (!chart || !chart->split())
                 return;
             float sum = 0.0f, longest = 0.0f;
             for (const float ms : chart->laneMs)
                 sum += ms, longest = std::max(longest, ms);
-            const auto frets = static_cast<float>(__builtin_popcount(load<uint8_t>(rdram, game + kGemSlots)));
+            const auto frets = static_cast<float>(__builtin_popcount(gemFrets(rdram, game)));
             const auto all = static_cast<float>(load<int32_t>(rdram, note + kNoteAll));
             store<int32_t>(rdram, note + kNoteAll, static_cast<int32_t>(std::lround(all * sum / (longest * frets))));
         }
@@ -289,27 +292,27 @@ namespace gh2::guitar
         template <uint32_t Addresses::*At, PS2Runtime::RecompiledFunction *Original, bool TopFret>
         void matchUnder(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
-            const uint32_t watcher = GPR_U32(ctx, 4);
-            const uint32_t held = load<uint32_t>(rdram, watcher + kHeld);
+            const GuitarTrackWatcherImpl watcher(rdram, GPR_U32(ctx, 4));
+            const uint32_t held = watcher.held();
             uint32_t sustained = 0u;
-            if (playingCustom() && held != 0u && s_held.count(watcher))
+            if (playingCustom() && held != 0u && s_held.count(watcher.address))
             {
                 const EntryArgs args(ctx);
                 const float f14 = ctx->f[14];
-                const int32_t next = closestUnplayed(rdram, ctx, runtime, watcher);
-                const uint8_t frets = next >= 0 ? load<uint8_t>(rdram, watcherGem(rdram, watcher, next) + kGemSlots) : 0u;
-                sustained = held & sustainedLanes(rdram, watcher, frets);
+                const int32_t next = closestUnplayed(rdram, ctx, runtime, watcher.address);
+                const uint8_t frets = next >= 0 ? gemFrets(rdram, watcherGem(rdram, watcher.address, next)) : 0u;
+                sustained = held & sustainedLanes(rdram, watcher.address, frets);
                 args.restore(ctx);
                 ctx->f[14] = f14;
             }
             if (sustained == 0u)
                 return (*Original)(rdram, ctx, runtime);
             const uint32_t rest = held & ~sustained;
-            store<uint32_t>(rdram, watcher + kHeld, rest);
+            watcher.setHeld(rest);
             if (TopFret && GPR_U32(ctx, 5) < 32u && ((sustained >> GPR_U32(ctx, 5)) & 1u) && rest != 0u)
                 SET_GPR_U32(ctx, 5, 31u - static_cast<uint32_t>(__builtin_clz(rest)));
             callOriginal(rdram, ctx, runtime, s_addresses->*At, *Original);
-            store<uint32_t>(rdram, watcher + kHeld, load<uint32_t>(rdram, watcher + kHeld) | sustained);
+            watcher.setHeld(watcher.held() | sustained);
         }
         PS2Runtime::RecompiledFunction s_swing = nullptr, s_tryToHopo = nullptr, s_tryToFinishSwing = nullptr;
     }

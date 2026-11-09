@@ -19,5 +19,9 @@ namespace gh2::guitar
     // as a hammer-on, 0 when none is.
     uint32_t hammeredOpen();
 
+    // A GameGem's frets: a HOPO or tap chord being hammered on or pulled off
+    // to is shown to GH2 as its top fret alone for the while, its own here.
+    uint8_t gemFrets(uint8_t *rdram, uint32_t gem);
+
     void installHammerOns(PS2Runtime &runtime, const Addresses &addresses);
 }

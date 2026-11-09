@@ -1,8 +1,20 @@
+// A NowBar (one a track) draws its hit effects with SlotViews (+0x20): at
+// each fret a group (+0x50, by fret) placed on that fret's smasher, there
+// until reset. A hit puts its SmashFX's group (+0x14, its group +0x04) at the
+// gem's frets and resets the rest (NowBar::Hit, 0x15d0b8); the group holds
+// the burst and, for a gem with a sustain, the burn (its BurnFX, +0x18). So
+// one burn, on the last gem hit. Here a hit while the SmashFX still burns
+// for a fret held takes another SmashFX (made as NowBar's, 0x15cb2c, kept
+// for again), the burning one left where it is, its frets not reset; each
+// fret reset once no sustain holds it. No flame moves or starts again.
+
 #include "highway/extended/guitar/sustain_flames.h"
 
 #include "gameplay/extended/guitar/gem_kinds.h"
+#include "gameplay/extended/guitar/hammer_ons.h"
 #include "gameplay/extended/guitar/sustain_hold.h"
 #include "guest.h"
+#include "guest/beatmatch.h"
 #include "highway/gem_looks.h"
 #include "hook.h"
 
@@ -77,8 +89,12 @@ namespace gh2::guitar
             // The frets held for sustains before this gem's is taken (HitGem,
             // after), other than its own.
             const uint32_t watcher = watcherOf(rdram, ctx, runtime, nowBar);
-            const uint32_t game = watcher ? watcherGem(rdram, watcher, static_cast<int32_t>(args.a[1])) : 0u;
-            const uint8_t slots = game ? load<uint8_t>(rdram, game + kGemSlots) : 0u;
+            const guest::GameGem game(rdram, watcher ? watcherGem(rdram, watcher, static_cast<int32_t>(args.a[1])) : 0u);
+            // A chord hammered on or pulled off to hit at all its frets, not
+            // the one it is shown to GH2 as
+            // (gameplay/extended/guitar/hammer_ons.h).
+            const uint8_t shown = game.address ? game.slots() : 0u;
+            const uint8_t slots = game.address ? gemFrets(rdram, game.address) : 0u;
             s_hitKeep = watcher ? heldLanes(rdram, watcher, args.f12) & ~slots : 0u;
             if (const auto burning = bar.burning.find(current); burning != bar.burning.end())
             {
@@ -91,9 +107,13 @@ namespace gh2::guitar
             s_hitViews = load<uint32_t>(rdram, nowBar + kNowBarViews);
             args.restore(ctx);
             ctx->f[14] = f14;
+            if (slots != shown)
+                game.setSlots(slots);
             callOriginal(rdram, ctx, runtime, s_addresses->nowBarHit, s_nowBarHit);
+            if (slots != shown)
+                game.setSlots(shown);
             s_hitViews = 0u;
-            if (game && !(load<uint8_t>(rdram, game + kGemFlags) & kGemNoSustain))
+            if (game.address && !game.noSustain())
                 bar.burning[load<uint32_t>(rdram, nowBar + kNowBarSmash)] = slots;
         }
 
