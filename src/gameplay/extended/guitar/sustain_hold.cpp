@@ -40,6 +40,7 @@ namespace gh2::guitar
         };
         std::map<uint32_t, std::vector<Held>> s_held; // by watcher
         std::map<uint32_t, uint32_t> s_players;       // by track
+        std::map<uint32_t, uint32_t> s_watchers;      // by track
         uint32_t s_hitTrack = 0u;                     // the track of the gem HitGem hits
 
         HeldNote heldNote(uint8_t *rdram, uint32_t player)
@@ -139,6 +140,7 @@ namespace gh2::guitar
             if (!playingCustom())
                 return s_hitGem(rdram, ctx, runtime);
             s_hitTrack = watcher.track();
+            s_watchers[s_hitTrack] = watcher.address;
             callOriginal(rdram, ctx, runtime, s_addresses->trackWatcherHitGem, s_hitGem);
             const int32_t gem = watcher.sustained();
             if (gem < 0)
@@ -321,10 +323,26 @@ namespace gh2::guitar
         return lanes & ~uint32_t(next);
     }
 
+    uint8_t heldLanes(uint8_t *rdram, uint32_t watcher, float now)
+    {
+        uint8_t lanes = 0u;
+        if (const auto found = s_held.find(watcher); found != s_held.end())
+            for (const Held &held : found->second)
+                lanes |= held.lanes & ~done(rdram, watcher, held, now);
+        return lanes;
+    }
+
+    uint32_t trackWatcher(uint32_t track)
+    {
+        const auto found = s_watchers.find(track);
+        return found != s_watchers.end() ? found->second : 0u;
+    }
+
     void forgetSustains()
     {
         s_held.clear();
         s_players.clear();
+        s_watchers.clear();
     }
 
     void installSustainHold(PS2Runtime &runtime, const Addresses &addresses)

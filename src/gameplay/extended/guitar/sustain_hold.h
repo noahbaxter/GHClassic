@@ -14,8 +14,9 @@
 // and the last hit whammied as GH2 whammies its own. A chord whose lanes end
 // apart is held as long as its longest, each lane let go freely once its own is
 // done, scored by each lane's length (its tails,
-// highway/extended/guitar/sustain_tails.h). The burn flame is still GH2's, one
-// a track, on the last gem hit. Only for a song of ours.
+// highway/extended/guitar/sustain_tails.h). Each fret's burn flame keeps
+// burning while a sustain is held on it
+// (highway/extended/guitar/sustain_flames.h). Only for a song of ours.
 
 #include "addresses.h"
 
@@ -28,6 +29,10 @@ namespace gh2::guitar
     // The frets the watcher holds for sustains, those of `next` (the gem it
     // is to play, which ends any on them) aside.
     uint32_t sustainedLanes(uint8_t *rdram, uint32_t watcher, uint8_t next);
+    // Those it holds at `now`, a split chord's lanes done by then aside.
+    uint8_t heldLanes(uint8_t *rdram, uint32_t watcher, float now);
+    // The watcher of that track, as it last hit a gem; 0 before.
+    uint32_t trackWatcher(uint32_t track);
 
     // Every sustain forgotten, as a song loads.
     void forgetSustains();

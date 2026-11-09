@@ -91,6 +91,18 @@ namespace gh2
         uint32_t slotViewsDrawShowing;        // SlotViews::DrawShowing(RndDrawable::DrawType)
         uint32_t smashFxSetType;              // SmashFX::SetType(bool, bool, bool)
         uint32_t nowBarHit;                   // NowBar::Hit(float, int gem, bool, PhraseState)
+        uint32_t nowBarPoll;                  // NowBar::Poll(float, bool whammy)
+        uint32_t nowBarSetBonus;              // NowBar::SetBonus(bool)
+        uint32_t nowBarDtor;                  // NowBar::~NowBar
+        uint32_t slotViewsReset;              // SlotViews::Reset(int slot), nothing shown there
+        uint32_t slotViewsResetAt;            // SlotViews::Reset(int slot, float), as NowBar::Hit resets one
+        uint32_t slotViewsPoll;               // SlotViews::Poll(float ms)
+        uint32_t smashFxCtor;                 // SmashFX::SmashFX(bool), 0x1c bytes
+        uint32_t smashFxDtor;                 // SmashFX::~SmashFX
+        uint32_t smashFxSetWhammy;            // SmashFX::SetWhammy(bool)
+        uint32_t smashFxSetBonus;             // SmashFX::SetBonus(bool)
+        uint32_t smashFxRemoveAll;            // SmashFX::RemoveAll, its burst and burn off
+        uint32_t trackConfigPlayer;           // TrackConfig::Player
         uint32_t trackConfigTrackNum;         // TrackConfig::TrackNum
         uint32_t songDbGetGem;                // SongDB::GetGem(int track, int gem), a GameGem *
         uint32_t songDbIsStarPhraseEnd;       // SongDB::IsStarPhraseEnd(int track, int gem) const
@@ -447,6 +459,18 @@ namespace gh2
         .slotViewsDrawShowing = 0x15f038u,
         .smashFxSetType = 0x15f650u,
         .nowBarHit = 0x15d0b8u,
+        .nowBarPoll = 0x15cf98u,
+        .nowBarSetBonus = 0x15d4a0u,
+        .nowBarDtor = 0x15cdb0u,
+        .slotViewsReset = 0x15f2f0u,
+        .slotViewsResetAt = 0x15f2b0u,
+        .slotViewsPoll = 0x15ef30u,
+        .smashFxCtor = 0x15f308u,
+        .smashFxDtor = 0x15f530u,
+        .smashFxSetWhammy = 0x15f768u,
+        .smashFxSetBonus = 0x15f748u,
+        .smashFxRemoveAll = 0x15f6e0u,
+        .trackConfigPlayer = 0x152478u,
         .trackConfigTrackNum = 0x152480u,
         .songDbGetGem = 0x11cf78u,
         .songDbIsStarPhraseEnd = 0x11dab8u,
