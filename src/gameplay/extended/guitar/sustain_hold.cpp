@@ -164,6 +164,30 @@ namespace gh2::guitar
             watcher.setSustainEnd(0.0f);
         }
 
+        // Player::Penalize(float ms, int gem), 0x1114c0: a gem missed or
+        // passed, or a strum at none. Both engines finish the Player's
+        // HeldNote there (FinishHeldNote, 0x112348), so every sustain held
+        // is let go too.
+        struct PenalizeTag;
+        void onPenalize(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            if (!playingCustom())
+                return;
+            const auto watcher = s_watchers.find(load<uint32_t>(rdram, GPR_U32(ctx, 4) + kPlayerTrack));
+            if (watcher == s_watchers.end())
+                return;
+            const auto found = s_held.find(watcher->second);
+            if (found == s_held.end() || found->second.empty())
+                return;
+            const EntryArgs args(ctx);
+            const float now = watcherNow(rdram, ctx, runtime, watcher->second);
+            for (const Held &held : found->second)
+                if (held.end > now)
+                    letGo(rdram, ctx, runtime, watcher->second, held, now);
+            found->second.clear();
+            args.restore(ctx);
+        }
+
         // TrackWatcherImpl::Jump(float), to another place in the song.
         struct JumpTag;
         void onJump(uint8_t *, R5900Context *ctx, PS2Runtime *)
@@ -353,6 +377,7 @@ namespace gh2::guitar
         s_addresses = &addresses;
         EntryHook<PlayerHitTag>::install(runtime, addresses.playerHit, onPlayerHit);
         replaceKeeping(runtime, addresses.trackWatcherHitGem, &hitGem, s_hitGem);
+        EntryHook<PenalizeTag>::install(runtime, addresses.playerPenalize, onPenalize);
         EntryHook<JumpTag>::install(runtime, addresses.trackWatcherJump, onJump);
         EntryHook<PollTag>::install(runtime, addresses.trackWatcherSustainTimeout, onPoll);
         replaceKeeping(runtime, addresses.checkForPitchBend, &pitchBend, s_pitchBend);
