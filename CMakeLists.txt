@@ -341,6 +341,7 @@ set(GHC_GAME_SOURCES
     src/gameplay/extended/guitar/gem_kinds.cpp
     src/gameplay/extended/guitar/hammer_ons.cpp
     src/gameplay/extended/guitar/lane_hits.cpp
+    src/gameplay/extended/guitar/open_chord_hits.cpp
     src/gameplay/extended/guitar/sustain_hold.cpp
     src/highway/cyan_stars.cpp
     src/highway/extended/guitar/lane_bands.cpp

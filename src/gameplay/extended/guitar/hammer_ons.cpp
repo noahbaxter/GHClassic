@@ -33,11 +33,19 @@ namespace gh2::guitar
         // song's most to score (for its stars) go by how many frets it has,
         // each asked where it is scored. Elsewhere, Swing's matching above
         // all, it has none.
+        constexpr uint32_t kAnalyzedAt = 0x12a5ccu; // MultiplayerAnalyzer::AddMultiGem, GemNumSlots
         constexpr uint32_t kScoredAt[] = {
             0x112238u, // Player::AddHeadPoints, GameGem::NumSlots
             0x12a110u, // HeldNote::HeldNote, GameGem::NumSlots
-            0x12a5ccu, // MultiplayerAnalyzer::AddMultiGem, GemNumSlots
+            kAnalyzedAt,
         };
+
+        // An open chord's open scores as one more fret, as an open alone
+        // does: for the gem hit last (HitGem, before its points and its
+        // sustain's are counted) and the gem the song's most to score is
+        // counting.
+        uint32_t s_hitOpenChord = 0u;
+        bool s_analyzingOpenChord = false;
 
         // A chord being hammered on scores as its own frets, not the one it
         // is shown as: asked of the gem (GameGem::NumSlots) or of the frets
@@ -53,7 +61,18 @@ namespace gh2::guitar
                 SET_GPR_U32(ctx, 2, static_cast<uint32_t>(__builtin_popcount(s_chordFrets)));
             else if (GPR_U32(ctx, 2) == 0u)
                 SET_GPR_U32(ctx, 2, 1u);
+            if (from == kAnalyzedAt ? s_analyzingOpenChord : asked != 0u && asked == s_hitOpenChord)
+                SET_GPR_U32(ctx, 2, GPR_U32(ctx, 2) + 1u);
         }
+
+        // MultiplayerAnalyzer::AddMultiGem(int track, const GameGem &),
+        // 0x12a500: a gem counted into the song's most to score.
+        struct AnalyzeGemTag;
+        void onAnalyzeGem(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
+        {
+            const GameGem gem(rdram, GPR_U32(ctx, 6));
+            const Gh2Gem *chart = chartGem(GPR_U32(ctx, 5), static_cast<uint32_t>(gem.tick()), gem.slots());
+            s_analyzingOpenChord = chart && chart->openChord;        }
         PS2Runtime::RecompiledFunction s_numSlots = nullptr, s_gemNumSlots = nullptr;
 
         // By its own frets, those of the chord or open hammered on as one fret
@@ -193,13 +212,17 @@ namespace gh2::guitar
 
         // TrackWatcherImpl::HitGem(float ms, int gem, bool hammered), 0x2488d0:
         // a gem hammered on that GH1's engine let through without a strum
-        // stands in for one, so the let-go rule is met after it.
+        // stands in for one, so the let-go rule is met after it; and an open
+        // chord hit is kept for its scoring.
         struct HitGemTag;
         void onHitGem(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
             const uint32_t watcher = GPR_U32(ctx, 4);
-            if (GPR_U32(ctx, 6) != 0u && strumless(rdram, watcher, static_cast<int32_t>(GPR_U32(ctx, 5))))
+            const auto index = static_cast<int32_t>(GPR_U32(ctx, 5));
+            if (GPR_U32(ctx, 6) != 0u && strumless(rdram, watcher, index))
                 countAsStrum(watcher);
+            const Gh2Gem *chart = index >= 0 ? watcherChartGem(rdram, watcher, index) : nullptr;
+            s_hitOpenChord = chart && chart->openChord ? watcherGem(rdram, watcher, index) : 0u;
         }
     }
 
@@ -222,6 +245,7 @@ namespace gh2::guitar
         replaceKeeping(runtime, addresses.guitarWatcherFretButtonUp, &fretButtonUp, s_fretButtonUp);
         replaceKeeping(runtime, addresses.guitarWatcherFretButtonDown, &fretButtonDown, s_fretButtonDown);
         EntryHook<HitGemTag>::install(runtime, addresses.trackWatcherHitGem, onHitGem);
+        EntryHook<AnalyzeGemTag>::install(runtime, addresses.multiplayerAnalyzerAddMultiGem, onAnalyzeGem);
         setStrumlessGems(&strumless);
         replaceKeeping(runtime, addresses.gameGemNumSlots, &scoredSlots<&s_numSlots>, s_numSlots);
         replaceKeeping(runtime, addresses.gemNumSlots, &scoredSlots<&s_gemNumSlots>, s_gemNumSlots);

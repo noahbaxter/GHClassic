@@ -31,6 +31,7 @@
 #include "gameplay/extended/guitar/hammer_ons.h"
 #include "gameplay/extended/guitar/lane_hits.h"
 #include "highway/extended/guitar/lane_bands.h"
+#include "gameplay/extended/guitar/open_chord_hits.h"
 #include "highway/extended/guitar/open_gems.h"
 #include "highway/extended/guitar/open_bursts.h"
 #include "highway/extended/guitar/open_tails.h"
@@ -166,6 +167,8 @@ namespace
         // frets held for its sustains are left out of what either engine sees.
         gh2::guitar::installGemKinds(runtime, gh2::kSlus21447);
         gh2::guitar::installHammerOns(runtime, gh2::kSlus21447);
+        // Over hammer_ons' CanHopo.
+        gh2::guitar::installOpenChordHits(runtime, gh2::kSlus21447);
         // Over hammer_ons' FretButtonUp.
         gh2::guitar::installSustainHold(runtime, gh2::kSlus21447);
         gh2::guitar::installSustainFlames(runtime, gh2::kSlus21447);

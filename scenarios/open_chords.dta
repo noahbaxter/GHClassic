@@ -1,0 +1,55 @@
+; A custom song's open chords (gameplay/extended/guitar/open_chord_hits.h), from a chart
+; of its own: a green and yellow chord, then an open and yellow strummed on
+; yellow alone, hit; another strummed on green and yellow, missed; a yellow
+; strummed on green and yellow, hit (a lone fret's lower ones may be held);
+; an open, green and red, hit; an open and yellow tap hammered on over green
+; and red, missed; a green; an open and yellow held, the open's sustain under
+; it, whammied; a green.
+(songs open_chords)
+#include common/first_boot.dta
+{gamecfg set mode quickplay}
+{setlist select custom}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+(press green)
+(wait_screen game_screen 60)
+(wait_until {> {ghc_play gems} 0} 30)
+(expect {ghc_play gems} 9)
+{ghc_play strum 0 0}
+{ghc_play strum 1 0}
+{ghc_play strum 0 2000}
+{ghc_play strum 0 3000}
+{ghc_play strum 4 0}
+{ghc_play hammer 5 0}
+{ghc_play strum 6 0}
+{ghc_play strum 7 0}
+{ghc_play strum 8 0}
+(record on open_chords)
+(wait_until {> {ghc_play now} 1200} 30)
+(shot chords_coming)
+(wait_until {> {ghc_play now} 4600} 30)
+(shot chord_and_tap)
+(wait_until {> {ghc_play now} 8450} 30)
+(shot open_chord_held)
+(whammy 1)
+(wait_until {> {ghc_play now} 8600} 30)
+(whammy 0)
+(wait_until {> {ghc_play now} 8750} 30)
+(whammy 1)
+(shot open_chord_whammy)
+(wait_until {> {ghc_play now} 8900} 30)
+(whammy 0)
+(wait_until {> {ghc_play now} 9050} 30)
+(whammy 1)
+(wait_until {> {ghc_play now} 9200} 30)
+(whammy 0)
+(wait_until {ghc_play idle} 30)
+(record off)
+(wait 2)
+(expect {player0 gems_passed} 2)
+(expect {player0 gems_hit} 7)
+(quit)

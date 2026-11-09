@@ -132,6 +132,7 @@ namespace gh2
         uint32_t playerCheckHeldNote;         // Player::CheckHeldNote(float ms)
         uint32_t playerPenalize;              // Player::Penalize(float ms, int gem)
         uint32_t heldNoteCtor;                // HeldNote::HeldNote(int gem, const GameGem &)
+        uint32_t multiplayerAnalyzerAddMultiGem; // MultiplayerAnalyzer::AddMultiGem(int track, const GameGem &)
         uint32_t gemApplyDuration;            // Gem::ApplyDuration(float, float, float), each rep's tail
         uint32_t hudPanelEnter;      // HudPanel::Enter
         uint32_t hudPanelSetMetersShowing; // HudPanel::SetMetersShowing(bool)
@@ -503,6 +504,7 @@ namespace gh2
         .playerCheckHeldNote = 0x112280u,
         .playerPenalize = 0x1114c0u,
         .heldNoteCtor = 0x12a0e0u,
+        .multiplayerAnalyzerAddMultiGem = 0x12a500u,
         .gemApplyDuration = 0x157ce0u,
         .hudPanelEnter = 0x12ba00u,
         .hudPanelSetMetersShowing = 0x12c210u,

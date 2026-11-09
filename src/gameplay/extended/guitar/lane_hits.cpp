@@ -39,6 +39,9 @@ namespace gh2::guitar
 
         bool judging() { return playingCustom(); }
 
+        // A lane mask's mark past the frets: an open chord's.
+        constexpr uint8_t kOpenChord = 0x20u;
+
         // The lane gem i is in: its first and last gems, and its masks (a
         // tremolo's one, a trill's two).
         struct Lane
@@ -71,18 +74,23 @@ namespace gh2::guitar
             const GuitarTrackWatcherImpl view(rdram, watcher);
             for (int g = lane.first; g <= lane.last && lane.masks.size() < 2u; ++g)
             {
-                const uint8_t mask = view.gems()[g].slots();
+                uint8_t mask = view.gems()[g].slots();
+                if (const Gh2Gem *chart = watcherChartGem(rdram, watcher, g); chart && chart->openChord)
+                    mask |= kOpenChord;
                 if (std::find(lane.masks.begin(), lane.masks.end(), mask) == lane.masks.end())
                     lane.masks.push_back(mask);
             }
             return lane;
         }
 
-        // Whether `held` plays `mask` (GuitarEngine.ActiveLaneIncludesNote):
-        // a chord's frets exactly, a single note's (or an open's, none) as
-        // the highest held.
+        // Whether `held` plays `mask` (GuitarEngine.ActiveLaneIncludesNote): a
+        // chord's frets exactly, an open chord's too (kOpenChord marked,
+        // gameplay/extended/guitar/open_chord_hits.h), a single note's (or an
+        // open's, none) as the highest held.
         bool plays(uint8_t held, uint8_t mask)
         {
+            if (mask & kOpenChord)
+                return held == (mask & ~kOpenChord);
             if (std::popcount(mask) > 1)
                 return held == mask;
             return held == 0u ? mask == 0u : mask != 0u && std::bit_width(held) == std::bit_width(mask);
