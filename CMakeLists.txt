@@ -342,6 +342,7 @@ set(GHC_GAME_SOURCES
     src/gameplay/extended/guitar/hammer_ons.cpp
     src/highway/extended/guitar/open_gems.cpp
     src/highway/extended/guitar/open_pieces.cpp
+    src/highway/extended/guitar/open_tails.cpp
     src/highway/gem_looks.cpp
     src/highway/note_speed.cpp
     src/highway/retrack.cpp

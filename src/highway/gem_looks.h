@@ -78,8 +78,28 @@ namespace gh2
         constexpr uint32_t kHeld = 2u;
     }
 
+    // Star power's cyan, as a gem's colours go (1 a lane's full).
+    constexpr float kStarPowerCyan[3] = {0.3f, 1.0f, 1.0f};
+    // gem.tex turned to these hues (degrees): star power's cyan, an open's
+    // purple.
+    constexpr float kStarPowerHue = 180.0f, kOpenHue = 280.0f;
+
     // The track's scene through `add` as it is read, for pieces of its own.
     void addToTrackScene(void (*add)(milo::Dir &scene));
+
+    // A gem GemManager::AdvanceEnd (0x156868) is adding to the track: its
+    // manager, its Gem (the manager's next, +0x24, of its Gems at +0x04,
+    // 0x20 each), that index, the track's number, and its GameGem
+    // (SongDB::GetGem), 0 for none.
+    struct GemAdded
+    {
+        uint32_t manager, gem, index, track, game;
+    };
+    // Each called as a gem is added, the last given first; and as the
+    // track's GemRepPool goes (~GemRepPool, 0x159810), its scene and reps
+    // with it. Their calls into the guest need put back nothing.
+    void onGemAdded(void (*added)(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const GemAdded &gem));
+    void onTrackGone(void (*gone)(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t pool));
 
     // A mesh body's vertices: a count, then that many of position, normal,
     // colour (four floats) and uv, each kMeshVertex long, its uv at
@@ -87,6 +107,19 @@ namespace gh2
     // positions all read as such.
     constexpr size_t kMeshVertex = 48u, kMeshVertexUv = 40u;
     std::optional<size_t> meshVertices(const milo::Bytes &body);
+    // Those vertices, each's bytes, and their lowest height (z).
+    struct MeshVertices
+    {
+        uint8_t *first;
+        uint32_t count;
+        float bottom;
+        uint8_t *operator[](uint32_t i) const { return first + i * kMeshVertex; }
+    };
+    std::optional<MeshVertices> vertices(milo::Bytes &body);
+
+    // The this a mesh's Sync takes, through its vtable (+0x34), moved by the
+    // int16 at +0x48 (as at 0x1592e0).
+    uint32_t syncThis(uint8_t *rdram, uint32_t mesh);
 
     // `name`'s body in the scene copied as `as`, changed by `change`. False if
     // the scene has no `name` or has `as` already, or `change` fails.

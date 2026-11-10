@@ -9,6 +9,7 @@
 #include "gameplay/extended/guitar/gem_kinds.h"
 #include "guest.h"
 #include "highway/extended/guitar/open_pieces.h"
+#include "highway/extended/guitar/open_tails.h"
 #include "highway/gem_looks.h"
 #include "hook.h"
 #include "milo/layout.h"
@@ -71,9 +72,10 @@ namespace gh2::guitar
         constexpr const char *kStarShine = "star2.mesh";
 
         // Each of the rep's parts shown as its wide mesh, where the scene has
-        // that.
+        // that, and its tail an open's.
         void widenParts(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t rep)
         {
+            dressOpenTail(rdram, ctx, runtime, rep);
             const uint32_t type = load<uint32_t>(rdram, rep + gemRep::kType);
             for (const uint32_t part : gemRep::kParts)
             {

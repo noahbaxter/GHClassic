@@ -181,6 +181,26 @@ namespace gh2
         return std::nullopt;
     }
 
+    std::optional<MeshVertices> vertices(milo::Bytes &body)
+    {
+        const auto at = meshVertices(body);
+        if (!at)
+            return std::nullopt;
+        MeshVertices out{body.data() + *at + 4u, milo::u32(body, *at), 1e9f};
+        for (uint32_t i = 0; i < out.count; ++i)
+        {
+            float z;
+            std::memcpy(&z, out[i] + 8u, 4u);
+            out.bottom = std::min(out.bottom, z);
+        }
+        return out;
+    }
+
+    uint32_t syncThis(uint8_t *rdram, uint32_t mesh)
+    {
+        return mesh + static_cast<uint32_t>(load<int16_t>(rdram, load<uint32_t>(rdram, mesh + 0x34u) + 0x48u));
+    }
+
     bool addCopy(milo::Dir &scene, const std::string &name, const std::string &as,
                  const std::function<bool(milo::Bytes &)> &change)
     {
