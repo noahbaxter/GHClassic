@@ -3,11 +3,11 @@
 // retail's own: no code of ours, every hook hands GH2's calls to the
 // original. GH1's are GH2's with GH1's differences put back, in gh1_*.cpp.
 
-#include "gameplay/note_engine/note_engine.h"
+#include "gameplay/engine/note_engine.h"
 
 #include "content/campaigns.h"
 #include "content/games.h"
-#include "gameplay/note_engine/gh1.h"
+#include "gameplay/engine/gh1/gh1.h"
 #include "save/save.h"
 #include "script.h"
 

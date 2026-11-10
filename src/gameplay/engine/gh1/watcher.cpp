@@ -2,7 +2,8 @@
 // these differences, each put back here.
 //
 // - A gem is a HOPO when it is one fret, not the same frets as the gem
-//   before, and at most 159 ticks after it. GH2's must share no fret with
+//   before, and at most 159 ticks after it (or the song's own threshold,
+//   where it sets one other than 170). GH2's must share no fret with
 //   the gem before and be under the song's hopo_threshold, 170 unless the
 //   song sets one (GameGemList::WillBeNoStrum, GH1 0x277e58).
 // - A gem under 121 ticks long has no sustain. GH2's parser cuts at 160
@@ -10,7 +11,7 @@
 // - Once every fret is let go, no hammer-on or pull-off counts until the
 //   next strum. A strum counts here even if BeatMatcher::Swing drops it
 //   inside its 52 ms limit. GH2 has no such lock (GuitarController::OnMsg,
-//   GH1 0x278120).
+//   GH1 0x278120). Gems GH1 never had come in as setStrumlessGems says.
 // - A hammer-on or pull-off may come at most 40 ms early (slop - 60) and
 //   aims at the nearest gem, played or not. GH2's may come 100 ms early
 //   (slop) and aims at the nearest unplayed gem. Both allow 160 ms late
@@ -36,7 +37,7 @@
 //
 // Kept GH2's: the song's sync offset in every window.
 
-#include "gameplay/note_engine/gh1.h"
+#include "gameplay/engine/gh1/gh1.h"
 
 #include "guest/beatmatch.h"
 #include "hook.h"
@@ -59,12 +60,13 @@ namespace gh2::gh1_rules
         using guest::MultiGemInfo;
         using guest::TrackWatcherImpl;
 
-        constexpr int32_t kGh1HopoTicks = 159;
+        constexpr int32_t kGh1HopoTicks = 159, kGh2HopoTicks = 170;
         constexpr int32_t kGh1SustainTicks = 121;
 
         const Addresses *s_addresses = nullptr;
         // Each guitar watcher's: a strum since every fret was last let go.
         std::unordered_map<uint32_t, bool> s_strummed;
+        StrumlessGem s_strumless = nullptr;
 
         float nowOf(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const TrackWatcherImpl &watcher)
         {
@@ -74,7 +76,8 @@ namespace gh2::gh1_rules
         }
 
         // Asked of each gem as the chart is read: GH1's HOPO rule, and its
-        // sustain cutoff alongside.
+        // sustain cutoff alongside. A song's own threshold in place of
+        // GH2's 170 (a custom song's, or songs.dta's) stands for GH1's 159.
         struct WillBeNoStrumTag;
         bool onWillBeNoStrum(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
@@ -85,8 +88,9 @@ namespace gh2::gh1_rules
             if (list.size() > 0)
             {
                 const GameGem last = list[list.size() - 1];
+                const int32_t own = list.hopoThreshold();
                 hopo = info.slots() != last.slots() && std::popcount(info.slots()) == 1 &&
-                       info.tick() - last.tick() <= kGh1HopoTicks;
+                       info.tick() - last.tick() <= (own == kGh2HopoTicks ? kGh1HopoTicks : own);
             }
             SET_GPR_U32(ctx, 2, hopo ? 1u : 0u);
             leave(ctx);
@@ -131,7 +135,8 @@ namespace gh2::gh1_rules
             const float at = ctx->f[12] + watcher.sync();
             const int c = gems.closest(at);
             const float early = watcher.leniency() - watcher.slop();
-            if (!s_strummed[watcher.address] || watcher.done(c) || at - gems[c].ms() < early)
+            const bool strummed = s_strummed[watcher.address] || (s_strumless && s_strumless(rdram, watcher.address, c));
+            if (!strummed || watcher.done(c) || at - gems[c].ms() < early)
             {
                 leave(ctx);
                 return true;
@@ -246,5 +251,18 @@ namespace gh2::gh1_rules
         Override<GemCanBePassedTag>::install(runtime, addresses.guitarWatcherGemCanBePassed, gh1Only<onGemCanBePassed>);
         EntryHook<PollTag>::install(runtime, addresses.trackWatcherPoll, gh1Only<onPoll>);
         EntryHook<FretTimeoutTag>::install(runtime, addresses.guitarWatcherCheckForFretTimeout, gh1Only<onCheckForFretTimeout>);
+    }
+}
+
+namespace gh2
+{
+    void setStrumlessGems(StrumlessGem strumless)
+    {
+        gh1_rules::s_strumless = strumless;
+    }
+
+    void countAsStrum(uint32_t watcher)
+    {
+        gh1_rules::s_strummed[watcher] = true;
     }
 }

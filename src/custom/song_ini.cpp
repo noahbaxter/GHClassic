@@ -52,8 +52,11 @@ namespace gh2::custom
     Options options(const Tags &tags)
     {
         Options out;
-        if (const auto n = number(tags, "sustain_cutoff_threshold"); n && *n >= 0)
-            out.sustainCutoff = static_cast<uint32_t>(*n);
+        // 0 or less is Clone Hero's "unset".
+        if (const auto n = number(tags, "hopo_frequency"); n && *n > 0)
+            out.hopoFrequency = static_cast<uint32_t>(*n);
+        if (const auto s = tag(tags, "eighthnote_hopo"))
+            out.eighthNoteHopo = *s == "1" || lower(*s) == "true";
         if (const auto n = number(tags, "multiplier_note"))
             out.starPowerOn103 = *n == 103;
         return out;

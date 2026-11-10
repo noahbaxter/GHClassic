@@ -19,6 +19,7 @@ namespace gh2::guest
 
         bool enabled() const { return get<uint32_t>(0x28u) != 0u; }
         bool active() const { return get<uint32_t>(0x2cu) != 0u; } // star power on
+        void setActive(bool on) const { set<uint32_t>(0x2cu, on ? 1u : 0u); }
         uint32_t track() const { return get<uint32_t>(0x48u); }
         int32_t state() const { return get<int32_t>(0x58u); }
         void setState(State state) const { set<int32_t>(0x58u, state); }

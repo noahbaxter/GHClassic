@@ -8,9 +8,13 @@ namespace gh2::custom
 {
     namespace
     {
-        // A gem this short is no sustain to GH2 (SongParser, 0x245ff8, under
-        // 161 at 480), and a short note is written this long.
-        constexpr uint32_t kTap = 60u;
+        // A gem this short is no sustain to either engine (GH1's from 121 at
+        // 480, GH2's 161; each cuts its own as the song loads,
+        // gameplay/extended/guitar/gem_kinds.h), and a short note is written
+        // this long.
+        constexpr uint32_t kSustainFrom = 121u, kTap = 60u;
+        // A big note (midi_parsers.dta's big_note_parser_guitar).
+        constexpr uint8_t kBigNote = 110u;
 
         using midi::note;
 
@@ -44,6 +48,7 @@ namespace gh2::custom
     std::optional<Gh2Chart> toGh2(const Chart &chart, double lengthSeconds, std::optional<Part> want)
     {
         Gh2Chart out;
+        out.hopoThreshold = chart.hopoThreshold;
         uint8_t parts = 0u;
         for (const auto &[part, difficulties] : chart.parts)
             parts |= static_cast<uint8_t>(1u << int(part));
@@ -77,20 +82,86 @@ namespace gh2::custom
         {
             const Difficulty &diff = lead[d];
             const uint8_t base = static_cast<uint8_t>(60u + 12u * d);
-            const std::vector<Gem> &gems = diff.gems;
+            std::vector<const Gem *> gems;
+            for (const Gem &g : diff.gems)
+                if (g.lanes & 0x3fu)
+                    gems.push_back(&g);
             for (size_t i = 0; i < gems.size(); ++i)
             {
-                const Gem &g = gems[i];
+                const Gem &g = *gems[i];
                 const uint32_t start = at(g.tick);
-                const uint32_t next = i + 1u < gems.size() ? at(gems[i + 1u].tick) : UINT32_MAX;
-                uint32_t length = at(uint64_t(g.tick) + g.length) - start;
+                const uint32_t next = i + 1u < gems.size() ? at(gems[i + 1u]->tick) : UINT32_MAX;
+                uint32_t length = at(uint64_t(g.tick) + g.longest()) - start;
                 length = std::max(length, kTap);
                 if (next != UINT32_MAX)
                     length = std::min(length, next - start);
                 length = std::max(length, 1u);
                 last = std::max(last, start + length);
-                for (int lane = 0; lane < 5; ++lane)
+                // An open, with no fret of its own, is written as all five
+                // frets, told from a chord of all five by Gh2Gem::open. GH2
+                // hammers on single frets alone (GuitarTrackWatcherImpl::
+                // TryToHopo, 0x24dc20); an open and a chord hammer on as one
+                // (gameplay/extended/guitar/hammer_ons.h). An open chord is its
+                // frets, a chord to the reader, so never a natural HOPO: its
+                // kind the chart's, which GH2's rule, seeing one fret, could
+                // not say.
+                const bool open = (g.lanes & 0x1fu) == 0u;
+                const bool openChord = !open && (g.lanes & (1u << kOpen)) != 0u;
+                const uint8_t frets = open ? kOpenFrets : static_cast<uint8_t>(g.lanes & 0x1fu);
+                Gh2Gem &kept = out.gems[d][start] = {.frets = frets,
+                                                     .hopo = g.kind != Kind::Strum,
+                                                     .decided = g.forced || open || openChord,
+                                                     .flip = g.flip,
+                                                     .open = open,
+                                                     .openChord = openChord,
+                                                     .tap = g.kind == Kind::Tap,
+                                                     .laned = g.laned,
+                                                     .laneStart = g.laneStart};
+                for (const Difficulty::Band &b : diff.bands)
+                    if (b.tick == g.tick)
+                    {
+                        kept.bandMs[size_t(b.lane)] =
+                            static_cast<float>((chart.seconds(b.tick + b.length) - chart.seconds(b.tick)) * 1000.0);
+                        if (b.lane == kOpen)
+                            for (const Difficulty::Band &other : diff.bands)
+                                if (other.lane < kOpen && other.tick <= b.tick + b.length && b.tick <= other.tick + other.length)
+                                    kept.openBandGap = static_cast<int8_t>(other.lane);
+                    }
+                // Each lane held to its own end or the next gem on it, as
+                // Clone Hero's; the gem as long as the longest.
+                uint32_t held = g.tick;
+                std::array<uint32_t, 5> ends{};
+                for (int lane = 0; lane <= kOpen; ++lane)
                     if (g.lanes & (1u << lane))
+                    {
+                        uint32_t end = g.tick + g.length[size_t(lane)];
+                        for (size_t k = i + 1u; k < gems.size() && gems[k]->tick < end; ++k)
+                            if (gems[k]->lanes & (1u << lane))
+                                end = gems[k]->tick;
+                        held = std::max(held, end);
+                        if (lane < 5)
+                            ends[size_t(lane)] = end;
+                    }
+                // The song ends past its sustains too, a held one past the
+                // last gem's end.
+                last = std::max(last, at(held));
+                if (at(held) - start > length && at(held) - start >= kSustainFrom)
+                {
+                    kept.sustain = at(held) - start;
+                    kept.sustainMs = static_cast<float>((chart.seconds(held) - chart.seconds(g.tick)) * 1000.0);
+                }
+                // A chord whose lanes end apart, each lane's.
+                uint32_t shortest = held;
+                for (size_t lane = 0; lane < 5u; ++lane)
+                    if (frets & (1u << lane))
+                        shortest = std::min(shortest, ends[lane]);
+                if (g.chord() && !open && at(shortest) < at(held) && at(held) - start >= kSustainFrom)
+                    for (size_t lane = 0; lane < 5u; ++lane)
+                        if (frets & (1u << lane))
+                            kept.laneMs[lane] =
+                                static_cast<float>((chart.seconds(ends[lane]) - chart.seconds(g.tick)) * 1000.0);
+                for (int lane = 0; lane < 5; ++lane)
+                    if (frets & (1u << lane))
                     {
                         guitar.events.push_back(note(start, static_cast<uint8_t>(base + lane), true));
                         guitar.events.push_back(note(start + length, static_cast<uint8_t>(base + lane), false));
@@ -101,6 +172,16 @@ namespace gh2::custom
                 guitar.events.push_back(note(at(s.tick), static_cast<uint8_t>(base + 7u), true));
                 guitar.events.push_back(note(std::max(at(uint64_t(s.tick) + s.length), at(s.tick) + 1u), static_cast<uint8_t>(base + 7u), false));
             }
+            // Each player's Face-Off phrases on the two notes past it: GH2's
+            // parser gives a gem started under one to that player alone, one
+            // under neither to both (SongParser::SetActivePlayer, 0x246928).
+            for (uint8_t player = 0u; player < 2u; ++player)
+                for (const Span &s : diff.faceOff[player])
+                {
+                    const uint8_t pitch = static_cast<uint8_t>(base + 9u + player);
+                    guitar.events.push_back(note(at(s.tick), pitch, true));
+                    guitar.events.push_back(note(std::max(at(uint64_t(s.tick) + s.length), at(s.tick) + 1u), pitch, false));
+                }
         }
         if (last == 0u)
             return std::nullopt;
@@ -108,6 +189,11 @@ namespace gh2::custom
         {
             guitar.events.push_back(midi::text(at(s.tick), "[solo_on]"));
             guitar.events.push_back(midi::text(at(uint64_t(s.tick) + s.length), "[solo_off]"));
+        }
+        for (const Span &s : lead[3].bigNotes)
+        {
+            guitar.events.push_back(note(at(s.tick), kBigNote, true));
+            guitar.events.push_back(note(std::max(at(uint64_t(s.tick) + s.length), at(s.tick) + 1u), kBigNote, false));
         }
         order(guitar);
 

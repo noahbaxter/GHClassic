@@ -7,6 +7,7 @@
 #include "custom/songs.h"
 #include "custom/text.h"
 #include "formats/dtb.h"
+#include "gameplay/extended/guitar/gem_kinds.h"
 #include "render/texture_store.h"
 #include "script.h"
 
@@ -94,8 +95,9 @@ namespace gh2::custom
         }
 
         // The chart in GH2's form, made from the song's folder, PART GUITAR
-        // that part.
-        std::optional<ark::Made> chartOf(const Song &song, Part part)
+        // that part, at `path`; and its gems' kinds, for the engine to take
+        // as the song loads (gameplay/extended/guitar/gem_kinds.h).
+        std::optional<ark::Made> chartOf(const std::string &path, const Song &song, Part part)
         {
             std::string why;
             const auto chart = parseSongChart(song.chart, songFile(songPath(song, song.chart)), options(song.tags), why);
@@ -107,6 +109,7 @@ namespace gh2::custom
                           << std::endl;
                 return std::nullopt;
             }
+            guitar::setGems(path, gh2->gems, gh2->hopoThreshold);
             return ark::held(gh2->mid);
         }
 
@@ -130,7 +133,7 @@ namespace gh2::custom
                 return std::nullopt;
             const Part part = bass ? Part::Bass : playedPart(song->parts);
             if (ext == ".mid")
-                return chartOf(*song, part);
+                return chartOf(path, *song, part);
             if (ext == ".vgs")
                 return madeMix(path, *song, playedStem(part));
             if (ext == ".voc")

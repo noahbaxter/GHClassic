@@ -38,5 +38,13 @@ namespace gh2
     // the engine judging it, and the same game's comes out of `engine`'s.
     void judgeNoteEngine(NoteEngine engine, uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
 
+    // GH1's rule that nothing is hammered on once every fret is let go,
+    // until a strum (gh1/watcher.cpp), for gems GH1 never had. `strumless`
+    // names those hammered on anyway, by watcher and gem; countAsStrum, a
+    // hit on one that stands in for the strum the rule waits for.
+    using StrumlessGem = bool (*)(uint8_t *rdram, uint32_t watcher, int32_t gem);
+    void setStrumlessGems(StrumlessGem strumless);
+    void countAsStrum(uint32_t watcher);
+
     void installNoteEngine(PS2Runtime &runtime, const Addresses &addresses);
 }

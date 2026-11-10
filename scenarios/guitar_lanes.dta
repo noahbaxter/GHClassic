@@ -1,0 +1,76 @@
+; A custom song's trill and tremolo lanes (highway/extended/guitar/lane_bands.h,
+; lane_hits.h), from a chart of its own: a tremolo of 16 red notes 125 ms
+; apart strummed every other note, four notes played, a trill of 16 green
+; and yellow notes 62.5 ms apart played two notes in four (its second and
+; third carried by the hit on its first, as YARG's are), two notes, a
+; tremolo of 8 opens strummed every other note, a trill of 16 opens and
+; greens as the green and yellow one (an open a pull-off), then one more.
+; Every gem is hit, the lanes' others for the player.
+(songs lanes)
+#include common/first_boot.dta
+{gamecfg set mode quickplay}
+{setlist select custom}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+(press green)
+(wait_screen game_screen 60)
+(wait_until {> {ghc_play gems} 0} 30)
+(expect {ghc_play gems} 63)
+{ghc_play strum 0 0}
+{ghc_play strum 2 0}
+{ghc_play strum 4 0}
+{ghc_play strum 6 0}
+{ghc_play strum 8 0}
+{ghc_play strum 10 0}
+{ghc_play strum 12 0}
+{ghc_play strum 14 0}
+{ghc_play play 16 4}
+{ghc_play strum 20 0}
+{ghc_play hammer 23 0}
+{ghc_play hammer 24 0}
+{ghc_play hammer 25 0}
+{ghc_play hammer 28 0}
+{ghc_play hammer 29 0}
+{ghc_play hammer 32 0}
+{ghc_play hammer 33 0}
+{ghc_play play 36 2}
+{ghc_play strum 38 0}
+{ghc_play strum 40 0}
+{ghc_play strum 42 0}
+{ghc_play strum 44 0}
+{ghc_play strum 46 0}
+{ghc_play hammer 47 0}
+{ghc_play hammer 50 0}
+{ghc_play hammer 51 0}
+{ghc_play hammer 54 0}
+{ghc_play hammer 55 0}
+{ghc_play hammer 58 0}
+{ghc_play hammer 59 0}
+{ghc_play play 62 1}
+(record on lanes)
+(wait_until {> {ghc_play now} 1500} 30)
+(shot tremolo_coming)
+(wait_until {> {ghc_play now} 2800} 30)
+(shot tremolo_playing)
+(wait_until {> {ghc_play now} 7000} 30)
+(shot trill_coming)
+(wait_until {> {ghc_play now} 7900} 30)
+(shot trill_playing)
+(wait_until {> {ghc_play now} 11000} 30)
+(shot open_coming)
+(wait_until {> {ghc_play now} 12500} 30)
+(shot open_playing)
+(wait_until {> {ghc_play now} 13200} 30)
+(shot open_trill_coming)
+(wait_until {> {ghc_play now} 14450} 30)
+(shot open_trill_playing)
+(wait_until {ghc_play idle} 30)
+(record off)
+(wait 2)
+(expect {player0 gems_passed} 0)
+(expect {player0 gems_hit} 63)
+(quit)

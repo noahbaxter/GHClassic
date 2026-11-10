@@ -122,14 +122,14 @@ namespace
                                  "[SyncTrack]\n{\n  0 = TS 4\n  0 = B 120000\n  768 = B 240000\n}\n"
                                  "[Events]\n{\n  0 = E \"section Intro\"\n}\n"
                                  "[ExpertSingle]\n{\n"
-                                 "  0 = N 0 0\n"             // green
-                                 "  48 = N 1 0\n"            // red
-                                 "  96 = N 1 0\n"            // red again
-                                 "  144 = N 2 0\n  144 = N 5 0\n" // yellow, flipped: the flag left out
-                                 "  384 = N 3 0\n"           // blue
-                                 "  432 = N 4 0\n  432 = N 6 0\n" // orange, tapped: the flag left out
-                                 "  480 = N 7 96\n"          // open: no gem
-                                 "  768 = N 0 384\n  768 = N 2 96\n" // chord, held to its longest lane
+                                 "  0 = N 0 0\n"             // green, strum (first)
+                                 "  48 = N 1 0\n"            // red, natural HOPO
+                                 "  96 = N 1 0\n"            // red again, strum
+                                 "  144 = N 2 0\n  144 = N 5 0\n" // yellow, natural HOPO flipped to strum
+                                 "  384 = N 3 0\n  384 = N 5 0\n" // blue, far: strum flipped to HOPO
+                                 "  432 = N 4 0\n  432 = N 6 0\n" // orange tap
+                                 "  480 = N 7 96\n"          // open, sustained
+                                 "  768 = N 0 384\n  768 = N 2 96\n" // chord, lanes ending apart
                                  "  768 = S 2 384\n"
                                  "  900 = E solo\n  1000 = E soloend\n"
                                  "}\n";
@@ -146,12 +146,16 @@ namespace
         CHECK(chart->sections.size() == 1u && chart->sections[0].second == "Intro");
         CHECK(chart->parts.count(Part::Guitar));
         const Difficulty &x = chart->parts.at(Part::Guitar)[3];
-        CHECK(x.gems.size() == 7u);
-        CHECK(at(x, 144) && at(x, 144)->lanes == 1u << 2);
-        CHECK(at(x, 432) && at(x, 432)->lanes == 1u << 4);
-        CHECK(!at(x, 480));
+        CHECK(x.gems.size() == 8u);
+        CHECK(at(x, 0) && at(x, 0)->kind == Kind::Strum && !at(x, 0)->forced);
+        CHECK(at(x, 48) && at(x, 48)->kind == Kind::Hopo && !at(x, 48)->forced);
+        CHECK(at(x, 96) && at(x, 96)->kind == Kind::Strum);
+        CHECK(at(x, 144) && at(x, 144)->kind == Kind::Strum && at(x, 144)->flip && !at(x, 144)->forced);
+        CHECK(at(x, 384) && at(x, 384)->kind == Kind::Hopo && at(x, 384)->flip && !at(x, 384)->forced);
+        CHECK(at(x, 432) && at(x, 432)->kind == Kind::Tap);
+        CHECK(at(x, 480) && at(x, 480)->lanes == 1u << kOpen && at(x, 480)->length[kOpen] == 96u);
         const Gem *chord = at(x, 768);
-        CHECK(chord && chord->chord() && chord->length == 384u);
+        CHECK(chord && chord->chord() && chord->split() && chord->longest() == 384u);
         CHECK(x.starPower.size() == 1u && x.starPower[0].length == 384u);
         CHECK(x.solos.size() == 1u && x.solos[0].tick == 900u && x.solos[0].length == 100u);
 
@@ -159,7 +163,93 @@ namespace
         const auto unsorted = parseChart("[SyncTrack]\n{\n  768 = B 240000\n  0 = B 60000\n}\n", {}, why);
         CHECK(unsorted && unsorted->tempos.size() == 2u && unsorted->tempos[0].usPerBeat == 1000000u);
 
-        // As GH2 takes it: 480 a beat, the open gone, star power on 103.
+        // GH2's rule in a .chart too: a note on a fret of the chord before
+        // is a strum, one off it a HOPO.
+        const auto outOfChord =
+            parseChart("[ExpertSingle]\n{\n  0 = N 0 0\n  0 = N 1 0\n  48 = N 0 0\n  96 = N 0 0\n  96 = N 1 0\n"
+                       "  144 = N 2 0\n}\n",
+                       {}, why);
+        CHECK(outOfChord && outOfChord->parts.count(Part::Guitar));
+        if (outOfChord && outOfChord->parts.count(Part::Guitar))
+        {
+            const Difficulty &o = outOfChord->parts.at(Part::Guitar)[3];
+            CHECK(at(o, 48) && at(o, 48)->kind == Kind::Strum);
+            CHECK(at(o, 144) && at(o, 144)->kind == Kind::Hopo);
+        }
+
+        // GH2's threshold, under 170 at 480: 67 ticks at 192 is 168, a
+        // HOPO; 71 is 177, a strum. Clone Hero's, 65 at 192, strums both.
+        const std::string gaps = "[ExpertSingle]\n{\n  0 = N 0 0\n  67 = N 1 0\n  138 = N 2 0\n}\n";
+        const auto natural = parseChart(gaps, {}, why);
+        CHECK(natural && natural->parts.count(Part::Guitar) && !natural->hopoThreshold);
+        if (natural && natural->parts.count(Part::Guitar))
+        {
+            const Difficulty &n = natural->parts.at(Part::Guitar)[3];
+            CHECK(at(n, 67) && at(n, 67)->kind == Kind::Hopo);
+            CHECK(at(n, 138) && at(n, 138)->kind == Kind::Strum);
+        }
+        // song.ini's own: 100 at 192 is 250 at 480; GH2's 170 (68 at 192)
+        // and an eighth's 240 by eighthnote_hopo.
+        Options wide;
+        wide.hopoFrequency = 100u;
+        const auto widened = parseChart(gaps, wide, why);
+        CHECK(widened && widened->hopoThreshold == 250u);
+        if (widened && widened->parts.count(Part::Guitar))
+            CHECK(at(widened->parts.at(Part::Guitar)[3], 138)->kind == Kind::Hopo);
+        Options stamped;
+        stamped.hopoFrequency = 68u;
+        const auto ripped = parseChart(gaps, stamped, why);
+        CHECK(ripped && !ripped->hopoThreshold);
+        Options eighth;
+        eighth.eighthNoteHopo = true;
+        const auto eighths = parseChart(gaps, eighth, why);
+        CHECK(eighths && eighths->hopoThreshold == 240u);
+
+        // Notes within 10 ticks at 480 (4 at 192) are one chord, as GH2's
+        // parser makes them.
+        const auto near = parseChart("[ExpertSingle]\n{\n  0 = N 0 0\n  4 = N 1 0\n  9 = N 2 0\n}\n", {}, why);
+        CHECK(near && near->parts.count(Part::Guitar));
+        if (near && near->parts.count(Part::Guitar))
+        {
+            const Difficulty &n = near->parts.at(Part::Guitar)[3];
+            CHECK(n.gems.size() == 2u && at(n, 0) && at(n, 0)->lanes == 0x3u && at(n, 9));
+        }
+
+        // An open with frets is an open chord: the frets and the open, a
+        // chord, so never a natural HOPO. GH2 is given its frets, the open
+        // beside them, its kind the chart's.
+        const auto openChord = parseChart(
+            "[ExpertSingle]\n{\n  0 = N 0 0\n  48 = N 2 0\n  48 = N 7 0\n  96 = N 0 0\n  96 = N 1 0\n  96 = N 7 0\n}\n", {}, why);
+        CHECK(openChord && openChord->parts.count(Part::Guitar));
+        if (openChord && openChord->parts.count(Part::Guitar))
+        {
+            const Difficulty &o = openChord->parts.at(Part::Guitar)[3];
+            CHECK(at(o, 48) && at(o, 48)->lanes == ((1u << 2) | (1u << kOpen)) && at(o, 48)->kind == Kind::Strum);
+            CHECK(at(o, 96) && at(o, 96)->lanes == (0x3u | (1u << kOpen)));
+            const auto converted = toGh2(*openChord, 0.0);
+            CHECK(converted);
+            if (converted)
+            {
+                const auto &k = converted->gems[3];
+                CHECK(k.count(0) && !k.at(0).openChord);
+                CHECK(k.count(120) && k.at(120).openChord && !k.at(120).open && k.at(120).frets == 0x4u &&
+                      k.at(120).decided && !k.at(120).hopo);
+                CHECK(k.count(240) && k.at(240).openChord && k.at(240).frets == 0x3u);
+            }
+        }
+
+        // Each player's Face-Off phrases.
+        const auto faceOff = parseChart("[ExpertSingle]\n{\n  0 = N 0 0\n  0 = S 0 192\n  384 = S 1 96\n}\n", {}, why);
+        CHECK(faceOff && faceOff->parts.count(Part::Guitar));
+        if (faceOff && faceOff->parts.count(Part::Guitar))
+        {
+            const Difficulty &f = faceOff->parts.at(Part::Guitar)[3];
+            CHECK(f.faceOff[0].size() == 1u && f.faceOff[0][0].length == 192u);
+            CHECK(f.faceOff[1].size() == 1u && f.faceOff[1][0].tick == 384u);
+        }
+
+        // As GH2 takes it: 480 a beat, the open as all five frets, star
+        // power on 103.
         const auto gh2 = toGh2(*chart, 0.0);
         CHECK(gh2);
         if (!gh2)
@@ -172,10 +262,23 @@ namespace
         for (const midi::Event &e : back->tracks[1].events)
             if (midi::kind(e) == midi::kNoteOn)
                 ons[e.data[0]].push_back(e.tick);
-        CHECK(ons[96] == (std::vector<uint32_t>{0u, 1920u}));
-        CHECK(ons[97] == (std::vector<uint32_t>{120u, 240u}));
+        CHECK(ons[96] == (std::vector<uint32_t>{0u, 1200u, 1920u}));
+        CHECK(ons[97] == (std::vector<uint32_t>{120u, 240u, 1200u}));
         CHECK(ons[103] == (std::vector<uint32_t>{1920u}));
-        CHECK(ons.size() == 6u); // five frets and star power: no open
+        CHECK(ons.size() == 6u); // five frets and star power
+        // Each gem's kind beside it, at 480 a beat: the tap hammers on, and
+        // so does the open close after it; the chord is strummed.
+        const auto &kinds = gh2->gems[3];
+        const auto hopo = [&](uint32_t tick) { return kinds.count(tick) && kinds.at(tick).hopo; };
+        CHECK(kinds.size() == 8u);
+        CHECK(!hopo(0) && hopo(120) && !hopo(240) && !hopo(360) && hopo(960) && hopo(1080) && !hopo(1920));
+        CHECK(kinds.count(1920) && kinds.at(1920).frets == 0x5u);
+        // The chord's lanes apart, at 240 a minute from 768: green 500 ms,
+        // yellow 125.
+        CHECK(kinds.count(1920) && kinds.at(1920).split() && kinds.at(1920).laneMs[0] == 500.0f &&
+              kinds.at(1920).laneMs[2] == 125.0f && kinds.at(1920).laneMs[1] == 0.0f);
+        CHECK(kinds.count(0) && !kinds.at(0).split());
+        CHECK(kinds.count(1200) && kinds.at(1200).open && kinds.at(1200).frets == kOpenFrets && hopo(1200));
         bool end = false, section = false;
         for (const midi::Event &e : back->tracks[2].events)
         {
@@ -184,6 +287,69 @@ namespace
             section |= e.status == midi::kMeta && text == "[section custom_section_0]";
         }
         CHECK(end && section);
+    }
+
+    // Sustains held past the next gem: green under red and yellow, kept
+    // whole beside the MIDI's, cut where it starts the next; blue cut by the
+    // blue after it, as long as the MIDI's, so none beside it.
+    void heldPastNext()
+    {
+        const std::string text = "[Song]\n{\n  Resolution = 192\n}\n"
+                                 "[SyncTrack]\n{\n  0 = TS 4\n  0 = B 120000\n}\n"
+                                 "[ExpertSingle]\n{\n"
+                                 "  0 = N 0 768\n  192 = N 1 0\n  384 = N 2 0\n"
+                                 "  960 = N 3 768\n  1152 = N 3 0\n"
+                                 "}\n";
+        std::string why;
+        const auto chart = parseChart(text, {}, why);
+        const auto gh2 = chart ? toGh2(*chart, 0.0) : std::nullopt;
+        CHECK(gh2);
+        if (!gh2)
+            return;
+        const auto &gems = gh2->gems[3];
+        CHECK(gems.count(0) && gems.at(0).sustain == 1920u && gems.at(0).sustainMs == 2000.0f);
+        CHECK(gems.count(480) && gems.at(480).sustain == 0u);
+        CHECK(gems.count(2400) && gems.at(2400).sustain == 0u);
+        const auto back = midi::parse(gh2->mid);
+        std::set<uint32_t> greenOff;
+        if (back && back->tracks.size() > 1u)
+            for (const midi::Event &e : back->tracks[1].events)
+                if (midi::kind(e) == midi::kNoteOff && e.data[0] == 96u)
+                    greenOff.insert(e.tick);
+        CHECK(greenOff.count(480u));
+
+        // A chord whose lanes end apart: the longest in the MIDI, each lane
+        // its own beside it.
+        const auto apart = parseChart("[Song]\n{\n  Resolution = 192\n}\n[SyncTrack]\n{\n  0 = B 120000\n}\n"
+                                      "[ExpertSingle]\n{\n  0 = N 0 384\n  0 = N 1 96\n  960 = N 2 0\n}\n",
+                                      {}, why);
+        const auto offsOf = [](const std::optional<Gh2Chart> &c)
+        {
+            std::set<uint32_t> offs;
+            const auto m = c ? midi::parse(c->mid) : std::nullopt;
+            if (m && m->tracks.size() > 1u)
+                for (const midi::Event &e : m->tracks[1].events)
+                    if (midi::kind(e) == midi::kNoteOff && (e.data[0] == 96u || e.data[0] == 97u))
+                        offs.insert(e.tick);
+            return offs;
+        };
+        const auto longest = apart ? toGh2(*apart, 0.0) : std::nullopt;
+        CHECK(longest && offsOf(longest) == std::set<uint32_t>{960u} && longest->gems[3].at(0).split());
+
+        // A sustain held past the last gem: the song ends past it, not past
+        // the last gem (else GH2 tears the track down under the held one).
+        const auto past = parseChart("[Song]\n{\n  Resolution = 192\n}\n[SyncTrack]\n{\n  0 = B 120000\n}\n"
+                                     "[ExpertSingle]\n{\n  0 = N 0 768\n  192 = N 1 0\n}\n",
+                                     {}, why);
+        const auto pastGh2 = past ? toGh2(*past, 0.0) : std::nullopt;
+        const auto pastMid = pastGh2 ? midi::parse(pastGh2->mid) : std::nullopt;
+        uint32_t endAt = 0u;
+        if (pastMid && pastMid->tracks.size() > 2u)
+            for (const midi::Event &e : pastMid->tracks[2].events)
+                if (e.status == midi::kMeta && std::string(e.data.begin(), e.data.end()) == "[end]")
+                    endAt = e.tick;
+        CHECK(pastGh2 && pastGh2->gems[3].count(0) && pastGh2->gems[3].at(0).sustain == 1920u);
+        CHECK(endAt >= 1920u + 960u);
     }
 
     using midi::note;
@@ -201,10 +367,8 @@ namespace
             guitar.events.push_back(note(tick, pitch, true));
             guitar.events.push_back(note(tick + length, pitch, false));
         };
-        // Forced strums (102) and HOPOs (101), taps (104) and opens (95, and
-        // Phase Shift's at 2880) left out, the frets under them kept.
-        hold(0u, 96u, 60u);     // green, too short to sustain
-        hold(120u, 97u, 60u);   // red
+        hold(0u, 96u, 60u);     // green, short: kept as written, the engine cuts it
+        hold(120u, 97u, 60u);   // red, natural HOPO
         hold(240u, 98u, 60u);   // yellow, forced strum
         hold(240u, 102u, 60u);
         hold(960u, 99u, 60u);   // blue, forced HOPO
@@ -212,7 +376,7 @@ namespace
         hold(1200u, 100u, 60u); // orange tap
         hold(1200u, 104u, 60u);
         hold(1440u, 95u, 480u); // open
-        hold(1920u, 96u, 960u); // a chord held to its longest lane
+        hold(1920u, 96u, 960u); // a chord ending apart
         hold(1920u, 98u, 480u);
         hold(1920u, 116u, 960u);
         hold(1920u, 103u, 240u);
@@ -220,6 +384,9 @@ namespace
         guitar.events.push_back({2880u, midi::kSysex, 0u, {'P', 'S', 0u, 0u, 0xffu, 1u, 1u, midi::kSysexEnd}});
         hold(2880u, 96u, 60u);
         guitar.events.push_back({2940u, midi::kSysex, 0u, {'P', 'S', 0u, 0u, 0xffu, 1u, 0u, midi::kSysexEnd}});
+        hold(3360u, 96u, 60u); // chord
+        hold(3360u, 97u, 60u);
+        hold(3480u, 96u, 60u); // green out of it: a strum, in a .mid
         std::stable_sort(guitar.events.begin(), guitar.events.end(),
                          [](const midi::Event &a, const midi::Event &b) { return a.tick < b.tick; });
         midi::Track events;
@@ -240,14 +407,165 @@ namespace
         CHECK(chart->sections.size() == 2u && chart->sections[1].second == "chorus_1");
         CHECK(chart->parts.count(Part::Guitar));
         const Difficulty &x = chart->parts.at(Part::Guitar)[3];
-        CHECK(x.gems.size() == 6u);
-        CHECK(at(x, 0) && at(x, 0)->length == 0u);
-        CHECK(at(x, 240) && at(x, 240)->lanes == 1u << 2);
-        CHECK(at(x, 960) && at(x, 960)->lanes == 1u << 3);
-        CHECK(at(x, 1200) && at(x, 1200)->lanes == 1u << 4);
-        CHECK(!at(x, 1440) && !at(x, 2880));
-        CHECK(at(x, 1920) && at(x, 1920)->lanes == 0x5u && at(x, 1920)->length == 960u);
+        CHECK(x.gems.size() == 10u);
+        CHECK(at(x, 3480) && at(x, 3480)->kind == Kind::Strum);
+        CHECK(at(x, 0) && at(x, 0)->longest() == 60u);
+        CHECK(at(x, 120) && at(x, 120)->kind == Kind::Hopo && !at(x, 120)->forced);
+        CHECK(at(x, 240) && at(x, 240)->kind == Kind::Strum && at(x, 240)->forced);
+        CHECK(at(x, 960) && at(x, 960)->kind == Kind::Hopo && at(x, 960)->forced);
+        CHECK(at(x, 1200) && at(x, 1200)->kind == Kind::Tap);
+        CHECK(at(x, 1440) && at(x, 1440)->lanes == 1u << kOpen && at(x, 1440)->length[kOpen] == 480u);
+        CHECK(at(x, 1920) && at(x, 1920)->split());
+        CHECK(at(x, 2880) && at(x, 2880)->lanes == 1u << kOpen);
         CHECK(x.starPower.size() == 1u && x.solos.size() == 1u);
+    }
+
+    // A GH1 or GH2 rip's markers: each difficulty's star power and Face-Off
+    // phrases, big notes; Rock Band's 105 and 106 on all four, its big rock
+    // ending.
+    void midMarkers()
+    {
+        const auto chartOf = [](const std::vector<std::pair<uint8_t, uint32_t>> &notes)
+        {
+            midi::File file{1u, 480u, {midi::Track{}}};
+            midi::Track guitar;
+            guitar.name = "PART GUITAR";
+            for (const auto &[pitch, tick] : notes)
+            {
+                guitar.events.push_back(note(tick, pitch, true));
+                guitar.events.push_back(note(tick + 240u, pitch, false));
+            }
+            std::stable_sort(guitar.events.begin(), guitar.events.end(),
+                             [](const midi::Event &a, const midi::Event &b) { return a.tick < b.tick; });
+            file.tracks.push_back(guitar);
+            std::string why;
+            return parseMid(midi::write(file), {}, why);
+        };
+        const auto gh = chartOf({{60u, 0u}, {96u, 0u}, {67u, 0u}, {103u, 960u}, {69u, 0u}, {106u, 480u},
+                                 {110u, 1920u}});
+        CHECK(gh && gh->parts.count(Part::Guitar));
+        if (gh && gh->parts.count(Part::Guitar))
+        {
+            const auto &d = gh->parts.at(Part::Guitar);
+            CHECK(d[0].starPower.size() == 1u && d[0].starPower[0].tick == 0u);
+            CHECK(d[1].starPower.empty() && d[3].starPower.size() == 1u && d[3].starPower[0].tick == 960u);
+            CHECK(d[3].solos.empty());
+            CHECK(d[0].faceOff[0].size() == 1u && d[0].faceOff[1].empty());
+            CHECK(d[3].faceOff[0].empty() && d[3].faceOff[1].size() == 1u);
+            CHECK(d[3].bigNotes.size() == 1u && d[3].bigNotes[0].tick == 1920u);
+            // Written for GH2's own parsers: 67 Easy's star power, 69 Easy's
+            // first player, 106 Expert's second, 110.
+            const auto gh2 = toGh2(*gh, 0.0);
+            const auto back = gh2 ? gh2::midi::parse(gh2->mid) : std::nullopt;
+            CHECK(back && back->tracks.size() == 3u);
+            if (back && back->tracks.size() == 3u)
+            {
+                const auto has = [&](uint8_t pitch, uint32_t tick)
+                {
+                    return std::any_of(back->tracks[1].events.begin(), back->tracks[1].events.end(),
+                                       [&](const midi::Event &e) {
+                                           return midi::kind(e) == midi::kNoteOn && e.data.size() >= 2u &&
+                                                  e.data[0] == pitch && e.data[1] != 0u && e.tick == tick;
+                                       });
+                };
+                CHECK(has(67u, 0u) && has(103u, 960u) && !has(79u, 0u) && has(110u, 1920u));
+                CHECK(has(69u, 0u) && has(106u, 480u) && !has(70u, 0u) && !has(105u, 0u));
+            }
+        }
+        const auto rb = chartOf({{96u, 0u}, {116u, 0u}, {103u, 480u}, {105u, 0u}, {106u, 960u}, {120u, 1920u}});
+        CHECK(rb && rb->parts.count(Part::Guitar));
+        if (rb && rb->parts.count(Part::Guitar))
+        {
+            const auto &d = rb->parts.at(Part::Guitar);
+            CHECK(d[0].starPower.size() == 1u && d[0].starPower[0].tick == 0u && d[3].solos.size() == 1u);
+            CHECK(d[0].faceOff[0].size() == 1u && d[0].faceOff[1].size() == 1u && d[0].faceOff[1][0].tick == 960u);
+            CHECK(d[3].rockEndings.size() == 1u && d[3].rockEndings[0].tick == 1920u);
+            // Rock Band's 105 and 106 written onto every difficulty.
+            const auto gh2 = toGh2(*rb, 0.0);
+            const auto back = gh2 ? gh2::midi::parse(gh2->mid) : std::nullopt;
+            CHECK(back && back->tracks.size() == 3u);
+            if (back && back->tracks.size() == 3u)
+                for (const uint8_t base : {60u, 72u, 84u, 96u})
+                {
+                    const auto count = std::count_if(back->tracks[1].events.begin(), back->tracks[1].events.end(),
+                                                     [&](const midi::Event &e) {
+                                                         return midi::kind(e) == midi::kNoteOn && e.data.size() >= 2u &&
+                                                                e.data[1] != 0u &&
+                                                                ((e.data[0] == base + 9u && e.tick == 0u) ||
+                                                                 (e.data[0] == base + 10u && e.tick == 960u));
+                                                     });
+                    CHECK(count == 2);
+                }
+        }
+    }
+
+    // Trill and tremolo lanes, as YARG picks their notes: a tremolo's one
+    // mask, cut where it changes; a trill's two single notes alternating;
+    // one that never starts right, no lane. Sustains cut but the last's.
+    // Hard's only where struck at velocity 41 to 50.
+    void lanes()
+    {
+        std::string why;
+        const auto chart = parseChart("[ExpertSingle]\n{\n"
+                                      "  0 = S 65 300\n  0 = N 1 50\n  96 = N 1 50\n  192 = N 1 50\n  288 = N 2 0\n"
+                                      "  768 = S 66 400\n  768 = N 0 0\n  864 = N 2 0\n  960 = N 0 0\n  1056 = N 2 0\n"
+                                      "  1152 = N 3 300\n"
+                                      "  1536 = S 66 300\n  1536 = N 0 0\n  1632 = N 2 0\n  1728 = N 3 0\n"
+                                      "  2304 = S 65 200\n  2304 = N 7 0\n  2400 = N 7 0\n  2496 = N 7 0\n"
+                                      "  3072 = S 66 300\n  3072 = N 7 0\n  3168 = N 0 0\n  3264 = N 7 0\n  3360 = N 0 0\n}\n",
+                                      {}, why);
+        CHECK(chart && chart->parts.count(Part::Guitar));
+        if (!chart || !chart->parts.count(Part::Guitar))
+            return;
+        const Difficulty &x = chart->parts.at(Part::Guitar)[3];
+        CHECK(at(x, 0) && at(x, 0)->laned && at(x, 0)->laneStart && at(x, 0)->longest() == 0u);
+        CHECK(at(x, 192) && at(x, 192)->laned && !at(x, 192)->laneStart && at(x, 192)->longest() == 50u);
+        CHECK(at(x, 288) && !at(x, 288)->laned);
+        CHECK(at(x, 768) && at(x, 768)->laneStart && at(x, 1056) && at(x, 1056)->laned);
+        CHECK(at(x, 1152) && !at(x, 1152)->laned && at(x, 1152)->longest() == 300u);
+        CHECK(at(x, 1536) && !at(x, 1536)->laned);
+        // Red's band, then green's and yellow's, then the opens', then a
+        // trill of an open and green's, one band each.
+        CHECK(x.bands.size() == 6u);
+        if (x.bands.size() == 6u)
+        {
+            CHECK(x.bands[0].lane == 1 && x.bands[0].tick == 0u && x.bands[0].length == 192u);
+            CHECK(x.bands[1].lane == 0 && x.bands[1].tick == 768u && x.bands[1].length == 192u);
+            CHECK(x.bands[2].lane == 2 && x.bands[2].tick == 864u && x.bands[2].length == 192u);
+            CHECK(x.bands[3].lane == kOpen && x.bands[3].tick == 2304u && x.bands[3].length == 192u);
+            CHECK(x.bands[4].lane == kOpen && x.bands[4].tick == 3072u && x.bands[4].length == 192u);
+            CHECK(x.bands[5].lane == 0 && x.bands[5].tick == 3168u && x.bands[5].length == 192u);
+        }
+        CHECK(at(x, 3072) && at(x, 3072)->laneStart && at(x, 3360) && at(x, 3360)->laned);
+
+        const auto midOf = [&](uint8_t velocity)
+        {
+            midi::File file{1u, 480u, {midi::Track{}}};
+            midi::Track guitar;
+            guitar.name = "PART GUITAR";
+            guitar.events.push_back({0u, 0x90u, 0u, {126u, velocity}});
+            for (const uint8_t base : {84u, 96u})
+                for (uint32_t tick : {0u, 240u, 480u})
+                {
+                    guitar.events.push_back(note(tick, base, true));
+                    guitar.events.push_back(note(tick + 60u, base, false));
+                }
+            guitar.events.push_back(note(720u, 126u, false));
+            std::stable_sort(guitar.events.begin(), guitar.events.end(),
+                             [](const midi::Event &a, const midi::Event &b) { return a.tick < b.tick; });
+            file.tracks.push_back(guitar);
+            return parseMid(midi::write(file), {}, why);
+        };
+        for (const uint8_t velocity : {uint8_t(100u), uint8_t(45u)})
+        {
+            const auto mid = midOf(velocity);
+            CHECK(mid && mid->parts.count(Part::Guitar));
+            if (!mid || !mid->parts.count(Part::Guitar))
+                continue;
+            const auto &d = mid->parts.at(Part::Guitar);
+            CHECK(at(d[3], 240) && at(d[3], 240)->laned);
+            CHECK(at(d[2], 240) && at(d[2], 240)->laned == (velocity == 45u));
+        }
     }
 
     // Charts as written in the wild: a note struck again before the last's
@@ -267,7 +585,7 @@ namespace
         auto mid = parseMid(midi::write(file), {}, why);
         CHECK(mid && mid->tempos.size() == 1u && mid->tempos[0].usPerBeat == 500000u);
         const Difficulty *x = mid && mid->parts.count(Part::Guitar) ? &mid->parts.at(Part::Guitar)[3] : nullptr;
-        CHECK(x && at(*x, 0) && at(*x, 0)->length == 480u && at(*x, 480) && at(*x, 480)->length == 960u);
+        CHECK(x && at(*x, 0) && at(*x, 0)->longest() == 480u && at(*x, 480) && at(*x, 480)->longest() == 960u);
         file.division = 0u;
         CHECK(!parseMid(midi::write(file), {}, why));
 
@@ -282,7 +600,7 @@ namespace
         CHECK(chart->tempos.size() == 1u && chart->tempos[0].usPerBeat == 0xffffffu);
         CHECK(chart->sections.size() == 2u && chart->sections[0].second == "A");
         const Difficulty &c = chart->parts.at(Part::Guitar)[3];
-        CHECK(at(c, 0) && at(c, 0)->length == 0u && at(c, 192) && at(c, 192)->length > 0u);
+        CHECK(at(c, 0) && at(c, 0)->longest() == 0u && at(c, 192) && at(c, 192)->longest() > 0u);
         const auto gh2 = toGh2(*chart, 60.0);
         CHECK(gh2 && midi::parse(gh2->mid));
     }
@@ -679,10 +997,21 @@ namespace
             const Difficulty &x = chart->parts.at(Part::Guitar)[3];
             if (x.gems.empty())
                 ++tally["no expert"];
-            // Held past the next gem's start.
-            bool extended = false;
-            for (size_t i = 0; i + 1u < x.gems.size(); ++i)
-                extended |= x.gems[i].tick + x.gems[i].length > x.gems[i + 1u].tick;
+            bool taps = false, opens = false, forced = false, split = false, extended = false;
+            for (size_t i = 0; i < x.gems.size(); ++i)
+            {
+                const Gem &g = x.gems[i];
+                taps |= g.kind == Kind::Tap;
+                opens |= (g.lanes & (1u << kOpen)) != 0u;
+                forced |= g.forced && g.kind != Kind::Tap;
+                split |= g.split();
+                // Held past the next gem's start.
+                extended |= i + 1u < x.gems.size() && g.tick + g.longest() > x.gems[i + 1u].tick;
+            }
+            tally["with taps"] += taps;
+            tally["with opens"] += opens;
+            tally["with forced"] += forced;
+            tally["with split chords"] += split;
             tally["with extended sustains"] += extended;
         }
         std::cout << root.string() << "\n";
@@ -727,7 +1056,10 @@ int main(int argc, char **argv)
 {
     mixedRates();
     chartTypes();
+    heldPastNext();
     midTypes();
+    midMarkers();
+    lanes();
     chartEdges();
     catalogOrder();
     catalogCopies();

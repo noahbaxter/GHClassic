@@ -12,17 +12,20 @@
 // - A star phrase that star power is on for only stops being tracked.
 //   Once star power runs out, hitting any later gem of it starts it
 //   again, and the rest still wins it. In GH2 star power loses the phrase
-//   (StarPower::Hit, MissOrPass, GH1 0x11e158 0x11e608).
+//   (StarPower::Hit, MissOrPass, GH1 0x11e158 0x11e608). With
+//   star_power_overlap, neither: it is tracked as GH2's is
+//   (gameplay/engine/star_power_overlap.cpp).
 // - The first gem at or past a phrase's end is in no phrase. So when two
 //   phrases sit back to back, the second loses its first gem
 //   (SongDB::SetupStarpower, GH1 0x10cf00).
 
-#include "gameplay/note_engine/gh1.h"
+#include "gameplay/engine/gh1/gh1.h"
 
 #include "guest/beatmatch.h"
 #include "guest/song_db.h"
 #include "guest/star_power.h"
 #include "hook.h"
+#include "settings/settings.h"
 
 #include "ps2_runtime_macros.h"
 
@@ -95,7 +98,7 @@ namespace gh2::gh1_rules
             const StarPower star(rdram, GPR_U32(ctx, 4));
             if (!star.enabled())
                 return false;
-            if (star.active())
+            if (star.active() && !settings::get(settings::kStarPowerOverlap))
             {
                 star.setState(StarPower::kNone);
                 leave(ctx);
@@ -117,7 +120,7 @@ namespace gh2::gh1_rules
         bool onMissOrPass(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
             const StarPower star(rdram, GPR_U32(ctx, 4));
-            if (!star.enabled() || !star.active())
+            if (!star.enabled() || !star.active() || settings::get(settings::kStarPowerOverlap))
                 return false;
             star.setState(StarPower::kNone);
             leave(ctx);

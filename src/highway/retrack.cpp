@@ -16,7 +16,7 @@
 // at +0x10 and +0x14, where its tail starts from its start at +0x18, and
 // hit, missed and let go in +0x1c.
 
-#include "gameplay/retrack.h"
+#include "highway/retrack.h"
 
 #include "guest.h"
 #include "hook.h"

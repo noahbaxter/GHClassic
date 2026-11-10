@@ -92,6 +92,7 @@ namespace gh2::settings
             {"sustain_release_ms", Type::kInt, 0, 500, 5, 0},
             {"whammy_hold", Type::kBool, 0, 1, 1, 0},
             {"strum_limit", Type::kBool, 0, 1, 1, 1},
+            {"star_power_overlap", Type::kBool, 0, 1, 1, 0},
             {"note_streak", Type::kBool, 0, 1, 1, 0},
             {"song_progress", Type::kBool, 0, 1, 1, 0},
             // The unlock-all cheat's, without its turning off saving and the

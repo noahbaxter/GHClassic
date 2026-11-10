@@ -25,6 +25,7 @@
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
 #include "render/camera.h"
+#include "render/draw_hue.h"
 #include "render/frame.h"
 #include "render/look.h"
 #include "render/native_environ.h"
@@ -133,6 +134,7 @@ namespace gh2
                 if (lit)
                     for (uint32_t c = 0; c < 3; ++c)
                         color[c] *= ambient[c];
+                turnColor(color);
 
                 // Left below, left above, right below, right above.
                 const float sx[4] = {-1.0f, -1.0f, 1.0f, 1.0f};
@@ -144,8 +146,8 @@ namespace gh2
                 for (int i = 0; i < 4; ++i)
                 {
                     Vertex v{};
-                    const float along = sx[i] * cosA + sy[i] * sinA;
-                    const float above = sy[i] * cosA - sx[i] * sinA;
+                    const float along = (sx[i] * cosA + sy[i] * sinA) * spriteAcross();
+                    const float above = (sy[i] * cosA - sx[i] * sinA) * spriteUp();
                     for (uint32_t c = 0; c < 3; ++c)
                         v.pos[c] = center[c] + half * (along * right[c] + above * up[c]);
                     for (uint32_t c = 0; c < 4; ++c)
@@ -205,6 +207,7 @@ namespace gh2
                     draw.material.uvXfm[3] = 1.0f;
                     draw.material.uvXfm[4] = 0.0f;
                     draw.material.uvXfm[5] = 0.0f;
+                    turnMaterial(draw.material);
                     building().draws.push_back(draw);
                 }
             }

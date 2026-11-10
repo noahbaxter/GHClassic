@@ -22,7 +22,7 @@
 //   {note_speed tenths easy|hard}       the setting itself, which the
 //                                       settings file can put past the stops
 
-#include "gameplay/note_speed.h"
+#include "highway/note_speed.h"
 
 #include "dta.h"
 #include "guest.h"

@@ -4,7 +4,7 @@
 // with GH1's differences put back, listed atop its file.
 
 #include "addresses.h"
-#include "gameplay/note_engine/note_engine.h"
+#include "gameplay/engine/note_engine.h"
 
 #include <cstdint>
 #include <type_traits>

@@ -5,7 +5,7 @@
 #include "content/setlists.h"
 #include "disc/ark.h"
 #include "formats/dtb.h"
-#include "gameplay/note_engine/note_engine.h"
+#include "gameplay/engine/note_engine.h"
 #include "guest.h"
 #include "hook.h"
 #include "save/save.h"
