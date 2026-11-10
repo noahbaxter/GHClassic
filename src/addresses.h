@@ -140,6 +140,7 @@ namespace gh2
         uint32_t willBeNoStrum;      // GameGemList::WillBeNoStrum
         uint32_t trackWatcherPoll;   // TrackWatcherImpl::Poll
         uint32_t trackWatcherOnMiss; // TrackWatcherImpl::OnMiss
+        uint32_t trackWatcherOnPass; // TrackWatcherImpl::OnPass(float ms, int gem)
         uint32_t trackWatcherSendMiss;
         uint32_t guitarWatcherVtable;
         uint32_t guitarWatcherCtor;  // GuitarTrackWatcherImpl::GuitarTrackWatcherImpl
@@ -509,6 +510,7 @@ namespace gh2
         .willBeNoStrum = 0x24d360u,
         .trackWatcherPoll = 0x2484e0u,
         .trackWatcherOnMiss = 0x249338u,
+        .trackWatcherOnPass = 0x249408u,
         .trackWatcherSendMiss = 0x249598u,
         .guitarWatcherVtable = 0x3efb10u,
         .guitarWatcherCtor = 0x24d400u,

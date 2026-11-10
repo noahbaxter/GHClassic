@@ -29,6 +29,7 @@
 #include "highway/cyan_stars.h"
 #include "gameplay/extended/guitar/gem_kinds.h"
 #include "gameplay/extended/guitar/hammer_ons.h"
+#include "gameplay/extended/guitar/lane_hits.h"
 #include "highway/extended/guitar/open_gems.h"
 #include "highway/extended/guitar/open_bursts.h"
 #include "highway/extended/guitar/open_tails.h"
@@ -167,6 +168,9 @@ namespace
         // Over hammer_ons' FretButtonUp.
         gh2::guitar::installSustainHold(runtime, gh2::kSlus21447);
         gh2::guitar::installSustainFlames(runtime, gh2::kSlus21447);
+        // Its strums seen before either engine's Swing, its misses and
+        // passes answered before theirs.
+        gh2::guitar::installLaneHits(runtime, gh2::kSlus21447);
         // After the note engine, whose hook on BeatMatcher::Swing it wraps:
         // a strum it drops never reaches the engine.
         gh2::installStrumLimit(runtime, gh2::kSlus21447);
