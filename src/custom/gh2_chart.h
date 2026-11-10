@@ -17,6 +17,7 @@
 // GH2's parser wants.
 
 #include "custom/chart.h"
+#include "formats/midi.h"
 
 #include <algorithm>
 #include <array>
@@ -28,6 +29,12 @@
 namespace gh2::custom
 {
     constexpr uint32_t kGh2Resolution = 480u;
+
+    // The first beat at or after `tick`.
+    constexpr uint32_t nextBeat(uint32_t tick) { return (tick + kGh2Resolution - 1u) / kGh2Resolution * kGh2Resolution; }
+
+    // A note from `from` to `to`, at least a tick long.
+    void addNote(midi::Track &track, uint32_t from, uint32_t to, uint8_t pitch);
 
     // A gem as GH2's parser reads it from the MIDI (its frets), and what the
     // parser cannot read: whether it is strummed or hammered on, whether it
@@ -57,7 +64,7 @@ namespace gh2::custom
         // A trill or tremolo lane's note, its lane's first, and each band
         // starting on it, by fret (an open's last): its ms to the band's
         // last note there.
-        bool laned = false, laneStart = false;
+        bool inLanePhrase = false, lanePhraseStart = false;
         std::array<float, 6> bandMs{};
         // An open's band run beside a fret's (a trill of the two): that
         // fret, its lane left out of the open's band; else -1.
@@ -66,6 +73,7 @@ namespace gh2::custom
         bool split() const { return *std::max_element(laneMs.begin(), laneMs.end()) > 0.0f; }
     };
     constexpr uint8_t kOpenFrets = 0x1fu;
+    constexpr unsigned kFretLanes = 0x1fu; // Gem::lanes' green to orange, no open
 
     struct Gh2Chart
     {

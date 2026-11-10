@@ -518,12 +518,12 @@ namespace
         if (!chart || !chart->parts.count(Part::Guitar))
             return;
         const Difficulty &x = chart->parts.at(Part::Guitar)[3];
-        CHECK(at(x, 0) && at(x, 0)->laned && at(x, 0)->laneStart && at(x, 0)->longest() == 0u);
-        CHECK(at(x, 192) && at(x, 192)->laned && !at(x, 192)->laneStart && at(x, 192)->longest() == 50u);
-        CHECK(at(x, 288) && !at(x, 288)->laned);
-        CHECK(at(x, 768) && at(x, 768)->laneStart && at(x, 1056) && at(x, 1056)->laned);
-        CHECK(at(x, 1152) && !at(x, 1152)->laned && at(x, 1152)->longest() == 300u);
-        CHECK(at(x, 1536) && !at(x, 1536)->laned);
+        CHECK(at(x, 0) && at(x, 0)->inLanePhrase && at(x, 0)->lanePhraseStart && at(x, 0)->longest() == 0u);
+        CHECK(at(x, 192) && at(x, 192)->inLanePhrase && !at(x, 192)->lanePhraseStart && at(x, 192)->longest() == 50u);
+        CHECK(at(x, 288) && !at(x, 288)->inLanePhrase);
+        CHECK(at(x, 768) && at(x, 768)->lanePhraseStart && at(x, 1056) && at(x, 1056)->inLanePhrase);
+        CHECK(at(x, 1152) && !at(x, 1152)->inLanePhrase && at(x, 1152)->longest() == 300u);
+        CHECK(at(x, 1536) && !at(x, 1536)->inLanePhrase);
         // Red's band, then green's and yellow's, then the opens', then a
         // trill of an open and green's, one band each.
         CHECK(x.bands.size() == 6u);
@@ -536,7 +536,7 @@ namespace
             CHECK(x.bands[4].lane == kOpen && x.bands[4].tick == 3072u && x.bands[4].length == 192u);
             CHECK(x.bands[5].lane == 0 && x.bands[5].tick == 3168u && x.bands[5].length == 192u);
         }
-        CHECK(at(x, 3072) && at(x, 3072)->laneStart && at(x, 3360) && at(x, 3360)->laned);
+        CHECK(at(x, 3072) && at(x, 3072)->lanePhraseStart && at(x, 3360) && at(x, 3360)->inLanePhrase);
 
         const auto midOf = [&](uint8_t velocity)
         {
@@ -563,8 +563,8 @@ namespace
             if (!mid || !mid->parts.count(Part::Guitar))
                 continue;
             const auto &d = mid->parts.at(Part::Guitar);
-            CHECK(at(d[3], 240) && at(d[3], 240)->laned);
-            CHECK(at(d[2], 240) && at(d[2], 240)->laned == (velocity == 45u));
+            CHECK(at(d[3], 240) && at(d[3], 240)->inLanePhrase);
+            CHECK(at(d[2], 240) && at(d[2], 240)->inLanePhrase == (velocity == 45u));
         }
     }
 

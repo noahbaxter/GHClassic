@@ -168,9 +168,12 @@ add_executable(custom_chart_test EXCLUDE_FROM_ALL
     tests/custom_chart_test.cpp
     src/custom/catalog.cpp
     src/custom/chart.cpp
+    src/custom/chart_rules.cpp
     src/custom/gh2_chart.cpp
     src/custom/index.cpp
     src/custom/library.cpp
+    src/custom/notes_chart.cpp
+    src/custom/notes_mid.cpp
     src/custom/song_ini.cpp
     src/custom/text.cpp
     src/formats/md5.cpp
@@ -297,11 +300,14 @@ set(GHC_GAME_SOURCES
     src/custom/audio.cpp
     src/custom/catalog.cpp
     src/custom/chart.cpp
+    src/custom/chart_rules.cpp
     src/custom/command.cpp
     src/custom/gh2_chart.cpp
     src/custom/index.cpp
     src/custom/install.cpp
     src/custom/library.cpp
+    src/custom/notes_chart.cpp
+    src/custom/notes_mid.cpp
     src/custom/song_files.cpp
     src/custom/song_ini.cpp
     src/custom/songs.cpp
