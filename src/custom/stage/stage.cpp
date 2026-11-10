@@ -193,6 +193,12 @@ namespace gh2::custom
         for (const uint32_t t : pulses)
             addShortNote(bass, t, 36u);
 
+        // The keyboard player, where a song has one (custom/song_files.cpp):
+        // where its keys part plays.
+        midi::Track keys;
+        keys.name = "BAND KEYS";
+        playIdle(keys, playingRuns(toGh2Sorted(chart.keys, in.toGh2)));
+
         midi::Track singer;
         singer.name = "BAND SINGER";
         for (const Span &s : chart.vocals)
@@ -270,6 +276,9 @@ namespace gh2::custom
             if (b + kBeat * 4u >= playing.front().tick)
                 addShortNote(triggers, b, 48u);
 
-        return {std::move(drums), std::move(bass), std::move(singer), std::move(triggers)};
+        std::vector<midi::Track> out = {std::move(drums), std::move(bass), std::move(singer), std::move(triggers)};
+        if (!keys.events.empty())
+            out.push_back(std::move(keys));
+        return out;
     }
 }

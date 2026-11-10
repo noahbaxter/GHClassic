@@ -535,6 +535,17 @@ namespace
 
         CHECK(keys == 16);
         CHECK(!textsOf(guitar).empty() && textsOf(guitar).front().second == "[play]");
+
+        // A keys part: the keyboard player's track, playing where it does.
+        chart.keys = {480u * 8u, 480u * 9u};
+        midi::Track guitar2, events2;
+        const auto keyed = addStage({chart, lead, [](uint32_t t) { return t; }, 64u * 480u}, guitar2, events2);
+        CHECK(keyed.size() == 5u && keyed.back().name == "BAND KEYS");
+        if (keyed.size() == 5u)
+        {
+            const std::vector<std::pair<uint32_t, std::string>> played = {{3600u, "[play]"}, {4800u, "[idle]"}};
+            CHECK(textsOf(keyed.back()) == played);
+        }
     }
 
     void midTypes()
@@ -895,6 +906,43 @@ namespace
         fs::remove(file);
     }
 
+    // Who stands at the front: the singer wherever anything says there is
+    // singing, a keyboard player in place of none, no one only for a split
+    // multitrack with drums and bass charted and nothing sung.
+    void bandFronts()
+    {
+        const auto front = [](uint8_t band, uint8_t parts, std::vector<std::string> stems, const char *gender = "")
+        {
+            Song s = song("/c/a", "A");
+            s.chartHas = band;
+            s.parts = parts;
+            s.stems = std::move(stems);
+            if (*gender)
+                s.tags["vocal_gender"] = gender;
+            const char *f = bandFront(s);
+            return f ? std::string("=") + f : std::string("default");
+        };
+        const uint8_t guitar = 1u << int(Part::Guitar), both = guitar | 1u << int(Part::Bass);
+        CHECK(front(0u, guitar, {"song.ogg"}) == "default");
+        CHECK(front(kHasVocals, guitar, {"song.ogg"}, "Female") == "=female_singer");
+        CHECK(front(0u, guitar, {"song.ogg"}, "female") == "=female_singer");
+        CHECK(front(kHasKeys, guitar, {"song.ogg"}) == "=metal_keyboard");
+        CHECK(front(kHasKeys | kHasVocals, guitar, {"song.ogg"}) == "default");
+        CHECK(front(kHasKeys, guitar, {"song.ogg", "vocals_1.ogg"}) == "default");
+        CHECK(front(kHasDrums, both, {"song.ogg", "drums_1.ogg", "bass.ogg"}) == "=");
+        CHECK(front(kHasDrums, both, {"song.ogg", "bass.ogg"}) == "default");
+        CHECK(front(kHasDrums, guitar, {"song.ogg", "drums.ogg"}) == "default");
+        CHECK(front(kHasDrums, both, {"song.ogg", "drums.ogg", "vocals.ogg"}) == "default");
+
+        const fs::path file = fs::temp_directory_path() / "ghc_index_band_test.txt";
+        Song keyed = song("/c/a/keys", "Keys");
+        keyed.chartHas = kHasKeys | kHasDrums;
+        writeIndex(file, {keyed});
+        const std::vector<Song> back = readIndex(file);
+        CHECK(back.size() == 1u && back[0].chartHas == (kHasKeys | kHasDrums) && tag(back[0].tags, "name") == "Keys");
+        fs::remove(file);
+    }
+
     // badsongs.txt: the songs that don't play under their kind's heading,
     // in Reject's order, the why only where the heading doesn't say it;
     // no song that plays, nor a copy.
@@ -1246,6 +1294,7 @@ int main(int argc, char **argv)
     chartEdges();
     bandParts();
     stageTracks();
+    bandFronts();
     stage();
     catalogOrder();
     catalogCopies();

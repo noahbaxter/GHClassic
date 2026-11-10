@@ -9,6 +9,8 @@
 //   BAND DRUMS   the same for the drummer, 36 a kick (the drums' expert kicks,
 //                else every beat the band plays) and 37 a crash at each section
 //   BAND SINGER  the same for the singer, by when there is singing
+//   BAND KEYS    the same for the keyboard player, by the keys part, where
+//                it has one
 //   EVENTS       each section's look: [verse], [chorus] or [solo] for the
 //                camera and lighting, and a [lighting (...)]. A section is
 //                its look by its name less its number ("Chorus 2" as

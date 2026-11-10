@@ -208,6 +208,9 @@ namespace gh2::custom
                 for (const auto &[tick, name] : chart->sections)
                     if (std::find(song.sections.begin(), song.sections.end(), name) == song.sections.end())
                         song.sections.push_back(name);
+                song.chartHas = static_cast<uint8_t>((chart->vocals.empty() ? 0u : kHasVocals) |
+                                                 (chart->keys.empty() ? 0u : kHasKeys) |
+                                                 (chart->drums.empty() ? 0u : kHasDrums));
             }
 
             const auto turnDown = [&](Reject reject, std::string why)
@@ -399,6 +402,20 @@ namespace gh2::custom
     {
         const std::string stem = lower(file.substr(0u, file.rfind('.')));
         return stem == part || stem.rfind(part + "_", 0u) == 0u;
+    }
+
+    const char *bandFront(const Song &song)
+    {
+        const auto stem = [&](const char *part)
+        { return std::any_of(song.stems.begin(), song.stems.end(), [&](const std::string &s) { return partStem(s, part); }); };
+        if (!(song.chartHas & kHasVocals) && !stem("vocals"))
+        {
+            if (song.chartHas & kHasKeys)
+                return "metal_keyboard";
+            if (song.chartHas & kHasDrums && hasPart(song.parts, Part::Bass) && stem("drums"))
+                return "";
+        }
+        return lower(tag(song.tags, "vocal_gender").value_or("")) == "female" ? "female_singer" : nullptr;
     }
 
     // As text, as fs::path compares a part at a time, many times slower.

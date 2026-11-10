@@ -22,6 +22,9 @@
 
 namespace gh2::custom
 {
+    // Song::chartHas bits.
+    constexpr uint8_t kHasVocals = 1u, kHasKeys = 2u, kHasDrums = 4u;
+
     // Why a song does not play, as badsongs.txt groups them.
     enum class Reject : uint8_t
     {
@@ -44,6 +47,7 @@ namespace gh2::custom
         Reject reject = Reject::None; // why's kind
         uint8_t parts = 0u; // bit n Part n, those with gems
         uint16_t charted = 0u; // bit 4 * part + difficulty, easy 0: those with gems
+        uint8_t chartHas = 0u; // kHasVocals, kHasKeys, kHasDrums: for who is on stage
         std::vector<std::string> stems; // its audio's file names
         std::string art; // its album art's file name, empty for none
         std::vector<std::string> sections; // the chart's, for practice's names
@@ -70,6 +74,18 @@ namespace gh2::custom
     // Whether a stem file is that part's ("guitar", "drums"): its own, or a
     // split of it (drums_2, vocals_1_explicit), in any case.
     bool partStem(const std::string &file, const std::string &part);
+
+    // Who stands at the front of its band, where it is not GH2's default
+    // band's singer (gh2.dta's default_band): "female_singer" by song.ini's
+    // vocal_gender, as Rock Band's; with no one singing, a keys part's
+    // "metal_keyboard", as GH2's Jessica and YYZ; "" for no one, an
+    // instrumental's, as Soy Bomb. GH2 has no song with both a singer and a
+    // keyboard player: one stands in the other's place. A song is sung
+    // where its chart or stems say, and an instrumental only where its
+    // stems are split down to the drums with no singing among them and its
+    // chart has drums and bass but no singing: a chart without a vocal part
+    // is most often one without its vocals charted.
+    const char *bandFront(const Song &song);
 
     // Of songs that play with the same chart, the one listed: the first by
     // folder, so the same each scan.
