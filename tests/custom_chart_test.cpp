@@ -264,7 +264,7 @@ namespace
               back->tracks[5].name == "BAND SINGER" && back->tracks[6].name == "TRIGGERS");
         std::map<uint8_t, std::vector<uint32_t>> ons;
         for (const midi::Event &e : back->tracks[1].events)
-            if (midi::kind(e) == midi::kNoteOn)
+            if (midi::kind(e) == midi::kNoteOn && e.data[0] >= 60u) // past the hand's places
                 ons[e.data[0]].push_back(e.tick);
         CHECK(ons[96] == (std::vector<uint32_t>{0u, 1200u, 1920u}));
         CHECK(ons[97] == (std::vector<uint32_t>{120u, 240u, 1200u}));
@@ -473,6 +473,111 @@ namespace
         file.tracks = {tempo, guitar, keys};
         const auto keyed = parseMid(midi::write(file), {}, why);
         CHECK(keyed && keyed->keys == std::vector<uint32_t>({480u}));
+    }
+
+    std::vector<std::pair<uint32_t, std::string>> textsOf(const midi::Track &track);
+
+    // Notes on a track by pitch: each note-on's tick.
+    std::vector<uint32_t> notesOf(const midi::Track &track, uint8_t from, uint8_t to)
+    {
+        std::vector<uint32_t> out;
+        for (const midi::Event &e : track.events)
+            if (midi::kind(e) == midi::kNoteOn && e.data.size() >= 2u && e.data[1] > 0u && e.data[0] >= from &&
+                e.data[0] <= to)
+                out.push_back(e.tick);
+        return out;
+    }
+
+    // The band playing as the chart says: its members' texts as GH2's,
+    // the hand's places and maps, else made; the drummer's beat by its
+    // snares; the bassist's strumming hand.
+    void bandPerformance()
+    {
+        Chart chart = chart480();
+        Difficulty lead;
+        for (uint32_t t = 0; t < 32u * 480u; t += 240u)
+            lead.gems.push_back({t, static_cast<uint8_t>(1u << (t / 240u % 5u))});
+        chart.sections = {{0u, "Verse 1"}, {16u * 480u, "Chorus 1"}};
+        // Bars 0 to 3 the backbeat, 4 and 5 half time, 6 every beat (one
+        // bar, not kept), 7 the backbeat again.
+        for (uint32_t bar = 0; bar < 8u; ++bar)
+            for (const uint32_t beat : bar == 4u || bar == 5u ? std::vector<uint32_t>{2u}
+                                       : bar == 6u            ? std::vector<uint32_t>{0u, 1u, 2u, 3u}
+                                                              : std::vector<uint32_t>{1u, 3u})
+            {
+                chart.snares.push_back(bar * 1920u + beat * 480u);
+                chart.drums.push_back(bar * 1920u + beat * 480u);
+            }
+        chart.kicks = {0u};
+        chart.drums.push_back(0u);
+        std::sort(chart.drums.begin(), chart.drums.end());
+
+        {
+            midi::Track guitar, events;
+            const auto band = addStage({chart, lead, kSameTicks, 32u * 480u}, guitar, events);
+            const auto texts = textsOf(guitar);
+            const auto hasText = [&](uint32_t tick, const std::string &text)
+            { return std::find(texts.begin(), texts.end(), std::pair{tick, text}) != texts.end(); };
+            CHECK(hasText(16u * 480u, "[wail_on]") && hasText(32u * 480u, "[wail_off]"));
+            CHECK(!notesOf(guitar, 40u, 59u).empty());
+            const std::vector<std::pair<uint32_t, std::string>> beats = {
+                {0u, "[allbeat]"}, {4u * 1920u, "[half_time]"}, {7u * 1920u, "[allbeat]"}};
+            std::vector<std::pair<uint32_t, std::string>> drummed;
+            for (const auto &t : textsOf(band[0]))
+                if (t.second != "[play]" && t.second != "[idle]")
+                    drummed.push_back(t);
+            CHECK(drummed == beats);
+        }
+
+        Chart::StageTrack own;
+        own.cues = {{0u, "[mellow]"},
+                    {0u, "[map HandMap_Chord_A]"},
+                    {0u, "[map StrumMap_Pick]"},
+                    {960u, "[wail_on]"},
+                    {1920u, "[wail_off]"},
+                    {12000u, "[idle_realtime]"}};
+        own.marks = {{0u, 480u, 45u}};
+        chart.stage["PART GUITAR"] = own;
+        Difficulty bassLead;
+        bassLead.gems = {{0u, 1u << kOpen}, {480u, 4u}};
+        chart.parts[Part::Bass][3] = bassLead;
+        chart.stage["PART BASS"].cues = {{0u, "[map StrumMap_SlapBass]"}, {0u, "[intense]"}};
+        midi::Track guitar, events;
+        const auto band = addStage({chart, lead, kSameTicks, 32u * 480u}, guitar, events);
+        const std::vector<std::pair<uint32_t, std::string>> said = {
+            {0u, "[play]"}, {960u, "[wail_on]"}, {1920u, "[wail_off]"}, {12000u, "[idle]"}, {0u, "[map HandMap_Default]"}};
+        CHECK(textsOf(guitar) == said);
+        CHECK(notesOf(guitar, 40u, 59u) == std::vector<uint32_t>({0u}));
+        CHECK(band.size() == 5u && band.back().name == "PART BASS");
+        if (band.size() == 5u)
+        {
+            CHECK(notesOf(band.back(), 96u, 100u) == std::vector<uint32_t>({0u, 480u}));
+            const auto bassTexts = textsOf(band.back());
+            CHECK(bassTexts.size() == 1u && bassTexts[0].second == "[map StrumMap_SlapBass]");
+            const auto played = textsOf(band[1]);
+            CHECK(!played.empty() && played.front().first == 0u && played.front().second == "[play]");
+        }
+    }
+
+    // The made fret hand moves only where a phrase starts: green and red
+    // traded, then green over and over, keep it at the third fret; past a
+    // two-beat rest, a phrase mostly on orange moves it to the twelfth.
+    void handPlaces()
+    {
+        Chart chart = chart480();
+        Difficulty lead;
+        for (uint32_t t = 0; t < 16u * 480u; t += 240u)
+            lead.gems.push_back({t, static_cast<uint8_t>(t < 8u * 480u ? (t / 240u % 2u ? 2u : 1u) : 1u)});
+        for (uint32_t t = 18u * 480u; t < 24u * 480u; t += 240u)
+            lead.gems.push_back({t, static_cast<uint8_t>(t % 960u ? 0x10u : 0x18u)});
+        midi::Track guitar, events;
+        addStage({chart, lead, kSameTicks, 24u * 480u}, guitar, events);
+        std::vector<std::pair<uint32_t, uint8_t>> places;
+        for (const midi::Event &e : guitar.events)
+            if (midi::kind(e) == midi::kNoteOn && e.data[1] > 0u && e.data[0] >= 40u && e.data[0] <= 59u)
+                places.push_back({e.tick, e.data[0]});
+        const std::vector<std::pair<uint32_t, uint8_t>> want = {{0u, 42u}, {18u * 480u, 51u}};
+        CHECK(places == want);
     }
 
     // A track's texts at each tick, in order.
@@ -1295,6 +1400,8 @@ int main(int argc, char **argv)
     bandParts();
     stageTracks();
     bandFronts();
+    bandPerformance();
+    handPlaces();
     stage();
     catalogOrder();
     catalogCopies();

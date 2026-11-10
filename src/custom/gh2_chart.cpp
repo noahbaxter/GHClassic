@@ -208,7 +208,7 @@ namespace gh2::custom
             end = std::max(end, tempos.tick(lengthSeconds));
         events.events.push_back(midi::text(end, "[end]"));
 
-        std::vector<midi::Track> band = addStage({chart, lead[3], gh2Tick, end}, guitar, events);
+        std::vector<midi::Track> band = addStage({chart, lead[3], gh2Tick, end, *played}, guitar, events);
         midi::File file{1u, static_cast<uint16_t>(kGh2Resolution), {tempo, guitar, events}};
         for (midi::Track &track : band)
             file.tracks.push_back(std::move(track));
