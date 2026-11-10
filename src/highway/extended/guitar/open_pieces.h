@@ -13,8 +13,8 @@
 namespace gh2::guitar
 {
     // The wide mesh drawn for a part of the middle lane's, of a rep of
-    // `type`.
-    std::string openName(const std::string &mesh, uint32_t type);
+    // `type`, its gem in a star phrase or not.
+    std::string openName(const std::string &mesh, uint32_t type, bool phrase);
     // The materials of the caps' streaks, scrolled as they are drawn.
     std::vector<std::string> openStreakMats();
 

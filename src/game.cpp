@@ -26,6 +26,7 @@
 #include "game_overrides.h"
 #include "gh1/face.h"
 #include "custom/install.h"
+#include "highway/cyan_stars.h"
 #include "gameplay/extended/guitar/gem_kinds.h"
 #include "gameplay/extended/guitar/hammer_ons.h"
 #include "highway/extended/guitar/open_gems.h"
@@ -140,6 +141,7 @@ namespace
         gh2::guitar::installOpenBursts(runtime, gh2::kSlus21447);
         gh2::installWhammyHold(runtime, gh2::kSlus21447);
         gh2::installStarPowerOverlap(runtime, gh2::kSlus21447);
+        gh2::guitar::installCyanStars(runtime, gh2::kSlus21447);
         gh2::installHopoLock(runtime, gh2::kSlus21447);
         // Off, neither is installed: the score and rock meters stay where
         // retail has them.

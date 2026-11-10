@@ -63,12 +63,17 @@ namespace gh2::guitar
             {.from = "star_base.mesh", .as = "open_star_base.mesh", .hidden = true},
             // Under star power every lane's gem is its own blue one, under
             // the lane's cap or the blue lane's HOPO, and its glow: the
-            // open's gem and lip are cyan.
+            // open's gem and lip are cyan, its cap pulsing if it is in a
+            // phrase (openName).
             {.from = "blue_gem.mesh", .as = "open_gem_bonus.mesh", .mat = "gem.mat", .openMat = "open_bonus_gem.mat",
              .body = true},
             {.from = "gem_bonus2.mesh", .as = "open_gem_bonus2.mesh"},
             {.from = "top.mesh", .as = "open_bonus_top.mesh", .mat = "top.mat", .openMat = "open_on_cap.mat", .across = true},
             {.from = "top.mesh", .as = "open_bonus_hopo.mesh", .mat = "top.mat", .openMat = "open_on_hopo.mat",
+             .across = true, .raised = true},
+            {.from = "top.mesh", .as = "open_bonus_top_star.mesh", .mat = "top.mat", .openMat = "open_on_streak.mat",
+             .across = true},
+            {.from = "top.mesh", .as = "open_bonus_hopo_star.mesh", .mat = "top.mat", .openMat = "open_on_streak_hopo.mat",
              .across = true, .raised = true},
         };
 
@@ -184,9 +189,12 @@ namespace gh2::guitar
             {"open_cap.tex", "open_cap.mat", kStreakPurple, nullptr, kStreakBlack, kStreakWhite},
             {"open_streak.tex", "open_streak.mat", kStreakPurple, kStreakCyan, kStreakBlack, kStreakCyan},
             {"open_streak_hopo.tex", "open_streak_hopo.mat", kStreakWhite, kStreakCyan, kStreakPurple, kStreakCyan},
-            // Under star power.
+            // Under star power; a phrase's strummed one's pulse white, as
+            // cyan on its cyan would not show.
             {"open_on_cap.tex", "open_on_cap.mat", kStreakCyan, nullptr, kStreakBlack, kStreakCyan},
             {"open_on_hopo.tex", "open_on_hopo.mat", kStreakWhite, nullptr, kStreakCyan, kStreakCyan},
+            {"open_on_streak.tex", "open_on_streak.mat", kStreakCyan, kStreakWhite, kStreakBlack, kStreakCyan},
+            {"open_on_streak_hopo.tex", "open_on_streak_hopo.mat", kStreakWhite, kStreakCyan, kStreakCyan, kStreakCyan},
         };
         void streakColor(float u, const Streak &s, uint8_t *rgba)
         {
@@ -237,13 +245,13 @@ namespace gh2::guitar
     }
 
     // The wide mesh drawn for a part of the middle lane's, of a rep of
-    // `type`.
-    std::string openName(const std::string &mesh, uint32_t type)
+    // `type`, its gem in a star phrase or not.
+    std::string openName(const std::string &mesh, uint32_t type, bool phrase)
     {
         if (mesh == "blue_hopo.mesh")
-            return "open_bonus_hopo.mesh";
+            return phrase ? "open_bonus_hopo_star.mesh" : "open_bonus_hopo.mesh";
         if (mesh == "top.mesh" && type == gemRep::kTypeBonus)
-            return "open_bonus_top.mesh";
+            return phrase ? "open_bonus_top_star.mesh" : "open_bonus_top.mesh";
         return "open_" + (mesh.rfind(kLaneColour, 0u) == 0u ? mesh.substr(std::strlen(kLaneColour)) : mesh);
     }
 

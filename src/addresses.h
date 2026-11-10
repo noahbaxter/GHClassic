@@ -93,6 +93,11 @@ namespace gh2
         uint32_t nowBarHit;                   // NowBar::Hit(float, int gem, bool, PhraseState)
         uint32_t trackConfigTrackNum;         // TrackConfig::TrackNum
         uint32_t songDbGetGem;                // SongDB::GetGem(int track, int gem), a GameGem *
+        uint32_t songDbIsStarPhraseEnd;       // SongDB::IsStarPhraseEnd(int track, int gem) const
+        uint32_t gemManagerAdvanceEnd;        // GemManager::AdvanceEnd, which adds the next gem to the track
+        uint32_t gemManagerOnMissPhrase;      // GemManager::OnMissPhrase(int gem)
+        uint32_t gemSetType;                  // Gem::SetType(GemRep::Type), each of its reps'
+        uint32_t rndLineSetMat;               // RndLine::SetMat(RndMat *)
         uint32_t checkForPitchBend; // TrackWatcherImpl::CheckForPitchBend
         uint32_t sendWhammy;        // TrackWatcherImpl::SendWhammy
         uint32_t playerSetWhammyBar; // Player::SetWhammyBar
@@ -437,6 +442,11 @@ namespace gh2
         .nowBarHit = 0x15d0b8u,
         .trackConfigTrackNum = 0x152480u,
         .songDbGetGem = 0x11cf78u,
+        .songDbIsStarPhraseEnd = 0x11dab8u,
+        .gemManagerAdvanceEnd = 0x156868u,
+        .gemManagerOnMissPhrase = 0x1570b0u,
+        .gemSetType = 0x157b60u,
+        .rndLineSetMat = 0x1bc980u,
         .checkForPitchBend = 0x248e38u,
         .sendWhammy = 0x249b98u,
         .playerSetWhammyBar = 0x111d88u,

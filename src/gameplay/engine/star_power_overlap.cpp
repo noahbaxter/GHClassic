@@ -5,15 +5,17 @@
 // the call, the phrase's gems are tracked, its last gem adds the phrase's
 // worth (AddValue, 0x11eee8: the bar, at most full, that star power drains
 // from, so it lasts longer) and phrase_captured plays its sound; star power
-// stays on, as the flag is put back. Off, this isn't installed.
+// stays on, as the flag is put back. Off, none of this is installed. Its
+// gems look a phrase's under star power (highway/cyan_stars.h).
 
 #include "gameplay/engine/star_power_overlap.h"
 
 #include "guest/star_power.h"
 #include "hook.h"
+#include "settings/settings.h"
+
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
-#include "settings/settings.h"
 
 namespace gh2
 {

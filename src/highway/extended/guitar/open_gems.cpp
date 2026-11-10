@@ -8,6 +8,7 @@
 
 #include "gameplay/extended/guitar/gem_kinds.h"
 #include "guest.h"
+#include "highway/cyan_stars.h"
 #include "highway/extended/guitar/open_pieces.h"
 #include "highway/extended/guitar/open_tails.h"
 #include "highway/gem_looks.h"
@@ -77,6 +78,8 @@ namespace gh2::guitar
         {
             dressOpenTail(rdram, ctx, runtime, rep);
             const uint32_t type = load<uint32_t>(rdram, rep + gemRep::kType);
+            const auto open = s_openReps.find(rep);
+            const bool phrase = open != s_openReps.end() && inStarPhrase(open->second);
             for (const uint32_t part : gemRep::kParts)
             {
                 const uint32_t object = partObject(rdram, rep, part);
@@ -91,7 +94,7 @@ namespace gh2::guitar
                     continue;
                 }
                 const uint32_t scene = load<uint32_t>(rdram, object + ::milo::object::kDir);
-                const uint32_t found = findObject(rdram, ctx, runtime, scene, openName(name, type));
+                const uint32_t found = findObject(rdram, ctx, runtime, scene, openName(name, type, phrase));
                 if (found == 0u)
                     continue;
                 setUpStreaks(rdram, ctx, runtime, scene);
