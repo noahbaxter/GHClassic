@@ -17,6 +17,7 @@
 // GH2's parser wants.
 
 #include "custom/chart.h"
+#include "custom/lipsync.h"
 #include "formats/midi.h"
 
 #include <algorithm>
@@ -81,6 +82,10 @@ namespace gh2::custom
         // Each difficulty's gems by tick, easy first.
         std::array<std::map<uint32_t, Gh2Gem>, 4> gems;
         std::optional<uint32_t> hopoThreshold; // Chart's
+        // What the singer sings, for its mouth (custom/lipsync.h): the
+        // chart's syllables, else a filler word ("yeah", "oh", ...) in turn
+        // on each beat the singer sings (custom/stage/stage.h).
+        std::vector<Sung> sung;
     };
 
     // The part PART GUITAR is of a chart with `parts` (a bit each Part):

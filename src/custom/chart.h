@@ -102,6 +102,16 @@ namespace gh2::custom
         // of its notes or lyrics, else HARM1's the same; .chart's [Events]
         // phrase_start and phrase_end, else runs of its lyrics.
         std::vector<Span> vocals;
+        // Each sung syllable, by tick: its lyric as sung ("Hel", "lo"),
+        // markup off, and how long it is held (its note, a slide's notes
+        // after it too; with no note, to the next or a beat at most).
+        // PART VOCALS', else HARM1's; .chart's lyric events.
+        struct Syllable
+        {
+            uint32_t tick = 0u, length = 0u;
+            std::string text;
+        };
+        std::vector<Syllable> syllables;
         // The keys' expert hits by tick (PART KEYS' 96 to 100,
         // [ExpertKeyboard]'s).
         std::vector<uint32_t> keys;

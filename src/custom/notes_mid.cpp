@@ -252,28 +252,32 @@ namespace gh2::custom
         // notes' runs (36 to 84), else its lyrics', two beats apart.
         void midVocals(const midi::Track &track, Chart &chart)
         {
-            std::map<uint8_t, uint32_t> on;
-            std::vector<uint32_t> notes, lyrics;
+            std::vector<uint32_t> notes, lyricTicks;
+            std::map<uint32_t, uint32_t> noteLength; // by start, the longest
+            std::vector<std::pair<uint32_t, std::string>> lyricTexts;
             for (const midi::Event &e : track.events)
-            {
-                if (e.status == midi::kMeta && e.meta == midi::kLyric)
-                    lyrics.push_back(e.tick);
-                else if (noteOn(e))
+                if (e.status == midi::kMeta && (e.meta == midi::kLyric || e.meta == midi::kText) && !e.data.empty() &&
+                    e.data[0] != '[')
                 {
-                    if (e.data[0] == 105u || e.data[0] == 106u)
-                        on[e.data[0]] = e.tick;
-                    else if (e.data[0] >= 36u && e.data[0] <= 84u)
-                        notes.push_back(e.tick);
+                    lyricTicks.push_back(e.tick);
+                    lyricTexts.emplace_back(e.tick, std::string(e.data.begin(), e.data.end()));
                 }
-                else if (noteOff(e))
-                    if (const auto it = on.find(e.data[0]); it != on.end())
-                    {
-                        chart.vocals.push_back({it->second, e.tick - it->second});
-                        on.erase(it);
-                    }
-            }
+                else if (noteOn(e) && e.data[0] >= 36u && e.data[0] <= 84u)
+                    notes.push_back(e.tick);
+            for (const Chart::Mark &m : heldNotes(track))
+                if (m.pitch == 105u || m.pitch == 106u)
+                    chart.vocals.push_back({m.tick, m.length});
+                else if (m.pitch >= 36u && m.pitch <= 84u)
+                    noteLength[m.tick] = std::max(noteLength[m.tick], m.length);
             if (chart.vocals.empty())
-                chart.vocals = phrasesFrom(notes.empty() ? lyrics : notes, chart.resolution);
+                chart.vocals = phrasesFrom(notes.empty() ? lyricTicks : notes, chart.resolution);
+            // Each lyric with its note.
+            std::stable_sort(lyricTexts.begin(), lyricTexts.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
+            for (const auto &[tick, text] : lyricTexts)
+            {
+                const auto note = noteLength.find(tick);
+                addLyric(chart, tick, note == noteLength.end() ? 0u : note->second, text);
+            }
         }
 
         // A track the stage reads, and whether its notes below 60 are its

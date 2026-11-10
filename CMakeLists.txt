@@ -172,6 +172,7 @@ add_executable(custom_chart_test EXCLUDE_FROM_ALL
     src/custom/gh2_chart.cpp
     src/custom/index.cpp
     src/custom/library.cpp
+    src/custom/lipsync.cpp
     src/custom/notes_chart.cpp
     src/custom/notes_mid.cpp
     src/custom/song_facts.cpp
@@ -310,6 +311,7 @@ set(GHC_GAME_SOURCES
     src/custom/index.cpp
     src/custom/install.cpp
     src/custom/library.cpp
+    src/custom/lipsync.cpp
     src/custom/notes_chart.cpp
     src/custom/notes_mid.cpp
     src/custom/song_facts.cpp

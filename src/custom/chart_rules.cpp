@@ -8,6 +8,8 @@
 
 #include "settings/ini.h"
 
+#include <string_view>
+
 namespace gh2::custom::rules
 {
     namespace
@@ -147,6 +149,41 @@ namespace gh2::custom::rules
             }
             sortByTick(d.bands);
         }
+
+        // A lyric as sung: its markup off (- + = # ^ * % $ / and <tags>), §
+        // and _ spaces, its spaces trimmed. A '+' alone is a slide, none.
+        std::string sung(const std::string &lyric)
+        {
+            std::string out;
+            bool tag = false;
+            for (const char c : lyric)
+            {
+                if (c == '<')
+                    tag = true;
+                else if (c == '>')
+                    tag = false;
+                else if (tag || std::string_view("-+=#^*%$/").find(c) != std::string_view::npos)
+                    continue;
+                else
+                    out += c == '_' ? ' ' : c;
+            }
+            for (size_t at; (at = out.find("\xc2\xa7")) != std::string::npos;)
+                out.replace(at, 2u, " ");
+            return ini::trim(out);
+        }
+
+        // Syllables with no note held to the next, a beat at most.
+        void holdSyllables(Chart &chart)
+        {
+            sortByTick(chart.syllables);
+            for (size_t i = 0; i < chart.syllables.size(); ++i)
+                if (chart.syllables[i].length == 0u)
+                {
+                    const uint32_t next = i + 1u < chart.syllables.size() ? chart.syllables[i + 1u].tick : UINT32_MAX;
+                    chart.syllables[i].length =
+                        static_cast<uint32_t>(std::min<uint64_t>(chart.resolution, uint64_t(next) - chart.syllables[i].tick));
+                }
+        }
     }
 
     std::optional<uint32_t> songThreshold(const Options &options, uint32_t resolution)
@@ -185,19 +222,6 @@ namespace gh2::custom::rules
         return std::nullopt;
     }
 
-    void finish(Chart &chart)
-    {
-        const auto byTick = [](const auto &a, const auto &b) { return a.tick < b.tick; };
-        std::stable_sort(chart.tempos.begin(), chart.tempos.end(), byTick);
-        if (chart.tempos.empty() || chart.tempos.front().tick != 0u)
-            chart.tempos.insert(chart.tempos.begin(), Tempo{});
-        std::stable_sort(chart.sections.begin(), chart.sections.end(),
-                         [](const auto &a, const auto &b) { return a.first < b.first; });
-        std::stable_sort(chart.vocals.begin(), chart.vocals.end(), byTick);
-        for (std::vector<uint32_t> *hits : {&chart.kicks, &chart.snares, &chart.crashes, &chart.drums, &chart.keys})
-            std::sort(hits->begin(), hits->end());
-    }
-
     void addDrum(Chart &chart, std::vector<PadHit> &pads, uint32_t tick, int lane)
     {
         if (lane == 0 || lane == 32)
@@ -216,8 +240,41 @@ namespace gh2::custom::rules
                 chart.crashes.push_back(hit.tick);
     }
 
+    void addLyric(Chart &chart, uint32_t tick, uint32_t length, const std::string &text)
+    {
+        if (!chart.syllables.empty() && chart.syllables.back().tick == tick)
+            return; // the same lyric twice
+        const std::string word = sung(text);
+        if (word.empty())
+        {
+            if (!chart.syllables.empty() && text.find('+') != std::string::npos && tick >= chart.syllables.back().tick)
+                chart.syllables.back().length = tick + length - chart.syllables.back().tick;
+            return;
+        }
+        chart.syllables.push_back({tick, length, word});
+    }
+
     std::vector<Span> phrasesFrom(const std::vector<uint32_t> &ticks, uint32_t resolution)
     {
         return runs(ticks, resolution * 2u, resolution / 2u);
+    }
+
+    void finish(Chart &chart)
+    {
+        sortByTick(chart.tempos);
+        if (chart.tempos.empty() || chart.tempos.front().tick != 0u)
+            chart.tempos.insert(chart.tempos.begin(), Tempo{});
+        const auto byFirst = [](const auto &a, const auto &b) { return a.first < b.first; };
+        std::stable_sort(chart.signatures.begin(), chart.signatures.end(), byFirst);
+        std::stable_sort(chart.sections.begin(), chart.sections.end(), byFirst);
+        sortByTick(chart.vocals);
+        for (auto &[name, track] : chart.stage)
+            sortByTick(track.cues), sortByTick(track.marks);
+        for (auto &[part, difficulties] : chart.parts)
+            for (Difficulty &d : difficulties)
+                sortByTick(d.solos);
+        for (std::vector<uint32_t> *hits : {&chart.kicks, &chart.snares, &chart.crashes, &chart.drums, &chart.keys})
+            std::sort(hits->begin(), hits->end());
+        holdSyllables(chart);
     }
 }

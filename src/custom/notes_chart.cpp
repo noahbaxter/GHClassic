@@ -130,7 +130,10 @@ namespace gh2::custom
                         phraseOn.reset();
                     }
                     else if (text.rfind("lyric", 0) == 0)
+                    {
                         lyrics.push_back(tick);
+                        addLyric(chart, tick, 0u, text.substr(5u));
+                    }
                 }
                 continue;
             }

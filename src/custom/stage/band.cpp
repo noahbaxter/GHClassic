@@ -222,6 +222,29 @@ namespace gh2::custom
             }
         }
 
+
+        // The lead's playing runs with its solos cut out.
+        std::vector<Span> playingOutsideSolos(const BandTracks &band)
+        {
+            std::vector<Span> out;
+            for (const Span &r : band.playing)
+            {
+                uint32_t from = r.tick;
+                const uint32_t to = r.tick + r.length;
+                for (const Span &solo : band.in.lead.solos)
+                {
+                    const uint32_t soloFrom = band.in.toGh2(solo.tick), soloTo = band.in.toGh2(solo.tick + solo.length);
+                    if (soloTo <= from || soloFrom >= to)
+                        continue;
+                    if (soloFrom > from)
+                        out.push_back({from, soloFrom - from});
+                    from = std::max(from, soloTo);
+                }
+                if (to > from)
+                    out.push_back({from, to - from});
+            }
+            return out;
+        }
     }
 
     midi::Track bassHand(const Chart &chart, const TickMap &toGh2)
@@ -323,6 +346,8 @@ namespace gh2::custom
         std::vector<Span> singerSpans;
         for (const Span &s : chart.vocals)
             singerSpans.push_back({toGh2(s.tick), toGh2(s.tick + s.length) - toGh2(s.tick)});
+        if (chart.vocals.empty())
+            singerSpans = playingOutsideSolos(band);
         addMemberCues(band.singer, singerCues, {}, toGh2);
         if (!has(singerCues, "[play]"))
             for (const Span &s : singerSpans)
@@ -330,6 +355,8 @@ namespace gh2::custom
                 band.singer.events.push_back(midi::text(s.tick, "[play]"));
                 band.singer.events.push_back(midi::text(s.tick + s.length, "[idle]"));
             }
+        if (band.in.singing)
+            *band.in.singing = singerSpans;
     }
 
     void addSectionCrashes(BandTracks &band, const std::vector<Section> &sections)

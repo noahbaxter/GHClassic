@@ -208,7 +208,21 @@ namespace gh2::custom
             end = std::max(end, tempos.tick(lengthSeconds));
         events.events.push_back(midi::text(end, "[end]"));
 
-        std::vector<midi::Track> band = addStage({chart, lead[3], gh2Tick, end, *played}, guitar, events);
+        std::vector<Span> singing;
+        std::vector<midi::Track> band = addStage({chart, lead[3], gh2Tick, end, *played, &singing}, guitar, events);
+        // The mouth: the chart's syllables, else a filler word on each beat
+        // the singer sings, a half beat long.
+        if (!chart.syllables.empty())
+            for (const Chart::Syllable &s : chart.syllables)
+                out.sung.push_back({chart.seconds(s.tick), chart.seconds(s.tick + s.length), s.text});
+        else
+        {
+            static const char *const kFiller[] = {"yeah", "oh", "hey", "na", "whoa", "la", "go", "ah"};
+            size_t n = 0u;
+            for (const Span &s : singing)
+                for (uint32_t t = nextBeat(s.tick); t + kGh2Resolution / 2u <= s.tick + s.length; t += kGh2Resolution)
+                    out.sung.push_back({tempos.seconds(t), tempos.seconds(t + kGh2Resolution / 2u), kFiller[n++ % std::size(kFiller)]});
+        }
         midi::File file{1u, static_cast<uint16_t>(kGh2Resolution), {tempo, guitar, events}};
         for (midi::Track &track : band)
             file.tracks.push_back(std::move(track));

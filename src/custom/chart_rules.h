@@ -57,10 +57,15 @@ namespace gh2::custom::rules
     // Crashes from cymbal hits: green, and blue on pro drums only.
     void cymbals(Chart &chart, const std::vector<PadHit> &pads, bool pro);
 
+    // A lyric at `tick` held `length` (0 for no note): markup stripped, a
+    // lone '+' extends the syllable before, a repeat at the same tick
+    // dropped.
+    void addLyric(Chart &chart, uint32_t tick, uint32_t length, const std::string &text);
     // Phrases where a chart marks none: the singing's runs, two beats apart.
     std::vector<Span> phrasesFrom(const std::vector<uint32_t> &ticks, uint32_t resolution);
 
     // What reading either format ends with: tempos in order, one at 0;
-    // sections, phrases and hits in order.
+    // signatures, sections, phrases, solos, stage tracks and hits in order;
+    // syllables held.
     void finish(Chart &chart);
 }

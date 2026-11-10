@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -427,22 +428,143 @@ namespace
               chart->stage.at("EVENTS").cues[1].text == "lyric la");
         const auto keyed = parseChart(text + "[ExpertKeyboard]\n{\n  0 = N 1 0\n  0 = N 3 0\n  192 = N 7 0\n}\n", {}, why);
         CHECK(keyed && keyed->keys == std::vector<uint32_t>({0u, 0u}));
+        // Lines out of order sorted, a note or phrase that doesn't read none.
+        const auto messy = parseChart(kOneGemChart + "[SyncTrack]\n{\n  768 = TS 3\n  0 = TS 4\n}\n[ExpertSingle]\n{\n"
+                                                     "  384 = E solo\n  480 = E soloend\n  0 = E solo\n  96 = E soloend\n"
+                                                     "  192 = N x 0\n  192 = S x 0\n}\n",
+                                      {}, why);
+        const Difficulty *expert = messy ? &messy->parts.at(Part::Guitar)[3] : nullptr;
+        CHECK(messy && messy->signatures.size() == 2u && messy->signatures[0].first == 0u);
+        CHECK(expert && expert->solos.size() == 2u && expert->solos[0].tick == 0u && expert->gems.size() == 1u &&
+              expert->faceOff[0].empty());
     }
 
     std::vector<uint32_t> notesOf(const midi::Track &track, uint8_t from, uint8_t to);
 
-    // The drums' hi-hats and crashes: pro drums' cymbals (a tom marker makes
-    // a pad a tom), a plain or five-lane chart's yellow and green or orange,
-    // .chart's cymbal markers; the drummer's animation notes over any.
+    // The sung syllables: each lyric with its note, its markup off, a
+    // slide's '+' adding its note to the syllable before; one with no note
+    // held to the next, a beat at most; .chart's lyric events alike.
+    void syllables()
+    {
+        midi::Track vocals;
+        vocals.name = "PART VOCALS";
+        const auto lyric = [](uint32_t tick, const std::string &text)
+        { return midi::Event{tick, midi::kMeta, midi::kLyric, {text.begin(), text.end()}}; };
+        vocals.events = {lyric(0u, "Hel-"),  note(0u, 60u, true),   note(240u, 60u, false),
+                         lyric(240u, "lo#"), note(240u, 62u, true), note(480u, 62u, false),
+                         lyric(480u, "+"),   note(480u, 64u, true), note(960u, 64u, false),
+                         lyric(1920u, "world")};
+        std::string why;
+        const auto mid = parseMid(oneGemMid({vocals}), {}, why);
+        CHECK(mid && mid->syllables.size() == 3u);
+        if (mid && mid->syllables.size() == 3u)
+        {
+            CHECK(mid->syllables[0].text == "Hel" && mid->syllables[0].length == 240u);
+            CHECK(mid->syllables[1].text == "lo" && mid->syllables[1].length == 720u); // through the slide
+            CHECK(mid->syllables[2].text == "world" && mid->syllables[2].length == 480u);
+        }
+        const auto chart = parseChart(kOneGemChart + "[Events]\n{\n  0 = E \"lyric Oh-\"\n  96 = E \"lyric yeah\"\n}\n", {}, why);
+        CHECK(chart && chart->syllables.size() == 2u && chart->syllables[0].text == "Oh" &&
+              chart->syllables[0].length == 96u && chart->syllables[1].length == 192u);
+        // A slide's '+' holds the syllable before through it, in either
+        // format (custom/chart_rules.h's addLyric).
+        const auto slid = parseChart(
+            kOneGemChart + "[Events]\n{\n  0 = E \"lyric Oh\"\n  288 = E \"lyric +\"\n  480 = E \"lyric yeah\"\n}\n", {}, why);
+        CHECK(slid && slid->syllables.size() == 2u && slid->syllables[0].length == 288u);
+        // A slide before the syllable written last holds nothing.
+        const auto back = parseChart(kOneGemChart + "[Events]\n{\n  480 = E \"lyric yeah\"\n  288 = E \"lyric +\"\n}\n", {}, why);
+        CHECK(back && back->syllables.size() == 1u && back->syllables[0].length == 192u);
+        // Lyrics as text events with no notes: PART VOCALS' alone, not
+        // HARM1's after them.
+        midi::Track texts, harmony;
+        texts.name = "PART VOCALS";
+        texts.events = {midi::text(0u, "la"), midi::text(480u, "di")};
+        harmony.name = "HARM1";
+        harmony.events = {lyric(240u, "oh")};
+        const auto texted = parseMid(oneGemMid({texts, harmony}), {}, why);
+        CHECK(texted && texted->syllables.size() == 2u && !texted->vocals.empty());
+    }
+
+    // A blink track as GH2's: its header, Blink with a key, Eat and Ox
+    // empty, a tail.
+    std::vector<uint8_t> blinkTrack()
+    {
+        std::vector<uint8_t> b = {'F', 'A', 'C', 'E'};
+        const auto u32 = [&](uint32_t v)
+        {
+            for (int i = 0; i < 4; ++i)
+                b.push_back(static_cast<uint8_t>(v >> (8 * i)));
+        };
+        const auto u16 = [&](uint16_t v) { b.push_back(static_cast<uint8_t>(v)), b.push_back(static_cast<uint8_t>(v >> 8)); };
+        const auto text = [&](const std::string &s) { u32(static_cast<uint32_t>(s.size())), b.insert(b.end(), s.begin(), s.end()); };
+        u32(1200u), u16(0u), text("Harmonix"), u16(0u), text("Karaoke Revolution Vol 4");
+        b.insert(b.end(), 12u, 0u);
+        text("blinkTrack"), u16(0u), u32(0u), u16(0u), u32(3u);
+        for (const char *name : {"Blink", "Eat", "Ox"})
+        {
+            b.insert(b.end(), 8u, 0u);
+            text(name);
+            b.insert(b.end(), 8u, 0u);
+            const bool blink = std::string(name) == "Blink";
+            u32(blink ? 1u : 0u);
+            if (blink)
+                b.insert(b.end(), 18u, 7u);
+        }
+        b.insert(b.end(), 14u, 9u);
+        return b;
+    }
+
+    // The mouth: each syllable's consonants and vowel as GH2's visemes, in
+    // the blink track's curves, its blinks and tail kept, its size its own;
+    // GH1's singer's open mouth the shapes' spans, near ones as one; a chart
+    // with nothing sung sung on each beat the band plays.
+    void lipSync()
+    {
+        const auto shapes = mouthShapes({{1.0, 1.5, "bah"}, {2.0, 2.4, "see"}});
+        const auto has = [&](Viseme viseme, double at)
+        {
+            return std::any_of(shapes.begin(), shapes.end(),
+                               [&](const Shape &s) { return s.viseme == viseme && s.start <= at && s.end >= at; });
+        };
+        CHECK(has(Viseme::Bump, 1.01) && has(Viseme::Ox, 1.25) && !has(Viseme::Ox, 2.2)); // not in "see"
+        CHECK(has(Viseme::Size, 2.01) && has(Viseme::Eat, 2.2));
+
+        const std::vector<uint8_t> blink = blinkTrack();
+        const std::vector<uint8_t> voc = withMouth(blink, shapes);
+        const auto curves = vocCurves(voc);
+        CHECK(curves.size() == 3u && curves[0].first == "Blink" && curves[0].second == 1u && curves[1].first == "Eat" &&
+              curves[1].second == 4u && curves[2].first == "Ox" && curves[2].second == 4u);
+        uint32_t size = 0u;
+        std::memcpy(&size, voc.data() + 10u + 4u + 8u + 2u + 4u + 24u + 12u + 4u + 10u + 2u, 4u);
+        CHECK(size == voc.size() && std::equal(blink.end() - 14, blink.end(), voc.end() - 14));
+        CHECK(withMouth({1u, 2u, 3u}, shapes) == std::vector<uint8_t>({1u, 2u, 3u}));
+        // Its open mouth read back, as GH1's singer takes a GH2 song's.
+        const auto back = vocMouthOpen(voc);
+        CHECK(back.size() == 2u && back[0].first > 1.0f && back[0].first < 1.1f && back[1].second > 2.3f &&
+              back[1].second <= 2.4f);
+        CHECK(vocMouthOpen(blink).empty());
+
+        const auto open = mouthOpen({{1.0, 1.2, Viseme::Eat, 1.0f}, {1.22, 1.5, Viseme::Ox, 1.0f}, {3.0, 3.1, Viseme::Eat, 1.0f}});
+        CHECK(open.size() == 2u && open[0].first == 1.0f && open[0].second == 1.5f);
+
+        // Nothing sung: one on each beat the band plays, a half beat long.
+        Chart chart = chart480();
+        Difficulty lead;
+        for (uint32_t t = 0; t < 8u * 480u; t += 480u)
+            lead.gems.push_back({t, 1u});
+        chart.parts[Part::Guitar][3] = lead;
+        const auto gh2 = toGh2(chart, 0.0);
+        CHECK(gh2 && gh2->sung.size() >= 6u && gh2->sung[0].end - gh2->sung[0].start == 0.25);
+    }
+
+    // The drums' crashes: pro drums' cymbals (a tom marker makes a pad a
+    // tom), a plain or five-lane chart's green or orange, .chart's cymbal
+    // markers; the drummer's animation notes over any.
     void drumPieces()
     {
         const auto mid = [](std::vector<std::pair<uint32_t, uint8_t>> hits, std::vector<std::pair<uint32_t, uint8_t>> marks)
         {
-            midi::File file{1u, 480u, {}};
-            midi::Track tempo, guitar, drums;
-            tempo.events.push_back({0u, midi::kMeta, midi::kTempo, {0x07u, 0xa1u, 0x20u}});
-            guitar.name = "PART GUITAR";
-            guitar.events = {note(0u, 96u, true), note(60u, 96u, false)};
+            midi::Track drums;
             drums.name = "PART DRUMS";
             for (const auto &[tick, pitch] : marks)
             {
@@ -1556,6 +1678,8 @@ int main(int argc, char **argv)
     chartEdges();
     bandParts();
     stageTracks();
+    syllables();
+    lipSync();
     drumPieces();
     bandFronts();
     songFactsTable();

@@ -80,7 +80,9 @@ namespace gh2::custom
     // (custom/song_files.cpp).
     void addKeys(BandTracks &band);
 
-    // BAND SINGER: the chart's own play state, else each vocal phrase.
+    // BAND SINGER: the chart's own play state, else each vocal phrase;
+    // with no vocals charted, the lead's playing less its solos, as most
+    // songs are sung through.
     void addSinger(BandTracks &band);
 
     struct Section

@@ -19,7 +19,8 @@
 //                else at each section); its
 //                beat by where the snares fall each bar: [allbeat],
 //                [double_time], [half_time], [nobeat]
-//   BAND SINGER  the singer, by when there is singing
+//   BAND SINGER  the singer, by when there is singing; with none in the
+//                chart, the band's playing but its solos
 //   BAND KEYS    the keyboard player, by the keys part, where it has one
 //   EVENTS       each section's look: [verse], [chorus] or [solo] for the
 //                camera and lighting, and a [lighting (...)]. A section is
@@ -53,6 +54,9 @@ namespace gh2::custom
         std::function<uint32_t(uint32_t)> toGh2; // chart tick to GH2 tick
         uint32_t end = 0u; // the song's [end]
         Part part = Part::Guitar; // the part PART GUITAR is, its texts and hand the chart's
+        // Where given, when the singer sings, by GH2's ticks: the chart's
+        // phrases, else the band's playing but its solos.
+        std::vector<Span> *singing = nullptr;
     };
 
     // `guitar` and `events` (PART GUITAR, EVENTS) with the band's texts

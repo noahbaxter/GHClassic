@@ -18,6 +18,7 @@
 #include "content/locale.h"
 #include "content/setlists.h"
 #include "content/songs.h"
+#include "custom/lipsync.h"
 #include "formats/dtb.h"
 #include "gh1/face.h"
 #include "gh1/guitarist.h"
@@ -505,6 +506,7 @@ namespace gh2::gh1
 
         std::vector<setlists::Tier> tiers;
         size_t count = 0u;
+        const auto blink = ark::readFile(gh2Disc, "songs/_blinktrack/_blinktrack.voc");
         for (const auto &[group, list] : groups)
         {
             setlists::Tier tier{group == "store" ? venue(groups.front().first) : venue(group), "gh1_" + group, {},
@@ -527,10 +529,19 @@ namespace gh2::gh1
                 }
                 songs::add(*text);
                 ark::addFile(mid, *converted);
-                addSinging(name, sung(*file));
+                const auto open = sung(*file);
+                addSinging(name, open);
                 // GH2's singer lip-syncs to <song>.voc; GH1's sang to chart
-                // events, so GH2's neutral track stands in.
-                ark::rename("songs/" + name + "/" + name + ".voc", gh2Disc, "songs/_blinktrack/_blinktrack.voc");
+                // events, so GH2's neutral track (its blinks) with a vowel
+                // each time GH1's opens its mouth (custom/lipsync.h).
+                if (blink)
+                {
+                    static const char *const kVowels[] = {"ah", "oh", "eh", "ee", "oo"};
+                    std::vector<custom::Sung> mouth;
+                    for (const auto &[from, to] : open)
+                        mouth.push_back({from, to, kVowels[mouth.size() % std::size(kVowels)]});
+                    ark::addFile("songs/" + name + "/" + name + ".voc", custom::withMouth(*blink, custom::mouthShapes(mouth)));
+                }
                 ark::rename("songs/" + name + "/", disc, "songs/" + name + "/");
                 tier.songs.push_back(name);
                 ++count;
