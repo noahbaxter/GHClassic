@@ -33,6 +33,8 @@
 //                [sync_head_bang] and [sync_wag] as written.
 //   TRIGGERS     48 each bar, the lighting's next keyframe, for the lighting
 //                made
+//   GH1 UPCOMING GH1's venues' drum cue, a beat ahead of BAND DRUMS' [play]
+//                and [idle]
 //
 // A chart made for GH2 keeps what its own BAND tracks and TRIGGERS write,
 // lane by lane: when a member plays, its tempo, the drummer's beat, each
@@ -72,8 +74,14 @@ namespace gh2::custom
 
     // `guitar` and `events` (PART GUITAR, EVENTS) with the band's texts
     // added; the band's own tracks, a chart made for GH2's where it has
-    // them.
+    // them, and GH1's venues' drum cue.
     std::vector<midi::Track> addStage(const StageIn &in, midi::Track &guitar, midi::Track &events);
+
+    // GH1's venues' drum cue, which GH1 sent its venue a beat ahead of its
+    // drum_on and drum_off (gh1/songs.cpp, gh1/scripts.cpp): 60 a beat
+    // before each of BAND DRUMS' [play], 61 before each [idle].
+    inline constexpr const char *kUpcomingTrack = "GH1 UPCOMING";
+    midi::Track upcomingDrums(const midi::Track &bandDrums, uint32_t ticksPerBeat);
 
     // GH2 plays its band's clips and crowd to the chart's beat. Its own songs
     // play at their own tempo from 88 to 201 BPM, Tattooed Love Boys (242)

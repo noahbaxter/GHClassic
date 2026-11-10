@@ -230,6 +230,23 @@ namespace gh2::custom
         return out;
     }
 
+    midi::Track upcomingDrums(const midi::Track &bandDrums, uint32_t ticksPerBeat)
+    {
+        midi::Track out;
+        out.name = kUpcomingTrack;
+        for (const midi::Event &e : bandDrums.events)
+            if (e.status == midi::kMeta && e.meta == midi::kText)
+            {
+                std::string text(e.data.begin(), e.data.end());
+                text.erase(text.find_last_not_of(' ') + 1u);
+                if (text != "[play]" && text != "[idle]")
+                    continue;
+                const uint32_t cueTick = e.tick > ticksPerBeat ? e.tick - ticksPerBeat : 0u;
+                addNote(out, cueTick, cueTick, text == "[play]" ? 60u : 61u);
+            }
+        return out;
+    }
+
     std::vector<midi::Track> addStage(const StageIn &in, midi::Track &guitar, midi::Track &events)
     {
         const std::vector<uint32_t> lead = toGh2Sorted(ticksOf(in.lead.gems), in.toGh2);
@@ -258,6 +275,7 @@ namespace gh2::custom
             if (made != &band.keys || !band.keys.events.empty())
                 out.push_back(std::move(*made));
         }
+        out.push_back(upcomingDrums(out.front(), kBeat));
         if (midi::Track hand = bassHand(in.chart, in.toGh2); !hand.events.empty())
             out.push_back(std::move(hand));
         return out;

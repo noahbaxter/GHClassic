@@ -259,11 +259,12 @@ namespace
             return;
         const auto back = gh2::midi::parse(gh2->mid);
         // Tempo, PART GUITAR, EVENTS, then the band's (custom/stage/stage.h).
-        CHECK(back && back->division == 480u && back->tracks.size() == 7u);
-        if (!back || back->tracks.size() != 7u)
+        CHECK(back && back->division == 480u && back->tracks.size() == 8u);
+        if (!back || back->tracks.size() != 8u)
             return;
         CHECK(back->tracks[3].name == "BAND DRUMS" && back->tracks[4].name == "BAND BASS" &&
-              back->tracks[5].name == "BAND SINGER" && back->tracks[6].name == "TRIGGERS");
+              back->tracks[5].name == "BAND SINGER" && back->tracks[6].name == "TRIGGERS" &&
+              back->tracks[7].name == "GH1 UPCOMING");
         std::map<uint8_t, std::vector<uint32_t>> ons;
         for (const midi::Event &e : back->tracks[1].events)
             if (midi::kind(e) == midi::kNoteOn && e.data[0] >= 60u) // past the hand's places
@@ -738,8 +739,8 @@ namespace
             {0u, "[play]"}, {960u, "[wail_on]"}, {1920u, "[wail_off]"}, {12000u, "[idle]"}, {0u, "[map HandMap_Default]"}};
         CHECK(textsOf(guitar) == said);
         CHECK(notesOf(guitar, 40u, 59u) == std::vector<uint32_t>({0u}));
-        CHECK(band.size() == 5u && band.back().name == "PART BASS");
-        if (band.size() == 5u)
+        CHECK(band.size() == 6u && band.back().name == "PART BASS");
+        if (band.size() == 6u)
         {
             CHECK(notesOf(band.back(), 96u, 100u) == std::vector<uint32_t>({0u, 480u}));
             const auto bassTexts = textsOf(band.back());
@@ -804,7 +805,7 @@ namespace
 
     // A chart made for GH2, everything its own: its BAND tracks and
     // TRIGGERS as written, its drummer's beat, lighting and tempo, none
-    // made over them.
+    // made over them; GH1's drum cue a beat ahead of its drummer's.
     void authoredStage()
     {
         midi::File file{1u, 480u, {}};
@@ -829,12 +830,12 @@ namespace
             return;
         const Difficulty &lead = chart->parts.at(Part::Guitar)[3];
         midi::Track out, outEvents;
-        const auto band = addStage({*chart, lead, [](uint32_t t) { return t; }, 16u * 480u}, out, outEvents);
+        const auto band = addStage({*chart, lead, kSameTicks, 16u * 480u}, out, outEvents);
         const auto named = [&](const std::string &name)
         { return std::find_if(band.begin(), band.end(), [&](const midi::Track &t) { return t.name == name; }); };
-        const auto ownDrums = named("BAND DRUMS"), ownTriggers = named("TRIGGERS");
-        CHECK(ownDrums != band.end() && ownTriggers != band.end());
-        if (ownDrums == band.end() || ownTriggers == band.end())
+        const auto ownDrums = named("BAND DRUMS"), ownTriggers = named("TRIGGERS"), upcoming = named("GH1 UPCOMING");
+        CHECK(ownDrums != band.end() && ownTriggers != band.end() && upcoming != band.end());
+        if (ownDrums == band.end() || ownTriggers == band.end() || upcoming == band.end())
             return;
         const std::vector<std::pair<uint32_t, std::string>> drummer = {
             {960u, "[play]"}, {960u, "[half_time]"}, {4800u, "[idle]"}};
@@ -842,6 +843,8 @@ namespace
         CHECK(notesOf(*ownDrums, 36u, 36u) == std::vector<uint32_t>({960u}));
         // Its own lighting's keyframes alone.
         CHECK(notesOf(*ownTriggers, 0u, 127u) == std::vector<uint32_t>({0u}));
+        CHECK(notesOf(*upcoming, 60u, 60u) == std::vector<uint32_t>({480u}) &&
+              notesOf(*upcoming, 61u, 61u) == std::vector<uint32_t>({4320u}));
         // Its lighting and look alone, and no tempo made at 240 BPM.
         const std::vector<std::pair<uint32_t, std::string>> lit = {
             {0u, "[lighting (strobe)]"}, {0u, "[chorus]"}, {0u, "[crowd_half_tempo]"}};
@@ -926,9 +929,9 @@ namespace
         chart.sections = {{0u, "Riff 1"}, {32u * 480u, "Big Part"}, {48u * 480u, "Riff 2"}};
         chart.vocals = {{480u * 4u, 480u * 8u}};
         midi::Track guitar, events;
-        const auto band = addStage({chart, lead, [](uint32_t t) { return t; }, 64u * 480u}, guitar, events);
-        CHECK(band.size() == 4u);
-        if (band.size() != 4u)
+        const auto band = addStage({chart, lead, kSameTicks, 64u * 480u}, guitar, events);
+        CHECK(band.size() == 5u && band[4].name == "GH1 UPCOMING");
+        if (band.size() != 5u)
             return;
         const auto ev = textsOf(events);
         const auto has = [&](uint32_t tick, const std::string &text)
@@ -959,12 +962,12 @@ namespace
         // A keys part: the keyboard player's track, playing where it does.
         chart.keys = {480u * 8u, 480u * 9u};
         midi::Track guitar2, events2;
-        const auto keyed = addStage({chart, lead, [](uint32_t t) { return t; }, 64u * 480u}, guitar2, events2);
-        CHECK(keyed.size() == 5u && keyed.back().name == "BAND KEYS");
-        if (keyed.size() == 5u)
+        const auto keyed = addStage({chart, lead, kSameTicks, 64u * 480u}, guitar2, events2);
+        CHECK(keyed.size() == 6u && keyed[4].name == "BAND KEYS");
+        if (keyed.size() == 6u)
         {
             const std::vector<std::pair<uint32_t, std::string>> played = {{3600u, "[play]"}, {4800u, "[idle]"}};
-            CHECK(textsOf(keyed.back()) == played);
+            CHECK(textsOf(keyed[4]) == played);
         }
     }
 

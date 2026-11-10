@@ -14,11 +14,14 @@
 #include "gh1/songs.h"
 
 #include "disc/ark.h"
+#include "content/campaigns.h"
 #include "content/encores.h"
 #include "content/locale.h"
 #include "content/setlists.h"
 #include "content/songs.h"
+#include "custom/gh2_chart.h"
 #include "custom/lipsync.h"
+#include "custom/stage/stage.h"
 #include "formats/dtb.h"
 #include "gh1/face.h"
 #include "gh1/guitarist.h"
@@ -37,11 +40,6 @@ namespace gh2::gh1
 {
     namespace
     {
-        // A chart's track of the drums' cues a beat ahead, note 60 drum_on
-        // and 61 drum_off, which a parser of its own sends the world as
-        // GH1 sends its venue (addSetlist).
-        constexpr const char *kUpcoming = "GH1 UPCOMING";
-
         // GH2's venues standing in for GH1's, by tier: each the one that
         // plays GH1's crowd for it (crowd_v1 to v6, world/<venue>/streams).
         const std::map<std::string, std::string> kVenues = {
@@ -202,7 +200,7 @@ namespace gh2::gh1
             };
 
             const char *const order[] = {"PART GUITAR", "EVENTS",     "BAND BASS", "BAND DRUMS",
-                                         "BAND SINGER", "BAND KEYS", kUpcoming};
+                                         "BAND SINGER", "BAND KEYS", custom::kUpcomingTrack};
             std::map<std::string, midi::Track> made;
             made["PART GUITAR"].events = gems->events;
             made["EVENTS"];
@@ -230,13 +228,11 @@ namespace gh2::gh1
                     // GH1 sends the venue each text a beat ahead as
                     // upcoming_<text> (BeatMaster::CheckUpcomingTextEvents,
                     // GH1 0x274460); its venues' drum kit cymbals stop and
-                    // start by the drums' (kUpcoming, addSetlist).
+                    // start by the drums' (custom::kUpcomingTrack, addSetlist).
                     if (*s == "drum_on" || *s == "drum_off")
                     {
-                        const uint32_t at = e.tick > in->division ? e.tick - in->division : 0u;
-                        const uint8_t note = *s == "drum_on" ? 60u : 61u;
-                        made[kUpcoming].events.push_back(midi::note(at, note, true));
-                        made[kUpcoming].events.push_back(midi::note(at + 1u, note, false));
+                        const uint32_t cueTick = e.tick > in->division ? e.tick - in->division : 0u;
+                        custom::addNote(made[custom::kUpcomingTrack], cueTick, cueTick, *s == "drum_on" ? 60u : 61u);
                     }
                 }
             // GH1's gems are notes 60 to 100 of T1 GEMS, easy's to expert's.
@@ -315,6 +311,23 @@ namespace gh2::gh1
                 }
             }
             return out;
+        }
+
+        // Another game's chart with GH1's venues' drum cue added from its
+        // BAND DRUMS (custom::upcomingDrums); none where it has no BAND
+        // DRUMS.
+        std::optional<ark::Made> withUpcomingDrums(size_t disc, const std::string &path)
+        {
+            const auto bytes = ark::readFile(disc, path);
+            auto file = bytes ? midi::parse(*bytes) : std::nullopt;
+            if (!file)
+                return std::nullopt;
+            const auto drums = std::find_if(file->tracks.begin(), file->tracks.end(),
+                                            [](const midi::Track &t) { return t.name == "BAND DRUMS"; });
+            if (drums == file->tracks.end())
+                return std::nullopt;
+            file->tracks.push_back(custom::upcomingDrums(*drums, file->division));
+            return ark::held(midi::write(*file));
         }
 
         using dtb::array;
@@ -479,11 +492,10 @@ namespace gh2::gh1
 
         // The drums' cues a beat ahead to the world, as upcoming_drum_on and
         // upcoming_drum_off, which GH1's venue scripts take (gh1/scripts.cpp).
-        // GH2's songs have no such track, so nothing of theirs reaches it.
         constexpr const char *kParsers = "config/gen/midi_parsers.dtb";
         const auto parsers = ark::readFile(0u, kParsers);
         auto parserRoot = parsers ? dtb::raw(*parsers) : std::nullopt;
-        const auto upcoming = dtb::parse(std::string("(gh1_upcoming (type midi) (eval 1) (track_name '") + kUpcoming +
+        const auto upcoming = dtb::parse(std::string("(gh1_upcoming (type midi) (eval 1) (track_name '") + custom::kUpcomingTrack +
                                          "') (mappings (default (events (60 ({handle (world upcoming_drum_on)})) "
                                          "(61 ({handle (world upcoming_drum_off)}))))))");
         if (parserRoot && upcoming)
@@ -491,6 +503,15 @@ namespace gh2::gh1
             parserRoot->nodes.insert(parserRoot->nodes.end(), upcoming->nodes.begin(), upcoming->nodes.end());
             ark::addFile(kParsers, dtb::write(*parserRoot));
         }
+        // Other games' songs (GH2's, the 80s') get that cue track too while
+        // they play in GH1's venues; in their own venues they keep the
+        // disc's chart.
+        for (size_t other = 0u; other < ark::discs(); ++other)
+            if (other != disc)
+                for (const std::string &path : ark::paths(other, "songs/"))
+                    if (path.ends_with(".mid"))
+                        ark::addMade(other, path, [other, path] { return withUpcomingDrums(other, path); },
+                                     [] { return campaigns::venueGame() == "gh1"; });
 
         // The basement's results headlines, by stars (gh1/menus.dta).
         for (int stars = 3; stars <= 5; ++stars)
