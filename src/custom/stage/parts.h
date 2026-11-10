@@ -22,16 +22,11 @@ namespace gh2::custom
     // `ticks` as playing runs, each to its last tick.
     inline std::vector<Span> playingRuns(const std::vector<uint32_t> &ticks) { return runs(ticks, kRestEndsRun, 0u); }
 
-    // Each change of the band's beat (its length in GH2's ticks, kBeat
-    // twice for half, half for double) by GH2 tick, the first at 0.
-    using BandBeatLengths = std::vector<std::pair<uint32_t, uint32_t>>;
+    // The band's beat length in GH2 ticks (kBeat, twice that at half
+    // tempo, half at double) at each change, the first at 0.
+    using BandBeatLengths = std::map<uint32_t, uint32_t>;
 
-    inline uint32_t beatAt(const BandBeatLengths &beats, uint32_t tick)
-    {
-        auto it = std::upper_bound(beats.begin(), beats.end(), tick,
-                                   [](uint32_t t, const std::pair<uint32_t, uint32_t> &b) { return t < b.first; });
-        return std::prev(it)->second;
-    }
+    inline uint32_t beatAt(const BandBeatLengths &beats, uint32_t tick) { return std::prev(beats.upper_bound(tick))->second; }
 
     enum class Mood
     {

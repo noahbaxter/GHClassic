@@ -58,7 +58,15 @@ namespace gh2::custom
     // added; the band's own tracks.
     std::vector<midi::Track> addStage(const StageIn &in, midi::Track &guitar, midi::Track &events);
 
-    // A section's name as its look's: lowercase, '_' a space, its number and
-    // a trailing letter or two ("Verse 1A", "chorus_2b") left off.
+    // GH2 plays its band's clips and crowd to the chart's beat. Its own songs
+    // play at their own tempo from 88 to 201 BPM, Tattooed Love Boys (242)
+    // at half, Red Lottery (61) at double; a chart's beat past these is
+    // played at half or double.
+    inline constexpr double kBandFastest = 210.0, kBandSlowest = 80.0;
+    // A tempo as the band plays it.
+    inline double bandBpm(double bpm) { return bpm > kBandFastest ? bpm / 2.0 : bpm < kBandSlowest ? bpm * 2.0 : bpm; }
+
+    // A section's name as its mood is picked by: lowercase, '_' a space, its
+    // number and a trailing letter or two ("Verse 1A", "chorus_2b") left off.
     std::string sectionBaseName(const std::string &section);
 }

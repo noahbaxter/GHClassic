@@ -16,7 +16,7 @@ namespace gh2::custom
         {
             std::vector<uint32_t> out;
             for (const Span &r : playing)
-                for (uint32_t t = (r.tick + kBeat - 1u) / kBeat * kBeat; t <= r.tick + r.length; t += kBeat)
+                for (uint32_t t = nextBeat(r.tick); t <= r.tick + r.length; t += kBeat)
                     out.push_back(t);
             return out;
         }

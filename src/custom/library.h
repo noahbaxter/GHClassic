@@ -48,6 +48,10 @@ namespace gh2::custom
         uint8_t parts = 0u; // bit n Part n, those with gems
         uint16_t charted = 0u; // bit 4 * part + difficulty, easy 0: those with gems
         uint8_t chartHas = 0u; // kHasVocals, kHasKeys, kHasDrums: for who is on stage
+        // Its lead part's beats a minute from its first note to its last,
+        // as its band plays it (custom/stage/stage.h: halved past 210, doubled
+        // under 80); 0 not known.
+        float bandBpm = 0.0f;
         std::vector<std::string> stems; // its audio's file names
         std::string art; // its album art's file name, empty for none
         std::vector<std::string> sections; // the chart's, for practice's names
@@ -75,17 +79,23 @@ namespace gh2::custom
     // split of it (drums_2, vocals_1_explicit), in any case.
     bool partStem(const std::string &file, const std::string &part);
 
-    // Who stands at the front of its band, where it is not GH2's default
-    // band's singer (gh2.dta's default_band): "female_singer" by song.ini's
-    // vocal_gender, as Rock Band's; with no one singing, a keys part's
-    // "metal_keyboard", as GH2's Jessica and YYZ; "" for no one, an
-    // instrumental's, as Soy Bomb. GH2 has no song with both a singer and a
-    // keyboard player: one stands in the other's place. A song is sung
-    // where its chart or stems say, and an instrumental only where its
-    // stems are split down to the drums with no singing among them and its
-    // chart has drums and bass but no singing: a chart without a vocal part
-    // is most often one without its vocals charted.
+    // Who stands at the front of its band: nullptr for GH2's default band's
+    // singer (gh2.dta's default_band), "" for no one (an instrumental, as
+    // Soy Bomb), else "female_singer" (as Rock Band's) or, with no one
+    // singing, a keys part's "metal_keyboard" (as GH2's Jessica and YYZ).
+    // GH2 has no song with both a singer and a keyboard player: one stands in
+    // the other's place. An official song's is its game's (custom/
+    // song_facts.h), its singer's gender song.ini's vocal_gender where it
+    // has one. Another's is sung where its chart or stems say, and an
+    // instrumental only where its stems are split down to the drums with no
+    // singing among them and its chart has drums and bass but no singing: a
+    // chart without a vocal part is most often one without its vocals
+    // charted.
     const char *bandFront(const Song &song);
+    // Whether its band plays GH2's fast clips (anim_tempo kTempoFast): an
+    // official song's as its game has it, else from 120 BPM, as most of
+    // GH2's own are.
+    bool bandFast(const Song &song);
 
     // Of songs that play with the same chart, the one listed: the first by
     // folder, so the same each scan.

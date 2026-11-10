@@ -1,0 +1,5 @@
+#pragma once
+
+// assets/song_facts.tsv (custom/song_facts.h), tools/song_facts.py's, compiled in by CMake.
+
+inline constexpr const char kSongFactsTable[] = R"tsv(@GHC_SONG_FACTS@)tsv";

@@ -65,7 +65,7 @@ namespace gh2::custom
                     array({symbol("midi_file"), symbol(dir + ".mid")}),
                 }),
                 array({symbol("bank"), symbol("sfx/song_default")}),
-                array({symbol("anim_tempo"), symbol("kTempoMedium")}),
+                array({symbol("anim_tempo"), symbol(bandFast(song) ? "kTempoFast" : "kTempoMedium")}),
             });
             if (const char *front = bandFront(song))
             {

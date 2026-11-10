@@ -10,6 +10,7 @@
 #include "custom/gh2_chart.h"
 #include "custom/index.h"
 #include "custom/library.h"
+#include "custom/song_facts.h"
 #include "custom/song_ini.h"
 #include "custom/stage/stage.h"
 #include "formats/md5.h"
@@ -1074,10 +1075,67 @@ namespace
         const fs::path file = fs::temp_directory_path() / "ghc_index_band_test.txt";
         Song keyed = song("/c/a/keys", "Keys");
         keyed.chartHas = kHasKeys | kHasDrums;
+        keyed.bandBpm = 112.5f;
         writeIndex(file, {keyed});
         const std::vector<Song> back = readIndex(file);
-        CHECK(back.size() == 1u && back[0].chartHas == (kHasKeys | kHasDrums) && tag(back[0].tags, "name") == "Keys");
+        CHECK(back.size() == 1u && back[0].chartHas == (kHasKeys | kHasDrums) && tag(back[0].tags, "name") == "Keys" &&
+              back[0].bandBpm == 112.5f);
         fs::remove(file);
+    }
+
+    // Names keyed as tools/song_facts.py's key() keys them (its output for
+    // each, copied here), and the official songs' bands from the table:
+    // the song's own, else its artist's gender; song.ini's vocal_gender
+    // over either.
+    void songFactsTable()
+    {
+        const std::pair<const char *, const char *> keys[] = {
+            {"The Edgar Winter Group", "edgarwintergroup"}, {"M\xc3\xb6tley Cr\xc3\xbc" "e", "motleycrue"},
+            {"Simon & Garfunkel", "simonandgarfunkel"},     {"Song (Live) feat. Someone", "song"},
+            {"AC/DC", "acdc"},                              {"  Th\xc3\xa9  Who ", "who"},
+            {"Beyonc\xc3\xa9 ft Jay-Z", "beyonce"},         {"[Bonus] Track (x", "trackx"},
+            {"Theory of a Deadman", "theoryofadeadman"},    {"Caf\xc3\xa9 del Mar featuring X", "cafedelmar"},
+        };
+        for (const auto &[name, want] : keys)
+        {
+            CHECK(factKey(name) == want);
+            if (factKey(name) != want)
+                std::cerr << "  " << name << " -> " << factKey(name) << ", not " << want << "\n";
+        }
+
+        const auto named = [](const char *artist, const char *title, uint8_t band = 0u)
+        {
+            Song s = song("/c/a", title);
+            s.tags["artist"] = artist;
+            s.chartHas = band;
+            s.parts = 1u << int(Part::Guitar);
+            s.stems = {"song.ogg"};
+            const char *f = bandFront(s);
+            return f ? std::string("=") + f : std::string("default");
+        };
+        // A game's own: Jessica's keyboard player, Soy Bomb's no one,
+        // Misery Business's singer female; Freezepop by its artist.
+        CHECK(named("The Allman Brothers Band", "Jessica") == "=metal_keyboard");
+        CHECK(named("Honest Bob and the Factory-to-Dealer Incentives", "Soy Bomb") == "=");
+        CHECK(named("Paramore", "Misery Business") == "=female_singer");
+        CHECK(named("Freezepop", "I Am Not Your Gameboy") == "=female_singer");
+        CHECK(named("Rush", "Tom Sawyer", kHasKeys) == "default"); // a singer over a keys part
+        CHECK(named("Nobody Known", "Nothing") == "default");
+        Song told = song("/c/a", "Misery Business");
+        told.tags["artist"] = "Paramore";
+        told.tags["vocal_gender"] = "male";
+        CHECK(bandFront(told) == nullptr);
+
+        // The band's clips: the game's, else from 120 BPM.
+        Song fast = song("/c/a", "Jessica"), slow = song("/c/a", "Gemini"), other = song("/c/a", "Nothing");
+        fast.tags["artist"] = "The Allman Brothers Band";
+        slow.tags["artist"] = "Brian Kahanek";
+        other.tags["artist"] = "Nobody Known";
+        CHECK(bandFast(fast) && !bandFast(slow));
+        other.bandBpm = 119.0f;
+        CHECK(!bandFast(other));
+        other.bandBpm = 150.0f;
+        CHECK(bandFast(other));
     }
 
     // badsongs.txt: the songs that don't play under their kind's heading,
@@ -1432,6 +1490,7 @@ int main(int argc, char **argv)
     bandParts();
     stageTracks();
     bandFronts();
+    songFactsTable();
     bandPerformance();
     bandTempo();
     handPlaces();

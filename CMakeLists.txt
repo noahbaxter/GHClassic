@@ -174,6 +174,7 @@ add_executable(custom_chart_test EXCLUDE_FROM_ALL
     src/custom/library.cpp
     src/custom/notes_chart.cpp
     src/custom/notes_mid.cpp
+    src/custom/song_facts.cpp
     src/custom/song_ini.cpp
     src/custom/stage/band.cpp
     src/custom/stage/stage.cpp
@@ -183,7 +184,7 @@ add_executable(custom_chart_test EXCLUDE_FROM_ALL
     src/formats/midi.cpp
     src/formats/sng.cpp
 )
-target_include_directories(custom_chart_test PRIVATE src)
+target_include_directories(custom_chart_test PRIVATE src "${CMAKE_CURRENT_BINARY_DIR}/dta")
 
 # Which release the game offers as an update.
 add_executable(releases_test EXCLUDE_FROM_ALL tests/releases_test.cpp src/host/releases.cpp)
@@ -311,6 +312,7 @@ set(GHC_GAME_SOURCES
     src/custom/library.cpp
     src/custom/notes_chart.cpp
     src/custom/notes_mid.cpp
+    src/custom/song_facts.cpp
     src/custom/song_files.cpp
     src/custom/song_ini.cpp
     src/custom/songs.cpp
@@ -572,6 +574,10 @@ configure_file(src/ui/dta/dta.h.in "${GHC_DTA_DIR}/dta.h" @ONLY)
 file(READ config/settings.template.ini GHC_SETTINGS_TEMPLATE)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS config/settings.template.ini)
 configure_file(src/settings/settings_template.h.in "${GHC_DTA_DIR}/settings_template.h" @ONLY)
+# Official songs' bands (custom/song_facts.h), tools/song_facts.py's table.
+file(READ assets/song_facts.tsv GHC_SONG_FACTS)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/song_facts.tsv)
+configure_file(src/custom/song_facts_table.h.in "${GHC_DTA_DIR}/song_facts_table.h" @ONLY)
 # The old Flying V layout's texel table (gh1/guitars.h), as a byte array.
 file(READ src/gh1/flyingv_old_layout.bin GHC_FLYINGV_OLD_LAYOUT HEX)
 string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_FLYINGV_OLD_LAYOUT "${GHC_FLYINGV_OLD_LAYOUT}")

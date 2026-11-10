@@ -9,55 +9,45 @@ namespace gh2::custom
 {
     namespace
     {
-        // Each bar's start in GH2's ticks, from 0 to `end`, or to where `at`
-        // stops going on (a wild chart's end is past the most it maps to).
-        std::vector<uint32_t> barsTo(const Chart &chart, const std::function<uint32_t(uint32_t)> &at, uint32_t end)
+        // Each bar's start in GH2 ticks, up to `end` or until `toGh2` stops
+        // growing (it clamps a wild chart's ticks).
+        std::vector<uint32_t> barsTo(const Chart &chart, const TickMap &toGh2, uint32_t end)
         {
             std::vector<uint32_t> out;
             uint32_t tick = 0u, length = chart.resolution * 4u;
             size_t next = 0u;
-            while (at(tick) < end && (out.empty() || at(tick) > out.back()))
+            for (uint32_t at; (at = toGh2(tick)) < end && (out.empty() || at > out.back()); tick += length)
             {
                 while (next < chart.signatures.size() && chart.signatures[next].first <= tick)
                 {
                     const auto &sig = chart.signatures[next++].second;
                     length = std::max(1u, chart.resolution * 4u * sig[0] / (1u << std::min<uint8_t>(sig[1], 6u)));
                 }
-                out.push_back(at(tick));
-                tick += length;
+                out.push_back(at);
             }
             return out;
         }
 
-        // GH2 plays its band's clips and crowd to the chart's beat (main.drv's
-        // beat scale). Its own songs play at their own tempo from 88 to 201
-        // BPM, Tattooed Love Boys (242) at half, Red Lottery (61) at double
-        // ([half_tempo], [double_tempo]). A chart's tempo past these is
-        // played at half or double, and back only well inside, so a chart
-        // wavering at the line keeps one. A chart charted at twice its
-        // song's tempo (or in eighth-note beats) is played at its song's.
-        constexpr double kFastest = 210.0, kSlowest = 80.0, kBack = 0.9;
+        // Past kBandFastest the band plays at half tempo, under kBandSlowest
+        // at double (main.drv's beat scale). It goes back to normal only 10%
+        // inside the line, so a chart wavering at it keeps one.
+        constexpr double kHysteresis = 0.9;
 
-        BandBeatLengths bandBeatLengths(const Chart &chart, const std::function<uint32_t(uint32_t)> &at)
+        BandBeatLengths bandBeatLengths(const Chart &chart, const TickMap &toGh2)
         {
             BandBeatLengths out = {{0u, kBeat}};
             for (const Tempo &t : chart.tempos)
             {
                 const double bpm = 60e6 / t.usPerBeat;
-                uint32_t beat = out.back().second;
-                if (bpm > kFastest)
+                uint32_t beat = out.rbegin()->second;
+                if (bpm > kBandFastest)
                     beat = kBeat * 2u;
-                else if (bpm < kSlowest)
+                else if (bpm < kBandSlowest)
                     beat = kBeat / 2u;
-                else if (bpm < kFastest * kBack && bpm > kSlowest / kBack)
+                else if (bpm < kBandFastest * kHysteresis && bpm > kBandSlowest / kHysteresis)
                     beat = kBeat;
-                if (beat == out.back().second)
-                    continue;
-                const uint32_t tick = at(t.tick);
-                if (out.back().first == tick)
-                    out.back().second = beat;
-                else
-                    out.push_back({tick, beat});
+                if (beat != out.rbegin()->second)
+                    out[toGh2(t.tick)] = beat;
             }
             return out;
         }
