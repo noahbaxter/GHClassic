@@ -28,6 +28,12 @@
 //                With no sections, one every eight bars.
 //   TRIGGERS     48 each bar, the lighting's next keyframe
 //
+// The band and crowd play to the chart's beat, so a chart past 210 BPM (or
+// charted at twice its song's tempo) plays them at [half_tempo], one under
+// 80 at [double_tempo], each member's and EVENTS' [crowd_..._tempo], and a
+// bar above is the band's: two of the chart's at half, half of one at
+// double.
+//
 // Every tick is GH2's (480 a beat).
 
 #include "custom/chart.h"

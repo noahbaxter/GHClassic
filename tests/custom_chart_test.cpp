@@ -580,6 +580,38 @@ namespace
         CHECK(places == want);
     }
 
+    // A chart too fast for the band played at half: the band and crowd at
+    // half from its start, kept through a dip to 200, normal again at 150;
+    // the lighting's keyframe each band bar, two of the chart's.
+    void bandTempo()
+    {
+        Chart chart;
+        chart.resolution = 480u;
+        chart.tempos = {{0u, 266667u}, {16u * 480u, 300000u}, {24u * 480u, 400000u}};
+        Difficulty lead;
+        for (uint32_t t = 0; t < 40u * 480u; t += 240u)
+            lead.gems.push_back({t, 1u});
+        midi::Track guitar, events;
+        const auto band = addStage({chart, lead, kSameTicks, 40u * 480u}, guitar, events);
+        const auto only = [](const std::vector<std::pair<uint32_t, std::string>> &texts, const std::string &part)
+        {
+            std::vector<std::pair<uint32_t, std::string>> out;
+            for (const auto &t : texts)
+                if (t.second.find(part) != std::string::npos)
+                    out.push_back(t);
+            return out;
+        };
+        const std::vector<std::pair<uint32_t, std::string>> played = {{0u, "[half_tempo]"}, {24u * 480u, "[normal_tempo]"}};
+        CHECK(only(textsOf(guitar), "_tempo") == played);
+        CHECK(band.size() >= 4u && only(textsOf(band[0]), "_tempo") == played && only(textsOf(band[1]), "_tempo") == played);
+        const std::vector<std::pair<uint32_t, std::string>> crowd = {{0u, "[crowd_half_tempo]"},
+                                                                     {24u * 480u, "[crowd_normal_tempo]"}};
+        CHECK(only(textsOf(events), "crowd_") == crowd);
+        // Keyframes at bars 0, 2, 4 (the half), then 6, 7, 8, 9.
+        CHECK(band.size() >= 4u &&
+              notesOf(band[3], 48u, 48u) == std::vector<uint32_t>({0u, 3840u, 7680u, 11520u, 13440u, 15360u, 17280u}));
+    }
+
     // A track's texts at each tick, in order.
     std::vector<std::pair<uint32_t, std::string>> textsOf(const midi::Track &track)
     {
@@ -1401,6 +1433,7 @@ int main(int argc, char **argv)
     stageTracks();
     bandFronts();
     bandPerformance();
+    bandTempo();
     handPlaces();
     stage();
     catalogOrder();
