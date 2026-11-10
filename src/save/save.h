@@ -1,7 +1,7 @@
 #pragma once
 
 #include "addresses.h"
-#include "gameplay/note_engine/note_engine.h"
+#include "gameplay/engine/note_engine.h"
 #include "save/best.h"
 
 #include <array>

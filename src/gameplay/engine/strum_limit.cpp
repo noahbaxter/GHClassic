@@ -4,7 +4,7 @@
 // only every fourth frame takes one: 15 strums a second, and 16.7 at PAL's 50.
 // On, this isn't installed and retail's check stands.
 
-#include "gameplay/strum_limit.h"
+#include "gameplay/engine/strum_limit.h"
 
 #include "guest/beatmatch.h"
 #include "hook.h"

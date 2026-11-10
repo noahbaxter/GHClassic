@@ -17,7 +17,7 @@
 //   phrases sit back to back, the second loses its first gem
 //   (SongDB::SetupStarpower, GH1 0x10cf00).
 
-#include "gameplay/note_engine/gh1.h"
+#include "gameplay/engine/gh1/gh1.h"
 
 #include "guest/beatmatch.h"
 #include "guest/song_db.h"

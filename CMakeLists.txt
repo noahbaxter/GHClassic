@@ -328,17 +328,17 @@ set(GHC_GAME_SOURCES
     src/formats/md5.cpp
     src/formats/midi.cpp
     src/formats/sng.cpp
-    src/gameplay/hopo_lock.cpp
-    src/gameplay/note_engine/gh1_scoring.cpp
-    src/gameplay/note_engine/gh1_star_power.cpp
-    src/gameplay/note_engine/gh1_watcher.cpp
-    src/gameplay/note_engine/note_engine.cpp
-    src/gameplay/note_speed.cpp
-    src/gameplay/retrack.cpp
-    src/gameplay/strum_limit.cpp
-    src/gameplay/sustain_release.cpp
-    src/gameplay/track_start.cpp
-    src/gameplay/whammy_hold.cpp
+    src/gameplay/engine/gh1/scoring.cpp
+    src/gameplay/engine/gh1/star_power.cpp
+    src/gameplay/engine/gh1/watcher.cpp
+    src/gameplay/engine/hopo_lock.cpp
+    src/gameplay/engine/note_engine.cpp
+    src/gameplay/engine/strum_limit.cpp
+    src/gameplay/engine/sustain_release.cpp
+    src/gameplay/engine/track_start.cpp
+    src/gameplay/engine/whammy_hold.cpp
+    src/highway/note_speed.cpp
+    src/highway/retrack.cpp
     src/gh1/band.cpp
     src/gh1/cameras.cpp
     src/gh1/career.cpp

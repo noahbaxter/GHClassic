@@ -25,7 +25,7 @@
 
 #include "save/save.h"
 
-#include "gameplay/note_engine/note_engine.h"
+#include "gameplay/engine/note_engine.h"
 #include "guest.h"
 #include "hook.h"
 #include "save/gh1_stream.h"

@@ -10,7 +10,7 @@
 // Scoring+0x24). So they are overwritten in memory under GH1's engine, and
 // GH2's written back under GH2's.
 
-#include "gameplay/note_engine/gh1.h"
+#include "gameplay/engine/gh1/gh1.h"
 
 #include "guest/data_array.h"
 #include "hook.h"

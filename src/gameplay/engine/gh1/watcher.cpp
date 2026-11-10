@@ -36,7 +36,7 @@
 //
 // Kept GH2's: the song's sync offset in every window.
 
-#include "gameplay/note_engine/gh1.h"
+#include "gameplay/engine/gh1/gh1.h"
 
 #include "guest/beatmatch.h"
 #include "hook.h"
