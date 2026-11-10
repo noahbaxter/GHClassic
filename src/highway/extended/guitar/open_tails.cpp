@@ -258,13 +258,15 @@ namespace gh2::guitar
         // A held tail's swell, drawn with it: down its middle as a lane's,
         // each row three faces across (kSwellTop), out to the sheet's edges
         // by its reach; round the end, along the sheet's outer edge,
-        // narrowing to its tip as it does. None while no row reaches out.
+        // narrowing to its tip as it does. None while no row reaches out,
+        // nor for an open chord's, whose frets' sustains swell over it.
         void rideTail(uint8_t *rdram, uint32_t mesh, const MeshData &geometry, std::vector<std::shared_ptr<const MeshData>> &out)
         {
             const auto found = s_swells.find(mesh);
             const size_t rows = geometry.verts.size() / kTailAcross;
             if (found == s_swells.end() || rows < kTailCapRows + 2u || found->second.reach.size() != rows ||
-                !isOpenRep(found->second.rep) || load<uint32_t>(rdram, found->second.rep + gemRep::kTail) != mesh ||
+                !isOpenRep(found->second.rep) || isOpenChordRep(found->second.rep) ||
+                load<uint32_t>(rdram, found->second.rep + gemRep::kTail) != mesh ||
                 *std::max_element(found->second.reach.begin(), found->second.reach.end()) < 0.01f)
                 return;
             const Swell &swell = found->second;

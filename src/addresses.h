@@ -85,6 +85,7 @@ namespace gh2
         uint32_t gemRepTemplateDtor;          // GemRepTemplate::~GemRepTemplate
         uint32_t gemRepEnableDuration;        // GemRep::EnableDuration, which takes a tail from the pool
         uint32_t gemRepSetDuration;           // GemRep::SetDuration(float, float, float), which places the tail's glow
+        uint32_t gemRepPoll;                  // GemRep::Poll(float, float, float, float), which places its tail
         uint32_t rndMeshSetMat;               // RndMesh::SetMat(RndMat *)
         uint32_t rndLineSetPointColor;        // RndLine::SetPointColor(int, const Color &)
         uint32_t rndLineDrawShowing;          // RndLine::DrawShowing(RndDrawable::DrawType)
@@ -455,6 +456,7 @@ namespace gh2
         .gemRepTemplateDtor = 0x15b558u,
         .gemRepEnableDuration = 0x158a78u,
         .gemRepSetDuration = 0x158b60u,
+        .gemRepPoll = 0x158e18u,
         .rndMeshSetMat = 0x1c6b88u,
         .rndLineSetPointColor = 0x1bce70u,
         .rndLineDrawShowing = 0x1bc1c0u,

@@ -110,6 +110,11 @@ namespace gh2::guitar
         // Each taken inside its lane's block.
         constexpr float kBodyTopV = 0.68f;
 
+        // How high a strummed open's cap stands, and a HOPO's, above where
+        // a lane's gem stands (its lowest): an open chord's frets are lifted
+        // that far, onto it, as a drum chord's pads stand over its kick.
+        float s_capTop = 0.0f, s_hopoCapTop = 0.0f;
+
         // The mesh pulled apart at its middle, a half to each outer lane,
         // and flattened toward the track, as every part is, so they meet as
         // they did; or, hidden, every vertex at its middle.
@@ -127,6 +132,9 @@ namespace gh2::guitar
                 return true;
             }
             const float bottom = verts->bottom;
+            float *capTop = std::strcmp(wide.as, "open_top.mesh") == 0    ? &s_capTop
+                            : std::strcmp(wide.as, "open_hopo.mesh") == 0 ? &s_hopoCapTop
+                                                                           : nullptr;
             for (uint32_t i = 0; i < n; ++i)
             {
                 uint8_t *v = vertex(i);
@@ -142,6 +150,8 @@ namespace gh2::guitar
                 std::memcpy(v, &x, 4u);
                 std::memcpy(v + 8u, &z, 4u);
                 std::memcpy(v + kMeshVertexUv + 4u, &uvV, 4u);
+                if (capTop)
+                    *capTop = std::max(*capTop, z - bottom);
             }
             if (!wide.across)
                 return true;
@@ -282,6 +292,11 @@ namespace gh2::guitar
         if (open == "open_top_star.mesh")
             return "open_tap_star.mesh";
         return std::find(std::begin(kTapBodies), std::end(kTapBodies), open) != std::end(kTapBodies) ? "tap_" + open : open;
+    }
+
+    float openCapTop(bool hopo)
+    {
+        return hopo ? s_hopoCapTop : s_capTop;
     }
 
     std::vector<std::string> openStreakMats()

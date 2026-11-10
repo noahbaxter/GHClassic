@@ -8,6 +8,7 @@
 
 #include "gameplay/extended/guitar/gem_kinds.h"
 #include "guest.h"
+#include "guest/beatmatch.h"
 #include "highway/cyan_stars.h"
 #include "highway/extended/guitar/open_pieces.h"
 #include "highway/extended/guitar/open_tails.h"
@@ -38,6 +39,11 @@ namespace gh2::guitar
 
         // Each open rep's Gem.
         std::map<uint32_t, uint32_t> s_openReps;
+        // The Gems on the track that are open chords (custom/gh2_chart.h),
+        // known as GemManager::AdvanceEnd adds them, before their reps; and
+        // their frets' reps, each lifted how far.
+        std::set<uint32_t> s_openChords;
+        std::map<uint32_t, float> s_lifted;
 
         // A star power open's cap: its streak runs right to left, a bar's
         // length in this many seconds, its uv offset in tex_xfm, about the
@@ -146,6 +152,7 @@ namespace gh2::guitar
             for (const uint32_t rep : s_openFree[pool])
                 runtime->callGuestFunction(rdram, ctx, s_addresses->gemRepPoolReturnGem, {pool, rep});
             s_openFree.erase(pool);
+            s_openChords.clear(), s_lifted.clear();
             // Those still out are deleted with their gems (~Gem), never
             // through Gem::RemoveRep.
             for (auto out = s_openOut.begin(); out != s_openOut.end();)
@@ -159,16 +166,72 @@ namespace gh2::guitar
             s_scenes.clear(), s_streakMats.clear();
         }
 
+        void gemAdded(uint8_t *rdram, R5900Context *, PS2Runtime *, const GemAdded &added)
+        {
+            s_openChords.erase(added.gem);
+            if (!playingCustom() || added.game == 0u)
+                return;
+            const guest::GameGem game(rdram, added.game);
+            if (const Gh2Gem *chart = chartGem(added.track, static_cast<uint32_t>(game.tick()), game.slots());
+                chart && chart->openChord)
+                s_openChords.insert(added.gem);
+        }
+
+        // A transform's height over its parent (its local place's z), set
+        // and made dirty.
+        void setHeight(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t trans, float z)
+        {
+            store<float>(rdram, trans + ::milo::transformable::kLocal + 0x38u, z);
+            runtime->callGuestFunction(rdram, ctx, s_addresses->setDirty, {trans});
+        }
+
+        // An open chord's reps lifted onto its open's cap: each rep's
+        // transform (+0x50 of its first word, as GemRep::Init places it,
+        // 0x1586d4) raised.
+        void lift(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t rep, float by)
+        {
+            const uint32_t trans = load<uint32_t>(rdram, rep) + 0x50u;
+            setHeight(rdram, ctx, runtime, trans, load<float>(rdram, trans + ::milo::transformable::kLocal + 0x38u) + by);
+            s_lifted[rep] = by;
+        }
+
+        // GemRep::Poll(float, float, float, float), which places the rep's
+        // tail along it, level with it (its transform +0x40, 0x158f38): a
+        // lifted rep's put back down on the track, just over the open's, so
+        // the two don't fight to be drawn.
+        constexpr float kTailOverOpen = 0.05f;
+        PS2Runtime::RecompiledFunction s_poll = nullptr;
+        void poll(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t rep = GPR_U32(ctx, 4);
+            const auto lifted = s_lifted.find(rep);
+            if (lifted == s_lifted.end())
+                return s_poll(rdram, ctx, runtime);
+            callOriginal(rdram, ctx, runtime, s_addresses->gemRepPoll, s_poll);
+            if (const uint32_t tail = load<uint32_t>(rdram, rep + gemRep::kTail))
+                setHeight(rdram, ctx, runtime, tail + 0x40u, kTailOverOpen - lifted->second);
+        }
+
         // Gem::AddRep(GemRepPool &, RndGroup *, GemRep::Type, const
         // TrackConfig &), the config in $t0, which the calls into the guest
-        // before AddRepForSlot's may clobber.
+        // before AddRepForSlot's may clobber. An open's rep is the middle
+        // lane's, made wide; an open chord's frets' reps are lifted onto one.
         void addRep(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
             const uint32_t gem = GPR_U32(ctx, 4);
-            if (load<uint8_t>(rdram, gem + gem::kFrets) != 0u)
+            const bool chord = s_openChords.count(gem) != 0u;
+            if (load<uint8_t>(rdram, gem + gem::kFrets) != 0u && !chord)
                 return s_addRep(rdram, ctx, runtime);
             const uint32_t returnTo = GPR_U32(ctx, 31), config = GPR_U32(ctx, 8);
             const EntryArgs args(ctx);
+            if (chord)
+            {
+                callOriginal(rdram, ctx, runtime, s_addresses->gemAddRep, s_addRep);
+                const float by = openCapTop((load<uint32_t>(rdram, gem + gem::kFrets) & gem::kHopo) != 0u);
+                for (uint32_t r = load<uint32_t>(rdram, gem + gem::kReps), end = load<uint32_t>(rdram, gem + gem::kRepsEnd);
+                     r < end; r += 4u)
+                    lift(rdram, ctx, runtime, load<uint32_t>(rdram, r), by);
+            }
             offerOpenRep(rdram, ctx, runtime, args.a[1]);
             runtime->callGuestFunction(rdram, ctx, s_addresses->gemAddRepForSlot,
                                        {gem, args.a[1], args.a[2], kOpenLane, args.a[3], config});
@@ -196,13 +259,22 @@ namespace gh2::guitar
             const uint32_t gem = GPR_U32(ctx, 4);
             for (uint32_t r = load<uint32_t>(rdram, gem + gem::kReps), end = load<uint32_t>(rdram, gem + gem::kRepsEnd);
                  r < end; r += 4u)
-                s_openReps.erase(load<uint32_t>(rdram, r));
+            {
+                const uint32_t rep = load<uint32_t>(rdram, r);
+                s_openReps.erase(rep), s_lifted.erase(rep);
+            }
         }
     }
 
     bool isOpenRep(uint32_t rep)
     {
         return s_openReps.count(rep) != 0u;
+    }
+
+    bool isOpenChordRep(uint32_t rep)
+    {
+        const auto open = s_openReps.find(rep);
+        return open != s_openReps.end() && s_openChords.count(open->second) != 0u;
     }
 
     uint32_t openScene()
@@ -214,7 +286,9 @@ namespace gh2::guitar
     {
         s_addresses = &addresses;
         addToTrackScene(addOpenPieces);
+        onGemAdded(gemAdded);
         replaceKeeping(runtime, addresses.gemAddRep, &addRep, s_addRep);
+        replaceKeeping(runtime, addresses.gemRepPoll, &poll, s_poll);
         replaceKeeping(runtime, addresses.gemRepSetType, &setType, s_setType);
         EntryHook<RemoveRepTag>::install(runtime, addresses.gemRemoveRep, onRemoveRep);
         replaceKeeping(runtime, addresses.gemRepPoolReturnGem, &returnGem, s_returnGem);

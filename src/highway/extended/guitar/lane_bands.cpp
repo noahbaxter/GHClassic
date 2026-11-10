@@ -111,8 +111,9 @@ namespace gh2::guitar
                     banded |= static_cast<uint8_t>(1u << fret);
                     longest = std::max(longest, chart->bandMs[size_t(fret)]);
                 }
-            if (chart->open && chart->bandMs[kOpenBand] > 0.0f)
-                banded = 1u << kOpenBand, longest = chart->bandMs[kOpenBand];
+            const bool open = chart->open || chart->openChord;
+            if (open && chart->bandMs[kOpenBand] > 0.0f)
+                banded |= 1u << kOpenBand, longest = std::max(longest, chart->bandMs[kOpenBand]);
             if (banded == 0u)
                 return;
             const uint32_t config = load<uint32_t>(rdram, added.manager + gemManager::kConfig);
@@ -120,7 +121,7 @@ namespace gh2::guitar
             const float from = load<float>(rdram, added.gem + kGemFrom);
             store<float>(rdram, added.gem + kGemTo, from + longest * spacing + kBandAfter);
             store<float>(rdram, added.gem + kGemTailStart, -kBandBefore);
-            s_bandGems[added.gem] = {game.slots(), banded, chart->open ? int(chart->openBandGap) : -1};
+            s_bandGems[added.gem] = {game.slots(), banded, open ? int(chart->openBandGap) : -1};
         }
 
         // GemRep::EnableDuration, which lends the rep a tail: a band's, its
@@ -135,8 +136,9 @@ namespace gh2::guitar
                 return;
             for (const auto &[gem, band] : s_bandGems)
             {
-                // Its reps a fret each, lowest first; an open's its one.
-                uint8_t left = band.banded == 1u << kOpenBand ? uint8_t(1u << kOpenBand) : band.frets;
+                // Its reps a fret each, lowest first, then an open's
+                // (an open's its one, highway/extended/guitar/open_gems).
+                uint8_t left = band.frets | (band.banded & uint8_t(1u << kOpenBand));
                 for (uint32_t r = load<uint32_t>(rdram, gem + gem::kReps), last = load<uint32_t>(rdram, gem + gem::kRepsEnd);
                      r < last && left; r += 4u, left &= static_cast<uint8_t>(left - 1u))
                 {
