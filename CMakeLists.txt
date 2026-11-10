@@ -340,6 +340,7 @@ set(GHC_GAME_SOURCES
     src/gameplay/engine/whammy_hold.cpp
     src/gameplay/extended/guitar/gem_kinds.cpp
     src/gameplay/extended/guitar/hammer_ons.cpp
+    src/highway/extended/guitar/open_bursts.cpp
     src/highway/extended/guitar/open_gems.cpp
     src/highway/extended/guitar/open_pieces.cpp
     src/highway/extended/guitar/open_tails.cpp
@@ -451,6 +452,7 @@ set(GHC_GAME_SOURCES
     src/render/frame.cpp
     src/render/look.cpp
     src/render/char_lod.cpp
+    src/render/draw_hue.cpp
     src/render/font_bake.cpp
     src/render/mesh_capture.cpp
     src/render/native_cull.cpp

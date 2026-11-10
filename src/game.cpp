@@ -29,6 +29,7 @@
 #include "gameplay/extended/guitar/gem_kinds.h"
 #include "gameplay/extended/guitar/hammer_ons.h"
 #include "highway/extended/guitar/open_gems.h"
+#include "highway/extended/guitar/open_bursts.h"
 #include "highway/extended/guitar/open_tails.h"
 #include "highway/gem_looks.h"
 #include "gh1/install.h"
@@ -136,6 +137,7 @@ namespace
         gh2::installGemLooks(runtime, gh2::kSlus21447);
         gh2::guitar::installOpenGems(runtime, gh2::kSlus21447);
         gh2::guitar::installOpenTails(runtime, gh2::kSlus21447);
+        gh2::guitar::installOpenBursts(runtime, gh2::kSlus21447);
         gh2::installWhammyHold(runtime, gh2::kSlus21447);
         gh2::installStarPowerOverlap(runtime, gh2::kSlus21447);
         gh2::installHopoLock(runtime, gh2::kSlus21447);

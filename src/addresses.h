@@ -88,6 +88,11 @@ namespace gh2
         uint32_t rndMeshSetMat;               // RndMesh::SetMat(RndMat *)
         uint32_t rndLineSetPointColor;        // RndLine::SetPointColor(int, const Color &)
         uint32_t rndLineDrawShowing;          // RndLine::DrawShowing(RndDrawable::DrawType)
+        uint32_t slotViewsDrawShowing;        // SlotViews::DrawShowing(RndDrawable::DrawType)
+        uint32_t smashFxSetType;              // SmashFX::SetType(bool, bool, bool)
+        uint32_t nowBarHit;                   // NowBar::Hit(float, int gem, bool, PhraseState)
+        uint32_t trackConfigTrackNum;         // TrackConfig::TrackNum
+        uint32_t songDbGetGem;                // SongDB::GetGem(int track, int gem), a GameGem *
         uint32_t checkForPitchBend; // TrackWatcherImpl::CheckForPitchBend
         uint32_t sendWhammy;        // TrackWatcherImpl::SendWhammy
         uint32_t playerSetWhammyBar; // Player::SetWhammyBar
@@ -427,6 +432,11 @@ namespace gh2
         .rndMeshSetMat = 0x1c6b88u,
         .rndLineSetPointColor = 0x1bce70u,
         .rndLineDrawShowing = 0x1bc1c0u,
+        .slotViewsDrawShowing = 0x15f038u,
+        .smashFxSetType = 0x15f650u,
+        .nowBarHit = 0x15d0b8u,
+        .trackConfigTrackNum = 0x152480u,
+        .songDbGetGem = 0x11cf78u,
         .checkForPitchBend = 0x248e38u,
         .sendWhammy = 0x249b98u,
         .playerSetWhammyBar = 0x111d88u,

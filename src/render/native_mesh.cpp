@@ -14,6 +14,7 @@
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
 #include "render/camera.h"
+#include "render/draw_hue.h"
 #include "render/frame.h"
 #include "render/look.h"
 #include "render/mesh_capture.h"
@@ -99,6 +100,7 @@ namespace gh2
                 draw.material = readMaterial(rdram, mat);
                 if (draw.material.texGen == milo::mat::kTexGenSphere)
                     readSphereRows(rdram, ctx, runtime, *s_addresses, mat, draw.material);
+                turnMaterial(draw.material);
                 building().draws.push_back(draw);
             }
         }
