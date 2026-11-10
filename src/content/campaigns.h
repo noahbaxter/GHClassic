@@ -94,6 +94,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 class PS2Runtime;
@@ -145,6 +146,27 @@ namespace gh2::campaigns
     std::string ownFinishes(uint8_t *rdram);
     // `game`'s own outfits, in its config's order.
     std::vector<std::string> outfits(const std::string &game);
+    // `game`'s characters, each with its outfits, its first outfit first,
+    // in its config's order.
+    std::vector<std::pair<std::string, std::vector<std::string>>> characters(const std::string &game);
+    // Every game's guitar finishes (no basses, cheat guitars or scythes),
+    // each once, in config order.
+    struct Finish
+    {
+        std::string guitar; // the guitar's key in the live config
+        std::string finish; // the finish's key
+        std::string model;  // its (outfit ...): the model it is drawn as
+        int price = 0;      // finishesOf's: guitar plus finish in that game's store, 0 if neither is sold
+    };
+    std::vector<Finish> finishes();
+    // `game`'s own, the same way, cheapest first (config order among a
+    // price).
+    std::vector<Finish> finishesOf(const std::string &game);
+    // `game`'s Grim Ripper's scythe, by its finish's key ("scythe" for none).
+    std::string scytheOf(const std::string &game);
+    // Whether a song may play in that game's venue outside its career, as
+    // {campaigns venue_open}.
+    bool venueOpen(const std::string &game, const std::string &venue);
     // In a career, where every pick is its own game's: the game's mode is
     // career, however it got there.
     bool inCareer(uint8_t *rdram);

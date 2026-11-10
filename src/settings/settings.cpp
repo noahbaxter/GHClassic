@@ -135,6 +135,7 @@ namespace gh2::settings
             {"vector_fonts", Type::kBool, 0, 1, 1, 1},
             {"folders", Type::kText, 0, 0, 1, 0},
             {"show_duplicates", Type::kBool, 0, 1, 1, 0},
+            {"disc_song_guitars", Type::kBool, 0, 1, 1, 0},
         };
 
         const Entry *entryNamed(const std::string &name)
@@ -336,7 +337,7 @@ namespace gh2::settings
             return false;
         if (playing.career)
             return playing.nextGen;
-        const bool venue = playing.gh2Venue && get(kVenues) == kHd;
+        const bool venue = playing.gh2Venue && (get(kVenues) == kHd || playing.nextGenSong);
         switch (look)
         {
         case kLookVenue:
@@ -344,7 +345,7 @@ namespace gh2::settings
         case kLookCharacters:
             return get(kCharacters) == kHd;
         case kLookGuitars:
-            return get(kGuitars) == kHd;
+            return get(kGuitars) == kHd || playing.nextGenSong;
         case kLookHighway:
             return get(kHighway) == kHighwayAuto ? venue : get(kHighway) == kHighwayHd;
         default:

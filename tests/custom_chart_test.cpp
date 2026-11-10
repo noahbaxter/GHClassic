@@ -5,6 +5,7 @@
 //   custom_chart_test [folder ...]
 
 #include "content/pcm_mix.h"
+#include "custom/cast.h"
 #include "custom/catalog.h"
 #include "custom/chart.h"
 #include "custom/gh2_chart.h"
@@ -851,6 +852,98 @@ namespace
         CHECK(textsOf(outEvents) == lit);
         CHECK(std::none_of(out.events.begin(), out.events.end(), [](const midi::Event &e)
                            { return std::string(e.data.begin(), e.data.end()).find("_tempo]") != std::string::npos; }));
+    }
+
+    // A song's quickplay cast: its genre's kind, the same each time, a
+    // venue by its difficulty, and songs with nothing to say spread over
+    // every guitarist.
+    void casts()
+    {
+        CHECK(genreKind("Pop Punk") == "punk" && genreKind("Hardcore Punk") == "punk");
+        CHECK(genreKind("Technical Death Metal") == "extreme" && genreKind("Post-Hardcore") == "metalcore");
+        // Prog is rock unless it says metal.
+        CHECK(genreKind("Progressive Metal") == "metal" && genreKind("prog metal") == "metal");
+        CHECK(genreKind("Progressive") == "rock" && genreKind("prog") == "rock" && genreKind("Progressive Rock") == "rock");
+        CHECK(genreKind("Alternative Rock") == "alternative" && genreKind("Classic Rock") == "rock");
+        CHECK(genreKind("Chiptune") == "game" && genreKind("Jazz Fusion") == "funk" && genreKind("Emo") == "punk");
+        CHECK(genreKind("Demo") == "" && genreKind("") == "" && genreKind("Solo Medley") == "");
+        // Any case, and a fragment alone.
+        CHECK(genreKind("thrash") == "metal" && genreKind("THRASH") == "metal" && genreKind("Thrash") == "metal");
+        CHECK(genreKind("death") == "extreme" && genreKind("HEAVY METAL") == "metal" && genreKind("pOp PuNk") == "punk");
+        CHECK(genreKind("PROG") == "rock" && genreKind("Metalcore") == "metalcore" && genreKind("grunge") == "alternative");
+        CHECK(genreKind("metal") == "metal" && genreKind("METAL") == "metal" && genreKind("rock") == "rock" &&
+              genreKind("ROCK") == "rock" && genreKind("Rock") == "rock");
+        {
+            const Cast lowerCase = castOf({{"artist", "black sabbath"}, {"name", "war pigs"}, {"genre", "heavy metal"}});
+            const Cast upperCase = castOf({{"artist", "BLACK SABBATH"}, {"name", "WAR PIGS"}, {"genre", "HEAVY METAL"}});
+            CHECK(lowerCase.outfit == upperCase.outfit && lowerCase.guitar == upperCase.guitar &&
+                  lowerCase.venue == upperCase.venue);
+        }
+
+        const Tags punk = {{"artist", "Some Band"}, {"name", "Some Song"}, {"genre", "Punk Rock"}, {"diff_guitar", "0"}};
+        const Cast a = castOf(punk), b = castOf(punk);
+        CHECK(a.outfit == b.outfit && a.guitar == b.guitar && a.venue == b.venue);
+        CHECK(a.venue == "battle" || a.venue == "small1" || a.venue == "small2");
+        const Tags hard = {{"artist", "x"}, {"name", "y"}, {"diff_guitar", "6"}};
+        const std::string far = castOf(hard).venue;
+        CHECK(far == "theatre" || far == "fest" || far == "arena");
+
+        std::map<std::string, int> outfits, venues;
+        for (int i = 0; i < 2000; ++i)
+        {
+            const Cast c = castOf({{"artist", "Artist " + std::to_string(i)}, {"name", "Song"}});
+            ++outfits[c.outfit];
+            ++venues[c.venue];
+        }
+        CHECK(outfits.size() == 10u && venues.size() == 7u);
+        for (const auto &[name, n] : outfits)
+            CHECK(n > 120 && n < 280);
+
+        // Rolled from the song's seed: its genre's guitarist mostly, any now
+        // and then, the Grim Ripper in about one heavy song in twenty and
+        // never songs.dta's; any of the 19 guitars, spread evenly;
+        // songs.dta's a Les Paul, SG or Flying V; the venue by difficulty,
+        // up to two either way.
+        CHECK(a.seed == b.seed && a.seed != castOf(hard).seed);
+        int grims = 0, punks = 0;
+        std::map<std::string, int> models;
+        for (int i = 0; i < 2000; ++i)
+        {
+            const Cast c = castOf({{"artist", std::to_string(i)}, {"genre", "Thrash Metal"}, {"diff_guitar", "3"}});
+            CHECK(c.outfit != "grim" && (c.guitar == "lespaul" || c.guitar == "sg" || c.guitar == "flying_v"));
+            CHECK(c.venue == "small1" || c.venue == "small2" || c.venue == "big" || c.venue == "theatre" || c.venue == "fest");
+            grims += c.character == "grim" ? 1 : 0;
+            ++models[c.realGuitar];
+            const Cast p = castOf({{"artist", std::to_string(i)}, {"genre", "Pop Punk"}});
+            CHECK(p.character != "grim");
+            punks += p.character == "punk" || p.character == "alterna" ? 1 : 0;
+        }
+        CHECK(grims > 50 && grims < 160 && punks > 1700 && punks < 1950);
+        CHECK(models.size() == 19u);
+        for (const auto &[model, n] : models)
+            CHECK(n > 60 && n < 160);
+        CHECK(pickOf(1u, kSaltCharacter, 0u) == 0u);
+
+        // Picks by different salts are their own: of the songs that pick
+        // the fourth of four guitarists, the outfit quickplay picks among
+        // that one's four still comes out every way.
+        std::set<size_t> outfitsOfFourth;
+        for (uint32_t seed = 0u; seed < 4000u; ++seed)
+            if (pickOf(seed, kSaltCharacter, 4u) == 3u)
+                outfitsOfFourth.insert(pickOf(seed, kSaltOutfit, 4u));
+        CHECK(outfitsOfFourth.size() == 4u);
+
+        // By career: six guitars, plainest first, one to each sixth of the
+        // career, rounded down; three, one to each third; none, any.
+        for (int tier = 0; tier < 8; ++tier)
+        {
+            const double at = tier / 7.0;
+            const size_t step = std::min(static_cast<size_t>(at * 6.0), size_t{5});
+            CHECK(pickAlong(9u, kSaltFinish, 6u, at) == step);
+            CHECK(pickAlong(9u, kSaltFinish, 3u, at) == step / 2u);
+        }
+        CHECK(pickAlong(9u, kSaltFinish, 6u, std::nullopt) == pickOf(9u, kSaltFinish, 6u));
+        CHECK(realGuitars().size() == 19u);
     }
 
     // A chart made for GH2 with only some of the stage: what it writes as
@@ -1783,6 +1876,7 @@ int main(int argc, char **argv)
     bandTempo();
     authoredStage();
     partlyAuthored();
+    casts();
     handPlaces();
     stage();
     catalogOrder();

@@ -46,6 +46,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -93,7 +94,10 @@ namespace gh2::setlists
         std::function<std::shared_ptr<const std::vector<LiveRow>>()> rows;
         std::function<void(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::vector<std::string> &songs)>
             ready;
-        std::string venue; // where its songs play when their own is locked
+        // A song's venue by GH2's name, for where it plays when its own is
+        // locked (setlists.cpp's openVenue falls back from it). On the guest
+        // thread.
+        std::function<std::string(const std::string &song)> venue;
         // A line under each row's song name, its artist: with it, the
         // setlist shows in a copy of GH2's scene of its own, beside `look`
         // as sel_song_<name>.milo, whose rows have room for two lines
@@ -113,6 +117,9 @@ namespace gh2::setlists
 
     // A game's career songs: its tiers' own, without the store's.
     std::vector<std::string> careerSongs(const std::string &name);
+    // How far into that setlist's career a song is, from 0 to 1: its
+    // tier's place among them. None for a song in none (the store's).
+    std::optional<double> careerAt(const std::string &name, const std::string &song);
     // And its store's: the bonus songs.
     std::vector<std::string> bonusSongs(const std::string &name);
 

@@ -3,8 +3,8 @@
 ; leading back here (quickplay_pickers.dta). Playing the show is the song
 ; list, then a song's difficulty and the song, then the list again, as many
 ; songs as are played; back from the list is here. With song defaults on
-; ({quickplay song_defaults}) a song plays as its setlist's game boots and
-; the three pickers are greyed. The guitarist a song will play stands
+; ({quickplay song_defaults}) a song plays as it casts itself (ghc_qp_play)
+; and the three pickers are greyed. The guitarist a song will play stands
 ; there, in character select's doorway, by a picture of the venue
 ; (hub/hub_scene.h).
 ;
@@ -17,16 +17,16 @@
    {if {quickplay picked guitar} {game set_guitar {quickplay pick guitar} {quickplay pick skin}}}
    {if {quickplay picked venue} {game set_venue {quickplay pick venue}}}
 }
-; The song started: with song defaults, as the setlist's game boots, with its
-; first guitar, in its own game's venue for the song's tier; else as picked,
-; the venue in its own game's venues.
+; The song started: with song defaults, cast as its own game casts it, in
+; its own game's venues, its guitarist and guitar picked again by what is
+; unlocked ({quickplay cast}); else as picked, the venue in its own game's
+; venues.
 {func ghc_qp_play
    {if_else {quickplay song_defaults}
       {do
-         {game set_quickplay}
          {campaigns venues_from {ghc_venue_game {setlist shown}}}
-         {game set_character {quickplay outfit {setlist shown}} TRUE}
-         {game set_guitar_index 0}
+         {game set_quickplay}
+         {quickplay cast {game get_song} {ghc_venue_game {setlist shown}} {game get_character_outfit}}
       }
       {do
          {ghc_qp_recall}

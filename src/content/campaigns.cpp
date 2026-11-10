@@ -775,26 +775,37 @@ namespace gh2::campaigns
             return all == 0u ? 0 : static_cast<int>(count * 100u / all);
         }
 
-        // Whether `game`'s store sells `item`: named in any of store.dta's
-        // lists, read off its disc.
-        bool sells(const Campaign &campaign, const std::string &item)
+        // What `game`'s store sells, each by its price (0 where it names
+        // none): named in any of store.dta's lists, read off its disc.
+        const std::map<std::string, int> &sold(const Campaign &campaign)
         {
-            static std::map<std::string, std::set<std::string>> s_sold;
+            static std::map<std::string, std::map<std::string, int>> s_sold;
             auto found = s_sold.find(campaign.game);
             if (found == s_sold.end())
             {
-                found = s_sold.emplace(campaign.game, std::set<std::string>()).first;
+                found = s_sold.emplace(campaign.game, std::map<std::string, int>()).first;
                 const auto front = campaign.front;
                 dtb::Macros macros;
                 const auto store =
                     dtb::read("config/store.dta", macros, [front](const std::string &path) { return ark::readFront(front, path); });
                 for (const dtb::Node &list : store ? store->nodes : std::vector<dtb::Node>())
                     for (size_t i = 1u; i < list.nodes.size(); ++i)
-                        found->second.insert(list.nodes[i].type == dtb::kArray && !list.nodes[i].nodes.empty()
-                                                 ? list.nodes[i].nodes[0].text
-                                                 : list.nodes[i].text);
+                    {
+                        const dtb::Node &item = list.nodes[i];
+                        const bool named = item.type == dtb::kArray && !item.nodes.empty();
+                        const dtb::Node *price = named ? dtb::find(item, "price") : nullptr;
+                        const auto value = price && price->nodes.size() > 1u ? dtb::number(price->nodes[1]) : std::nullopt;
+                        found->second[named ? item.nodes[0].text : item.text] = value ? static_cast<int>(*value) : 0;
+                    }
             }
-            return found->second.count(item) != 0u;
+            return found->second;
+        }
+        bool sells(const Campaign &campaign, const std::string &item) { return sold(campaign).count(item) != 0u; }
+        int priceOf(const Campaign &campaign, const std::string &item)
+        {
+            const auto &prices = sold(campaign);
+            const auto it = prices.find(item);
+            return it != prices.end() ? it->second : 0;
         }
 
         // What `game`'s config has to use, read off its disc: its characters
@@ -805,12 +816,14 @@ namespace gh2::campaigns
             // of, where the two are named apart (gh1/career.cpp).
             std::string key, type, as;
             std::vector<std::array<std::string, 3>> skins; // key, outfit, mat
+
+            const std::string &liveKey() const { return as.empty() ? key : as; }
         };
         struct Usable
         {
             std::set<std::string> items;
             std::vector<std::string> outfits; // in config's order
-            std::vector<std::string> characters;
+            std::vector<std::pair<std::string, std::vector<std::string>>> characters; // each with its outfits
             std::vector<Guitar> guitars;
         };
         const Usable &usable(const Campaign &campaign)
@@ -838,8 +851,8 @@ namespace gh2::campaigns
                     if (character.type != dtb::kArray || character.nodes.empty())
                         continue;
                     found.items.insert(character.nodes[0].text);
-                    found.characters.push_back(character.nodes[0].text);
-                    for (const std::string &outfit : keys(character))
+                    found.characters.emplace_back(character.nodes[0].text, keys(character));
+                    for (const std::string &outfit : found.characters.back().second)
                     {
                         found.items.insert(outfit);
                         found.outfits.push_back(outfit);
@@ -1170,9 +1183,9 @@ namespace gh2::campaigns
                 for (size_t i = 0; i < s_campaigns.size(); ++i)
                     for (const std::string &venue : venuesOf(i))
                         venues.insert(venue);
-                for (const std::string &character : usable(s_campaigns[0]).characters)
+                for (const auto &character : usable(s_campaigns[0]).characters)
                     for (const char *suffix : {"", "_blurb", "_outfit_blurb"})
-                        characters.insert(character + suffix);
+                        characters.insert(character.first + suffix);
                 locale::ownTokens(locale::kVenue, venues);
                 locale::ownTokens(locale::kCharacter, characters);
                 *ctx = saved;
@@ -1356,7 +1369,7 @@ namespace gh2::campaigns
             {
                 const bool finish = std::any_of(guitar.skins.begin(), guitar.skins.end(),
                                                 [&](const auto &skin) { return skin[0] == item; });
-                if (!finish && (guitar.as.empty() ? guitar.key : guitar.as) != item)
+                if (!finish && guitar.liveKey() != item)
                     continue;
                 known = true;
                 if (unlockedIn(campaign.game, finish ? item : guitar.key))
@@ -1387,7 +1400,7 @@ namespace gh2::campaigns
         for (size_t i = 0; i < s_campaigns.size(); ++i)
             for (const Guitar &guitar : i == s_active ? std::vector<Guitar>() : usable(s_campaigns[i]).guitars)
             {
-                const std::string body = guitar.as.empty() ? guitar.key : guitar.as;
+                const std::string body = guitar.liveKey();
                 // A guitar the live config has none of comes whole. No band
                 // has an item for it (ProfileState::InitGuitars ran on the
                 // config before this), so no career's picker lists it.
@@ -1409,7 +1422,7 @@ namespace gh2::campaigns
         std::set<std::string> names;
         for (const Campaign &campaign : s_campaigns)
             for (const Guitar &guitar : usable(campaign).guitars)
-                names.insert(guitar.as.empty() ? guitar.key : guitar.as);
+                names.insert(guitar.liveKey());
         const uint32_t held = load<uint32_t>(rdram, s_addresses->theCampaign);
         const bool career = inCareer(rdram), all = held != 0u && load<uint32_t>(rdram, held + kAllAccess) != 0u;
         // Each such finish by its guitar and key: what it is, and whether
@@ -1420,7 +1433,7 @@ namespace gh2::campaigns
                 for (const auto &skin : guitar.skins)
                     if (names.count(skin[0]) != 0u)
                     {
-                        auto &finish = finishes[{guitar.as.empty() ? guitar.key : guitar.as, skin[0]}];
+                        auto &finish = finishes[{guitar.liveKey(), skin[0]}];
                         finish.first = "(" + skin[0] + " (outfit " + skin[1] + ") (mat " + skin[2] + "))";
                         finish.second = finish.second ||
                                         (career ? i == s_active : all || unlockedIn(s_campaigns[i].game, guitar.key));
@@ -1441,6 +1454,56 @@ namespace gh2::campaigns
     {
         const auto index = indexOf(game);
         return index ? usable(s_campaigns[*index]).outfits : std::vector<std::string>();
+    }
+
+    std::vector<std::pair<std::string, std::vector<std::string>>> characters(const std::string &game)
+    {
+        const auto index = indexOf(game);
+        return index ? usable(s_campaigns[*index]).characters : std::vector<std::pair<std::string, std::vector<std::string>>>();
+    }
+
+    std::vector<Finish> finishes()
+    {
+        std::vector<Finish> out;
+        for (const Campaign &campaign : s_campaigns)
+            for (const Guitar &guitar : usable(campaign).guitars)
+                if (guitar.type == "guitar")
+                    for (const auto &skin : guitar.skins)
+                    {
+                        const Finish finish{guitar.liveKey(), skin[0], skin[1]};
+                        if (std::none_of(out.begin(), out.end(), [&](const Finish &f)
+                                         { return f.guitar == finish.guitar && f.finish == finish.finish; }))
+                            out.push_back(finish);
+                    }
+        return out;
+    }
+
+    std::vector<Finish> finishesOf(const std::string &game)
+    {
+        std::vector<Finish> out;
+        if (const auto index = indexOf(game))
+            for (const Guitar &guitar : usable(s_campaigns[*index]).guitars)
+                if (guitar.type == "guitar")
+                    for (const auto &skin : guitar.skins)
+                        out.push_back({guitar.liveKey(), skin[0], skin[1],
+                                       priceOf(s_campaigns[*index], guitar.key) + priceOf(s_campaigns[*index], skin[0])});
+        std::stable_sort(out.begin(), out.end(), [](const Finish &a, const Finish &b) { return a.price < b.price; });
+        return out;
+    }
+
+    std::string scytheOf(const std::string &game)
+    {
+        if (const auto index = indexOf(game))
+            for (const Guitar &guitar : usable(s_campaigns[*index]).guitars)
+                if (guitar.liveKey() == "scythe" && !guitar.skins.empty())
+                    return guitar.skins.front()[0];
+        return "scythe";
+    }
+
+    bool venueOpen(const std::string &game, const std::string &venue)
+    {
+        const auto index = indexOf(game);
+        return index && venueOpen(*index, venue);
     }
 
     bool gh1Highway()

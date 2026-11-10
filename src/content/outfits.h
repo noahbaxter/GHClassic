@@ -28,6 +28,14 @@ namespace gh2::outfits
     void add(const std::string &game, const std::string &own, const std::string &character,
              const std::string &outfit, const std::string &beside, const std::string &label);
 
+    // Each outfit added, as add() was given it, `outfit` the name it is
+    // added under.
+    struct Outfit
+    {
+        std::string game, own, character, outfit, beside, label;
+    };
+    const std::vector<Outfit> &added();
+
     // The outfit added for `game`'s own outfit of that name, or none.
     std::optional<std::string> named(const std::string &game, const std::string &own);
     // The game and own name of an outfit added, or none.

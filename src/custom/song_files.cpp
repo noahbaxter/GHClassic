@@ -3,6 +3,7 @@
 #include "content/games.h"
 #include "content/setlist_printout.h"
 #include "custom/audio.h"
+#include "custom/cast.h"
 #include "custom/gh2_chart.h"
 #include "custom/songs.h"
 #include "custom/text.h"
@@ -83,11 +84,12 @@ namespace gh2::custom
             const int preview = std::clamp(static_cast<int>(number(song.tags, "preview_start_time").value_or(30000)), 0,
                                            std::max(length - 15000, 0));
             out.nodes.push_back(array({symbol("preview"), integer(preview), integer(std::min(preview + 15000, length))}));
+            const Cast cast = castOf(song.tags);
             out.nodes.push_back(array({
                 symbol("quickplay"),
-                array({symbol("character_outfit"), symbol("punk1")}),
-                array({symbol("guitar"), symbol("lespaul")}),
-                array({symbol("venue"), symbol("small1")}),
+                array({symbol("character_outfit"), symbol(cast.outfit)}),
+                array({symbol("guitar"), symbol(cast.guitar)}),
+                array({symbol("venue"), symbol(cast.venue)}),
             }));
             return dtb::text(out);
         }
