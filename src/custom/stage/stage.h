@@ -16,19 +16,30 @@
 //                part's, else the kicks, else the beat
 //   BAND DRUMS   the drummer, 36 a kick (the drums' expert kicks, else every
 //                beat the band plays) and 37 a crash (the chart's crashes,
-//                else at each section); its
-//                beat by where the snares fall each bar: [allbeat],
-//                [double_time], [half_time], [nobeat]
+//                else at each section); its beat the chart's own, else by
+//                where the snares fall each bar: [allbeat], [double_time],
+//                [half_time], [nobeat]
 //   BAND SINGER  the singer, by when there is singing; with none in the
 //                chart, the band's playing but its solos
 //   BAND KEYS    the keyboard player, by the keys part, where it has one
-//   EVENTS       each section's look: [verse], [chorus] or [solo] for the
-//                camera and lighting, and a [lighting (...)]. A section is
-//                its look by its name less its number ("Chorus 2" as
+//   EVENTS       each section's mood: [verse], [chorus] or [solo] for the
+//                camera and lighting, and a [lighting (...)]. A section's
+//                mood is by its name less its number ("Chorus 2" as
 //                "Chorus 1"): chorus, solo or verse where the name says,
 //                else by how busy the part is against the rest of the song.
-//                With no sections, one every eight bars.
-//   TRIGGERS     48 each bar, the lighting's next keyframe
+//                With no sections, one every eight bars. A chart's own
+//                [lighting (...)] and moods each in place of those made, and
+//                its crowd's tempo and lighters and its band's [band_jump],
+//                [sync_head_bang] and [sync_wag] as written.
+//   TRIGGERS     48 each bar, the lighting's next keyframe, for the lighting
+//                made
+//
+// A chart made for GH2 keeps what its own BAND tracks and TRIGGERS write,
+// lane by lane: when a member plays, its tempo, the drummer's beat, each
+// note's pitch (the keyframes as one). What a lane the chart writes leaves
+// out stays out; the lanes it doesn't write are made, around its own (the
+// drummer's kicks where its BAND DRUMS has it play, the bass's hits on its
+// kicks). Where any of its tracks sets a tempo, none is made.
 //
 // The band and crowd play to the chart's beat, so a chart past 210 BPM (or
 // charted at twice its song's tempo) plays them at [half_tempo], one under
@@ -60,7 +71,8 @@ namespace gh2::custom
     };
 
     // `guitar` and `events` (PART GUITAR, EVENTS) with the band's texts
-    // added; the band's own tracks.
+    // added; the band's own tracks, a chart made for GH2's where it has
+    // them.
     std::vector<midi::Track> addStage(const StageIn &in, midi::Track &guitar, midi::Track &events);
 
     // GH2 plays its band's clips and crowd to the chart's beat. Its own songs

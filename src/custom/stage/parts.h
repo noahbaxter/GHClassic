@@ -45,6 +45,9 @@ namespace gh2::custom
 
     const Chart::StageTrack *stageTrack(const Chart &chart, const char *name);
 
+    // Its lane, empty for none.
+    std::string_view gh2Lane(const std::string &text);
+
     // PART BASS as GH2's bassist's strumming hand reads it (bass_strum):
     // the bass part's frets each difficulty, an open on green, and its
     // slap where the chart says.
@@ -68,8 +71,9 @@ namespace gh2::custom
     // and maps, else made.
     void addGuitarist(BandTracks &band);
 
-    // BAND DRUMS, playing while the drums part does, else with the lead:
-    // its kicks, crashes and drum pattern. Returns the kicks.
+    // BAND DRUMS, playing while the drums part does, else when the
+    // chart's own BAND DRUMS says, else with the lead: its kicks, crashes
+    // and drum pattern. Returns the kicks.
     std::vector<uint32_t> addDrummer(BandTracks &band);
 
     // BAND BASS: a speaker pulse on each of the bass part's expert notes,
@@ -98,8 +102,10 @@ namespace gh2::custom
     // name's sections are on average kBusier than the median section.
     std::vector<Section> sectionsOf(const BandTracks &band);
 
-    // EVENTS: each section's and solo's mood and lighting.
-    void addMoods(BandTracks &band, const std::vector<Section> &sections);
+    // EVENTS: the chart's own stage texts, and each section's and solo's
+    // mood and lighting where the chart has none of its own. Returns
+    // whether it has its own lighting.
+    bool addMoods(BandTracks &band, const std::vector<Section> &sections);
 
     // Without charted crashes, a crash at each section start: every
     // section where the drums are charted, else all but verses.
@@ -110,6 +116,6 @@ namespace gh2::custom
     void addWails(BandTracks &band, const std::vector<Section> &sections);
 
     // TRIGGERS: the lighting's next keyframe each bar from a bar before
-    // the lead.
-    void addKeyframes(BandTracks &band);
+    // the lead, for the lighting made.
+    void addKeyframes(BandTracks &band, bool chartHasLighting);
 }

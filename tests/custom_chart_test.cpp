@@ -802,6 +802,99 @@ namespace
               notesOf(band[3], 48u, 48u) == std::vector<uint32_t>({0u, 3840u, 7680u, 11520u, 13440u, 15360u, 17280u}));
     }
 
+    // A chart made for GH2, everything its own: its BAND tracks and
+    // TRIGGERS as written, its drummer's beat, lighting and tempo, none
+    // made over them.
+    void authoredStage()
+    {
+        midi::File file{1u, 480u, {}};
+        midi::Track tempo, guitar, drums, triggers, events;
+        tempo.events.push_back({0u, midi::kMeta, midi::kTempo, {0x03u, 0xd0u, 0x90u}}); // 240 BPM
+        guitar.name = "PART GUITAR";
+        for (uint32_t t = 0; t < 16u * 480u; t += 240u)
+            guitar.events.push_back(note(t, 96u, true)), guitar.events.push_back(note(t + 60u, 96u, false));
+        drums.name = "BAND DRUMS";
+        drums.events = {midi::text(960u, "[play]"), midi::text(960u, "[half_time]"), note(960u, 36u, true),
+                        note(1000u, 36u, false), midi::text(4800u, "[idle]")};
+        triggers.name = "TRIGGERS";
+        triggers.events = {note(0u, 48u, true), note(10u, 48u, false)};
+        events.name = "EVENTS";
+        events.events = {midi::text(0u, "[lighting (strobe)]"), midi::text(0u, "[chorus]"),
+                         midi::text(0u, "[crowd_half_tempo]")};
+        file.tracks = {tempo, guitar, drums, triggers, events};
+        std::string why;
+        const auto chart = parseMid(midi::write(file), {}, why);
+        CHECK(chart && chart->stage.count("BAND DRUMS") && chart->stage.count("TRIGGERS"));
+        if (!chart)
+            return;
+        const Difficulty &lead = chart->parts.at(Part::Guitar)[3];
+        midi::Track out, outEvents;
+        const auto band = addStage({*chart, lead, [](uint32_t t) { return t; }, 16u * 480u}, out, outEvents);
+        const auto named = [&](const std::string &name)
+        { return std::find_if(band.begin(), band.end(), [&](const midi::Track &t) { return t.name == name; }); };
+        const auto ownDrums = named("BAND DRUMS"), ownTriggers = named("TRIGGERS");
+        CHECK(ownDrums != band.end() && ownTriggers != band.end());
+        if (ownDrums == band.end() || ownTriggers == band.end())
+            return;
+        const std::vector<std::pair<uint32_t, std::string>> drummer = {
+            {960u, "[play]"}, {960u, "[half_time]"}, {4800u, "[idle]"}};
+        CHECK(textsOf(*ownDrums) == drummer);
+        CHECK(notesOf(*ownDrums, 36u, 36u) == std::vector<uint32_t>({960u}));
+        // Its own lighting's keyframes alone.
+        CHECK(notesOf(*ownTriggers, 0u, 127u) == std::vector<uint32_t>({0u}));
+        // Its lighting and look alone, and no tempo made at 240 BPM.
+        const std::vector<std::pair<uint32_t, std::string>> lit = {
+            {0u, "[lighting (strobe)]"}, {0u, "[chorus]"}, {0u, "[crowd_half_tempo]"}};
+        CHECK(textsOf(outEvents) == lit);
+        CHECK(std::none_of(out.events.begin(), out.events.end(), [](const midi::Event &e)
+                           { return std::string(e.data.begin(), e.data.end()).find("_tempo]") != std::string::npos; }));
+    }
+
+    // A chart made for GH2 with only some of the stage: what it writes as
+    // written, the rest made around it. Its drummer plays from bar 2 to 4
+    // and nothing says where it kicks, so it kicks there alone; its look
+    // but no lighting, so lighting and keyframes made, no look; lighters
+    // kept.
+    void partlyAuthored()
+    {
+        midi::File file{1u, 480u, {}};
+        midi::Track tempo, guitar, drums, events;
+        tempo.events.push_back({0u, midi::kMeta, midi::kTempo, {0x07u, 0xa1u, 0x20u}}); // 120 BPM
+        guitar.name = "PART GUITAR";
+        for (uint32_t t = 0; t < 32u * 480u; t += 240u)
+            guitar.events.push_back(note(t, 96u, true)), guitar.events.push_back(note(t + 60u, 96u, false));
+        drums.name = "BAND DRUMS";
+        drums.events = {midi::text(1920u, "[play]"), midi::text(3840u, "[idle]")};
+        events.name = "EVENTS";
+        events.events = {midi::text(0u, "[verse]"), midi::text(1920u, "[crowd_lighters_slow]")};
+        file.tracks = {tempo, guitar, drums, events};
+        std::string why;
+        const auto chart = parseMid(midi::write(file), {}, why);
+        CHECK(chart.has_value());
+        if (!chart)
+            return;
+        const Difficulty &lead = chart->parts.at(Part::Guitar)[3];
+        midi::Track out, outEvents;
+        const auto band = addStage({*chart, lead, kSameTicks, 32u * 480u}, out, outEvents);
+        const auto named = [&](const std::string &name)
+        { return std::find_if(band.begin(), band.end(), [&](const midi::Track &t) { return t.name == name; }); };
+        const auto ownDrums = named("BAND DRUMS"), triggers = named("TRIGGERS");
+        CHECK(ownDrums != band.end() && triggers != band.end());
+        if (ownDrums == band.end() || triggers == band.end())
+            return;
+        const auto kicks = notesOf(*ownDrums, 36u, 36u);
+        CHECK(!kicks.empty() && kicks.front() >= 1920u && kicks.back() <= 3840u);
+        const auto states = textsOf(*ownDrums);
+        CHECK(std::count_if(states.begin(), states.end(), [](const auto &s) { return s.second == "[play]"; }) == 1);
+        CHECK(!notesOf(*triggers, 48u, 48u).empty());
+        const auto texts = textsOf(outEvents);
+        const auto count = [&](const auto &kind)
+        { return std::count_if(texts.begin(), texts.end(), [&](const auto &s) { return kind(s.second); }); };
+        CHECK(count([](const std::string &t) { return t == "[verse]" || t == "[chorus]" || t == "[solo]"; }) == 1);
+        CHECK(count([](const std::string &t) { return t.rfind("[lighting", 0) == 0; }) > 0);
+        CHECK(count([](const std::string &t) { return t == "[crowd_lighters_slow]"; }) == 1);
+    }
+
     // A track's texts at each tick, in order.
     std::vector<std::pair<uint32_t, std::string>> textsOf(const midi::Track &track)
     {
@@ -1685,6 +1778,8 @@ int main(int argc, char **argv)
     songFactsTable();
     bandPerformance();
     bandTempo();
+    authoredStage();
+    partlyAuthored();
     handPlaces();
     stage();
     catalogOrder();

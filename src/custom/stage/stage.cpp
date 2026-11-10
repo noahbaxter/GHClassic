@@ -76,8 +76,59 @@ namespace gh2::custom
             return out;
         }
 
-        // Where the guitarist's chart track sets no tempo, the band's and
-        // crowd's at each change of the band's beat.
+        // The chart tracks a band member's own texts may be on.
+        constexpr const char *kMembers[] = {"PART BASS",  "PART DRUMS", "PART KEYS",  "PART VOCALS", "HARM1",
+                                            "BAND BASS",  "BAND DRUMS", "BAND KEYS",  "BAND SINGER"};
+
+        // GH2's band member texts, each with its lane.
+        constexpr std::pair<std::string_view, std::string_view> kLaneTexts[] = {
+            {"[play]", "state"},         {"[idle]", "state"},         {"[half_tempo]", "tempo"},
+            {"[normal_tempo]", "tempo"}, {"[double_tempo]", "tempo"}, {"[wail_on]", "wail"},
+            {"[wail_off]", "wail"},      {"[ow_face_on]", "face"},    {"[ow_face_off]", "face"},
+            {"[allbeat]", "beat"},       {"[double_time]", "beat"},   {"[half_time]", "beat"},
+            {"[nobeat]", "beat"},
+        };
+
+        // Which lane of a band track an event is, so a chart's authored lane
+        // replaces the made one: kLaneTexts' (any "_tempo]" text a tempo), a
+        // note by its pitch (the lighting's keyframes, 48 to 50, as one), any
+        // other text by itself.
+        std::string laneOf(const midi::Event &e)
+        {
+            if (e.status == midi::kMeta)
+            {
+                const std::string s(e.data.begin(), e.data.end());
+                if (s.find("_tempo]") != std::string::npos)
+                    return "tempo";
+                if (const auto lane = gh2Lane(s); !lane.empty())
+                    return std::string(lane);
+                return s;
+            }
+            const uint8_t pitch = e.data.empty() ? 0u : e.data[0];
+            return pitch >= 48u && pitch <= 50u ? "keyframes" : "note " + std::to_string(pitch);
+        }
+
+        // Each lane of `made` the chart's own track of its name has (a
+        // GH2-made chart's BAND DRUMS, TRIGGERS) replaced by the chart's.
+        void replaceAuthoredLanes(midi::Track &made, const Chart &chart, const TickMap &toGh2)
+        {
+            const Chart::StageTrack *track = stageTrack(chart, made.name.c_str());
+            if (!track)
+                return;
+            midi::Track authored;
+            for (const Chart::Cue &c : track->cues)
+                authored.events.push_back(midi::text(toGh2(c.tick), c.text));
+            for (const Chart::Mark &m : track->marks)
+                addNote(authored, toGh2(m.tick), toGh2(m.tick + m.length), m.pitch);
+            std::set<std::string> lanes;
+            for (const midi::Event &e : authored.events)
+                lanes.insert(laneOf(e));
+            std::erase_if(made.events, [&](const midi::Event &e) { return lanes.count(laneOf(e)) != 0u; });
+            made.events.insert(made.events.end(), authored.events.begin(), authored.events.end());
+        }
+
+        // Where no chart track sets a tempo, the band's and crowd's at each
+        // change of the band's beat.
         void addBandTempo(BandTracks &band)
         {
             const Chart &chart = band.in.chart;
@@ -87,7 +138,8 @@ namespace gh2::custom
                 return track && std::any_of(track->cues.begin(), track->cues.end(),
                                             [](const Chart::Cue &c) { return c.text.find("_tempo") != std::string::npos; });
             };
-            if (authorsTempo(trackOf(band.in.part)))
+            if (std::any_of(std::begin(kMembers), std::end(kMembers), authorsTempo) || authorsTempo(trackOf(band.in.part)) ||
+                authorsTempo("EVENTS"))
                 return;
             for (const auto &[tick, beat] : band.beats)
             {
@@ -130,6 +182,14 @@ namespace gh2::custom
     {
         const auto it = chart.stage.find(name);
         return it == chart.stage.end() ? nullptr : &it->second;
+    }
+
+    std::string_view gh2Lane(const std::string &text)
+    {
+        for (const auto &[t, lane] : kLaneTexts)
+            if (text == t)
+                return lane;
+        return {};
     }
 
     std::string sectionBaseName(const std::string &section)
@@ -184,16 +244,20 @@ namespace gh2::custom
         addKeys(band);
         addSinger(band);
         const std::vector<Section> sections = sectionsOf(band);
-        addMoods(band, sections);
+        const bool chartHasLighting = addMoods(band, sections);
         addSectionCrashes(band, sections);
         addWails(band, sections);
-        addKeyframes(band);
+        addKeyframes(band, chartHasLighting);
         addBandTempo(band);
 
+        // The chart's own lanes in place of those made.
         std::vector<midi::Track> out;
         for (midi::Track *made : {&band.drums, &band.bass, &band.singer, &band.triggers, &band.keys})
+        {
+            replaceAuthoredLanes(*made, in.chart, in.toGh2);
             if (made != &band.keys || !band.keys.events.empty())
                 out.push_back(std::move(*made));
+        }
         if (midi::Track hand = bassHand(in.chart, in.toGh2); !hand.events.empty())
             out.push_back(std::move(hand));
         return out;

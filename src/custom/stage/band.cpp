@@ -21,15 +21,38 @@ namespace gh2::custom
             return out;
         }
 
+        // When a GH2-made chart's own `name` track has its member play, by
+        // its [play] and [idle]; none if it doesn't say.
+        std::vector<Span> authoredPlaying(const Chart &chart, const char *name, const TickMap &toGh2, uint32_t end)
+        {
+            std::vector<std::pair<uint32_t, bool>> said;
+            if (const Chart::StageTrack *track = stageTrack(chart, name))
+                for (const Chart::Cue &c : track->cues)
+                    if (c.text == "[play]" || c.text == "[idle]")
+                        said.emplace_back(toGh2(c.tick), c.text == "[play]");
+            std::sort(said.begin(), said.end());
+            std::vector<Span> out;
+            std::optional<uint32_t> from;
+            for (const auto &[tick, play] : said)
+                if (play && !from)
+                    from = tick;
+                else if (!play && from)
+                {
+                    out.push_back({*from, tick - *from});
+                    from.reset();
+                }
+            if (from && end > *from)
+                out.push_back({*from, end - *from});
+            return out;
+        }
+
         // A band member's own texts on its chart track, as GH2's: Rock
-        // Band's ways of playing and idling as [play] and [idle], GH2's
-        // tempo, wail and face texts as they are, the rest left out.
+        // Band's ways of playing and idling as [play] and [idle], the rest of
+        // kLaneTexts as they are, anything else left out.
         std::vector<Chart::Cue> memberCues(const Chart::StageTrack *track)
         {
             static const std::vector<std::string> kPlay = {"[play]", "[mellow]", "[intense]", "[play_solo]"},
-                                                  kIdle = {"[idle]", "[idle_realtime]", "[idle_intense]"},
-                                                  kKept = {"[half_tempo]", "[normal_tempo]", "[double_tempo]", "[wail_on]",
-                                                           "[wail_off]", "[ow_face_on]", "[ow_face_off]"};
+                                                  kIdle = {"[idle]", "[idle_realtime]", "[idle_intense]"};
             const auto in = [](const std::vector<std::string> &list, const std::string &s)
             { return std::find(list.begin(), list.end(), s) != list.end(); };
             std::vector<Chart::Cue> out;
@@ -38,7 +61,7 @@ namespace gh2::custom
                     out.push_back({c.tick, "[play]"});
                 else if (in(kIdle, c.text))
                     out.push_back({c.tick, "[idle]"});
-                else if (in(kKept, c.text))
+                else if (!gh2Lane(c.text).empty())
                     out.push_back(c);
             return out;
         }
@@ -222,7 +245,6 @@ namespace gh2::custom
             }
         }
 
-
         // The lead's playing runs with its solos cut out.
         std::vector<Span> playingOutsideSolos(const BandTracks &band)
         {
@@ -300,8 +322,18 @@ namespace gh2::custom
         const Chart &chart = band.in.chart;
         const auto &toGh2 = band.in.toGh2;
         band.drums.name = "BAND DRUMS";
-        const std::vector<Span> drumming = !chart.drums.empty() ? playingRuns(toGh2Sorted(chart.drums, toGh2)) : band.playing;
-        const std::vector<uint32_t> kicks = chart.kicks.empty() ? beatsIn(drumming) : toGh2Sorted(chart.kicks, toGh2);
+        const std::vector<Span> authored = authoredPlaying(chart, "BAND DRUMS", toGh2, band.in.end);
+        const std::vector<Span> drumming = !chart.drums.empty() ? playingRuns(toGh2Sorted(chart.drums, toGh2))
+                                           : !authored.empty()  ? authored
+                                                                : band.playing;
+        std::vector<uint32_t> kicks; // the chart's own BAND DRUMS kicks, else made
+        if (const Chart::StageTrack *track = stageTrack(chart, "BAND DRUMS"))
+            for (const Chart::Mark &m : track->marks)
+                if (m.pitch == 36u)
+                    kicks.push_back(toGh2(m.tick));
+        std::sort(kicks.begin(), kicks.end());
+        if (kicks.empty())
+            kicks = chart.kicks.empty() ? beatsIn(drumming) : toGh2Sorted(chart.kicks, toGh2);
         const std::vector<Chart::Cue> drummerCues = memberCues(stageTrack(chart, "PART DRUMS"));
         addMemberCues(band.drums, drummerCues, drumming, toGh2);
         for (const uint32_t t : kicks)
@@ -309,8 +341,10 @@ namespace gh2::custom
         // The chart's crashes, else one a section (addSectionCrashes).
         for (const uint32_t t : toGh2Sorted(chart.crashes, toGh2))
             addShortNote(band.drums, t, 37u);
-        addDrumPatterns(band.drums, band.bars, toGh2Sorted(chart.snares, toGh2), drumming, !chart.drums.empty(),
-                        band.in.end, band.beats);
+        if (std::none_of(drummerCues.begin(), drummerCues.end(),
+                         [](const Chart::Cue &c) { return gh2Lane(c.text) == "beat"; }))
+            addDrumPatterns(band.drums, band.bars, toGh2Sorted(chart.snares, toGh2), drumming, !chart.drums.empty(),
+                            band.in.end, band.beats);
         return kicks;
     }
 

@@ -285,34 +285,21 @@ namespace gh2::custom
         const std::map<std::string, bool> kStageTracks = {
             {"PART GUITAR", true}, {"T1 GEMS", true},     {"PART GUITAR COOP", true}, {"PART RHYTHM", true},
             {"PART BASS", true},   {"PART DRUMS", true},  {"PART KEYS", true},        {"PART VOCALS", false},
-            {"HARM1", false},      {"EVENTS", true},      {"VENUE", true},
+            {"HARM1", false},      {"EVENTS", true},      {"VENUE", true},            {"BAND BASS", true},
+            {"BAND DRUMS", true},  {"BAND KEYS", true},   {"BAND SINGER", true},      {"TRIGGERS", true},
         };
 
         Chart::StageTrack midStage(const midi::Track &track, bool keepLowNotes)
         {
             Chart::StageTrack out;
-            const bool venue = track.name == "VENUE";
-            std::map<uint8_t, uint32_t> on;
             for (const midi::Event &e : track.events)
-            {
                 if (e.status == midi::kMeta && e.meta == midi::kText)
-                {
-                    const std::string text = ini::trim(std::string(e.data.begin(), e.data.end()));
-                    if (!text.empty())
-                        out.cues.push_back({e.tick, text});
-                }
-                else if (!keepLowNotes || e.status == midi::kMeta || e.data.empty() || (!venue && e.data[0] >= 60u))
-                    continue;
-                else if (noteOn(e))
-                    on[e.data[0]] = e.tick;
-                else if (noteOff(e))
-                    if (const auto it = on.find(e.data[0]); it != on.end())
-                    {
-                        out.marks.push_back({it->second, e.tick - it->second, e.data[0]});
-                        on.erase(it);
-                    }
-            }
-            sortByTick(out.marks);
+                    if (std::string text = ini::trim(std::string(e.data.begin(), e.data.end())); !text.empty())
+                        out.cues.push_back({e.tick, std::move(text)});
+            if (keepLowNotes)
+                for (const Chart::Mark &m : heldNotes(track))
+                    if (m.pitch < 60u || track.name == "VENUE")
+                        out.marks.push_back(m);
             return out;
         }
 

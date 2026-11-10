@@ -120,8 +120,10 @@ namespace gh2::custom
         // each text event ([play], [map HandMap_Solo], [lighting (verse)])
         // and each note no gem is on: below 60 (hand positions 40 to 59,
         // drum animations 24 to 51, EVENTS' practice clicks 24 to 26), and
-        // every one of VENUE's; the singers' texts alone. .chart's [Events]
-        // texts as EVENTS'.
+        // every one of VENUE's; the singers' texts alone. A chart made for
+        // GH2 has GH2's own band tracks (BAND BASS, BAND DRUMS, BAND KEYS,
+        // BAND SINGER) and TRIGGERS, kept the same. .chart's [Events] texts
+        // as EVENTS'.
         struct Cue
         {
             uint32_t tick = 0u;

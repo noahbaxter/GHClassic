@@ -47,6 +47,31 @@ namespace gh2::custom
 
         constexpr const char *kMoodTexts[] = {"[verse]", "[chorus]", "[solo]"}; // by Mood
 
+        bool isLightingCue(const std::string &t) { return t.rfind("[lighting", 0) == 0; }
+
+        bool isMoodCue(const std::string &t) { return t == "[verse]" || t == "[chorus]" || t == "[solo]"; }
+
+        bool isStageCue(const std::string &t)
+        {
+            return (t.rfind("[crowd_", 0) == 0 && (t.find("_tempo]") != std::string::npos || t.find("_lighters_") != std::string::npos)) ||
+                   t == "[band_jump]" || t == "[sync_head_bang]" || t == "[sync_wag]";
+        }
+
+        // A GH2-made chart's own EVENTS texts for the stage, bracketed (a
+        // .chart's may not be): its lighting and moods, the crowd's tempo and
+        // lighters, the band's jumps and head bangs, which nothing makes.
+        std::vector<Chart::Cue> authoredStageCues(const Chart &chart)
+        {
+            std::vector<Chart::Cue> out;
+            if (const Chart::StageTrack *events = stageTrack(chart, "EVENTS"))
+                for (const Chart::Cue &c : events->cues)
+                {
+                    const std::string t = c.text.starts_with("[") ? c.text : "[" + c.text + "]";
+                    if (isLightingCue(t) || isMoodCue(t) || isStageCue(t))
+                        out.push_back({c.tick, t});
+                }
+            return out;
+        }
     }
 
     std::vector<Section> sectionsOf(const BandTracks &band)
@@ -86,12 +111,20 @@ namespace gh2::custom
         return sections;
     }
 
-    void addMoods(BandTracks &band, const std::vector<Section> &sections)
+    bool addMoods(BandTracks &band, const std::vector<Section> &sections)
     {
+        const std::vector<Chart::Cue> authored = authoredStageCues(band.in.chart);
+        const auto chartHas = [&](bool (*kind)(const std::string &))
+        { return std::any_of(authored.begin(), authored.end(), [&](const Chart::Cue &c) { return kind(c.text); }); };
+        const bool chartHasLighting = chartHas(isLightingCue), chartHasMoods = chartHas(isMoodCue);
+        for (const Chart::Cue &c : authored)
+            band.events.events.push_back(midi::text(band.in.toGh2(c.tick), c.text));
         const auto addMood = [&](uint32_t tick, Mood mood, const std::string &name)
         {
-            band.events.events.push_back(midi::text(tick, kMoodTexts[size_t(mood)]));
-            band.events.events.push_back(midi::text(tick, lighting(mood, name)));
+            if (!chartHasMoods)
+                band.events.events.push_back(midi::text(tick, kMoodTexts[size_t(mood)]));
+            if (!chartHasLighting)
+                band.events.events.push_back(midi::text(tick, lighting(mood, name)));
         };
         for (const Section &s : sections)
             addMood(s.tick, s.mood, s.name);
@@ -104,13 +137,15 @@ namespace gh2::custom
             if (back != sections.rend())
                 addMood(to, back->mood, back->name);
         }
+        return chartHasLighting;
     }
 
-    void addKeyframes(BandTracks &band)
+    void addKeyframes(BandTracks &band, bool chartHasLighting)
     {
         band.triggers.name = "TRIGGERS";
-        for (const uint32_t b : band.bars)
-            if (b + kBeat * 4u >= band.playing.front().tick)
-                addShortNote(band.triggers, b, 48u);
+        if (!chartHasLighting)
+            for (const uint32_t b : band.bars)
+                if (b + kBeat * 4u >= band.playing.front().tick)
+                    addShortNote(band.triggers, b, 48u);
     }
 }
