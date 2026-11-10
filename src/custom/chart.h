@@ -93,9 +93,11 @@ namespace gh2::custom
         std::vector<std::pair<uint32_t, std::array<uint8_t, 2>>> signatures; // numerator, denominator's log2
         std::vector<std::pair<uint32_t, std::string>> sections; // practice names, "Verse 1"
         std::map<Part, std::array<Difficulty, 4>> parts; // easy first
-        // PART DRUMS' or [ExpertDrums]' expert: its kicks, its snares (red),
-        // and every hit with them, each by tick.
-        std::vector<uint32_t> kicks, snares, drums;
+        // Expert drums (PART DRUMS, [ExpertDrums]) by tick: kicks, snares
+        // (red), crashes (blue or green cymbal) and every hit. The
+        // drummer's animation notes replace the snares and crashes where
+        // the chart has them.
+        std::vector<uint32_t> kicks, snares, crashes, drums;
         // When someone sings: PART VOCALS' phrases (105, 106), else runs
         // of its notes or lyrics, else HARM1's the same; .chart's [Events]
         // phrase_start and phrase_end, else runs of its lyrics.

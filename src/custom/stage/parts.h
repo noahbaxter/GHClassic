@@ -69,7 +69,7 @@ namespace gh2::custom
     void addGuitarist(BandTracks &band);
 
     // BAND DRUMS, playing while the drums part does, else with the lead:
-    // its kicks and drum pattern. Returns the kicks.
+    // its kicks, crashes and drum pattern. Returns the kicks.
     std::vector<uint32_t> addDrummer(BandTracks &band);
 
     // BAND BASS: a speaker pulse on each of the bass part's expert notes,
@@ -99,8 +99,8 @@ namespace gh2::custom
     // EVENTS: each section's and solo's mood and lighting.
     void addMoods(BandTracks &band, const std::vector<Section> &sections);
 
-    // A crash at each section start: every section where the drums are
-    // charted, else all but verses.
+    // Without charted crashes, a crash at each section start: every
+    // section where the drums are charted, else all but verses.
     void addSectionCrashes(BandTracks &band, const std::vector<Section> &sections);
 
     // Where the chart has no wails, the guitarist wails through each

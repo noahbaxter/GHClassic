@@ -193,19 +193,59 @@ namespace gh2::custom
                    !e.data.empty();
         }
 
+        // Each note held, on to off, in the order they end.
+        std::vector<Chart::Mark> heldNotes(const midi::Track &track)
+        {
+            std::vector<Chart::Mark> out;
+            std::map<uint8_t, uint32_t> on;
+            for (const midi::Event &e : track.events)
+                if (noteOn(e))
+                    on[e.data[0]] = e.tick;
+                else if (const auto it = noteOff(e) ? on.find(e.data[0]) : on.end(); it != on.end())
+                {
+                    out.push_back({it->second, e.tick - it->second, e.data[0]});
+                    on.erase(it);
+                }
+            return out;
+        }
+
         // PART DRUMS' expert: 96 the kick (95 the second pedal's), 97 to
         // 100 the pads, 101 five-lane's green.
+        //
+        // 98 to 100 are cymbals but where a tom marker (110 to 112) is on
+        // them, Rock Band's pro drums; with no marker, a five-lane chart's
+        // 98 and 100 are its cymbals, as are a plain four-lane chart's. The
+        // drummer's animation notes, where the chart has them, are each
+        // piece as played: 26 to 29 the snare, 34 to 39, 44 and 45 the
+        // crashes.
         void midDrums(const midi::Track &track, Chart &chart)
         {
+            std::vector<PadHit> padHits;
+            std::vector<uint32_t> animSnares, animCrashes;
             for (const midi::Event &e : track.events)
-                if (noteOn(e) && e.data[0] >= 95u && e.data[0] <= 101u)
-                {
-                    if (e.data[0] <= 96u)
-                        chart.kicks.push_back(e.tick);
-                    if (e.data[0] == 97u)
-                        chart.snares.push_back(e.tick);
-                    chart.drums.push_back(e.tick);
-                }
+            {
+                if (!noteOn(e))
+                    continue;
+                if (const uint8_t n = e.data[0]; n >= 95u && n <= 101u)
+                    addDrum(chart, padHits, e.tick, n == 95u ? 32 : n - 96);
+                else if (n >= 26u && n <= 29u)
+                    animSnares.push_back(e.tick);
+                else if ((n >= 34u && n <= 39u) || n == 44u || n == 45u)
+                    animCrashes.push_back(e.tick);
+            }
+            std::map<uint8_t, Spans> toms;
+            for (const Chart::Mark &m : heldNotes(track))
+                if (m.pitch >= 110u && m.pitch <= 112u)
+                    toms[m.pitch].push_back({m.tick, std::max(m.length, 1u)});
+            // A pad is a cymbal but where its tom marker (its note + 12) is on it.
+            for (PadHit &hit : padHits)
+                if (const auto marks = toms.find(static_cast<uint8_t>(96 + hit.lane + 12)); marks != toms.end())
+                    hit.cymbal = !within(marks->second, hit.tick);
+            cymbals(chart, padHits, !toms.empty());
+            if (!animSnares.empty())
+                chart.snares = std::move(animSnares);
+            if (!animCrashes.empty())
+                chart.crashes = std::move(animCrashes);
         }
 
         // PART VOCALS: its phrases (105, 106) where it marks them, else its

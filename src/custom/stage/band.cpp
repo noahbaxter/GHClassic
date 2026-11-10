@@ -283,6 +283,9 @@ namespace gh2::custom
         addMemberCues(band.drums, drummerCues, drumming, toGh2);
         for (const uint32_t t : kicks)
             addShortNote(band.drums, t, 36u);
+        // The chart's crashes, else one a section (addSectionCrashes).
+        for (const uint32_t t : toGh2Sorted(chart.crashes, toGh2))
+            addShortNote(band.drums, t, 37u);
         addDrumPatterns(band.drums, band.bars, toGh2Sorted(chart.snares, toGh2), drumming, !chart.drums.empty(),
                         band.in.end, band.beats);
         return kicks;
@@ -331,6 +334,8 @@ namespace gh2::custom
 
     void addSectionCrashes(BandTracks &band, const std::vector<Section> &sections)
     {
+        if (!band.in.chart.crashes.empty())
+            return;
         for (const Section &s : sections)
             if (!band.in.chart.drums.empty() || s.mood != Mood::Verse)
                 addShortNote(band.drums, s.tick, 37u);

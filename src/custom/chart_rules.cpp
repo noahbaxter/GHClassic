@@ -194,8 +194,26 @@ namespace gh2::custom::rules
         std::stable_sort(chart.sections.begin(), chart.sections.end(),
                          [](const auto &a, const auto &b) { return a.first < b.first; });
         std::stable_sort(chart.vocals.begin(), chart.vocals.end(), byTick);
-        for (std::vector<uint32_t> *hits : {&chart.kicks, &chart.snares, &chart.drums, &chart.keys})
+        for (std::vector<uint32_t> *hits : {&chart.kicks, &chart.snares, &chart.crashes, &chart.drums, &chart.keys})
             std::sort(hits->begin(), hits->end());
+    }
+
+    void addDrum(Chart &chart, std::vector<PadHit> &pads, uint32_t tick, int lane)
+    {
+        if (lane == 0 || lane == 32)
+            chart.kicks.push_back(tick);
+        else if (lane == 1)
+            chart.snares.push_back(tick);
+        else
+            pads.push_back({tick, lane});
+        chart.drums.push_back(tick);
+    }
+
+    void cymbals(Chart &chart, const std::vector<PadHit> &pads, bool pro)
+    {
+        for (const PadHit &hit : pads)
+            if (hit.cymbal && (hit.lane == kGreenPad || (pro && hit.lane == kBluePad)))
+                chart.crashes.push_back(hit.tick);
     }
 
     std::vector<Span> phrasesFrom(const std::vector<uint32_t> &ticks, uint32_t resolution)

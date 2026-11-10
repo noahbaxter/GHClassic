@@ -429,6 +429,73 @@ namespace
         CHECK(keyed && keyed->keys == std::vector<uint32_t>({0u, 0u}));
     }
 
+    std::vector<uint32_t> notesOf(const midi::Track &track, uint8_t from, uint8_t to);
+
+    // The drums' hi-hats and crashes: pro drums' cymbals (a tom marker makes
+    // a pad a tom), a plain or five-lane chart's yellow and green or orange,
+    // .chart's cymbal markers; the drummer's animation notes over any.
+    void drumPieces()
+    {
+        const auto mid = [](std::vector<std::pair<uint32_t, uint8_t>> hits, std::vector<std::pair<uint32_t, uint8_t>> marks)
+        {
+            midi::File file{1u, 480u, {}};
+            midi::Track tempo, guitar, drums;
+            tempo.events.push_back({0u, midi::kMeta, midi::kTempo, {0x07u, 0xa1u, 0x20u}});
+            guitar.name = "PART GUITAR";
+            guitar.events = {note(0u, 96u, true), note(60u, 96u, false)};
+            drums.name = "PART DRUMS";
+            for (const auto &[tick, pitch] : marks)
+            {
+                drums.events.push_back(note(tick, pitch, true));
+                drums.events.push_back(note(tick + 60u, pitch, false));
+            }
+            for (const auto &[tick, pitch] : hits)
+            {
+                drums.events.push_back(note(tick, pitch, true));
+                drums.events.push_back(note(tick + 30u, pitch, false));
+            }
+            std::stable_sort(drums.events.begin(), drums.events.end(),
+                             [](const midi::Event &a, const midi::Event &b) { return a.tick < b.tick; });
+            std::string why;
+            return parseMid(oneGemMid({drums}), {}, why);
+        };
+        // Pro: blue under a tom marker a tom; green and the second blue
+        // crashes.
+        const auto pro = mid({{0u, 98u}, {480u, 99u}, {960u, 100u}, {1440u, 99u}}, {{480u, 111u}});
+        CHECK(pro && pro->crashes == std::vector<uint32_t>({960u, 1440u}));
+        // Plain four-lane: green the crash, blue none.
+        const auto plain = mid({{0u, 98u}, {480u, 99u}, {960u, 100u}}, {});
+        CHECK(plain && plain->crashes == std::vector<uint32_t>({960u}));
+        // Five-lane: orange (100) the crash, its green (101) a tom.
+        const auto five = mid({{0u, 98u}, {480u, 101u}, {960u, 100u}}, {});
+        CHECK(five && five->crashes == std::vector<uint32_t>({960u}) && five->drums.size() == 3u);
+        // Animation notes over the gems: 26 the snare, 36 a crash.
+        const auto anim = mid({{0u, 98u}, {0u, 97u}, {960u, 100u}, {240u, 26u}, {480u, 30u}, {720u, 36u}}, {});
+        CHECK(anim && anim->snares == std::vector<uint32_t>({240u}) && anim->crashes == std::vector<uint32_t>({720u}));
+
+        std::string why;
+        // .chart pro: pads toms unless marked; green marked.
+        const auto chartPro = parseChart(kOneGemChart + "[ExpertDrums]\n{\n  0 = N 2 0\n  0 = N 66 0\n  192 = N 3 0\n"
+                                                        "  384 = N 4 0\n  384 = N 68 0\n}\n",
+                                         {}, why);
+        CHECK(chartPro && chartPro->crashes == std::vector<uint32_t>({384u}));
+        const auto chartPlain =
+            parseChart(kOneGemChart + "[ExpertDrums]\n{\n  0 = N 2 0\n  192 = N 3 0\n  384 = N 4 0\n}\n", {}, why);
+        CHECK(chartPlain && chartPlain->crashes == std::vector<uint32_t>({384u}));
+
+        // The stage's crash on the chart's, none at the sections then.
+        Chart chart = chart480();
+        chart.sections = {{0u, "Chorus"}, {1920u, "Chorus 2"}};
+        chart.drums = {0u, 960u};
+        chart.crashes = {960u};
+        Difficulty lead;
+        for (uint32_t t = 0; t < 8u * 480u; t += 480u)
+            lead.gems.push_back({t, 1u});
+        midi::Track g, ev;
+        const auto band = addStage({chart, lead, kSameTicks, 8u * 480u}, g, ev);
+        CHECK(!band.empty() && notesOf(band[0], 37u, 37u) == std::vector<uint32_t>({960u}));
+    }
+
     // Each stage track's texts and animation notes as written; five-lane
     // green a drum hit; HARM1 the singing where PART VOCALS has none; keys
     // by PART KEYS' notes.
@@ -1489,6 +1556,7 @@ int main(int argc, char **argv)
     chartEdges();
     bandParts();
     stageTracks();
+    drumPieces();
     bandFronts();
     songFactsTable();
     bandPerformance();

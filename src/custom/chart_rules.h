@@ -43,6 +43,20 @@ namespace gh2::custom::rules
     // A section's practice name from an EVENTS text, or none.
     std::optional<std::string> sectionName(const std::string &text);
 
+    constexpr int kYellowPad = 2, kBluePad = 3, kGreenPad = 4;
+    // A pad hit by .chart's lane (notes.mid's 98 to 100 as 2 to 4).
+    struct PadHit
+    {
+        uint32_t tick;
+        int lane;
+        bool cymbal = true;
+    };
+    // A drum hit by .chart's lane: 0 or 32 the kick, 1 the snare, 2 and up
+    // a pad, added to `pads`.
+    void addDrum(Chart &chart, std::vector<PadHit> &pads, uint32_t tick, int lane);
+    // Crashes from cymbal hits: green, and blue on pro drums only.
+    void cymbals(Chart &chart, const std::vector<PadHit> &pads, bool pro);
+
     // Phrases where a chart marks none: the singing's runs, two beats apart.
     std::vector<Span> phrasesFrom(const std::vector<uint32_t> &ticks, uint32_t resolution);
 

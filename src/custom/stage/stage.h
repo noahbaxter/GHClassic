@@ -15,7 +15,8 @@
 //   BAND BASS    the bassist, and 36 a speaker pulse on each hit: the bass
 //                part's, else the kicks, else the beat
 //   BAND DRUMS   the drummer, 36 a kick (the drums' expert kicks, else every
-//                beat the band plays) and 37 a crash at each section; its
+//                beat the band plays) and 37 a crash (the chart's crashes,
+//                else at each section); its
 //                beat by where the snares fall each bar: [allbeat],
 //                [double_time], [half_time], [nobeat]
 //   BAND SINGER  the singer, by when there is singing

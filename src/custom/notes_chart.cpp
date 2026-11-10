@@ -60,6 +60,8 @@ namespace gh2::custom
         std::map<std::pair<Part, size_t>, std::map<uint32_t, Raw>> rawsByTrack;
         std::map<std::pair<Part, size_t>, std::optional<uint32_t>> soloOn;
         std::optional<uint32_t> phraseOn;
+        std::vector<PadHit> padHits;                    // [ExpertDrums]' pads
+        std::set<std::pair<uint32_t, int>> cymbalMarks; // by tick and the pad's lane
         std::vector<uint32_t> lyrics;
         std::istringstream in(ini::withoutBom(text));
         std::string line, section;
@@ -132,18 +134,15 @@ namespace gh2::custom
                 }
                 continue;
             }
-            // 0 the kick (32 the second pedal's), 1 to 5 the pads.
+            // 0 the kick (32 the second pedal's), 1 to 5 the pads, 66 to 68
+            // pro drums' yellow, blue and green cymbal markers.
             if (section == "ExpertDrums")
             {
                 int lane = -1;
-                if (type == "N" && (fields >> lane) && (lane == 0 || lane == 32 || (lane >= 1 && lane <= 5)))
-                {
-                    if (lane == 0 || lane == 32)
-                        chart.kicks.push_back(tick);
-                    if (lane == 1)
-                        chart.snares.push_back(tick);
-                    chart.drums.push_back(tick);
-                }
+                if (type == "N" && (fields >> lane) && (lane == 32 || (lane >= 0 && lane <= 5)))
+                    addDrum(chart, padHits, tick, lane);
+                else if (type == "N" && lane >= 66 && lane <= 68)
+                    cymbalMarks.insert({tick, lane - 66 + kYellowPad});
                 continue;
             }
             if (section == "ExpertKeyboard")
@@ -205,6 +204,12 @@ namespace gh2::custom
         for (const auto &[track, raws] : rawsByTrack)
             settleGems(chart.parts[track.first][track.second], raws, chart.resolution, chart.hopoThreshold);
         std::erase_if(chart.parts, [](const auto &p) { return !hasGems(p.second); });
+        // Pro drums' pads toms but where a cymbal marker is on them; with
+        // no marker, every pad a cymbal.
+        const bool pro = !cymbalMarks.empty();
+        for (PadHit &hit : padHits)
+            hit.cymbal = !pro || cymbalMarks.count({hit.tick, hit.lane}) != 0u;
+        cymbals(chart, padHits, pro);
         if (chart.vocals.empty())
             chart.vocals = phrasesFrom(lyrics, chart.resolution);
         finish(chart);
