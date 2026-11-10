@@ -194,7 +194,7 @@ namespace gh2::custom::rules
         std::stable_sort(chart.sections.begin(), chart.sections.end(),
                          [](const auto &a, const auto &b) { return a.first < b.first; });
         std::stable_sort(chart.vocals.begin(), chart.vocals.end(), byTick);
-        for (std::vector<uint32_t> *hits : {&chart.kicks, &chart.drums})
+        for (std::vector<uint32_t> *hits : {&chart.kicks, &chart.snares, &chart.drums, &chart.keys})
             std::sort(hits->begin(), hits->end());
     }
 

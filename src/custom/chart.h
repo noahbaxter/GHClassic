@@ -93,13 +93,39 @@ namespace gh2::custom
         std::vector<std::pair<uint32_t, std::array<uint8_t, 2>>> signatures; // numerator, denominator's log2
         std::vector<std::pair<uint32_t, std::string>> sections; // practice names, "Verse 1"
         std::map<Part, std::array<Difficulty, 4>> parts; // easy first
-        // PART DRUMS' or [ExpertDrums]' expert: its kicks, and every hit
-        // with them, each by tick.
-        std::vector<uint32_t> kicks, drums;
+        // PART DRUMS' or [ExpertDrums]' expert: its kicks, its snares (red),
+        // and every hit with them, each by tick.
+        std::vector<uint32_t> kicks, snares, drums;
         // When someone sings: PART VOCALS' phrases (105, 106), else runs
-        // of its notes or lyrics; .chart's [Events] phrase_start and
-        // phrase_end, else runs of its lyrics.
+        // of its notes or lyrics, else HARM1's the same; .chart's [Events]
+        // phrase_start and phrase_end, else runs of its lyrics.
         std::vector<Span> vocals;
+        // The keys' expert hits by tick (PART KEYS' 96 to 100,
+        // [ExpertKeyboard]'s).
+        std::vector<uint32_t> keys;
+        // The rest of what a .mid's tracks say for the stage, by track name,
+        // as written, for the band and venue to follow (custom/stage/stage.h):
+        // each text event ([play], [map HandMap_Solo], [lighting (verse)])
+        // and each note no gem is on: below 60 (hand positions 40 to 59,
+        // drum animations 24 to 51, EVENTS' practice clicks 24 to 26), and
+        // every one of VENUE's; the singers' texts alone. .chart's [Events]
+        // texts as EVENTS'.
+        struct Cue
+        {
+            uint32_t tick = 0u;
+            std::string text;
+        };
+        struct Mark
+        {
+            uint32_t tick = 0u, length = 0u;
+            uint8_t pitch = 0u;
+        };
+        struct StageTrack
+        {
+            std::vector<Cue> cues;   // by tick
+            std::vector<Mark> marks; // by tick
+        };
+        std::map<std::string, StageTrack> stage;
         // .chart's [Song] Offset, in seconds: the audio's lead.
         double offset = 0.0;
         // The song's own HOPO threshold at 480 a beat, as GH2's songs.dta

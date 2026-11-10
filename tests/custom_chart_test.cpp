@@ -404,7 +404,7 @@ namespace
         std::string why;
         const auto mid = parseMid(oneGemMid({drums, vocals}), {}, why);
         CHECK(mid && mid->kicks == std::vector<uint32_t>({0u, 960u}) &&
-              mid->drums == std::vector<uint32_t>({0u, 480u, 960u, 960u}));
+              mid->drums == std::vector<uint32_t>({0u, 480u, 960u, 960u}) && mid->snares == std::vector<uint32_t>({480u}));
         CHECK(mid && mid->vocals.size() == 2u && mid->vocals[0].tick == 0u && mid->vocals[1].tick == 2880u);
 
         // Its phrases where it has them.
@@ -419,8 +419,60 @@ namespace
                                  "[Events]\n{\n  0 = E \"phrase_start\"\n  96 = E \"lyric la\"\n  384 = E \"phrase_end\"\n}\n"
                                  "[ExpertDrums]\n{\n  0 = N 0 0\n  192 = N 2 0\n  384 = N 32 0\n  384 = N 66 0\n}\n";
         const auto chart = parseChart(text, {}, why);
-        CHECK(chart && chart->kicks == std::vector<uint32_t>({0u, 384u}) && chart->drums.size() == 3u);
+        CHECK(chart && chart->kicks == std::vector<uint32_t>({0u, 384u}) && chart->drums.size() == 3u &&
+              chart->snares.empty());
         CHECK(chart && chart->vocals.size() == 1u && chart->vocals[0].tick == 0u && chart->vocals[0].length == 384u);
+        CHECK(chart && chart->keys.empty() && chart->stage.at("EVENTS").cues.size() == 3u &&
+              chart->stage.at("EVENTS").cues[1].text == "lyric la");
+        const auto keyed = parseChart(text + "[ExpertKeyboard]\n{\n  0 = N 1 0\n  0 = N 3 0\n  192 = N 7 0\n}\n", {}, why);
+        CHECK(keyed && keyed->keys == std::vector<uint32_t>({0u, 0u}));
+    }
+
+    // Each stage track's texts and animation notes as written; five-lane
+    // green a drum hit; HARM1 the singing where PART VOCALS has none; keys
+    // by PART KEYS' notes.
+    void stageTracks()
+    {
+        midi::File file{1u, 480u, {}};
+        midi::Track tempo, guitar, drums, harmony, keys, venue, events;
+        tempo.events.push_back({0u, midi::kMeta, midi::kTempo, {0x07u, 0xa1u, 0x20u}});
+        guitar.name = "PART GUITAR";
+        guitar.events = {midi::text(0u, "[map HandMap_Solo]"), note(0u, 45u, true), note(0u, 96u, true),
+                         note(60u, 96u, false),               note(480u, 45u, false)};
+        drums.name = "PART DRUMS";
+        drums.events = {note(0u, 24u, true), note(0u, 101u, true), note(60u, 24u, false), note(60u, 101u, false)};
+        harmony.name = "HARM1";
+        harmony.events = {midi::text(0u, "[play]"), note(0u, 105u, true), note(0u, 50u, true), note(240u, 50u, false),
+                          note(480u, 105u, false)};
+        keys.name = "PART KEYS";
+        keys.events = {note(0u, 30u, true), note(60u, 30u, false)};
+        venue.name = "VENUE";
+        venue.events = {midi::text(0u, "[lighting (verse)]"), note(0u, 110u, true), note(120u, 110u, false)};
+        events.name = "EVENTS";
+        events.events = {note(0u, 24u, true), midi::text(0u, " [crowd_clap] "), note(30u, 24u, false)};
+        file.tracks = {tempo, guitar, drums, harmony, keys, venue, events};
+        std::string why;
+        const auto mid = parseMid(midi::write(file), {}, why);
+        CHECK(mid && mid->drums == std::vector<uint32_t>({0u}));
+        CHECK(mid && mid->vocals.size() == 1u && mid->vocals[0].length == 480u);
+        CHECK(mid && mid->keys.empty()); // only an animation note
+        if (!mid)
+            return;
+        const auto &s = mid->stage;
+        CHECK(s.at("PART GUITAR").cues.size() == 1u && s.at("PART GUITAR").cues[0].text == "[map HandMap_Solo]");
+        CHECK(s.at("PART GUITAR").marks.size() == 1u && s.at("PART GUITAR").marks[0].pitch == 45u &&
+              s.at("PART GUITAR").marks[0].length == 480u);
+        CHECK(s.at("PART DRUMS").marks.size() == 1u && s.at("PART DRUMS").marks[0].pitch == 24u);
+        CHECK(s.at("HARM1").cues.size() == 1u && s.at("HARM1").marks.empty());
+        CHECK(s.at("VENUE").marks.size() == 1u && s.at("VENUE").marks[0].pitch == 110u &&
+              s.at("VENUE").cues[0].text == "[lighting (verse)]");
+        CHECK(s.at("EVENTS").cues[0].text == "[crowd_clap]" && s.at("EVENTS").marks[0].length == 30u);
+
+        keys.events.push_back(note(480u, 96u, true));
+        keys.events.push_back(note(540u, 96u, false));
+        file.tracks = {tempo, guitar, keys};
+        const auto keyed = parseMid(midi::write(file), {}, why);
+        CHECK(keyed && keyed->keys == std::vector<uint32_t>({480u}));
     }
 
     // A track's texts at each tick, in order.
@@ -1193,6 +1245,7 @@ int main(int argc, char **argv)
     lanes();
     chartEdges();
     bandParts();
+    stageTracks();
     stage();
     catalogOrder();
     catalogCopies();

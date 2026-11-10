@@ -116,6 +116,8 @@ namespace gh2::custom
                 if (type == "E")
                 {
                     const std::string text = unquoted(value.substr(1u));
+                    if (!text.empty())
+                        chart.stage["EVENTS"].cues.push_back({tick, text});
                     if (auto name = sectionName(text))
                         chart.sections.emplace_back(tick, *name);
                     else if (text == "phrase_start")
@@ -138,8 +140,17 @@ namespace gh2::custom
                 {
                     if (lane == 0 || lane == 32)
                         chart.kicks.push_back(tick);
+                    if (lane == 1)
+                        chart.snares.push_back(tick);
                     chart.drums.push_back(tick);
                 }
+                continue;
+            }
+            if (section == "ExpertKeyboard")
+            {
+                int lane = -1;
+                if (type == "N" && (fields >> lane) && lane >= 0 && lane <= 4)
+                    chart.keys.push_back(tick);
                 continue;
             }
             const auto track = chartTrack(section);

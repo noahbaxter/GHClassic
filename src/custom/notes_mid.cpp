@@ -12,26 +12,17 @@
 // taps too.
 //
 // Past the five-fret parts, each read only for the band to move by: the
-// drums' expert hits (PART DRUMS, [ExpertDrums]) and when there is
-// singing (PART VOCALS, or [Events]' phrase_start, phrase_end and lyric).
-
-#include "custom/chart.h"
+// drums' expert hits (PART DRUMS, [ExpertDrums]), when there is singing
+// (PART VOCALS, else HARM1, or [Events]' phrase_start, phrase_end and
+// lyric), the keys' expert hits, and each stage track's texts and
+// animation notes as written (Chart::stage).
 
 #include "custom/chart_rules.h"
 
-#include "custom/text.h"
 #include "formats/midi.h"
 #include "settings/ini.h"
 
-#include <algorithm>
-#include <array>
-#include <map>
-#include <optional>
 #include <set>
-#include <sstream>
-#include <string>
-#include <string_view>
-#include <vector>
 
 namespace gh2::custom
 {
@@ -203,14 +194,16 @@ namespace gh2::custom
         }
 
         // PART DRUMS' expert: 96 the kick (95 the second pedal's), 97 to
-        // 100 the pads.
+        // 100 the pads, 101 five-lane's green.
         void midDrums(const midi::Track &track, Chart &chart)
         {
             for (const midi::Event &e : track.events)
-                if (noteOn(e) && e.data[0] >= 95u && e.data[0] <= 100u)
+                if (noteOn(e) && e.data[0] >= 95u && e.data[0] <= 101u)
                 {
                     if (e.data[0] <= 96u)
                         chart.kicks.push_back(e.tick);
+                    if (e.data[0] == 97u)
+                        chart.snares.push_back(e.tick);
                     chart.drums.push_back(e.tick);
                 }
         }
@@ -241,6 +234,50 @@ namespace gh2::custom
             }
             if (chart.vocals.empty())
                 chart.vocals = phrasesFrom(notes.empty() ? lyrics : notes, chart.resolution);
+        }
+
+        // A track the stage reads, and whether its notes below 60 are its
+        // own (a singer's are pitches).
+        const std::map<std::string, bool> kStageTracks = {
+            {"PART GUITAR", true}, {"T1 GEMS", true},     {"PART GUITAR COOP", true}, {"PART RHYTHM", true},
+            {"PART BASS", true},   {"PART DRUMS", true},  {"PART KEYS", true},        {"PART VOCALS", false},
+            {"HARM1", false},      {"EVENTS", true},      {"VENUE", true},
+        };
+
+        Chart::StageTrack midStage(const midi::Track &track, bool keepLowNotes)
+        {
+            Chart::StageTrack out;
+            const bool venue = track.name == "VENUE";
+            std::map<uint8_t, uint32_t> on;
+            for (const midi::Event &e : track.events)
+            {
+                if (e.status == midi::kMeta && e.meta == midi::kText)
+                {
+                    const std::string text = ini::trim(std::string(e.data.begin(), e.data.end()));
+                    if (!text.empty())
+                        out.cues.push_back({e.tick, text});
+                }
+                else if (!keepLowNotes || e.status == midi::kMeta || e.data.empty() || (!venue && e.data[0] >= 60u))
+                    continue;
+                else if (noteOn(e))
+                    on[e.data[0]] = e.tick;
+                else if (noteOff(e))
+                    if (const auto it = on.find(e.data[0]); it != on.end())
+                    {
+                        out.marks.push_back({it->second, e.tick - it->second, e.data[0]});
+                        on.erase(it);
+                    }
+            }
+            sortByTick(out.marks);
+            return out;
+        }
+
+        // PART KEYS' expert: 96 to 100.
+        void midKeys(const midi::Track &track, Chart &chart)
+        {
+            for (const midi::Event &e : track.events)
+                if (noteOn(e) && e.data[0] >= 96u && e.data[0] <= 100u)
+                    chart.keys.push_back(e.tick);
         }
     }
 
@@ -274,8 +311,15 @@ namespace gh2::custom
             }
             else if (e.status == midi::kMeta && e.meta == midi::kSignature && e.data.size() >= 2u && e.data[0] != 0u)
                 chart.signatures.push_back({e.tick, {e.data[0], e.data[1]}});
+        const midi::Track *harmony = nullptr;
         for (const midi::Track &track : file->tracks)
         {
+            if (const auto it = kStageTracks.find(track.name); it != kStageTracks.end() && !chart.stage.count(track.name))
+                chart.stage[track.name] = midStage(track, it->second);
+            if (track.name == "PART KEYS" && chart.keys.empty())
+                midKeys(track, chart);
+            if (track.name == "HARM1" && !harmony)
+                harmony = &track;
             if (track.name == "EVENTS")
                 for (const midi::Event &e : track.events)
                     if (e.status == midi::kMeta && e.meta == midi::kText)
@@ -292,6 +336,8 @@ namespace gh2::custom
             if (hasGems(read))
                 chart.parts[part->second] = std::move(read);
         }
+        if (chart.vocals.empty() && harmony)
+            midVocals(*harmony, chart);
         finish(chart);
         return chart;
     }
