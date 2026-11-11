@@ -12,8 +12,8 @@
 (press green)
 (wait_screen sel_song_screen)
 (wait 1)
-(expect {game get_song} iloverockandroll)
-{foreach $s (iloverockandroll iwannabesedated thunderkiss65 smokeonthewater) {campaign cheat_beat_song $s 100000}}
+(expect {game get_song} gh1_iloverockandroll)
+{foreach $s (gh1_iloverockandroll gh1_iwannabesedated gh1_thunderkiss65 gh1_smokeonthewater) {campaign cheat_beat_song $s 100000}}
 (press red)
 (wait_screen sel_venue_screen 40)
 (wait 1)
@@ -21,8 +21,8 @@
 (press green)
 (wait_screen sel_song_screen)
 (wait 1)
-(expect {game get_song} ironman)
-{foreach $s (ironman morethanafeeling yougotanotherthingcomin takemeout) {campaign cheat_beat_song $s 100000}}
+(expect {game get_song} gh1_ironman)
+{foreach $s (gh1_ironman gh1_morethanafeeling gh1_yougotanotherthingcomin gh1_takemeout) {campaign cheat_beat_song $s 100000}}
 (press red)
 (wait_screen sel_venue_screen 40)
 (wait 1)
@@ -30,8 +30,8 @@
 (press green)
 (wait_screen sel_song_screen)
 (wait 1)
-(expect {game get_song} killerqueen)
-{foreach $s (killerqueen heyyou stellar heartfullofblack) {campaign cheat_beat_song $s 100000}}
+(expect {game get_song} gh1_killerqueen)
+{foreach $s (gh1_killerqueen gh1_heyyou gh1_stellar gh1_heartfullofblack) {campaign cheat_beat_song $s 100000}}
 (press red)
 (wait_screen sel_venue_screen 40)
 (wait 1)
@@ -39,8 +39,8 @@
 (press green)
 (wait_screen sel_song_screen)
 (wait 1)
-(expect {game get_song} ziggystardust)
-{foreach $s (ziggystardust fatlip cochise takeitoff) {campaign cheat_beat_song $s 100000}}
+(expect {game get_song} gh1_ziggystardust)
+{foreach $s (gh1_ziggystardust gh1_fatlip gh1_cochise gh1_takeitoff) {campaign cheat_beat_song $s 100000}}
 (press red)
 (wait_screen sel_venue_screen 40)
 (wait 1)
@@ -48,8 +48,8 @@
 (press green)
 (wait_screen sel_song_screen)
 (wait 1)
-(expect {game get_song} spanishcastlemagic)
-{foreach $s (spanishcastlemagic higherground nooneknows aceofspades) {campaign cheat_beat_song $s 100000}}
+(expect {game get_song} gh1_spanishcastlemagic)
+{foreach $s (gh1_spanishcastlemagic gh1_higherground gh1_nooneknows gh1_aceofspades) {campaign cheat_beat_song $s 100000}}
 (press red)
 (wait_screen sel_venue_screen 40)
 (wait 1)
@@ -57,8 +57,8 @@
 (press green)
 (wait_screen sel_song_screen)
 (wait 1)
-(expect {game get_song} godzilla)
-{foreach $s (godzilla texasflood frankenstein) {campaign cheat_beat_song $s 100000}}
+(expect {game get_song} gh1_godzilla)
+{foreach $s (gh1_godzilla gh1_texasflood gh1_frankenstein) {campaign cheat_beat_song $s 100000}}
 ; The last venue's line under its songs asks for the songs medium needs,
 ; "Beat 4/5 songs to win", where GH2's names Free Bird (content/encores.cpp).
 {sel_song_panel refresh}
@@ -73,7 +73,7 @@
 (shot last_venue)
 {set $index 3}
 #include common/career_song.dta
-(expect {gamecfg get_song} cowboysfromhell)
+(expect {gamecfg get_song} gh1_cowboysfromhell)
 (wait 3)
 {player0 win 5}
 (wait 12)

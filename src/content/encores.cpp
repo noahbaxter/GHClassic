@@ -1,6 +1,7 @@
 #include "content/encores.h"
 
 #include "content/campaigns.h"
+#include "content/sources.h"
 #include "guest.h"
 #include "script.h"
 
@@ -66,18 +67,21 @@ namespace gh2::encores
         // CampaignState::IsNewEncoreUnlock(Symbol venue, bool &isFreebird)
         // (0x132a68) flags the special encore by the name "freebird", which
         // the 80s' retail code has as "playwithme": its finale's confirms
-        // and text hang on the flag.
+        // and text hang on the flag. Neither is the song's name here
+        // (content/sources.h).
         void isNewEncoreUnlock(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
             const uint32_t returnTo = GPR_U32(ctx, 31);
             const uint32_t state = GPR_U32(ctx, 4), venue = GPR_U32(ctx, 5), flag = GPR_U32(ctx, 6);
             s_isNewEncoreUnlock(rdram, ctx, runtime);
             const uint32_t result = GPR_U32(ctx, 2);
-            if (campaigns::active() == "gh80s")
+            const std::string &game = campaigns::active();
+            const char *finale = game == "gh2" ? "freebird" : game == "gh80s" ? "playwithme" : nullptr;
+            if (finale)
             {
                 const uint32_t encore = static_cast<uint32_t>(
                     runtime->callGuestFunction(rdram, ctx, s_addresses->campaignStateGetCurEncore, {state, venue}));
-                if (encore == script::symbol(rdram, ctx, runtime, "playwithme"))
+                if (encore == script::symbol(rdram, ctx, runtime, sources::song(game, finale)))
                     store<uint8_t>(rdram, flag, 1u);
             }
             SET_GPR_U32(ctx, 2, result);

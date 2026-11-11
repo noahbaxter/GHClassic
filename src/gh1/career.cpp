@@ -28,6 +28,7 @@
 #include "content/hidden_guitars.h"
 #include "content/locale.h"
 #include "content/payouts.h"
+#include "content/sources.h"
 #include "disc/ark.h"
 #include "formats/dtb.h"
 #include "gh1/guitars.h"
@@ -490,10 +491,12 @@ namespace gh2::gh1
                 text[body(of) + key.substr(of.size())] = entry.nodes[1].text;
             if (f || guitar)
                 continue;
-            if (const auto as = renamed(key, names))
+            // A song's blurb by our name for it (content/sources.h).
+            if (const std::string song = sources::song("gh1", stem); songs.count(song) != 0u)
+                text[song + key.substr(stem.size())] = entry.nodes[1].text;
+            else if (const auto as = renamed(key, names))
                 text[*as] = entry.nodes[1].text;
-            else if (starts("loading_tip") || starts("video") || starts("store_") || songs.count(stem) != 0u ||
-                     kStore.count(key) != 0u)
+            else if (starts("loading_tip") || starts("video") || starts("store_") || kStore.count(key) != 0u)
                 text[key] = entry.nodes[1].text;
         }
         // The disc has no blurb for a song it does not list: none, where

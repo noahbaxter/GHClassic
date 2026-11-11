@@ -6,10 +6,10 @@
 {set $d3 none}
 {set $v1 down}
 {set $finale_venue fest}
-{set $b1 aintnothinbut}
-{set $b2 lonelyisthenight}
-{set $b3 bathroomwall}
-{set $b4 bathroomwall}
+{set $b1 gh80s_aintnothinbut}
+{set $b2 gh80s_lonelyisthenight}
+{set $b3 gh80s_bathroomwall}
+{set $b4 gh80s_bathroomwall}
 {set $idx 3}
-{set $play losangeles}
+{set $play gh80s_losangeles}
 #include common/finale_direct.dta

@@ -4,11 +4,11 @@
 {set $d2 down}
 {set $d3 down}
 {set $pick gh2}
-{set $b1 beastandtheharlot}
-{set $b2 institutionalized}
-{set $b3 misirlou}
-{set $b4 misirlou}
+{set $b1 gh2_beastandtheharlot}
+{set $b2 gh2_institutionalized}
+{set $b3 gh2_misirlou}
+{set $b4 gh2_misirlou}
 {set $idx 3}
-{set $offer hangar18}
-{set $final freebird}
+{set $offer gh2_hangar18}
+{set $final gh2_freebird}
 #include common/finale_encore.dta

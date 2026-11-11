@@ -4,11 +4,11 @@
 {set $d2 down}
 {set $d3 down}
 {set $pick gh80s}
-{set $b1 electriceye}
-{set $b2 policetruck}
-{set $b3 seventeen}
-{set $b4 seventeen}
+{set $b1 gh80s_electriceye}
+{set $b2 gh80s_policetruck}
+{set $b3 gh80s_seventeen}
+{set $b4 gh80s_seventeen}
 {set $idx 3}
-{set $offer caughtinamosh}
-{set $final playwithme}
+{set $offer gh80s_caughtinamosh}
+{set $final gh80s_playwithme}
 #include common/finale_encore.dta

@@ -1,8 +1,8 @@
 // 360 GH2's songs.dta entries are PS2 GH2's form, and its charts and lip
 // sync files PS2's formats; only its audio differs (content/mogg.h). Every
 // song shares a name with PS2's or might, and 51 of the 64 shared charts
-// differ (22 in their notes), so each goes in as x_<name>, its files under
-// songs/x_<name>/. The 360 has no practice audio (it slows the song itself),
+// differ (22 in their notes), so each goes in as gh2x_<name>
+// (content/sources.h), its files under songs/gh2x_<name>/. The 360 has no practice audio (it slows the song itself),
 // so its entries drop their practice keys.
 //
 // Its career is a campaign (content/campaigns.h). The 360's archive is in
@@ -22,6 +22,7 @@
 #include "content/quickplay.h"
 #include "content/setlists.h"
 #include "content/songs.h"
+#include "content/sources.h"
 #include "disc/ark.h"
 #include "formats/dtb.h"
 #include "gh2x/focus.h"
@@ -43,14 +44,14 @@ namespace gh2
 {
     namespace
     {
-        std::string ours(const std::string &name) { return "x_" + name; }
+        std::string ours(const std::string &name) { return sources::song("gh2x", name); }
 
         // A side of the PS2 store's album art (its us_logo pictures).
         constexpr uint32_t kAlbumArtSide = 256u;
         constexpr const char *kSongsToContinue = "song_current_venue";
         constexpr const char *kGamePanel = "ui/gen/game.dtb";
 
-        // Paths under songs/<name>/ moved to songs/x_<name>/, practice keys
+        // Paths under songs/<name>/ moved to songs/gh2x_<name>/, practice keys
         // dropped.
         void retarget(dtb::Node &node, const std::string &name)
         {
@@ -66,7 +67,7 @@ namespace gh2
                 retarget(n, name);
         }
 
-        // One entry in as x_<name>: its chart and lip sync read from the 360
+        // One entry in as gh2x_<name>: its chart and lip sync read from the 360
         // disc, each audio (song, song_coop) made from its mogg.
         bool addSong(size_t disc, const dtb::Node &songs, const std::string &name)
         {

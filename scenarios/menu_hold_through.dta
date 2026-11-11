@@ -10,7 +10,7 @@
 (hold dualsense)
 (wait 0.5)
 (expect {seat_has 0 dualsense} 1)
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {{game get_player_config 0} set_difficulty easy}
 {{game get_player_config 0} set autoplay TRUE}
 {game set_quickplay}
@@ -48,7 +48,7 @@
 {ui goto_screen main_screen}
 (wait_screen main_screen)
 (wait 1)
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {{game get_player_config 0} set_difficulty easy}
 {{game get_player_config 0} set autoplay TRUE}
 {game set_quickplay}

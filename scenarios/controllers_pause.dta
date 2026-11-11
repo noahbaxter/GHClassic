@@ -45,7 +45,7 @@
 
 {quickplay in_song_ui gh2}
 {gamecfg set mode quickplay}
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {{game get_player_config 0} set_difficulty easy}
 {{game get_player_config 0} set autoplay TRUE}
 {game set_quickplay}
@@ -106,7 +106,7 @@
 (wait_screen main_screen 60)
 
 {quickplay in_song_ui gh1}
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {ui goto_screen loading_screen}
 (wait_screen game_screen 60)
 (wait 2)

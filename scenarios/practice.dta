@@ -3,7 +3,7 @@
 ; screen loads the song's sections from its MIDI.
 #include common/first_boot.dta
 {gamecfg set mode practice}
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {gamecfg set_track 0 0}
 {{game get_player_config 0} set_difficulty expert}
 {{game get_player_config 0} set autoplay TRUE}

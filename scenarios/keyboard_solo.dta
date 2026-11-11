@@ -6,7 +6,7 @@
 (expect {main_screen focus_name} main_options.btn)
 (key Return)
 (wait_screen options_screen 10)
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {{game get_player_config 0} set_difficulty easy}
 {{game get_player_config 0} set autoplay TRUE}
 {game set_quickplay}

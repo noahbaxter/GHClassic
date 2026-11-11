@@ -13,7 +13,7 @@
 (press down pad)
 (expect {seat_has 0 pad} 1)
 (expect {seat_has 1 guitar} 0)
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {{game get_player_config 0} set_difficulty easy}
 {{game get_player_config 0} set autoplay TRUE}
 {game set_quickplay}

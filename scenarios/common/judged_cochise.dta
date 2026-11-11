@@ -6,7 +6,7 @@
 {gamecfg set mode quickplay}
 {quickplay song_defaults 0}
 {{game get_player_config 0} set_difficulty expert}
-{game set_song cochise}
+{game set_song gh1_cochise}
 {game set_quickplay}
 {ui goto_screen loading_screen}
 (wait_screen game_screen 60)

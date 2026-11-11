@@ -3,7 +3,7 @@
 ; save.bin.
 #include common/first_boot.dta
 (expect {note_engine} gh2)
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {{game get_player_config 0} set_difficulty expert}
 {highscores get_highscore 0 $name $score}
 (expect $name Reiko)
@@ -31,7 +31,7 @@
 (wait_screen main_screen)
 {ui goto_screen bootup_load}
 (wait_screen guitar_help_screen)
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {{game get_player_config 0} set_difficulty expert}
 {highscores get_highscore 0 $name $score}
 (expect $name GHTWO)

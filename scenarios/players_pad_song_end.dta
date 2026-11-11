@@ -59,7 +59,7 @@
 ; Lost: no autoplay, so the song fails.
 {{game get_player_config 0} set autoplay FALSE}
 {gamecfg set mode quickplay}
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {game set_quickplay}
 {ui goto_screen loading_screen}
 (wait_screen game_screen 60)

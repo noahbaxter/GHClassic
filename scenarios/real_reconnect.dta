@@ -3,7 +3,7 @@
 ; so it reads the controllers. A pad presses before the song to take P1.
 #include common/first_boot.dta
 (wait 8)
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {{game get_player_config 0} set_difficulty easy}
 {{game get_player_config 0} set autoplay TRUE}
 {game set_quickplay}

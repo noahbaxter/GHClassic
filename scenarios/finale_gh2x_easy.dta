@@ -6,10 +6,10 @@
 {set $d3 none}
 {set $v1 down}
 {set $finale_venue arena}
-{set $b1 x_madhouse}
-{set $b2 x_trooper}
-{set $b3 x_rockthistown}
-{set $b4 x_laidtorest}
+{set $b1 gh2x_madhouse}
+{set $b2 gh2x_trooper}
+{set $b3 gh2x_rockthistown}
+{set $b4 gh2x_laidtorest}
 {set $idx 4}
-{set $play x_psychobilly}
+{set $play gh2x_psychobilly}
 #include common/finale_direct.dta

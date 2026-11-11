@@ -19,6 +19,7 @@
 #include "content/locale.h"
 #include "content/setlists.h"
 #include "content/songs.h"
+#include "content/sources.h"
 #include "custom/gh2_chart.h"
 #include "custom/lipsync.h"
 #include "custom/stage/stage.h"
@@ -458,11 +459,12 @@ namespace gh2::gh1
    (preview 23700 39500)
    (midi_file songs/graveyardshift/graveyardshift.mid)
    (quickplay (character hair_metal) (guitar gibson_flying_v) (venue big_club))))";
-        const auto entries = dtb::parse(kEntries);
+        auto entries = dtb::parse(kEntries);
         if (!entries)
             return;
-        for (const dtb::Node &entry : entries->nodes)
+        for (dtb::Node &entry : entries->nodes)
         {
+            sources::entry(entry, "gh1");
             if (songs)
                 songs->nodes.push_back(entry);
             // At its other bonus songs' lower price.
@@ -538,19 +540,21 @@ namespace gh2::gh1
             for (size_t s = 1u; s < list->nodes.size(); ++s)
             {
                 const dtb::Node &item = list->nodes[s];
+                // Ours (content/sources.h); the disc's files go by its own.
                 const std::string name = item.type == dtb::kArray && !item.nodes.empty() ? item.nodes[0].text : item.text;
+                const std::string own = sources::bare("gh1", name).value_or(name);
                 const dtb::Node *gh1 = dtb::find(*entries, name);
                 const auto text = gh1 ? entry(*gh1) : std::nullopt;
-                const std::string mid = "songs/" + name + "/" + name + ".mid";
-                const auto file = ark::readFile(disc, mid);
+                const auto file = ark::readFile(disc, "songs/" + own + "/" + own + ".mid");
                 const auto converted = file ? chart(*file) : std::nullopt;
                 if (!text || !converted)
                 {
-                    std::cerr << "[gh1] cannot convert " << name << std::endl;
+                    std::cerr << "[gh1] cannot convert " << own << std::endl;
                     continue;
                 }
                 songs::add(*text);
-                ark::addFile(mid, *converted);
+                const std::string dir = "songs/" + name + "/" + name;
+                ark::addFile(dir + ".mid", *converted);
                 const auto open = sung(*file);
                 addSinging(name, open);
                 // GH2's singer lip-syncs to <song>.voc; GH1's sang to chart
@@ -562,9 +566,8 @@ namespace gh2::gh1
                     std::vector<custom::Sung> mouth;
                     for (const auto &[from, to] : open)
                         mouth.push_back({from, to, kVowels[mouth.size() % std::size(kVowels)]});
-                    ark::addFile("songs/" + name + "/" + name + ".voc", custom::withMouth(*blink, custom::mouthShapes(mouth)));
+                    ark::addFile(dir + ".voc", custom::withMouth(*blink, custom::mouthShapes(mouth)));
                 }
-                ark::rename("songs/" + name + "/", disc, "songs/" + name + "/");
                 tier.songs.push_back(name);
                 ++count;
             }

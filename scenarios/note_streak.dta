@@ -3,7 +3,7 @@
 ; each side of each step, by note_streak_due itself.
 #include common/first_boot.dta
 {gamecfg set mode quickplay}
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {{game get_player_config 0} set_difficulty expert}
 {{game get_player_config 0} set autoplay TRUE}
 {game set_quickplay}

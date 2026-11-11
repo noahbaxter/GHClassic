@@ -58,7 +58,7 @@
 {{game get_player_config 0} set autoplay TRUE}
 (press green)
 (wait_screen game_screen 60)
-(expect {gamecfg get_song} bangyourhead)
+(expect {gamecfg get_song} gh80s_bangyourhead)
 (expect {game get_venue} battle)
 (wait 5)
 (shot song)
@@ -84,7 +84,7 @@
 {set $cash {campaign cash}}
 {set $score {campaign career_score}}
 (expect {> $score 0} 1)
-(expect {campaign high_score bangyourhead} $score)
+(expect {campaign high_score gh80s_bangyourhead} $score)
 
 ; Not saved: the load must drop it.
 {campaign add_cash 111}

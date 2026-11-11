@@ -19,6 +19,7 @@
 #include "content/payouts.h"
 #include "content/campaigns.h"
 #include "content/setlists.h"
+#include "content/sources.h"
 #include "milo/milo.h"
 
 #include <string>
@@ -54,6 +55,8 @@ namespace gh2
         const auto disc = games::disc("gh80s");
         if (!disc)
             return;
+        // Before its config is read: its songs by our names.
+        sources::addDisc("gh80s", *disc);
         // The 80s is GH2's code over its own files at GH2's paths, so with
         // its archive in front it is the whole game (content/campaigns.h).
         // But for its intro movie, which is on the disc beside the archive.

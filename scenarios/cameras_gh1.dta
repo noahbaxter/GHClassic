@@ -3,7 +3,7 @@
 ; nearest. GH2's own are untouched in its campaign.
 (needs gh1)
 #include common/first_boot.dta
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {{game get_player_config 0} set_difficulty medium}
 {{game get_player_config 0} set autoplay TRUE}
 {game set_quickplay}
@@ -20,7 +20,7 @@
 (wait_screen main_screen 60)
 
 {campaigns venues_from gh1}
-{game set_song ziggystardust}
+{game set_song gh1_ziggystardust}
 {{game get_player_config 0} set_difficulty medium}
 {{game get_player_config 0} set autoplay TRUE}
 {game set_quickplay}
@@ -66,7 +66,7 @@
 
 ; The basement, in GH2's battle of the bands.
 {campaigns venues_from gh1}
-{game set_song iloverockandroll}
+{game set_song gh1_iloverockandroll}
 {{game get_player_config 0} set autoplay TRUE}
 {game set_quickplay}
 {game set_venue battle}
@@ -90,7 +90,7 @@
 
 ; The arena, whose last win is GH1's own.
 {campaigns venues_from gh1}
-{game set_song iloverockandroll}
+{game set_song gh1_iloverockandroll}
 {{game get_player_config 0} set autoplay TRUE}
 {game set_quickplay}
 {game set_venue arena}

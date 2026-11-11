@@ -9,7 +9,7 @@
 ; A high score saved with it on, and loaded back.
 {campaigns unlock_all 1}
 (expect {campaign all_access} 1)
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {{game get_player_config 0} set_difficulty expert}
 {highscores add UNLOCKED 654321}
 {campaign mark_needs_save}
@@ -19,7 +19,7 @@
 (expect {campaign all_access} 1)
 {ui goto_screen bootup_load}
 (wait_screen guitar_help_screen)
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {{game get_player_config 0} set_difficulty expert}
 {highscores get_highscore 0 $name $score}
 (expect $name UNLOCKED)

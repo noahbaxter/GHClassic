@@ -4,7 +4,7 @@
 #include common/first_boot.dta
 {options set_lefty 0 TRUE}
 {gamecfg set mode quickplay}
-{game set_song ziggystardust}
+{game set_song gh1_ziggystardust}
 {{game get_player_config 0} set_difficulty expert}
 {{game get_player_config 0} set autoplay TRUE}
 {game set_quickplay}

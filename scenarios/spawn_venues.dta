@@ -5,7 +5,7 @@
 (needs gh1 gh80s)
 #include common/first_boot.dta
 {func ghc_spawn_set ($v)
-   {game set_song iloverockandroll}
+   {game set_song gh1_iloverockandroll}
    {{game get_player_config 0} set autoplay TRUE}
    {game set_quickplay}
    {game set_venue $v}

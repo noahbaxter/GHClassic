@@ -68,7 +68,7 @@
 (wait_screen sel_song_screen)
 (wait 2)
 (shot songs)
-(expect {song_provider get_symbol 0} iloverockandroll)
+(expect {song_provider get_symbol 0} gh1_iloverockandroll)
 {set $ghc_switch gh2}
 {set $ghc_switch_next main_screen}
 {ui goto_screen ghc_switch_screen}

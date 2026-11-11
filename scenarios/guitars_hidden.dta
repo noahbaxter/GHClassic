@@ -67,14 +67,14 @@
 (wait 1)
 (expect {game get_difficulty 0} 3)
 {foreach $s
-   (shoutatthedevil mother surrender woman tonightimgonna
-      strutter heartshapedbox messageinabottle youreallygotme carryonwayward
-      monkeywrench thembones searchanddestroy tattooedloveboys warpigs
-      cherrypie whowasinmyroom girlfriend cantyouhearme sweetchild
-      killinginthenameof johnthefisherman freya badreputation lastchild
-      crazyonyou trippinonahole rockthistown jessica stop
-      madhouse carrymehome laidtorest psychobilly yyz
-      beastandtheharlot institutionalized misirlou hangar18 freebird)
+   (gh2_shoutatthedevil gh2_mother gh2_surrender gh2_woman gh2_tonightimgonna
+      gh2_strutter gh2_heartshapedbox gh2_messageinabottle gh2_youreallygotme gh2_carryonwayward
+      gh2_monkeywrench gh2_thembones gh2_searchanddestroy gh2_tattooedloveboys gh2_warpigs
+      gh2_cherrypie gh2_whowasinmyroom gh2_girlfriend gh2_cantyouhearme gh2_sweetchild
+      gh2_killinginthenameof gh2_johnthefisherman gh2_freya gh2_badreputation gh2_lastchild
+      gh2_crazyonyou gh2_trippinonahole gh2_rockthistown gh2_jessica gh2_stop
+      gh2_madhouse gh2_carrymehome gh2_laidtorest gh2_psychobilly gh2_yyz
+      gh2_beastandtheharlot gh2_institutionalized gh2_misirlou gh2_hangar18 gh2_freebird)
    {campaign cheat_beat_song $s 100000}}
 {ui goto_screen store_screen}
 (wait_screen store_screen)

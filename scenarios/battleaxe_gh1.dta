@@ -27,12 +27,12 @@
 (expect {game get_difficulty 0} 3)
 (expect {campaign is_unlocked battleaxe} 0)
 {foreach $s
-   (iloverockandroll iwannabesedated thunderkiss65 smokeonthewater infected
-      ironman morethanafeeling yougotanotherthingcomin takemeout sharpdressedman
-      killerqueen heyyou stellar heartfullofblack symphofdestruction
-      ziggystardust fatlip cochise takeitoff unsung
-      spanishcastlemagic higherground nooneknows aceofspades crossroads
-      godzilla texasflood frankenstein cowboysfromhell)
+   (gh1_iloverockandroll gh1_iwannabesedated gh1_thunderkiss65 gh1_smokeonthewater gh1_infected
+      gh1_ironman gh1_morethanafeeling gh1_yougotanotherthingcomin gh1_takemeout gh1_sharpdressedman
+      gh1_killerqueen gh1_heyyou gh1_stellar gh1_heartfullofblack gh1_symphofdestruction
+      gh1_ziggystardust gh1_fatlip gh1_cochise gh1_takeitoff gh1_unsung
+      gh1_spanishcastlemagic gh1_higherground gh1_nooneknows gh1_aceofspades gh1_crossroads
+      gh1_godzilla gh1_texasflood gh1_frankenstein gh1_cowboysfromhell)
    {campaign cheat_beat_song $s 100000}}
 (press green)
 (wait_screen sel_venue_screen 40)
@@ -43,7 +43,7 @@
 (wait 1)
 {set $index 4}
 #include common/career_song.dta
-(expect {gamecfg get_song} barkatthemoon)
+(expect {gamecfg get_song} gh1_barkatthemoon)
 (wait 3)
 {player0 win 5}
 (wait_screen win_game_screen 60)

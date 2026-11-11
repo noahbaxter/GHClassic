@@ -30,7 +30,7 @@
 ; The screens around a song: GH1's tips on GH1's loading screen.
 {gamecfg set mode quickplay}
 {{game get_player_config 0} set_difficulty medium}
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {game set_quickplay}
 {game set_venue battle}
 {campaigns venues_from gh1}

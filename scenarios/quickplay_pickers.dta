@@ -46,7 +46,7 @@
 {{game get_player_config 0} set autoplay TRUE}
 (press green)
 (wait_screen game_screen 60)
-(expect {gamecfg get_song} shoutatthedevil)
+(expect {gamecfg get_song} gh2_shoutatthedevil)
 (expect {game get_character_outfit} punk1)
 (wait 20)
 (shot song)

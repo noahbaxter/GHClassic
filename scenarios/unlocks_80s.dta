@@ -18,9 +18,9 @@
 (press down)
 (press down)
 (press down)
-(expect {game get_song} ballstothewall)
+(expect {game get_song} gh80s_ballstothewall)
 (press down)
-(expect {game get_song} noonelikeyou)
+(expect {game get_song} gh80s_noonelikeyou)
 (shot quickplay_before)
 {setlist select gh2}
 {ui goto_screen main_screen}
@@ -32,11 +32,11 @@
 (press green)
 (wait_screen sel_song_screen)
 (wait 1)
-{campaign cheat_beat_song bangyourhead 100000}
-{campaign cheat_beat_song wegotthebeat 100000}
+{campaign cheat_beat_song gh80s_bangyourhead 100000}
+{campaign cheat_beat_song gh80s_wegotthebeat 100000}
 {set $index 2}
 #include common/career_song.dta
-(expect {gamecfg get_song} iran)
+(expect {gamecfg get_song} gh80s_iran)
 (wait 3)
 {player0 win 5}
 (wait_screen endgame_encore_screen 400)
@@ -44,7 +44,7 @@
 (shot encore_unlocked)
 (press green)
 (wait_screen game_screen 60)
-(expect {gamecfg get_song} 18andlife)
+(expect {gamecfg get_song} gh80s_18andlife)
 (wait 3)
 {player0 win 5}
 (wait_screen endgame_screen 400)
@@ -122,26 +122,26 @@
 ; Four rows down is the encore now, and it can be picked. The second
 ; tier's, in a venue the career has only opened, is the list's last row
 ; and still shut: down stops on the row before it.
-(expect {song_provider get_symbol 4} 18andlife)
+(expect {song_provider get_symbol 4} gh80s_18andlife)
 (press down)
 (press down)
 (press down)
 (press down)
-(expect {game get_song} 18andlife)
+(expect {game get_song} gh80s_18andlife)
 (shot encore_row)
 (press down)
 (press down)
 (press down)
 (press down)
-(expect {game get_song} radarlove)
+(expect {game get_song} gh80s_radarlove)
 (press down)
-(expect {game get_song} radarlove)
+(expect {game get_song} gh80s_radarlove)
 (press up)
 (press up)
 (press up)
 (press up)
-(expect {game get_song} 18andlife)
+(expect {game get_song} gh80s_18andlife)
 (press green)
 (wait_screen qp_diff_screen)
-(expect {game get_song} 18andlife)
+(expect {game get_song} gh80s_18andlife)
 (quit)

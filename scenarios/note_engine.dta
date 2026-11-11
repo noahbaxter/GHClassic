@@ -117,7 +117,7 @@
 {quickplay song_defaults 0}
 {{game get_player_config 0} set_difficulty expert}
 {{game get_player_config 0} set autoplay TRUE}
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {game set_quickplay}
 {game set_venue battle}
 {ui goto_screen loading_screen}

@@ -101,7 +101,7 @@
 ; Mid-song, P1's X-plorer pulled out pauses the song; the keyboard pressed
 ; meanwhile stands in, and the X-plorer back, a new joystick to SDL, is P1
 ; again, its green resuming.
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {{game get_player_config 0} set_difficulty easy}
 {{game get_player_config 0} set autoplay TRUE}
 {game set_quickplay}

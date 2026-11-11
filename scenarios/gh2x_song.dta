@@ -19,7 +19,7 @@
 {ui goto_screen main_screen}
 (wait_screen main_screen)
 
-{game set_song x_possum}
+{game set_song gh2x_possum}
 {{game get_player_config 0} set_difficulty expert}
 {{game get_player_config 0} set autoplay TRUE}
 {game set_quickplay}

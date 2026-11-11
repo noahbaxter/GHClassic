@@ -14,7 +14,7 @@
 (expect {seat_has 1 pad} 1)
 {gamecfg set mode multi_fo}
 {game set_num_players 2}
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {{game get_player_config 0} set_difficulty easy}
 {{game get_player_config 1} set_difficulty easy}
 {{game get_player_config 0} set autoplay TRUE}

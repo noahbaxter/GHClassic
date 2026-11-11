@@ -24,7 +24,7 @@
 {set $disable_save 1}
 {set $disable_career 1}
 {gamecfg set mode quickplay}
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {game set_quickplay}
 {ui goto_screen ghc_qp_character_screen}
 (wait_screen ghc_qp_character_screen)

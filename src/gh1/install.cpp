@@ -18,6 +18,7 @@
 #include "content/card.h"
 #include "content/games.h"
 #include "content/outfits.h"
+#include "content/sources.h"
 #include "formats/dtb.h"
 #include "gh1/band.h"
 #include "gh1/career.h"
@@ -84,6 +85,9 @@ namespace gh2
             return;
         const auto start = std::chrono::steady_clock::now();
         ark::unlocalize(*gh1Disc);
+        // Before its config is read: its songs by our names, the two no
+        // entry lists with them (gh1/songs.h).
+        sources::addDisc("gh1", *gh1Disc, {"advharmony", "graveyardshift"});
         gh1::addSetlist(*gh1Disc, *gh2Disc);
         // GH1's own save (save/gh1_stream.h): title 0x309cf8, broken after 6
         // characters (SetupMCIcon 0x14a500).

@@ -4,7 +4,7 @@
 ; with the guitarist at the origin about two times in three.
 #include common/first_boot.dta
 {quickplay song_defaults 0}
-{game set_song iloverockandroll}
+{game set_song gh1_iloverockandroll}
 {game set_venue small1}
 #include common/preshow_song.dta
 #include common/preshow_song.dta

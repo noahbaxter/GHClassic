@@ -10,7 +10,7 @@
 (wait 0.5)
 {gamecfg set mode multi_coop}
 {game set_num_players 2}
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {{game get_player_config 0} set_difficulty expert}
 {{game get_player_config 1} set_difficulty expert}
 {{game get_player_config 0} set autoplay TRUE}

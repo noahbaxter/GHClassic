@@ -13,9 +13,9 @@
 (press down)
 (press down)
 (press down)
-(expect {game get_song} infected)
+(expect {game get_song} gh1_infected)
 (press down)
-(expect {game get_song} ironman)
+(expect {game get_song} gh1_ironman)
 (shot quickplay)
 {setlist select gh2}
 {ui goto_screen main_screen}
@@ -28,16 +28,16 @@
 (press green)
 (wait_screen sel_song_screen)
 (wait 1)
-(expect {campaign is_encore_song infected} 0)
-(expect {campaign is_unlocked infected} 1)
-{campaign cheat_beat_song iloverockandroll 100000}
-{campaign cheat_beat_song iwannabesedated 100000}
+(expect {campaign is_encore_song gh1_infected} 0)
+(expect {campaign is_unlocked gh1_infected} 1)
+{campaign cheat_beat_song gh1_iloverockandroll 100000}
+{campaign cheat_beat_song gh1_iwannabesedated 100000}
 {game set_song_index 2}
-(expect {gamecfg get_song} thunderkiss65)
+(expect {gamecfg get_song} gh1_thunderkiss65)
 (expect {campaign encore_unlock_potential} 0)
-{campaign cheat_beat_song thunderkiss65 100000}
+{campaign cheat_beat_song gh1_thunderkiss65 100000}
 (expect {campaign is_unlocked small1} 0)
-{campaign cheat_beat_song infected 100000}
+{campaign cheat_beat_song gh1_infected 100000}
 (expect {campaign is_unlocked small1} 1)
-(expect {campaign is_unlocked ironman} 1)
+(expect {campaign is_unlocked gh1_ironman} 1)
 (quit)

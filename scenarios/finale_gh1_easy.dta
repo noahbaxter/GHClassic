@@ -6,10 +6,10 @@
 {set $d3 none}
 {set $v1 down}
 {set $finale_venue fest}
-{set $b1 spanishcastlemagic}
-{set $b2 higherground}
-{set $b3 nooneknows}
-{set $b4 nooneknows}
+{set $b1 gh1_spanishcastlemagic}
+{set $b2 gh1_higherground}
+{set $b3 gh1_nooneknows}
+{set $b4 gh1_nooneknows}
 {set $idx 3}
-{set $play aceofspades}
+{set $play gh1_aceofspades}
 #include common/finale_direct.dta

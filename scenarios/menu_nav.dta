@@ -49,7 +49,7 @@
 ; rows each a row apart.
 {quickplay in_song_ui gh1}
 {gamecfg set mode quickplay}
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {{game get_player_config 0} set autoplay TRUE}
 {game set_quickplay}
 {game set_venue theatre}

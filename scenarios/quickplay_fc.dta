@@ -3,10 +3,10 @@
 ; is not, and the one kept counts in the campaign picker's number and holds
 ; through a load.
 #include common/first_boot.dta
-(expect {campaigns full_combo shoutatthedevil 3} 0)
+(expect {campaigns full_combo gh2_shoutatthedevil 3} 0)
 (expect {campaigns full_combos gh2 0} 0)
 {gamecfg set mode quickplay}
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {{game get_player_config 0} set_difficulty expert}
 {{game get_player_config 0} set autoplay TRUE}
 {game set_quickplay}
@@ -14,15 +14,15 @@
 (wait_screen game_screen 60)
 (wait_screen endgame_screen 900)
 (expect {player0 percent_hit} 100)
-(expect {campaigns full_combo shoutatthedevil 3} 1)
-(expect {campaigns full_combo shoutatthedevil 2} 0)
+(expect {campaigns full_combo gh2_shoutatthedevil 3} 1)
+(expect {campaigns full_combo gh2_shoutatthedevil 2} 0)
 (expect {> {campaigns full_combos gh2 0} 0} 1)
 
 ; Won by the cheat a few seconds in: no full combo.
 {ui goto_screen main_screen}
 (wait_screen main_screen)
 {gamecfg set mode quickplay}
-{game set_song mother}
+{game set_song gh2_mother}
 {{game get_player_config 0} set_difficulty expert}
 {{game get_player_config 0} set autoplay TRUE}
 {game set_quickplay}
@@ -31,7 +31,7 @@
 (wait 5)
 {player0 win 5}
 (wait_screen endgame_screen 400)
-(expect {campaigns full_combo mother 3} 0)
+(expect {campaigns full_combo gh2_mother 3} 0)
 
 ; Saved and loaded back.
 {ui goto_screen main_screen}
@@ -42,6 +42,6 @@
 (wait_screen main_screen)
 {ui goto_screen bootup_load}
 (wait_screen guitar_help_screen)
-(expect {campaigns full_combo shoutatthedevil 3} 1)
-(expect {campaigns full_combo mother 3} 0)
+(expect {campaigns full_combo gh2_shoutatthedevil 3} 1)
+(expect {campaigns full_combo gh2_mother 3} 0)
 (quit)

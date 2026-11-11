@@ -680,11 +680,9 @@ namespace gh2::setlists
                 const dtb::Node *entry = dtb::find(*songs, name);
                 if (!entry)
                     continue;
+                // Its files are served by sources::addDisc.
                 if (!inConfig)
-                {
                     songs::add(dtb::text(*entry));
-                    ark::rename("songs/" + name + "/", disc, "songs/" + name + "/");
-                }
                 tier.songs.push_back(name);
             }
             tiers.push_back(std::move(tier));

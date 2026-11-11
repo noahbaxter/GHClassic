@@ -3,7 +3,7 @@
 ; the fail sequence, whose length is random (arm.sh fixes the seed).
 #include common/first_boot.dta
 {gamecfg set mode quickplay}
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {{game get_player_config 0} set_difficulty expert}
 {game set_quickplay}
 {ui goto_screen loading_screen}

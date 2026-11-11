@@ -2,7 +2,7 @@
 (pads 2)
 {gamecfg set mode multi_coop}
 {game set_num_players 2}
-{game set_song iloverockandroll}
+{game set_song gh1_iloverockandroll}
 {{game get_player_config 0} set autoplay TRUE}
 {{game get_player_config 1} set autoplay TRUE}
 {game set_quickplay}

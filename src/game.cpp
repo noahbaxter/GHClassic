@@ -5,6 +5,7 @@
 #include "content/band.h"
 #include "content/crowd_cards.h"
 #include "content/focus.h"
+#include "content/sources.h"
 #include "content/floor_spot.h"
 #include "content/encores.h"
 #include "content/quickplay.h"
@@ -102,6 +103,8 @@ namespace
     void applySlus21447(PS2Runtime &runtime)
     {
         gh2::ark::install(runtime, gh2::kSlus21447);
+        // Before anything reads GH2's config: its songs by our names.
+        gh2::sources::addDisc("gh2", 0u);
         gh2::installHeaps();
         gh2::installGuitarCopy();
         // Before GH1's lists, built from GH2's song list and its type.

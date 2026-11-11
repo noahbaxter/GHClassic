@@ -183,7 +183,7 @@
 (shot setlist_gh1)
 (press green p1)
 (wait_screen multi_vs_seldiff_screen)
-(expect {gamecfg get_song} iloverockandroll)
+(expect {gamecfg get_song} gh1_iloverockandroll)
 
 ; Pro Face-Off has the same, and plays GH1's song in that room, the two
 ; guitarists apart.
@@ -198,7 +198,7 @@
 {{game get_player_config 1} set autoplay TRUE}
 {ui goto_screen loading_screen}
 (wait_screen game_screen 60)
-(expect {gamecfg get_song} iloverockandroll)
+(expect {gamecfg get_song} gh1_iloverockandroll)
 (expect {campaigns venue_game} gh1)
 (expect {game get_venue} small2)
 (wait 3)
@@ -216,7 +216,7 @@
 {campaigns venues_from gh1}
 {gamecfg set mode multi_fo}
 {game set_num_players 2}
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {{game get_player_config 0} set autoplay TRUE}
 {{game get_player_config 1} set autoplay TRUE}
 {game set_venue battle}

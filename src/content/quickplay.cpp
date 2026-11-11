@@ -283,7 +283,7 @@ namespace gh2::quickplay
         void castSong(const script::Call &call)
         {
             const std::string song = call.symbol(2), game = call.symbol(3), retail = call.symbol(4);
-            s_nextGenSong = song.rfind("x_", 0) == 0u;
+            s_nextGenSong = song.rfind("gh2x_", 0) == 0u;
             const std::string &activeGame = campaigns::active();
             const auto liveName = [&](const std::string &outfit)
             { return game == activeGame ? outfit : outfits::named(game, outfit).value_or(outfit); };

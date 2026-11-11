@@ -25,7 +25,7 @@
 (press down guitar)
 (wait 0.5)
 (expect {game get_controller 0} guitar)
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {{game get_player_config 0} set_difficulty easy}
 {{game get_player_config 0} set autoplay TRUE}
 {game set_quickplay}
@@ -46,7 +46,7 @@
 (expect {ghc_controllers text read {ghc_controllers focus}} GUITAR)
 (key Escape)
 (wait 1)
-{game set_song shoutatthedevil}
+{game set_song gh2_shoutatthedevil}
 {ui goto_screen loading_screen}
 (wait_screen game_screen 60)
 (wait 1)
