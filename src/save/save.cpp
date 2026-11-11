@@ -354,10 +354,11 @@ namespace gh2::save
                 {
                     if (gameOf(song.song) != game.game)
                         continue;
+                    const std::string name = gh2::storedSong(game.game, song.song);
                     auto it = std::find_if(out->scores.begin(), out->scores.end(),
-                                           [&](const gh1::SongScores &s) { return s.song == song.song; });
+                                           [&](const gh1::SongScores &s) { return s.song == name; });
                     if (it == out->scores.end())
-                        it = out->scores.insert(out->scores.end(), gh1::SongScores{song.song, {}});
+                        it = out->scores.insert(out->scores.end(), gh1::SongScores{name, {}});
                     for (int band = 0; band < gh1::kProfiles; ++band)
                         for (int d = 0; d < gh1::kDifficulties; ++d)
                             for (int rank = 0; rank < gh1::kScoresPerList; ++rank)
@@ -373,10 +374,14 @@ namespace gh2::save
             {
                 if (gameOf(song.song) != game.game)
                     continue;
+                const std::string name = gh2::storedSong(game.game, song.song);
                 auto it = std::find_if(out->scores.begin(), out->scores.end(),
-                                       [&](const gh2::SongScores &s) { return s.song == song.song; });
+                                       [&](const gh2::SongScores &s) { return s.song == name; });
                 if (it == out->scores.end())
+                {
                     out->scores.push_back(song);
+                    out->scores.back().song = name;
+                }
                 else
                     it->lists = song.lists;
             }
@@ -420,7 +425,7 @@ namespace gh2::save
             {
                 // GH1's own layout holds only what otherSave gives it.
                 const std::vector<uint8_t> stream = game.game == s_game && !game.gh1Layout
-                                                        ? gh2::write(own)
+                                                        ? gh2::write(gh2::asCard(own, s_game))
                                                         : otherSave(game, save, card->read(game.dir, saveFile));
                 if (stream.size() > game.dataSize)
                 {
@@ -543,16 +548,16 @@ namespace gh2::save
                     {
                         parsed = true;
                         for (const gh1::SongScores &song : save->scores)
-                            if (gameOf(song.song) == game.game)
-                                s_imported[song.song] = bestOfBands(song), ++songs;
+                            if (const std::string ours = gh2::ourSong(game.game, song.song); gameOf(ours) == game.game)
+                                s_imported[ours] = bestOfBands(song), ++songs;
                     }
                 }
                 else if (const std::optional<gh2::Save> save = gh2::parse(data->data(), data->size()))
                 {
                     parsed = true;
                     for (const gh2::SongScores &song : save->scores)
-                        if (gameOf(song.song) == game.game)
-                            s_imported[song.song] = song.lists, ++songs;
+                        if (const std::string ours = gh2::ourSong(game.game, song.song); gameOf(ours) == game.game)
+                            s_imported[ours] = song.lists, ++songs;
                 }
                 if (parsed)
                     std::cout << "[save] " << game.game << ": high scores for " << songs << " songs from "
@@ -663,7 +668,7 @@ namespace gh2::save
                 if (save && s_loaded == Loaded::kCard)
                 {
                     if (const std::optional<gh2::Save> card = gh2::parse(buffer, kBufferSize))
-                        overCard(*save, *card);
+                        overCard(*save, gh2::fromCard(*card, s_game));
                     else
                         save.reset();
                 }
@@ -704,7 +709,8 @@ namespace gh2::save
         // Each "song.<name>" in a section whose state has a word starting
         // `start` (gh2_text.h): "unlocked", or "stars=", which a song has
         // once it is finished.
-        void songsWith(const Section &section, const std::string &start, std::set<std::string> &out)
+        void songsWith(const Section &section, const std::string &game, const std::string &start,
+                       std::set<std::string> &out)
         {
             for (const auto &[key, value] : section.values)
             {
@@ -713,7 +719,8 @@ namespace gh2::save
                 std::istringstream words(value);
                 for (std::string word; words >> word;)
                     if (word.rfind(start, 0) == 0)
-                        out.insert(key.substr(5, key.find('#') == std::string::npos ? std::string::npos : key.find('#') - 5));
+                        out.insert(gh2::ourSong(
+                            game, key.substr(5, key.find('#') == std::string::npos ? std::string::npos : key.find('#') - 5)));
             }
         }
     }
@@ -725,7 +732,7 @@ namespace gh2::save
             if (!engine || e == *engine)
                 for (int d = 0; d < gh2::kDifficulties; ++d)
                     if (const Section *section = bandSection(slot, game, e, kDifficulties[d]))
-                        songsWith(*section, "stars=", passed[static_cast<size_t>(d)]);
+                        songsWith(*section, game, "stars=", passed[static_cast<size_t>(d)]);
         return passed;
     }
 
@@ -741,7 +748,7 @@ namespace gh2::save
                         if (section)
                             for (const auto &[key, value] : section->values)
                                 if (key.rfind("fc.", 0) == 0)
-                                    found[static_cast<size_t>(d)].insert(key.substr(3));
+                                    found[static_cast<size_t>(d)].insert(gh2::ourSong(game, key.substr(3)));
         return found;
     }
 
@@ -750,7 +757,7 @@ namespace gh2::save
         if (slot < 0 || slot >= gh2::kProfiles || difficulty < 0 || difficulty >= gh2::kDifficulties)
             return;
         s_store.section("band " + std::to_string(slot + 1) + " " + sectionGame(s_game) + " " + kDifficulties[difficulty])
-            .set("fc." + song, "1");
+            .set("fc." + gh2::storedSong(s_game, song), "1");
     }
 
     void keepQuickplayFullCombo(int difficulty, const std::string &song)
@@ -758,7 +765,9 @@ namespace gh2::save
         // Named songs (save/results.h) keep theirs in [best], by chart.
         if (difficulty < 0 || difficulty >= gh2::kDifficulties || isNamed(song))
             return;
-        s_store.section("quickplay " + sectionGame(gameOf(song)) + " " + kDifficulties[difficulty]).set("fc." + song, "1");
+        const std::string game = gameOf(song);
+        s_store.section("quickplay " + sectionGame(game) + " " + kDifficulties[difficulty])
+            .set("fc." + gh2::storedSong(game, song), "1");
     }
 
     bool hasFullCombo(const std::string &song, int difficulty)
@@ -771,7 +780,7 @@ namespace gh2::save
             const auto best = keptBest(playedKey(song, name));
             return best && best->fullCombo;
         }
-        const std::string game = gameOf(song), key = "fc." + song;
+        const std::string game = gameOf(song), key = "fc." + gh2::storedSong(game, song);
         if (const Section *section = quickplaySection(game, noteEngine(), name); section && section->get(key))
             return true;
         for (int slot = 0; slot < gh2::kProfiles; ++slot)
@@ -787,7 +796,7 @@ namespace gh2::save
             for (int slot = 0; slot < gh2::kProfiles; ++slot)
                 for (const char *difficulty : kDifficulties)
                     if (const Section *section = bandSection(slot, game, engine, difficulty))
-                        songsWith(*section, "unlocked", unlocked);
+                        songsWith(*section, game, "unlocked", unlocked);
         return unlocked;
     }
 
@@ -796,6 +805,7 @@ namespace gh2::save
         std::set<std::string> games;
         for (const NoteEngine engine : kNoteEngines)
             games.insert(sectionGame(game, engine));
+        const std::string stored = gh2::storedSong(game, item);
         for (const Section &section : s_store.sections)
         {
             // [band N <game>] and [band N <game> <difficulty>], under any engine.
@@ -807,7 +817,7 @@ namespace gh2::save
             {
                 // "<type>.<item>", "#2" on for one listed twice.
                 const size_t dot = key.find('.');
-                if (dot == std::string::npos || key.substr(dot + 1, key.find('#') - dot - 1) != item)
+                if (dot == std::string::npos || key.substr(dot + 1, key.find('#') - dot - 1) != stored)
                     continue;
                 std::istringstream words(value);
                 for (std::string word; words >> word;)

@@ -1,6 +1,9 @@
 #include "save/gh2_text.h"
 
+#include "content/sources.h"
+
 #include <charconv>
+#include <functional>
 #include <iostream>
 #include <map>
 #include <optional>
@@ -46,15 +49,27 @@ namespace gh2::save::gh2
             return std::nullopt;
         }
 
+        std::string gameOf(const Games &games, const std::string &song)
+        {
+            const auto it = games.songs.find(song);
+            return it == games.songs.end() ? games.own : it->second;
+        }
+
+        std::string storeName(const Games &games, const std::string &song)
+        {
+            return storedSong(gameOf(games, song), song);
+        }
+
         // "<type>.<name>", with "#2" on for an item listed twice: the
         // characters share their outfits' names.
-        std::vector<std::string> itemKeys(const std::vector<Item> &items)
+        std::vector<std::string> itemKeys(const std::vector<Item> &items, const Games &games)
         {
             std::map<std::string, int> seen;
             std::vector<std::string> keys;
             for (const Item &item : items)
             {
-                std::string key = typeName(item.type) + "." + item.name;
+                std::string key =
+                    typeName(item.type) + "." + (item.type == kSongType ? storeName(games, item.name) : item.name);
                 if (const int n = ++seen[key]; n > 1)
                     key += "#" + std::to_string(n);
                 keys.push_back(key);
@@ -131,10 +146,10 @@ namespace gh2::save::gh2
 
         // The items' states at index that differ from fresh's.
         void writeItems(Section &section, const std::vector<Item> &items, const std::vector<Item> &fresh,
-                        size_t index)
+                        size_t index, const Games &games)
         {
-            const std::vector<std::string> keys = itemKeys(items);
-            const std::vector<std::string> freshKeys = itemKeys(fresh);
+            const std::vector<std::string> keys = itemKeys(items, games);
+            const std::vector<std::string> freshKeys = itemKeys(fresh, games);
             std::map<std::string, const Item *> byKey;
             for (size_t i = 0; i < fresh.size(); ++i)
                 byKey[freshKeys[i]] = &fresh[i];
@@ -166,12 +181,12 @@ namespace gh2::save::gh2
 
         // The coop list has no names: expert's career songs, then the store's,
         // the same songs in the same order as the campaign's song items.
-        std::vector<std::string> coopKeys(const Save &fresh)
+        std::vector<std::string> coopKeys(const Save &fresh, const Games &games)
         {
             std::vector<std::string> keys;
             for (const Item &item : fresh.campaignItems)
                 if (item.type == kSongType)
-                    keys.push_back("song." + item.name);
+                    keys.push_back("song." + storeName(games, item.name));
             if (keys.size() != fresh.coop.size())
             {
                 keys.clear();
@@ -179,12 +194,6 @@ namespace gh2::save::gh2
                     keys.push_back("slot." + std::to_string(i));
             }
             return keys;
-        }
-
-        std::string gameOf(const Games &games, const std::string &song)
-        {
-            const auto it = games.songs.find(song);
-            return it == games.songs.end() ? games.own : it->second;
         }
 
         // "<game> scores <difficulty>", for the career's game or one whose
@@ -231,7 +240,8 @@ namespace gh2::save::gh2
             const Games &games;
 
             Keys(const Save &fresh, const Games &songGames)
-                : profile(itemKeys(fresh.profileItems)), campaign(itemKeys(fresh.campaignItems)), coop(coopKeys(fresh)),
+                : profile(itemKeys(fresh.profileItems, songGames)), campaign(itemKeys(fresh.campaignItems, songGames)),
+                  coop(coopKeys(fresh, songGames)),
                   games(songGames)
             {
             }
@@ -275,7 +285,7 @@ namespace gh2::save::gh2
                 if (!rank || *rank < 1 || *rank > kScoresPerList || !score)
                     return false;
                 for (SongScores &song : save.scores)
-                    if (song.song == key.substr(0, dot) && gameOf(keys.games, song.song) == game)
+                    if (storeName(keys.games, song.song) == key.substr(0, dot) && gameOf(keys.games, song.song) == game)
                     {
                         song.lists[d][*rank - 1] = {space == std::string::npos ? "" : value.substr(space + 1), *score};
                         return true;
@@ -326,6 +336,49 @@ namespace gh2::save::gh2
         }
     }
 
+    // A section's game under another note engine carries it ("gh2@gh1"):
+    // its songs are still the game's.
+    std::string storedSong(const std::string &section, const std::string &song)
+    {
+        const std::string game = section.substr(0u, section.find('@'));
+        const auto name = sources::bare(game, song);
+        if (!name)
+            return song;
+        return game == "gh2x" ? "x_" + *name : *name;
+    }
+
+    std::string ourSong(const std::string &section, const std::string &stored)
+    {
+        const std::string game = section.substr(0u, section.find('@'));
+        if (game == "gh2x" && stored.rfind("x_", 0) == 0)
+            return sources::song(game, stored.substr(2));
+        return sources::song(game, stored);
+    }
+
+    namespace
+    {
+        Save renamed(Save save, const std::function<std::string(const std::string &)> &name)
+        {
+            for (std::vector<Item> *items : {&save.profileItems, &save.campaignItems})
+                for (Item &item : *items)
+                    if (item.type == kSongType)
+                        item.name = name(item.name);
+            for (SongScores &song : save.scores)
+                song.song = name(song.song);
+            return save;
+        }
+    }
+
+    Save asCard(const Save &save, const std::string &game)
+    {
+        return renamed(save, [&](const std::string &song) { return storedSong(game, song); });
+    }
+
+    Save fromCard(const Save &card, const std::string &game)
+    {
+        return renamed(card, [&](const std::string &song) { return ourSong(game, song); });
+    }
+
     void toStore(const Save &save, const Save &fresh, Store &store, const Games &games)
     {
         store.removeIf([&](const std::string &name)
@@ -373,7 +426,7 @@ namespace gh2::save::gh2
                 own.set("difficulty", kDifficultyNames[profile.difficulty]);
             if (profile.cash != base.cash)
                 own.set("cash", std::to_string(profile.cash));
-            writeItems(own, save.profileItems, fresh.profileItems, p);
+            writeItems(own, save.profileItems, fresh.profileItems, p, games);
 
             for (int d = 0; d < kDifficulties; ++d)
             {
@@ -381,7 +434,7 @@ namespace gh2::save::gh2
                 for (int part = 0; part < 4; ++part)
                     if (profile.look[d][part] != base.look[d][part])
                         diff.set(kLook[part], profile.look[d][part]);
-                writeItems(diff, save.campaignItems, fresh.campaignItems, p * kDifficulties + d);
+                writeItems(diff, save.campaignItems, fresh.campaignItems, p * kDifficulties + d, games);
             }
         }
 
@@ -405,7 +458,7 @@ namespace gh2::save::gh2
                     const ScoreEntry &e = song.lists[d][rank];
                     if (base && base->lists[d][rank] == e)
                         continue;
-                    scores.set(song.song + "." + std::to_string(rank + 1),
+                    scores.set(storeName(games, song.song) + "." + std::to_string(rank + 1),
                                std::to_string(e.score) + (e.name.empty() ? "" : " " + e.name));
                 }
             }

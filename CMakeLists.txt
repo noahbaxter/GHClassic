@@ -298,6 +298,7 @@ set(GHC_GAME_SOURCES
     src/content/setlist_window.cpp
     src/content/setlists.cpp
     src/content/songs.cpp
+    src/content/sources.cpp
     src/content/status_line.cpp
     src/content/tour_or_higher.cpp
     src/content/vgs.cpp

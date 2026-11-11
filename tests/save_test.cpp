@@ -218,6 +218,48 @@ namespace
         CHECK(store.find("mod colours") != nullptr);
     }
 
+    // Songs go by <source>_<name> in the game (content/sources.h) and by
+    // their disc's names in the store and on a card, as saves always have.
+    void sourceNames()
+    {
+        const codec::Save bareFresh = freshCampaign(), bareSave = playedCampaign();
+        const codec::Save fresh = codec::fromCard(bareFresh, "gh2"), save = codec::fromCard(bareSave, "gh2");
+        CHECK(fresh.campaignItems[1].name == "gh2_freebird" && save.scores[1].song == "gh2_freebird");
+        CHECK(codec::write(codec::asCard(save, "gh2")) == codec::write(bareSave));
+
+        Store store;
+        codec::toStore(save, fresh, store);
+        const auto *scores = store.find("gh2 scores expert");
+        CHECK(scores && scores->get("freebird.1") && !scores->get("gh2_freebird.1"));
+        CHECK(codec::write(codec::fromStore(Store::parse(store.text()), fresh)) == codec::write(save));
+
+        // A save kept before songs had sources reads the same.
+        Store old;
+        codec::toStore(bareSave, bareFresh, old);
+        CHECK(old.text() == store.text());
+        CHECK(codec::write(codec::fromStore(old, fresh)) == codec::write(save));
+
+        // Another game's song keeps its scores in its game's sections.
+        codec::Save mixed = save, mixedFresh = fresh;
+        for (codec::Save *s : {&mixed, &mixedFresh})
+            s->scores.push_back(s->scores[0]), s->scores.back().song = "gh80s_bangyourhead";
+        mixed.scores.back().lists[3][0] = {"TESTER", 99999};
+        const codec::Games games{"gh2", {{"gh80s_bangyourhead", "gh80s"}}};
+        Store both;
+        codec::toStore(mixed, mixedFresh, both, games);
+        const auto *eighties = both.find("gh80s scores expert");
+        CHECK(eighties && eighties->get("bangyourhead.1"));
+        CHECK(codec::write(codec::fromStore(both, mixedFresh, games)) == codec::write(mixed));
+
+        // The 360's songs were x_<name> before.
+        CHECK(codec::storedSong("gh2x", "gh2x_surrender") == "x_surrender");
+        CHECK(codec::ourSong("gh2x", "x_surrender") == "gh2x_surrender");
+        CHECK(codec::storedSong("gh2", "cs_1234") == "cs_1234");
+        // A section under another note engine is still its game's.
+        CHECK(codec::storedSong("gh2@gh1", "gh2_surrender") == "surrender");
+        CHECK(codec::ourSong("gh2@gh1", "surrender") == "gh2_surrender");
+    }
+
     void ps2Card(const fs::path &dir)
     {
         const std::string path = (dir / "card.ps2").string();
@@ -287,6 +329,7 @@ int main()
     storeFile(dir);
     gh2Stream();
     gh2Sections();
+    sourceNames();
     ps2Card(dir);
     std::error_code error;
     fs::remove_all(dir, error);

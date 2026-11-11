@@ -39,6 +39,17 @@ namespace gh2::save::gh2
         SongGames songs;
     };
 
+    // A song of that game's as its sections and its card save name it: its
+    // name on the disc (content/sources.h), as saves always have, the 360's
+    // as x_<name>. A song not of that game's keeps its name.
+    std::string storedSong(const std::string &game, const std::string &song);
+    // The song a key in that game's sections, or its card save, names.
+    std::string ourSong(const std::string &game, const std::string &stored);
+
+    // A save of that game's with its songs as its card holds them, and back.
+    Save asCard(const Save &save, const std::string &game);
+    Save fromCard(const Save &card, const std::string &game);
+
     // Replaces every section of that game's in store with save's differences
     // from fresh. A band the save has none of loses its sections for every
     // game: the slot is shared, and its next band starts from nothing.

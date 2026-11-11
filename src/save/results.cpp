@@ -2,6 +2,7 @@
 
 #include "gameplay/engine/note_engine.h"
 #include "hook.h"
+#include "save/gh2_text.h"
 #include "save/save.h"
 #include "script.h"
 
@@ -82,7 +83,8 @@ namespace gh2::save
                           const std::string &controller)
     {
         const auto name = s_namer ? s_namer(song) : std::nullopt;
-        return bestKey(name ? name->song : gameOfSong(song) + '.' + song, noteEngineName(noteEngine()),
+        const std::string game = name ? "" : gameOfSong(song);
+        return bestKey(name ? name->song : game + '.' + gh2::storedSong(game, song), noteEngineName(noteEngine()),
                        name ? name->part : part, difficulty, controller);
     }
 
