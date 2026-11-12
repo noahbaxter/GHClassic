@@ -3,6 +3,7 @@
 #include "disc/ark.h"
 #include "disc/made_cache.h"
 #include "formats/bitmap.h"
+#include "host/log.h"
 #include "milo/layout.h"
 #include "milo/milo.h"
 #include "milo/objects.h"
@@ -553,7 +554,9 @@ namespace gh2
                 const std::string drawn = bakeFont(*scene, i);
                 if (drawn.empty())
                     continue;
-                std::cerr << "[font bake] " << path << " " << scene->entries[i].second << ": drew " << drawn << std::endl;
+                if (log::verbose())
+                    std::cerr << "[font bake] " << path << " " << scene->entries[i].second << ": drew " << drawn
+                              << std::endl;
                 changed = true;
             }
             if (changed)
