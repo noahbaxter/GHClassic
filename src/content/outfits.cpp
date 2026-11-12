@@ -24,10 +24,6 @@ namespace gh2::outfits
 {
     namespace
     {
-        struct Outfit
-        {
-            std::string game, own, character, outfit, beside, label;
-        };
         std::vector<Outfit> s_outfits;
 
         // The one outfit of a GH2 character that had only one, which the
@@ -222,6 +218,8 @@ namespace gh2::outfits
 
         s_outfits.push_back({game, own, character, outfit, beside, label});
     }
+
+    const std::vector<Outfit> &added() { return s_outfits; }
 
     std::optional<std::pair<std::string, std::string>> ownOf(const std::string &outfit)
     {

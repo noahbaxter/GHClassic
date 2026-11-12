@@ -3,11 +3,13 @@
 #include "content/games.h"
 #include "content/setlist_printout.h"
 #include "custom/audio.h"
+#include "custom/cast.h"
 #include "custom/gh2_chart.h"
 #include "custom/songs.h"
 #include "custom/text.h"
 #include "formats/dtb.h"
 #include "gameplay/extended/guitar/gem_kinds.h"
+#include "gh1/face.h"
 #include "render/texture_store.h"
 #include "script.h"
 
@@ -15,6 +17,7 @@
 #include <iostream>
 #include <map>
 #include <memory>
+#include <mutex>
 
 namespace gh2::custom
 {
@@ -65,13 +68,15 @@ namespace gh2::custom
                     array({symbol("midi_file"), symbol(dir + ".mid")}),
                 }),
                 array({symbol("bank"), symbol("sfx/song_default")}),
-                array({symbol("anim_tempo"), symbol("kTempoMedium")}),
+                array({symbol("anim_tempo"), symbol(bandFast(song) ? "kTempoFast" : "kTempoMedium")}),
             });
-            // song.ini's vocal_gender, as Rock Band's: GH2's female singer
-            // in place of its default band's (gh2.dta's default_band).
-            if (lower(tag(song.tags, "vocal_gender").value_or("")) == "female")
-                out.nodes.push_back(
-                    array({symbol("band"), symbol("metal_bass"), symbol("metal_drummer"), symbol("female_singer")}));
+            if (const char *front = bandFront(song))
+            {
+                dtb::Node band = array({symbol("band"), symbol("metal_bass"), symbol("metal_drummer")});
+                if (*front)
+                    band.nodes.push_back(symbol(front));
+                out.nodes.push_back(std::move(band));
+            }
             // Fifteen seconds from song.ini's start, 30 s in where it has
             // none, kept inside the song: GH2 waits forever on audio past
             // the end.
@@ -79,11 +84,12 @@ namespace gh2::custom
             const int preview = std::clamp(static_cast<int>(number(song.tags, "preview_start_time").value_or(30000)), 0,
                                            std::max(length - 15000, 0));
             out.nodes.push_back(array({symbol("preview"), integer(preview), integer(std::min(preview + 15000, length))}));
+            const Cast cast = castOf(song.tags);
             out.nodes.push_back(array({
                 symbol("quickplay"),
-                array({symbol("character_outfit"), symbol("punk1")}),
-                array({symbol("guitar"), symbol("lespaul")}),
-                array({symbol("venue"), symbol("small1")}),
+                array({symbol("character_outfit"), symbol(cast.outfit)}),
+                array({symbol("guitar"), symbol(cast.guitar)}),
+                array({symbol("venue"), symbol(cast.venue)}),
             }));
             return dtb::text(out);
         }
@@ -95,27 +101,66 @@ namespace gh2::custom
         }
 
         // The chart in GH2's form, made from the song's folder, PART GUITAR
-        // that part, at `path`; and its gems' kinds, for the engine to take
-        // as the song loads (gameplay/extended/guitar/gem_kinds.h).
-        std::optional<ark::Made> chartOf(const std::string &path, const Song &song, Part part)
+        // that part.
+        std::optional<Gh2Chart> gh2Of(const Song &song, Part part)
         {
             std::string why;
             const auto chart = parseSongChart(song.chart, songFile(songPath(song, song.chart)), options(song.tags), why);
             const double length = number(song.tags, "song_length").value_or(0) / 1000.0;
-            const auto gh2 = chart ? toGh2(*chart, length, part) : std::nullopt;
+            auto gh2 = chart ? toGh2(*chart, length, part) : std::nullopt;
             if (!gh2)
-            {
                 std::cerr << "[custom] " << utf8(song.dir) << ": chart no longer reads" << (why.empty() ? "" : ": " + why)
                           << std::endl;
+            return gh2;
+        }
+
+        // What each chart made sings, by its path less its extension, so its
+        // lip sync needn't read the chart again.
+        std::mutex s_sungMutex;
+        std::map<std::string, std::vector<Sung>> s_sung;
+
+        // The chart at `path`, and beside it its gems' kinds, for the engine
+        // to take as the song loads (gameplay/extended/guitar/gem_kinds.h),
+        // and when GH1's singer opens its mouth (gh1/face.h), by its id.
+        std::optional<ark::Made> chartOf(const std::string &path, const std::string &id, const Song &song, Part part)
+        {
+            const auto gh2 = gh2Of(song, part);
+            if (!gh2)
                 return std::nullopt;
-            }
             guitar::setGems(path, gh2->gems, gh2->hopoThreshold);
+            gh1::addSinging(id, mouthOpen(mouthShapes(gh2->sung)));
+            {
+                const std::lock_guard lock(s_sungMutex);
+                s_sung[path.substr(0u, path.rfind('.'))] = gh2->sung;
+            }
             return ark::held(gh2->mid);
         }
 
-        // songs/<id>/<id>[_bass].<mid|vgs|voc>: its chart and audio for its
-        // own part, or for the bass where it has one besides; no lip sync
-        // of its own, GH2's neutral track, as GH1's songs have.
+        // Its singer's lip sync at `path`: GH2's blink track (its blinks)
+        // with the mouth's shapes from what is sung (custom/lipsync.h).
+        std::optional<ark::Made> vocOf(const std::string &path, const Song &song, Part part)
+        {
+            static const auto s_blink =
+                ark::readFile(games::disc("gh2").value_or(0u), "songs/_blinktrack/_blinktrack.voc");
+            if (!s_blink)
+                return std::nullopt;
+            std::optional<std::vector<Sung>> sung;
+            {
+                const std::lock_guard lock(s_sungMutex);
+                if (const auto it = s_sung.find(path.substr(0u, path.rfind('.'))); it != s_sung.end())
+                {
+                    sung = std::move(it->second);
+                    s_sung.erase(it);
+                }
+            }
+            if (!sung)
+                if (auto gh2 = gh2Of(song, part))
+                    sung = std::move(gh2->sung);
+            return ark::held(sung ? withMouth(*s_blink, mouthShapes(*sung)) : *s_blink);
+        }
+
+        // songs/<id>/<id>[_bass].<mid|vgs|voc>: its chart, audio and lip
+        // sync for its own part, or for the bass where it has one besides.
         std::optional<ark::Made> fileOf(const std::string &path)
         {
             const size_t slash = path.find('/', 6u), dot = path.rfind('.');
@@ -133,15 +178,11 @@ namespace gh2::custom
                 return std::nullopt;
             const Part part = bass ? Part::Bass : playedPart(song->parts);
             if (ext == ".mid")
-                return chartOf(path, *song, part);
+                return chartOf(path, id, *song, part);
             if (ext == ".vgs")
                 return madeMix(path, *song, playedStem(part));
             if (ext == ".voc")
-            {
-                static const auto s_voc =
-                    ark::readFile(games::disc("gh2").value_or(0u), "songs/_blinktrack/_blinktrack.voc");
-                return s_voc ? std::optional(ark::held(*s_voc)) : std::nullopt;
-            }
+                return vocOf(path, *song, part);
             return std::nullopt;
         }
 

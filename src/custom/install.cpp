@@ -2,6 +2,7 @@
 
 #include "content/locale.h"
 #include "content/setlists.h"
+#include "custom/cast.h"
 #include "custom/command.h"
 #include "custom/index.h"
 #include "custom/scan_status.h"
@@ -127,8 +128,14 @@ namespace gh2
             const auto song = catalog().find(id);
             return song ? plain(tag(song->tags, "artist").value_or("")) : std::string();
         };
+        // Each song in its cast's venue (custom/cast.h).
+        const auto venue = [](const std::string &id)
+        {
+            const auto song = catalog().find(id);
+            return song ? castOf(song->tags).venue : std::string("small1");
+        };
         // On GH2's own paper whichever game's menus are up, as it goes on
         // for as long as the list (content/setlist_paper.h).
-        setlists::addLive("custom", "gh2/ui/sel_song_quickplay.milo", {rows, readyEntries, "small1", artist});
+        setlists::addLive("custom", "gh2/ui/sel_song_quickplay.milo", {rows, readyEntries, venue, artist});
     }
 }

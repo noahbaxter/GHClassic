@@ -1,10 +1,9 @@
 // The index is its version's line, then a line a song, its fields split by
 // tabs: folder, chart, the two write times, why it does not play and its
-// kind, parts,
-// stems and sections each split by '|', length, the charted difficulties,
-// the chart's MD5, album art, then its tags as key=value, each a
-// field. A '|' in a section's name splits it. A tab or line break in a
-// value is a space.
+// kind, parts, stems and sections each split by '|', length, the charted
+// difficulties, the chart's MD5, album art, Song::chartHas, band BPM, then
+// its tags as key=value, each a field. A '|' in a section's name splits it.
+// A tab or line break in a value is a space.
 
 #include "custom/index.h"
 
@@ -23,7 +22,7 @@ namespace gh2::custom
         namespace fs = std::filesystem;
 
         // The index's first line, changed with its fields.
-        constexpr const char *kIndexVersion = "# GH Classic songs index 7";
+        constexpr const char *kIndexVersion = "# GH Classic songs index 9";
 
         std::string flat(std::string s)
         {
@@ -46,7 +45,7 @@ namespace gh2::custom
             // split leaves out a last field that is empty (no art, no tags).
             if (f.size() < 12u)
                 continue;
-            f.resize(std::max<size_t>(f.size(), 13u));
+            f.resize(std::max<size_t>(f.size(), 15u));
             Song song;
             song.dir = fromUtf8(f[0]);
             song.chart = f[1];
@@ -61,7 +60,9 @@ namespace gh2::custom
             song.charted = static_cast<uint16_t>(std::strtoul(f[10].c_str(), nullptr, 10));
             song.chartMd5 = f[11];
             song.art = f[12];
-            for (size_t i = 13u; i < f.size(); ++i)
+            song.chartHas = static_cast<uint8_t>(std::strtoul(f[13].c_str(), nullptr, 10));
+            song.bandBpm = std::strtof(f[14].c_str(), nullptr);
+            for (size_t i = 15u; i < f.size(); ++i)
                 if (const size_t eq = f[i].find('='); eq != std::string::npos)
                     song.tags[f[i].substr(0, eq)] = f[i].substr(eq + 1u);
             songs.push_back(std::move(song));
@@ -86,7 +87,7 @@ namespace gh2::custom
                 out << flat(utf8(s.dir)) << '\t' << s.chart << '\t' << s.iniTime << '\t' << s.chartTime << '\t'
                     << flat(s.why) << '\t' << int(s.reject) << '\t' << int(s.parts) << '\t' << joined(s.stems) << '\t' << joined(s.sections)
                     << '\t' << s.length << '\t' << s.charted << '\t' << s.chartMd5 << '\t'
-                    << flat(s.art);
+                    << flat(s.art) << '\t' << int(s.chartHas) << '\t' << s.bandBpm;
                 for (const auto &[key, value] : s.tags)
                     out << '\t' << flat(key) << '=' << flat(value);
                 out << '\n';

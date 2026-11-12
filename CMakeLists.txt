@@ -166,18 +166,27 @@ target_link_libraries(save_test PRIVATE miniz)
 # Custom songs' charts, and a tally of a folder of them.
 add_executable(custom_chart_test EXCLUDE_FROM_ALL
     tests/custom_chart_test.cpp
+    src/custom/cast.cpp
     src/custom/catalog.cpp
     src/custom/chart.cpp
+    src/custom/chart_rules.cpp
     src/custom/gh2_chart.cpp
     src/custom/index.cpp
     src/custom/library.cpp
+    src/custom/lipsync.cpp
+    src/custom/notes_chart.cpp
+    src/custom/notes_mid.cpp
+    src/custom/song_facts.cpp
     src/custom/song_ini.cpp
+    src/custom/stage/band.cpp
+    src/custom/stage/stage.cpp
+    src/custom/stage/venue.cpp
     src/custom/text.cpp
     src/formats/md5.cpp
     src/formats/midi.cpp
     src/formats/sng.cpp
 )
-target_include_directories(custom_chart_test PRIVATE src)
+target_include_directories(custom_chart_test PRIVATE src "${CMAKE_CURRENT_BINARY_DIR}/dta")
 
 # Which release the game offers as an update.
 add_executable(releases_test EXCLUDE_FROM_ALL tests/releases_test.cpp src/host/releases.cpp)
@@ -295,16 +304,25 @@ set(GHC_GAME_SOURCES
     src/content/vorbis.cpp
     src/content/audio_file.cpp
     src/custom/audio.cpp
+    src/custom/cast.cpp
     src/custom/catalog.cpp
     src/custom/chart.cpp
+    src/custom/chart_rules.cpp
     src/custom/command.cpp
     src/custom/gh2_chart.cpp
     src/custom/index.cpp
     src/custom/install.cpp
     src/custom/library.cpp
+    src/custom/lipsync.cpp
+    src/custom/notes_chart.cpp
+    src/custom/notes_mid.cpp
+    src/custom/song_facts.cpp
     src/custom/song_files.cpp
     src/custom/song_ini.cpp
     src/custom/songs.cpp
+    src/custom/stage/band.cpp
+    src/custom/stage/stage.cpp
+    src/custom/stage/venue.cpp
     src/custom/text.cpp
     src/dev/cheats.cpp
     src/dev/draw_dump.cpp
@@ -560,6 +578,10 @@ configure_file(src/ui/dta/dta.h.in "${GHC_DTA_DIR}/dta.h" @ONLY)
 file(READ config/settings.template.ini GHC_SETTINGS_TEMPLATE)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS config/settings.template.ini)
 configure_file(src/settings/settings_template.h.in "${GHC_DTA_DIR}/settings_template.h" @ONLY)
+# Official songs' bands (custom/song_facts.h), tools/song_facts.py's table.
+file(READ assets/song_facts.tsv GHC_SONG_FACTS)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/song_facts.tsv)
+configure_file(src/custom/song_facts_table.h.in "${GHC_DTA_DIR}/song_facts_table.h" @ONLY)
 # The old Flying V layout's texel table (gh1/guitars.h), as a byte array.
 file(READ src/gh1/flyingv_old_layout.bin GHC_FLYINGV_OLD_LAYOUT HEX)
 string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_FLYINGV_OLD_LAYOUT "${GHC_FLYINGV_OLD_LAYOUT}")

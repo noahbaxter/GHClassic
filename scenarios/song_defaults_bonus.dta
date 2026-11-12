@@ -1,0 +1,22 @@
+; Quickplay with song defaults and the unlock-all cheat: GH2's bonus song
+; Raw Dog plays its own guitarist (Casey) in her alternate outfit, in the
+; venue its songs.dta casts (theatre), locked on a first boot but for the
+; cheat.
+#include common/first_boot.dta
+{quickplay song_defaults 1}
+{campaign set_all_access 1}
+{gamecfg set mode quickplay}
+{setlist select gh2}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 2)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+{game set_song rawdog}
+{{game get_player_config 0} set autoplay TRUE}
+(press green)
+(wait_screen game_screen 60)
+(expect {game get_character_outfit} rock1)
+(expect {game get_venue} theatre)
+(quit)

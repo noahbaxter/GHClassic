@@ -57,8 +57,8 @@ namespace gh2::guitar
                 return false;
             const Gh2Gem *gem = watcherChartGem(rdram, watcher, i);
             if (start)
-                *start = gem && gem->laneStart;
-            return gem && gem->laned;
+                *start = gem && gem->lanePhraseStart;
+            return gem && gem->inLanePhrase;
         }
         std::optional<Lane> laneOf(uint8_t *rdram, uint32_t watcher, int i)
         {

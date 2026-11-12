@@ -15,7 +15,7 @@ namespace gh2::midi
     // An event's status.
     constexpr uint8_t kNoteOff = 0x80u, kNoteOn = 0x90u, kSysex = 0xf0u, kSysexEnd = 0xf7u, kMeta = 0xffu;
     // A meta event's type.
-    constexpr uint8_t kText = 0x01u, kTrackName = 0x03u, kEndOfTrack = 0x2fu, kTempo = 0x51u, kSignature = 0x58u;
+    constexpr uint8_t kText = 0x01u, kTrackName = 0x03u, kLyric = 0x05u, kEndOfTrack = 0x2fu, kTempo = 0x51u, kSignature = 0x58u;
 
     struct Event
     {

@@ -1,6 +1,8 @@
 #include "custom/library.h"
 
 #include "content/audio_kind.h"
+#include "custom/song_facts.h"
+#include "custom/stage/stage.h"
 #include "custom/text.h"
 #include "formats/md5.h"
 #include "formats/sng.h"
@@ -169,6 +171,26 @@ namespace gh2::custom
 
         std::string artIn(const Source &source) { return firstOf(source, {"album.png", "album.jpg", "album.jpeg"}); }
 
+        // The lead part's expert's beats a minute as the band plays it, from
+        // its first note to its last; 0 if none.
+        float leadBpm(const Chart &chart)
+        {
+            for (const Part part : {Part::Guitar, Part::Coop, Part::Rhythm, Part::Bass})
+                if (const auto it = chart.parts.find(part); it != chart.parts.end() && it->second[3].gems.size() > 1u)
+                {
+                    const std::vector<Gem> &gems = it->second[3].gems;
+                    const double beats = double(gems.back().tick - gems.front().tick) / chart.resolution,
+                                 seconds = chart.seconds(gems.back().tick) - chart.seconds(gems.front().tick);
+                    return seconds > 0.0 ? static_cast<float>(bandBpm(60.0 * beats / seconds)) : 0.0f;
+                }
+            return 0.0f;
+        }
+
+        std::optional<SongFacts> factsOf(const Song &song)
+        {
+            return songFacts(tag(song.tags, "artist").value_or(""), tag(song.tags, "name").value_or(""));
+        }
+
         // A song read from its files: `tags` its song.ini's, the times when
         // its song.ini and chart were written.
         Song readListed(const fs::path &dir, const std::string &chartName, const Source &source, Tags tags,
@@ -208,6 +230,10 @@ namespace gh2::custom
                 for (const auto &[tick, name] : chart->sections)
                     if (std::find(song.sections.begin(), song.sections.end(), name) == song.sections.end())
                         song.sections.push_back(name);
+                song.chartHas = static_cast<uint8_t>((chart->vocals.empty() ? 0u : kHasVocals) |
+                                                     (chart->keys.empty() ? 0u : kHasKeys) |
+                                                     (chart->drums.empty() ? 0u : kHasDrums));
+                song.bandBpm = leadBpm(*chart);
             }
 
             const auto turnDown = [&](Reject reject, std::string why)
@@ -399,6 +425,40 @@ namespace gh2::custom
     {
         const std::string stem = lower(file.substr(0u, file.rfind('.')));
         return stem == part || stem.rfind(part + "_", 0u) == 0u;
+    }
+
+    const char *bandFront(const Song &song)
+    {
+        const auto facts = factsOf(song);
+        const std::string iniGender = lower(tag(song.tags, "vocal_gender").value_or(""));
+        const bool female = iniGender.empty() ? facts && facts->gender == 'f' : iniGender == "female";
+        const char *singer = female ? "female_singer" : nullptr;
+        if (facts && facts->song)
+        {
+            if (facts->gender != 'n')
+                return singer;
+            if (facts->keys || song.chartHas & kHasKeys)
+                return "metal_keyboard";
+            return "";
+        }
+        const auto hasStem = [&](const char *part)
+        { return std::any_of(song.stems.begin(), song.stems.end(), [&](const std::string &s) { return partStem(s, part); }); };
+        if (!(song.chartHas & kHasVocals) && !hasStem("vocals"))
+        {
+            if (song.chartHas & kHasKeys)
+                return "metal_keyboard";
+            if (song.chartHas & kHasDrums && hasPart(song.parts, Part::Bass) && hasStem("drums"))
+                return "";
+        }
+        return singer;
+    }
+
+    bool bandFast(const Song &song)
+    {
+        constexpr float kFastFrom = 120.0f;
+        if (const auto facts = factsOf(song); facts && facts->fast)
+            return *facts->fast;
+        return song.bandBpm >= kFastFrom;
     }
 
     // As text, as fs::path compares a part at a time, many times slower.

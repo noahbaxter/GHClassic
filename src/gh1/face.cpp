@@ -19,10 +19,13 @@
 // A singer's face has an event_list in place of excitement poses, and
 // CharFace::EventPicker (GH1 0x287a80) shows the pose of the chart event it
 // is in, looking event_offset ms ahead, and ref between them. The events are
-// the gems track's note 108, their pose open (charsys.dta's singer_events).
+// the gems track's note 108, their pose open (charsys.dta's singer_events);
+// a GH2 song's, where its mouth is open in its lip sync (<song>.voc).
 
 #include "gh1/face.h"
 
+#include "custom/lipsync.h"
+#include "disc/ark.h"
 #include "guest.h"
 #include "hook.h"
 #include "milo/layout.h"
@@ -122,12 +125,16 @@ namespace gh2
         {
             const uint32_t config = load<uint32_t>(rdram, s_addresses->theGameConfig);
             const uint32_t song = config ? load<uint32_t>(rdram, config + kSong) : 0u;
-            const auto events = song ? s_singing.find(reinterpret_cast<const char *>(getMemPtr(rdram, song))) : s_singing.end();
-            if (events == s_singing.end())
+            if (!song)
                 return false;
-            const float at = load<float>(rdram, load<uint32_t>(rdram, s_addresses->theTaskMgr + 0x28u) + 0xcu) + ahead;
-            const auto next = std::upper_bound(events->second.begin(), events->second.end(), std::pair(at, 1.0e9f));
-            return next != events->second.begin() && std::prev(next)->second >= at;
+            const auto [events, fresh] = s_singing.try_emplace(reinterpret_cast<const char *>(getMemPtr(rdram, song)));
+            // A GH2 song's, from its lip sync (custom/lipsync.h), once.
+            if (fresh)
+                if (const auto voc = ark::readFile("songs/" + events->first + "/" + events->first + ".voc"))
+                    events->second = custom::vocMouthOpen(*voc);
+            const float when = load<float>(rdram, load<uint32_t>(rdram, s_addresses->theTaskMgr + 0x28u) + 0xcu) + ahead;
+            const auto next = std::upper_bound(events->second.begin(), events->second.end(), std::pair(when, 1.0e9f));
+            return next != events->second.begin() && std::prev(next)->second >= when;
         }
 
         // CharFace::EventPicker or ExcitementPicker (GH1 0x287a80,

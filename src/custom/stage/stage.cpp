@@ -1,0 +1,283 @@
+#include "custom/stage/parts.h"
+
+#include <algorithm>
+#include <cctype>
+#include <set>
+#include <sstream>
+
+namespace gh2::custom
+{
+    namespace
+    {
+        // Each bar's start in GH2 ticks, up to `end` or until `toGh2` stops
+        // growing (it clamps a wild chart's ticks).
+        std::vector<uint32_t> barsTo(const Chart &chart, const TickMap &toGh2, uint32_t end)
+        {
+            std::vector<uint32_t> out;
+            uint32_t tick = 0u, length = chart.resolution * 4u;
+            size_t next = 0u;
+            for (uint32_t at; (at = toGh2(tick)) < end && (out.empty() || at > out.back()); tick += length)
+            {
+                while (next < chart.signatures.size() && chart.signatures[next].first <= tick)
+                {
+                    const auto &sig = chart.signatures[next++].second;
+                    length = std::max(1u, chart.resolution * 4u * sig[0] / (1u << std::min<uint8_t>(sig[1], 6u)));
+                }
+                out.push_back(at);
+            }
+            return out;
+        }
+
+        // Past kBandFastest the band plays at half tempo, under kBandSlowest
+        // at double (main.drv's beat scale). It goes back to normal only 10%
+        // inside the line, so a chart wavering at it keeps one.
+        constexpr double kHysteresis = 0.9;
+
+        BandBeatLengths bandBeatLengths(const Chart &chart, const TickMap &toGh2)
+        {
+            BandBeatLengths out = {{0u, kBeat}};
+            for (const Tempo &t : chart.tempos)
+            {
+                const double bpm = 60e6 / t.usPerBeat;
+                uint32_t beat = out.rbegin()->second;
+                if (bpm > kBandFastest)
+                    beat = kBeat * 2u;
+                else if (bpm < kBandSlowest)
+                    beat = kBeat / 2u;
+                else if (bpm < kBandFastest * kHysteresis && bpm > kBandSlowest / kHysteresis)
+                    beat = kBeat;
+                if (beat != out.rbegin()->second)
+                    out[toGh2(t.tick)] = beat;
+            }
+            return out;
+        }
+
+        // The chart's bars as the band's: every other one where it plays at
+        // half, each split in two where at double.
+        std::vector<uint32_t> bandBars(const std::vector<uint32_t> &bars, const BandBeatLengths &beats, uint32_t end)
+        {
+            std::vector<uint32_t> out;
+            uint32_t regionBeat = UINT32_MAX;
+            size_t barInRegion = 0u;
+            for (size_t b = 0; b < bars.size(); ++b)
+            {
+                const uint32_t beat = beatAt(beats, bars[b]);
+                if (beat != regionBeat)
+                {
+                    regionBeat = beat;
+                    barInRegion = 0u;
+                }
+                if (beat > kBeat && barInRegion++ % 2u != 0u)
+                    continue;
+                out.push_back(bars[b]);
+                if (beat < kBeat)
+                    out.push_back(bars[b] + ((b + 1u < bars.size() ? bars[b + 1u] : end) - bars[b]) / 2u);
+            }
+            return out;
+        }
+
+        // The chart tracks a band member's own texts may be on.
+        constexpr const char *kMembers[] = {"PART BASS",  "PART DRUMS", "PART KEYS",  "PART VOCALS", "HARM1",
+                                            "BAND BASS",  "BAND DRUMS", "BAND KEYS",  "BAND SINGER"};
+
+        // GH2's band member texts, each with its lane.
+        constexpr std::pair<std::string_view, std::string_view> kLaneTexts[] = {
+            {"[play]", "state"},         {"[idle]", "state"},         {"[half_tempo]", "tempo"},
+            {"[normal_tempo]", "tempo"}, {"[double_tempo]", "tempo"}, {"[wail_on]", "wail"},
+            {"[wail_off]", "wail"},      {"[ow_face_on]", "face"},    {"[ow_face_off]", "face"},
+            {"[allbeat]", "beat"},       {"[double_time]", "beat"},   {"[half_time]", "beat"},
+            {"[nobeat]", "beat"},
+        };
+
+        // Which lane of a band track an event is, so a chart's authored lane
+        // replaces the made one: kLaneTexts' (any "_tempo]" text a tempo), a
+        // note by its pitch (the lighting's keyframes, 48 to 50, as one), any
+        // other text by itself.
+        std::string laneOf(const midi::Event &e)
+        {
+            if (e.status == midi::kMeta)
+            {
+                const std::string s(e.data.begin(), e.data.end());
+                if (s.find("_tempo]") != std::string::npos)
+                    return "tempo";
+                if (const auto lane = gh2Lane(s); !lane.empty())
+                    return std::string(lane);
+                return s;
+            }
+            const uint8_t pitch = e.data.empty() ? 0u : e.data[0];
+            return pitch >= 48u && pitch <= 50u ? "keyframes" : "note " + std::to_string(pitch);
+        }
+
+        // Each lane of `made` the chart's own track of its name has (a
+        // GH2-made chart's BAND DRUMS, TRIGGERS) replaced by the chart's.
+        void replaceAuthoredLanes(midi::Track &made, const Chart &chart, const TickMap &toGh2)
+        {
+            const Chart::StageTrack *track = stageTrack(chart, made.name.c_str());
+            if (!track)
+                return;
+            midi::Track authored;
+            for (const Chart::Cue &c : track->cues)
+                authored.events.push_back(midi::text(toGh2(c.tick), c.text));
+            for (const Chart::Mark &m : track->marks)
+                addNote(authored, toGh2(m.tick), toGh2(m.tick + m.length), m.pitch);
+            std::set<std::string> lanes;
+            for (const midi::Event &e : authored.events)
+                lanes.insert(laneOf(e));
+            std::erase_if(made.events, [&](const midi::Event &e) { return lanes.count(laneOf(e)) != 0u; });
+            made.events.insert(made.events.end(), authored.events.begin(), authored.events.end());
+        }
+
+        // Where no chart track sets a tempo, the band's and crowd's at each
+        // change of the band's beat.
+        void addBandTempo(BandTracks &band)
+        {
+            const Chart &chart = band.in.chart;
+            const auto authorsTempo = [&](const char *name)
+            {
+                const Chart::StageTrack *track = stageTrack(chart, name);
+                return track && std::any_of(track->cues.begin(), track->cues.end(),
+                                            [](const Chart::Cue &c) { return c.text.find("_tempo") != std::string::npos; });
+            };
+            if (std::any_of(std::begin(kMembers), std::end(kMembers), authorsTempo) || authorsTempo(trackOf(band.in.part)) ||
+                authorsTempo("EVENTS"))
+                return;
+            for (const auto &[tick, beat] : band.beats)
+            {
+                if (tick == 0u && beat == kBeat)
+                    continue;
+                const std::string text = beat > kBeat ? "half_tempo" : beat < kBeat ? "double_tempo" : "normal_tempo";
+                for (midi::Track *member : {&band.guitar, &band.drums, &band.bass, &band.singer, &band.keys})
+                    if (member != &band.keys || !chart.keys.empty())
+                        member->events.push_back(midi::text(tick, "[" + text + "]"));
+                band.events.events.push_back(midi::text(tick, "[crowd_" + text + "]"));
+            }
+        }
+    }
+
+    std::vector<uint32_t> ticksOf(const std::vector<Gem> &gems)
+    {
+        std::vector<uint32_t> out;
+        for (const Gem &g : gems)
+            out.push_back(g.tick);
+        return out;
+    }
+
+    std::vector<uint32_t> toGh2Sorted(const std::vector<uint32_t> &ticks, const TickMap &toGh2)
+    {
+        std::vector<uint32_t> out;
+        for (const uint32_t t : ticks)
+            out.push_back(toGh2(t));
+        std::sort(out.begin(), out.end());
+        out.erase(std::unique(out.begin(), out.end()), out.end());
+        return out;
+    }
+
+    const char *trackOf(Part part)
+    {
+        static constexpr const char *kTracks[] = {"PART GUITAR", "PART GUITAR COOP", "PART RHYTHM", "PART BASS"};
+        return kTracks[size_t(part)];
+    }
+
+    const Chart::StageTrack *stageTrack(const Chart &chart, const char *name)
+    {
+        const auto it = chart.stage.find(name);
+        return it == chart.stage.end() ? nullptr : &it->second;
+    }
+
+    std::string_view gh2Lane(const std::string &text)
+    {
+        for (const auto &[t, lane] : kLaneTexts)
+            if (text == t)
+                return lane;
+        return {};
+    }
+
+    std::string sectionBaseName(const std::string &section)
+    {
+        std::string s;
+        for (const unsigned char c : section)
+            s += c == '_' || c == '-' ? ' ' : static_cast<char>(std::tolower(c));
+        std::vector<std::string> words;
+        std::istringstream in(s);
+        for (std::string w; in >> w;)
+            words.push_back(w);
+        // Its number, and a letter or two with it or after it, off the end.
+        const auto numbered = [](const std::string &w)
+        {
+            size_t i = 0;
+            while (i < w.size() && std::isdigit(static_cast<unsigned char>(w[i])))
+                ++i;
+            return (i > 0u && w.size() - i <= 2u) || (w.size() <= 1u);
+        };
+        while (words.size() > 1u && numbered(words.back()))
+            words.pop_back();
+        // And one written into its word ("verse1a").
+        if (!words.empty())
+        {
+            std::string &last = words.back();
+            size_t letters = last.size();
+            while (letters > 0u && last.size() - letters < 2u && std::isalpha(static_cast<unsigned char>(last[letters - 1u])))
+                --letters;
+            size_t digits = letters;
+            while (digits > 0u && std::isdigit(static_cast<unsigned char>(last[digits - 1u])))
+                --digits;
+            if (digits < letters && digits >= 2u)
+                last.resize(digits);
+        }
+        std::string out;
+        for (const std::string &w : words)
+            out += (out.empty() ? "" : " ") + w;
+        return out;
+    }
+
+    midi::Track upcomingDrums(const midi::Track &bandDrums, uint32_t ticksPerBeat)
+    {
+        midi::Track out;
+        out.name = kUpcomingTrack;
+        for (const midi::Event &e : bandDrums.events)
+            if (e.status == midi::kMeta && e.meta == midi::kText)
+            {
+                std::string text(e.data.begin(), e.data.end());
+                text.erase(text.find_last_not_of(' ') + 1u);
+                if (text != "[play]" && text != "[idle]")
+                    continue;
+                const uint32_t cueTick = e.tick > ticksPerBeat ? e.tick - ticksPerBeat : 0u;
+                addNote(out, cueTick, cueTick, text == "[play]" ? 60u : 61u);
+            }
+        return out;
+    }
+
+    std::vector<midi::Track> addStage(const StageIn &in, midi::Track &guitar, midi::Track &events)
+    {
+        const std::vector<uint32_t> lead = toGh2Sorted(ticksOf(in.lead.gems), in.toGh2);
+        if (lead.empty())
+            return {};
+        const BandBeatLengths beats = bandBeatLengths(in.chart, in.toGh2);
+        BandTracks band{in, guitar, events, lead, playingRuns(lead), beats,
+                        bandBars(barsTo(in.chart, in.toGh2, in.end), beats, in.end)};
+        addGuitarist(band);
+        const std::vector<uint32_t> kicks = addDrummer(band);
+        addBassist(band, kicks);
+        addKeys(band);
+        addSinger(band);
+        const std::vector<Section> sections = sectionsOf(band);
+        const bool chartHasLighting = addMoods(band, sections);
+        addSectionCrashes(band, sections);
+        addWails(band, sections);
+        addKeyframes(band, chartHasLighting);
+        addBandTempo(band);
+
+        // The chart's own lanes in place of those made.
+        std::vector<midi::Track> out;
+        for (midi::Track *made : {&band.drums, &band.bass, &band.singer, &band.triggers, &band.keys})
+        {
+            replaceAuthoredLanes(*made, in.chart, in.toGh2);
+            if (made != &band.keys || !band.keys.events.empty())
+                out.push_back(std::move(*made));
+        }
+        out.push_back(upcomingDrums(out.front(), kBeat));
+        if (midi::Track hand = bassHand(in.chart, in.toGh2); !hand.events.empty())
+            out.push_back(std::move(hand));
+        return out;
+    }
+}

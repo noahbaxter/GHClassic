@@ -62,6 +62,7 @@ namespace gh2::settings
         kVectorFonts, // text in the traced fonts drawn from their outlines (render/vector_fonts.h)
         kSongFolders, // text: chart folders custom songs are read from, ';' between (custom/install.h)
         kShowDuplicates, // every copy of a custom chart listed, not just the first by folder
+        kDiscSongGuitars, // song defaults give a disc song a guitar by how far into its career it is, not its own (no menu has it)
         kKeyCount,
     };
 
@@ -149,6 +150,7 @@ namespace gh2::settings
         bool nextGen = false;  // that career is the 360's
         bool gh2Venue = false; // the venue a song plays in is one of GH2's
         bool inVenue = false;  // a venue is drawn
+        bool nextGenSong = false; // a 360 song is up, played with song defaults: its venue (one of GH2's) and guitars are the 360's
     };
 
     int get(Key key);
@@ -158,8 +160,9 @@ namespace gh2::settings
     // Outside one the models are the pickers' three, the lighting is the
     // venue's (the guitarist's or guitar's on a screen with no venue), and
     // the HUD's and menus' pictures, the same ones drawn larger, are the
-    // 360's wherever its disc is mounted. It can change from one song to
-    // the next.
+    // 360's wherever its disc is mounted; a 360 song played with song
+    // defaults has the 360's venue and guitars whatever the pickers say. It
+    // can change from one song to the next.
     bool hd(Look look);
     // Who says what is played. Until one is given, nothing is the 360's.
     void setPlaying(std::function<Playing()> now);

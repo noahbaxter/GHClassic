@@ -35,8 +35,7 @@ namespace gh2::custom
         Kind kind = Kind::Strum;
         bool forced = false; // its kind is the chart's: a forced HOPO or strum, or a tap
         bool flip = false;   // the running engine's natural kind flipped (.chart's 5)
-        // A trill or tremolo lane's note, and its lane's first.
-        bool laned = false, laneStart = false;
+        bool inLanePhrase = false, lanePhraseStart = false; // in a trill or tremolo phrase, and its first note
 
         bool chord() const { return (lanes & (lanes - 1u)) != 0u; }
         // Its lanes don't all end together.
@@ -49,15 +48,19 @@ namespace gh2::custom
         uint32_t tick = 0u, length = 0u;
     };
 
+    // `ticks` (any order) as runs, each a span from its first to past its
+    // last by `tail`, a new one where two are more than `gap` apart.
+    std::vector<Span> runs(std::vector<uint32_t> ticks, uint32_t gap, uint32_t tail);
+
     struct Difficulty
     {
         std::vector<Gem> gems; // by tick
         std::vector<Span> starPower, solos;
         std::array<std::vector<Span>, 2> faceOff; // each player's phrases
         std::vector<Span> bigNotes, rockEndings;  // GH2's note 110, Rock Band's big rock endings
-        // Trill and tremolo lanes as marked (126 and 127, .chart's S 66 and
-        // S 65), and each lane's band, by lane: from its first note there to
-        // its last.
+        // Tremolo and trill phrases as marked (126 and 127, .chart's S 65
+        // and S 66), and each phrase's bands, one per fret: its first note
+        // there to its last.
         std::vector<Span> tremolos, trills;
         struct Band
         {
@@ -90,6 +93,53 @@ namespace gh2::custom
         std::vector<std::pair<uint32_t, std::array<uint8_t, 2>>> signatures; // numerator, denominator's log2
         std::vector<std::pair<uint32_t, std::string>> sections; // practice names, "Verse 1"
         std::map<Part, std::array<Difficulty, 4>> parts; // easy first
+        // Expert drums (PART DRUMS, [ExpertDrums]) by tick: kicks, snares
+        // (red), crashes (blue or green cymbal) and every hit. The
+        // drummer's animation notes replace the snares and crashes where
+        // the chart has them.
+        std::vector<uint32_t> kicks, snares, crashes, drums;
+        // When someone sings: PART VOCALS' phrases (105, 106), else runs
+        // of its notes or lyrics, else HARM1's the same; .chart's [Events]
+        // phrase_start and phrase_end, else runs of its lyrics.
+        std::vector<Span> vocals;
+        // Each sung syllable, by tick: its lyric as sung ("Hel", "lo"),
+        // markup off, and how long it is held (its note, a slide's notes
+        // after it too; with no note, to the next or a beat at most).
+        // PART VOCALS', else HARM1's; .chart's lyric events.
+        struct Syllable
+        {
+            uint32_t tick = 0u, length = 0u;
+            std::string text;
+        };
+        std::vector<Syllable> syllables;
+        // The keys' expert hits by tick (PART KEYS' 96 to 100,
+        // [ExpertKeyboard]'s).
+        std::vector<uint32_t> keys;
+        // The rest of what a .mid's tracks say for the stage, by track name,
+        // as written, for the band and venue to follow (custom/stage/stage.h):
+        // each text event ([play], [map HandMap_Solo], [lighting (verse)])
+        // and each note no gem is on: below 60 (hand positions 40 to 59,
+        // drum animations 24 to 51, EVENTS' practice clicks 24 to 26), and
+        // every one of VENUE's; the singers' texts alone. A chart made for
+        // GH2 has GH2's own band tracks (BAND BASS, BAND DRUMS, BAND KEYS,
+        // BAND SINGER) and TRIGGERS, kept the same. .chart's [Events] texts
+        // as EVENTS'.
+        struct Cue
+        {
+            uint32_t tick = 0u;
+            std::string text;
+        };
+        struct Mark
+        {
+            uint32_t tick = 0u, length = 0u;
+            uint8_t pitch = 0u;
+        };
+        struct StageTrack
+        {
+            std::vector<Cue> cues;   // by tick
+            std::vector<Mark> marks; // by tick
+        };
+        std::map<std::string, StageTrack> stage;
         // .chart's [Song] Offset, in seconds: the audio's lead.
         double offset = 0.0;
         // The song's own HOPO threshold at 480 a beat, as GH2's songs.dta

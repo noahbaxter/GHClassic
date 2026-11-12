@@ -302,6 +302,7 @@ namespace gh2
         uint32_t campaignSave;             // Campaign::Save(BinStream &)
         uint32_t campaignIsItemUnlocked;   // Campaign::IsItemUnlocked(Symbol) const
         uint32_t campaignIsItemUnlockedOn; // Campaign::IsItemUnlocked(Symbol, Difficulty) const
+        uint32_t campaignIsVenueUnlockedQuickplay; // Campaign::IsVenueUnlockedQuickplay(Symbol) const
         uint32_t selectGuitarProviderInitData; // SelectGuitarProvider::InitData(RndDir *)
         uint32_t charsysPanelShowChar;   // CharsysPanel::ShowChar(int, Symbol)
         uint32_t cacheModelUnload;       // CharsysPanel::CacheModel::Unload()
@@ -674,6 +675,7 @@ namespace gh2
         .campaignSave = 0x12ec90u,
         .campaignIsItemUnlocked = 0x12d490u,
         .campaignIsItemUnlockedOn = 0x12d5a0u,
+        .campaignIsVenueUnlockedQuickplay = 0x12de88u,
         .selectGuitarProviderInitData = 0x119060u,
         .charsysPanelShowChar = 0x143120u,
         .cacheModelUnload = 0x141250u,

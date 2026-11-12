@@ -315,6 +315,27 @@ namespace gh2::setlists
             ctx->pc = GPR_U32(ctx, 31);
         }
 
+        // A live setlist's song's venue, `wanted` by GH2's name, or the
+        // nearest open one before it (setlists.h's Live). The first two are
+        // always open, as retail's quickplay has them
+        // (Campaign::IsVenueUnlockedQuickplay, 0x12de88).
+        std::string openVenue(const std::string &wanted)
+        {
+            const std::string &game = campaigns::venueGame();
+            const std::vector<std::string> &venues = campaigns::venues(game), &gh2 = campaigns::venues("gh2");
+            if (venues.empty())
+                return wanted;
+            const auto indexIn = [&](const std::vector<std::string> &list)
+            { return static_cast<size_t>(std::find(list.begin(), list.end(), wanted) - list.begin()); };
+            // Not one of this game's: as far into its venues as into GH2's, else the first.
+            size_t at = indexIn(venues);
+            if (const size_t inGh2 = indexIn(gh2); at == venues.size())
+                at = inGh2 < gh2.size() ? std::min(inGh2, venues.size() - 1u) : 0u;
+            while (at > 1u && !campaigns::venueOpen(game, venues[at]))
+                --at;
+            return venues[at];
+        }
+
         // CampaignData::GetVenueForSong(Symbol) (0x1312a0): the venue of the
         // song's tier in GH2's campaign, else the empty Symbol. A song whose
         // quickplay venue is locked plays there (GameConfig::SetQuickplay,
@@ -341,7 +362,7 @@ namespace gh2::setlists
                         const auto begin = w->second.songs.begin() + static_cast<std::ptrdiff_t>(w->second.first);
                         if (std::find(begin, begin + static_cast<std::ptrdiff_t>(w->second.count), song) !=
                             begin + static_cast<std::ptrdiff_t>(w->second.count))
-                            venue = symbol(rdram, ctx, runtime, setlist.live.venue);
+                            venue = symbol(rdram, ctx, runtime, openVenue(setlist.live.venue(song)));
                     }
                     for (size_t t = 0; t < setlist.tiers.size(); ++t)
                     {
@@ -588,6 +609,21 @@ namespace gh2::setlists
     }
 
     std::vector<std::string> careerSongs(const std::string &name) { return tierSongs(name, true); }
+
+    std::optional<double> careerAt(const std::string &name, const std::string &song)
+    {
+        const auto it = s_setlists.find(name);
+        if (it == s_setlists.end())
+            return std::nullopt;
+        std::vector<const Tier *> career;
+        for (const Tier &tier : it->second.tiers)
+            if (tier.encore) // marks a career tier
+                career.push_back(&tier);
+        for (size_t t = 0; t < career.size(); ++t)
+            if (std::find(career[t]->songs.begin(), career[t]->songs.end(), song) != career[t]->songs.end())
+                return career.size() > 1u ? static_cast<double>(t) / static_cast<double>(career.size() - 1u) : 0.0;
+        return std::nullopt;
+    }
 
     std::vector<std::string> bonusSongs(const std::string &name) { return tierSongs(name, false); }
 
