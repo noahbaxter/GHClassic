@@ -17,6 +17,7 @@
 #include "guest.h"
 #include "hook.h"
 #include "host/audio.h"
+#include "host/song_log.h"
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
 #include "ps2x/iop/iop_subsystem.h"
@@ -249,6 +250,7 @@ namespace gh2
                 timing::sample(timing::kClockError, error);
                 timing::sample(timing::kClockAge, ageMs);
                 timing::sample(timing::kClockPull, pull);
+                song_log::clock(error, pull);
             }
             lock->second.at = now;
             lock->second.clockMs = clockMs - pull;
