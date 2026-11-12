@@ -431,9 +431,24 @@ namespace gh2::settings
 
     void set(Key key, int value)
     {
-        state().value[key] = snap(kEntries[key], value);
+        const int snapped = snap(kEntries[key], value);
+        if (snapped != state().value[key])
+            std::cerr << "[settings] " << kEntries[key].name << " = " << text(kEntries[key], snapped) << std::endl;
+        state().value[key] = snapped;
         state().set[key] = true;
         save();
+    }
+
+    std::string describe()
+    {
+        std::string out;
+        for (int k = 0; k < kKeyCount; ++k)
+        {
+            const Entry &entry = kEntries[k];
+            out += (k ? " " : "") + std::string(entry.name) + "=" +
+                   (entry.type == Type::kText ? "\"" + state().text[k] + "\"" : text(entry, state().value[k]));
+        }
+        return out;
     }
 
     void rereadGraphics()

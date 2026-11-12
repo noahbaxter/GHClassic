@@ -483,12 +483,14 @@ set(GHC_GAME_SOURCES
     src/host/device_screen.cpp
     src/host/input.cpp
     src/host/layouts.cpp
+    src/host/log.cpp
     src/host/menu_layer.cpp
     src/host/owner.cpp
     src/host/pad.cpp
     src/host/perf.cpp
     src/host/profiles.cpp
     src/host/record.cpp
+    src/host/song_log.cpp
     src/host/releases.cpp
     src/host/scripted_devices.cpp
     src/host/sdl_devices.cpp
