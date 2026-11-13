@@ -22,7 +22,9 @@
 #include <iostream>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <thread>
+#include <unordered_set>
 
 namespace gh2
 {
@@ -152,19 +154,40 @@ namespace gh2
                         // The list made again every half second while the
                         // scan runs, here and not by a finder: one that
                         // waits on a slow folder leaves none of what came
-                        // before it unlisted.
+                        // before it unlisted. Every half minute the index
+                        // kept as it stands too, the last scan's songs not
+                        // yet come to still in it, so a game quit before a
+                        // long scan ends starts from what it found.
+                        std::mutex foundMutex;
+                        std::vector<Song> found;
                         std::thread ticker([&]
                                            {
-                                               while (status.running)
+                                               for (int tick = 1; status.running; ++tick)
                                                {
                                                    std::this_thread::sleep_for(std::chrono::milliseconds(500));
                                                    catalog().refresh();
+                                                   if (tick % 60 != 0 || !status.running)
+                                                       continue;
+                                                   std::vector<Song> soFar;
+                                                   {
+                                                       const std::lock_guard lock(foundMutex);
+                                                       soFar = found;
+                                                   }
+                                                   std::unordered_set<fs::path::string_type> seen;
+                                                   for (const Song &s : soFar)
+                                                       seen.insert(s.dir.native());
+                                                   for (const Song &s : known)
+                                                       if (!seen.count(s.dir.native()))
+                                                           soFar.push_back(s);
+                                                   writeIndex(index, soFar);
                                                }
                                            });
                         const std::vector<Song> scanned = scan(folders, known, 32u, [&](const Song &s)
                                                                {
                                                                    catalog().put(s);
                                                                    ++status.seen;
+                                                                   const std::lock_guard lock(foundMutex);
+                                                                   found.push_back(s);
                                                                });
                         status.running = false;
                         ticker.join();
