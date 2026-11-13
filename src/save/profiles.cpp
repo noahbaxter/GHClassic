@@ -73,10 +73,37 @@ namespace gh2::save
         keepSection(kSection, [&](Section &section) { section.set(std::to_string(profile + 1), name); });
     }
 
+    namespace
+    {
+        // A seat's player moved to another device in it (host/input.h's
+        // takeHandovers) is still who they were: the device takes their
+        // profile, or guest, and the one left lets it go. Only picking one
+        // changes who a seat is. The keyboard standing in for a P1 with no
+        // controller is no one till it plays as a profile: a controller
+        // coming to P1 from it keeps its own.
+        void followHandovers()
+        {
+            const std::vector<Handover> moved = takeHandovers();
+            if (moved.empty())
+                return;
+            const Profiles now = profiles();
+            for (const Handover &h : moved)
+            {
+                const auto profile = deviceProfile(now, h.from);
+                if (!profile && h.fromKeyboard)
+                    continue;
+                keepState(kSection, h.to, profile ? profileText(now, *profile) : kGuest);
+                if (profile)
+                    keepState(kSection, h.from, "");
+            }
+        }
+    }
+
     std::optional<int> seatProfile(int seat)
     {
         if (seat < 0 || seat >= kSeats)
             return std::nullopt;
+        followHandovers();
         const Profiles now = profiles();
         const auto profile = deviceProfile(now, seatDevice(seat));
         for (int before = 0; before < seat; ++before)
@@ -87,6 +114,7 @@ namespace gh2::save
 
     void keepSeatProfile(int seat, std::optional<int> profile)
     {
+        followHandovers();
         const Profiles now = profiles();
         const std::string device = seat >= 0 && seat < kSeats ? seatDevice(seat) : std::string();
         if (device.empty() || (profile && !now.here(profile)))

@@ -36,7 +36,10 @@ namespace gh2::input
     {
         m_seats[seat] = r.id;
         if (joined)
+        {
             m_letGo.insert(r.id);
+            ++m_startSeats;
+        }
         std::cerr << "[input] P" << seat + 1 << ": " << r.name << ", " << kindName(r.kind) << std::endl;
     }
 
@@ -58,7 +61,7 @@ namespace gh2::input
     // to the last. Not off a press a seated controller made in the same poll:
     // Steam Input's mirror of a pad presses with it. P1 is never empty while
     // P2 is not. The keyboard takes no seat.
-    void Seats::seat(const std::vector<Read> &all, Mode mode, uint64_t nowMs)
+    void Seats::seat(const std::vector<Read> &all, Mode mode, uint64_t nowMs, bool held)
     {
         std::vector<Read> reads;
         std::copy_if(all.begin(), all.end(), std::back_inserter(reads), [](const Read &r) { return !r.keyboard(); });
@@ -84,8 +87,9 @@ namespace gh2::input
         // On the Controllers screen nothing moves, and what is held there
         // has not gone down once it goes: red held to leave takes no seat.
         // In a song a seat whose controller is gone waits for it (follow):
-        // no other takes it.
-        if (mode == Mode::kControllers || inSong(mode))
+        // no other takes it. With a player's profile menu up, the seats
+        // stay whose they are until it shuts.
+        if (mode == Mode::kControllers || inSong(mode) || held)
             return;
 
         // Each seat's own device first, then one of its model, so two the
@@ -236,6 +240,15 @@ namespace gh2::input
                 std::cerr << "[input] P" << seat + 1 << ": " << (pad ? "pad" : "guitar") << " mode" << std::endl;
             m_pad[seat] = pad;
         }
+    }
+
+    void Seats::leave(int seat)
+    {
+        if (seat < 0 || seat >= kSeats || m_seats[seat].none())
+            return;
+        std::cerr << "[input] P" << seat + 1 << " dropped out" << std::endl;
+        m_seats[seat] = {};
+        m_away[seat] = false;
     }
 
     void Seats::letGoAll()

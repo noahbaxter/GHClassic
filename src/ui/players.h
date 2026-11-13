@@ -8,7 +8,8 @@ namespace gh2
 {
     // Multiplayer's screen as where players join (dta/players.dta): who
     // holds each seat under the mode buttons, P2 joining with Start and
-    // yellow moving a player up a seat, and no mode until two have.
+    // yellow moving a player up a seat, and no mode until two have. And who
+    // each player is (dta/profiles.dta, save/profiles.h).
     void installPlayers(PS2Runtime &runtime);
 
     // A seat as a player is shown it ahead of what holds it: "P1  ".

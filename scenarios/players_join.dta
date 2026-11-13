@@ -25,6 +25,12 @@
 (expect {game is_missing_multi_controller} 0)
 (expect {{ui current_screen} name} multi_screen)
 (shot joined)
+; Joining opens the pad's menu (profiles.dta); red shuts it.
+(expect {ghc_profile_panel get seat} 1)
+(press red pad)
+(wait 0.5)
+(expect {ghc_profile_panel get seat} -1)
+(expect {{ui current_screen} name} multi_screen)
 ; The pad's player plays left handed, and moves up to P1.
 {options set_lefty 1 TRUE}
 (press yellow pad)

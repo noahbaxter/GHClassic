@@ -233,7 +233,7 @@
 ; one picked becomes the theme, its menus and music, back on this screen.
 {retype main_screen
    (
-      (panels meta main_panel helpbar ghc_pick_panel fade_panel)
+      (panels meta main_panel ghc_profile_panel helpbar ghc_pick_panel fade_panel)
       (focus main_panel)
       (access_all {main_panel reset_player_settings})
       ; The help bar puts up a screen's (helpbar ...) after its enter, so
@@ -248,6 +248,17 @@
          {set $ghc_practice_from FALSE}
          ; Song speed is quickplay's and practice's alone.
          {song_speed set 100}
+         {$this ghc_help}
+         ; Who holds each seat, in the corner (profiles.dta).
+         {ghc_profile_panel set badges TRUE}
+         {ghc_profile_panel paint_badges}
+      )
+      (exit
+         {ghc_profile_panel leave}
+         {ghc_profile_panel set badges FALSE}
+         {ghc_profile_panel paint_badges}
+      )
+      (ghc_help
          {do
             ($array)
             {set $array ()}
@@ -258,8 +269,13 @@
             {helpbar set_display $array}
          }
       )
+      ; Start opens the player's menu (profiles.dta).
+      (ghc_help_set ($array) {helpbar set_display $array})
+      (ghc_option_text ($option) {ghc_profile_panel text $option})
+      (ghc_chose ($option) {ghc_profile_panel chose $option})
       (BUTTON_DOWN_MSG
          {cond
+            ({ghc_profile_panel button $player_num $button} TRUE)
             ({ghc_pick_button $button} TRUE)
             ({&& {== $button kPad_Circle} {> {size {ghc_themes}} 1} {! {ui in_transition}}}
                {ghc_pick_panel open_with {ghc_themes} {campaigns active}}
@@ -278,7 +294,8 @@
       )
    )
 }
-; The splash, as the game's own (splash.dta) but for lick_attach.
+; The splash, as the game's own (splash.dta) but for lick_attach, and its
+; press picks P1's profile on the way to the main menu (profiles.dta).
 {retype splash_panel
    (
       (file ui/splash.milo)
@@ -312,10 +329,16 @@
          {game_screen set attract_mode TRUE}
          {ui goto_screen loading_screen}
       )
+      ; The first press of a boot plays as the profile P1's controller last
+      ; did, if one; any other, or none, picks one.
       (BUTTON_DOWN_MSG
          {if {meta is_any_button $button $player_num}
             {synth play_sequence button_select}
-            {ui goto_screen main_screen}
+            {if_else {&& {! $ghc_profile_booted} {>= {ghc_profile current 0} 0}}
+               {ui goto_screen main_screen}
+               {ghc_profile_screen show 0 splash_screen main_screen}
+            }
+            {set $ghc_profile_booted TRUE}
          }
       )
    )

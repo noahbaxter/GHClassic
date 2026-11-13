@@ -29,6 +29,8 @@ namespace gh2
         // The main menu's version line (main_menu.dta).
         script::patchUi("{set $ghc_version \"" + build::shownVersion() + "\"}");
         script::patchUi(kPickerDta);
+        // Before the screens that hold its panel (ui/players.h).
+        script::patchUi(kProfilesDta);
         script::patchUi(kMainMenuDta);
         script::patchUi(kHighscorePanelDta);
         script::patchUi(kSelCharacterDta);

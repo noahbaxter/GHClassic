@@ -1,0 +1,332 @@
+; Who plays (save/profiles.h). The splash's press picks P1's profile on the
+; profile screen, GH2's band list made one of profiles: each a row, a free
+; one NEW PROFILE, GUEST last. NEW PROFILE names one on GH2's band naming
+; screen, as the profile naming screen. On the main menu and Multiplayer's
+; screen a player's Start dims the screen and opens their menu (picker.dta's
+; list, as a menu), their profile over it: CHANGE PROFILE goes to the profile
+; screen, DROP OUT sends P1 back to the splash and frees any other seat.
+; Joining on Multiplayer's screen, or taking P1 on the main menu by Start,
+; opens the joining player's. Only the controller it opened for works it,
+; and no seat changes while it is up. The main menu shows who holds each
+; seat in its top left corner.
+;
+; A screen with ghc_profile_panel among its panels, before the help bar, and
+; picker.dta's after it, sends its presses here first ({ghc_profile_panel
+; button $player_num $button}), passes on the list's (ghc_option_text
+; ($option)) and (ghc_chose ($option)) to it, has (ghc_help) put its own help
+; bar back and (ghc_help_set ($array)) put up the menu's, and calls
+; {ghc_profile_panel leave} as it exits.
+{if {! {exists ghc_profile_panel}} {new GHPanel ghc_profile_panel}}
+{retype ghc_profile_panel
+   (
+      ; From the ARK root: a path resolves against the file its array came
+      ; from, and this one comes from no file.
+      (file ui/helpbar.milo)
+      ; The seat whose menu is up, -1 for none.
+      (seat -1)
+      ; The dimmer: a box behind the menu nearly as wide as the screen, as
+      ; wide as a box goes (one with a corner much past 390 either side of
+      ; the middle draws nothing), its round ends that wide, and its colour.
+      (dim_wide 780)
+      (dim_tall 520)
+      (dim_end 30)
+      (dim_color (0 0 0 0.7))
+      ; Whether this screen shows who holds each seat in its corner.
+      (badges FALSE)
+      ; The title's and the corner's text, their size against the help
+      ; bar's, the title's height over the list, and the corner's left edge
+      ; (16:9 and 4:3), top and row height (x right, z up, the screen's
+      ; middle 0).
+      (texts (prof_title.txt prof_p0.txt prof_p1.txt))
+      (title_size 1.8)
+      (title_gap 34)
+      (badge_size 1.1)
+      (badge_x_wide -405)
+      (badge_x_square -288)
+      (badge_z 200)
+      (badge_tall 26)
+      (enter
+         {$this build}
+         {set [seat] -1}
+         {$this hide}
+         ; Who sits now sat before this screen.
+         {ghc_profile seen}
+         {$this paint_badges}
+      )
+      ; Its screen going, a menu up shuts, its seats let go.
+      (leave
+         {if {>= [seat] 0}
+            {ghc_pick_panel shut}
+            {ghc_profile hold 0}
+            {set [seat] -1}
+            {$this hide}
+         }
+      )
+      ; The dimmer, and the texts, each the help bar's text copied; the help
+      ; bar's own stays out of sight.
+      (build
+         {if {! {exists prof_title.txt}}
+            {foreach $o
+               (
+                  help_bar_strum.mesh help_bar_starting.mesh help_bar_strumbar.mesh help_bar.mesh help_bar.txt
+                  help_box_left.mesh help_box_mid.mesh help_box_right.mesh
+               )
+               {{$this find $o} set_showing FALSE}
+            }
+            {ghc_box_make $this prof_dim {help_box_mid.mesh get trans_parent} 1}
+            {ghc_box_color $this prof_dim
+               {elem [dim_color] 0} {elem [dim_color] 1} {elem [dim_color] 2} {elem [dim_color] 3}}
+            {foreach $part ("_left.mesh" "_mid.mesh" "_right.mesh")
+               {helpbar.view insert (objects 0) {$this find {sprint prof_dim $part}}}
+            }
+            {foreach $t [texts]
+               {new Text $t}
+               {{$this find $t} copy help_bar.txt 0}
+               {{$this find $t} set draw_order 2}
+               {helpbar.view insert (objects {helpbar.view size objects}) {$this find $t}}
+            }
+            {prof_title.txt set_local_scale [title_size] [title_size] [title_size]}
+            {prof_p0.txt set_local_scale [badge_size] [badge_size] [badge_size]}
+            {prof_p1.txt set_local_scale [badge_size] [badge_size] [badge_size]}
+            {helpbar.view sort_draws}
+            {{$this loaded_dir} sync_objects}
+         }
+      )
+      (hide
+         {ghc_box_show $this prof_dim FALSE}
+         {prof_title.txt set_showing FALSE}
+      )
+      (paint_badges
+         {foreach_int $i 0 2
+            {do
+               ($t {$this find {elem [texts] {'+' $i 1}}})
+               ($text {ghc_profile badge $i})
+               {$t set_text $text}
+               {$t set_local_pos
+                  {if_else {== {rnd aspect} kWidescreenAspect} [badge_x_wide] [badge_x_square]}
+                  0
+                  {'-' [badge_z] {'*' [badge_tall] $i}}}
+               {$t set_showing {&& [badges] {== [seat] -1} {!= $text ""}}}
+            }
+         }
+      )
+      (poll
+         {if {&& {>= [seat] 0} {! {ghc_pick_panel get open}}} {$this shut}}
+         ; Another controller taking a seat opens its menu: one joining
+         ; Multiplayer's screen, or taking P1 on the main menu by Start.
+         {if {< [seat] 0}
+            {do
+               ($joined {ghc_profile joined [badges]})
+               {if {>= $joined 0} {$this open $joined}}
+            }
+         }
+      )
+      (open
+         ($seat)
+         {set [seat] $seat}
+         {ghc_profile hold 1}
+         {ghc_profile seen}
+         {ghc_pick_panel open_sticky (change drop) change}
+         {synth play_sequence button_select}
+         {$this paint_badges}
+         ; Placed as shown: placed in build, before the view takes it, it
+         ; draws nothing.
+         {ghc_box_show $this prof_dim TRUE}
+         {ghc_box_put $this prof_dim {/ [dim_wide] -2.0} 0 0 [dim_wide] [dim_tall] [dim_end] [dim_end]}
+         {prof_title.txt set_text {ghc_profile badge $seat}}
+         {prof_title.txt set_local_pos
+            {/ {ghc_pick_panel get width} -2.0}
+            0
+            {'+' {'*' {ghc_pick_panel get height} {/ {ghc_pick_panel visible} 2.0}} [title_gap]}}
+         {prof_title.txt set_showing TRUE}
+         ; The screen's: here helpbar is this panel's own copy.
+         {{ui current_screen} ghc_help_set ((fret1 help_select) (fret2 help_back) (strum help_updown))}
+      )
+      (shut
+         {ghc_pick_panel shut}
+         {ghc_profile hold 0}
+         {set [seat] -1}
+         {$this hide}
+         {$this paint_badges}
+         {{ui current_screen} ghc_help}
+      )
+      ; A press, from port $player: TRUE where the menu took it, every
+      ; press while it is up.
+      (button
+         ($player $button)
+         {if_else {>= [seat] 0}
+            {do
+               {if {== $player [seat]} {ghc_pick_button $button}}
+               TRUE
+            }
+            {if_else {&& {== $button kPad_Start} {! {ui in_transition}}}
+               {do {$this open $player} TRUE}
+               FALSE
+            }
+         }
+      )
+      (text ($option) {localize {sprint ghc_profile_ $option}})
+      (chose
+         ($option)
+         {do
+            ($seat [seat])
+            {$this shut}
+            {cond
+               ({== $option change} {ghc_profile_screen show $seat {ui current_screen} {ui current_screen}})
+               ({== $seat 0} {ui goto_screen splash_screen})
+               (TRUE {ghc_profile drop $seat})
+            }
+         }
+      )
+   )
+}
+; GH2's band list (manage_bands.dta's chooseprof_panel) as the profiles:
+; {ghc_profile_screen show <seat> <back> <next>} picks that seat's, back to
+; <back> on red, on to <next> once picked or named.
+{if {! {exists ghc_profile_screen}} {new GHScreen ghc_profile_screen}}
+{retype ghc_profile_screen
+   (
+      (panels meta chooseprof_panel helpbar)
+      (focus chooseprof_panel)
+      (allow_back FALSE)
+      (seat 0)
+      (back_screen main_screen)
+      (next_screen main_screen)
+      ; Its last row; the rest are the profiles'.
+      (guest_row 7)
+      (helpbar (default ((fret1 help_select) (fret2 help_back) (strum help_updown))))
+      (show
+         ($seat $back $next)
+         {set [seat] $seat}
+         {set [back_screen] $back}
+         {set [next_screen] $next}
+         {ui goto_screen $this}
+      )
+      (enter
+         {ghc_profile hold 1}
+         ; Whose it is, where another plays.
+         {{chooseprof_panel find cp_title.lbl} set_localized_text
+            {localize
+               {if_else {&& {== [seat] 0} {== {ghc_profile badge 1} ""}} ghc_choose_profile {sprint ghc_profile_p [seat]}}}}
+         {foreach_int $i 0 {'+' [guest_row] 1}
+            {do
+               ($btn {chooseprof_panel find {sprintf "cp_band%d.btn" $i}})
+               {cond
+                  ({== $i [guest_row]} {$btn set_text ghc_guest})
+                  ({ghc_profile named $i} {$btn set_localized_text {ghc_profile name_of $i}})
+                  (TRUE {$btn set_text ghc_new_profile})
+               }
+            }
+         }
+         {do
+            ($now {ghc_profile current [seat]})
+            {chooseprof_panel set_focus
+               {chooseprof_panel find {sprintf "cp_band%d.btn" {if_else {>= $now 0} $now [guest_row]}}}}
+         }
+      )
+      ; The band list as GH2 has it again, for a career's.
+      (exit
+         {ghc_profile hold 0}
+         {{chooseprof_panel find cp_title.lbl} set_text choose_band}
+      )
+      (SELECT_START_MSG
+         {do
+            ($row {chooseprof_panel get button_idx})
+            {cond
+               ({== $row [guest_row]}
+                  {ghc_profile pick [seat] -1}
+                  {ui goto_screen [next_screen]}
+               )
+               ({ghc_profile named $row}
+                  {ghc_profile pick [seat] $row}
+                  {ui goto_screen [next_screen]}
+               )
+               (TRUE {ui goto_screen ghc_nameprofile_screen})
+            }
+         }
+         kDataUnhandled
+      )
+      ; Only the player picking moves it.
+      (BUTTON_DOWN_MSG
+         {cond
+            ({!= $player_num [seat]} TRUE)
+            ({== $button kPad_Tri}
+               {$this backwards_anim}
+               {synth play_sequence button_back.cue}
+               {ui goto_screen [back_screen]}
+               kDataUnhandled
+            )
+            (TRUE kDataUnhandled)
+         }
+      )
+   )
+}
+; GH2's band naming (manage_bands.dta's nameprof_screen) for a profile: its
+; panel and text entry, named for ghc_profile_screen's seat.
+{if {! {exists ghc_nameprofile_screen}} {new GHScreen ghc_nameprofile_screen}}
+{retype ghc_nameprofile_screen
+   (
+      (panels meta nameprof_panel helpbar)
+      (focus nameprof_panel)
+      (allow_back FALSE)
+      (enter
+         {ghc_profile hold 1}
+         {{nameprof_panel find nameprof.view} set_frame 0}
+         {$this turn_off_ambient}
+         {{nameprof_panel find nameprof.view} animate (period 1) (range 0 100)}
+         {nameprof_screen set prof_ten {nameprof_panel find profile.ten}}
+         {nameprof_screen set zoom_tnm {nameprof_panel find nameprof.tnm}}
+         {{nameprof_panel find profile.ten} set_text ""}
+         {{nameprof_panel find nameprof.tnm} set_frame 0}
+         {{nameprof_panel find sp_title.lbl} set_text ghc_name_profile}
+         {{nameprof_panel find np_editlater.lbl} set_showing FALSE}
+      )
+      (exit
+         {ghc_profile hold 0}
+         {{nameprof_panel find sp_title.lbl} set_text name_band}
+         {{nameprof_panel find np_editlater.lbl} set_showing TRUE}
+      )
+      (TEXT_ENTRY_MSG
+         {do
+            ($name {{nameprof_panel find profile.ten} get_text})
+            {cond
+               ({== $name ""} {ui push_screen error_no_profile_screen})
+               ({ghc_profile taken $name} {ui push_screen error_duplicate_profile_screen})
+               (TRUE
+                  {ghc_profile make {ghc_profile_screen get seat} $name}
+                  {synth play_sequence button_select}
+                  {ui goto_screen {ghc_profile_screen get next_screen}}
+               )
+            }
+         }
+         kDataUnhandled
+      )
+      (BUTTON_DOWN_MSG
+         {do
+            ($ten {nameprof_panel find profile.ten})
+            {cond
+               ({!= $player_num {ghc_profile_screen get seat}} TRUE)
+               ({&& {== $button kPad_Tri} {$ten no_text_entered}}
+                  {$this backwards_anim}
+                  {synth play_sequence button_back.cue}
+                  {ui goto_screen ghc_profile_screen}
+                  kDataUnhandled
+               )
+               ({|| {== $button kPad_Tri} {== $button kPad_X}}
+                  {nameprof_screen update_nameprof
+                     {if_else {== $button kPad_X} {min {'+' {$ten length} 1} 20} {max {'-' {$ten length} 1} 0}}}
+                  kDataUnhandled
+               )
+               (TRUE kDataUnhandled)
+            }
+         }
+      )
+      (TRANSITION_COMPLETE_MSG
+         {{nameprof_panel find profile.ten} resume_input}
+         {helpbar set_display {nameprof_screen get_help_text ()}}
+      )
+      (SELECT_START_MSG {helpbar set_display {nameprof_screen get_help_text ()}} kDataUnhandled)
+      (SELECT_MSG {synth play_sequence button_select})
+      (SCREEN_BACK_MSG {helpbar set_display {nameprof_screen get_help_text ()}} kDataUnhandled)
+   )
+}

@@ -1,0 +1,164 @@
+; Who plays (save/profiles.h, ui/dta/profiles.dta). The splash's press picks
+; P1's profile on GH2's band list made one of profiles, NEW PROFILE naming
+; one on its band naming screen. On the main menu Start opens P1's menu:
+; CHANGE PROFILE back to the list, DROP OUT to the splash. Joining
+; Multiplayer's screen opens P2's, only P2's controller working it, and DROP
+; OUT frees P2's seat. The main menu's corner and Multiplayer's rows show
+; who holds each seat, and a quickplay high score goes in under the
+; profile's name.
+#include common/first_boot.dta
+(device guitar)
+(device guitar2)
+{ui goto_screen splash_screen}
+(wait_screen splash_screen)
+(wait 1)
+(press green guitar)
+(wait_screen ghc_profile_screen 10)
+(wait 1)
+(expect {seat_has 0 guitar} 1)
+(expect {ghc_profile current 0} -1)
+(expect {chooseprof_panel get button_idx} 7)
+(shot list_empty)
+; A new profile, named, is P1's, in the first row whichever NEW PROFILE
+; row it was picked from.
+(press up guitar)
+(wait 0.3)
+(expect {chooseprof_panel get button_idx} 6)
+(press green guitar)
+(wait_screen ghc_nameprofile_screen 10)
+(wait 1)
+(shot name)
+{{nameprof_panel find profile.ten} set_text "Alpha"}
+(press start guitar)
+(wait_screen main_screen 10)
+(wait 1)
+(expect {ghc_profile named 0} 1)
+(expect {ghc_profile name 0} Alpha)
+(expect {ghc_profile badge 0} "P1  Alpha")
+(shot corner)
+
+; Start opens P1's menu; CHANGE PROFILE goes to the list, on Alpha's row.
+(press start guitar)
+(wait 0.5)
+(expect {ghc_profile_panel get seat} 0)
+(expect {ghc_pick_panel get open} 1)
+(shot menu)
+(press green guitar)
+(wait_screen ghc_profile_screen 10)
+(wait 1)
+(expect {chooseprof_panel get button_idx} 0)
+; A second, Beta, then back to Alpha.
+(press down guitar)
+(wait 0.3)
+(press green guitar)
+(wait_screen ghc_nameprofile_screen 10)
+{{nameprof_panel find profile.ten} set_text "Beta"}
+(press start guitar)
+(wait_screen main_screen 10)
+(wait 0.5)
+(expect {ghc_profile name 0} Beta)
+(expect {ghc_profile named 1} 1)
+(press start guitar)
+(wait 0.5)
+(press green guitar)
+(wait_screen ghc_profile_screen 10)
+(wait 1)
+(shot list)
+(expect {chooseprof_panel get button_idx} 1)
+(press up guitar)
+(wait 0.3)
+(press green guitar)
+(wait_screen main_screen 10)
+(wait 0.5)
+(expect {ghc_profile name 0} Alpha)
+
+; Joining Multiplayer's screen opens P2's menu, as a guest; P1's controller
+; does nothing to it. P2 picks Beta.
+{ui goto_screen multi_screen}
+(wait_screen multi_screen)
+(press start guitar2)
+(wait 0.5)
+(expect {seat_has 1 guitar2} 1)
+(expect {ghc_profile_panel get seat} 1)
+(press down guitar)
+(wait 0.3)
+(expect {ghc_pick_panel get picked} 0)
+(press green guitar2)
+(wait_screen ghc_profile_screen 10)
+(wait 1)
+(expect {chooseprof_panel get button_idx} 7)
+(shot list_p2)
+(press green guitar)
+(wait 0.3)
+(expect {{ui current_screen} name} ghc_profile_screen)
+(press up guitar2)
+(wait 0.2)
+(press up guitar2)
+(wait 0.2)
+(press up guitar2)
+(wait 0.2)
+(press up guitar2)
+(wait 0.2)
+(press up guitar2)
+(wait 0.2)
+(press up guitar2)
+(wait 0.3)
+(expect {chooseprof_panel get button_idx} 1)
+(press green guitar2)
+(wait_screen multi_screen 10)
+(wait 0.5)
+(expect {ghc_profile name 1} Beta)
+(expect {ghc_players row 0} "P1  Alpha")
+(expect {ghc_players row 1} "P2  Beta")
+(shot multiplayer)
+; P2 drops out: the seat is free.
+(press start guitar2)
+(wait 0.5)
+(expect {ghc_profile_panel get seat} 1)
+(press down guitar2)
+(wait 0.3)
+(press green guitar2)
+(wait 0.5)
+(expect {seat_has 1 guitar2} 0)
+(expect {ghc_players row 1} "P2  press START to join")
+
+; P1's quickplay song is kept as Alpha's, and its high score goes in under
+; Alpha with none typed: the last seconds of a disc song, enough to beat
+; the table's last score.
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+{game set_num_players 1}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 120)
+(wait_until {> {taskmgr seconds} 1} 60)
+{beatmatch jump 150000}
+{game set_paused TRUE}
+(wait 0.5)
+{game set_paused FALSE}
+(wait_screen endgame_screen 120)
+(wait 1)
+(expect {== {best score shoutatthedevil expert} {player0 score}} 1)
+(press green guitar)
+(wait_screen highscore_screen 30)
+(wait 1)
+(shot highscore)
+(expect {highscore_panel get auto_add} 1)
+(press green guitar)
+(wait_screen complete_screen 30)
+{highscores get_highscore 2 $name $score}
+(expect $name Alpha)
+
+; DROP OUT for P1 goes back to the splash.
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+(press start guitar)
+(wait 0.5)
+(press down guitar)
+(wait 0.3)
+(press green guitar)
+(wait_screen splash_screen 10)
+(quit)
