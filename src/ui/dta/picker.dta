@@ -66,6 +66,13 @@
       (most_width_square 670)
       (marquee_polls 5)
       (marquee 0)
+      ; The rows' widths are measured this many a poll, outward from the
+      ; one it opened on, the list widening to the widest so far: a
+      ; custom setlist's thousands of sections, measured at once, would
+      ; hold up a frame for a second.
+      (chunk 16)
+      (measured 0)
+      (widest 0)
       (enter
          {$this build}
          {$this shut}
@@ -125,24 +132,39 @@
       (open_with
          ($options $current)
          {set [options] $options}
-         {set [picked] 0}
-         {set [width] 0}
          {set [polls] 0}
-         {foreach_int $i 0 {size $options}
-            {do
-               ($wide {'*' [size] {help_bar.txt get_string_width {$this text {elem $options $i}}}})
-               {if {> $wide [width]} {set [width] $wide}}
-               {if {== {elem $options $i} $current} {set [picked] $i}}
-            }
+         {do
+            ($at 0)
+            {find_elem $options $current $at}
+            {set [picked] $at}
          }
          {set [first] [picked]}
          {set [top]
             {max 0 {min {'-' {size $options} {$this visible}} {'-' [picked] {int {/ {$this visible} 2}}}}}}
-         {set [width]
-            {min {if_else {== {rnd aspect} kWidescreenAspect} [most_width_wide] [most_width_square]}
-               {'+' [width] {'*' 2 [margin]}}}}
+         {set [measured] 0}
+         {set [widest] 0}
+         {$this measure}
          {set [open] TRUE}
          {if [shown] {$this reveal}}
+      )
+      ; The next chunk of rows' widths, and the list's width from them.
+      (measure
+         {do
+            ($n {size [options]})
+            ($from {max 0 {'-' [first] {int {/ [chunk] 2}}}})
+            ($to {min $n {'+' [measured] [chunk]}})
+            {foreach_int $k [measured] $to
+               {do
+                  ($wide {'*' [size]
+                     {help_bar.txt get_string_width {$this text {elem [options] {mod {'+' $from $k} $n}}}}})
+                  {if {> $wide [widest]} {set [widest] $wide}}
+               }
+            }
+            {set [measured] $to}
+            {set [width]
+               {min {if_else {== {rnd aspect} kWidescreenAspect} [most_width_wide] [most_width_square]}
+                  {'+' [widest] {'*' 2 [margin]}}}}
+         }
       )
       (text
          ($option)
@@ -244,6 +266,13 @@
       ; Shown once its fret has been held a moment; let go, the pick, or
       ; the tap, to the screen.
       (poll
+         {if {&& [open] {< [measured] {size [options]}}}
+            {do
+               ($was [width])
+               {$this measure}
+               {if {&& [shown] {!= $was [width]}} {$this reveal}}
+            }
+         }
          {if {&& [open] [shown]} {$this scroll_picked}}
          {if {&& [open] {! [sticky]}}
             {if_else {pad_held [held]}

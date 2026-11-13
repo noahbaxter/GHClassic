@@ -556,8 +556,10 @@
             {! {ui in_transition}}}
          {do
             ($tiers ())
-            {resize $tiers 0}
-            {foreach_int $t 0 {setlist tiers} {push_back $tiers $t}}
+            ; Sized once: a push_back each, of thousands, copies the
+            ; whole array each time.
+            {resize $tiers {setlist tiers}}
+            {foreach_int $t 0 {setlist tiers} {set_elem $tiers $t $t}}
             {ghc_pick_panel open_held $tiers {setlist tier_at} orange ghc_section_text ghc_section_picked
                ghc_section_next}
          }
