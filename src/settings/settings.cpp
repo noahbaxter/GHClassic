@@ -90,6 +90,7 @@ namespace gh2::settings
             // 100: the hit window (slop, beatmatcher.dta), so the note after
             // can be hit from when the release stops muting.
             {"sustain_release_ms", Type::kInt, 0, 500, 5, 0},
+            {"miss_mute", Type::kBool, 0, 1, 1, 1},
             {"whammy_hold", Type::kBool, 0, 1, 1, 0},
             {"strum_limit", Type::kBool, 0, 1, 1, 1},
             {"star_power_overlap", Type::kBool, 0, 1, 1, 0},
