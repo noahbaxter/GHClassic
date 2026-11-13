@@ -2,6 +2,7 @@
 // text and file, GH2's stream and its store sections, and a PCSX2 card.
 // tools/ghc.py ci builds and runs it; it exits 1 on any failed check.
 
+#include "content/sources.h"
 #include "save/best.h"
 #include "save/gh2_stream.h"
 #include "save/gh2_text.h"
@@ -258,6 +259,17 @@ namespace
         // A section under another note engine is still its game's.
         CHECK(codec::storedSong("gh2@gh1", "gh2_surrender") == "surrender");
         CHECK(codec::ourSong("gh2@gh1", "surrender") == "gh2_surrender");
+
+        // A venue goes by its own name: GH1's basement by GH2's battle, which
+        // it was saved as when it stood in for it.
+        gh2::sources::add(gh2::sources::Kind::Venue, "gh1", "basement", "battle");
+        codec::Save stoodIn = bareSave, room = bareSave, roomFresh = bareFresh;
+        stoodIn.profileItems[0].states[0].flags = room.profileItems[0].states[0].flags = 0x2;
+        room.profileItems[0].name = roomFresh.profileItems[0].name = "gh1_basement";
+        Store before, after;
+        codec::toStore(stoodIn, bareFresh, before);
+        codec::toStore(room, roomFresh, after);
+        CHECK(before.text().find("venue.battle") != std::string::npos && after.text() == before.text());
     }
 
     void ps2Card(const fs::path &dir)

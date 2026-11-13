@@ -3,13 +3,13 @@
 // Text beyond the locale's own, for tokens the host adds, and each game's
 // text where it belongs outside a career.
 //
-// Every game's table names the same things by the same tokens: the 80s'
-// "fest" is its Rock for Safety Tour where GH2's is the Vans Warped Tour, and
-// GH1's rooms and guitarists are under GH2's venues' and characters' names.
-// Outside a career the table is GH2's, and a token whose text another game
-// has its own of takes its owner's: a venue's name its venue's game's, a
-// character's name and blurbs its outfit's game's, the rest its screen's
-// (the theme's menus, the in-song look's screens around a song).
+// Every game's table names the same things by the same tokens: GH1's
+// guitarists are under GH2's characters' names. Outside a career the table
+// is GH2's, and a token whose text another game has its own of takes its
+// owner's: a venue's name its venue's source's (its id names it,
+// content/sources.h), a character's name and blurbs its outfit's game's, the
+// rest its screen's (the theme's menus, the in-song look's screens around a
+// song).
 
 #include "addresses.h"
 
@@ -41,7 +41,6 @@ namespace gh2::locale
     enum Owner
     {
         kScreen,    // any token not another's
-        kVenue,     // the venues' names
         kCharacter, // the characters' names and blurbs
         kOwners,
     };

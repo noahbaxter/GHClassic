@@ -16,88 +16,88 @@
 }
 
 ; GH2's own.
-{ghc_spawn_set battle}
+{ghc_spawn_set gh2_battle}
 #include common/spawn_once.dta
-{ghc_spawn_set battle}
+{ghc_spawn_set gh2_battle}
 #include common/spawn_once.dta
-{ghc_spawn_set small1}
+{ghc_spawn_set gh2_small1}
 #include common/spawn_once.dta
-{ghc_spawn_set small1}
+{ghc_spawn_set gh2_small1}
 #include common/spawn_once.dta
-{ghc_spawn_set small2}
+{ghc_spawn_set gh2_small2}
 #include common/spawn_once.dta
-{ghc_spawn_set small2}
+{ghc_spawn_set gh2_small2}
 #include common/spawn_once.dta
-{ghc_spawn_set big}
+{ghc_spawn_set gh2_big}
 #include common/spawn_once.dta
-{ghc_spawn_set big}
+{ghc_spawn_set gh2_big}
 #include common/spawn_once.dta
-{ghc_spawn_set theatre}
+{ghc_spawn_set gh2_theatre}
 #include common/spawn_once.dta
-{ghc_spawn_set theatre}
+{ghc_spawn_set gh2_theatre}
 #include common/spawn_once.dta
-{ghc_spawn_set fest}
+{ghc_spawn_set gh2_fest}
 #include common/spawn_once.dta
-{ghc_spawn_set fest}
+{ghc_spawn_set gh2_fest}
 #include common/spawn_once.dta
-{ghc_spawn_set arena}
+{ghc_spawn_set gh2_arena}
 #include common/spawn_once.dta
-{ghc_spawn_set arena}
+{ghc_spawn_set gh2_arena}
 #include common/spawn_once.dta
-{ghc_spawn_set stone}
+{ghc_spawn_set gh2_stone}
 #include common/spawn_once.dta
-{ghc_spawn_set stone}
+{ghc_spawn_set gh2_stone}
 #include common/spawn_once.dta
 
 ; GH1's, standing in at GH2's.
-{ghc_spawn_from gh1 battle}
+{ghc_spawn_from gh1 gh1_basement}
 #include common/spawn_once.dta
-{ghc_spawn_from gh1 battle}
+{ghc_spawn_from gh1 gh1_basement}
 #include common/spawn_once.dta
-{ghc_spawn_from gh1 small1}
+{ghc_spawn_from gh1 gh1_small_club}
 #include common/spawn_once.dta
-{ghc_spawn_from gh1 small1}
+{ghc_spawn_from gh1 gh1_small_club}
 #include common/spawn_once.dta
-{ghc_spawn_from gh1 big}
+{ghc_spawn_from gh1 gh1_big_club}
 #include common/spawn_once.dta
-{ghc_spawn_from gh1 big}
+{ghc_spawn_from gh1 gh1_big_club}
 #include common/spawn_once.dta
-{ghc_spawn_from gh1 theatre}
+{ghc_spawn_from gh1 gh1_theatre}
 #include common/spawn_once.dta
-{ghc_spawn_from gh1 theatre}
+{ghc_spawn_from gh1 gh1_theatre}
 #include common/spawn_once.dta
-{ghc_spawn_from gh1 fest}
+{ghc_spawn_from gh1 gh1_fest}
 #include common/spawn_once.dta
-{ghc_spawn_from gh1 fest}
+{ghc_spawn_from gh1 gh1_fest}
 #include common/spawn_once.dta
-{ghc_spawn_from gh1 arena}
+{ghc_spawn_from gh1 gh1_arena}
 #include common/spawn_once.dta
-{ghc_spawn_from gh1 arena}
+{ghc_spawn_from gh1 gh1_arena}
 #include common/spawn_once.dta
 
 ; The 80s'.
-{ghc_spawn_from gh80s battle}
+{ghc_spawn_from gh80s gh80s_battle}
 #include common/spawn_once.dta
-{ghc_spawn_from gh80s battle}
+{ghc_spawn_from gh80s gh80s_battle}
 #include common/spawn_once.dta
-{ghc_spawn_from gh80s small1}
+{ghc_spawn_from gh80s gh80s_small1}
 #include common/spawn_once.dta
-{ghc_spawn_from gh80s small1}
+{ghc_spawn_from gh80s gh80s_small1}
 #include common/spawn_once.dta
-{ghc_spawn_from gh80s small2}
+{ghc_spawn_from gh80s gh80s_small2}
 #include common/spawn_once.dta
-{ghc_spawn_from gh80s small2}
+{ghc_spawn_from gh80s gh80s_small2}
 #include common/spawn_once.dta
-{ghc_spawn_from gh80s theatre}
+{ghc_spawn_from gh80s gh80s_theatre}
 #include common/spawn_once.dta
-{ghc_spawn_from gh80s theatre}
+{ghc_spawn_from gh80s gh80s_theatre}
 #include common/spawn_once.dta
-{ghc_spawn_from gh80s fest}
+{ghc_spawn_from gh80s gh80s_fest}
 #include common/spawn_once.dta
-{ghc_spawn_from gh80s fest}
+{ghc_spawn_from gh80s gh80s_fest}
 #include common/spawn_once.dta
-{ghc_spawn_from gh80s arena}
+{ghc_spawn_from gh80s gh80s_arena}
 #include common/spawn_once.dta
-{ghc_spawn_from gh80s arena}
+{ghc_spawn_from gh80s gh80s_arena}
 #include common/spawn_once.dta
 (quit)

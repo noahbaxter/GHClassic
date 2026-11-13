@@ -109,7 +109,8 @@ namespace gh2::custom
 
         // GH2's career's venues in order, its last (stone) left out as its
         // own songs' casts leave it.
-        const std::vector<std::string> kVenues = {"battle", "small1", "small2", "big", "theatre", "fest", "arena"};
+        const std::vector<std::string> kVenues = {"gh2_battle", "gh2_small1", "gh2_small2", "gh2_big",
+                                                   "gh2_theatre", "gh2_fest", "gh2_arena"};
 
         // Every guitarist the kinds name, in the order they first name
         // them, each with its first outfit (config/gh2.dta's characters).

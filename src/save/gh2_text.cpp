@@ -61,15 +61,16 @@ namespace gh2::save::gh2
         }
 
         // "<type>.<name>", with "#2" on for an item listed twice: the
-        // characters share their outfits' names.
+        // characters share their outfits' names. Anything but a song by the
+        // name its files go by (content/sources.h), as saves always have.
         std::vector<std::string> itemKeys(const std::vector<Item> &items, const Games &games)
         {
             std::map<std::string, int> seen;
             std::vector<std::string> keys;
             for (const Item &item : items)
             {
-                std::string key =
-                    typeName(item.type) + "." + (item.type == kSongType ? storeName(games, item.name) : item.name);
+                std::string key = typeName(item.type) + "." +
+                                  (item.type == kSongType ? storeName(games, item.name) : sources::own(item.name));
                 if (const int n = ++seen[key]; n > 1)
                     key += "#" + std::to_string(n);
                 keys.push_back(key);
@@ -351,8 +352,8 @@ namespace gh2::save::gh2
     {
         const std::string game = section.substr(0u, section.find('@'));
         if (game == "gh2x" && stored.rfind("x_", 0) == 0)
-            return sources::song(game, stored.substr(2));
-        return sources::song(game, stored);
+            return sources::id(game, stored.substr(2));
+        return sources::id(game, stored);
     }
 
     namespace

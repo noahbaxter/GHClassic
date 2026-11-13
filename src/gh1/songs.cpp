@@ -410,6 +410,11 @@ namespace gh2::gh1
 
     std::string venue(const std::string &gh1)
     {
+        return sources::id("gh1", kVenues.count(gh1) != 0u ? gh1 : "small_club");
+    }
+
+    std::string slot(const std::string &gh1)
+    {
         const auto it = kVenues.find(gh1);
         return it != kVenues.end() ? it->second : "small1";
     }

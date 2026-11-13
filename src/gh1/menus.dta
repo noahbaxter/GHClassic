@@ -27,12 +27,12 @@
    (= FOCUS_MSG
       {if {! {ui in_transition}}
          {switch $new_focus
-            (sv_battle.btn {$this set_venue_map_frame 1} {game set_venue battle})
-            (sv_small1.btn {$this set_venue_map_frame 2} {game set_venue small1})
-            (sv_big.btn {$this set_venue_map_frame 3} {game set_venue big})
-            (sv_theatre.btn {$this set_venue_map_frame 4} {game set_venue theatre})
-            (sv_fest.btn {$this set_venue_map_frame 5} {game set_venue fest})
-            (sv_arena.btn {$this set_venue_map_frame 6} {game set_venue arena})}}))
+            (sv_battle.btn {$this set_venue_map_frame 1} {game set_venue gh1_basement})
+            (sv_small1.btn {$this set_venue_map_frame 2} {game set_venue gh1_small_club})
+            (sv_big.btn {$this set_venue_map_frame 3} {game set_venue gh1_big_club})
+            (sv_theatre.btn {$this set_venue_map_frame 4} {game set_venue gh1_theatre})
+            (sv_fest.btn {$this set_venue_map_frame 5} {game set_venue gh1_fest})
+            (sv_arena.btn {$this set_venue_map_frame 6} {game set_venue gh1_arena})}}))
 
 ; GH1's letter is to the band by name, and lists seven deductions where the
 ; game counts five (CashAwardScreen's set_deduction).

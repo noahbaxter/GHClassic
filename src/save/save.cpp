@@ -25,6 +25,7 @@
 
 #include "save/save.h"
 
+#include "content/sources.h"
 #include "gameplay/engine/note_engine.h"
 #include "guest.h"
 #include "hook.h"
@@ -805,7 +806,8 @@ namespace gh2::save
         std::set<std::string> games;
         for (const NoteEngine engine : kNoteEngines)
             games.insert(sectionGame(game, engine));
-        const std::string stored = gh2::storedSong(game, item);
+        const sources::Row *row = sources::find(item);
+        const std::string stored = row && row->kind != sources::Kind::Song ? row->own : gh2::storedSong(game, item);
         for (const Section &section : s_store.sections)
         {
             // [band N <game>] and [band N <game> <difficulty>], under any engine.

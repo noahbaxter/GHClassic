@@ -10,7 +10,7 @@
 {{game get_player_config 0} set_difficulty expert}
 {{game get_player_config 0} set autoplay TRUE}
 {game set_quickplay}
-{game set_venue theatre}
+{game set_venue gh2_theatre}
 {ui goto_screen loading_screen}
 (wait_screen game_screen 60)
 (wait 30)

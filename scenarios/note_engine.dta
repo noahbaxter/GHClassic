@@ -119,7 +119,7 @@
 {{game get_player_config 0} set autoplay TRUE}
 {game set_song gh2_shoutatthedevil}
 {game set_quickplay}
-{game set_venue battle}
+{game set_venue gh2_battle}
 {ui goto_screen loading_screen}
 (wait_screen game_screen 60)
 (wait 15)
@@ -145,7 +145,7 @@
 (wait_screen main_screen 60)
 {gamecfg set mode quickplay}
 {game set_quickplay}
-{game set_venue battle}
+{game set_venue gh1_basement}
 {campaigns venues_from gh1}
 {ui goto_screen loading_screen}
 (wait_screen game_screen 60)

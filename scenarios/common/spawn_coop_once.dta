@@ -6,7 +6,7 @@
 {{game get_player_config 0} set autoplay TRUE}
 {{game get_player_config 1} set autoplay TRUE}
 {game set_quickplay}
-{game set_venue small1}
+{game set_venue gh2_small1}
 {ui goto_screen loading_screen}
 (wait_screen game_screen 60)
 (wait 0.5)

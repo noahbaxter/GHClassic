@@ -17,7 +17,7 @@
 ; 0x126828).
 (expect {game get_character_outfit} glam1)
 (expect {game get_guitar} flying_v)
-(expect {game get_venue} battle)
+(expect {game get_venue} gh2_battle)
 {game set_character punk1 TRUE}
 {ghc_sel_character_done ghc_qp_character_screen}
 (wait_screen ghc_qp_setup_screen)

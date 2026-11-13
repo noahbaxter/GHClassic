@@ -2,6 +2,7 @@
 
 #include "content/games.h"
 #include "content/outfits.h"
+#include "content/sources.h"
 #include "hub/poster_meshes.h"
 #include "hub/venue_posters.h"
 #include "milo/milo.h"
@@ -37,9 +38,9 @@ namespace gh2::hub_scene
         constexpr const char *kMesh = "char_punk.mesh", *kMat = "char_punk.mat", *kTex = "char_punk.tex";
         constexpr const char *kGroup = "cs_icons.grp";
 
-        // A flat picture of each mounted game's venues, named for its game
-        // and venue (ghc_venue_<game>_<venue>.mesh, .mat and .tex), drawn
-        // after the portrait.
+        // A flat picture of each mounted game's venues, named for the
+        // venue's id (ghc_venue_<id>.mesh, .mat and .tex), drawn after the
+        // portrait.
         bool addVenues(milo::Dir &scene)
         {
             const milo::Bytes *likeTex = milo::body(scene, "Tex", kTex);
@@ -73,7 +74,11 @@ namespace gh2::hub_scene
                                           if (const auto made = venue_posters::poster(g, v))
                                               data = *made;
                                       });
-                    const std::string name = std::string("ghc_venue_") + game + "_" + venue;
+                    // By the venue's id, but for song defaults' (content/sources.h).
+                    std::string name = std::string("ghc_venue_") + game + "_unknown";
+                    for (const sources::Row &row : sources::rows(sources::Kind::Venue, game))
+                        if (row.own == venue)
+                            name = "ghc_venue_" + row.id;
                     milo::Bytes ownMat = mat;
                     if (!milo::replaceStr(ownMat, kTex, name + ".tex"))
                         return false;

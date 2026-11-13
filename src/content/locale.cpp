@@ -1,5 +1,6 @@
 #include "content/locale.h"
 
+#include "content/sources.h"
 #include "formats/dtb.h"
 #include "guest.h"
 #include "script.h"
@@ -24,7 +25,7 @@ namespace gh2::locale
         // Each other game's text where it differs from GH2's, by token: a
         // char* in its kept table.
         std::map<std::string, std::unordered_map<std::string, uint32_t>> s_differs;
-        std::array<std::string, kOwners> s_owners = {"gh2", "gh2", "gh2"};
+        std::array<std::string, kOwners> s_owners = {"gh2", "gh2"};
         std::array<std::set<std::string>, kOwners> s_ownTokens;
 
         // A kept table's (token "text") entries: the token's chars and the
@@ -192,13 +193,15 @@ namespace gh2::locale
     {
         if (s_game != "gh2" || token == nullptr)
             return 0u;
-        Owner owner = kScreen;
-        for (const Owner other : {kVenue, kCharacter})
-            if (s_ownTokens[other].count(token) != 0u)
-                owner = other;
-        if (s_owners[owner] == "gh2")
+        // A venue's name and what is made from it are its venue's source's
+        // (content/sources.h).
+        const sources::Row *venue = sources::venueOfKey(token);
+        const std::string &from = venue ? venue->source
+                                  : s_ownTokens[kCharacter].count(token) != 0u ? s_owners[kCharacter]
+                                                                                : s_owners[kScreen];
+        if (from == "gh2")
             return 0u;
-        const auto differs = s_differs.find(s_owners[owner]);
+        const auto differs = s_differs.find(from);
         if (differs == s_differs.end())
             return 0u;
         const auto text = differs->second.find(token);

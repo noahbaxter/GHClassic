@@ -443,8 +443,6 @@ namespace gh2::campaigns
         bool venuesFrom(const script::Call &call, size_t index)
         {
             const size_t look = lookFor(call.rdram, index);
-            // The venue's name is its game's, wherever it shows.
-            locale::own(locale::kVenue, s_campaigns[index].game);
             if (index == s_venueFrom && look == s_lookFrom)
                 return highwayFrom(call, look);
             const Guest guest{call};
@@ -1003,17 +1001,15 @@ namespace gh2::campaigns
                 const auto index = indexOf(call.symbol(2));
                 return {index && venuesFrom(call, *index) ? 1u : 0u, script::kInt};
             }
-            // Whose names the venues show from here on (a map's), and whose
-            // a character's name and blurbs are: the outfit's game's.
-            if (op == "text_venues" || op == "text_outfit")
+            // Whose a character's name and blurbs are: the outfit's game's.
+            if (op == "text_outfit")
             {
-                const auto own = op == "text_venues" ? std::optional<std::pair<std::string, std::string>>()
-                                                     : outfits::ownOf(call.symbol(2));
-                const auto index = indexOf(op == "text_venues" ? call.symbol(2) : own ? own->first : active());
+                const auto own = outfits::ownOf(call.symbol(2));
+                const auto index = indexOf(own ? own->first : active());
                 if (!index)
                     return {0u, script::kInt};
                 textBuilt(Guest{call}, *index);
-                locale::own(op == "text_venues" ? locale::kVenue : locale::kCharacter, s_campaigns[*index].game);
+                locale::own(locale::kCharacter, s_campaigns[*index].game);
                 return {1u, script::kInt};
             }
             if (op == "owns")
@@ -1178,15 +1174,11 @@ namespace gh2::campaigns
                             rdram, ctx, s_addresses->dataNodeGetObj,
                             {load<uint32_t>(rdram, parsed) + 8u * static_cast<uint32_t>(i), parsed})))
                         s_menuScreens.emplace(object, names[i].second);
-                // The venues' names and the characters', with their blurbs.
-                std::set<std::string> venues, characters;
-                for (size_t i = 0; i < s_campaigns.size(); ++i)
-                    for (const std::string &venue : venuesOf(i))
-                        venues.insert(venue);
+                // The characters' names, with their blurbs.
+                std::set<std::string> characters;
                 for (const auto &character : usable(s_campaigns[0]).characters)
                     for (const char *suffix : {"", "_blurb", "_outfit_blurb"})
                         characters.insert(character.first + suffix);
-                locale::ownTokens(locale::kVenue, venues);
                 locale::ownTokens(locale::kCharacter, characters);
                 *ctx = saved;
             }

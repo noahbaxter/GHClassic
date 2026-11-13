@@ -511,7 +511,7 @@
                (battle sv_battle.btn) (small1 sv_small1.btn) (small2 sv_small2.btn) (big sv_big.btn)
                (theatre sv_theatre.btn) (fest sv_fest.btn) (arena sv_arena.btn) (stone sv_stone.btn)
             )
-            {if {&& {exists {elem $v 1}} {! {find_elem {find $syscfg venues} {elem $v 0}}}}
+            {if {&& {exists {elem $v 1}} {! {sources owned {find $syscfg venues} {elem $v 0}}}}
                {$this disable {elem $v 1}}
                {{$this find {elem $v 1}} set_showing FALSE}
             }

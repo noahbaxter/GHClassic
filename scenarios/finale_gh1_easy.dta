@@ -5,7 +5,7 @@
 {set $d2 none}
 {set $d3 none}
 {set $v1 down}
-{set $finale_venue fest}
+{set $finale_venue gh1_fest}
 {set $b1 gh1_spanishcastlemagic}
 {set $b2 gh1_higherground}
 {set $b3 gh1_nooneknows}

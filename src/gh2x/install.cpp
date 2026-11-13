@@ -44,7 +44,7 @@ namespace gh2
 {
     namespace
     {
-        std::string ours(const std::string &name) { return sources::song("gh2x", name); }
+        std::string ours(const std::string &name) { return sources::id("gh2x", name); }
 
         // A side of the PS2 store's album art (its us_logo pictures).
         constexpr uint32_t kAlbumArtSide = 256u;
@@ -77,6 +77,12 @@ namespace gh2
             dtb::Node entry = *found;
             entry.nodes[0].text = ours(name);
             retarget(entry, name);
+            // Its quickplay venue, (quickplay (venue <v>)), is PS2 GH2's.
+            for (dtb::Node &quickplay : entry.nodes)
+                if (quickplay.type == dtb::kArray && !quickplay.nodes.empty() && quickplay.nodes[0].text == "quickplay")
+                    for (dtb::Node &venue : quickplay.nodes)
+                        if (venue.type == dtb::kArray && venue.nodes.size() == 2u && venue.nodes[0].text == "venue")
+                            venue.nodes[1].text = sources::id("gh2", venue.nodes[1].text);
             for (const char *key : {"song", "song_coop"})
             {
                 const dtb::Node *audio = dtb::find(*found, key);
@@ -199,9 +205,14 @@ namespace gh2
                 std::cerr << "[gh2x] cannot read the 360 career" << std::endl;
                 return;
             }
+            // Each tier in PS2 GH2's venue of its name.
             if (dtb::Node *order = child(campaign, "order"))
                 for (size_t i = 1u; i < order->nodes.size(); ++i)
+                {
                     rename(order->nodes[i]);
+                    if (!order->nodes[i].nodes.empty())
+                        order->nodes[i].nodes[0].text = sources::id("gh2", order->nodes[i].nodes[0].text);
+                }
             if (dtb::Node *songs = child(*store, "song"))
                 rename(*songs);
             requireAs(*guitars, *theirGuitars);
@@ -237,7 +248,7 @@ namespace gh2
             const bool drummer = !tests.empty() && tests.size() == theirTests.size();
             for (size_t i = 0; drummer && i < tests.size(); ++i)
             {
-                tests[i].first->text = theirTests[i].first->text;
+                tests[i].first->text = sources::id("gh2", theirTests[i].first->text);
                 tests[i].second->text = ours(theirTests[i].second->text);
             }
 
@@ -294,7 +305,7 @@ namespace gh2
             if (list.nodes.empty())
                 continue;
             const std::string group = isStore ? "store" : list.nodes[0].text;
-            setlists::Tier tier{isStore ? tiers.front().venue : group, "gh2x_" + group, {}, !isStore};
+            setlists::Tier tier{isStore ? tiers.front().venue : sources::id("gh2", group), "gh2x_" + group, {}, !isStore};
             locale::add("song_header_" + tier.header, text("song_header_" + group));
             for (size_t s = 1u; s < list.nodes.size(); ++s)
             {

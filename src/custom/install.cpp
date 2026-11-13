@@ -216,7 +216,7 @@ namespace gh2
         const auto venue = [](const std::string &id)
         {
             const auto song = catalog().find(id);
-            return song ? castOf(song->tags).venue : std::string("small1");
+            return song ? castOf(song->tags).venue : std::string("gh2_small1");
         };
         // On GH2's own paper whichever game's menus are up, as it goes on
         // for as long as the list (content/setlist_paper.h).

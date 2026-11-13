@@ -492,7 +492,7 @@ namespace gh2::gh1
             if (f || guitar)
                 continue;
             // A song's blurb by our name for it (content/sources.h).
-            if (const std::string song = sources::song("gh1", stem); songs.count(song) != 0u)
+            if (const std::string song = sources::id("gh1", stem); songs.count(song) != 0u)
                 text[song + key.substr(stem.size())] = entry.nodes[1].text;
             else if (const auto as = renamed(key, names))
                 text[*as] = entry.nodes[1].text;

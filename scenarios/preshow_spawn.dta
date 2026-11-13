@@ -5,7 +5,7 @@
 #include common/first_boot.dta
 {quickplay song_defaults 0}
 {game set_song gh1_iloverockandroll}
-{game set_venue small1}
+{game set_venue gh2_small1}
 #include common/preshow_song.dta
 #include common/preshow_song.dta
 #include common/preshow_song.dta

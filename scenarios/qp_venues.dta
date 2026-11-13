@@ -38,14 +38,14 @@
 (wait_screen ghc_qp_venue_twin_screen)
 (wait 2)
 (expect $ghc_qp_venues gh1)
-(expect {game get_venue} battle)
+(expect {game get_venue} gh1_basement)
 (shot gh1_map)
 ; GH1's career has opened nothing past its first: the map stays there.
 (press down)
 (wait 0.5)
 (press up)
 (wait 0.5)
-(expect {game get_venue} battle)
+(expect {game get_venue} gh1_basement)
 ; The 80s' map, and back to GH1's.
 {ghc_qp_venue_twin_screen ghc_picked gh80s}
 (wait_screen ghc_qp_venue_screen)

@@ -213,6 +213,7 @@ namespace
         gh2::hub_scene::install();
         gh2::setlists::install(runtime, gh2::kSlus21447);
         gh2::encores::install(runtime, gh2::kSlus21447);
+        gh2::sources::install(runtime, gh2::kSlus21447);
         gh2::status_line::install(runtime, gh2::kSlus21447);
         gh2::songs::install();
         gh2::locale::install(runtime, gh2::kSlus21447);

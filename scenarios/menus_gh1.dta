@@ -63,7 +63,7 @@
 (wait_screen sel_venue_screen 40)
 (wait 1.5)
 (shot venue)
-(expect {game get_venue} battle)
+(expect {game get_venue} gh1_basement)
 (press green)
 (wait_screen sel_song_screen)
 (wait 2)

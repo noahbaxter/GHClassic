@@ -8,7 +8,7 @@
 {quickplay pick outfit glam1}
 {quickplay pick guitar sg}
 {quickplay pick skin sg_white}
-{quickplay pick venue battle}
+{quickplay pick venue gh2_battle}
 {quickplay pick venue_game gh1}
 {gamecfg set mode quickplay}
 {ui goto_screen ghc_qp_setup_screen}
@@ -18,7 +18,7 @@
 (wait_screen ghc_qp_character_screen)
 (expect {game get_character_outfit} glam1)
 (expect {game get_guitar} sg)
-(expect {game get_venue} battle)
+(expect {game get_venue} gh2_battle)
 (wait_until {char_single are_chars_loaded})
 {ui goto_screen ghc_qp_guitar_screen}
 (wait_screen ghc_qp_guitar_screen)
@@ -31,7 +31,7 @@
 (wait_screen ghc_qp_venue_screen)
 (wait 2)
 (expect $ghc_qp_venues gh1)
-(expect {game get_venue} battle)
+(expect {game get_venue} gh1_basement)
 (shot venue)
 (press green)
 (wait_screen ghc_qp_setup_screen)
@@ -47,5 +47,5 @@
 (expect {quickplay pick venue_game} gh1)
 (expect {quickplay pick outfit} glam1)
 (expect {game get_character_outfit} glam1)
-(expect {game get_venue} battle)
+(expect {game get_venue} gh1_basement)
 (quit)

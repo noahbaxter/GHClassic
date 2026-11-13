@@ -24,7 +24,7 @@ namespace gh2::venue_posters
 
     struct Venue
     {
-        const char *venue; // {campaigns venues}
+        const char *venue; // its own name (content/sources.h)
         const char *art;   // its art's name
         const char *title;
     };
@@ -32,8 +32,8 @@ namespace gh2::venue_posters
     // Each venue of `game` that has a poster, not counting "unknown".
     const std::vector<Venue> &venues(const std::string &game);
 
-    // The poster for `game` (gh2, gh80s, gh1) and `venue` ({campaigns
-    // venues}, GH1's by the GH2 venue standing in for it; or "unknown", for
+    // The poster for `game` (gh2, gh80s, gh1) and `venue` (its own name,
+    // GH1's the GH2 venue standing in for it; or "unknown", for
     // song defaults: blank paper with a big ? on it), made by prepare, or
     // the first time any of that game's is asked for. None when that game
     // is not mounted or its art cannot be read. Any thread.

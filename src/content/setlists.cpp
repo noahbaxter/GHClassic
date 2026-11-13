@@ -670,8 +670,9 @@ namespace gh2::setlists
             const dtb::Node &list = isStore ? *bonus : order->nodes[i];
             if (list.nodes.empty())
                 continue;
+            // A tier's venue by its id (content/sources.h), which heads it.
             const std::string group = isStore ? "store" : list.nodes[0].text;
-            Tier tier{isStore ? tiers.front().venue : group, game + "_" + group, {}, !isStore};
+            Tier tier{isStore ? tiers.front().venue : group, isStore ? game + "_store" : group, {}, !isStore};
             locale::add("song_header_" + tier.header, text("song_header_" + group));
             for (size_t s = 1u; s < list.nodes.size(); ++s)
             {

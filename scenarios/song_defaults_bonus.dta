@@ -18,5 +18,5 @@
 (press green)
 (wait_screen game_screen 60)
 (expect {game get_character_outfit} rock1)
-(expect {game get_venue} theatre)
+(expect {game get_venue} gh2_theatre)
 (quit)

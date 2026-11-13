@@ -98,12 +98,12 @@ namespace gh2::ark
         std::optional<size_t> s_boot;  // bootFrom's
         std::unordered_set<std::string> s_bootFiles;
         // A path starting `prefix` found as `layer` in front would find it,
-        // without the prefix where `strip` (alias's) or as it is (lend's).
+        // `to` in the prefix's place: none for alias's, itself for lend's.
         struct Route
         {
             std::string prefix;
             std::optional<size_t> layer;
-            bool strip;
+            std::string to;
         };
         std::vector<Route> s_routes;
         bool s_routing = false; // a route's own find, which takes no route again
@@ -326,7 +326,7 @@ namespace gh2::ark
                 const auto front = s_front;
                 s_front = route.layer;
                 s_routing = true;
-                const Entry *entry = find(route.strip ? name.substr(route.prefix.size()) : name);
+                const Entry *entry = find(route.to + name.substr(route.prefix.size()));
                 s_routing = false;
                 s_front = front;
                 return entry;
@@ -659,19 +659,24 @@ namespace gh2::ark
 
     void alias(const std::string &as, std::optional<size_t> layer)
     {
-        s_routes.push_back({key(as.c_str()), layer, true});
+        s_routes.push_back({key(as.c_str()), layer, ""});
+    }
+
+    void route(const std::string &as, std::optional<size_t> layer, const std::string &to)
+    {
+        s_routes.push_back({key(as.c_str()), layer, key(to.c_str())});
     }
 
     void lend(const std::string &prefix, std::optional<size_t> layer)
     {
         unlend(prefix);
-        s_routes.push_back({key(prefix.c_str()), layer, false});
+        s_routes.push_back({key(prefix.c_str()), layer, key(prefix.c_str())});
     }
 
     void unlend(const std::string &prefix)
     {
         const std::string name = key(prefix.c_str());
-        std::erase_if(s_routes, [&](const Route &route) { return !route.strip && route.prefix == name; });
+        std::erase_if(s_routes, [&](const Route &route) { return route.to == name && route.prefix == name; });
     }
 
     void bootFrom(std::optional<size_t> layer, const std::vector<std::string> &paths)

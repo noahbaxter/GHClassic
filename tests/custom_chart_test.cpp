@@ -991,10 +991,10 @@ namespace
         const Tags punk = {{"artist", "Some Band"}, {"name", "Some Song"}, {"genre", "Punk Rock"}, {"diff_guitar", "0"}};
         const Cast a = castOf(punk), b = castOf(punk);
         CHECK(a.outfit == b.outfit && a.guitar == b.guitar && a.venue == b.venue);
-        CHECK(a.venue == "battle" || a.venue == "small1" || a.venue == "small2");
+        CHECK(a.venue == "gh2_battle" || a.venue == "gh2_small1" || a.venue == "gh2_small2");
         const Tags hard = {{"artist", "x"}, {"name", "y"}, {"diff_guitar", "6"}};
         const std::string far = castOf(hard).venue;
-        CHECK(far == "theatre" || far == "fest" || far == "arena");
+        CHECK(far == "gh2_theatre" || far == "gh2_fest" || far == "gh2_arena");
 
         std::map<std::string, int> outfits, venues;
         for (int i = 0; i < 2000; ++i)
@@ -1019,7 +1019,8 @@ namespace
         {
             const Cast c = castOf({{"artist", std::to_string(i)}, {"genre", "Thrash Metal"}, {"diff_guitar", "3"}});
             CHECK(c.outfit != "grim" && (c.guitar == "lespaul" || c.guitar == "sg" || c.guitar == "flying_v"));
-            CHECK(c.venue == "small1" || c.venue == "small2" || c.venue == "big" || c.venue == "theatre" || c.venue == "fest");
+            CHECK(c.venue == "gh2_small1" || c.venue == "gh2_small2" || c.venue == "gh2_big" || c.venue == "gh2_theatre" ||
+                  c.venue == "gh2_fest");
             grims += c.character == "grim" ? 1 : 0;
             ++models[c.realGuitar];
             const Cast p = castOf({{"artist", std::to_string(i)}, {"genre", "Pop Punk"}});

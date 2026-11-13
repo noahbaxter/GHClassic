@@ -186,7 +186,7 @@
       )
       (reset_player_settings
          {{game get_player_config 0} set_difficulty kDifficultyMedium}
-         {game set_venue small2}
+         {game set_venue gh2_small2}
          {game set_song_index 0}
          {game set_character {campaigns first_character} TRUE}
          {game set_guitar_index 0}

@@ -74,7 +74,6 @@
          {ghc_venue_game {campaigns active}}
       }
    }
-   {campaigns text_venues $ghc_qp_venues}
    {ui goto_screen ghc_qp_venue_screen}
 }
 ; The hub's rows: each a button named for what it does, its text, and how
@@ -338,9 +337,12 @@
    {if_else {! {$panel get hub}}
       none
       {symbol
-         {sprint "ghc_venue_"
-            {if_else {quickplay picked venue_game} {quickplay pick venue_game} {ghc_venue_game {campaigns active}}}
-            "_" {if_else {quickplay song_defaults} unknown {game get_venue}} ".mesh"
+         {if_else {quickplay song_defaults}
+            {sprint "ghc_venue_"
+               {if_else {quickplay picked venue_game} {quickplay pick venue_game} {ghc_venue_game {campaigns active}}}
+               "_unknown.mesh"
+            }
+            {sprint "ghc_venue_" {game get_venue} ".mesh"}
          }
       }
    }
@@ -358,7 +360,7 @@
       {foreach $g (gh1 gh2 gh80s)
          {if {campaigns has $g}
             {foreach $v {campaigns venues $g}
-               {ghc_qp_hang_poster $panel {sprint "ghc_venue_" $g "_" $v} $shown $door}
+               {ghc_qp_hang_poster $panel {sprint "ghc_venue_" $v} $shown $door}
             }
             {ghc_qp_hang_poster $panel {sprint "ghc_venue_" $g "_unknown"} $shown $door}
          }

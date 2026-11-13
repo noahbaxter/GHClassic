@@ -312,6 +312,13 @@ namespace gh2
         uint32_t charDriverStarved;           // CharDriver::Starved()
         uint32_t guitarCharacterGetClipGroup; // GuitarCharacter::GetClipGroup()
         uint32_t gameConfigPlayerConfig;      // GameConfig::GetPlayerConfig(int) (symbol map: GetVenueIndex)
+        uint32_t gameConfigGetVenue;          // GameConfig::GetVenue() const
+        uint32_t gameConfigOnFilterClips;     // GameConfig::OnFilterClips(DataArray *): <venue>_exclude
+        uint32_t gameConfigOnChangeDrums;     // GameConfig::OnChangeDrums(DataArray *): the kit named with the venue
+        uint32_t gameConfigVenueData;         // GameConfig::VenueData(Symbol): the venue's WorldDir type
+        uint32_t venueProviderGetVenue;       // VenueProvider::GetVenue(int) const: its type's name
+        uint32_t venueProviderGetIndex;       // VenueProvider::GetIndex(Symbol) const
+        uint32_t systemConfig1;               // SystemConfig(Symbol)
         uint32_t localeInit;       // Locale::Init
         uint32_t localeTerminate;  // Locale::Terminate
         uint32_t campaignStateIsEncoreSong;           // (Symbol song)
@@ -685,6 +692,13 @@ namespace gh2
         .charDriverStarved = 0x1710b8u,
         .guitarCharacterGetClipGroup = 0x10b7b0u,
         .gameConfigPlayerConfig = 0x1264f8u,
+        .gameConfigGetVenue = 0x1264d0u,
+        .gameConfigOnFilterClips = 0x1293e8u,
+        .gameConfigOnChangeDrums = 0x129248u,
+        .gameConfigVenueData = 0x126d80u,
+        .venueProviderGetVenue = 0x118b98u,
+        .venueProviderGetIndex = 0x118bc8u,
+        .systemConfig1 = 0x2a8690u,
         .localeInit = 0x2cb798u,
         .localeTerminate = 0x2cba98u,
         .campaignStateIsEncoreSong = 0x131d30u,

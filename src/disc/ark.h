@@ -109,6 +109,10 @@ namespace gh2::ark
     // in front, or with none: one game's file whichever game is played
     // ("ghc/gh2/ui/sel_character.milo" is GH2's own).
     void alias(const std::string &as, std::optional<size_t> layer);
+    // A path starting `as` is `to` plus the rest of it, as it is found with
+    // that layer in front: a venue's id for the files a layer makes at
+    // another's paths ("world/gh1_basement/" is GH1's "world/battle/").
+    void route(const std::string &as, std::optional<size_t> layer, const std::string &to);
     // Until unlent, a path starting `prefix` is found as it is with that
     // layer in front, or with none: another game's venue for one song.
     void lend(const std::string &prefix, std::optional<size_t> layer);

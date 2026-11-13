@@ -2,9 +2,15 @@
 
 #include "disc/ark.h"
 #include "formats/dtb.h"
+#include "guest.h"
+#include "script.h"
+
+#include "ps2_runtime.h"
+#include "ps2_runtime_macros.h"
 
 #include <functional>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <set>
 
@@ -13,6 +19,8 @@ namespace gh2::sources
     namespace
     {
         using Names = std::set<std::string>;
+        // A name on the disc to its id.
+        using Ids = std::map<std::string, std::string>;
 
         // Config scripts naming a song only as one: its entry, its tier, its
         // price, its co-op scores.
@@ -26,13 +34,71 @@ namespace gh2::sources
         // {meta_music stop} is no song.
         const Names kWords = {"stop"};
 
+        // Names a script makes from a venue to find an object in a scene:
+        // its button on the venue map (career.dta's venue_button), made
+        // from its own name.
+        constexpr const char *kOwnFormats[] = {"sv_%s.btn"};
+
         // Each symbol that is one of `names` as `source` names it.
         void qualify(dtb::Node &node, const std::string &source, const Names &names, const Names &skip)
         {
             if (node.type == dtb::kSymbol && names.count(node.text) != 0u && skip.count(node.text) == 0u)
-                node.text = song(source, node.text);
+                node.text = id(source, node.text);
             for (dtb::Node &n : node.nodes)
                 qualify(n, source, names, skip);
+        }
+
+        bool isSymbol(const dtb::Node &node, const char *text)
+        {
+            return node.type == dtb::kSymbol && node.text == text;
+        }
+
+        // Every venue's name in it.
+        void rename(dtb::Node &node, const Ids &ids)
+        {
+            if (node.type == dtb::kSymbol)
+                if (const auto it = ids.find(node.text); it != ids.end())
+                    node.text = it->second;
+            for (dtb::Node &n : node.nodes)
+                rename(n, ids);
+        }
+
+        // {game get_venue}, {gamecfg get_venue}
+        bool isGetVenue(const dtb::Node &node)
+        {
+            return node.type == dtb::kCommand && node.nodes.size() == 2u && isSymbol(node.nodes[1], "get_venue");
+        }
+
+        // A venue wherever a script names one as a venue, never a word that
+        // is also a venue's name elsewhere ({arena ...}, big): in a (venues
+        // ...) or (venue ...) array (the list, a song's quickplay venue,
+        // DX's achievements by venue), what {game set_venue} or {game
+        // set_career_venue} is given (marfGH's {random_elem (...)} too), and
+        // what {== <x> get_venue} is compared with either way round. A
+        // venue made into an object's name gets its own name.
+        void qualifyVenues(dtb::Node &node, const Ids &ids)
+        {
+            auto &n = node.nodes;
+            if (node.type == dtb::kArray && !n.empty() && (isSymbol(n[0], "venues") || isSymbol(n[0], "venue")))
+                for (size_t i = 1u; i < n.size(); ++i)
+                    rename(n[i], ids);
+            if (node.type == dtb::kCommand && n.size() == 3u && isSymbol(n[0], "game") &&
+                (isSymbol(n[1], "set_venue") || isSymbol(n[1], "set_career_venue")))
+                rename(n[2], ids);
+            if (node.type == dtb::kCommand && n.size() == 3u && (isSymbol(n[0], "==") || isSymbol(n[0], "!=")))
+            {
+                if (isGetVenue(n[1]))
+                    rename(n[2], ids);
+                if (isGetVenue(n[2]))
+                    rename(n[1], ids);
+            }
+            if (node.type == dtb::kCommand && n.size() >= 3u && (isSymbol(n[0], "sprintf")) && n[1].type == dtb::kString)
+                for (const char *format : kOwnFormats)
+                    if (n[1].text == format)
+                        for (size_t i = 2u; i < n.size(); ++i)
+                            n[i] = dtb::command({dtb::symbol("sources"), dtb::symbol("own"), n[i]});
+            for (dtb::Node &child : n)
+                qualifyVenues(child, ids);
         }
 
         // Paths under songs/<name>/ moved to songs/<ours>/, the files named
@@ -40,7 +106,7 @@ namespace gh2::sources
         void retarget(dtb::Node &node, const std::string &source, const std::string &name)
         {
             const std::string file = "songs/" + name + "/" + name, dir = "songs/" + name + "/";
-            const std::string ours = song(source, name);
+            const std::string ours = id(source, name);
             if (node.type == dtb::kSymbol || node.type == dtb::kString)
             {
                 if (node.text.rfind(file, 0) == 0)
@@ -67,6 +133,167 @@ namespace gh2::sources
                             bytes = dtb::write(*root);
                         });
         }
+
+        // The locale key `key` names, as an id: a song's or venue's name, or
+        // one made from a venue's.
+        std::optional<std::string> localeKey(const std::string &key, const std::string &source, const Names &songs,
+                                             const Ids &venues)
+        {
+            if (songs.count(key) != 0u)
+                return id(source, key);
+            if (const auto it = venues.find(key); it != venues.end())
+                return it->second;
+            for (const char *prefix : kVenueKeyPrefixes)
+                if (key.rfind(prefix, 0) == 0)
+                    if (const auto it = venues.find(key.substr(std::string(prefix).size())); it != venues.end())
+                        return prefix + it->second;
+            for (const std::string suffix : kVenueKeySuffixes)
+                if (key.size() > suffix.size() && key.ends_with(suffix))
+                    if (const auto it = venues.find(key.substr(0u, key.size() - suffix.size())); it != venues.end())
+                        return it->second + suffix;
+            return std::nullopt;
+        }
+
+        // The venues on that disc: its config's list (config/gh2.dta's
+        // venues), and any world/<v>/ with its scene in world/<v>/gen/.
+        Names venuesOn(size_t disc)
+        {
+            Names found;
+            if (const auto file = ark::readFile(disc, "config/gen/gh2.dtb"))
+                if (const auto root = dtb::raw(*file))
+                    if (const dtb::Node *list = dtb::find(*root, "venues"))
+                        for (size_t i = 1u; i < list->nodes.size(); ++i)
+                            if (list->nodes[i].type == dtb::kSymbol)
+                                found.insert(list->nodes[i].text);
+            for (const std::string &path : ark::paths(disc, "world/"))
+            {
+                const size_t slash = path.find('/', 6u);
+                if (slash == std::string::npos)
+                    continue;
+                const std::string venue = path.substr(6u, slash - 6u);
+                if (path == "world/" + venue + "/gen/" + venue + ".milo_ps2")
+                    found.insert(venue);
+            }
+            return found;
+        }
+
+        // GameConfig::GetVenue (0x1264d0) gives the venue's own name while
+        // the game makes a name from it to find something in a file:
+        // OnFilterClips' <venue>_exclude and <venue>_multi_exclude in the
+        // character's clips (0x1293e8), OnChangeDrums' kit with the venue in
+        // its name (strstr, 0x129248).
+        const Addresses *s_addresses = nullptr;
+        int s_makingNames = 0;
+        PS2Runtime::RecompiledFunction s_getVenue = nullptr, s_onFilterClips = nullptr, s_onChangeDrums = nullptr;
+
+        // The Symbol of that venue's own name.
+        uint32_t ownSymbol(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t venue)
+        {
+            if (venue == 0u)
+                return venue;
+            const std::string ours = reinterpret_cast<const char *>(getMemPtr(rdram, venue));
+            const std::string name = own(ours);
+            return name == ours ? venue : script::symbol(rdram, ctx, runtime, name);
+        }
+
+        void getVenue(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t returnTo = GPR_U32(ctx, 31);
+            s_getVenue(rdram, ctx, runtime);
+            if (s_makingNames > 0)
+                SET_GPR_U32(ctx, 2, ownSymbol(rdram, ctx, runtime, GPR_U32(ctx, 2)));
+            ctx->pc = returnTo;
+        }
+
+        // Each returns a DataNode by the pointer in a0: (DataNode *, this,
+        // DataArray *).
+        template <PS2Runtime::RecompiledFunction *Original, uint32_t Addresses::*Function>
+        void makingNames(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t returnTo = GPR_U32(ctx, 31);
+            ++s_makingNames;
+            const auto result = static_cast<uint32_t>(
+                runtime->callGuestFunction(rdram, ctx, s_addresses->*Function,
+                                           {GPR_U32(ctx, 4), GPR_U32(ctx, 5), GPR_U32(ctx, 6)}, *Original));
+            --s_makingNames;
+            SET_GPR_U32(ctx, 2, result);
+            ctx->pc = returnTo;
+        }
+
+        // GameConfig::VenueData(Symbol venue) (0x126d80) is the config's
+        // WorldDir type of that name (objects WorldDir types <venue>), which
+        // the venue's own scene names it by.
+        PS2Runtime::RecompiledFunction s_venueData = nullptr;
+
+        void venueData(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t returnTo = GPR_U32(ctx, 31);
+            const uint32_t venue = ownSymbol(rdram, ctx, runtime, GPR_U32(ctx, 5));
+            const auto data = static_cast<uint32_t>(runtime->callGuestFunction(
+                rdram, ctx, s_addresses->gameConfigVenueData, {GPR_U32(ctx, 4), venue}, s_venueData));
+            SET_GPR_U32(ctx, 2, data);
+            ctx->pc = returnTo;
+        }
+
+        // VenueProvider keeps each venue's WorldDir type (InitData, 0x118a90,
+        // through VenueData), and names a venue by the type's name, its own
+        // name: GetVenue(int) (0x118b98) gives the id of that own name in
+        // the config's venues list, which it was made from, and
+        // GetIndex(Symbol) (0x118bc8) finds an id by its own name.
+        PS2Runtime::RecompiledFunction s_providerGetVenue = nullptr, s_providerGetIndex = nullptr;
+
+        void providerGetVenue(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t returnTo = GPR_U32(ctx, 31);
+            uint32_t venue = static_cast<uint32_t>(runtime->callGuestFunction(
+                rdram, ctx, s_addresses->venueProviderGetVenue, {GPR_U32(ctx, 4), GPR_U32(ctx, 5)}, s_providerGetVenue));
+            const std::string name = venue ? reinterpret_cast<const char *>(getMemPtr(rdram, venue)) : "";
+            const uint32_t list = static_cast<uint32_t>(runtime->callGuestFunction(
+                rdram, ctx, s_addresses->systemConfig1, {script::symbol(rdram, ctx, runtime, "venues")}));
+            for (int i = 1, n = list ? load<int16_t>(rdram, list + 8u) : 0; i < n; ++i)
+            {
+                const uint32_t node = load<uint32_t>(rdram, list) + 8u * static_cast<uint32_t>(i);
+                const uint32_t symbol = load<uint32_t>(rdram, node);
+                if (load<uint32_t>(rdram, node + 4u) == script::kSymbol &&
+                    own(reinterpret_cast<const char *>(getMemPtr(rdram, symbol))) == name)
+                    venue = symbol;
+            }
+            SET_GPR_U32(ctx, 2, venue);
+            ctx->pc = returnTo;
+        }
+
+        void providerGetIndex(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t returnTo = GPR_U32(ctx, 31);
+            const uint32_t venue = ownSymbol(rdram, ctx, runtime, GPR_U32(ctx, 5));
+            const auto index = static_cast<uint32_t>(runtime->callGuestFunction(
+                rdram, ctx, s_addresses->venueProviderGetIndex, {GPR_U32(ctx, 4), venue}, s_providerGetIndex));
+            SET_GPR_U32(ctx, 2, index);
+            ctx->pc = returnTo;
+        }
+
+        script::Node sourcesCommand(const script::Call &call)
+        {
+            const std::string op = call.symbol(1);
+            if (op == "own")
+                return call.word(own(call.text(2)));
+            if (op == "owned")
+            {
+                // A DataArray: its nodes at +0, 8 bytes each, as many as +8.
+                const script::Node list = call.arg(2);
+                const std::string name = call.text(3);
+                if (list.type == script::kArray)
+                    for (int i = 0, n = load<int16_t>(call.rdram, list.value + 8u); i < n; ++i)
+                    {
+                        const uint32_t node = load<uint32_t>(call.rdram, list.value) + 8u * static_cast<uint32_t>(i);
+                        if (load<uint32_t>(call.rdram, node + 4u) == script::kSymbol &&
+                            own(reinterpret_cast<const char *>(getMemPtr(call.rdram, load<uint32_t>(call.rdram, node)))) == name)
+                            return {1u, script::kInt};
+                    }
+                return {0u, script::kInt};
+            }
+            return {};
+        }
     }
 
     void entry(dtb::Node &entry, const std::string &source)
@@ -74,7 +301,7 @@ namespace gh2::sources
         if (entry.type != dtb::kArray || entry.nodes.empty())
             return;
         const std::string name = entry.nodes[0].text;
-        entry.nodes[0].text = song(source, name);
+        entry.nodes[0].text = id(source, name);
         retarget(entry, source, name);
     }
 
@@ -92,6 +319,11 @@ namespace gh2::sources
             if (entry.type == dtb::kArray && !entry.nodes.empty() && entry.nodes[0].type == dtb::kSymbol)
                 names->insert(entry.nodes[0].text);
         names->insert(unlisted.begin(), unlisted.end());
+        for (const std::string &name : *names)
+            add(Kind::Song, source, name);
+        auto venues = std::make_shared<Ids>();
+        for (const std::string &venue : venuesOn(disc))
+            (*venues)[venue] = add(Kind::Venue, source, venue).id;
 
         fix(disc, kConfigs[0], [source, names](dtb::Node &root)
             {
@@ -101,28 +333,69 @@ namespace gh2::sources
             });
         for (size_t i = 1u; i < std::size(kConfigs); ++i)
             fix(disc, kConfigs[i], [source, names](dtb::Node &root) { qualify(root, source, *names, {}); });
+        // A tier of a campaign is its venue's: campaign.dtb's, and DX's
+        // others (campaign_ce.dtb).
+        for (const std::string &path : ark::paths(disc, "config/gen/campaign"))
+            fix(disc, path, [venues](dtb::Node &root)
+                {
+                    for (dtb::Node &node : root.nodes)
+                        for (dtb::Node &tier : node.nodes)
+                            if (tier.type == dtb::kArray && !tier.nodes.empty())
+                                rename(tier.nodes[0], *venues);
+                });
 
         std::vector<std::string> screens(std::begin(kScreens), std::end(kScreens));
         for (const std::string &path : ark::paths(disc, "ui/gen/tutorial_"))
             screens.push_back(path);
         for (const std::string &path : screens)
             fix(disc, path, [source, names](dtb::Node &root) { qualify(root, source, *names, kWords); });
+        for (const char *prefix : {"config/gen/", "ui/gen/"})
+            for (const std::string &path : ark::paths(disc, prefix))
+                if (path.ends_with(".dtb"))
+                    fix(disc, path, [venues](dtb::Node &root) { qualifyVenues(root, *venues); });
 
-        // A song's title is the locale token of its name.
-        fix(disc, "ui/eng/gen/locale.dtb", [source, names](dtb::Node &root)
+        // A song's title is the locale token of its name, a venue's of its.
+        fix(disc, "ui/eng/gen/locale.dtb", [source, names, venues](dtb::Node &root)
             {
                 for (dtb::Node &entry : root.nodes)
-                    if (entry.type == dtb::kArray && !entry.nodes.empty() && entry.nodes[0].type == dtb::kSymbol &&
-                        names->count(entry.nodes[0].text) != 0u)
-                        entry.nodes[0].text = song(source, entry.nodes[0].text);
+                    if (entry.type == dtb::kArray && !entry.nodes.empty() && entry.nodes[0].type == dtb::kSymbol)
+                        if (const auto key = localeKey(entry.nodes[0].text, source, *names, *venues))
+                            entry.nodes[0].text = *key;
             });
 
         // The specific before the folder: the first rename that matches wins.
         for (const std::string &name : *names)
         {
-            const std::string ours = song(source, name);
+            const std::string ours = id(source, name);
             ark::rename("songs/" + ours + "/" + ours, disc, "songs/" + name + "/" + name);
             ark::rename("songs/" + ours + "/", disc, "songs/" + name + "/");
         }
+        // world/<id>/<id>_bank.milo is world/<v>/<v>_bank.milo, and so on.
+        for (const auto &[name, ours] : *venues)
+        {
+            ark::rename("world/" + ours + "/" + ours, disc, "world/" + name + "/" + name);
+            ark::rename("world/" + ours + "/gen/" + ours, disc, "world/" + name + "/gen/" + name);
+            ark::rename("world/" + ours + "/", disc, "world/" + name + "/");
+        }
+    }
+
+    void install(PS2Runtime &runtime, const Addresses &addresses)
+    {
+        s_addresses = &addresses;
+        script::addCommand("sources", sourcesCommand);
+        s_getVenue = runtime.lookupFunction(addresses.gameConfigGetVenue);
+        runtime.replaceFunction(addresses.gameConfigGetVenue, &getVenue);
+        s_onFilterClips = runtime.lookupFunction(addresses.gameConfigOnFilterClips);
+        runtime.replaceFunction(addresses.gameConfigOnFilterClips,
+                                &makingNames<&s_onFilterClips, &Addresses::gameConfigOnFilterClips>);
+        s_venueData = runtime.lookupFunction(addresses.gameConfigVenueData);
+        runtime.replaceFunction(addresses.gameConfigVenueData, &venueData);
+        s_providerGetVenue = runtime.lookupFunction(addresses.venueProviderGetVenue);
+        runtime.replaceFunction(addresses.venueProviderGetVenue, &providerGetVenue);
+        s_providerGetIndex = runtime.lookupFunction(addresses.venueProviderGetIndex);
+        runtime.replaceFunction(addresses.venueProviderGetIndex, &providerGetIndex);
+        s_onChangeDrums = runtime.lookupFunction(addresses.gameConfigOnChangeDrums);
+        runtime.replaceFunction(addresses.gameConfigOnChangeDrums,
+                                &makingNames<&s_onChangeDrums, &Addresses::gameConfigOnChangeDrums>);
     }
 }

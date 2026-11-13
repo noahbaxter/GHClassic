@@ -16,6 +16,10 @@ namespace gh2::gh1
     // and chart in GH2's form, the audio read off GH1's disc as it is.
     void addSetlist(size_t disc, size_t gh2Disc);
 
-    // GH2's venue standing in for that venue of GH1's.
+    // That venue of GH1's by our name ("gh1_basement", content/sources.h),
+    // the small club's for one GH1 has none of.
     std::string venue(const std::string &gh1);
+    // GH2's venue standing in for it, whose files it is made from
+    // (gh1/venues.h).
+    std::string slot(const std::string &gh1);
 }

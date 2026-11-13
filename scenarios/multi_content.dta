@@ -163,16 +163,17 @@
 (wait_screen multi_vs_venue_screen)
 (wait 2)
 (expect $ghc_qp_venues gh2)
+{game set_venue gh1_small_club}
 {multi_vs_venue_screen ghc_picked gh1}
 (wait_screen ghc_qp_venue_twin_screen)
 (wait 2)
 (expect $ghc_qp_venues gh1)
-(expect {game get_venue} small1)
+(expect {game get_venue} gh1_small_club)
 (shot venue_gh1)
 (press green p1)
 (wait_screen multi_vs_selsong_screen)
 (wait 1)
-(expect {game get_venue} small2)
+(expect {game get_venue} gh1_small_club_multi)
 (expect {campaigns venue_game} gh1)
 
 ; GH1's setlist, on its twin screen.
@@ -200,7 +201,7 @@
 (wait_screen game_screen 60)
 (expect {gamecfg get_song} gh1_iloverockandroll)
 (expect {campaigns venue_game} gh1)
-(expect {game get_venue} small2)
+(expect {game get_venue} gh1_small_club_multi)
 (wait 3)
 (shot song_small_club_multi_3s)
 (wait 12)
@@ -219,10 +220,10 @@
 {game set_song gh2_shoutatthedevil}
 {{game get_player_config 0} set autoplay TRUE}
 {{game get_player_config 1} set autoplay TRUE}
-{game set_venue battle}
+{game set_venue gh1_basement}
 {ui goto_screen loading_screen}
 (wait_screen game_screen 60)
-(expect {game get_venue} battle)
+(expect {game get_venue} gh1_basement)
 (wait 3)
 {world do_force_shot flr_far_lft01}
 (wait 0.4)

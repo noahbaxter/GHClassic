@@ -16,6 +16,7 @@
 
 #include "gh1/venues.h"
 
+#include "content/sources.h"
 #include "disc/ark.h"
 #include "formats/dtb.h"
 #include "gh1/cameras.h"
@@ -329,7 +330,13 @@ namespace gh2::gh1
         const auto fx = loadScene(disc, "../../system/run/arena/gen/fx.rnd_ps2");
         for (const auto &[name, kit] : kVenues)
         {
-            const std::string ours = venue(name);
+            // Made at its stand-in's paths, found by its id there, its files
+            // calling it by the stand-in's name.
+            const std::string ours = slot(name), id = venue(name);
+            sources::add(sources::Kind::Venue, "gh1", name, ours);
+            ark::route("world/" + id + "/" + id, layer, "world/" + ours + "/" + ours);
+            ark::route("world/" + id + "/gen/" + id, layer, "world/" + ours + "/gen/" + ours);
+            ark::route("world/" + id + "/", layer, "world/" + ours + "/");
             const std::string world = "world/" + ours + "/", theirs = std::string("venues/") + name + "/gen/";
             const std::string geomPath = world + "og/gen/" + ours + "_geom.milo_ps2";
             const std::string lightsPath = world + "og/gen/" + ours + "_lighting.milo_ps2";

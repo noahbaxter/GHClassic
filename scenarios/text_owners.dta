@@ -1,24 +1,21 @@
 ; Outside a career the table is GH2's, and a token another game names for
-; itself takes its owner's text: a venue's name its venue's game's, a
-; character's blurb its outfit's game's, the rest its screen's.
+; itself takes its owner's text: a venue's name its venue's source's (its id
+; names it), a character's blurb its outfit's game's, the rest its screen's.
 (needs gh1 gh80s)
 #include common/first_boot.dta
 (expect {campaigns live} gh2)
-{set $fest {localize fest}}
-{set $battle {localize battle}}
+{set $fest {localize gh2_fest}}
+{set $battle {localize gh2_battle}}
 {set $blurb {localize alterna_blurb}}
 {set $tip {localize loading_tip1}}
 (print gh2 $fest $battle)
 
-; The venues' names: the 80s' fest, GH1's room at battle; GH2's again.
-{campaigns text_venues gh80s}
-(expect {== {localize fest} $fest} 0)
-(print gh80s {localize fest})
-{campaigns text_venues gh1}
-(expect {== {localize battle} $battle} 0)
-(print gh1 {localize battle})
-{campaigns text_venues gh2}
-(expect {localize fest} $fest)
+; The venues' names, each its own game's with nothing switched: the 80s'
+; fest, GH1's basement.
+(expect {== {localize gh80s_fest} $fest} 0)
+(print gh80s {localize gh80s_fest})
+(expect {== {localize gh1_basement} $battle} 0)
+(print gh1 {localize gh1_basement})
 
 ; A character's blurb: the 80s' for its outfit, GH2's for GH2's.
 {campaigns text_outfit alterna3}
@@ -27,20 +24,21 @@
 {campaigns text_outfit alterna1}
 (expect {localize alterna_blurb} $blurb)
 
-; The screens around a song: GH1's tips on GH1's loading screen.
+; The screens around a song: GH1's tips on GH1's loading screen, the
+; venues' names their own all the while.
 {gamecfg set mode quickplay}
 {{game get_player_config 0} set_difficulty medium}
 {game set_song gh2_shoutatthedevil}
 {game set_quickplay}
-{game set_venue battle}
+{game set_venue gh1_basement}
 {campaigns venues_from gh1}
 {ui goto_screen loading_screen}
 (wait_screen game_screen 60)
 (expect {== {localize loading_tip1} $tip} 0)
 (print song {localize loading_tip1})
-(expect {== {localize battle} $battle} 0)
+(expect {localize gh2_battle} $battle)
 {meta_loading_nosave_goto main_screen}
 (wait_screen main_screen 60)
 (expect {localize loading_tip1} $tip)
-(expect {localize battle} $battle)
+(expect {localize gh2_fest} $fest)
 (quit)

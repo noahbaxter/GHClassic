@@ -517,7 +517,6 @@
                         {ghc_venue_game {campaigns active}}
                      }
                   }
-                  {campaigns text_venues $ghc_qp_venues}
                   {ui goto_screen {ghc_multi_screen venue}}
                }
                {ui goto_screen loading_screen}

@@ -81,7 +81,7 @@ namespace gh2::encores
             {
                 const uint32_t encore = static_cast<uint32_t>(
                     runtime->callGuestFunction(rdram, ctx, s_addresses->campaignStateGetCurEncore, {state, venue}));
-                if (encore == script::symbol(rdram, ctx, runtime, sources::song(game, finale)))
+                if (encore == script::symbol(rdram, ctx, runtime, sources::id(game, finale)))
                     store<uint8_t>(rdram, flag, 1u);
             }
             SET_GPR_U32(ctx, 2, result);

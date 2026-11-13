@@ -11,7 +11,7 @@
 {{game get_player_config 0} set_difficulty expert}
 {{game get_player_config 0} set autoplay TRUE}
 {game set_quickplay}
-{game set_venue small2}
+{game set_venue gh2_small2}
 {ui goto_screen loading_screen}
 (wait_screen game_screen 120)
 (wait_until {> {taskmgr seconds} 2} 60)

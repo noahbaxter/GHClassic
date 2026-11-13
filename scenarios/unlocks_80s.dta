@@ -63,7 +63,7 @@
 (press green)
 (wait_screen career_screen 40)
 (wait 1)
-(expect {campaign is_unlocked small1} 1)
+(expect {campaign is_unlocked gh80s_small1} 1)
 (shot career)
 
 ; The store: Finishes, the first one, bought.
@@ -102,7 +102,7 @@
 #include common/reenter_career.dta
 (expect {campaign cash} $cash)
 (expect {campaign is_unlocked $item} 1)
-(expect {campaign is_unlocked small1} 1)
+(expect {campaign is_unlocked gh80s_small1} 1)
 ; Four of thirty songs passed, on medium: half of each one's thirtieth,
 ; rounded down.
 (expect {campaigns progress gh80s 0} 6)

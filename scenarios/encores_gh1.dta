@@ -36,8 +36,8 @@
 (expect {gamecfg get_song} gh1_thunderkiss65)
 (expect {campaign encore_unlock_potential} 0)
 {campaign cheat_beat_song gh1_thunderkiss65 100000}
-(expect {campaign is_unlocked small1} 0)
+(expect {campaign is_unlocked gh1_small_club} 0)
 {campaign cheat_beat_song gh1_infected 100000}
-(expect {campaign is_unlocked small1} 1)
+(expect {campaign is_unlocked gh1_small_club} 1)
 (expect {campaign is_unlocked gh1_ironman} 1)
 (quit)

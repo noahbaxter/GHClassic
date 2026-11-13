@@ -8,7 +8,7 @@
 {{game get_player_config 0} set_difficulty medium}
 {{game get_player_config 0} set autoplay TRUE}
 {game set_quickplay}
-{game set_venue small1}
+{game set_venue gh2_small1}
 {ui goto_screen loading_screen}
 (wait_screen game_screen 60)
 (wait 2)
@@ -22,7 +22,7 @@
 {{game get_player_config 0} set_difficulty medium}
 {{game get_player_config 0} set autoplay TRUE}
 {game set_quickplay}
-{game set_venue small1}
+{game set_venue gh1_small_club}
 {ui goto_screen loading_screen}
 (wait_screen game_screen 60)
 (wait 14)
@@ -74,7 +74,7 @@
 {game set_song gh1_iloverockandroll}
 {{game get_player_config 0} set autoplay TRUE}
 {game set_quickplay}
-{game set_venue fest}
+{game set_venue gh1_fest}
 {ui goto_screen loading_screen}
 (wait_screen game_screen 60)
 (wait 10)

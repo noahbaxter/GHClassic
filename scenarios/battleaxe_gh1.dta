@@ -37,7 +37,7 @@
 (press green)
 (wait_screen sel_venue_screen 40)
 (wait 1)
-{game set_venue arena}
+{game set_venue gh1_arena}
 {ui goto_screen sel_song_screen}
 (wait_screen sel_song_screen)
 (wait 1)

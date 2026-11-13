@@ -57,7 +57,7 @@
 (press green)
 (wait_screen game_screen 60)
 (expect {gamecfg get_song} gh2x_surrender)
-(expect {game get_venue} battle)
+(expect {game get_venue} gh2_battle)
 (wait 5)
 (shot song)
 {player0 win 5}

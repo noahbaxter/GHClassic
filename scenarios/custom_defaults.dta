@@ -7,7 +7,7 @@
 {quickplay pick outfit punk1}
 {quickplay pick guitar tobac}
 {quickplay pick skin tobac_sunburst}
-{quickplay pick venue battle}
+{quickplay pick venue gh1_basement}
 {quickplay pick venue_game gh1}
 {gamecfg set mode quickplay}
 {setlist select custom}
@@ -24,7 +24,7 @@
 (print "cast " {game get_character_outfit} " " {game get_guitar} " " {game get_guitar_skin} " " {game get_venue} " " {campaigns venue_game})
 (expect {!= {game get_character_outfit} punk1} 1)
 (expect {game get_guitar} sg)
-(expect {game get_venue} small1)
+(expect {game get_venue} gh2_small1)
 (expect {campaigns venue_game} gh2)
 (wait 8)
 (shot own_cast)
