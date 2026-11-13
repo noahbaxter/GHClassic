@@ -146,10 +146,11 @@ namespace gh2::custom
     std::optional<ark::Made> madeMix(const std::string &path, const Song &song, const std::string &played)
     {
         // The played part's stems on the second pair, every other one
-        // backing on the first.
+        // backing on the first. A song of one stem, song.ogg or any, is
+        // all the played part's, so a miss cuts it as it would a guitar.
         std::vector<std::pair<fs::path, uint32_t>> stems;
         for (const std::string &file : song.stems)
-            stems.emplace_back(songPath(song, file), partStem(file, played) ? 1u : 0u);
+            stems.emplace_back(songPath(song, file), song.stems.size() == 1u || partStem(file, played) ? 1u : 0u);
         // song.ini's delay, in ms, holds the notes back against the audio,
         // so the audio starts that far in.
         const double lead = number(song.tags, "delay").value_or(0) / 1000.0;

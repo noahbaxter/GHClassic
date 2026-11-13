@@ -2,8 +2,9 @@
 
 // A custom song's stems as one .vgs, a pair of channels each part: the
 // backing (song, drums, vocals, keys, crowd, the other guitar or bass mixed)
-// on 0 and 1, the played part on 2 and 3. With no stem of its own the
-// played part is silence, so a miss mutes nothing.
+// on 0 and 1, the played part on 2 and 3. A song of one stem has it all on
+// 2 and 3; with more and none of its own the played part is silence, so a
+// miss mutes nothing.
 
 #include "custom/library.h"
 #include "disc/ark.h"
