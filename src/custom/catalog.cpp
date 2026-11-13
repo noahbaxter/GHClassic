@@ -268,7 +268,12 @@ namespace gh2::custom
         {
             auto [rank, header] = tierOf(*listed.song, listed.header, listed.name, m_sort, m_part);
             listed.header = std::move(header);
-            keyed.push_back({rank, lower(listed.header), lower(listed.name), std::move(listed)});
+            // A band by the word after its "The": The Dillinger Escape
+            // Plan under D.
+            std::string tier = lower(listed.header);
+            if (m_sort == Sort::Artist && tier.rfind("the ", 0) == 0)
+                tier.erase(0, 4);
+            keyed.push_back({rank, std::move(tier), lower(listed.name), std::move(listed)});
         }
         std::stable_sort(keyed.begin(), keyed.end(), [](const Keyed &a, const Keyed &b)
                          { return std::tie(a.rank, a.tier, a.name) < std::tie(b.rank, b.tier, b.name); });
