@@ -87,8 +87,9 @@ namespace gh2::script
     // array set here must outlive the variable or be cleared after use.
     void setVariable(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const char *name, Node node);
 
-    // Run once the game's UI objects exist: at the first screen change after
-    // the commands are registered.
+    // Run once the game's UI objects exist: at the first UI poll once the
+    // boot has drawn a picture, or at the first screen change after the
+    // commands are registered if one comes first.
     void runWhenUiReady(std::string text);
     // Those scripts run now if the commands are registered and they have not
     // yet, for a hook on that screen change that runs before this one's.
