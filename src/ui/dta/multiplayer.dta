@@ -588,3 +588,25 @@
       (ghc_picked ($game) {ghc_qp_picked sel_song_twin_panel {ghc_multi_screen selsong} $game})
    )
 }
+
+; Face-Off's difficulties, each player's own (MultiSelectPanel): only those
+; the song has, as Pro Face-Off's and quickplay's (quickplay_pickers.dta
+; sel_difficulty_panel), focused on the nearest to the player's last. The
+; panel shows every button each poll until its player is ready
+; (MultiSelectPanel::Poll, 0x1380b8), so one left out is left blank.
+{func ghc_multi_diffs ($panel $player)
+   {do
+      ($buttons (easy.btn medium.btn hard.btn expert.btn))
+      {foreach_int $d 0 4
+         {do
+            ($button {elem $buttons $d})
+            ($has {custom has {game get_song} $d TRUE})
+            {{$panel find $button} set_text {if_else $has {elem (easy medium hard expert) $d} ""}}
+            {if_else $has {$panel enable $button} {$panel disable $button}}
+         }
+      }
+      {$panel set_focus {elem $buttons {custom nearest {game get_song} {game get_difficulty $player} TRUE}}}
+   }
+}
+{amend seldiff0 (enter {ghc_multi_diffs $this 0})}
+{amend seldiff1 (enter {ghc_multi_diffs $this 1})}
