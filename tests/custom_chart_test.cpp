@@ -1442,7 +1442,8 @@ namespace
     }
 
     // The catalog's list: by folder then name, a song changed in place, one
-    // that stops playing or that a scan did not find gone.
+    // that stops playing or that a scan did not find gone, each once the
+    // list is made again.
     void catalogOrder()
     {
         Catalog catalog;
@@ -1457,13 +1458,14 @@ namespace
         Song changed = song("/c/b/two", "Zed");
         changed.chartTime = 1;
         catalog.put(changed);
-        CHECK(catalog.now() != now && catalog.now()->size() == 3u && catalog.now()->at(2).id == id);
+        CHECK(catalog.now() == now);
+        CHECK(catalog.refresh() != now && catalog.now()->size() == 3u && catalog.now()->at(2).id == id);
         Song broken = song("/c/a/one", "Mid");
         broken.why = "no audio";
         catalog.put(broken);
-        CHECK(catalog.now()->size() == 2u);
+        CHECK(catalog.refresh()->size() == 2u);
         catalog.keepOnly({song("/c/b/three", "Alpha")});
-        CHECK(catalog.now()->size() == 1u && !catalog.find(id));
+        CHECK(catalog.refresh()->size() == 1u && !catalog.find(id));
     }
 
     // Copies of one chart: the first by folder listed, the next once it
@@ -1483,7 +1485,7 @@ namespace
         catalog.showCopies(false);
         CHECK(catalog.now()->size() == 2u);
         catalog.keepOnly({songs[0], songs[2]});
-        CHECK(catalog.now()->size() == 2u && catalog.now()->at(0).song->dir == "/c/x/x/one");
+        CHECK(catalog.refresh()->size() == 2u && catalog.now()->at(0).song->dir == "/c/x/x/one");
     }
 
     // A copy sits in every folder it is in when listed by folder, so a

@@ -18,6 +18,8 @@
 #include "settings/settings.h"
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <iostream>
 #include <map>
 #include <memory>
@@ -143,17 +145,28 @@ namespace gh2
                         const std::vector<Song> known = readIndex(index);
                         for (const Song &song : known)
                             catalog().put(song);
+                        catalog().refresh();
                         std::cerr << "[custom] " << known.size() << " songs from the last scan" << std::endl;
                         ScanStatus &status = scanStatus();
                         status.expected = known.size();
                         status.running = true;
-                        const std::vector<Song> scanned = scan(folders, known, 32u, [&status](const Song &s)
+                        // The list made again here every half second as
+                        // songs are found, by whichever finder comes to it.
+                        using Clock = std::chrono::steady_clock;
+                        const Clock::rep half = Clock::duration(std::chrono::milliseconds(500)).count();
+                        std::atomic<Clock::rep> due{0};
+                        const std::vector<Song> scanned = scan(folders, known, 32u, [&](const Song &s)
                                                                {
                                                                    catalog().put(s);
                                                                    ++status.seen;
+                                                                   const Clock::rep now = Clock::now().time_since_epoch().count();
+                                                                   Clock::rep at = due;
+                                                                   if (now >= at && due.compare_exchange_strong(at, now + half))
+                                                                       catalog().refresh();
                                                                });
                         status.running = false;
                         catalog().keepOnly(scanned);
+                        catalog().refresh();
                         writeIndex(index, scanned);
                         const auto copied = showCopies ? std::map<fs::path, fs::path>() : copies(scanned);
                         writeBadSongs(own / "badsongs.txt", scanned);

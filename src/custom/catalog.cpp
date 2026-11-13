@@ -176,7 +176,7 @@ namespace gh2::custom
             {
                 m_dirOf.erase(it->second.id);
                 m_byDir.erase(it);
-                m_now.reset();
+                ++m_version;
             }
             return;
         }
@@ -189,7 +189,7 @@ namespace gh2::custom
                 return;
             it->second.song = std::make_shared<const Song>(song);
             it->second.name = title(song);
-            m_now.reset();
+            ++m_version;
             return;
         }
         // Another folder with the same hash takes an x on the end.
@@ -199,7 +199,7 @@ namespace gh2::custom
         m_dirOf[id] = song.dir.native();
         m_byDir[song.dir.native()] = {id, section(song.dir, m_roots), title(song),
                              std::make_shared<const Song>(song)};
-        m_now.reset();
+        ++m_version;
     }
 
     void Catalog::keepOnly(const std::vector<Song> &songs)
@@ -214,7 +214,7 @@ namespace gh2::custom
             {
                 m_dirOf.erase(it->second.id);
                 it = m_byDir.erase(it);
-                m_now.reset();
+                ++m_version;
             }
             else
                 ++it;
@@ -224,29 +224,57 @@ namespace gh2::custom
     {
         const std::lock_guard lock(m_mutex);
         if (show != m_showCopies)
+        {
             m_now.reset();
+            ++m_order;
+        }
         m_showCopies = show;
     }
 
     Snapshot Catalog::now()
     {
-        const std::lock_guard lock(m_mutex);
-        if (m_now)
-            return m_now;
+        {
+            const std::lock_guard lock(m_mutex);
+            if (m_now)
+                return m_now;
+        }
+        return refresh();
+    }
+
+    Snapshot Catalog::refresh()
+    {
+        // Made from a copy, so finds wait only for the copying.
+        std::vector<Listed> all;
+        Sort sort;
+        std::string part;
+        bool showCopies;
+        uint64_t version, order;
+        {
+            const std::lock_guard lock(m_mutex);
+            if (m_now && m_nowVersion == m_version)
+                return m_now;
+            all.reserve(m_byDir.size());
+            for (const auto &[dir, listed] : m_byDir)
+                all.push_back(listed);
+            sort = m_sort;
+            part = m_part;
+            showCopies = m_showCopies;
+            version = m_version;
+            order = m_order;
+        }
         // Of copies of one chart, one listed unless all are; the others
         // stay, to be listed when it goes. By folder every folder lists its
         // copy, so a folder always shows everything in it.
         std::map<std::string, const Listed *> first;
         auto list = std::make_shared<std::vector<Listed>>();
-        if (m_showCopies)
-            for (const auto &[dir, listed] : m_byDir)
-                list->push_back(listed);
+        if (showCopies)
+            list = std::make_shared<std::vector<Listed>>(std::move(all));
         else
         {
-            for (const auto &[dir, listed] : m_byDir)
+            for (const Listed &listed : all)
             {
-                const std::string key = m_sort == Sort::Folder ? listed.song->chartMd5 + '\n' + lower(listed.header)
-                                                               : listed.song->chartMd5;
+                const std::string key = sort == Sort::Folder ? listed.song->chartMd5 + '\n' + lower(listed.header)
+                                                             : listed.song->chartMd5;
                 if (const Listed *&kept = first[key]; !kept || listedBefore(*listed.song, *kept->song))
                     kept = &listed;
             }
@@ -266,12 +294,12 @@ namespace gh2::custom
         keyed.reserve(list->size());
         for (Listed &listed : *list)
         {
-            auto [rank, header] = tierOf(*listed.song, listed.header, listed.name, m_sort, m_part);
+            auto [rank, header] = tierOf(*listed.song, listed.header, listed.name, sort, part);
             listed.header = std::move(header);
             // A band by the word after its "The": The Dillinger Escape
             // Plan under D.
             std::string tier = lower(listed.header);
-            if (m_sort == Sort::Artist && tier.rfind("the ", 0) == 0)
+            if (sort == Sort::Artist && tier.rfind("the ", 0) == 0)
                 tier.erase(0, 4);
             keyed.push_back({rank, std::move(tier), lower(listed.name), std::move(listed)});
         }
@@ -286,15 +314,24 @@ namespace gh2::custom
                 keyed[i].listed.header = list->back().header;
             list->push_back(std::move(keyed[i].listed));
         }
-        m_now = std::move(list);
-        return m_now;
+        // Kept unless the sort changed meanwhile or a newer one is kept.
+        const std::lock_guard lock(m_mutex);
+        if (order == m_order && (!m_now || version > m_nowVersion))
+        {
+            m_now = list;
+            m_nowVersion = version;
+        }
+        return list;
     }
 
     void Catalog::sortBy(Sort sort, const std::string &part)
     {
         const std::lock_guard lock(m_mutex);
         if (sort != m_sort || part != m_part)
+        {
             m_now.reset();
+            ++m_order;
+        }
         m_sort = sort;
         m_part = part;
     }
