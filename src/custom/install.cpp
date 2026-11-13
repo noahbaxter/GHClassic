@@ -8,7 +8,10 @@
 #include "custom/scan_status.h"
 #include "custom/song_files.h"
 #include "custom/songs.h"
+#include "custom/stage/stage.h"
 #include "custom/text.h"
+#include "disc/ark.h"
+#include "formats/dtb.h"
 #include "save/results.h"
 #include "save/save.h"
 #include "settings/ini.h"
@@ -74,10 +77,51 @@ namespace gh2
                 return std::nullopt;
             return save::NamedSong{"custom." + song->chartMd5, kPartNames[static_cast<int>(played(*song))]};
         }
+
+        // Each of GH2's hand maps, wherever its fret parsers list them, again
+        // as kOpenHandMap's. A map's events match in order, a list of lanes
+        // any gem holding them all (MidiParser, 0x23ed80), so an open, a gem
+        // with no fret (gem_kinds.h), falls to its () with the chords. Here
+        // () is finger_open, the chords it took matched first by their
+        // lowest lane: ((3) clip) ((4) clip); a map with no () ends on it.
+        void addOpenHandMaps(dtb::Node &node)
+        {
+            if (dtb::find(node, "HandMap_Default"))
+            {
+                for (size_t i = 1u, maps = node.nodes.size(); i < maps; ++i)
+                    if (dtb::Node map = node.nodes[i]; map.nodes.size() >= 2u && map.nodes[0].text.starts_with("HandMap_"))
+                        if (dtb::Node *events = const_cast<dtb::Node *>(dtb::find(map, "events")))
+                        {
+                            const auto chords = std::find_if(events->nodes.begin(), events->nodes.end(), [](const dtb::Node &e)
+                                                             { return e.nodes.size() == 2u && e.nodes[0].type == dtb::kArray &&
+                                                                      e.nodes[0].nodes.empty(); });
+                            std::vector<dtb::Node> added;
+                            if (chords != events->nodes.end())
+                                for (const int lane : {3, 4})
+                                    added.push_back(dtb::array({dtb::array({dtb::integer(lane)}), chords->nodes[1]}));
+                            added.push_back(dtb::array({dtb::array({}), dtb::symbol("finger_open")}));
+                            const auto at = chords != events->nodes.end() ? events->nodes.erase(chords) : events->nodes.end();
+                            events->nodes.insert(at, added.begin(), added.end());
+                            map.nodes[0].text += kOpenHandMap;
+                            node.nodes.push_back(std::move(map));
+                        }
+                return;
+            }
+            for (dtb::Node &child : node.nodes)
+                addOpenHandMaps(child);
+        }
     }
 
     void installCustomSongs()
     {
+        ark::addFix(0u, "config/gen/midi_parsers.dtb", [](std::vector<uint8_t> &file)
+                    {
+                        if (auto root = dtb::raw(file))
+                        {
+                            addOpenHandMaps(*root);
+                            file = dtb::write(*root);
+                        }
+                    });
         installCommand();
         installSongFiles();
         save::nameSongs(bestName);

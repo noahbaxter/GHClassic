@@ -131,7 +131,12 @@ namespace gh2::custom
         // frets 1 to 9, solos and parts mostly tapped 10 to 14. It moves
         // only at a part's start, a part under two bars is the one before's,
         // and a part of only open notes or rests leaves it where it is.
-        void handPositions(BandTracks &band)
+        // Each kind of part also takes a hand map (kOpenHandMap's): Solo
+        // in a solo, AllChords where half its notes are chords, Linear
+        // where three in five single notes are a lane from the one before
+        // (trills and runs, a finger a lane), else Default. `places` and
+        // `maps` say which to make.
+        void fretHand(BandTracks &band, bool places, bool maps)
         {
             const Difficulty &lead = band.in.lead;
             const auto &toGh2 = band.in.toGh2;
@@ -225,10 +230,19 @@ namespace gh2::custom
 
             struct Place
             {
-                unsigned notes = 0u, taps = 0u;
+                // Its fretted notes, taps, chords, and single notes after a
+                // single note, and of those a lane from it.
+                unsigned notes = 0u, taps = 0u, chords = 0u, singlePairs = 0u, steps = 0u;
                 uint32_t ticks = 0u;
-                bool high = false;
+                bool solo = false;
                 uint8_t fret = 0u;
+                const char *map() const
+                {
+                    return solo                        ? "Solo"
+                           : chords * 2u >= notes      ? "AllChords"
+                           : steps * 5u >= singlePairs * 3u ? "Linear"
+                                                       : "Default";
+                }
             };
             std::map<uint64_t, Place> kinds;
             std::vector<uint64_t> order; // kinds by first part
@@ -239,21 +253,31 @@ namespace gh2::custom
                 if (!kinds.count(parts[i].kind))
                     order.push_back(parts[i].kind);
                 Place &k = kinds[parts[i].kind];
+                int lastSingle = -1;
                 for (const Gem &g : lead.gems)
                     if (const uint32_t at = toGh2(g.tick); at >= parts[i].from && at < to && (g.lanes & kFretLanes))
                     {
                         ++partNotes[i];
                         k.taps += g.kind == Kind::Tap;
+                        const int lane = std::countr_zero(g.lanes);
+                        if (g.chord())
+                            ++k.chords;
+                        else if (lastSingle >= 0)
+                        {
+                            ++k.singlePairs;
+                            k.steps += std::abs(lane - lastSingle) == 1;
+                        }
+                        lastSingle = g.chord() ? -1 : lane;
                     }
                 k.notes += partNotes[i];
                 k.ticks += to > parts[i].from ? to - parts[i].from : 0u;
-                k.high |= parts[i].solo;
+                k.solo |= parts[i].solo;
             }
             for (bool high : {false, true})
             {
                 std::vector<Place *> ranked;
                 for (const uint64_t key : order)
-                    if (Place &k = kinds[key]; k.notes && (k.high || k.taps * 2u >= k.notes) == high)
+                    if (Place &k = kinds[key]; k.notes && (k.solo || k.taps * 2u >= k.notes) == high)
                         ranked.push_back(&k);
                 std::stable_sort(ranked.begin(), ranked.end(), [](const Place *a, const Place *b)
                                  { return double(a->notes) * b->ticks < double(b->notes) * a->ticks; });
@@ -263,12 +287,26 @@ namespace gh2::custom
                         ranked.size() < 2u ? (lo + hi) / 2u : lo + (r * (hi - lo) + (ranked.size() - 1u) / 2u) / (ranked.size() - 1u));
             }
             uint8_t last = 0u;
+            std::string lastMap;
+            // A song opening on opens alone has them as finger_open too.
+            if (maps && !partNotes[0])
+            {
+                lastMap = "Default";
+                band.guitar.events.push_back(midi::text(0u, "[map HandMap_" + lastMap + kOpenHandMap + "]"));
+            }
             for (size_t i = 0; i < parts.size(); ++i)
-                if (const uint8_t fret = kinds[parts[i].kind].fret; partNotes[i] && fret != last)
-                {
-                    addShortNote(band.guitar, parts[i].from, static_cast<uint8_t>(39u + fret));
-                    last = fret;
-                }
+            {
+                const Place &k = kinds[parts[i].kind];
+                if (!partNotes[i])
+                    continue;
+                if (places && k.fret != last)
+                    addShortNote(band.guitar, parts[i].from, static_cast<uint8_t>(39u + k.fret));
+                if (maps && k.map() != lastMap)
+                    band.guitar.events.push_back(
+                        midi::text(parts[i].from, std::string("[map HandMap_") + k.map() + kOpenHandMap + "]"));
+                last = k.fret;
+                lastMap = k.map();
+            }
         }
 
         enum class DrumPattern
@@ -403,7 +441,7 @@ namespace gh2::custom
         const Chart::StageTrack *track = stageTrack(band.in.chart, trackOf(band.in.part));
         band.guitaristCues = memberCues(track);
         addMemberCues(band.guitar, band.guitaristCues, band.playing, toGh2);
-        bool placed = false;
+        bool placed = false, mapped = false;
         if (track)
         {
             for (const Chart::Mark &m : track->marks)
@@ -414,10 +452,12 @@ namespace gh2::custom
                 }
             for (const Chart::Cue &c : track->cues)
                 if (const auto map = guitarMap(c.text))
+                {
                     band.guitar.events.push_back(midi::text(toGh2(c.tick), *map));
+                    mapped |= map->rfind("[map HandMap_", 0) == 0;
+                }
         }
-        if (!placed)
-            handPositions(band);
+        fretHand(band, !placed, !mapped);
     }
 
     std::vector<uint32_t> addDrummer(BandTracks &band)

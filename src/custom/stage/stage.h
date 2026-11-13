@@ -11,7 +11,8 @@
 //                place (40 to 59) and [map ...]s, the chart's, else one place
 //                a part of the song (its sections, else the bars it
 //                repeats), the same for each part alike, busier higher,
-//                solos and taps highest
+//                solos and taps highest, and a hand map a part by what it
+//                plays: chords, runs and trills, solos, the rest
 //   PART BASS    the bass part's frets for the bassist's strumming hand, and
 //                its [map StrumMap_SlapBass]
 //   BAND BASS    the bassist, and 36 a speaker pulse on each hit: the bass
@@ -92,6 +93,11 @@ namespace gh2::custom
     inline constexpr double kBandFastest = 210.0, kBandSlowest = 80.0;
     // A tempo as the band plays it.
     inline double bandBpm(double bpm) { return bpm > kBandFastest ? bpm / 2.0 : bpm < kBandSlowest ? bpm * 2.0 : bpm; }
+
+    // The made hand maps are GH2's (config/midi_parsers.dta) with this after
+    // their name: each the same but an open played as finger_open rather
+    // than a power chord (custom/install.cpp).
+    inline constexpr const char *kOpenHandMap = "_Open";
 
     // A section's name as its mood is picked by: lowercase, '_' a space, its
     // number and a trailing letter or two ("Verse 1A", "chorus_2b") left off.

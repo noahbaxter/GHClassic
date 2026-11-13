@@ -777,14 +777,37 @@ namespace
             for (const midi::Event &e : guitar.events)
                 if (midi::kind(e) == midi::kNoteOn && e.data[1] > 0u && e.data[0] >= 40u && e.data[0] <= 59u)
                     out.push_back({e.tick, e.data[0]});
-            return out;
+            std::vector<std::pair<uint32_t, std::string>> maps;
+            for (const auto &t : textsOf(guitar))
+                if (t.second.rfind("[map ", 0) == 0)
+                    maps.push_back(t);
+            return std::pair{out, maps};
         };
-        const std::vector<std::pair<uint32_t, uint8_t>> want = {
-            {0u, 40u}, {8u * kBar, 48u}, {16u * kBar, 40u}, {24u * kBar, 48u}, {34u * kBar, 51u}};
+        // The verses' green and red trade lane by lane, the choruses are
+        // chords.
+        const std::pair<std::vector<std::pair<uint32_t, uint8_t>>, std::vector<std::pair<uint32_t, std::string>>> want = {
+            {{0u, 40u}, {8u * kBar, 48u}, {16u * kBar, 40u}, {24u * kBar, 48u}, {34u * kBar, 51u}},
+            {{0u, "[map HandMap_Linear_Open]"},
+             {8u * kBar, "[map HandMap_AllChords_Open]"},
+             {16u * kBar, "[map HandMap_Linear_Open]"},
+             {24u * kBar, "[map HandMap_AllChords_Open]"},
+             {34u * kBar, "[map HandMap_Solo_Open]"}}};
         CHECK(places() == want);
         chart.sections = {{0u, "Verse 1"},         {8u * kBar, "Chorus 1"}, {16u * kBar, "Verse 2"},
                           {24u * kBar, "Chorus 2"}, {32u * kBar, "Break"},   {34u * kBar, "Solo"}};
         CHECK(places() == want);
+        // A song opening on opens has its map from the start, its place
+        // from its first fretted part.
+        chart.sections = {{0u, "Intro"}, {2u * kBar, "Verse 1"}};
+        lead.gems.erase(lead.gems.begin(), std::find_if(lead.gems.begin(), lead.gems.end(),
+                                                        [](const Gem &g) { return g.tick >= 32u * kBar; }));
+        lead.solos.clear();
+        for (Gem &g : lead.gems)
+            g.tick -= 32u * kBar;
+        const auto opening = places();
+        CHECK(opening.first.size() == 1u && opening.first[0].first == 2u * kBar);
+        CHECK(opening.second.size() == 2u && opening.second[0].first == 0u &&
+              opening.second[0].second == "[map HandMap_Default_Open]");
     }
 
     // A chart too fast for the band played at half: the band and crowd at
