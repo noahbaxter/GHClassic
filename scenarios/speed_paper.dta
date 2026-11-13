@@ -4,6 +4,11 @@
 ; changed as Select's speed row steps and put back by red.
 (songs songs)
 #include common/first_boot.dta
+; A profile's, as a guest keeps no best.
+(device guitar)
+(press down guitar)
+(wait 0.5)
+{ghc_profile make 0 "Tester"}
 {gamecfg set mode quickplay}
 {setlist select custom}
 {song_speed set 120}

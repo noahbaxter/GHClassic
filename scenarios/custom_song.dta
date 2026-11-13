@@ -1,8 +1,9 @@
 ; A custom song from songs/ (a .chart and an Opus stem of silence): listed on
-; the custom setlist, played to its end on autoplay, its best kept and
-; shown back on the list's printout.
+; the custom setlist, played to its end on autoplay, its best kept (a
+; profile's: a guest keeps none) and shown back on the list's printout.
 (songs songs)
 #include common/first_boot.dta
+{ghc_profile make 0 "Tester"}
 {gamecfg set mode quickplay}
 {setlist select custom}
 {ui goto_screen qp_selsong_screen}

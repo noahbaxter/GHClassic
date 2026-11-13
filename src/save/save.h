@@ -3,9 +3,12 @@
 #include "addresses.h"
 #include "gameplay/engine/note_engine.h"
 #include "save/best.h"
+#include "save/store.h"
 
 #include <array>
 #include <cstdint>
+#include <functional>
+#include <map>
 #include <optional>
 #include <set>
 #include <string>
@@ -103,14 +106,24 @@ namespace gh2::save
     // Where the menus were left, kept in state.ini by section and key for
     // the next boot to open on: empty when it holds none.
     std::string state(const std::string &section, const std::string &key);
+    std::map<std::string, std::string> stateSection(const std::string &section);
     void keepState(const std::string &section, const std::string &key, const std::string &value);
 
-    // Every song's best (save/best.h), in save.bin apart from the careers.
-    // A best kept is the better of it and the one there, written into the
-    // save on disk at once; where there is none yet, the game's first save
-    // carries it.
-    std::optional<Best> keptBest(const std::string &key);
-    void keepBest(const std::string &key, const Best &best);
+    // A section of the save's, as kept: the disk's where no save has loaded
+    // yet. keepSection changes one of GH Classic's own, apart from the
+    // careers, at once in the save on disk as well; where there is none yet,
+    // the game's first save carries it.
+    const Section *keptSection(const std::string &name);
+    void keepSection(const std::string &name, const std::function<void(Section &)> &change);
+
+    // Every song's best (save/best.h), as profile `profile` (from 0) keeps
+    // it, in solo or a multiplayer mode (bestSection). A best kept is the
+    // better of it and the one there. A guest keeps none.
+    std::optional<Best> keptBest(const std::string &key, std::optional<int> profile, const std::string &mode = "");
+    void keepBest(const std::string &key, std::optional<int> profile, const Best &best, const std::string &mode = "");
+    // Whether any profile has full combo'd `song` (as playedKey takes it)
+    // on `difficulty`, on either controller.
+    bool anyFullCombo(const std::string &song, const std::string &difficulty);
     // The game a song is from, as addScoreSongs named it; the career's own
     // where none did.
     std::string gameOfSong(const std::string &song);

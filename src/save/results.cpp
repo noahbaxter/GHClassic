@@ -3,6 +3,8 @@
 
 #include "gameplay/engine/note_engine.h"
 #include "hook.h"
+#include "host/input.h"
+#include "save/profiles.h"
 #include "save/save.h"
 #include "script.h"
 
@@ -23,32 +25,57 @@ namespace gh2::save
             return static_cast<uint32_t>(std::max(0.0f, call.number(i)));
         }
 
-        // {best finished <mode> <song> <difficulty> <part> <score> <stars>
-        //   <percent> <streak> <hit> <passed>}   a run won, from onGameOver;
-        //   kept where it was alone, in quickplay or a career
-        // {best score <song> <difficulty>}       its best score as played
-        //   now, 0 for none
+        // The bests section a mode's runs go in (bestSection): solo's for
+        // quickplay and a career, none for the rest (practice, tutorials).
+        std::optional<std::string> modeBests(const std::string &mode)
+        {
+            if (mode == "quickplay" || mode == "career")
+                return "";
+            if (mode == "multi_coop")
+                return "coop";
+            if (mode == "multi_vs")
+                return "faceoff";
+            if (mode == "multi_fo")
+                return "pro_faceoff";
+            return std::nullopt;
+        }
+
+        // {best finished <mode> <seat> <song> <difficulty> <part> <score>
+        //   <stars> <percent> <streak> <hit> <passed>}   a seat's run of a
+        //   song won, from onGameOver; kept by mode, each player's own
+        //   score in multiplayer as GH2's endgame shows it, as the profile
+        //   the seat plays as
+        // {best score <song> <difficulty> [<seat> <mode>]}   its best score
+        //   as the seat (P1's by default) plays it now, in that mode (as
+        //   gamecfg's, solo's by default), 0 for none
         script::Node bestCommand(const script::Call &call)
         {
             const std::string op = call.symbol(1);
             if (op == "finished")
             {
-                const std::string mode = call.symbol(2);
-                if (mode != "quickplay" && mode != "career")
+                const auto mode = modeBests(call.symbol(2));
+                if (!mode)
                     return {};
-                Best run{count(call, 6), count(call, 7), count(call, 8), count(call, 9)};
-                const uint32_t hit = count(call, 10), passed = count(call, 11);
+                const int seat = static_cast<int>(call.number(3));
+                Best run{count(call, 7), count(call, 8), count(call, 9), count(call, 10)};
+                const uint32_t hit = count(call, 11), passed = count(call, 12);
                 // As the campaign hub's full combos: every gem hit in one streak.
                 run.fullCombo = hit > 0u && passed == 0u && run.streak == hit;
-                keepBest(playedKey(call.symbol(3), call.symbol(4), call.symbol(5)), run);
+                keepBest(playedKey(call.symbol(4), call.symbol(5), call.symbol(6), seatController(seat)),
+                         seatProfile(seat), run, *mode);
                 return {};
             }
             if (op == "score")
             {
-                const auto best = keptBest(playedKey(call.symbol(2), call.symbol(3)));
+                const int seat = call.size() > 4 ? static_cast<int>(call.number(4)) : 0;
+                const auto mode = call.size() > 5 ? modeBests(call.symbol(5)) : std::optional<std::string>("");
+                if (!mode)
+                    return {0u, script::kInt};
+                const auto best = keptBest(playedKey(call.symbol(2), call.symbol(3), "guitar", seatController(seat)),
+                                           seatProfile(seat), *mode);
                 return {best ? best->score : 0u, script::kInt};
             }
-            std::cerr << "[best] usage: {best score <song> <difficulty>}" << std::endl;
+            std::cerr << "[best] usage: {best score <song> <difficulty> [<seat> <mode>]}" << std::endl;
             return {};
         }
 
@@ -60,11 +87,15 @@ namespace gh2::save
             if (GPR_U32(ctx, 5) == 0u)
                 return;
             const R5900Context saved = *ctx;
-            script::run(rdram, ctx, runtime,
-                        "{if {== {game num_players} 1} "
-                        "{best finished {gamecfg get mode} {game get_song} {game get_difficulty_sym 0} "
-                        "{gamecfg get_track_sym 0} {player0 score} {player0 num_stars} {player0 percent_hit} "
-                        "{player0 longest_streak} {player0 gems_hit} {player0 gems_passed}}}");
+            for (const char *seat : {"0", "1"})
+            {
+                const std::string n = seat, player = std::string("{player") + seat;
+                script::run(rdram, ctx, runtime,
+                            "{if {> {game num_players} " + n + "} {best finished {gamecfg get mode} " + n +
+                                " {game get_song} {game get_difficulty_sym " + n + "} {gamecfg get_track_sym " + n +
+                                "} " + player + " score} " + player + " num_stars} " + player + " percent_hit} " +
+                                player + " longest_streak} " + player + " gems_hit} " + player + " gems_passed}}}");
+            }
             *ctx = saved;
         }
     }
@@ -87,6 +118,11 @@ namespace gh2::save
         return bestKey(name ? name->song : gameOfSong(song) + '.' + song, noteEngineName(noteEngine()),
                        name ? name->part : part, difficulty, controller) +
                (speed == 100 ? "" : ".s" + std::to_string(speed));
+    }
+
+    std::string seatController(int seat)
+    {
+        return seatPad(seat) ? "gamepad" : "guitar";
     }
 
     void installResults(PS2Runtime &runtime, const Addresses &addresses)

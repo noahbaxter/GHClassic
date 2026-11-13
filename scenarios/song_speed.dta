@@ -4,6 +4,11 @@
 ; its audio stretched to match (ghc_speed/...), its own audio name back once
 ; the song is left. Practice's is practice.dta's.
 #include common/first_boot.dta
+; A profile's, as a guest keeps no best.
+(device guitar)
+(press down guitar)
+(wait 0.3)
+{ghc_profile make 0 "Tester"}
 {ui goto_screen qp_selsong_screen}
 (wait_screen qp_selsong_screen)
 (wait 2)
