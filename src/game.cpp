@@ -212,6 +212,7 @@ namespace
         gh2::installControllers(runtime);
         // After the help bar, which recolours its scene's own pixels.
         gh2::installGh2xAssets(runtime, gh2::kSlus21447);
+        gh2::prebakeFonts();
         // After the 360's scenes, the streak counter and the font bake: its
         // highway starts from theirs, and is served over the 360's.
         gh2::installGh1Highway();

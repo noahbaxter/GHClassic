@@ -16,6 +16,10 @@ namespace gh2
 {
     // After ark::install, which indexes the discs.
     void installFontBake();
+    // Every scene's fonts baked beside the game, so a screen's first open
+    // finds them kept: after what the worker should do first (the pickers'
+    // models, installGh2xAssets).
+    void prebakeFonts();
 
     // Where on a packed Font's sheet, W by H pixels, a box w by h fits clear
     // of every character's box in its info (and, with `inked`, of the

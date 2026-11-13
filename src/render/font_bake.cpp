@@ -1,15 +1,18 @@
 #include "render/font_bake.h"
 
 #include "disc/ark.h"
+#include "disc/made_cache.h"
 #include "formats/bitmap.h"
 #include "milo/layout.h"
 #include "milo/milo.h"
 #include "milo/objects.h"
 #include "render/vector_fonts.h"
+#include "worker.h"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <iostream>
 #include <set>
@@ -21,6 +24,10 @@ namespace gh2
     namespace
     {
         constexpr const char *kFolders[] = {"ui/gen/", "hud/gen/"};
+        // Each disc's scenes with fonts to bake, and the fonts traced, for
+        // prebakeFonts: set at install, read only after.
+        std::vector<std::pair<size_t, std::string>> s_scenes;
+        std::set<std::string> s_traced;
         constexpr float kRegistered = 0.7f; // a font's median cell overlapping its trace this much: the trace sits on the sheet
         constexpr float kOwnArt = 0.8f;     // a cell overlapping its own trace this much is its own art
         constexpr float kBetter = 0.2f;     // else, another character's trace overlapping it this much more: that one's art
@@ -503,11 +510,34 @@ namespace gh2
 
         // A scene's traced fonts: another disc's gains what the game disc's
         // has of letters and digits, and each has its wrong cells drawn over.
-        void fixFonts(size_t disc, const std::string &path, const std::set<std::string> &traced, std::vector<uint8_t> &file)
+        bool fixFonts(size_t disc, const std::string &path, const std::set<std::string> &traced, std::vector<uint8_t> &file);
+
+        // The file as fixFonts leaves it, from the last run that drew it from
+        // these same bytes: kept by the path and the bytes' FNV-1a, empty
+        // where fixFonts changed nothing.
+        void fixFontsKept(size_t disc, const std::string &path, const std::set<std::string> &traced, std::vector<uint8_t> &file)
+        {
+            uint64_t hash = 0xcbf29ce484222325ull;
+            for (const uint8_t byte : file)
+                hash = (hash ^ byte) * 0x100000001b3ull;
+            char hex[17];
+            std::snprintf(hex, sizeof hex, "%016llx", static_cast<unsigned long long>(hash));
+            const std::string name = "font_bake/" + std::to_string(disc) + "/" + path + "." + hex;
+            if (auto kept = made_cache::read(name))
+            {
+                if (!kept->empty())
+                    file = std::move(*kept);
+                return;
+            }
+            const bool changed = fixFonts(disc, path, traced, file);
+            made_cache::write(name, changed ? file : std::vector<uint8_t>());
+        }
+
+        bool fixFonts(size_t disc, const std::string &path, const std::set<std::string> &traced, std::vector<uint8_t> &file)
         {
             auto scene = milo::read(file);
             if (!scene || scene->version != 24u)
-                return;
+                return false;
             bool changed = false;
             for (size_t i = 0; i < scene->entries.size(); ++i)
             {
@@ -528,6 +558,7 @@ namespace gh2
             }
             if (changed)
                 file = milo::write(*scene);
+            return changed;
         }
     }
 
@@ -588,7 +619,23 @@ namespace gh2
             for (const char *folder : kFolders)
                 for (const std::string &path : ark::paths(disc, folder))
                     if (path.ends_with(".milo_ps2"))
+                    {
                         ark::addFix(disc, path, [disc, path, traced](std::vector<uint8_t> &file)
-                                    { fixFonts(disc, path, traced, file); });
+                                    { fixFontsKept(disc, path, traced, file); });
+                        s_scenes.push_back({disc, path});
+                    }
+        s_traced = std::move(traced);
+    }
+
+    void prebakeFonts()
+    {
+        // From the disc's own bytes, which a scene another fix changes first
+        // does not start from: that one still bakes as it opens.
+        for (const auto &[disc, path] : s_scenes)
+            worker::run([disc, path]
+                        {
+                            if (auto file = ark::readOwn(disc, path))
+                                fixFontsKept(disc, path, s_traced, *file);
+                        });
     }
 }
