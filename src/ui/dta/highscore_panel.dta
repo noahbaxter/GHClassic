@@ -1,7 +1,10 @@
 ; The high score screen, as the game's own (endgame.dta) but for its wait: once
 ; a name is in, the game flushed and then held the screen for 7 seconds with
 ; an empty help bar. It now moves on when the flush animation ends, 1 second
-; in, and leaves the flush sound playing.
+; in, and leaves the flush sound playing. One player with a profile
+; (save/profiles.h) goes in under its name, already on the board, and
+; continuing flushes it; a guest types a name, a career's starting as its
+; band's.
 {retype highscore_panel
    (
       ; From the ARK root: a path resolves against the file its array came
@@ -9,9 +12,11 @@
       (file ui/highscore.milo)
       (active_ten 0)
       (auto_add TRUE)
+      (placed FALSE)
       (flushed FALSE)
       (enter
-         {set [auto_add] {== career {gamecfg get mode}}}
+         {set [auto_add] {&& {== {game num_players} 1} {!= {ghc_profile name 0} ""}}}
+         {set [placed] FALSE}
          {set [flushed] FALSE}
          {hs_stats.lbl set_localized_text
             {sprintf
@@ -30,7 +35,7 @@
                {$this fill_scores $index $score {$this get_default_name}}
                {if_else {!= $index 0}
                   {$this enter_score $index}
-                  {if_else [auto_add]
+                  {if_else {== career {gamecfg get mode}}
                      {ui goto_screen complete_screen}
                      {$this view_scores}
                   }
@@ -60,9 +65,10 @@
          }
       )
       (get_default_name
-         {if_else [auto_add]
-            {campaign profile_name {campaign profile_slot}}
-            {highscores get_default_name}
+         {cond
+            ({!= {ghc_profile name 0} ""} {ghc_profile name 0})
+            ({== career {gamecfg get mode}} {campaign profile_name {campaign profile_slot}})
+            (TRUE {highscores get_default_name})
          }
       )
       (set_entry
@@ -91,9 +97,12 @@
             {if_else [auto_add]
                {do
                   {set [active_ten] 0}
+                  {set [placed] TRUE}
                   {$this set_text_entry -1}
                   {hs_start.lbl set_showing FALSE}
-                  {highscores add {$ten get_text} {player0 score}}
+                  ; The table keeps the name it is given, not a copy, so
+                  ; the profile's as a symbol, which lasts.
+                  {highscores add {symbol {$this get_default_name}} {player0 score}}
                }
                {do
                   {set [active_ten] $ten}
@@ -130,16 +139,40 @@
                {{$this get_active_ten} is_done}
                {! [flushed]}
             }
-            {set [flushed] TRUE}
-            {hs_flush.tnm animate (range 0 17) (period 1) (units kTaskUISeconds)}
-            {play_sfx flush}
-            {highscore_screen update_help_bar}
-            {script_task
-               (delay 1) ; the game's 7
-               (units kTaskUISeconds)
-               (script {ui goto_screen complete_screen})
-            }
+            {$this flush}
          }
       )
+      (flush
+         {set [flushed] TRUE}
+         {hs_flush.tnm animate (range 0 17) (period 1) (units kTaskUISeconds)}
+         {play_sfx flush}
+         {highscore_screen update_help_bar}
+         {script_task
+            (delay 1) ; the game's 7
+            (units kTaskUISeconds)
+            (script {ui goto_screen complete_screen})
+         }
+      )
+   )
+}
+; The game's own (endgame.dta), but that continuing past a placed name
+; flushes it first.
+{amend highscore_screen
+   (BUTTON_DOWN_MSG
+      {if_else {== $button kPad_X}
+         {do
+            ($ten {highscore_panel get_active_ten})
+            {cond
+               ({highscore_panel get flushed} 0)
+               ({highscore_panel get placed} {synth play_sequence button_select} {highscore_panel flush})
+               ({|| {== $ten NULL} {$ten is_done}}
+                  {synth play_sequence button_select}
+                  {ui goto_screen complete_screen}
+               )
+            }
+            kDataUnhandled
+         }
+         {if_else {highscore_panel get_active_ten} kDataUnhandled TRUE}
+      }
    )
 }
