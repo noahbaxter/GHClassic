@@ -235,11 +235,11 @@ namespace gh2::custom
             script::run(rdram, ctx, runtime, text);
     }
 
-    std::string startSong(const std::string &id, std::shared_ptr<const Song> song)
+    std::string startSong(const std::string &id, std::shared_ptr<const Song> song, Part part)
     {
         s_playing = std::move(song);
         s_playingId = id;
-        return base(id, s_playing->parts, played(*s_playing));
+        return base(id, s_playing->parts, part);
     }
 
     std::shared_ptr<const Song> playingSong() { return s_playing; }

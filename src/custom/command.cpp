@@ -105,13 +105,17 @@ namespace gh2::custom
                 return call.word(lengthText(song ? song->length : 0.0));
             if (op == "best")
                 return call.word(bestLine(id));
+            // The part it plays: quickplay's instrument's, or with a TRUE
+            // after the rest its lead, as on guitar (Face-Off's).
+            const auto part = [&](int lead)
+            { return call.size() > lead && call.number(lead) != 0.0f ? playedPart(song->parts) : played(*song); };
             if (op == "base")
             {
                 if (!song)
                     return {0u, script::kSymbol};
-                return call.word(startSong(id, song));
+                return call.word(startSong(id, song, part(3)));
             }
-            const uint8_t mask = song ? static_cast<uint8_t>((song->charted >> (4 * int(played(*song)))) & 0xfu) : 0xfu;
+            const uint8_t mask = song ? static_cast<uint8_t>((song->charted >> (4 * int(part(4)))) & 0xfu) : 0xfu;
             const int wanted = static_cast<int>(call.number(3));
             if (op == "has")
                 return {(mask >> std::clamp(wanted, 0, 3)) & 1u, script::kInt};

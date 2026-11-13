@@ -532,7 +532,9 @@
 {retype multi_fo_venue_screen $ghc_qp_venue_screen}
 
 ; The songs: any setlist, picked as quickplay's (quickplay.dta), its twin
-; screen loading another.
+; screen loading another. A custom song picked is started as quickplay
+; starts one on guitar (quickplay_setup.dta ghc_custom_start), its lead
+; part whatever quickplay's instrument.
 {func ghc_multi_selsong_helpbar
    {do
       ($array)
@@ -567,7 +569,7 @@
       (focus sel_song_panel)
       (sel_song_career FALSE)
       (enter {ghc_multi_selsong_helpbar})
-      (SELECT_START_MSG {ui goto_screen {ghc_multi_screen seldiff}} kDataUnhandled)
+      (SELECT_START_MSG {ghc_custom_start TRUE} {ui goto_screen {ghc_multi_screen seldiff}} kDataUnhandled)
       (BUTTON_DOWN_MSG {ghc_multi_selsong_button $button})
       (ghc_picked ($game) {ghc_qp_picked sel_song_panel ghc_multi_selsong_twin_screen $game})
    )
@@ -581,7 +583,7 @@
       (focus sel_song_twin_panel)
       (sel_song_career FALSE)
       (enter {ghc_multi_selsong_helpbar})
-      (SELECT_START_MSG {ui goto_screen {ghc_multi_screen seldiff}} kDataUnhandled)
+      (SELECT_START_MSG {ghc_custom_start TRUE} {ui goto_screen {ghc_multi_screen seldiff}} kDataUnhandled)
       (BUTTON_DOWN_MSG {ghc_multi_selsong_button $button})
       (ghc_picked ($game) {ghc_qp_picked sel_song_twin_panel {ghc_multi_screen selsong} $game})
    )
