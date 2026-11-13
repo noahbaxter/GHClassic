@@ -172,6 +172,7 @@ namespace gh2::quickplay
         // which one serves it has changed. The panels are made once, with
         // the UI.
         constexpr uint32_t kPanelModels = 0x5cu, kCacheModelBytes = 0x1cu;
+        constexpr uint32_t kSetTypeDefSlot = 0x58u; // Hmx::Object's vtable
         std::vector<uint32_t> s_charPanels;
         struct ShowCharTag;
         void onShowChar(uint8_t *, R5900Context *ctx, PS2Runtime *)
@@ -367,6 +368,27 @@ namespace gh2::quickplay
             script::run(call.rdram, call.ctx, call.runtime, text);
         }
 
+        // {preview_load <panel>}: a CharsysPanel's models loaded on as its
+        // poll loads them (PollCharLoading), for one held loaded on no
+        // screen, once a screen had it up. Not its whole poll (Poll,
+        // 0x142110): that also sets the clock all previews animate by
+        // (0x2c6798 on 0x51ee40) from its own, and held another's figure in
+        // its bind pose.
+        script::Node previewLoad(const script::Call &call)
+        {
+            const uint32_t object = call.object(1);
+            if (object == 0u)
+                return {};
+            // Script finds its Hmx::Object; the panel's own `this` is where
+            // its SetTypeDef (CharsysPanel's, 0x141bf8) is called on, by the
+            // offset in that virtual's slot (script.cpp's setTypeDef).
+            const uint32_t vtable = load<uint32_t>(call.rdram, object);
+            const int16_t delta = load<int16_t>(call.rdram, vtable + kSetTypeDefSlot);
+            const uint32_t panel = object + static_cast<uint32_t>(static_cast<int32_t>(delta));
+            call.runtime->callGuestFunction(call.rdram, call.ctx, s_addresses->charsysPanelPollCharLoading, {panel});
+            return {};
+        }
+
         script::Node quickplayCommand(const script::Call &call)
         {
             const std::string op = call.symbol(1);
@@ -515,6 +537,7 @@ namespace gh2::quickplay
     {
         s_addresses = &addresses;
         script::addCommand("quickplay", quickplayCommand);
+        script::addCommand("preview_load", previewLoad);
         s_isItemUnlocked = runtime.lookupFunction(addresses.campaignIsItemUnlocked);
         runtime.replaceFunction(addresses.campaignIsItemUnlocked, &isItemUnlocked<false>);
         s_isItemUnlockedOn = runtime.lookupFunction(addresses.campaignIsItemUnlockedOn);

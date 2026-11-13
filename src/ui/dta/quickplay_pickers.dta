@@ -183,8 +183,11 @@
       (back_screen ghc_qp_setup_screen)
       ; The setup's scene (quickplay_setup.dta), going either way with no
       ; transition. Its guitarist's preview panel is not up here: beside
-      ; another, a preview panel's figure stands in its bind pose.
+      ; another, a preview panel's figure stands in its bind pose. Held
+      ; loaded instead, it loads the outfit on show (ghc_preshow_follow).
       (panels meta sel_character_panel char_single helpbar)
+      ; As SEL_CHARACTER_COMMON's, then the hub's guitarist let go.
+      (exit {char_single set_placer 0} {char_single set_door 0} {ghc_preshow_char unload})
       ; As SEL_CHARACTER_COMMON's, the panel opened again first.
       (enter
          {sel_character_panel pick}

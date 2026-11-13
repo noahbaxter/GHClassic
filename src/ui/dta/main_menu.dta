@@ -234,15 +234,21 @@
 ; With no more of them than $ghc_tap_flips, a tap is the next instead: two
 ; are no list to pick from.
 {set $ghc_tap_flips 2}
+; A screen takes its panels as it is typed: the hub's guitarist's
+; (preshow_guitarist.dta, read later) made first.
+{if {! {exists ghc_preshow_char}} {new CharsysPanel ghc_preshow_char}}
 {retype main_screen
    (
-      (panels meta main_panel ghc_dim_panel dialog ghc_profile_panel helpbar ghc_pick_panel fade_panel)
+      ; The hub's guitarist loading behind it (ghc_preshow_preload).
+      (panels meta main_panel ghc_dim_panel dialog ghc_profile_panel helpbar ghc_pick_panel fade_panel
+         ghc_preshow_char)
       (focus main_panel)
       (access_all {main_panel reset_player_settings})
       ; The help bar puts up a screen's (helpbar ...) after its enter, so
       ; this one has none and sets its own.
       (enter
          {$this turn_off_ambient}
+         {ghc_preshow_preload}
          ; Face-Off's looks, one outfit's and finish's each (multiplayer.dta).
          {ghc_multi_forget}
          ; A 360 song quit to here is over (content/quickplay.h).
