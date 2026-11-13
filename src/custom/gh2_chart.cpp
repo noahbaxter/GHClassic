@@ -178,12 +178,13 @@ namespace gh2::custom
         }
         if (last == 0u)
             return std::nullopt;
-        for (const Span &s : lead[3].solos)
+        const Difficulty &staged = fullest(lead);
+        for (const Span &s : staged.solos)
         {
             guitar.events.push_back(midi::text(gh2Tick(s.tick), "[solo_on]"));
             guitar.events.push_back(midi::text(gh2Tick(uint64_t(s.tick) + s.length), "[solo_off]"));
         }
-        for (const Span &s : lead[3].bigNotes)
+        for (const Span &s : staged.bigNotes)
             addNote(guitar, gh2Tick(s.tick), gh2Tick(uint64_t(s.tick) + s.length), kBigNote);
 
         midi::Track events;
@@ -209,7 +210,7 @@ namespace gh2::custom
         events.events.push_back(midi::text(end, "[end]"));
 
         std::vector<Span> singing;
-        std::vector<midi::Track> band = addStage({chart, lead[3], gh2Tick, end, *played, &singing}, guitar, events);
+        std::vector<midi::Track> band = addStage({chart, staged, gh2Tick, end, *played, &singing}, guitar, events);
         // The mouth: the chart's syllables, else a filler word on each beat
         // the singer sings, a half beat long.
         if (!chart.syllables.empty())

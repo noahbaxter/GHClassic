@@ -17,7 +17,7 @@
 //                its [map StrumMap_SlapBass]
 //   BAND BASS    the bassist, and 36 a speaker pulse on each hit: the bass
 //                part's, else the kicks, else the beat
-//   BAND DRUMS   the drummer, 36 a kick (the drums' expert kicks, else beats
+//   BAND DRUMS   the drummer, 36 a kick (the drums' kicks, Chart::kicks, else beats
 //                1 and 3 of each bar the band plays) and 37 a crash (the
 //                chart's crashes, else at each section); its beat the chart's
 //                own, else by where the snares fall each bar: [play] (the
@@ -67,7 +67,7 @@ namespace gh2::custom
     struct StageIn
     {
         const Chart &chart;
-        const Difficulty &lead; // PART GUITAR's expert
+        const Difficulty &lead; // PART GUITAR's expert, else its highest (fullest)
         std::function<uint32_t(uint32_t)> toGh2; // chart tick to GH2 tick
         uint32_t end = 0u; // the song's [end]
         Part part = Part::Guitar; // the part PART GUITAR is, its texts and hand the chart's

@@ -76,7 +76,8 @@ namespace gh2::custom
     // and drum pattern. Returns the kicks.
     std::vector<uint32_t> addDrummer(BandTracks &band);
 
-    // BAND BASS: a speaker pulse on each of the bass part's expert notes,
+    // BAND BASS: a speaker pulse on each of the bass part's expert notes
+    // (else its highest difficulty's),
     // else on the kicks.
     void addBassist(BandTracks &band, const std::vector<uint32_t> &kicks);
 

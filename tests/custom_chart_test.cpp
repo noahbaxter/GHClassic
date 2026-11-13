@@ -441,6 +441,74 @@ namespace
               expert->faceOff[0].empty());
     }
 
+    // What the stage reads comes from each part's expert, else its highest
+    // difficulty with notes, whatever the player picks.
+    void stageFromFullest()
+    {
+        std::string why;
+        // A .mid's hard drums alone: 84 the kick, 85 the snare, 88 green.
+        midi::Track drums;
+        drums.name = "PART DRUMS";
+        for (const auto &[tick, pitch] : std::vector<std::pair<uint32_t, uint8_t>>{{0u, 84u}, {480u, 85u}, {960u, 88u}, {960u, 72u}})
+        {
+            drums.events.push_back(note(tick, pitch, true));
+            drums.events.push_back(note(tick + 60u, pitch, false));
+        }
+        const auto hardMid = parseMid(oneGemMid({drums}), {}, why);
+        CHECK(hardMid && hardMid->kicks == std::vector<uint32_t>({0u}) && hardMid->snares == std::vector<uint32_t>({480u}) &&
+              hardMid->crashes == std::vector<uint32_t>({960u}) && hardMid->drums.size() == 3u);
+        // With expert's too, expert's alone.
+        drums.events.push_back(note(1440u, 96u, true));
+        drums.events.push_back(note(1500u, 96u, false));
+        const auto bothMid = parseMid(oneGemMid({drums}), {}, why);
+        CHECK(bothMid && bothMid->kicks == std::vector<uint32_t>({1440u}) && bothMid->drums.size() == 1u &&
+              bothMid->snares.empty());
+
+        // A .chart's [HardDrums] alone, its own cymbal marker; then with
+        // [ExpertDrums] beside it.
+        const std::string hardDrums = "[HardDrums]\n{\n  0 = N 0 0\n  192 = N 1 0\n  384 = N 3 0\n  384 = N 67 0\n}\n";
+        const auto hardChart = parseChart(kOneGemChart + hardDrums, {}, why);
+        CHECK(hardChart && hardChart->kicks == std::vector<uint32_t>({0u}) &&
+              hardChart->snares == std::vector<uint32_t>({192u}) && hardChart->crashes == std::vector<uint32_t>({384u}));
+        const auto bothChart = parseChart(kOneGemChart + hardDrums + "[ExpertDrums]\n{\n  96 = N 0 0\n  288 = N 0 0\n}\n", {}, why);
+        CHECK(bothChart && bothChart->kicks == std::vector<uint32_t>({96u, 288u}) && bothChart->snares.empty() &&
+              bothChart->crashes.empty());
+        // Keys the same.
+        const auto hardKeys = parseChart(kOneGemChart + "[HardKeyboard]\n{\n  0 = N 1 0\n  192 = N 2 0\n}\n", {}, why);
+        CHECK(hardKeys && hardKeys->keys == std::vector<uint32_t>({0u, 192u}));
+
+        // A guitar part with only hard gets the band expert's same notes
+        // would: every track past PART GUITAR alike.
+        const auto withGuitar = [&](const char *section)
+        {
+            std::string text = "[Song]\n{\n  Resolution = 192\n}\n[SyncTrack]\n{\n  0 = B 120000\n}\n[" + std::string(section) +
+                               "]\n{\n  0 = E solo\n";
+            for (uint32_t beat = 0u; beat < 32u; ++beat)
+                text += "  " + std::to_string(beat * 192u) + " = N " + std::to_string(beat % 3u) + " 0\n";
+            text += "  1536 = E soloend\n}\n";
+            const auto chart = parseChart(text, {}, why);
+            return chart ? toGh2(*chart, 0.0) : std::nullopt;
+        };
+        const auto hard = withGuitar("HardSingle"), expert = withGuitar("ExpertSingle");
+        const auto hardBack = hard ? midi::parse(hard->mid) : std::nullopt;
+        const auto expertBack = expert ? midi::parse(expert->mid) : std::nullopt;
+        CHECK(hardBack && expertBack && hardBack->tracks.size() > 3u && hardBack->tracks.size() == expertBack->tracks.size());
+        if (!hardBack || !expertBack || hardBack->tracks.size() != expertBack->tracks.size())
+            return;
+        CHECK(hardBack->tracks[3].name == "BAND DRUMS" && !hardBack->tracks[3].events.empty());
+        for (size_t t = 2u; t < hardBack->tracks.size(); ++t)
+        {
+            const auto &a = hardBack->tracks[t].events, &b = expertBack->tracks[t].events;
+            CHECK(a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(), b.end(), [](const midi::Event &x, const midi::Event &y)
+                                                     { return x.tick == y.tick && x.status == y.status && x.data == y.data; }));
+        }
+        // Hard's solo reaches PART GUITAR.
+        size_t solos = 0u;
+        for (const midi::Event &e : hardBack->tracks[1].events)
+            solos += e.status == midi::kMeta && std::string(e.data.begin(), e.data.end()) == "[solo_on]";
+        CHECK(solos == 1u);
+    }
+
     std::vector<uint32_t> notesOf(const midi::Track &track, uint8_t from, uint8_t to);
 
     // The sung syllables: each lyric with its note, its markup off, a
@@ -1913,6 +1981,7 @@ int main(int argc, char **argv)
     lanes();
     chartEdges();
     bandParts();
+    stageFromFullest();
     stageTracks();
     syllables();
     lipSync();

@@ -503,8 +503,8 @@ namespace gh2::custom
         const Chart &chart = band.in.chart;
         band.bass.name = "BAND BASS";
         std::vector<uint32_t> pulses = kicks;
-        if (const auto it = chart.parts.find(Part::Bass); it != chart.parts.end() && !it->second[3].gems.empty())
-            pulses = toGh2Sorted(ticksOf(it->second[3].gems), band.in.toGh2);
+        if (const auto it = chart.parts.find(Part::Bass); it != chart.parts.end())
+            pulses = toGh2Sorted(ticksOf(fullest(it->second).gems), band.in.toGh2);
         addMemberCues(band.bass, memberCues(stageTrack(chart, "PART BASS")), playingRuns(pulses), band.in.toGh2);
         for (const uint32_t t : pulses)
             addShortNote(band.bass, t, 36u);
