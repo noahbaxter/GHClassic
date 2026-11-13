@@ -215,10 +215,7 @@
          {{$s_dir find ghc_sticker.mesh} set_showing $shown}
          {{$s_dir find ghc_tape.mesh} set_showing $shown}
          {foreach_int $n 0 $ghc_info_pool {{$s_dir find {sprint "ghc_info_" $n ".lbl"}} set_showing FALSE}}
-         {{$s_dir find ghc_art.mesh} set_showing {&& $shown {custom art $song}}}
-         {if {&& $shown {custom art $song}}
-            {{$s_dir find ghc_art.tex} set_bitmap {sprint "ui/image/ghc_art_" $song ".png"}}
-         }
+         {ghc_info_art $s_dir}
          {if $shown
             {set $ghc_info_n 0}
             {do
@@ -251,6 +248,21 @@
             }
          }
       }
+   }
+}
+; The song's album art on the sticker once it is read off its disk ({custom
+; art}, asked for with its preview), so the list never waits on it: a scan
+; busy on a network drive can hold a read up a second. Put on once a song.
+{set $ghc_art_on ''}
+{func ghc_info_art ($a_dir)
+   {do
+      ($song {game get_song})
+      ($art {&& {== {setlist shown} custom} {custom art $song}})
+      {if {&& $art {!= $song $ghc_art_on}}
+         {{$a_dir find ghc_art.tex} set_bitmap {sprint "ui/image/ghc_art_" $song ".png"}}
+         {set $ghc_art_on $song}
+      }
+      {{$a_dir find ghc_art.mesh} set_showing $art}
    }
 }
 ; The details a song has, a key on the left and its value on the right of
@@ -384,6 +396,7 @@
          ; is up. Its pieces are hidden until then: the scene has them where
          ; the sheet they were cut from is, in its paper (content/setlist_printout.cpp).
          {set $ghc_info_since -2}
+         {set $ghc_art_on ''}
          {foreach $piece (ghc_printout.mesh ghc_sticker.mesh ghc_art.mesh ghc_tape.mesh)
             {if {$this find $piece FALSE} {{$this find $piece} set_showing FALSE}}
          }
@@ -430,6 +443,7 @@
             {set $ghc_info_due FALSE}
             {ghc_info_show $this}
          }
+         {if {&& {! $ghc_info_due} {$this find ghc_info_0.lbl FALSE}} {ghc_info_art $this}}
       )
       ; To a tier's first song (orange, custom songs' sections), or to a
       ; song at random (Select's menu).

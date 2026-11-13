@@ -23,11 +23,14 @@
 //                                         difficulty played, as played
 //                                         now: score, stars, percent
 //                                         or FC; else NOT PLAYED
-//   {custom art <song>}                   TRUE if it has album art,
+//   {custom art <song>}                   TRUE once its album art is
+//                                         read off its disk, as ready
+//                                         reads it first:
 //                                         ui/image/ghc_art_<song>.png
-//   {custom ready <song>}                 TRUE once its audio is read
-//                                         off its disk, which this
-//                                         starts (audio.h stemsReady)
+//   {custom ready <song>}                 TRUE once its art and audio
+//                                         are read off its disk, which
+//                                         this starts (audio.h
+//                                         stemsReady)
 //   {custom level <song> guitar|bass}     that instrument's difficulty
 //                                         in song.ini, "" if it has
 //                                         none or not the part

@@ -8,8 +8,11 @@
 #include "custom/library.h"
 #include "disc/ark.h"
 
+#include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace gh2::custom
 {
@@ -20,6 +23,10 @@ namespace gh2::custom
 
     // TRUE once every stem of the song is read into memory, for a mix of it
     // to open with no wait on its disk. Until then they are read on a
-    // thread of their own, the last song asked about the one read.
+    // thread of their own, the last song asked about the one read, its
+    // album art first.
     bool stemsReady(const Song &song);
+    // That art's bytes once read there, none before: a song folder on a
+    // network drive a scan is busy with can take a second to give them.
+    std::shared_ptr<const std::vector<uint8_t>> heldArt(const Song &song);
 }

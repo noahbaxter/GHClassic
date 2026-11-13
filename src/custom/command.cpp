@@ -93,7 +93,7 @@ namespace gh2::custom
                 return call.word(text);
             }
             if (op == "art")
-                return {song && !song->art.empty() ? 1u : 0u, script::kInt};
+                return {song && heldArt(*song) ? 1u : 0u, script::kInt};
             if (op == "ready")
                 return {song && stemsReady(*song) ? 1u : 0u, script::kInt};
             if (op == "level")

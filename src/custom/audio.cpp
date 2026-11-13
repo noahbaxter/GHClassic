@@ -116,6 +116,8 @@ namespace gh2::custom
         }();
         (void)started;
         std::vector<fs::path> files;
+        if (!song.art.empty())
+            files.push_back(songPath(song, song.art));
         for (const std::string &file : song.stems)
             files.push_back(songPath(song, file));
         const std::lock_guard lock(s_heldMutex);
@@ -131,6 +133,14 @@ namespace gh2::custom
             s_wake.notify_one();
         }
         return false;
+    }
+
+    std::shared_ptr<const std::vector<uint8_t>> heldArt(const Song &song)
+    {
+        if (song.art.empty())
+            return nullptr;
+        const std::lock_guard lock(s_heldMutex);
+        return held(songPath(song, song.art));
     }
 
     std::optional<ark::Made> madeMix(const std::string &path, const Song &song, const std::string &played)

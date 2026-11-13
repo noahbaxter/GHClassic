@@ -196,8 +196,14 @@ namespace gh2::custom
             if (!song || song->art.empty())
                 return std::nullopt;
             const fs::path art = songPath(*song, song->art);
+            // Drawn from the bytes the list waited for ({custom art}).
+            const auto file = [song, art]
+            {
+                const auto held = heldArt(*song);
+                return held ? std::string(held->begin(), held->end()) : songFile(art);
+            };
             std::vector<uint8_t> standIn = textures::standIn(
-                textures::add({.path = utf8(art), .file = [art] { return songFile(art); }}), setlist_printout::kArtStandIn, setlist_printout::kArtStandIn);
+                textures::add({.path = utf8(art), .file = file}), setlist_printout::kArtStandIn, setlist_printout::kArtStandIn);
             return standIn.empty() ? std::nullopt : std::optional(ark::held(std::move(standIn)));
         }
     }
