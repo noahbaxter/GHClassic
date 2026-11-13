@@ -229,6 +229,9 @@ namespace gh2
         // A pressed button drawn at its focused size (ui/press_size.h).
         uint32_t bandButtonDrawShowing;   // BandButton::DrawShowing
         uint32_t bandButtonGetStateColor; // BandButton::GetStateColor(State, Color &)
+        // A panel loaded for a screen and let go (ui/screen_loads.h).
+        uint32_t uiPanelCheckLoad;   // UIPanel::CheckLoad
+        uint32_t uiPanelCheckUnload; // UIPanel::CheckUnload
         uint32_t uiManagerPoll;
         uint32_t debugModal; // DebugModal(bool &, char *)
         uint32_t abort;
@@ -628,6 +631,8 @@ namespace gh2
         .uiSelectFrames = 0x473228u,
         .bandButtonDrawShowing = 0x28bcb8u,
         .bandButtonGetStateColor = 0x28bb80u,
+        .uiPanelCheckLoad = 0x20e040u,
+        .uiPanelCheckUnload = 0x20e0d0u,
         .uiManagerPoll = 0x214510u,
         .debugModal = 0x105a88u,
         .abort = 0x307b80u,
