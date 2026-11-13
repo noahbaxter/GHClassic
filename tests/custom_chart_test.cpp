@@ -1020,7 +1020,8 @@ namespace
         for (uint32_t t = 48u * 480u; t < 64u * 480u; t += 960u)
             lead.gems.push_back({t, 1u});
         chart.sections = {{0u, "Riff 1"}, {32u * 480u, "Big Part"}, {48u * 480u, "Riff 2"}};
-        chart.vocals = {{480u * 4u, 480u * 8u}};
+        // A beat's rest sung through, eight beats' idled.
+        chart.vocals = {{480u * 4u, 480u * 4u}, {480u * 9u, 480u * 3u}, {480u * 20u, 480u * 2u}};
         midi::Track guitar, events;
         const auto band = addStage({chart, lead, kSameTicks, 64u * 480u}, guitar, events);
         CHECK(band.size() == 5u && band[4].name == "GH1 UPCOMING");
@@ -1039,7 +1040,8 @@ namespace
                 second = text;
         CHECK(!first.empty() && first == second);
         const auto singer = textsOf(band[2]);
-        const std::vector<std::pair<uint32_t, std::string>> sung = {{1920u, "[play]"}, {5760u, "[idle]"}};
+        const std::vector<std::pair<uint32_t, std::string>> sung = {
+            {1920u, "[play]"}, {5760u, "[idle]"}, {9600u, "[play]"}, {10560u, "[idle]"}};
         CHECK(singer == sung);
         // No drums: a kick each beat while the band plays.
         int kicks = 0, keys = 0;

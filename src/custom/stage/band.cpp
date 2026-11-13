@@ -383,8 +383,16 @@ namespace gh2::custom
         if (chart.vocals.empty())
             singerSpans = playingOutsideSolos(band);
         addMemberCues(band.singer, singerCues, {}, toGh2);
+        // GH2's own singers never idle under three beats: a shorter rest
+        // between phrases is sung through.
+        std::vector<Span> held;
+        for (const Span &s : singerSpans)
+            if (!held.empty() && s.tick < held.back().tick + held.back().length + 3u * kBeat)
+                held.back().length = std::max(held.back().length, s.tick + s.length - held.back().tick);
+            else
+                held.push_back(s);
         if (!has(singerCues, "[play]"))
-            for (const Span &s : singerSpans)
+            for (const Span &s : held)
             {
                 band.singer.events.push_back(midi::text(s.tick, "[play]"));
                 band.singer.events.push_back(midi::text(s.tick + s.length, "[idle]"));
