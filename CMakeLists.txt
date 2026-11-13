@@ -462,6 +462,7 @@ set(GHC_GAME_SOURCES
     src/ui/list_scroll.cpp
     src/ui/transitions.cpp
     src/ui/press_size.cpp
+    src/guest/bin_reads.cpp
     src/ui/text_fit.cpp
     src/ui/menus.cpp
     src/ui/meta_music.cpp

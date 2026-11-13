@@ -261,6 +261,9 @@ namespace gh2
         uint32_t rndMatLoadMultiPass; // and from reading its multiPass
         uint32_t binStreamRead;     // (void *, int)
         uint32_t binStreamReadEndian; // (void *, int)
+        uint32_t charBonesSamplesLoadData; // CharBonesSamples::LoadData(BinStream &)
+        uint32_t rndMeshReadVert;          // operator>>(BinStream &, RndMesh::Vert &)
+        uint32_t rndMeshRev;               // int: the RndMesh revision being loaded
         uint32_t rndMorphCtor;
         uint32_t rndMorphDtor;
         uint32_t rndMorphSetFrame; // (frame, blend)
@@ -657,6 +660,9 @@ namespace gh2
         .rndMatLoadMultiPass = 0x1c0270u,
         .binStreamRead = 0x2c8c50u,
         .binStreamReadEndian = 0x2c8e20u,
+        .charBonesSamplesLoadData = 0x194978u,
+        .rndMeshReadVert = 0x1c8328u,
+        .rndMeshRev = 0x471df8u,
         .rndMorphCtor = 0x200b98u,
         .rndMorphDtor = 0x374f90u,
         .rndMorphSetFrame = 0x201048u,
