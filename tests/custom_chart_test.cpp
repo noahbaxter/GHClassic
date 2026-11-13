@@ -751,25 +751,40 @@ namespace
         }
     }
 
-    // The made fret hand moves only where a phrase starts: green and red
-    // traded, then green over and over, keep it at the third fret; past a
-    // two-beat rest, a phrase mostly on orange moves it to the twelfth.
+    // The made fret hand takes a place a part of the song: verse, chorus,
+    // verse (its riff two lanes up), chorus, solo. Each verse sits in one
+    // place, each chorus (busier) in one higher, the solo higher still, the
+    // same whether the chart names its sections or the hand finds them by
+    // what repeats. Open notes leave it where it is.
     void handPlaces()
     {
+        constexpr uint32_t kBar = 1920u;
         Chart chart = chart480();
         Difficulty lead;
-        for (uint32_t t = 0; t < 16u * 480u; t += 240u)
-            lead.gems.push_back({t, static_cast<uint8_t>(t < 8u * 480u ? (t / 240u % 2u ? 2u : 1u) : 1u)});
-        for (uint32_t t = 18u * 480u; t < 24u * 480u; t += 240u)
-            lead.gems.push_back({t, static_cast<uint8_t>(t % 960u ? 0x10u : 0x18u)});
-        midi::Track guitar, events;
-        addStage({chart, lead, kSameTicks, 24u * 480u}, guitar, events);
-        std::vector<std::pair<uint32_t, uint8_t>> places;
-        for (const midi::Event &e : guitar.events)
-            if (midi::kind(e) == midi::kNoteOn && e.data[1] > 0u && e.data[0] >= 40u && e.data[0] <= 59u)
-                places.push_back({e.tick, e.data[0]});
-        const std::vector<std::pair<uint32_t, uint8_t>> want = {{0u, 42u}, {18u * 480u, 51u}};
-        CHECK(places == want);
+        for (uint32_t part = 0; part < 4u; ++part)
+            for (uint32_t t = part * 8u * kBar; t < (part + 1u) * 8u * kBar; t += part % 2u ? 120u : 240u)
+                lead.gems.push_back({t, static_cast<uint8_t>(part % 2u ? 0x0cu : (t / 240u % 2u ? 2u : 1u) << part)});
+        for (uint32_t t = 32u * kBar; t < 34u * kBar; t += 480u)
+            lead.gems.push_back({t, static_cast<uint8_t>(1u << kOpen)});
+        for (uint32_t t = 34u * kBar; t < 38u * kBar; t += 120u)
+            lead.gems.push_back({t, static_cast<uint8_t>(1u << (t / 120u % 5u))});
+        lead.solos = {{34u * kBar, 4u * kBar}};
+        const auto places = [&]
+        {
+            midi::Track guitar, events;
+            addStage({chart, lead, kSameTicks, 38u * kBar}, guitar, events);
+            std::vector<std::pair<uint32_t, uint8_t>> out;
+            for (const midi::Event &e : guitar.events)
+                if (midi::kind(e) == midi::kNoteOn && e.data[1] > 0u && e.data[0] >= 40u && e.data[0] <= 59u)
+                    out.push_back({e.tick, e.data[0]});
+            return out;
+        };
+        const std::vector<std::pair<uint32_t, uint8_t>> want = {
+            {0u, 40u}, {8u * kBar, 48u}, {16u * kBar, 40u}, {24u * kBar, 48u}, {34u * kBar, 51u}};
+        CHECK(places() == want);
+        chart.sections = {{0u, "Verse 1"},         {8u * kBar, "Chorus 1"}, {16u * kBar, "Verse 2"},
+                          {24u * kBar, "Chorus 2"}, {32u * kBar, "Break"},   {34u * kBar, "Solo"}};
+        CHECK(places() == want);
     }
 
     // A chart too fast for the band played at half: the band and crowd at

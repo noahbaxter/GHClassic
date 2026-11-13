@@ -8,8 +8,10 @@
 //
 //   PART GUITAR  the guitarist, playing where the part does; [wail_on] and
 //                [wail_off] over a chorus's first four bars; its fret hand's
-//                place (40 to 59) and [map ...]s, the chart's, else the hand
-//                at the lowest fret played
+//                place (40 to 59) and [map ...]s, the chart's, else one place
+//                a part of the song (its sections, else the bars it
+//                repeats), the same for each part alike, busier higher,
+//                solos and taps highest
 //   PART BASS    the bass part's frets for the bassist's strumming hand, and
 //                its [map StrumMap_SlapBass]
 //   BAND BASS    the bassist, and 36 a speaker pulse on each hit: the bass
