@@ -1212,6 +1212,14 @@ namespace
         hold(3360u, 96u, 60u); // chord
         hold(3360u, 97u, 60u);
         hold(3480u, 96u, 60u); // green out of it: a strum, in a .mid
+        // A Phase Shift tap phrase, its end tick's note a tap too, over
+        // the forced strums under it.
+        guitar.events.push_back({3840u, midi::kSysex, 0u, {'P', 'S', 0u, 0u, 0xffu, 4u, 1u, midi::kSysexEnd}});
+        hold(3840u, 97u, 60u);
+        hold(3840u, 102u, 60u);
+        hold(3960u, 98u, 60u);
+        hold(3960u, 102u, 60u);
+        guitar.events.push_back({3960u, midi::kSysex, 0u, {'P', 'S', 0u, 0u, 0xffu, 4u, 0u, midi::kSysexEnd}});
         std::stable_sort(guitar.events.begin(), guitar.events.end(),
                          [](const midi::Event &a, const midi::Event &b) { return a.tick < b.tick; });
         midi::Track events;
@@ -1232,7 +1240,8 @@ namespace
         CHECK(chart->sections.size() == 2u && chart->sections[1].second == "chorus_1");
         CHECK(chart->parts.count(Part::Guitar));
         const Difficulty &x = chart->parts.at(Part::Guitar)[3];
-        CHECK(x.gems.size() == 10u);
+        CHECK(x.gems.size() == 12u);
+        CHECK(at(x, 3840) && at(x, 3840)->kind == Kind::Tap && at(x, 3960) && at(x, 3960)->kind == Kind::Tap);
         CHECK(at(x, 3480) && at(x, 3480)->kind == Kind::Strum);
         CHECK(at(x, 0) && at(x, 0)->longest() == 60u);
         CHECK(at(x, 120) && at(x, 120)->kind == Kind::Hopo && !at(x, 120)->forced);
