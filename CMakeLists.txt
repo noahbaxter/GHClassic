@@ -493,6 +493,7 @@ set(GHC_GAME_SOURCES
     src/host/sdl_devices.cpp
     src/host/seats.cpp
     src/host/update.cpp
+    src/host/boot_picture.cpp
     src/host/vulkan_frontend.cpp
     src/host/vma.cpp
     src/host/scene_renderer.cpp
