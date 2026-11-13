@@ -418,20 +418,35 @@
    )
 }
 ; The band list, as the game's own (manage_bands.dta) but that a band leads
-; to the campaigns.
+; to the campaigns, and yellow renames one and blue deletes it, as Options'
+; Manage Band did.
 {retype chooseprof_screen
    (
       (panels meta chooseprof_panel helpbar)
       (focus chooseprof_panel)
       (allow_back FALSE)
-      (helpbar
-         (default
-            (
-               (fret1 help_select)
-               (fret2 help_back)
-               (strum help_updown)
-            )
-         )
+      (helpbar (default ((fret1 help_select) (fret2 help_back) (strum help_updown))))
+      (TRANSITION_COMPLETE_MSG {$this help})
+      ; Rename and delete on a band.
+      (help
+         {do
+            ($array)
+            {set $array ()}
+            {resize $array 0}
+            {push_back $array (fret1 help_select)}
+            {push_back $array (fret2 help_back)}
+            {if {! {campaign is_empty_profile {chooseprof_panel get button_idx}}}
+               {push_back $array (fret3 ghc_rename)}
+               {push_back $array (fret4 ghc_delete)}
+            }
+            {push_back $array (strum help_updown)}
+            {helpbar set_display $array}
+         }
+      )
+      ; After the panel's own, which keeps the row.
+      (FOCUS_MSG
+         {script_task (delay 0) (units kTaskUISeconds) (script {chooseprof_screen help})}
+         kDataUnhandled
       )
       (SELECT_START_MSG
          {do
@@ -452,12 +467,34 @@
          kDataUnhandled
       )
       (BUTTON_DOWN_MSG
-         {if {== $button kPad_Tri}
-            {$this backwards_anim}
-            {synth play_sequence button_back.cue}
-            {ui goto_screen main_screen}
+         {do
+            ($index {chooseprof_panel get button_idx})
+            ($band {&& {! {campaign is_empty_profile $index}} {! {ui in_transition}}})
+            {cond
+               ({== $button kPad_Tri}
+                  {$this backwards_anim}
+                  {synth play_sequence button_back.cue}
+                  {ui goto_screen main_screen}
+                  kDataUnhandled
+               )
+               ({&& $band {== $button kPad_Circle}}
+                  {synth play_sequence button_select}
+                  {nameprof_screen set profile_slot $index}
+                  {nameprof_screen set back_screen chooseprof_screen}
+                  {nameprof_screen set next_screen chooseprof_screen}
+                  {nameprof_screen set initial_text {campaign profile_name $index}}
+                  {nameprof_screen set is_editing TRUE}
+                  {ui goto_screen nameprof_screen}
+                  TRUE
+               )
+               ({&& $band {== $button kPad_Square}}
+                  {synth play_sequence button_select}
+                  {ghc_delete_screen ask band $index {campaign profile_name $index} chooseprof_screen}
+                  TRUE
+               )
+               (TRUE kDataUnhandled)
+            }
          }
-         kDataUnhandled
       )
    )
 }

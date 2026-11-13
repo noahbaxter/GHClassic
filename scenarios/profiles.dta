@@ -5,7 +5,9 @@
 ; Multiplayer's screen opens P2's, only P2's controller working it, and DROP
 ; OUT frees P2's seat. The main menu's corner and Multiplayer's rows show
 ; who holds each seat, and a quickplay high score goes in under the
-; profile's name.
+; profile's name, continuing flushing it. On the list yellow renames a
+; profile and blue deletes one no seat plays as; on the band list a band. A
+; boot's first press skips the list for a controller with a profile.
 #include common/first_boot.dta
 (device guitar)
 (device guitar2)
@@ -65,8 +67,87 @@
 (wait 1)
 (shot list)
 (expect {chooseprof_panel get button_idx} 1)
+; Beta is P1's, so blue does not delete it, but yellow renames it: Alpha's
+; name, any case, is taken; Gamma is not.
+(press blue guitar)
+(wait 0.5)
+(expect {{ui current_screen} name} ghc_profile_screen)
+(press yellow guitar)
+(wait_screen ghc_nameprofile_screen 10)
+(wait 1)
+(expect {{nameprof_panel find profile.ten} get_text} Beta)
+{{nameprof_panel find profile.ten} set_text "alpha"}
+(press start guitar)
+(wait 0.5)
+(expect {{ui current_screen} name} ghc_profile_error_screen)
+(shot name_taken)
+(press green guitar)
+(wait 0.5)
+(expect {{ui current_screen} name} ghc_nameprofile_screen)
+{{nameprof_panel find profile.ten} set_text "Gamma"}
+(press start guitar)
+(wait_screen ghc_profile_screen 10)
+(wait 1)
+(expect {ghc_profile name_of 1} Gamma)
+(expect {ghc_profile name 0} Gamma)
+(shot list_renamed)
+; Alpha's, then blue deletes Gamma, no first: no keeps it, yes deletes it.
+; The title stays the profiles' as the list goes.
 (press up guitar)
 (wait 0.3)
+(record on leaving)
+(press green guitar)
+(wait_screen main_screen 10)
+(wait 0.3)
+(record off)
+(wait 0.5)
+(press start guitar)
+(wait 0.5)
+(press green guitar)
+(wait_screen ghc_profile_screen 10)
+(wait 1)
+(expect {chooseprof_panel get button_idx} 0)
+(press down guitar)
+(wait 0.3)
+(press blue guitar)
+(wait_screen ghc_delete_screen 10)
+(wait 1)
+(shot delete)
+(press green guitar)
+(wait_screen ghc_profile_screen 10)
+(wait 1)
+(expect {ghc_profile named 1} 1)
+(press down guitar)
+(wait 0.3)
+(press blue guitar)
+(wait_screen ghc_delete_screen 10)
+(wait 1)
+(press up guitar)
+(wait 0.3)
+(press green guitar)
+(wait_screen ghc_profile_screen 10)
+(wait 1)
+(expect {ghc_profile named 1} 0)
+(expect {ghc_profile current 0} 0)
+; Beta again, for P2, in the row Gamma left.
+(press down guitar)
+(wait 0.3)
+(press green guitar)
+(wait_screen ghc_nameprofile_screen 10)
+(expect {{nameprof_panel find profile.ten} get_text} "")
+{{nameprof_panel find profile.ten} set_text "Beta"}
+(press start guitar)
+(wait_screen main_screen 10)
+(wait 0.5)
+(expect {ghc_profile name_of 1} Beta)
+(press start guitar)
+(wait 0.5)
+(press green guitar)
+(wait_screen ghc_profile_screen 10)
+(wait 1)
+(press up guitar)
+(wait 0.3)
+(expect {chooseprof_panel get button_idx} 0)
 (press green guitar)
 (wait_screen main_screen 10)
 (wait 0.5)
@@ -147,12 +228,18 @@
 (wait 1)
 (shot highscore)
 (expect {highscore_panel get auto_add} 1)
-(press green guitar)
-(wait_screen complete_screen 30)
+(expect {highscore_panel get placed} 1)
+(expect {highscore_panel get flushed} 0)
 {highscores get_highscore 2 $name $score}
 (expect $name Alpha)
+; Continuing flushes it, then on.
+(press green guitar)
+(wait 0.3)
+(expect {highscore_panel get flushed} 1)
+(expect {{ui current_screen} name} highscore_screen)
+(wait_screen complete_screen 30)
 
-; DROP OUT for P1 goes back to the splash.
+; DROP OUT for P1 goes back to the splash, whose press picks again.
 {ui goto_screen main_screen}
 (wait_screen main_screen)
 (press start guitar)
@@ -161,4 +248,41 @@
 (wait 0.3)
 (press green guitar)
 (wait_screen splash_screen 10)
+(wait 1)
+(press green guitar)
+(wait_screen ghc_profile_screen 10)
+(expect {chooseprof_panel get button_idx} 0)
+; A boot's first press plays as the profile its controller last did.
+{set $ghc_profile_booted FALSE}
+{ui goto_screen splash_screen}
+(wait_screen splash_screen)
+(wait 1)
+(press green guitar)
+(wait_screen main_screen 10)
+(expect {ghc_profile name 0} Alpha)
+
+; The band list renames and deletes a band as Options' Manage Band did.
+{campaign set_profile_name "The Testers" 0}
+{ui goto_screen chooseprof_screen}
+(wait_screen chooseprof_screen)
+(wait 1)
+(press yellow guitar)
+(wait_screen nameprof_screen 10)
+(wait 1)
+(expect {{nameprof_panel find profile.ten} get_text} "The Testers")
+{{nameprof_panel find profile.ten} set_text "The Rest"}
+(press start guitar)
+(wait_screen chooseprof_screen 20)
+(wait 1)
+(expect {campaign profile_name 0} "The Rest")
+(press blue guitar)
+(wait_screen ghc_delete_screen 10)
+(wait 1)
+(shot delete_band)
+(press up guitar)
+(wait 0.3)
+(press green guitar)
+(wait_screen chooseprof_screen 20)
+(wait 1)
+(expect {campaign is_empty_profile 0} 1)
 (quit)

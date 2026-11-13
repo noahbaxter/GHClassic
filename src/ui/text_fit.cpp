@@ -21,45 +21,56 @@ namespace gh2::text_fit
         const Addresses *s_addresses = nullptr;
     }
 
+    namespace
+    {
+        // Where each character of `line` ends, as RndText::GetStringWidth
+        // (0x1dbca0) has it: each one's advance after the one before it
+        // (the first after none), times the size.
+        std::vector<float> ends(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t font,
+                                const std::string &line, float size)
+        {
+            const auto byte = [](char x) { return static_cast<uint32_t>(static_cast<int32_t>(static_cast<signed char>(x))); };
+            std::vector<float> out;
+            char before = 0;
+            for (const char c : line)
+            {
+                runtime->callGuestFunction(rdram, ctx, s_addresses->rndFontCharAdvance, {font, byte(before), byte(c)});
+                out.push_back((out.empty() ? 0.0f : out.back()) + ctx->f[0] * size);
+                before = c;
+            }
+            return out;
+        }
+
+        uint32_t fontOf(uint8_t *rdram, uint32_t text)
+        {
+            return text != 0u ? load<uint32_t>(rdram, text + ::milo::text::kFont) : 0u;
+        }
+
+        float width(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t text, const std::string &line,
+                    float size)
+        {
+            const uint32_t font = fontOf(rdram, text);
+            const auto at = font != 0u ? ends(rdram, ctx, runtime, font, line, size) : std::vector<float>{};
+            return at.empty() ? 0.0f : at.back();
+        }
+    }
+
     std::string fit(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t text, const std::string &line,
                     float size, float room)
     {
-        const uint32_t font = text != 0u ? load<uint32_t>(rdram, text + ::milo::text::kFont) : 0u;
+        const uint32_t font = fontOf(rdram, text);
         if (font == 0u || line.empty())
             return line;
-        // As RndText::GetStringWidth (0x1dbca0) has it: each character's
-        // advance after the one before it (the first after none), times
-        // the size.
-        const auto advance = [&](char before, char c)
-        {
-            const auto byte = [](char x) { return static_cast<uint32_t>(static_cast<int32_t>(static_cast<signed char>(x))); };
-            runtime->callGuestFunction(rdram, ctx, s_addresses->rndFontCharAdvance, {font, byte(before), byte(c)});
-            return ctx->f[0] * size;
-        };
-        std::vector<float> ends;
-        float end = 0.0f;
-        char before = 0;
-        for (const char c : line)
-        {
-            end += advance(before, c);
-            ends.push_back(end);
-            before = c;
-        }
-        if (end <= room)
+        const std::vector<float> at = ends(rdram, ctx, runtime, font, line, size);
+        if (at.back() <= room)
             return line;
         // Windows-1252's ellipsis, where the font has it.
         const uint32_t chars = load<uint32_t>(rdram, font + ::milo::font::kChars);
         const bool own = chars != 0u && std::strchr(reinterpret_cast<const char *>(getMemPtr(rdram, chars)), '\x85');
         const std::string ellipsis = own ? "\x85" : "...";
-        float tail = 0.0f;
-        before = 0;
-        for (const char c : ellipsis)
-        {
-            tail += advance(before, c);
-            before = c;
-        }
-        size_t n = ends.size();
-        while (n > 0u && ends[n - 1u] + tail > room)
+        const float tail = ends(rdram, ctx, runtime, font, ellipsis, size).back();
+        size_t n = at.size();
+        while (n > 0u && at[n - 1u] + tail > room)
             --n;
         while (n > 0u && line[n - 1u] == ' ')
             --n;
@@ -124,6 +135,8 @@ namespace gh2::text_fit
         //                                            font at its own size
         //                                            times that, as
         //                                            get_string_width
+        //   {text_fit width <text> <Text> <size>}    its width, as fit_text
+        //                                            measures it
         //   {text_fit marquee <text> <Text> <size> <width> <step>}  that at
         //                                            the nth step of
         //                                            scrolling along it, where
@@ -158,9 +171,9 @@ namespace gh2::text_fit
                     }
                 return call.word(text);
             }
-            if (op != "fit_text" && op != "marquee" && op != "wrap")
+            if (op != "fit_text" && op != "marquee" && op != "wrap" && op != "width")
             {
-                std::cerr << "[text_fit] usage: {text_fit upper <text>}, "
+                std::cerr << "[text_fit] usage: {text_fit upper <text>}, {text_fit width <text> <Text> <size>}, "
                              "{text_fit fit_text|marquee|wrap <text> <Text|label> <size> <width> ...}"
                           << std::endl;
                 return {};
@@ -181,6 +194,8 @@ namespace gh2::text_fit
             constexpr uint32_t kTextSize = 0x150u;
             const float size = call.number(4) * (ownText && text != 0u ? load<float>(call.rdram, text + kTextSize) : 1.0f);
             const float room = call.number(5);
+            if (op == "width")
+                return script::floatNode(width(call.rdram, call.ctx, call.runtime, text, call.text(2), size));
             std::string out;
             if (op == "marquee")
             {

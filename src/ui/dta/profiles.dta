@@ -1,7 +1,8 @@
 ; Who plays (save/profiles.h). The splash's press picks P1's profile on the
 ; profile screen, GH2's band list made one of profiles: each a row, a free
 ; one NEW PROFILE, GUEST last. NEW PROFILE names one on GH2's band naming
-; screen, as the profile naming screen. On the main menu and Multiplayer's
+; screen, as the profile naming screen; yellow renames one there, blue
+; deletes one once asked. On the main menu and Multiplayer's
 ; screen a player's Start dims the screen and opens their menu (picker.dta's
 ; list, as a menu), their profile over it: CHANGE PROFILE goes to the profile
 ; screen, DROP OUT sends P1 back to the splash and frees any other seat.
@@ -37,7 +38,7 @@
       ; bar's, the title's height over the list, and the corner's left edge
       ; (16:9 and 4:3), top and row height (x right, z up, the screen's
       ; middle 0).
-      (texts (prof_title.txt prof_p0.txt prof_p1.txt))
+      (texts (prof_title.txt prof_p0.txt prof_p1.txt prof_name.txt))
       (title_size 1.8)
       (title_gap 34)
       (badge_size 1.1)
@@ -95,6 +96,38 @@
       (hide
          {ghc_box_show $this prof_dim FALSE}
          {prof_title.txt set_showing FALSE}
+         {prof_name.txt set_showing FALSE}
+      )
+      ; A name typed in, under a dialog's message, at the poster's tilt, on
+      ; one line: the first size and height that fit the poster's width,
+      ; else the last height at whatever size does.
+      (name_width 300)
+      (name_fits ((2 0) (1.6 4)))
+      (show_name
+         ($text)
+         {do
+            ($x 0) ($y 0) ($z 0)
+            {{dialog find dl_message.lbl} get_world_rot $x $y $z}
+            {prof_name.txt set_local_rot $x $y $z}
+         }
+         {do
+            ($i 0)
+            ($wide {text_fit width $text prof_name.txt 1})
+            {while
+               {&& {< $i {'-' {size [name_fits]} 1}}
+                   {> {* $wide {elem {elem [name_fits] $i} 0}} [name_width]}}
+               {++ $i}
+            }
+            {do
+               ($size {min {elem {elem [name_fits] $i} 0} {/ [name_width] $wide}})
+               {prof_name.txt set_wrap_width 10000}
+               {prof_name.txt set_text $text}
+               {prof_name.txt set_local_scale $size $size $size}
+               {prof_name.txt set_align 18} ; kTopCenter
+               {prof_name.txt set_local_pos 0 0 {elem {elem [name_fits] $i} 1}}
+            }
+         }
+         {prof_name.txt set_showing TRUE}
       )
       (paint_badges
          {foreach_int $i 0 2
@@ -213,6 +246,9 @@
                ($btn {chooseprof_panel find {sprintf "cp_band%d.btn" $i}})
                {cond
                   ({== $i [guest_row]} {$btn set_text ghc_guest})
+                  ; One a seat plays as is marked as the corner marks it.
+                  ({>= {ghc_profile seat_of $i} 0}
+                     {$btn set_localized_text {ghc_profile badge {ghc_profile seat_of $i}}})
                   ({ghc_profile named $i} {$btn set_localized_text {ghc_profile name_of $i}})
                   (TRUE {$btn set_text ghc_new_profile})
                }
@@ -229,6 +265,29 @@
          {ghc_profile hold 0}
          {{chooseprof_panel find cp_title.lbl} set_text choose_band}
       )
+      (TRANSITION_COMPLETE_MSG {$this help})
+      ; Rename on a profile, delete on one no seat plays as.
+      (help
+         {do
+            ($row {chooseprof_panel get button_idx})
+            ($array)
+            {set $array ()}
+            {resize $array 0}
+            {push_back $array (fret1 help_select)}
+            {push_back $array (fret2 help_back)}
+            {if {ghc_profile named $row}
+               {push_back $array (fret3 ghc_rename)}
+               {if {< {ghc_profile seat_of $row} 0} {push_back $array (fret4 ghc_delete)}}
+            }
+            {push_back $array (strum help_updown)}
+            {helpbar set_display $array}
+         }
+      )
+      ; After the panel's own, which keeps the row.
+      (FOCUS_MSG
+         {script_task (delay 0) (units kTaskUISeconds) (script {ghc_profile_screen help})}
+         kDataUnhandled
+      )
       (SELECT_START_MSG
          {do
             ($row {chooseprof_panel get button_idx})
@@ -241,34 +300,56 @@
                   {ghc_profile pick [seat] $row}
                   {ui goto_screen [next_screen]}
                )
-               (TRUE {ui goto_screen ghc_nameprofile_screen})
+               (TRUE
+                  {ghc_nameprofile_screen set row -1}
+                  {ui goto_screen ghc_nameprofile_screen}
+               )
             }
          }
          kDataUnhandled
       )
-      ; Only the player picking moves it.
+      ; Only the player picking moves it. Yellow renames a profile, blue
+      ; deletes one no seat plays as.
       (BUTTON_DOWN_MSG
-         {cond
-            ({!= $player_num [seat]} TRUE)
-            ({== $button kPad_Tri}
-               {$this backwards_anim}
-               {synth play_sequence button_back.cue}
-               {ui goto_screen [back_screen]}
-               kDataUnhandled
-            )
-            (TRUE kDataUnhandled)
+         {do
+            ($row {chooseprof_panel get button_idx})
+            ($named {&& {ghc_profile named $row} {! {ui in_transition}}})
+            ($idle {&& $named {< {ghc_profile seat_of $row} 0}})
+            {cond
+               ({!= $player_num [seat]} TRUE)
+               ({== $button kPad_Tri}
+                  {$this backwards_anim}
+                  {synth play_sequence button_back.cue}
+                  {ui goto_screen [back_screen]}
+                  kDataUnhandled
+               )
+               ({&& $named {== $button kPad_Circle}}
+                  {synth play_sequence button_select}
+                  {ghc_nameprofile_screen set row $row}
+                  {ui goto_screen ghc_nameprofile_screen}
+                  TRUE
+               )
+               ({&& $idle {== $button kPad_Square}}
+                  {synth play_sequence button_select}
+                  {ghc_delete_screen ask profile $row {ghc_profile name_of $row} $this}
+                  TRUE
+               )
+               (TRUE kDataUnhandled)
+            }
          }
       )
    )
 }
 ; GH2's band naming (manage_bands.dta's nameprof_screen) for a profile: its
-; panel and text entry, named for ghc_profile_screen's seat.
+; panel and text entry, naming a new one for ghc_profile_screen's seat, or
+; with (row) a profile's, renaming it.
 {if {! {exists ghc_nameprofile_screen}} {new GHScreen ghc_nameprofile_screen}}
 {retype ghc_nameprofile_screen
    (
       (panels meta nameprof_panel helpbar)
       (focus nameprof_panel)
       (allow_back FALSE)
+      (row -1)
       (enter
          {ghc_profile hold 1}
          {{nameprof_panel find nameprof.view} set_frame 0}
@@ -276,8 +357,8 @@
          {{nameprof_panel find nameprof.view} animate (period 1) (range 0 100)}
          {nameprof_screen set prof_ten {nameprof_panel find profile.ten}}
          {nameprof_screen set zoom_tnm {nameprof_panel find nameprof.tnm}}
-         {{nameprof_panel find profile.ten} set_text ""}
-         {{nameprof_panel find nameprof.tnm} set_frame 0}
+         {{nameprof_panel find profile.ten} set_text {ghc_profile name_of [row]}}
+         {{nameprof_panel find nameprof.tnm} set_frame {{nameprof_panel find profile.ten} length}}
          {{nameprof_panel find sp_title.lbl} set_text ghc_name_profile}
          {{nameprof_panel find np_editlater.lbl} set_showing FALSE}
       )
@@ -290,8 +371,13 @@
          {do
             ($name {{nameprof_panel find profile.ten} get_text})
             {cond
-               ({== $name ""} {ui push_screen error_no_profile_screen})
-               ({ghc_profile taken $name} {ui push_screen error_duplicate_profile_screen})
+               ({== $name ""} {ghc_profile_error_screen show ghc_no_profile})
+               ({ghc_profile taken $name [row]} {ghc_profile_error_screen show ghc_duplicate_profile})
+               ({>= [row] 0}
+                  {ghc_profile rename [row] $name}
+                  {synth play_sequence button_select}
+                  {ui goto_screen ghc_profile_screen}
+               )
                (TRUE
                   {ghc_profile make {ghc_profile_screen get seat} $name}
                   {synth play_sequence button_select}
@@ -328,5 +414,108 @@
       (SELECT_START_MSG {helpbar set_display {nameprof_screen get_help_text ()}} kDataUnhandled)
       (SELECT_MSG {synth play_sequence button_select})
       (SCREEN_BACK_MSG {helpbar set_display {nameprof_screen get_help_text ()}} kDataUnhandled)
+   )
+}
+; GH2's naming errors (error.dta's), of a profile: {ghc_profile_error_screen
+; show ghc_no_profile} puts up that title over its _msg.
+{if {! {exists ghc_profile_error_screen}} {new GHScreen ghc_profile_error_screen}}
+{retype ghc_profile_error_screen
+   (
+      (panels dialog)
+      (focus dialog)
+      (allow_back FALSE)
+      (animate_transition FALSE)
+      (helpbar (default ((fret1 help_continue))))
+      (error ghc_no_profile)
+      (show ($error) {set [error] $error} {ui push_screen $this})
+      (enter
+         {$this set_focus {dialog find dl_button1.btn}}
+         {{dialog find dl_button1.btn} set_text CONTINUE}
+         {{dialog find dl_button2.btn} set_showing FALSE}
+         {{dialog find dl_button2.btn} set_state kDisabled}
+         {{dialog find dl_title.lbl} set_text [error]}
+         {{dialog find dl_message.lbl} set_text {symbol {sprint [error] "_msg"}}}
+      )
+      (SELECT_START_MSG {if {== $component {dialog find dl_button1.btn}} {ui pop_screen}})
+   )
+}
+; Deleting a profile or a band, yes or no, no first: {ghc_delete_screen ask
+; <profile|band> <row> <name> <back>}, back to <back> either way.
+{if {! {exists ghc_delete_screen}} {new GHScreen ghc_delete_screen}}
+{retype ghc_delete_screen
+   (
+      (panels meta dialog ghc_profile_panel helpbar)
+      (focus dialog)
+      (allow_back FALSE)
+      (animate_transition FALSE)
+      (kind profile)
+      (row 0)
+      (name "")
+      (back ghc_profile_screen)
+      ; YES lifted off NO by this, the dialog's own height kept to put back.
+      (yes_lift 10)
+      (yes_z none)
+      (ask
+         ($kind $row $name $back)
+         {set [kind] $kind}
+         {set [row] $row}
+         {set [name] $name}
+         {set [back] $back}
+         {ui goto_screen $this}
+      )
+      (enter
+         {if {== [kind] profile} {ghc_profile hold 1}}
+         {foreach $b (button1 button2)
+            {do
+               ($btn {dialog find {sprint "dl_" $b ".btn"}})
+               {$btn set_showing TRUE}
+               {$btn set_state kNormal}
+               {$btn set_text {if_else {== $b button1} yes no}}
+            }
+         }
+         {do
+            ($x 0) ($y 0) ($z 0)
+            ($yes {dialog find dl_button1.btn})
+            {$yes get_local_pos $x $y $z}
+            {if {== [yes_z] none} {set [yes_z] $z}}
+            {$yes set_local_pos $x $y {'+' [yes_z] [yes_lift]}}
+         }
+         {dialog set_focus {dialog find dl_button2.btn}}
+         {{dialog find dl_button2.btn} set_state kFocused}
+         {{dialog find dl_title.lbl} set_text {symbol {sprint ghc_delete_ [kind]}}}
+         {{dialog find dl_message.lbl} set_text {symbol {sprint ghc_delete_ [kind] _msg}}}
+         {ghc_profile_panel show_name [name]}
+         {helpbar set_display ((fret1 help_select) (fret2 help_back) (strum help_updown))}
+      )
+      (exit
+         {if {== [kind] profile} {ghc_profile hold 0}}
+         {ghc_profile_panel hide}
+         {do
+            ($x 0) ($y 0) ($z 0)
+            ($yes {dialog find dl_button1.btn})
+            {$yes get_local_pos $x $y $z}
+            {$yes set_local_pos $x $y [yes_z]}
+         }
+      )
+      (SELECT_START_MSG
+         {cond
+            ({!= $component {dialog find dl_button1.btn}} {ui goto_screen [back]})
+            ({== [kind] profile} {ghc_profile delete [row]} {ui goto_screen [back]})
+            (TRUE {campaign delete_slot [row]} {autosave_goto [back]})
+         }
+         kDataUnhandled
+      )
+      ; A profile's only by the player whose list it came from.
+      (BUTTON_DOWN_MSG
+         {cond
+            ({&& {== [kind] profile} {!= $player_num {ghc_profile_screen get seat}}} TRUE)
+            ({== $button kPad_Tri}
+               {synth play_sequence button_back.cue}
+               {ui goto_screen [back]}
+               TRUE
+            )
+            (TRUE kDataUnhandled)
+         }
+      )
    )
 }

@@ -115,6 +115,9 @@ namespace gh2::save
     // the game's first save carries it.
     const Section *keptSection(const std::string &name);
     void keepSection(const std::string &name, const std::function<void(Section &)> &change);
+    // Every one of GH Classic's own whose name starts with `prefix` gone, as
+    // keepSection would.
+    void dropSections(const std::string &prefix);
 
     // Every song's best (save/best.h), as profile `profile` (from 0) keeps
     // it, in solo or a multiplayer mode (bestSection). A best kept is the

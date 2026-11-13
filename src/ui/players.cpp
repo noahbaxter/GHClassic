@@ -53,7 +53,10 @@ namespace gh2
         // {ghc_profile current <seat>}: the seat's profile, -1 for a guest.
         // {ghc_profile badge <seat>}: "P1  Noah", "P1  GUEST", "" for none.
         // {ghc_profile pick <seat> <row>}: it plays as that one, -1 a guest.
-        // {ghc_profile taken <name>}: whether a profile has it, any case.
+        // {ghc_profile taken <name> [<row>]}: whether a profile has it, any
+        //   case, but for the one in <row>.
+        // {ghc_profile seat_of <row>}: the seat that plays as it, -1 for none.
+        // {ghc_profile rename <row> <name>}, {ghc_profile delete <row>}.
         // {ghc_profile make <seat> <name>}: a new profile it plays as, in the
         //   first free row, so the profiles stay at the top.
         // {ghc_profile hold <0|1>}: a menu is up, so no controller takes,
@@ -95,8 +98,29 @@ namespace gh2
             if (op == "taken")
             {
                 const std::string name = lower(call.text(2));
-                return number(std::any_of(profiles.names.begin(), profiles.names.end(),
-                                          [&](const std::string &p) { return !p.empty() && lower(p) == name; }));
+                const int except = call.size() > 3 ? static_cast<int>(call.number(3)) : -1;
+                for (int row = 0; row < save::kProfiles; ++row)
+                    if (row != except && profiles.here(row) && lower(profiles.names[static_cast<size_t>(row)]) == name)
+                        return number(1);
+                return number(0);
+            }
+            if (op == "seat_of")
+            {
+                for (int seat = 0; seat < kPlayers; ++seat)
+                    if (save::seatProfile(seat) == n)
+                        return number(seat);
+                return number(-1);
+            }
+            if (op == "rename")
+            {
+                if (profiles.here(n))
+                    save::nameProfile(n, call.text(3));
+                return {};
+            }
+            if (op == "delete")
+            {
+                save::deleteProfile(n);
+                return {};
             }
             if (op == "make")
             {
@@ -204,6 +228,18 @@ namespace gh2
         locale::add("ghc_guest", "guest");
         locale::add("ghc_profile_change", "CHANGE PROFILE");
         locale::add("ghc_profile_drop", "DROP OUT");
+        locale::add("ghc_rename", "RENAME");
+        locale::add("ghc_delete", "DELETE");
+        locale::add("ghc_delete_profile", "DELETE PROFILE");
+        locale::add("ghc_delete_profile_msg", "Are you sure you want to delete this profile?");
+        locale::add("ghc_delete_band", "DELETE BAND");
+        locale::add("ghc_delete_band_msg", "Are you sure you want to delete this band?");
+        // GH2's own (locale.dta's no_profile and duplicate_profile), of profiles.
+        locale::add("ghc_no_profile", "NO PROFILE");
+        locale::add("ghc_no_profile_msg", "Please enter a PROFILE NAME.");
+        locale::add("ghc_duplicate_profile", "DUPLICATE PROFILE");
+        locale::add("ghc_duplicate_profile_msg",
+                    "The PROFILE NAME you entered already exists. Please enter a different PROFILE NAME.");
         script::patchUi(kPlayersDta);
         // Multiplayer's help bar (players.dta).
         locale::add("ghc_players_reorder", "REORDER");

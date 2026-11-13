@@ -918,6 +918,18 @@ namespace gh2::save
             std::cerr << "[save] could not write " << path() << std::endl;
     }
 
+    void dropSections(const std::string &prefix)
+    {
+        const auto mine = [&](const std::string &name) { return name.starts_with(prefix); };
+        s_store.removeIf(mine);
+        Store disk;
+        if (s_inMemory || readFile(path(), disk) != ReadResult::kOk)
+            return;
+        disk.removeIf(mine);
+        if (!writeFile(path(), disk))
+            std::cerr << "[save] could not write " << path() << std::endl;
+    }
+
     std::optional<Best> keptBest(const std::string &key, std::optional<int> profile, const std::string &mode)
     {
         const Section *section = profile ? keptSection(bestSection(profile, mode)) : nullptr;

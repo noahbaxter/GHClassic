@@ -44,6 +44,14 @@ namespace gh2::save
                 return std::nullopt;
             return profile;
         }
+
+        // Each controller that played as `was` plays as `now`.
+        void remap(const std::string &was, const std::string &now)
+        {
+            for (const auto &[device, kept] : stateSection(kSection))
+                if (kept == was)
+                    keepState(kSection, device, now);
+        }
     }
 
     std::optional<int> Profiles::free() const
@@ -70,7 +78,25 @@ namespace gh2::save
     {
         if (profile < 0 || profile >= kProfiles)
             return;
+        const Profiles was = profiles();
         keepSection(kSection, [&](Section &section) { section.set(std::to_string(profile + 1), name); });
+        if (was.here(profile))
+            remap(profileText(was, profile), profileText(profiles(), profile));
+    }
+
+    void deleteProfile(int profile)
+    {
+        const Profiles was = profiles();
+        if (!was.here(profile))
+            return;
+        remap(profileText(was, profile), kGuest);
+        keepSection(kSection,
+                    [&](Section &section)
+                    {
+                        std::erase_if(section.values,
+                                      [&](const auto &value) { return value.first == std::to_string(profile + 1); });
+                    });
+        dropSections("profile " + std::to_string(profile + 1) + " ");
     }
 
     namespace
