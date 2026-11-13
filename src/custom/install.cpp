@@ -18,7 +18,6 @@
 #include "settings/settings.h"
 
 #include <algorithm>
-#include <atomic>
 #include <chrono>
 #include <iostream>
 #include <map>
@@ -150,21 +149,25 @@ namespace gh2
                         ScanStatus &status = scanStatus();
                         status.expected = known.size();
                         status.running = true;
-                        // The list made again here every half second as
-                        // songs are found, by whichever finder comes to it.
-                        using Clock = std::chrono::steady_clock;
-                        const Clock::rep half = Clock::duration(std::chrono::milliseconds(500)).count();
-                        std::atomic<Clock::rep> due{0};
+                        // The list made again every half second while the
+                        // scan runs, here and not by a finder: one that
+                        // waits on a slow folder leaves none of what came
+                        // before it unlisted.
+                        std::thread ticker([&]
+                                           {
+                                               while (status.running)
+                                               {
+                                                   std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                                                   catalog().refresh();
+                                               }
+                                           });
                         const std::vector<Song> scanned = scan(folders, known, 32u, [&](const Song &s)
                                                                {
                                                                    catalog().put(s);
                                                                    ++status.seen;
-                                                                   const Clock::rep now = Clock::now().time_since_epoch().count();
-                                                                   Clock::rep at = due;
-                                                                   if (now >= at && due.compare_exchange_strong(at, now + half))
-                                                                       catalog().refresh();
                                                                });
                         status.running = false;
+                        ticker.join();
                         catalog().keepOnly(scanned);
                         catalog().refresh();
                         writeIndex(index, scanned);

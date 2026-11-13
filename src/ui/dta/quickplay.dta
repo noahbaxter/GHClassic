@@ -444,6 +444,32 @@
             {ghc_info_show $this}
          }
          {if {&& {! $ghc_info_due} {$this find ghc_info_0.lbl FALSE}} {ghc_info_art $this}}
+         ; Songs a scan finds or loses since the list filled, put in while
+         ; it rests (content/setlists.h).
+         {if {&& {! $ghc_scroll_rushing} {setlist stale}} {$this ghc_renew}}
+      )
+      ; The list filled again with the same song on, where it was on the
+      ; screen; one gone leaves the highlight on the row there.
+      (ghc_renew
+         {do
+            ($pos {ss_song.lst selected_pos})
+            ($song {game get_song})
+            {ss_song.lst set_provider song_provider}
+            {do
+               ($row {setlist song})
+               {if_else {&& {>= $row 0} {== {song_provider get_symbol $row} $song}}
+                  {do
+                     {ss_song.lst set_selected $row}
+                     {game set_song_index $row}
+                     {$this ghc_frame $row}
+                  }
+                  {do
+                     {ss_song.lst set_selected $pos}
+                     {$this update_pos}
+                  }
+               }
+            }
+         }
       )
       ; To a tier's first song (orange, custom songs' sections), or to a
       ; song at random (Select's menu).
@@ -480,21 +506,25 @@
             ; Laying out the paper takes longer than a frame: while the list
             ; rushes by, only once it slows (poll).
             {if_else $ghc_scroll_rushing {set $ghc_info_due TRUE} {ghc_info_show $this}}
-            ; Paper made endless (content/setlist_paper.cpp) is framed from the
-            ; setlist's top, its sheets and doodles put on ahead.
-            {if_else {> {sel_song.view end_frame} 100}
-               {do
-                  {sel_song.view set_frame {setlist frame $pos}}
-                  {foreach $piece $ghc_paper
-                     {if {$this find $piece FALSE}
-                        {setlist paper_pose $piece {$this find $piece}}
-                        {{$this find $piece} set_local_pos {setlist paper $piece x} 0 {setlist paper $piece z}}
-                     }
+            {$this ghc_frame $pos}
+         }
+      )
+      ; Paper made endless (content/setlist_paper.cpp) is framed from the
+      ; setlist's top, its sheets and doodles put on ahead.
+      (ghc_frame
+         ($pos)
+         {if_else {> {sel_song.view end_frame} 100}
+            {do
+               {sel_song.view set_frame {setlist frame $pos}}
+               {foreach $piece $ghc_paper
+                  {if {$this find $piece FALSE}
+                     {setlist paper_pose $piece {$this find $piece}}
+                     {{$this find $piece} set_local_pos {setlist paper $piece x} 0 {setlist paper $piece z}}
                   }
                }
-               {sel_song.view set_frame
-                  {+ $pos {song_provider num_headers $pos} {switch {setlist shown} (gh1 1) 0}}
-               }
+            }
+            {sel_song.view set_frame
+               {+ $pos {song_provider num_headers $pos} {switch {setlist shown} (gh1 1) 0}}
             }
          }
       )

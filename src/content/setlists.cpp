@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstring>
 #include <iostream>
 #include <map>
@@ -86,6 +87,7 @@ namespace gh2::setlists
         // What the song list shows, when it is ours: each row's tier, and
         // whether it can be picked.
         const Setlist *s_shown = nullptr;
+        std::chrono::steady_clock::time_point s_filled; // when last filled
         std::vector<size_t> s_rowTiers;
         std::vector<bool> s_rowActive;
 
@@ -252,6 +254,7 @@ namespace gh2::setlists
             const uint32_t provider = GPR_U32(ctx, 4);
             s_provider = provider;
             s_shown = ours(rdram, provider);
+            s_filled = std::chrono::steady_clock::now();
             s_rowTiers.clear();
             s_rowActive.clear();
             if (!s_shown)
@@ -469,6 +472,15 @@ namespace gh2::setlists
                 return {symbol(call.rdram, call.ctx, call.runtime, selected()), script::kSymbol};
             if (op == "has")
                 return {has(call.symbol(2)) ? 1u : 0u, script::kInt};
+            // A live one's rows changed since the list filled: at most once
+            // a second, as filling takes most of a frame.
+            if (op == "stale")
+            {
+                const bool stale = s_shown && s_shown->live.rows &&
+                                   std::chrono::steady_clock::now() - s_filled >= std::chrono::seconds(1) &&
+                                   s_shown->live.rows() != s_windows[selected()].from;
+                return {stale ? 1u : 0u, script::kInt};
+            }
             // The text of the shown one's window's header (a live one's).
             if (op == "header")
             {
