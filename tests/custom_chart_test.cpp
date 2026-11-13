@@ -712,11 +712,13 @@ namespace
             { return std::find(texts.begin(), texts.end(), std::pair{tick, text}) != texts.end(); };
             CHECK(hasText(16u * 480u, "[wail_on]") && hasText(32u * 480u, "[wail_off]"));
             CHECK(!notesOf(guitar, 40u, 59u).empty());
+            // The backbeat is GH2's active clips, [play]; [allbeat] hits
+            // the snare on every beat.
             const std::vector<std::pair<uint32_t, std::string>> beats = {
-                {0u, "[allbeat]"}, {4u * 1920u, "[half_time]"}, {7u * 1920u, "[allbeat]"}};
+                {0u, "[play]"}, {4u * 1920u, "[half_time]"}, {7u * 1920u, "[play]"}};
             std::vector<std::pair<uint32_t, std::string>> drummed;
             for (const auto &t : textsOf(band[0]))
-                if (t.second != "[play]" && t.second != "[idle]")
+                if (t.second != "[idle]")
                     drummed.push_back(t);
             CHECK(drummed == beats);
         }
@@ -1081,13 +1083,18 @@ namespace
         const std::vector<std::pair<uint32_t, std::string>> sung = {
             {1920u, "[play]"}, {5760u, "[idle]"}, {9600u, "[play]"}, {10560u, "[idle]"}};
         CHECK(singer == sung);
-        // No drums: a kick each beat while the band plays.
-        int kicks = 0, keys = 0;
-        for (const midi::Event &e : band[0].events)
-            kicks += midi::kind(e) == midi::kNoteOn && e.data[0] == 36u;
+        // No drums: a rock beat while the band plays, kicks on 1 and 3
+        // and GH2's active clips' snare on 2 and 4, never [allbeat]'s on
+        // every beat.
+        int keys = 0;
         for (const midi::Event &e : band[3].events)
             keys += midi::kind(e) == midi::kNoteOn && e.data[0] == 48u;
-        CHECK(kicks == 63); // beats 0 to 62, the last note's
+        std::vector<uint32_t> rock;
+        for (uint32_t t = 0; t <= 62u * 480u; t += 960u) // to the last note's beat
+            rock.push_back(t);
+        CHECK(notesOf(band[0], 36u, 36u) == rock);
+        for (const auto &[tick, text] : textsOf(band[0]))
+            CHECK(text == "[play]" || text == "[idle]");
 
         CHECK(keys == 16);
         CHECK(!textsOf(guitar).empty() && textsOf(guitar).front().second == "[play]");

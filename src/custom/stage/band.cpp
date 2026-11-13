@@ -11,13 +11,20 @@ namespace gh2::custom
 {
     namespace
     {
-        // Every beat within the runs.
-        std::vector<uint32_t> beatsIn(const std::vector<Span> &playing)
+        // A rock beat's kicks: each bar's beats 1 and 3 (every other beat)
+        // within the runs.
+        std::vector<uint32_t> rockKicks(const std::vector<Span> &playing, const std::vector<uint32_t> &bars, uint32_t end,
+                                        const BandBeatLengths &beats)
         {
             std::vector<uint32_t> out;
-            for (const Span &r : playing)
-                for (uint32_t t = nextBeat(r.tick); t <= r.tick + r.length; t += kBeat)
-                    out.push_back(t);
+            for (size_t b = 0; b < bars.size(); ++b)
+            {
+                const uint32_t to = b + 1u < bars.size() ? bars[b + 1u] : end;
+                for (uint32_t t = bars[b]; t < to; t += 2u * beatAt(beats, bars[b]))
+                    if (std::any_of(playing.begin(), playing.end(),
+                                    [&](const Span &r) { return t >= r.tick && t <= r.tick + r.length; }))
+                        out.push_back(t);
+            }
             return out;
         }
 
@@ -311,20 +318,24 @@ namespace gh2::custom
 
         enum class DrumPattern
         {
+            Normal,
             All,
             Double,
             Half,
             Nobeat,
         };
 
-        constexpr const char *kPatternTexts[] = {"[allbeat]", "[double_time]", "[half_time]", "[nobeat]"}; // by DrumPattern
+        // By DrumPattern. [play] sets GH2's drummer back to its active
+        // clips, the snare on 2 and 4.
+        constexpr const char *kPatternTexts[] = {"[play]", "[allbeat]", "[double_time]", "[half_time]", "[nobeat]"};
 
         // A bar's drum pattern from its snares, as GH2's drummer clips
-        // (kBandAllbeat, kBandDouble, kBandHalf, kBandNosnare):
-        //   no snares                                       [nobeat]
-        //   one on every beat, or two or more off the beat  [double_time]
-        //   on beat 3 of a 4-beat bar but not 2 or 4        [half_time]
-        //   anything else, a backbeat                       [allbeat]
+        // (kBandActive, kBandAllbeat, kBandDouble, kBandHalf, kBandNosnare):
+        //   no snares                                     [nobeat]
+        //   one on every beat                             [allbeat]
+        //   two or more off the beat                      [double_time]
+        //   on beat 3 of a 4-beat bar but not 2 or 4      [half_time]
+        //   anything else, a backbeat                     [play]
         // `length` is the band's beat.
         DrumPattern barPattern(const std::vector<uint32_t> &snares, uint32_t from, uint32_t to, uint32_t length)
         {
@@ -344,25 +355,21 @@ namespace gh2::custom
             }
             if (count == 0u)
                 return DrumPattern::Nobeat;
-            if (std::count(on.begin(), on.end(), true) == static_cast<std::ptrdiff_t>(beatsInBar) || offbeats >= 2u)
+            if (offbeats >= 2u)
                 return DrumPattern::Double;
+            if (std::count(on.begin(), on.end(), true) == static_cast<std::ptrdiff_t>(beatsInBar))
+                return DrumPattern::All;
             if (beatsInBar == 4u && on[2] && !on[1] && !on[3])
                 return DrumPattern::Half;
-            return DrumPattern::All;
+            return DrumPattern::Normal;
         }
 
-        // The drum pattern bar by bar while the drums play, a change kept
-        // only where it holds two bars; [allbeat] at each run's start where
-        // there are no charted drums to say.
+        // The charted drums' pattern bar by bar while they play, a change
+        // kept only where it holds two bars. Each run starts on the active
+        // clips its [play] gives.
         void addDrumPatterns(midi::Track &drums, const std::vector<uint32_t> &bars, const std::vector<uint32_t> &snares,
-                             const std::vector<Span> &drumming, bool charted, uint32_t end, const BandBeatLengths &beats)
+                             const std::vector<Span> &drumming, uint32_t end, const BandBeatLengths &beats)
         {
-            if (!charted)
-            {
-                for (const Span &r : drumming)
-                    drums.events.push_back(midi::text(r.tick, "[allbeat]"));
-                return;
-            }
             for (const Span &r : drumming)
             {
                 std::vector<std::pair<uint32_t, DrumPattern>> run;
@@ -372,12 +379,12 @@ namespace gh2::custom
                     if (to > r.tick && bars[b] <= r.tick + r.length)
                         run.push_back({std::max(bars[b], r.tick), barPattern(snares, bars[b], to, beatAt(beats, bars[b]))});
                 }
-                std::optional<DrumPattern> now;
+                DrumPattern now = DrumPattern::Normal;
                 for (size_t i = 0; i < run.size(); ++i)
                 {
                     const DrumPattern pattern = run[i].second;
                     const bool holds = i + 1u >= run.size() || run[i + 1u].second == pattern;
-                    if (pattern != now && (!now || holds))
+                    if (pattern != now && (i == 0u || holds))
                     {
                         drums.events.push_back(midi::text(run[i].first, kPatternTexts[size_t(pattern)]));
                         now = pattern;
@@ -476,7 +483,8 @@ namespace gh2::custom
                     kicks.push_back(toGh2(m.tick));
         std::sort(kicks.begin(), kicks.end());
         if (kicks.empty())
-            kicks = chart.kicks.empty() ? beatsIn(drumming) : toGh2Sorted(chart.kicks, toGh2);
+            kicks = chart.kicks.empty() ? rockKicks(drumming, band.bars, band.in.end, band.beats)
+                                        : toGh2Sorted(chart.kicks, toGh2);
         const std::vector<Chart::Cue> drummerCues = memberCues(stageTrack(chart, "PART DRUMS"));
         addMemberCues(band.drums, drummerCues, drumming, toGh2);
         for (const uint32_t t : kicks)
@@ -484,10 +492,9 @@ namespace gh2::custom
         // The chart's crashes, else one a section (addSectionCrashes).
         for (const uint32_t t : toGh2Sorted(chart.crashes, toGh2))
             addShortNote(band.drums, t, 37u);
-        if (std::none_of(drummerCues.begin(), drummerCues.end(),
-                         [](const Chart::Cue &c) { return gh2Lane(c.text) == "beat"; }))
-            addDrumPatterns(band.drums, band.bars, toGh2Sorted(chart.snares, toGh2), drumming, !chart.drums.empty(),
-                            band.in.end, band.beats);
+        if (!chart.drums.empty() && std::none_of(drummerCues.begin(), drummerCues.end(),
+                                                 [](const Chart::Cue &c) { return gh2Lane(c.text) == "beat"; }))
+            addDrumPatterns(band.drums, band.bars, toGh2Sorted(chart.snares, toGh2), drumming, band.in.end, band.beats);
         return kicks;
     }
 
