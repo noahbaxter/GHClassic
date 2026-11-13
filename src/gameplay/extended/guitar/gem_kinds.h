@@ -36,7 +36,7 @@ namespace gh2::guitar
     // The lane an open is hammered on as, and drawn on.
     constexpr uint32_t kOpenLane = 2u;
 
-    // The song playing's gem on that track (SongData's), at that tick (GH2's,
+    // The song playing's gem on that track (SongDB's, the player's), at that tick (GH2's,
     // 480 a beat) on those frets as loaded, as its chart has it; none for a
     // song not ours. Before the track's difficulty is known, the first
     // difficulty with such a gem's. And whether it is a tap.
