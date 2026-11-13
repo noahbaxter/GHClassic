@@ -174,7 +174,6 @@
 (wait_screen multi_vs_selsong_screen)
 (wait 1)
 (expect {game get_venue} gh1_small_club_multi)
-(expect {campaigns venue_game} gh1)
 
 ; GH1's setlist, on its twin screen.
 {multi_vs_selsong_screen ghc_picked gh1}
@@ -214,7 +213,6 @@
 
 ; The basement has two walk spots 20 apart, which stacked two guitarists:
 ; the second steps aside across the stage.
-{campaigns venues_from gh1}
 {gamecfg set mode multi_fo}
 {game set_num_players 2}
 {game set_song gh2_shoutatthedevil}

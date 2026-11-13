@@ -16,7 +16,6 @@
 ; The venue's game, GH1's, for the screens.
 (expect {quickplay in_song_ui} venue)
 (expect {note_engine} gh2)
-{campaigns venues_from gh1}
 {ui goto_screen loading_screen}
 (wait 0.5)
 (shot gh1_loading)
@@ -43,7 +42,6 @@
 {gamecfg set mode quickplay}
 {game set_quickplay}
 {game set_venue gh1_basement}
-{campaigns venues_from gh1}
 {ui goto_screen loading_screen}
 (wait 0.5)
 (shot gh2ui_loading)
@@ -66,7 +64,6 @@
 {gamecfg set mode quickplay}
 {game set_quickplay}
 {game set_venue gh2_battle}
-{campaigns venues_from gh2}
 {ui goto_screen loading_screen}
 (wait_screen game_screen 60)
 (expect {campaigns highway} gh2)

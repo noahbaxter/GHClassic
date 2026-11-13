@@ -766,9 +766,8 @@
       (panels meta sel_song_panel helpbar ghc_pick_panel)
       (focus sel_song_panel)
       (sel_song_career FALSE)
-      ; Back from a song in another game's venue (quickplay_pickers.dta), the
-      ; next is GH2's again, and the 360's looks of a 360 song are let go.
-      (enter {campaigns venues_from {campaigns live}} {quickplay next_gen_song 0} {ghc_qp_helpbar})
+      ; Back from a 360 song, its 360 looks are let go.
+      (enter {quickplay next_gen_song 0} {ghc_qp_helpbar})
       (SELECT_START_MSG {ui goto_screen qp_diff_screen} kDataUnhandled)
       (BUTTON_DOWN_MSG {ghc_qp_button $button})
       (ghc_picked ($game) {ghc_qp_picked sel_song_panel qp_selsong_twin_screen $game})
@@ -785,9 +784,8 @@
       (panels meta sel_song_twin_panel helpbar ghc_pick_panel)
       (focus sel_song_twin_panel)
       (sel_song_career FALSE)
-      ; Back from a song in another game's venue (quickplay_pickers.dta), the
-      ; next is GH2's again, and the 360's looks of a 360 song are let go.
-      (enter {campaigns venues_from {campaigns live}} {quickplay next_gen_song 0} {ghc_qp_helpbar})
+      ; Back from a 360 song, its 360 looks are let go.
+      (enter {quickplay next_gen_song 0} {ghc_qp_helpbar})
       (SELECT_START_MSG {ui goto_screen qp_diff_screen} kDataUnhandled)
       (BUTTON_DOWN_MSG {ghc_qp_button $button})
       (ghc_picked ($game) {ghc_qp_picked sel_song_twin_panel qp_selsong_screen $game})

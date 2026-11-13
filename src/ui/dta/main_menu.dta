@@ -49,9 +49,6 @@
       (enter
          {$this add_quit}
          {$this add_version}
-         ; Out of quickplay (quickplay_pickers.dta), whose venue may be another
-         ; game's: GH2's again.
-         {campaigns venues_from {campaigns live}}
          {set $main_entered TRUE}
          {$this reset_player_settings}
          {if {! [already_entered]}

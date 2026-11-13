@@ -70,16 +70,16 @@
 //   {campaigns venue_open <game> <venue>}  TRUE if a song may play there
 //                              outside its career: its first, or one a band
 //                              has unlocked in that game's career
-//   {campaigns venues_from <game>}  the songs from here on play in that
-//                              game's venues: its world files and its venues'
-//                              scripts, until another or the game played's
-//                              own are asked for, or a switch. Outside a
-//                              career the screens around a song, its highway
-//                              (gems, strikeline and HUD) and the loading
-//                              tips are in_song_ui's game's, the venue's by
-//                              default (settings.h); in one, its own, under
-//                              either note engine
-//   {campaigns venue_game}     whose venues those are
+//   {campaigns venue_game}     whose venues the songs play in: the
+//                              loading song's venue's game, by its id, which
+//                              brings its world files and its venues'
+//                              scripts, and the active one's again at the
+//                              main menu. Outside a career the screens
+//                              around a song, its highway (gems, strikeline
+//                              and HUD) and the loading tips are
+//                              in_song_ui's game's, the venue's by default
+//                              (settings.h); in one, its own, under either
+//                              note engine
 //   {campaigns highway}        whose highway the songs have
 //   {campaigns read_text}      every campaign's text read now, as the boot
 //                              does, so none is read mid-screen
@@ -116,8 +116,8 @@ namespace gh2::campaigns
     // That game's venues, the active game's by default, in its config's
     // order. None for a game with no campaign.
     const std::vector<std::string> &venues(const std::string &game = active());
-    // The game whose venue a song plays in: the active one's unless
-    // {campaigns venues_from} named another.
+    // The game whose venue a song plays in: the last song's venue's, the
+    // active one's where it has that venue.
     const std::string &venueGame();
 
     // Whether `game`'s config has `item` (a character, outfit, guitar or

@@ -41,14 +41,10 @@
 {func ghc_qp_play
    {if_else {quickplay song_defaults}
       {do
-         {campaigns venues_from {ghc_venue_game {setlist shown}}}
          {game set_quickplay}
          {quickplay cast {game get_song} {ghc_venue_game {setlist shown}} {game get_character_outfit}}
       }
-      {do
-         {ghc_qp_recall}
-         {if {quickplay picked venue_game} {campaigns venues_from {quickplay pick venue_game}}}
-      }
+      {ghc_qp_recall}
    }
    {ghc_custom_start FALSE}
    {campaigns text_outfit {game get_character_outfit}}

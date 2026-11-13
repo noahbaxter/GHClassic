@@ -7,6 +7,7 @@
 #include "content/setlist_paper.h"
 #include "content/setlist_window.h"
 #include "content/songs.h"
+#include "content/sources.h"
 #include "disc/ark.h"
 #include "formats/dtb.h"
 #include "guest.h"
@@ -318,22 +319,18 @@ namespace gh2::setlists
             ctx->pc = GPR_U32(ctx, 31);
         }
 
-        // A live setlist's song's venue, `wanted` by GH2's name, or the
-        // nearest open one before it (setlists.h's Live). The first two are
+        // A live setlist's song's venue, `wanted`, or the nearest open one
+        // of its game's before it (setlists.h's Live). The first two are
         // always open, as retail's quickplay has them
         // (Campaign::IsVenueUnlockedQuickplay, 0x12de88).
         std::string openVenue(const std::string &wanted)
         {
-            const std::string &game = campaigns::venueGame();
-            const std::vector<std::string> &venues = campaigns::venues(game), &gh2 = campaigns::venues("gh2");
-            if (venues.empty())
+            const sources::Row *row = sources::find(wanted);
+            const std::string game = row ? row->source : "gh2";
+            const std::vector<std::string> &venues = campaigns::venues(game);
+            size_t at = static_cast<size_t>(std::find(venues.begin(), venues.end(), wanted) - venues.begin());
+            if (at == venues.size())
                 return wanted;
-            const auto indexIn = [&](const std::vector<std::string> &list)
-            { return static_cast<size_t>(std::find(list.begin(), list.end(), wanted) - list.begin()); };
-            // Not one of this game's: as far into its venues as into GH2's, else the first.
-            size_t at = indexIn(venues);
-            if (const size_t inGh2 = indexIn(gh2); at == venues.size())
-                at = inGh2 < gh2.size() ? std::min(inGh2, venues.size() - 1u) : 0u;
             while (at > 1u && !campaigns::venueOpen(game, venues[at]))
                 --at;
             return venues[at];
@@ -352,10 +349,8 @@ namespace gh2::setlists
                                            {GPR_U32(ctx, 4), GPR_U32(ctx, 5)}, s_venueForSong));
             if (load<uint8_t>(rdram, venue) == 0u)
             {
-                // Its tier's venue, or where the game whose venues are
-                // played has none of that name (the 80s lack GH2's big and
-                // stone), the venue as far into its own list.
-                const std::vector<std::string> venues = campaigns::venues(campaigns::venueGame());
+                // Its tier's venue, or where the setlist's game has none of
+                // that name, the venue as far into its own list.
                 for (const auto &[name, setlist] : s_setlists)
                 {
                     // A live one's song is in its window, being played
@@ -372,6 +367,7 @@ namespace gh2::setlists
                         const Tier &tier = setlist.tiers[t];
                         if (std::find(tier.songs.begin(), tier.songs.end(), song) == tier.songs.end())
                             continue;
+                        const std::vector<std::string> &venues = campaigns::venues(name);
                         const bool here = venues.empty() ||
                                           std::find(venues.begin(), venues.end(), tier.venue) != venues.end();
                         venue = symbol(rdram, ctx, runtime,

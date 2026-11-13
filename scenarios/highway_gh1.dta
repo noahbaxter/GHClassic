@@ -14,7 +14,6 @@
 {game set_song gh2_shoutatthedevil}
 {game set_quickplay}
 {game set_venue gh2_battle}
-{campaigns venues_from gh2}
 {ui goto_screen loading_screen}
 (wait_screen game_screen 60)
 (expect {campaigns highway} gh2)
@@ -34,7 +33,6 @@
 {game set_song gh2_shoutatthedevil}
 {game set_quickplay}
 {game set_venue gh2_battle}
-{campaigns venues_from gh2}
 {ui goto_screen loading_screen}
 (wait_screen game_screen 60)
 (expect {campaigns highway} gh1)

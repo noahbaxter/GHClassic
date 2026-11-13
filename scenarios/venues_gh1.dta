@@ -18,7 +18,6 @@
 {meta_loading_nosave_goto main_screen}
 (wait_screen main_screen 60)
 
-{campaigns venues_from gh1}
 {game set_song gh1_ziggystardust}
 {{game get_player_config 0} set_difficulty medium}
 {{game get_player_config 0} set autoplay TRUE}
@@ -36,7 +35,6 @@
 (wait_screen main_screen 60)
 
 ; The basement, in GH2's battle of the bands.
-{campaigns venues_from gh1}
 {game set_song gh1_iloverockandroll}
 {{game get_player_config 0} set autoplay TRUE}
 {game set_quickplay}

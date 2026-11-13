@@ -1,5 +1,5 @@
 ; A quickplay song in another game's venue shows that game's loading and
-; pause screens, and the menus' game's come back with the song list: GH1's
+; pause screens, and the next song's venue its own game's: GH1's
 ; basement and the 80s' first venue under GH2's menus.
 #include common/first_boot.dta
 (needs gh1 gh80s)
@@ -38,7 +38,6 @@
 {meta_loading_nosave_goto qp_selsong_screen}
 (wait_screen qp_selsong_screen 60)
 (wait 1)
-(expect {campaigns venue_game} gh2)
 ; Another venue is the setup's, back from the list.
 (press red)
 (wait_screen ghc_qp_setup_screen)

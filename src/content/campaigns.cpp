@@ -3,6 +3,7 @@
 #include "content/locale.h"
 #include "content/outfits.h"
 #include "content/setlists.h"
+#include "content/sources.h"
 #include "disc/ark.h"
 #include "formats/dtb.h"
 #include "gameplay/engine/note_engine.h"
@@ -398,6 +399,7 @@ namespace gh2::campaigns
         }
 
         std::optional<size_t> indexOf(const std::string &game);
+        const std::vector<std::string> &venuesOf(size_t index);
 
         // Outside a career, the game whose screens around a song and highway
         // (gems, strikeline and HUD, all but its surface, which is the
@@ -493,6 +495,25 @@ namespace gh2::campaigns
             std::cerr << "[campaign] venues from " << s_campaigns[index].game << ", screens around the song from "
                       << s_campaigns[look].game << std::endl;
             return highwayFrom(call, look);
+        }
+
+        // The song's venue's game, as the venue's id says, the active
+        // campaign's where it has that venue (the 360's GH2 ones): its world
+        // files and venue scripts, and in_song_ui's screens around it.
+        void venuesOfSong(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            // GameConfig's venue Symbol, +0x264 (GetVenue, 0x1264d0).
+            const uint32_t config = load<uint32_t>(rdram, s_addresses->theGameConfig);
+            const uint32_t venue = config ? load<uint32_t>(rdram, config + 0x264u) : 0u;
+            const sources::Row *row =
+                venue ? sources::find(reinterpret_cast<const char *>(getMemPtr(rdram, venue))) : nullptr;
+            if (!row)
+                return;
+            const std::vector<std::string> &own = venuesOf(s_active);
+            const auto index = std::find(own.begin(), own.end(), row->id) != own.end() ? std::optional<size_t>(s_active)
+                                                                                     : indexOf(row->source);
+            if (index)
+                venuesFrom(script::Call{rdram, ctx, runtime, 0u}, *index);
         }
 
         // That campaign's menu loops, as its (synth metamusic music) names
@@ -996,11 +1017,6 @@ namespace gh2::campaigns
                     textBuilt(Guest{call}, i);
                 return {};
             }
-            if (op == "venues_from")
-            {
-                const auto index = indexOf(call.symbol(2));
-                return {index && venuesFrom(call, *index) ? 1u : 0u, script::kInt};
-            }
             // Whose a character's name and blurbs are: the outfit's game's.
             if (op == "text_outfit")
             {
@@ -1218,11 +1234,22 @@ namespace gh2::campaigns
         void onGotoScreen(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
             static bool s_opened = false;
-            static uint32_t screens[3] = {0u, 0u, 0u}; // cut_scene_screen, main_screen, ghc_switch_screen
+            static uint32_t screens[4] = {}; // cut_scene_screen, main_screen, ghc_switch_screen, loading_screen
             static const char *const kOpening[] = {"cut_scene_screen", "main_screen"};
             const uint32_t screen = GPR_U32(ctx, 5);
             s_toSwitch = screen != 0u && screen == screens[2];
             ownScreen(rdram, ctx, runtime, screen);
+            // A song is loaded in its venue's game's venues, and the menus are
+            // the active one's again.
+            if (screen != 0u && (screen == screens[3] || (screen == screens[1] && s_venueFrom != s_active)))
+            {
+                const R5900Context saved = *ctx;
+                if (screen == screens[3])
+                    venuesOfSong(rdram, ctx, runtime);
+                else
+                    venuesFrom(script::Call{rdram, ctx, runtime, 0u}, s_active);
+                *ctx = saved;
+            }
             // Out of a career to the main menu, by way of the switch to the
             // menus picked for outside one.
             if (s_opened && s_career && screen != 0u && screen == screens[1])
@@ -1243,8 +1270,8 @@ namespace gh2::campaigns
             // screen change after the commands register (script.h), in a hook
             // that runs after this one: the intro movie's, on a boot.
             script::readyUi(rdram, ctx, runtime);
-            const uint32_t names = script::parse(rdram, ctx, runtime, "cut_scene_screen main_screen ghc_switch_screen");
-            for (uint32_t i = 0u; names != 0u && i < 3u; ++i)
+            const uint32_t names = script::parse(rdram, ctx, runtime, "cut_scene_screen main_screen ghc_switch_screen loading_screen");
+            for (uint32_t i = 0u; names != 0u && i < 4u; ++i)
                 screens[i] = static_cast<uint32_t>(runtime->callGuestFunction(
                     rdram, ctx, s_addresses->dataNodeGetObj, {load<uint32_t>(rdram, names) + 8u * i, names}));
             const int opening = screens[0] != 0u && screens[0] == screen   ? 0

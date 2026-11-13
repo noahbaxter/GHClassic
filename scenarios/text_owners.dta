@@ -31,7 +31,6 @@
 {game set_song gh2_shoutatthedevil}
 {game set_quickplay}
 {game set_venue gh1_basement}
-{campaigns venues_from gh1}
 {ui goto_screen loading_screen}
 (wait_screen game_screen 60)
 (expect {== {localize loading_tip1} $tip} 0)
