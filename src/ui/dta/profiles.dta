@@ -213,6 +213,51 @@
       )
    )
 }
+; A band screen's title as <token>, as its token, which GH1's scene puts
+; back as its panel enters. GH1's draws its band title as art (<mesh>), the
+; label hidden: any other title shows the label in its place.
+{func ghc_profile_title ($panel $mesh $lbl $token)
+   {do
+      ($dir {$panel loaded_dir})
+      ($l {$dir find $lbl})
+      {$l set text_token $token}
+      {$l set_text $token}
+      {if {$dir exists $mesh}
+         {do
+            ($ours {&& {!= $token choose_band} {!= $token name_band}})
+            {{$dir find $mesh} set_showing {! $ours}}
+            {$l set_showing $ours}
+         }
+      }
+   }
+}
+; The naming screen's title, and the line under it about the band (GH2's,
+; GH1's): a band's, or none. The band screens put theirs back as they enter,
+; so leaving ours never shows the band's.
+{func ghc_nameprof_band ($band)
+   {do
+      ($dir {nameprof_panel loaded_dir})
+      {ghc_profile_title nameprof_panel np_title.mesh sp_title.lbl {if_else $band name_band ghc_name_profile}}
+      {foreach $o (np_editlater.lbl np_subtitle.lbl)
+         {if {$dir exists $o} {{$dir find $o} set_showing $band}}
+      }
+   }
+}
+{amend nameprof_screen
+   (enter
+      {set [zoom_tnm] {nameprof_panel find nameprof.tnm}}
+      {{nameprof_panel find nameprof.view} set_frame 0}
+      {$this turn_off_ambient}
+      {{nameprof_panel find nameprof.view} animate (period 1) (range 0 100)}
+      {set [prof_ten] {nameprof_panel find profile.ten}}
+      {if {$this get initial_text}
+         {[prof_ten] set_text {$this get initial_text}}
+         {$this set initial_text 0}
+      }
+      {[zoom_tnm] set_frame {[prof_ten] length}}
+      {ghc_nameprof_band TRUE}
+   )
+}
 ; GH2's band list (manage_bands.dta's chooseprof_panel) as the profiles:
 ; {ghc_profile_screen show <seat> <back> <next>} picks that seat's, back to
 ; <back> on red, on to <next> once picked or named.
@@ -238,9 +283,10 @@
       (enter
          {ghc_profile hold 1}
          ; Whose it is, where another plays.
-         {{chooseprof_panel find cp_title.lbl} set_localized_text
-            {localize
-               {if_else {&& {== [seat] 0} {== {ghc_profile badge 1} ""}} ghc_choose_profile {sprint ghc_profile_p [seat]}}}}
+         {ghc_profile_title chooseprof_panel cp_title.mesh cp_title.lbl
+            {if_else {&& {== [seat] 0} {== {ghc_profile badge 1} ""}}
+               ghc_choose_profile
+               {symbol {sprint ghc_profile_p [seat]}}}}
          {foreach_int $i 0 {'+' [guest_row] 1}
             {do
                ($btn {chooseprof_panel find {sprintf "cp_band%d.btn" $i}})
@@ -260,11 +306,7 @@
                {chooseprof_panel find {sprintf "cp_band%d.btn" {if_else {>= $now 0} $now [guest_row]}}}}
          }
       )
-      ; The band list as GH2 has it again, for a career's.
-      (exit
-         {ghc_profile hold 0}
-         {{chooseprof_panel find cp_title.lbl} set_text choose_band}
-      )
+      (exit {ghc_profile hold 0})
       (TRANSITION_COMPLETE_MSG {$this help})
       ; Rename on a profile, delete on one no seat plays as.
       (help
@@ -359,14 +401,9 @@
          {nameprof_screen set zoom_tnm {nameprof_panel find nameprof.tnm}}
          {{nameprof_panel find profile.ten} set_text {ghc_profile name_of [row]}}
          {{nameprof_panel find nameprof.tnm} set_frame {{nameprof_panel find profile.ten} length}}
-         {{nameprof_panel find sp_title.lbl} set_text ghc_name_profile}
-         {{nameprof_panel find np_editlater.lbl} set_showing FALSE}
+         {ghc_nameprof_band FALSE}
       )
-      (exit
-         {ghc_profile hold 0}
-         {{nameprof_panel find sp_title.lbl} set_text name_band}
-         {{nameprof_panel find np_editlater.lbl} set_showing TRUE}
-      )
+      (exit {ghc_profile hold 0})
       (TEXT_ENTRY_MSG
          {do
             ($name {{nameprof_panel find profile.ten} get_text})
