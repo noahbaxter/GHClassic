@@ -150,7 +150,7 @@ namespace gh2::quickplay
         {
             const uint32_t returnTo = GPR_U32(ctx, 31), provider = GPR_U32(ctx, 4), dir = GPR_U32(ctx, 5);
             const bool free = !campaigns::inCareer(rdram);
-            script::run(rdram, ctx, runtime, configGuitars(rdram, free));
+            script::runKept(rdram, ctx, runtime, configGuitars(rdram, free));
             const uint32_t character = load<uint32_t>(rdram, provider + kProviderCharacter);
             const bool grim = free && character != 0u &&
                               std::string(reinterpret_cast<const char *>(getMemPtr(rdram, character))) == "grim";
