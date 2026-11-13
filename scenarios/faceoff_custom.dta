@@ -1,0 +1,164 @@
+; A custom song in Face-Off (multiplayer.dta), from a chart of its own
+; charted on Easy and Expert alone: Expert taps, opens (the last held), a
+; yellow sustain and a trill lane, Easy plain notes between them, its bass
+; six oranges. Played first on bass in quickplay, then the Test Song on
+; bass, so neither's files nor sections are left for Face-Off: it plays the
+; lead part with its own sections. Each player's difficulties are the
+; charted ones only, and P1's Expert taps, opens, bursts and lane show on
+; P1's highway alone, P2's Easy plain beside it (an Easy sustain burning
+; under P1's open one), then both on Expert. Pro Face-Off the same.
+(songs faceoff)
+(songs songs)
+#include common/first_boot.dta
+(device p1)
+(device p2)
+{custom instrument bass}
+{gamecfg set mode quickplay}
+{setlist select custom}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(expect {custom tag {game get_song} name} "Face Off")
+(press green p1)
+(wait_screen qp_diff_screen)
+(wait 1)
+(press green p1)
+(wait_screen game_screen 60)
+(wait_until {> {ghc_play gems} 0} 30)
+(expect {ghc_play gems} 6)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(press down p1)
+(wait 1)
+(expect {custom tag {game get_song} name} "Test Song")
+(press green p1)
+(wait_screen qp_diff_screen)
+(wait 1)
+(press green p1)
+(wait_screen game_screen 60)
+(wait_until {> {ghc_play gems} 0} 30)
+(expect {ghc_play gems} 16)
+(expect {custom section 0} "Intro")
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+
+; Face-Off: Easy and Expert offered each player, focused on the nearest
+; to what they had, a strum going between the two.
+(press start p1)
+{ui goto_screen multi_screen}
+(wait_screen multi_screen)
+(press start p2)
+(wait 0.5)
+{gamecfg set mode multi_vs}
+{game set_num_players 2}
+{setlist select custom}
+{ui goto_screen multi_vs_selsong_screen}
+(wait_screen multi_vs_selsong_screen)
+(wait 3)
+(press up p1)
+(wait 1)
+(expect {custom tag {game get_song} name} "Face Off")
+(press green p1)
+(wait_screen multi_vs_seldiff_screen)
+(wait 1.5)
+(shot seldiff)
+(expect {seldiff0 focus_name} easy.btn)
+(expect {seldiff1 focus_name} easy.btn)
+(press down p1)
+(wait 0.7)
+(expect {seldiff0 focus_name} expert.btn)
+(expect {seldiff1 focus_name} easy.btn)
+(press down p1)
+(wait 0.7)
+(expect {seldiff0 focus_name} easy.btn)
+(press up p1)
+(wait 0.7)
+(expect {seldiff0 focus_name} expert.btn)
+{{game get_player_config 0} set autoplay TRUE}
+{{game get_player_config 1} set autoplay TRUE}
+(press green p1)
+(wait 0.7)
+(press green p2)
+(wait_screen game_screen 60)
+(expect {game get_difficulty 0} 3)
+(expect {game get_difficulty 1} 0)
+(expect {custom section 1} "Face Taps")
+(wait_until {> {ghc_play gems} 0} 30)
+(expect {ghc_play gems} 28)
+(record on faceoff)
+(wait_until {> {ghc_play now} 2300} 30)
+(shot taps_coming)
+(wait_until {> {ghc_play now} 4060} 30)
+(shot open_burst)
+(wait_until {> {ghc_play now} 5450} 30)
+(shot open_held)
+(wait_until {> {ghc_play now} 6250} 30)
+(shot sustain_held)
+(wait_until {> {ghc_play now} 6900} 30)
+(shot lane_coming)
+(wait_until {> {ghc_play now} 7900} 30)
+(shot lane_playing)
+(wait_screen multi_compete_screen 60)
+(record off)
+(expect {player0 gems_hit} 28)
+(expect {player0 gems_passed} 0)
+(expect {player1 gems_hit} 11)
+(expect {player1 gems_passed} 0)
+
+; Again with both on Expert: each highway its own taps, opens, bursts and
+; lane.
+{ui goto_screen multi_vs_seldiff_screen}
+(wait_screen multi_vs_seldiff_screen)
+(wait 1.5)
+(expect {seldiff0 focus_name} expert.btn)
+(expect {seldiff1 focus_name} easy.btn)
+(press down p2)
+(wait 0.7)
+(expect {seldiff1 focus_name} expert.btn)
+(press green p1)
+(wait 0.7)
+(press green p2)
+(wait_screen game_screen 60)
+(expect {game get_difficulty 1} 3)
+(wait_until {> {ghc_play gems} 0} 30)
+(record on faceoff_expert)
+(wait_until {> {ghc_play now} 2300} 30)
+(shot expert_taps_coming)
+(wait_until {> {ghc_play now} 4060} 30)
+(shot expert_open_burst)
+(wait_until {> {ghc_play now} 5250} 30)
+(shot expert_open_held)
+(wait_until {> {ghc_play now} 6900} 30)
+(shot expert_lane_coming)
+(wait_until {> {ghc_play now} 7900} 30)
+(shot expert_lane_playing)
+(wait_screen multi_compete_screen 60)
+(record off)
+(expect {player0 gems_hit} 28)
+(expect {player1 gems_hit} 28)
+(expect {player1 gems_passed} 0)
+
+; Pro Face-Off: one pick for both, the same two, and the lead part.
+{gamecfg set mode multi_fo}
+{ui goto_screen multi_fo_selsong_screen}
+(wait_screen multi_fo_selsong_screen)
+(wait 2)
+(expect {custom tag {game get_song} name} "Face Off")
+(press green p1)
+(wait_screen multi_fo_seldiff_screen)
+(wait 1)
+(expect {{sel_difficulty_panel find sd_diff1.btn} showing} 1)
+(expect {{sel_difficulty_panel find sd_diff2.btn} showing} 0)
+(expect {{sel_difficulty_panel find sd_diff3.btn} showing} 0)
+(expect {{sel_difficulty_panel find sd_diff4.btn} showing} 1)
+(expect {sel_difficulty_panel focus_name} sd_diff4.btn)
+(press green p1)
+(wait_screen game_screen 60)
+(wait_until {> {ghc_play gems} 0} 30)
+(expect {ghc_play gems} 28)
+(expect {custom section 2} "Face Lane")
+(quit)
