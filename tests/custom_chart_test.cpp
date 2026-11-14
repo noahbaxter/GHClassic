@@ -441,6 +441,74 @@ namespace
               expert->faceOff[0].empty());
     }
 
+    // What the stage reads comes from each part's expert, else its highest
+    // difficulty with notes, whatever the player picks.
+    void stageFromFullest()
+    {
+        std::string why;
+        // A .mid's hard drums alone: 84 the kick, 85 the snare, 88 green.
+        midi::Track drums;
+        drums.name = "PART DRUMS";
+        for (const auto &[tick, pitch] : std::vector<std::pair<uint32_t, uint8_t>>{{0u, 84u}, {480u, 85u}, {960u, 88u}, {960u, 72u}})
+        {
+            drums.events.push_back(note(tick, pitch, true));
+            drums.events.push_back(note(tick + 60u, pitch, false));
+        }
+        const auto hardMid = parseMid(oneGemMid({drums}), {}, why);
+        CHECK(hardMid && hardMid->kicks == std::vector<uint32_t>({0u}) && hardMid->snares == std::vector<uint32_t>({480u}) &&
+              hardMid->crashes == std::vector<uint32_t>({960u}) && hardMid->drums.size() == 3u);
+        // With expert's too, expert's alone.
+        drums.events.push_back(note(1440u, 96u, true));
+        drums.events.push_back(note(1500u, 96u, false));
+        const auto bothMid = parseMid(oneGemMid({drums}), {}, why);
+        CHECK(bothMid && bothMid->kicks == std::vector<uint32_t>({1440u}) && bothMid->drums.size() == 1u &&
+              bothMid->snares.empty());
+
+        // A .chart's [HardDrums] alone, its own cymbal marker; then with
+        // [ExpertDrums] beside it.
+        const std::string hardDrums = "[HardDrums]\n{\n  0 = N 0 0\n  192 = N 1 0\n  384 = N 3 0\n  384 = N 67 0\n}\n";
+        const auto hardChart = parseChart(kOneGemChart + hardDrums, {}, why);
+        CHECK(hardChart && hardChart->kicks == std::vector<uint32_t>({0u}) &&
+              hardChart->snares == std::vector<uint32_t>({192u}) && hardChart->crashes == std::vector<uint32_t>({384u}));
+        const auto bothChart = parseChart(kOneGemChart + hardDrums + "[ExpertDrums]\n{\n  96 = N 0 0\n  288 = N 0 0\n}\n", {}, why);
+        CHECK(bothChart && bothChart->kicks == std::vector<uint32_t>({96u, 288u}) && bothChart->snares.empty() &&
+              bothChart->crashes.empty());
+        // Keys the same.
+        const auto hardKeys = parseChart(kOneGemChart + "[HardKeyboard]\n{\n  0 = N 1 0\n  192 = N 2 0\n}\n", {}, why);
+        CHECK(hardKeys && hardKeys->keys == std::vector<uint32_t>({0u, 192u}));
+
+        // A guitar part with only hard gets the band expert's same notes
+        // would: every track past PART GUITAR alike.
+        const auto withGuitar = [&](const char *section)
+        {
+            std::string text = "[Song]\n{\n  Resolution = 192\n}\n[SyncTrack]\n{\n  0 = B 120000\n}\n[" + std::string(section) +
+                               "]\n{\n  0 = E solo\n";
+            for (uint32_t beat = 0u; beat < 32u; ++beat)
+                text += "  " + std::to_string(beat * 192u) + " = N " + std::to_string(beat % 3u) + " 0\n";
+            text += "  1536 = E soloend\n}\n";
+            const auto chart = parseChart(text, {}, why);
+            return chart ? toGh2(*chart, 0.0) : std::nullopt;
+        };
+        const auto hard = withGuitar("HardSingle"), expert = withGuitar("ExpertSingle");
+        const auto hardBack = hard ? midi::parse(hard->mid) : std::nullopt;
+        const auto expertBack = expert ? midi::parse(expert->mid) : std::nullopt;
+        CHECK(hardBack && expertBack && hardBack->tracks.size() > 3u && hardBack->tracks.size() == expertBack->tracks.size());
+        if (!hardBack || !expertBack || hardBack->tracks.size() != expertBack->tracks.size())
+            return;
+        CHECK(hardBack->tracks[3].name == "BAND DRUMS" && !hardBack->tracks[3].events.empty());
+        for (size_t t = 2u; t < hardBack->tracks.size(); ++t)
+        {
+            const auto &a = hardBack->tracks[t].events, &b = expertBack->tracks[t].events;
+            CHECK(a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(), b.end(), [](const midi::Event &x, const midi::Event &y)
+                                                     { return x.tick == y.tick && x.status == y.status && x.data == y.data; }));
+        }
+        // Hard's solo reaches PART GUITAR.
+        size_t solos = 0u;
+        for (const midi::Event &e : hardBack->tracks[1].events)
+            solos += e.status == midi::kMeta && std::string(e.data.begin(), e.data.end()) == "[solo_on]";
+        CHECK(solos == 1u);
+    }
+
     std::vector<uint32_t> notesOf(const midi::Track &track, uint8_t from, uint8_t to);
 
     // The sung syllables: each lyric with its note, its markup off, a
@@ -712,11 +780,13 @@ namespace
             { return std::find(texts.begin(), texts.end(), std::pair{tick, text}) != texts.end(); };
             CHECK(hasText(16u * 480u, "[wail_on]") && hasText(32u * 480u, "[wail_off]"));
             CHECK(!notesOf(guitar, 40u, 59u).empty());
+            // The backbeat is GH2's active clips, [play]; [allbeat] hits
+            // the snare on every beat.
             const std::vector<std::pair<uint32_t, std::string>> beats = {
-                {0u, "[allbeat]"}, {4u * 1920u, "[half_time]"}, {7u * 1920u, "[allbeat]"}};
+                {0u, "[play]"}, {4u * 1920u, "[half_time]"}, {7u * 1920u, "[play]"}};
             std::vector<std::pair<uint32_t, std::string>> drummed;
             for (const auto &t : textsOf(band[0]))
-                if (t.second != "[play]" && t.second != "[idle]")
+                if (t.second != "[idle]")
                     drummed.push_back(t);
             CHECK(drummed == beats);
         }
@@ -751,25 +821,63 @@ namespace
         }
     }
 
-    // The made fret hand moves only where a phrase starts: green and red
-    // traded, then green over and over, keep it at the third fret; past a
-    // two-beat rest, a phrase mostly on orange moves it to the twelfth.
+    // The made fret hand takes a place a part of the song: verse, chorus,
+    // verse (its riff two lanes up), chorus, solo. Each verse sits in one
+    // place, each chorus (busier) in one higher, the solo higher still, the
+    // same whether the chart names its sections or the hand finds them by
+    // what repeats. Open notes leave it where it is.
     void handPlaces()
     {
+        constexpr uint32_t kBar = 1920u;
         Chart chart = chart480();
         Difficulty lead;
-        for (uint32_t t = 0; t < 16u * 480u; t += 240u)
-            lead.gems.push_back({t, static_cast<uint8_t>(t < 8u * 480u ? (t / 240u % 2u ? 2u : 1u) : 1u)});
-        for (uint32_t t = 18u * 480u; t < 24u * 480u; t += 240u)
-            lead.gems.push_back({t, static_cast<uint8_t>(t % 960u ? 0x10u : 0x18u)});
-        midi::Track guitar, events;
-        addStage({chart, lead, kSameTicks, 24u * 480u}, guitar, events);
-        std::vector<std::pair<uint32_t, uint8_t>> places;
-        for (const midi::Event &e : guitar.events)
-            if (midi::kind(e) == midi::kNoteOn && e.data[1] > 0u && e.data[0] >= 40u && e.data[0] <= 59u)
-                places.push_back({e.tick, e.data[0]});
-        const std::vector<std::pair<uint32_t, uint8_t>> want = {{0u, 42u}, {18u * 480u, 51u}};
-        CHECK(places == want);
+        for (uint32_t part = 0; part < 4u; ++part)
+            for (uint32_t t = part * 8u * kBar; t < (part + 1u) * 8u * kBar; t += part % 2u ? 120u : 240u)
+                lead.gems.push_back({t, static_cast<uint8_t>(part % 2u ? 0x0cu : (t / 240u % 2u ? 2u : 1u) << part)});
+        for (uint32_t t = 32u * kBar; t < 34u * kBar; t += 480u)
+            lead.gems.push_back({t, static_cast<uint8_t>(1u << kOpen)});
+        for (uint32_t t = 34u * kBar; t < 38u * kBar; t += 120u)
+            lead.gems.push_back({t, static_cast<uint8_t>(1u << (t / 120u % 5u))});
+        lead.solos = {{34u * kBar, 4u * kBar}};
+        const auto places = [&]
+        {
+            midi::Track guitar, events;
+            addStage({chart, lead, kSameTicks, 38u * kBar}, guitar, events);
+            std::vector<std::pair<uint32_t, uint8_t>> out;
+            for (const midi::Event &e : guitar.events)
+                if (midi::kind(e) == midi::kNoteOn && e.data[1] > 0u && e.data[0] >= 40u && e.data[0] <= 59u)
+                    out.push_back({e.tick, e.data[0]});
+            std::vector<std::pair<uint32_t, std::string>> maps;
+            for (const auto &t : textsOf(guitar))
+                if (t.second.rfind("[map ", 0) == 0)
+                    maps.push_back(t);
+            return std::pair{out, maps};
+        };
+        // The verses' green and red trade lane by lane, the choruses are
+        // chords.
+        const std::pair<std::vector<std::pair<uint32_t, uint8_t>>, std::vector<std::pair<uint32_t, std::string>>> want = {
+            {{0u, 40u}, {8u * kBar, 48u}, {16u * kBar, 40u}, {24u * kBar, 48u}, {34u * kBar, 51u}},
+            {{0u, "[map HandMap_Linear_Open]"},
+             {8u * kBar, "[map HandMap_AllChords_Open]"},
+             {16u * kBar, "[map HandMap_Linear_Open]"},
+             {24u * kBar, "[map HandMap_AllChords_Open]"},
+             {34u * kBar, "[map HandMap_Solo_Open]"}}};
+        CHECK(places() == want);
+        chart.sections = {{0u, "Verse 1"},         {8u * kBar, "Chorus 1"}, {16u * kBar, "Verse 2"},
+                          {24u * kBar, "Chorus 2"}, {32u * kBar, "Break"},   {34u * kBar, "Solo"}};
+        CHECK(places() == want);
+        // A song opening on opens has its map from the start, its place
+        // from its first fretted part.
+        chart.sections = {{0u, "Intro"}, {2u * kBar, "Verse 1"}};
+        lead.gems.erase(lead.gems.begin(), std::find_if(lead.gems.begin(), lead.gems.end(),
+                                                        [](const Gem &g) { return g.tick >= 32u * kBar; }));
+        lead.solos.clear();
+        for (Gem &g : lead.gems)
+            g.tick -= 32u * kBar;
+        const auto opening = places();
+        CHECK(opening.first.size() == 1u && opening.first[0].first == 2u * kBar);
+        CHECK(opening.second.size() == 2u && opening.second[0].first == 0u &&
+              opening.second[0].second == "[map HandMap_Default_Open]");
     }
 
     // A chart too fast for the band played at half: the band and crowd at
@@ -1020,7 +1128,8 @@ namespace
         for (uint32_t t = 48u * 480u; t < 64u * 480u; t += 960u)
             lead.gems.push_back({t, 1u});
         chart.sections = {{0u, "Riff 1"}, {32u * 480u, "Big Part"}, {48u * 480u, "Riff 2"}};
-        chart.vocals = {{480u * 4u, 480u * 8u}};
+        // A beat's rest sung through, eight beats' idled.
+        chart.vocals = {{480u * 4u, 480u * 4u}, {480u * 9u, 480u * 3u}, {480u * 20u, 480u * 2u}};
         midi::Track guitar, events;
         const auto band = addStage({chart, lead, kSameTicks, 64u * 480u}, guitar, events);
         CHECK(band.size() == 5u && band[4].name == "GH1 UPCOMING");
@@ -1039,15 +1148,21 @@ namespace
                 second = text;
         CHECK(!first.empty() && first == second);
         const auto singer = textsOf(band[2]);
-        const std::vector<std::pair<uint32_t, std::string>> sung = {{1920u, "[play]"}, {5760u, "[idle]"}};
+        const std::vector<std::pair<uint32_t, std::string>> sung = {
+            {1920u, "[play]"}, {5760u, "[idle]"}, {9600u, "[play]"}, {10560u, "[idle]"}};
         CHECK(singer == sung);
-        // No drums: a kick each beat while the band plays.
-        int kicks = 0, keys = 0;
-        for (const midi::Event &e : band[0].events)
-            kicks += midi::kind(e) == midi::kNoteOn && e.data[0] == 36u;
+        // No drums: a rock beat while the band plays, kicks on 1 and 3
+        // and GH2's active clips' snare on 2 and 4, never [allbeat]'s on
+        // every beat.
+        int keys = 0;
         for (const midi::Event &e : band[3].events)
             keys += midi::kind(e) == midi::kNoteOn && e.data[0] == 48u;
-        CHECK(kicks == 63); // beats 0 to 62, the last note's
+        std::vector<uint32_t> rock;
+        for (uint32_t t = 0; t <= 62u * 480u; t += 960u) // to the last note's beat
+            rock.push_back(t);
+        CHECK(notesOf(band[0], 36u, 36u) == rock);
+        for (const auto &[tick, text] : textsOf(band[0]))
+            CHECK(text == "[play]" || text == "[idle]");
 
         CHECK(keys == 16);
         CHECK(!textsOf(guitar).empty() && textsOf(guitar).front().second == "[play]");
@@ -1866,6 +1981,7 @@ int main(int argc, char **argv)
     lanes();
     chartEdges();
     bandParts();
+    stageFromFullest();
     stageTracks();
     syllables();
     lipSync();

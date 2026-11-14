@@ -70,6 +70,16 @@ namespace gh2::custom
         std::vector<Band> bands; // by tick
     };
 
+    // What the stage reads a part by, whatever the player picked: its
+    // expert, else its highest difficulty with gems.
+    inline const Difficulty &fullest(const std::array<Difficulty, 4> &part)
+    {
+        size_t d = 3u;
+        while (d > 0u && part[d].gems.empty())
+            --d;
+        return part[d];
+    }
+
     enum class Part : uint8_t
     {
         Guitar,
@@ -93,7 +103,8 @@ namespace gh2::custom
         std::vector<std::pair<uint32_t, std::array<uint8_t, 2>>> signatures; // numerator, denominator's log2
         std::vector<std::pair<uint32_t, std::string>> sections; // practice names, "Verse 1"
         std::map<Part, std::array<Difficulty, 4>> parts; // easy first
-        // Expert drums (PART DRUMS, [ExpertDrums]) by tick: kicks, snares
+        // The drums' expert, else their highest difficulty with hits
+        // (PART DRUMS, [ExpertDrums] to [EasyDrums]), by tick: kicks, snares
         // (red), crashes (blue or green cymbal) and every hit. The
         // drummer's animation notes replace the snares and crashes where
         // the chart has them.
@@ -112,8 +123,9 @@ namespace gh2::custom
             std::string text;
         };
         std::vector<Syllable> syllables;
-        // The keys' expert hits by tick (PART KEYS' 96 to 100,
-        // [ExpertKeyboard]'s).
+        // The keys' expert hits, else their highest difficulty's, by tick
+        // (PART KEYS' 60 to 64 up to 96 to 100, [EasyKeyboard] to
+        // [ExpertKeyboard]).
         std::vector<uint32_t> keys;
         // The rest of what a .mid's tracks say for the stage, by track name,
         // as written, for the band and venue to follow (custom/stage/stage.h):

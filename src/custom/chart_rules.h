@@ -51,6 +51,16 @@ namespace gh2::custom::rules
         int lane;
         bool cymbal = true;
     };
+    // Of four difficulties' lists, easy first, expert's, else the highest
+    // that has any.
+    template <typename T> const std::vector<T> &fullest(const std::array<std::vector<T>, 4> &lists)
+    {
+        size_t d = 3u;
+        while (d > 0u && lists[d].empty())
+            --d;
+        return lists[d];
+    }
+
     // A drum hit by .chart's lane: 0 or 32 the kick, 1 the snare, 2 and up
     // a pad, added to `pads`.
     void addDrum(Chart &chart, std::vector<PadHit> &pads, uint32_t tick, int lane);

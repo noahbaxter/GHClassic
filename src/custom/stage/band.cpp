@@ -11,13 +11,20 @@ namespace gh2::custom
 {
     namespace
     {
-        // Every beat within the runs.
-        std::vector<uint32_t> beatsIn(const std::vector<Span> &playing)
+        // A rock beat's kicks: each bar's beats 1 and 3 (every other beat)
+        // within the runs.
+        std::vector<uint32_t> rockKicks(const std::vector<Span> &playing, const std::vector<uint32_t> &bars, uint32_t end,
+                                        const BandBeatLengths &beats)
         {
             std::vector<uint32_t> out;
-            for (const Span &r : playing)
-                for (uint32_t t = nextBeat(r.tick); t <= r.tick + r.length; t += kBeat)
-                    out.push_back(t);
+            for (size_t b = 0; b < bars.size(); ++b)
+            {
+                const uint32_t to = b + 1u < bars.size() ? bars[b + 1u] : end;
+                for (uint32_t t = bars[b]; t < to; t += 2u * beatAt(beats, bars[b]))
+                    if (std::any_of(playing.begin(), playing.end(),
+                                    [&](const Span &r) { return t >= r.tick && t <= r.tick + r.length; }))
+                        out.push_back(t);
+            }
             return out;
         }
 
@@ -112,78 +119,223 @@ namespace gh2::custom
             return std::nullopt;
         }
 
-        // Where the fret hand sits (notes 40 to 59, the neck's frets 1 to
-        // 20), made where a chart has none. A hand on a real neck stays put
-        // while its fingers reach the frets near it, so it moves only where
-        // a phrase starts (past a beat's rest, a section or a solo's edge),
-        // to where that phrase's lowest frets mostly are: green at the
-        // third, orange at the twelfth, five higher in a solo. Notes over
-        // and over, or trading frets, never move it, and past a rest it
-        // waits a bar from its last move, so riffs of short phrases don't
-        // twitch it.
-        void handPositions(midi::Track &guitar, const Chart &chart, const Difficulty &lead, const TickMap &toGh2)
+        uint64_t fnv(uint64_t h, uint64_t v)
         {
-            static constexpr uint8_t kFret[5] = {3u, 5u, 7u, 9u, 12u};
-            const auto inSolo = [&](uint32_t tick)
+            for (int i = 0; i < 8; ++i, v >>= 8u)
+                h = (h ^ (v & 0xffu)) * 0x100000001b3ull;
+            return h;
+        }
+        constexpr uint64_t kFnvBasis = 0xcbf29ce484222325ull;
+
+        // Where the fret hand sits (notes 40 to 59, the neck's frets 1 to
+        // 20), made where a chart has none. A chart's lanes wrap around and
+        // say nothing of real notes, so the hand takes one place for each
+        // part of the song: the chart's sections, else runs of the bars it
+        // repeats (each bar by its rhythm and its lanes' shape, so a riff
+        // moved up the lanes is the same riff); solos are parts of their
+        // own. Each kind of part (a section's name less its number, the bars
+        // repeated) always takes the same place, the busier the higher:
+        // frets 1 to 9, solos and parts mostly tapped 10 to 14. It moves
+        // only at a part's start, a part under two bars is the one before's,
+        // and a part of only open notes or rests leaves it where it is.
+        // Each kind of part also takes a hand map (kOpenHandMap's): Solo
+        // in a solo, AllChords where half its notes are chords, Linear
+        // where three in five single notes are a lane from the one before
+        // (trills and runs, a finger a lane), else Default. `places` and
+        // `maps` say which to make.
+        void fretHand(BandTracks &band, bool places, bool maps)
+        {
+            const Difficulty &lead = band.in.lead;
+            const auto &toGh2 = band.in.toGh2;
+            const std::vector<uint32_t> &bars = band.bars;
+            const size_t n = bars.size();
+            if (n == 0u)
+                return;
+            const auto barOf = [&](uint32_t tick)
             {
-                return std::any_of(lead.solos.begin(), lead.solos.end(),
-                                   [&](const Span &s) { return tick >= s.tick && tick < s.tick + s.length; });
+                const auto i = size_t(std::upper_bound(bars.begin(), bars.end(), tick) - bars.begin());
+                return i ? i - 1u : 0u;
             };
-            const auto section = [&](uint32_t tick)
-            {
-                return std::count_if(chart.sections.begin(), chart.sections.end(),
-                                     [&](const auto &s) { return s.first <= tick; });
-            };
-            std::vector<const Gem *> fretted;
+            std::vector<uint64_t> shape(n, kFnvBasis);
+            std::vector<int> lowest(n, 5);
             for (const Gem &g : lead.gems)
                 if (g.lanes & kFretLanes)
-                    fretted.push_back(&g);
-            uint8_t last = 0u;
-            uint32_t movedAt = 0u;
-            for (size_t i = 0; i < fretted.size();)
+                    lowest[barOf(toGh2(g.tick))] = std::min(lowest[barOf(toGh2(g.tick))], std::countr_zero(g.lanes));
+            for (const Gem &g : lead.gems)
             {
-                size_t phraseEnd = i + 1u;
-                while (phraseEnd < fretted.size() &&
-                       fretted[phraseEnd]->tick - fretted[phraseEnd - 1u]->tick <= chart.resolution &&
-                       section(fretted[phraseEnd]->tick) == section(fretted[i]->tick) &&
-                       inSolo(fretted[phraseEnd]->tick) == inSolo(fretted[i]->tick))
-                    ++phraseEnd;
-                std::array<int, 5> lowestLaneCount{};
-                for (size_t k = i; k < phraseEnd; ++k)
-                    ++lowestLaneCount[static_cast<size_t>(
-                        std::countr_zero(static_cast<unsigned>(fretted[k]->lanes & kFretLanes)))];
-                const size_t lane = static_cast<size_t>(
-                    std::max_element(lowestLaneCount.begin(), lowestLaneCount.end()) - lowestLaneCount.begin());
-                const uint8_t fret = static_cast<uint8_t>(kFret[lane] + (inSolo(fretted[i]->tick) ? 5u : 0u));
-                const uint32_t at = fretted[i]->tick;
-                const bool edge = i == 0u || section(at) != section(fretted[i - 1u]->tick) ||
-                                  inSolo(at) != inSolo(fretted[i - 1u]->tick);
-                if (fret != last && (edge || at - movedAt >= 4u * chart.resolution))
+                const uint32_t at = toGh2(g.tick);
+                const size_t b = barOf(at);
+                const unsigned frets = (g.lanes & kFretLanes) >> (lowest[b] % 5);
+                shape[b] = fnv(fnv(shape[b], (at - bars[b]) / (kBeat / 8u)), frets | (g.lanes & ~kFretLanes));
+            }
+
+            struct Chunk
+            {
+                uint32_t from;
+                uint64_t kind;
+                bool solo = false, unrepeated = false;
+            };
+            std::vector<Chunk> parts;
+            if (band.in.chart.sections.size() >= 2u)
+                for (const auto &[tick, name] : band.in.chart.sections)
                 {
-                    addShortNote(guitar, toGh2(at), static_cast<uint8_t>(39u + fret));
-                    last = fret;
-                    movedAt = at;
+                    uint64_t kind = kFnvBasis;
+                    for (const char c : sectionBaseName(name))
+                        kind = fnv(kind, uint8_t(c));
+                    parts.push_back({toGh2(tick), kind});
                 }
-                i = phraseEnd;
+            else
+                // Greedily, the longest run of 8, 4 or 2 bars from here that
+                // the song plays again elsewhere, by the riff it repeats
+                // (four bars of one riff as two of it); bars repeated
+                // nowhere a part of their own.
+                for (size_t i = 0; i < n;)
+                {
+                    size_t length = 0u;
+                    for (const size_t l : {8u, 4u, 2u})
+                        for (size_t j = 0; !length && i + l <= n && j + l <= n; ++j)
+                            if ((j + l <= i || j >= i + l) && std::equal(&shape[i], &shape[i] + l, &shape[j]) &&
+                                std::any_of(&shape[i], &shape[i] + l, [](uint64_t s) { return s != kFnvBasis; }))
+                                length = l;
+                    size_t period = 1u;
+                    while (length && !std::equal(shape.data() + i + period, shape.data() + i + length, shape.data() + i))
+                        ++period;
+                    uint64_t kind = length ? kFnvBasis : fnv(kFnvBasis, ~uint64_t(i));
+                    for (size_t k = 0; k < period && length; ++k)
+                        kind = fnv(kind, shape[i + k]);
+                    if (length || parts.empty() || !parts.back().unrepeated)
+                        parts.push_back({bars[i], kind, false, !length});
+                    i += std::max<size_t>(length, 1u);
+                }
+            std::sort(parts.begin(), parts.end(), [](const Chunk &a, const Chunk &b) { return a.from < b.from; });
+            for (const Span &s : lead.solos)
+            {
+                const uint32_t from = toGh2(s.tick), to = toGh2(s.tick + s.length);
+                const auto at = [&](uint32_t t)
+                { return std::upper_bound(parts.begin(), parts.end(), t, [](uint32_t t, const Chunk &p) { return t < p.from; }); };
+                const uint64_t after = at(to) == parts.begin() ? 0u : std::prev(at(to))->kind;
+                const uint64_t kind = at(from) == parts.begin() ? 0u : std::prev(at(from))->kind;
+                std::erase_if(parts, [&](const Chunk &p) { return p.from >= from && p.from <= to; });
+                parts.insert(at(from), {from, fnv(kind, 1u), true});
+                parts.insert(at(to), {to, after});
+            }
+            // A part under two bars is the one before's, as is one of the
+            // same kind; the first starts with the song.
+            for (size_t i = 0; i + 1u < parts.size();)
+                if (barOf(parts[i + 1u].from) < barOf(parts[i].from) + 2u)
+                    parts.erase(parts.begin() + std::ptrdiff_t(i));
+                else
+                    ++i;
+            for (size_t i = 1; i < parts.size();)
+                if (parts[i].kind == parts[i - 1u].kind)
+                    parts.erase(parts.begin() + std::ptrdiff_t(i));
+                else
+                    ++i;
+            if (parts.empty())
+                return;
+            parts.front().from = 0u;
+
+            struct Place
+            {
+                // Its fretted notes, taps, chords, and single notes after a
+                // single note, and of those a lane from it.
+                unsigned notes = 0u, taps = 0u, chords = 0u, singlePairs = 0u, steps = 0u;
+                uint32_t ticks = 0u;
+                bool solo = false;
+                uint8_t fret = 0u;
+                const char *map() const
+                {
+                    return solo                        ? "Solo"
+                           : chords * 2u >= notes      ? "AllChords"
+                           : steps * 5u >= singlePairs * 3u ? "Linear"
+                                                       : "Default";
+                }
+            };
+            std::map<uint64_t, Place> kinds;
+            std::vector<uint64_t> order; // kinds by first part
+            std::vector<unsigned> partNotes(parts.size(), 0u);
+            for (size_t i = 0; i < parts.size(); ++i)
+            {
+                const uint32_t to = i + 1u < parts.size() ? parts[i + 1u].from : band.in.end;
+                if (!kinds.count(parts[i].kind))
+                    order.push_back(parts[i].kind);
+                Place &k = kinds[parts[i].kind];
+                int lastSingle = -1;
+                for (const Gem &g : lead.gems)
+                    if (const uint32_t at = toGh2(g.tick); at >= parts[i].from && at < to && (g.lanes & kFretLanes))
+                    {
+                        ++partNotes[i];
+                        k.taps += g.kind == Kind::Tap;
+                        const int lane = std::countr_zero(g.lanes);
+                        if (g.chord())
+                            ++k.chords;
+                        else if (lastSingle >= 0)
+                        {
+                            ++k.singlePairs;
+                            k.steps += std::abs(lane - lastSingle) == 1;
+                        }
+                        lastSingle = g.chord() ? -1 : lane;
+                    }
+                k.notes += partNotes[i];
+                k.ticks += to > parts[i].from ? to - parts[i].from : 0u;
+                k.solo |= parts[i].solo;
+            }
+            for (bool high : {false, true})
+            {
+                std::vector<Place *> ranked;
+                for (const uint64_t key : order)
+                    if (Place &k = kinds[key]; k.notes && (k.solo || k.taps * 2u >= k.notes) == high)
+                        ranked.push_back(&k);
+                std::stable_sort(ranked.begin(), ranked.end(), [](const Place *a, const Place *b)
+                                 { return double(a->notes) * b->ticks < double(b->notes) * a->ticks; });
+                const unsigned lo = high ? 10u : 1u, hi = high ? 14u : 9u;
+                for (size_t r = 0; r < ranked.size(); ++r)
+                    ranked[r]->fret = static_cast<uint8_t>(
+                        ranked.size() < 2u ? (lo + hi) / 2u : lo + (r * (hi - lo) + (ranked.size() - 1u) / 2u) / (ranked.size() - 1u));
+            }
+            uint8_t last = 0u;
+            std::string lastMap;
+            // A song opening on opens alone has them as finger_open too.
+            if (maps && !partNotes[0])
+            {
+                lastMap = "Default";
+                band.guitar.events.push_back(midi::text(0u, "[map HandMap_" + lastMap + kOpenHandMap + "]"));
+            }
+            for (size_t i = 0; i < parts.size(); ++i)
+            {
+                const Place &k = kinds[parts[i].kind];
+                if (!partNotes[i])
+                    continue;
+                if (places && k.fret != last)
+                    addShortNote(band.guitar, parts[i].from, static_cast<uint8_t>(39u + k.fret));
+                if (maps && k.map() != lastMap)
+                    band.guitar.events.push_back(
+                        midi::text(parts[i].from, std::string("[map HandMap_") + k.map() + kOpenHandMap + "]"));
+                last = k.fret;
+                lastMap = k.map();
             }
         }
 
         enum class DrumPattern
         {
+            Normal,
             All,
             Double,
             Half,
             Nobeat,
         };
 
-        constexpr const char *kPatternTexts[] = {"[allbeat]", "[double_time]", "[half_time]", "[nobeat]"}; // by DrumPattern
+        // By DrumPattern. [play] sets GH2's drummer back to its active
+        // clips, the snare on 2 and 4.
+        constexpr const char *kPatternTexts[] = {"[play]", "[allbeat]", "[double_time]", "[half_time]", "[nobeat]"};
 
         // A bar's drum pattern from its snares, as GH2's drummer clips
-        // (kBandAllbeat, kBandDouble, kBandHalf, kBandNosnare):
-        //   no snares                                       [nobeat]
-        //   one on every beat, or two or more off the beat  [double_time]
-        //   on beat 3 of a 4-beat bar but not 2 or 4        [half_time]
-        //   anything else, a backbeat                       [allbeat]
+        // (kBandActive, kBandAllbeat, kBandDouble, kBandHalf, kBandNosnare):
+        //   no snares                                     [nobeat]
+        //   one on every beat                             [allbeat]
+        //   two or more off the beat                      [double_time]
+        //   on beat 3 of a 4-beat bar but not 2 or 4      [half_time]
+        //   anything else, a backbeat                     [play]
         // `length` is the band's beat.
         DrumPattern barPattern(const std::vector<uint32_t> &snares, uint32_t from, uint32_t to, uint32_t length)
         {
@@ -203,25 +355,21 @@ namespace gh2::custom
             }
             if (count == 0u)
                 return DrumPattern::Nobeat;
-            if (std::count(on.begin(), on.end(), true) == static_cast<std::ptrdiff_t>(beatsInBar) || offbeats >= 2u)
+            if (offbeats >= 2u)
                 return DrumPattern::Double;
+            if (std::count(on.begin(), on.end(), true) == static_cast<std::ptrdiff_t>(beatsInBar))
+                return DrumPattern::All;
             if (beatsInBar == 4u && on[2] && !on[1] && !on[3])
                 return DrumPattern::Half;
-            return DrumPattern::All;
+            return DrumPattern::Normal;
         }
 
-        // The drum pattern bar by bar while the drums play, a change kept
-        // only where it holds two bars; [allbeat] at each run's start where
-        // there are no charted drums to say.
+        // The charted drums' pattern bar by bar while they play, a change
+        // kept only where it holds two bars. Each run starts on the active
+        // clips its [play] gives.
         void addDrumPatterns(midi::Track &drums, const std::vector<uint32_t> &bars, const std::vector<uint32_t> &snares,
-                             const std::vector<Span> &drumming, bool charted, uint32_t end, const BandBeatLengths &beats)
+                             const std::vector<Span> &drumming, uint32_t end, const BandBeatLengths &beats)
         {
-            if (!charted)
-            {
-                for (const Span &r : drumming)
-                    drums.events.push_back(midi::text(r.tick, "[allbeat]"));
-                return;
-            }
             for (const Span &r : drumming)
             {
                 std::vector<std::pair<uint32_t, DrumPattern>> run;
@@ -231,12 +379,12 @@ namespace gh2::custom
                     if (to > r.tick && bars[b] <= r.tick + r.length)
                         run.push_back({std::max(bars[b], r.tick), barPattern(snares, bars[b], to, beatAt(beats, bars[b]))});
                 }
-                std::optional<DrumPattern> now;
+                DrumPattern now = DrumPattern::Normal;
                 for (size_t i = 0; i < run.size(); ++i)
                 {
                     const DrumPattern pattern = run[i].second;
                     const bool holds = i + 1u >= run.size() || run[i + 1u].second == pattern;
-                    if (pattern != now && (!now || holds))
+                    if (pattern != now && (i == 0u || holds))
                     {
                         drums.events.push_back(midi::text(run[i].first, kPatternTexts[size_t(pattern)]));
                         now = pattern;
@@ -300,7 +448,7 @@ namespace gh2::custom
         const Chart::StageTrack *track = stageTrack(band.in.chart, trackOf(band.in.part));
         band.guitaristCues = memberCues(track);
         addMemberCues(band.guitar, band.guitaristCues, band.playing, toGh2);
-        bool placed = false;
+        bool placed = false, mapped = false;
         if (track)
         {
             for (const Chart::Mark &m : track->marks)
@@ -311,10 +459,12 @@ namespace gh2::custom
                 }
             for (const Chart::Cue &c : track->cues)
                 if (const auto map = guitarMap(c.text))
+                {
                     band.guitar.events.push_back(midi::text(toGh2(c.tick), *map));
+                    mapped |= map->rfind("[map HandMap_", 0) == 0;
+                }
         }
-        if (!placed)
-            handPositions(band.guitar, band.in.chart, band.in.lead, toGh2);
+        fretHand(band, !placed, !mapped);
     }
 
     std::vector<uint32_t> addDrummer(BandTracks &band)
@@ -333,7 +483,8 @@ namespace gh2::custom
                     kicks.push_back(toGh2(m.tick));
         std::sort(kicks.begin(), kicks.end());
         if (kicks.empty())
-            kicks = chart.kicks.empty() ? beatsIn(drumming) : toGh2Sorted(chart.kicks, toGh2);
+            kicks = chart.kicks.empty() ? rockKicks(drumming, band.bars, band.in.end, band.beats)
+                                        : toGh2Sorted(chart.kicks, toGh2);
         const std::vector<Chart::Cue> drummerCues = memberCues(stageTrack(chart, "PART DRUMS"));
         addMemberCues(band.drums, drummerCues, drumming, toGh2);
         for (const uint32_t t : kicks)
@@ -341,10 +492,9 @@ namespace gh2::custom
         // The chart's crashes, else one a section (addSectionCrashes).
         for (const uint32_t t : toGh2Sorted(chart.crashes, toGh2))
             addShortNote(band.drums, t, 37u);
-        if (std::none_of(drummerCues.begin(), drummerCues.end(),
-                         [](const Chart::Cue &c) { return gh2Lane(c.text) == "beat"; }))
-            addDrumPatterns(band.drums, band.bars, toGh2Sorted(chart.snares, toGh2), drumming, !chart.drums.empty(),
-                            band.in.end, band.beats);
+        if (!chart.drums.empty() && std::none_of(drummerCues.begin(), drummerCues.end(),
+                                                 [](const Chart::Cue &c) { return gh2Lane(c.text) == "beat"; }))
+            addDrumPatterns(band.drums, band.bars, toGh2Sorted(chart.snares, toGh2), drumming, band.in.end, band.beats);
         return kicks;
     }
 
@@ -353,8 +503,8 @@ namespace gh2::custom
         const Chart &chart = band.in.chart;
         band.bass.name = "BAND BASS";
         std::vector<uint32_t> pulses = kicks;
-        if (const auto it = chart.parts.find(Part::Bass); it != chart.parts.end() && !it->second[3].gems.empty())
-            pulses = toGh2Sorted(ticksOf(it->second[3].gems), band.in.toGh2);
+        if (const auto it = chart.parts.find(Part::Bass); it != chart.parts.end())
+            pulses = toGh2Sorted(ticksOf(fullest(it->second).gems), band.in.toGh2);
         addMemberCues(band.bass, memberCues(stageTrack(chart, "PART BASS")), playingRuns(pulses), band.in.toGh2);
         for (const uint32_t t : pulses)
             addShortNote(band.bass, t, 36u);
@@ -383,8 +533,16 @@ namespace gh2::custom
         if (chart.vocals.empty())
             singerSpans = playingOutsideSolos(band);
         addMemberCues(band.singer, singerCues, {}, toGh2);
+        // GH2's own singers never idle under three beats: a shorter rest
+        // between phrases is sung through.
+        std::vector<Span> held;
+        for (const Span &s : singerSpans)
+            if (!held.empty() && s.tick < held.back().tick + held.back().length + 3u * kBeat)
+                held.back().length = std::max(held.back().length, s.tick + s.length - held.back().tick);
+            else
+                held.push_back(s);
         if (!has(singerCues, "[play]"))
-            for (const Span &s : singerSpans)
+            for (const Span &s : held)
             {
                 band.singer.events.push_back(midi::text(s.tick, "[play]"));
                 band.singer.events.push_back(midi::text(s.tick + s.length, "[idle]"));

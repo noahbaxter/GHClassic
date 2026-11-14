@@ -492,17 +492,18 @@ namespace gh2::gh1
 
         // The drums' cues a beat ahead to the world, as upcoming_drum_on and
         // upcoming_drum_off, which GH1's venue scripts take (gh1/scripts.cpp).
-        constexpr const char *kParsers = "config/gen/midi_parsers.dtb";
-        const auto parsers = ark::readFile(0u, kParsers);
-        auto parserRoot = parsers ? dtb::raw(*parsers) : std::nullopt;
-        const auto upcoming = dtb::parse(std::string("(gh1_upcoming (type midi) (eval 1) (track_name '") + custom::kUpcomingTrack +
-                                         "') (mappings (default (events (60 ({handle (world upcoming_drum_on)})) "
-                                         "(61 ({handle (world upcoming_drum_off)}))))))");
-        if (parserRoot && upcoming)
-        {
-            parserRoot->nodes.insert(parserRoot->nodes.end(), upcoming->nodes.begin(), upcoming->nodes.end());
-            ark::addFile(kParsers, dtb::write(*parserRoot));
-        }
+        ark::addFix(0u, "config/gen/midi_parsers.dtb", [](std::vector<uint8_t> &file)
+                    {
+                        auto root = dtb::raw(file);
+                        const auto upcoming = dtb::parse(
+                            std::string("(gh1_upcoming (type midi) (eval 1) (track_name '") + custom::kUpcomingTrack +
+                            "') (mappings (default (events (60 ({handle (world upcoming_drum_on)})) "
+                            "(61 ({handle (world upcoming_drum_off)}))))))");
+                        if (!root || !upcoming)
+                            return;
+                        root->nodes.insert(root->nodes.end(), upcoming->nodes.begin(), upcoming->nodes.end());
+                        file = dtb::write(*root);
+                    });
         // Other games' songs (GH2's, the 80s') get that cue track too while
         // they play in GH1's venues; in their own venues they keep the
         // disc's chart.

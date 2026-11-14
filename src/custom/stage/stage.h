@@ -8,17 +8,21 @@
 //
 //   PART GUITAR  the guitarist, playing where the part does; [wail_on] and
 //                [wail_off] over a chorus's first four bars; its fret hand's
-//                place (40 to 59) and [map ...]s, the chart's, else the hand
-//                at the lowest fret played
+//                place (40 to 59) and [map ...]s, the chart's, else one place
+//                a part of the song (its sections, else the bars it
+//                repeats), the same for each part alike, busier higher,
+//                solos and taps highest, and a hand map a part by what it
+//                plays: chords, runs and trills, solos, the rest
 //   PART BASS    the bass part's frets for the bassist's strumming hand, and
 //                its [map StrumMap_SlapBass]
 //   BAND BASS    the bassist, and 36 a speaker pulse on each hit: the bass
 //                part's, else the kicks, else the beat
-//   BAND DRUMS   the drummer, 36 a kick (the drums' expert kicks, else every
-//                beat the band plays) and 37 a crash (the chart's crashes,
-//                else at each section); its beat the chart's own, else by
-//                where the snares fall each bar: [allbeat], [double_time],
-//                [half_time], [nobeat]
+//   BAND DRUMS   the drummer, 36 a kick (the drums' kicks, Chart::kicks, else beats
+//                1 and 3 of each bar the band plays) and 37 a crash (the
+//                chart's crashes, else at each section); its beat the chart's
+//                own, else by where the snares fall each bar: [play] (the
+//                snare on 2 and 4), [allbeat], [double_time], [half_time],
+//                [nobeat]; with no drums charted, [play]'s alone
 //   BAND SINGER  the singer, by when there is singing; with none in the
 //                chart, the band's playing but its solos
 //   BAND KEYS    the keyboard player, by the keys part, where it has one
@@ -63,7 +67,7 @@ namespace gh2::custom
     struct StageIn
     {
         const Chart &chart;
-        const Difficulty &lead; // PART GUITAR's expert
+        const Difficulty &lead; // PART GUITAR's expert, else its highest (fullest)
         std::function<uint32_t(uint32_t)> toGh2; // chart tick to GH2 tick
         uint32_t end = 0u; // the song's [end]
         Part part = Part::Guitar; // the part PART GUITAR is, its texts and hand the chart's
@@ -90,6 +94,11 @@ namespace gh2::custom
     inline constexpr double kBandFastest = 210.0, kBandSlowest = 80.0;
     // A tempo as the band plays it.
     inline double bandBpm(double bpm) { return bpm > kBandFastest ? bpm / 2.0 : bpm < kBandSlowest ? bpm * 2.0 : bpm; }
+
+    // The made hand maps are GH2's (config/midi_parsers.dta) with this after
+    // their name: each the same but an open played as finger_open rather
+    // than a power chord (custom/install.cpp).
+    inline constexpr const char *kOpenHandMap = "_Open";
 
     // A section's name as its mood is picked by: lowercase, '_' a space, its
     // number and a trailing letter or two ("Verse 1A", "chorus_2b") left off.

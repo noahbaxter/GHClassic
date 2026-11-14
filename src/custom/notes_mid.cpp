@@ -12,9 +12,9 @@
 // taps too.
 //
 // Past the five-fret parts, each read only for the band to move by: the
-// drums' expert hits (PART DRUMS, [ExpertDrums]), when there is singing
-// (PART VOCALS, else HARM1, or [Events]' phrase_start, phrase_end and
-// lyric), the keys' expert hits, and each stage track's texts and
+// drums' expert hits, else their highest difficulty's (PART DRUMS,
+// [ExpertDrums]), when there is singing (PART VOCALS, else HARM1, or
+// [Events]' phrase_start, phrase_end and lyric), the keys' the same, and each stage track's texts and
 // animation notes as written (Chart::stage).
 
 #include "custom/chart_rules.h"
@@ -209,30 +209,38 @@ namespace gh2::custom
             return out;
         }
 
-        // PART DRUMS' expert: 96 the kick (95 the second pedal's), 97 to
-        // 100 the pads, 101 five-lane's green.
+        // PART DRUMS' expert, else its highest difficulty with hits: 96
+        // the kick (95 the second pedal's, expert's alone), 97 to 100 the
+        // pads, 101 five-lane's green; hard's 84 to 89, medium's 72 to 77,
+        // easy's 60 to 65.
         //
-        // 98 to 100 are cymbals but where a tom marker (110 to 112) is on
-        // them, Rock Band's pro drums; with no marker, a five-lane chart's
-        // 98 and 100 are its cymbals, as are a plain four-lane chart's. The
+        // Yellow, blue and green (98 to 100) are cymbals but where a tom
+        // marker (110 to 112, every difficulty's) is on them, Rock Band's
+        // pro drums; with no marker, a five-lane chart's 98 and 100 are its
+        // cymbals, as are a plain four-lane chart's. The
         // drummer's animation notes, where the chart has them, are each
         // piece as played: 26 to 29 the snare, 34 to 39, 44 and 45 the
         // crashes.
         void midDrums(const midi::Track &track, Chart &chart)
         {
-            std::vector<PadHit> padHits;
+            std::array<std::vector<PadHit>, 4> hits; // each difficulty's, by .chart's lane
             std::vector<uint32_t> animSnares, animCrashes;
             for (const midi::Event &e : track.events)
             {
                 if (!noteOn(e))
                     continue;
-                if (const uint8_t n = e.data[0]; n >= 95u && n <= 101u)
-                    addDrum(chart, padHits, e.tick, n == 95u ? 32 : n - 96);
+                if (const uint8_t n = e.data[0]; n == 95u)
+                    hits[3].push_back({e.tick, 32});
+                else if (n >= 60u && n <= 101u && (n - 60u) % 12u <= 5u)
+                    hits[(n - 60u) / 12u].push_back({e.tick, (n - 60) % 12});
                 else if (n >= 26u && n <= 29u)
                     animSnares.push_back(e.tick);
                 else if ((n >= 34u && n <= 39u) || n == 44u || n == 45u)
                     animCrashes.push_back(e.tick);
             }
+            std::vector<PadHit> padHits;
+            for (const PadHit &hit : fullest(hits))
+                addDrum(chart, padHits, hit.tick, hit.lane);
             std::map<uint8_t, Spans> toms;
             for (const Chart::Mark &m : heldNotes(track))
                 if (m.pitch >= 110u && m.pitch <= 112u)
@@ -303,12 +311,15 @@ namespace gh2::custom
             return out;
         }
 
-        // PART KEYS' expert: 96 to 100.
+        // PART KEYS' expert, 96 to 100, else its highest difficulty with
+        // hits: hard's 84 to 88, medium's 72 to 76, easy's 60 to 64.
         void midKeys(const midi::Track &track, Chart &chart)
         {
+            std::array<std::vector<uint32_t>, 4> hits;
             for (const midi::Event &e : track.events)
-                if (noteOn(e) && e.data[0] >= 96u && e.data[0] <= 100u)
-                    chart.keys.push_back(e.tick);
+                if (const uint8_t n = noteOn(e) ? e.data[0] : 0u; n >= 60u && n <= 100u && (n - 60u) % 12u <= 4u)
+                    hits[(n - 60u) / 12u].push_back(e.tick);
+            chart.keys = fullest(hits);
         }
     }
 
