@@ -56,6 +56,7 @@
 #include "settings/settings.h"
 #include "ui/list_scroll.h"
 #include "ui/transitions.h"
+#include "ui/press_size.h"
 #include "ui/text_fit.h"
 #include "ui/locale.h"
 #include "ui/menus.h"
@@ -200,6 +201,7 @@ namespace
         gh2::installPad(runtime, gh2::kSlus21447);
         gh2::list_scroll::install(runtime, gh2::kSlus21447);
         gh2::transitions::install(runtime, gh2::kSlus21447);
+        gh2::press_size::install(runtime, gh2::kSlus21447);
         gh2::text_fit::install(gh2::kSlus21447);
         gh2::installFrameStep(runtime, gh2::kSlus21447);
         gh2::installMenus(runtime);

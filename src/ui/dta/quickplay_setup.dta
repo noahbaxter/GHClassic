@@ -133,7 +133,7 @@
 {set $ghc_qp_poster_scale 30}
 ; With song defaults, the question mark in the doorway: rows across and
 ; down from where the guitarist's name stood, and times its text.
-{set $ghc_qp_unknown_pos (9 3)}
+{set $ghc_qp_unknown_pos (6 3)}
 {set $ghc_qp_unknown_size 4}
 ; The door stays open, wider than the scene has it (cs_door.mesh at 90 0
 ; 125), clear of a walk-on's wide step. Character select hands it to the
@@ -191,6 +191,9 @@
 {set $ghc_qp_angle (28 -4 -160 -5 -20)}
 ; The words this much in from the view's own left, room for the arrow's head.
 {set $ghc_qp_rows_in 45}
+; And the words alone, not their arrows, this much further left: the
+; longest clear of the door frame.
+{set $ghc_qp_words_left 6}
 {set $ghc_qp_view_frames 36}
 ; Where the view is (0 character select's, 1 the hub's) and where it is
 ; going.
@@ -283,9 +286,10 @@
             ($btn {new {outfit1.btn class_name} {elem $row 0}})
             {$btn copy outfit1.btn 0}
             {$btn set trans_parent $group}
-            {$btn set_local_pos $x $y {'+' $top {'*' {'+' $ghc_qp_row_start $i} $step}}}
+            {$btn set_local_pos {'-' $x $ghc_qp_words_left} $y {'+' $top {'*' {'+' $ghc_qp_row_start $i} $step}}}
             {$btn set text_token {elem $row 1}}
             {$btn set text_size {outfit1.btn get text_size}}
+            {press_holds_size {elem $row 0}} ; pressed, not grown toward the door
             {$group insert (objects {$group size objects}) $btn}
          }
       }
@@ -313,7 +317,7 @@
       ($words {elem {find $ghc_qp_rows {symbol $btn}} 2}) ; a focus names it in a string
       ($bar {'+' $words $ghc_qp_arrow_past})
       {$btn get_local_pos $x $y $z}
-      {set $x {'+' $x $ghc_qp_arrow_x}}
+      {set $x {'+' $x {'+' $ghc_qp_arrow_x $ghc_qp_words_left}}}
       {set $y {'+' $y $ghc_qp_arrow_y}}
       {set $z {'+' $z $ghc_qp_arrow_z}}
       {ghc_arrow_head.mesh set_local_pos $x $y $z}

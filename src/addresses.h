@@ -226,6 +226,9 @@ namespace gh2
         uint32_t uiTriggerIsBlocking;   // UITrigger::IsBlocking
         uint32_t uiComponentSendSelect; // UIComponent::SendSelect(JoypadButton, int)
         uint32_t uiSelectFrames;        // int: UIComponent's select_frames
+        // A pressed button drawn at its focused size (ui/press_size.h).
+        uint32_t bandButtonDrawShowing;   // BandButton::DrawShowing
+        uint32_t bandButtonGetStateColor; // BandButton::GetStateColor(State, Color &)
         uint32_t uiManagerPoll;
         uint32_t debugModal; // DebugModal(bool &, char *)
         uint32_t abort;
@@ -619,6 +622,8 @@ namespace gh2
         .uiTriggerIsBlocking = 0x21b2a0u,
         .uiComponentSendSelect = 0x20d748u,
         .uiSelectFrames = 0x473228u,
+        .bandButtonDrawShowing = 0x28bcb8u,
+        .bandButtonGetStateColor = 0x28bb80u,
         .uiManagerPoll = 0x214510u,
         .debugModal = 0x105a88u,
         .abort = 0x307b80u,
