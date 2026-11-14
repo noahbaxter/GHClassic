@@ -46,6 +46,10 @@ namespace gh2::custom
                 if (const std::string charter = text("charter"); !charter.empty())
                     return {0, charter};
                 return {1, "UNKNOWN CHARTER"};
+            case Sort::Genre:
+                if (const std::string genre = text("genre"); !genre.empty())
+                    return {0, genre};
+                return {1, "UNKNOWN GENRE"};
             case Sort::Title:
             {
                 // A letter's own tier, the rest before them.

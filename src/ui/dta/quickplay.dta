@@ -586,7 +586,7 @@
       ; blue and orange both as kPad_Square.
       ({&& {== $button kPad_Square} {! {pad_held orange}} {== {setlist shown} custom} {! {ui in_transition}}}
          {ghc_pick_panel open_held
-            (sort_folder sort_artist sort_title sort_charter sort_length sort_difficulty) {custom sort} blue
+            (sort_folder sort_artist sort_title sort_charter sort_genre sort_length sort_difficulty) {custom sort} blue
             ghc_option_text ghc_picked none}
          TRUE
       )
@@ -638,6 +638,7 @@
       (sort_artist "ARTIST")
       (sort_title "TITLE")
       (sort_charter "CHARTER")
+      (sort_genre "GENRE")
       (sort_length "LENGTH")
       (sort_difficulty "DIFFICULTY")
       $option

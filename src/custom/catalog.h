@@ -31,18 +31,19 @@ namespace gh2::custom
     using Snapshot = std::shared_ptr<const std::vector<Listed>>;
 
     // What the list is in tiers by: the folder each song sits in, its
-    // artist, its name's first letter, its charter, its length to the
-    // minute, or song.ini's difficulty for the part played.
+    // artist, its name's first letter, its charter, its genre, its length
+    // to the minute, or song.ini's difficulty for the part played.
     enum class Sort
     {
         Folder,
         Artist,
         Title,
         Charter,
+        Genre,
         Length,
         Difficulty,
     };
-    inline constexpr const char *kSortNames[] = {"folder", "artist", "title", "charter", "length", "difficulty"};
+    inline constexpr const char *kSortNames[] = {"folder", "artist", "title", "charter", "genre", "length", "difficulty"};
     // The sort of that name, none for another.
     inline std::optional<Sort> sortNamed(const std::string &name)
     {
