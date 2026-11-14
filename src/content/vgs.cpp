@@ -183,6 +183,11 @@ namespace gh2::vgs
         return ark::Made{size, [source](uint64_t offset, uint8_t *dst, size_t n) { return read(*source, offset, dst, n); }};
     }
 
+    void reopen(const std::string &path)
+    {
+        s_open.remove_if([&](const auto &open) { return open.first->path == path; });
+    }
+
     void serve(const std::string &path, std::function<std::unique_ptr<Pcm>()> open)
     {
         ark::addMade(path, [path, open = std::move(open)] { return made(path, open); });

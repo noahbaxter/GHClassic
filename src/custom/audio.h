@@ -22,12 +22,20 @@ namespace gh2::custom
     // with only a bass part), as the game first reads it (ark::addMaker).
     std::optional<ark::Made> madeMix(const std::string &path, const Song &song, const std::string &played);
 
-    // TRUE once every stem of the song is read into memory, for a mix of it
-    // to open with no wait on its disk. Until then they are read on a
-    // thread of their own, the last song asked about the one read, its
-    // album art first.
+    // TRUE once what the song's preview plays of its stems is read into
+    // memory, for it to play with no wait on its disk. Until then it is
+    // read on a thread of its own, the last song asked about the one read,
+    // and the rest of its stems after, for playing it. The song started
+    // (song_files.h) opens with its stems read whole.
     bool stemsReady(const Song &song);
-    // That art's bytes once read there, none before: a song folder on a
-    // network drive a scan is busy with can take a second to give them.
+    // These songs' album art read on that thread, in this order, and held
+    // while they are the ones last wanted: the first before any preview.
+    void wantArt(const std::vector<std::shared_ptr<const Song>> &songs);
+    // A song's art's bytes once read there, none before: a song folder on
+    // a network drive a scan is busy with can take a second to give them.
     std::shared_ptr<const std::vector<uint8_t>> heldArt(const Song &song);
+    // Back once that thread has read the preview and art last asked for,
+    // for a scan to leave the disk to it: a network drive serves the
+    // scan's many requests in flight before any of the list's.
+    void waitForList();
 }

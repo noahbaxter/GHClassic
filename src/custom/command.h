@@ -24,12 +24,13 @@
 //                                         now: score, stars, percent
 //                                         or FC; else NOT PLAYED
 //   {custom art <song>}                   TRUE once its album art is
-//                                         read off its disk, as ready
-//                                         reads it first:
+//                                         read off its disk, which this
+//                                         starts, and the art of the
+//                                         20 songs either side of it:
 //                                         ui/image/ghc_art_<song>.png
-//   {custom ready <song>}                 TRUE once its art and audio
-//                                         are read off its disk, which
-//                                         this starts (audio.h
+//   {custom ready <song>}                 TRUE once what its preview
+//                                         plays is read off its disk,
+//                                         which this starts (audio.h
 //                                         stemsReady)
 //   {custom level <song> guitar|bass}     that instrument's difficulty
 //                                         in song.ini, "" if it has

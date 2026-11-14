@@ -187,9 +187,14 @@
 {func ghc_preview ($p_song)
    {set $ghc_preview_rest 0}
    {if_else {custom ours $p_song}
-      {if {!= $p_song $ghc_preview_on}
-         {song_preview ''}
-         {set $ghc_preview_on ''}
+      {do
+         ; Its art and its neighbours' read on ahead from each song gone
+         ; by, the paper or not.
+         {custom art $p_song}
+         {if {!= $p_song $ghc_preview_on}
+            {song_preview ''}
+            {set $ghc_preview_on ''}
+         }
       }
       {song_preview $p_song}
    }
@@ -251,8 +256,9 @@
    }
 }
 ; The song's album art on the sticker once it is read off its disk ({custom
-; art}, asked for with its preview), so the list never waits on it: a scan
-; busy on a network drive can hold a read up a second. Put on once a song.
+; art}, which reads it and its neighbours' ahead), so the list never waits
+; on it: a scan busy on a network drive can hold a read up a second. Put on
+; once a song.
 {set $ghc_art_on ''}
 {func ghc_info_art ($a_dir)
    {do

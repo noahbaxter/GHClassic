@@ -2,6 +2,7 @@
 
 #include "content/locale.h"
 #include "content/setlists.h"
+#include "custom/audio.h"
 #include "custom/cast.h"
 #include "custom/command.h"
 #include "custom/index.h"
@@ -188,7 +189,7 @@ namespace gh2
                                                                    ++status.seen;
                                                                    const std::lock_guard lock(foundMutex);
                                                                    found.push_back(s);
-                                                               });
+                                                               }, waitForList);
                         status.running = false;
                         ticker.join();
                         catalog().keepOnly(scanned);

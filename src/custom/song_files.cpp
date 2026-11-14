@@ -2,6 +2,7 @@
 
 #include "content/games.h"
 #include "content/setlist_printout.h"
+#include "content/vgs.h"
 #include "custom/audio.h"
 #include "custom/cast.h"
 #include "custom/gh2_chart.h"
@@ -245,6 +246,9 @@ namespace gh2::custom
     {
         s_playing = std::move(song);
         s_playingId = id;
+        // Its audio opened again, read whole (audio.h), if a preview had it.
+        for (const char *suffix : {".vgs", "_bass.vgs"})
+            vgs::reopen("songs/" + id + "/" + id + suffix);
         return base(id, s_playing->parts, part);
     }
 
