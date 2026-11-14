@@ -231,10 +231,13 @@
                ; The title over the artist, 4 between.
                ($names {'+' {'*' $tn {elem $ghc_info_title 1}} {'+' 4 {'*' $an {elem $ghc_info_artist 1}}}})
                ($details {'*' {ghc_info_details $s_dir $song 0 FALSE} {elem $ghc_info_detail 1}})
+               ; Under the scan's line while it shows, never up over it.
+               ($scan {!= {custom scan} ''})
+               ($top {if_else $scan {'-' $ghc_scan_z 4} $ghc_info_top})
                ; Four gaps: over the title, either side of the first rule
                ; and over the second.
-               ($gap {/ {'-' {'-' {'-' $ghc_info_top $ghc_info_rule2} $ghc_info_rule} {'+' $names $details}} 4})
-               ($at {'-' $ghc_info_top $gap})
+               ($gap {/ {'-' {'-' {'-' $top $ghc_info_rule2} $ghc_info_rule} {'+' $names $details}} 4})
+               ($at {'-' $top {if_else $scan {max 0 $gap} $gap}})
                {ghc_info_lines $s_dir $title $ghc_info_title $ghc_info_room
                   {'+' {'-' $at {elem $ghc_info_title 1}} 2} FALSE}
                ; The artist's thin small type darker, to read as dark as
