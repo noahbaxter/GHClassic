@@ -49,10 +49,24 @@ namespace gh2::guitar
         // made then, the first time it is (custom/song_files.cpp).
         std::string s_loadingMidi;
         std::shared_ptr<const Song> s_loading;
-        std::map<uint32_t, int> s_difficultyOf; // by SongData track
+        std::map<uint32_t, int> s_difficultyOf; // by SongData gem list, AddMultiGem's track
         int s_endingDifficulty = -1;            // the gem OnGemEnd is adding's, -1 for none
 
         const Addresses *s_addresses = nullptr;
+        uint8_t *s_rdram = nullptr;
+
+        // A SongDB track (the player's) as the SongData gem list it reads,
+        // which holds every difficulty's in its own: SongData::GetGemList
+        // (0x244c40) looks it up in the vector at SongData's +0x50.
+        uint32_t gemList(uint32_t track)
+        {
+            const uint32_t db = s_rdram ? load<uint32_t>(s_rdram, s_addresses->theSongDb) : 0u;
+            const uint32_t data = db ? load<uint32_t>(s_rdram, db + 0x4u) : 0u;
+            if (data == 0u)
+                return track;
+            const uint32_t begin = load<uint32_t>(s_rdram, data + 0x50u), end = load<uint32_t>(s_rdram, data + 0x54u);
+            return begin != 0u && track < (end - begin) / 4u ? load<uint32_t>(s_rdram, begin + 4u * track) : track;
+        }
 
         // The song's (midi_file ...), in its entry's (song ...) or in it.
         std::string midiFile(uint8_t *rdram, uint32_t array)
@@ -78,6 +92,7 @@ namespace gh2::guitar
         // which both of SongDB::Load's ways reach.
         void onLoad(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
+            s_rdram = rdram;
             s_loadingMidi = midiFile(rdram, GPR_U32(ctx, 6));
             s_loading.reset();
             s_difficultyOf.clear();
@@ -177,7 +192,7 @@ namespace gh2::guitar
                        ? &it->second
                        : nullptr;
         };
-        if (const auto known = s_difficultyOf.find(track); known != s_difficultyOf.end())
+        if (const auto known = s_difficultyOf.find(gemList(track)); known != s_difficultyOf.end())
             return at(known->second);
         for (int d = 0; d < 4; ++d)
             if (const Gh2Gem *gem = at(d))

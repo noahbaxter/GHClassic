@@ -17,6 +17,9 @@
 //                            for the paper has moved its window along under
 //                            it, the provider to be filled again; -1 if it
 //                            has not moved
+//   {setlist stale}          TRUE if a live one's rows have changed since
+//                            the list last filled, a second or more ago:
+//                            the provider to be filled again
 //   {setlist header <n>}     the text of a live one's window's nth header
 //   {setlist tiers}          how many tiers a live one has (0 for the rest)
 //   {setlist tier_name <n>}  its nth tier's header text

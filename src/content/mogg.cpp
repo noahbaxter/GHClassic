@@ -28,7 +28,7 @@ namespace gh2::mogg
                            std::cerr << "[mogg] " << mogg << ": not an unencrypted mogg" << std::endl;
                            return nullptr;
                        }
-                       return vorbis::open(std::make_shared<const std::vector<uint8_t>>(std::move(*bytes)), mogg, start);
+                       return vorbis::open(heldBytes(std::make_shared<const std::vector<uint8_t>>(std::move(*bytes)), start), mogg);
                    });
     }
 }

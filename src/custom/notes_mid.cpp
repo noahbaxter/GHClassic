@@ -86,7 +86,10 @@ namespace gh2::custom
                         on = e.tick;
                     else if (on)
                     {
-                        phrases[phraseKind][difficulty].push_back({*on, e.tick - *on});
+                        // A tap phrase holds the tick it ends on too, as
+                        // Phase Shift and Clone Hero read it (YARG's MidReader).
+                        const uint32_t end = e.tick + (phraseKind == kTapPhrase ? 1u : 0u);
+                        phrases[phraseKind][difficulty].push_back({*on, end - *on});
                         on.reset();
                     }
                     continue;

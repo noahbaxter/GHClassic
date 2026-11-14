@@ -54,4 +54,6 @@ namespace gh2::vgs
     void serve(const std::string &path, std::function<std::unique_ptr<Pcm>()> open);
     // That file made now, for a path found some other way (ark::addMaker).
     std::optional<ark::Made> made(const std::string &path, std::function<std::unique_ptr<Pcm>()> open);
+    // `path`'s open decoder dropped, so its next read opens it again.
+    void reopen(const std::string &path);
 }

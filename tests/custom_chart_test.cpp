@@ -1212,6 +1212,14 @@ namespace
         hold(3360u, 96u, 60u); // chord
         hold(3360u, 97u, 60u);
         hold(3480u, 96u, 60u); // green out of it: a strum, in a .mid
+        // A Phase Shift tap phrase, its end tick's note a tap too, over
+        // the forced strums under it.
+        guitar.events.push_back({3840u, midi::kSysex, 0u, {'P', 'S', 0u, 0u, 0xffu, 4u, 1u, midi::kSysexEnd}});
+        hold(3840u, 97u, 60u);
+        hold(3840u, 102u, 60u);
+        hold(3960u, 98u, 60u);
+        hold(3960u, 102u, 60u);
+        guitar.events.push_back({3960u, midi::kSysex, 0u, {'P', 'S', 0u, 0u, 0xffu, 4u, 0u, midi::kSysexEnd}});
         std::stable_sort(guitar.events.begin(), guitar.events.end(),
                          [](const midi::Event &a, const midi::Event &b) { return a.tick < b.tick; });
         midi::Track events;
@@ -1232,7 +1240,8 @@ namespace
         CHECK(chart->sections.size() == 2u && chart->sections[1].second == "chorus_1");
         CHECK(chart->parts.count(Part::Guitar));
         const Difficulty &x = chart->parts.at(Part::Guitar)[3];
-        CHECK(x.gems.size() == 10u);
+        CHECK(x.gems.size() == 12u);
+        CHECK(at(x, 3840) && at(x, 3840)->kind == Kind::Tap && at(x, 3960) && at(x, 3960)->kind == Kind::Tap);
         CHECK(at(x, 3480) && at(x, 3480)->kind == Kind::Strum);
         CHECK(at(x, 0) && at(x, 0)->longest() == 60u);
         CHECK(at(x, 120) && at(x, 120)->kind == Kind::Hopo && !at(x, 120)->forced);
@@ -1442,7 +1451,8 @@ namespace
     }
 
     // The catalog's list: by folder then name, a song changed in place, one
-    // that stops playing or that a scan did not find gone.
+    // that stops playing or that a scan did not find gone, each once the
+    // list is made again.
     void catalogOrder()
     {
         Catalog catalog;
@@ -1457,13 +1467,14 @@ namespace
         Song changed = song("/c/b/two", "Zed");
         changed.chartTime = 1;
         catalog.put(changed);
-        CHECK(catalog.now() != now && catalog.now()->size() == 3u && catalog.now()->at(2).id == id);
+        CHECK(catalog.now() == now);
+        CHECK(catalog.refresh() != now && catalog.now()->size() == 3u && catalog.now()->at(2).id == id);
         Song broken = song("/c/a/one", "Mid");
         broken.why = "no audio";
         catalog.put(broken);
-        CHECK(catalog.now()->size() == 2u);
+        CHECK(catalog.refresh()->size() == 2u);
         catalog.keepOnly({song("/c/b/three", "Alpha")});
-        CHECK(catalog.now()->size() == 1u && !catalog.find(id));
+        CHECK(catalog.refresh()->size() == 1u && !catalog.find(id));
     }
 
     // Copies of one chart: the first by folder listed, the next once it
@@ -1483,7 +1494,7 @@ namespace
         catalog.showCopies(false);
         CHECK(catalog.now()->size() == 2u);
         catalog.keepOnly({songs[0], songs[2]});
-        CHECK(catalog.now()->size() == 2u && catalog.now()->at(0).song->dir == "/c/x/x/one");
+        CHECK(catalog.refresh()->size() == 2u && catalog.now()->at(0).song->dir == "/c/x/x/one");
     }
 
     // A copy sits in every folder it is in when listed by folder, so a

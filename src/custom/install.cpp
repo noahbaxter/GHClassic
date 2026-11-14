@@ -2,6 +2,7 @@
 
 #include "content/locale.h"
 #include "content/setlists.h"
+#include "custom/audio.h"
 #include "custom/cast.h"
 #include "custom/command.h"
 #include "custom/index.h"
@@ -18,10 +19,13 @@
 #include "settings/settings.h"
 
 #include <algorithm>
+#include <chrono>
 #include <iostream>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <thread>
+#include <unordered_set>
 
 namespace gh2
 {
@@ -143,17 +147,53 @@ namespace gh2
                         const std::vector<Song> known = readIndex(index);
                         for (const Song &song : known)
                             catalog().put(song);
+                        catalog().refresh();
                         std::cerr << "[custom] " << known.size() << " songs from the last scan" << std::endl;
                         ScanStatus &status = scanStatus();
                         status.expected = known.size();
                         status.running = true;
-                        const std::vector<Song> scanned = scan(folders, known, 32u, [&status](const Song &s)
+                        // The list made again every half second while the
+                        // scan runs, here and not by a finder: one that
+                        // waits on a slow folder leaves none of what came
+                        // before it unlisted. Every half minute the index
+                        // kept as it stands too, the last scan's songs not
+                        // yet come to still in it, so a game quit before a
+                        // long scan ends starts from what it found.
+                        std::mutex foundMutex;
+                        std::vector<Song> found;
+                        std::thread ticker([&]
+                                           {
+                                               for (int tick = 1; status.running; ++tick)
+                                               {
+                                                   std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                                                   catalog().refresh();
+                                                   if (tick % 60 != 0 || !status.running)
+                                                       continue;
+                                                   std::vector<Song> soFar;
+                                                   {
+                                                       const std::lock_guard lock(foundMutex);
+                                                       soFar = found;
+                                                   }
+                                                   std::unordered_set<fs::path::string_type> seen;
+                                                   for (const Song &s : soFar)
+                                                       seen.insert(s.dir.native());
+                                                   for (const Song &s : known)
+                                                       if (!seen.count(s.dir.native()))
+                                                           soFar.push_back(s);
+                                                   writeIndex(index, soFar);
+                                               }
+                                           });
+                        const std::vector<Song> scanned = scan(folders, known, 32u, [&](const Song &s)
                                                                {
                                                                    catalog().put(s);
                                                                    ++status.seen;
-                                                               });
+                                                                   const std::lock_guard lock(foundMutex);
+                                                                   found.push_back(s);
+                                                               }, waitForList);
                         status.running = false;
+                        ticker.join();
                         catalog().keepOnly(scanned);
+                        catalog().refresh();
                         writeIndex(index, scanned);
                         const auto copied = showCopies ? std::map<fs::path, fs::path>() : copies(scanned);
                         writeBadSongs(own / "badsongs.txt", scanned);

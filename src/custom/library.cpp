@@ -312,7 +312,7 @@ namespace gh2::custom
     // fast as how many are in flight. Each folder is listed once; a song
     // folder's listing finds its chart and stems too.
     std::vector<Song> scan(const std::vector<fs::path> &roots, const std::vector<Song> &known, unsigned workers,
-                           const std::function<void(const Song &)> &each)
+                           const std::function<void(const Song &)> &each, const std::function<void()> &before)
     {
         std::unordered_map<fs::path::string_type, const Song *> seen;
         for (const Song &s : known)
@@ -408,6 +408,8 @@ namespace gh2::custom
                                          queue.pop_front();
                                          ++busy;
                                          lock.unlock();
+                                         if (before)
+                                             before();
                                          visit(dir);
                                          lock.lock();
                                          --busy;

@@ -253,11 +253,15 @@
    (needs game_settings)
    (enter
       {gs_title.lbl set_localized "AUDIO SETTINGS"}
-      {ghc_gh1_audio_rows $this}))
+      {ghc_gh1_audio_rows $this})
+   (SELECT_START_MSG {ghc_gh1_audio_miss $this $component} kDataUnhandled)
+   (update_help_display {ghc_gh1_audio_miss $this none} kDataUnhandled))
 ; In a song the same rows are GH1's pause settings' (gh1/screens.cpp).
 (pause_audio_settings_panel
    (needs pause_audio_settings)
-   (enter {ghc_gh1_audio_rows $this}))
+   (enter {ghc_gh1_audio_rows $this})
+   (SELECT_START_MSG {ghc_gh1_audio_miss $this $component} kDataUnhandled)
+   (update_help_display {ghc_gh1_audio_miss $this none} kDataUnhandled))
 
 ; GH1's data settings have rows for a band's name, a new band and deleting
 ; one, which are GH2's band screen's.

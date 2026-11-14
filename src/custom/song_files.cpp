@@ -2,6 +2,7 @@
 
 #include "content/games.h"
 #include "content/setlist_printout.h"
+#include "content/vgs.h"
 #include "custom/audio.h"
 #include "custom/cast.h"
 #include "custom/gh2_chart.h"
@@ -196,8 +197,14 @@ namespace gh2::custom
             if (!song || song->art.empty())
                 return std::nullopt;
             const fs::path art = songPath(*song, song->art);
+            // Drawn from the bytes the list waited for ({custom art}).
+            const auto file = [song, art]
+            {
+                const auto held = heldArt(*song);
+                return held ? std::string(held->begin(), held->end()) : songFile(art);
+            };
             std::vector<uint8_t> standIn = textures::standIn(
-                textures::add({.path = utf8(art), .file = [art] { return songFile(art); }}), setlist_printout::kArtStandIn, setlist_printout::kArtStandIn);
+                textures::add({.path = utf8(art), .file = file}), setlist_printout::kArtStandIn, setlist_printout::kArtStandIn);
             return standIn.empty() ? std::nullopt : std::optional(ark::held(std::move(standIn)));
         }
     }
@@ -239,6 +246,9 @@ namespace gh2::custom
     {
         s_playing = std::move(song);
         s_playingId = id;
+        // Its audio opened again, read whole (audio.h), if a preview had it.
+        for (const char *suffix : {".vgs", "_bass.vgs"})
+            vgs::reopen("songs/" + id + "/" + id + suffix);
         return base(id, s_playing->parts, part);
     }
 

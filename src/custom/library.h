@@ -61,9 +61,11 @@ namespace gh2::custom
 
     // Every song folder under `roots`, read again where its files changed
     // since `known` saw them, `workers` folders at once. Each is given to
-    // `each` as it is found, on the worker that found it.
+    // `each` as it is found, on the worker that found it; `before` is
+    // called on a worker before it takes each folder.
     std::vector<Song> scan(const std::vector<std::filesystem::path> &roots, const std::vector<Song> &known,
-                           unsigned workers = 32u, const std::function<void(const Song &)> &each = {});
+                           unsigned workers = 32u, const std::function<void(const Song &)> &each = {},
+                           const std::function<void()> &before = {});
 
     // One folder's or .sng package's song, read whole (tests only; the game
     // reads songs through scan).
