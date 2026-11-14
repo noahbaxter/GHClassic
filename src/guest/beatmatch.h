@@ -118,12 +118,15 @@ namespace gh2::guest
         void setLastMissMs(float ms) const { set<float>(0x54u, ms); } // SendMiss sends none within 50 ms of it
         uint32_t vtable() const { return get<uint32_t>(0x78u); }
 
-        // Playable's (0x249088) opposite: hit already, or another player's.
-        bool done(int i) const
+        // Its player's (GameGem::PlayableBy, 0x2364b8): every gem but another
+        // player's in Face-Off.
+        bool mine(int i) const
         {
             const uint8_t players = gems()[i].players();
-            return played(i) || (players != 0u && ((players >> player()) & 1u) == 0u);
+            return players == 0u || ((players >> player()) & 1u) != 0u;
         }
+        // Playable's (0x249088) opposite: hit already, or another player's.
+        bool done(int i) const { return played(i) || !mine(i); }
     };
 
     // GuitarTrackWatcherImpl (ctor, 0x24d400).

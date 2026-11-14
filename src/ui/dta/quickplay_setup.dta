@@ -33,14 +33,20 @@
          {if {quickplay picked venue_game} {campaigns venues_from {quickplay pick venue_game}}}
       }
    }
-   ; A custom song's audio and chart for the instrument played, guitar or
-   ; bass (custom/song_files.h).
-   {if {custom ours {game get_song}}
-      {set_elem {find $syscfg songs {game get_song} song name} 1 {custom base {game get_song}}}
-      {set_elem {find $syscfg songs {game get_song} song midi_file} 1 {sprint {custom base {game get_song}} ".mid"}}
-   }
+   {ghc_custom_start FALSE}
    {campaigns text_outfit {game get_character_outfit}}
    {ui goto_screen loading_screen}
+}
+; A custom song's audio and chart for the instrument played, guitar or
+; bass, or with $lead its lead part, as on guitar (custom/song_files.h).
+{func ghc_custom_start ($lead)
+   {if {custom ours {game get_song}}
+      {do
+         ($base {custom base {game get_song} $lead})
+         {set_elem {find $syscfg songs {game get_song} song name} 1 $base}
+         {set_elem {find $syscfg songs {game get_song} song midi_file} 1 {sprint $base ".mid"}}
+      }
+   }
 }
 ; The venue map opens on the game's whose venue was last picked, else the
 ; menus' game's.

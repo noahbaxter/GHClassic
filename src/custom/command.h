@@ -13,6 +13,8 @@
 //   {custom base <song>}                  its files for the part it
 //                                         plays, songs/<id>/<id>; it is
 //                                         the song being started
+//   Each with a TRUE after: the part its lead, as quickplay plays on
+//   guitar, whatever the instrument picked (Face-Off's).
 //   {custom tag <song> <key>}             its song.ini's tag, rich text
 //                                         taken out; "" if it has none;
 //                                         name, as the list shows it

@@ -71,26 +71,36 @@ namespace gh2::guitar
             addCopy(scene, kWhiteMat, kBandMat, [](milo::Bytes &) { return true; });
         }
 
-        // Each band gem on the track: its frets (its reps' in order) and
-        // those with bands, an open's (no fret, one rep) its own bit.
+        // Each band gem on a track: its frets (its reps' in order) and
+        // those with bands, an open's (no fret, one rep) its own bit, and
+        // its track.
         struct BandGem
         {
             uint8_t frets, banded;
             int gap;
+            uint32_t track;
         };
         std::map<uint32_t, BandGem> s_bandGems;
         // Each band's tail, by the this its Sync takes: its rep, its mesh,
-        // its fret and, an open's, the fret lane it leaves out (-1 none).
+        // its fret and, an open's, the fret lane it leaves out (-1 none),
+        // and its track.
         struct Band
         {
             uint32_t rep, tail;
             int fret, gap;
+            uint32_t track;
         };
         std::map<uint32_t, Band> s_bands;
+        // Every track's gems and lane dividers are of the one track scene,
+        // its material and theirs the same for each.
         uint32_t s_bandMat = 0u;
         // The track's lane dividers, the first it draws over its surface.
         constexpr const char *kDividersMat = "division_lines.mat";
         uint32_t s_dividersMat = 0u;
+        // Track: its TrackConfig. The track drawing now (Track::Draw), -1
+        // for none.
+        constexpr uint32_t kTrackConfig = 0x28u;
+        int64_t s_drawingTrack = -1;
 
         // A gem added to the track: a band's first, run on to the band's
         // end.
@@ -121,7 +131,7 @@ namespace gh2::guitar
             const float from = load<float>(rdram, added.gem + kGemFrom);
             store<float>(rdram, added.gem + kGemTo, from + longest * spacing + kBandAfter);
             store<float>(rdram, added.gem + kGemTailStart, -kBandBefore);
-            s_bandGems[added.gem] = {game.slots(), banded, open ? int(chart->openBandGap) : -1};
+            s_bandGems[added.gem] = {game.slots(), banded, open ? int(chart->openBandGap) : -1, added.track};
         }
 
         // GemRep::EnableDuration, which lends the rep a tail: a band's, its
@@ -147,7 +157,7 @@ namespace gh2::guitar
                     const int fret = std::countr_zero(left);
                     if (!((band.banded >> fret) & 1u))
                         return;
-                    s_bands[syncThis(rdram, tail)] = {rep, tail, fret, band.gap};
+                    s_bands[syncThis(rdram, tail)] = {rep, tail, fret, band.gap, band.track};
                     if (s_bandMat == 0u)
                     {
                         const uint32_t cap = partObject(rdram, rep, gemRep::kCap);
@@ -277,13 +287,25 @@ namespace gh2::guitar
             }
         }
 
+        // Track::Draw, each player's track in turn, with its own camera.
+        PS2Runtime::RecompiledFunction s_trackDraw = nullptr;
+        void trackDraw(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const EntryArgs args(ctx);
+            s_drawingTrack = trackNum(rdram, ctx, runtime, args.a[0] + kTrackConfig);
+            args.restore(ctx);
+            callOriginal(rdram, ctx, runtime, s_addresses->trackDraw, s_trackDraw);
+            s_drawingTrack = -1;
+        }
+
         // PsMesh::DrawShowing: the bands drawn on the track's surface, under
         // everything on it. The track draws its surface, then its lane
         // dividers (kDividersMat), beat lines and rails, then its gems'
         // tails and gems: the bands go in before the dividers, not where
         // their tails would draw. Added, and neither tested against depth
         // nor writing their own, so the dividers, lines, rails, now bar and
-        // gems all keep theirs.
+        // gems all keep theirs. Each track's dividers are a mesh of their
+        // own on the one material: its bands go in with its own.
         PS2Runtime::RecompiledFunction s_meshDraw = nullptr;
         bool s_drawingBands = false;
         void meshDraw(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
@@ -299,7 +321,7 @@ namespace gh2::guitar
                     const EntryArgs args(ctx);
                     s_drawingBands = true;
                     for (const auto &[self, band] : s_bands)
-                        if (load<uint32_t>(rdram, band.rep + gemRep::kTail) == band.tail)
+                        if (band.track == s_drawingTrack && load<uint32_t>(rdram, band.rep + gemRep::kTail) == band.tail)
                             runtime->callGuestFunction(rdram, ctx, s_addresses->psMeshDrawShowing, {band.tail, 0u});
                     s_drawingBands = false;
                     args.restore(ctx);
@@ -331,5 +353,6 @@ namespace gh2::guitar
         EntryHook<TailSyncTag>::install(runtime, addresses.psMeshSync, onTailSync);
         onTrackGone(trackGone);
         replaceKeeping(runtime, addresses.psMeshDrawShowing, &meshDraw, s_meshDraw);
+        replaceKeeping(runtime, addresses.trackDraw, &trackDraw, s_trackDraw);
     }
 }
