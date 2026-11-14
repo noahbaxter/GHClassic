@@ -9,6 +9,7 @@
 
 #include "custom/library.h"
 
+#include <cstdint>
 #include <filesystem>
 #include <map>
 #include <memory>
@@ -30,18 +31,19 @@ namespace gh2::custom
     using Snapshot = std::shared_ptr<const std::vector<Listed>>;
 
     // What the list is in tiers by: the folder each song sits in, its
-    // artist, its name's first letter, its charter, its length to the
-    // minute, or song.ini's difficulty for the part played.
+    // artist, its name's first letter, its charter, its genre, its length
+    // to the minute, or song.ini's difficulty for the part played.
     enum class Sort
     {
         Folder,
         Artist,
         Title,
         Charter,
+        Genre,
         Length,
         Difficulty,
     };
-    inline constexpr const char *kSortNames[] = {"folder", "artist", "title", "charter", "length", "difficulty"};
+    inline constexpr const char *kSortNames[] = {"folder", "artist", "title", "charter", "genre", "length", "difficulty"};
     // The sort of that name, none for another.
     inline std::optional<Sort> sortNamed(const std::string &name)
     {
@@ -71,8 +73,13 @@ namespace gh2::custom
         void sortBy(Sort sort, const std::string &part = "guitar");
         Sort sort() const;
 
-        // The list as it is now, the same one until the next change.
+        // The list as last made, made here only when there is none (at
+        // first, or after a new sort): songs put in since wait for
+        // refresh(), which the scan calls now and then, so the game thread
+        // never sorts a big list while a scan runs.
         Snapshot now();
+        // The list made again if songs have changed since it was.
+        Snapshot refresh();
         std::shared_ptr<const Song> find(const std::string &id) const;
 
     private:
@@ -82,6 +89,9 @@ namespace gh2::custom
         std::map<std::string, std::filesystem::path::string_type> m_dirOf; // by id
         std::vector<std::filesystem::path> m_roots;
         Snapshot m_now;
+        // Each change to the songs counted, and to their order (the sort,
+        // copies shown): m_now is of the songs at m_nowVersion.
+        uint64_t m_version = 0, m_nowVersion = 0, m_order = 0;
         bool m_showCopies = false;
         Sort m_sort = Sort::Folder;
         std::string m_part = "guitar";

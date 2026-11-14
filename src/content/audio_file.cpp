@@ -15,12 +15,12 @@ namespace gh2::audio_file
 {
     namespace
     {
-        // A decoder that gives frames interleaved, its bytes held in place,
-        // each read split into channels.
+        // A decoder that gives frames interleaved, each read split into
+        // channels.
         class Interleaved : public vgs::Pcm
         {
         public:
-            explicit Interleaved(std::shared_ptr<const std::vector<uint8_t>> bytes) : m_bytes(std::move(bytes)) {}
+            explicit Interleaved(FileBytes bytes) : m_in{std::move(bytes)} {}
 
             uint32_t read(float *const *out, uint32_t most) override
             {
@@ -36,7 +36,15 @@ namespace gh2::audio_file
             // Up to `most` frames into `to`, interleaved, how many it gave.
             virtual uint32_t decode(float *to, uint32_t most) = 0;
 
-            std::shared_ptr<const std::vector<uint8_t>> m_bytes;
+            // dr_mp3's and dr_wav's reads and seeks, from m_in.
+            static size_t take(void *from, void *to, size_t n) { return static_cast<Interleaved *>(from)->m_in.take(to, n); }
+            template <typename Origin>
+            static uint32_t to(void *from, int offset, Origin origin)
+            {
+                return static_cast<Interleaved *>(from)->m_in.to(offset, origin == Origin(0) ? SEEK_SET : SEEK_CUR);
+            }
+
+            FileCursor m_in;
 
         private:
             std::vector<float> m_scratch;
@@ -56,8 +64,20 @@ namespace gh2::audio_file
 
             bool start(const std::string &name)
             {
+                static const OpusFileCallbacks kFromBytes = {
+                    [](void *from, unsigned char *to, int n) -> int
+                    {
+                        return static_cast<int>(static_cast<Opus *>(from)->m_in.take(to, static_cast<size_t>(n)));
+                    },
+                    [](void *from, opus_int64 offset, int whence) -> int
+                    {
+                        return static_cast<Opus *>(from)->m_in.to(offset, whence) ? 0 : -1;
+                    },
+                    [](void *from) -> opus_int64 { return static_cast<opus_int64>(static_cast<Opus *>(from)->m_in.at); },
+                    nullptr,
+                };
                 int error = 0;
-                m_file = op_open_memory(m_bytes->data(), m_bytes->size(), &error);
+                m_file = op_open_callbacks(this, &kFromBytes, nullptr, 0u, &error);
                 if (!m_file)
                 {
                     std::cerr << "[audio] " << name << ": Opus error " << error << std::endl;
@@ -104,7 +124,7 @@ namespace gh2::audio_file
 
             bool start(const std::string &name)
             {
-                m_started = drmp3_init_memory(&m_mp3, m_bytes->data(), m_bytes->size(), nullptr);
+                m_started = drmp3_init(&m_mp3, take, to<drmp3_seek_origin>, this, nullptr);
                 if (!m_started || m_mp3.channels < 1u)
                 {
                     std::cerr << "[audio] " << name << ": not MP3" << std::endl;
@@ -152,7 +172,7 @@ namespace gh2::audio_file
 
             bool start(const std::string &name)
             {
-                m_started = drwav_init_memory(&m_wav, m_bytes->data(), m_bytes->size(), nullptr);
+                m_started = drwav_init(&m_wav, take, to<drwav_seek_origin>, this, nullptr);
                 if (!m_started || m_wav.channels < 1u)
                 {
                     std::cerr << "[audio] " << name << ": not WAV" << std::endl;
@@ -177,7 +197,7 @@ namespace gh2::audio_file
         };
 
         template <typename Decoder>
-        std::unique_ptr<vgs::Pcm> started(std::shared_ptr<const std::vector<uint8_t>> bytes, const std::string &name)
+        std::unique_ptr<vgs::Pcm> started(FileBytes bytes, const std::string &name)
         {
             auto decoder = std::make_unique<Decoder>(std::move(bytes));
             if (!decoder->start(name))
@@ -186,12 +206,12 @@ namespace gh2::audio_file
         }
     }
 
-    std::unique_ptr<vgs::Pcm> open(std::shared_ptr<const std::vector<uint8_t>> bytes, const std::string &name)
+    std::unique_ptr<vgs::Pcm> open(FileBytes bytes, const std::string &name)
     {
-        if (!bytes)
-            return nullptr;
+        uint8_t head[128];
+        const size_t got = bytes.read ? bytes.read(0u, head, sizeof head) : 0u;
         std::string other;
-        const std::string what = kind(bytes->data(), bytes->size(), &other);
+        const std::string what = kind(head, got, &other);
         if (what == "vorbis")
             return vorbis::open(std::move(bytes), name);
         if (what == "opus")

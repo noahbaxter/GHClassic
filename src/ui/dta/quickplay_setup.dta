@@ -8,14 +8,31 @@
 ; there, in character select's doorway, by a picture of the venue
 ; (hub/hub_scene.h).
 ;
-; What a song plays with is its own casting (GameConfig::SetQuickplay,
-; 0x126828) under whatever was last picked ({quickplay pick}), put together
-; again each time, so a picker backed out of leaves nothing.
+; What a song plays with is what was last picked ({quickplay pick}), put
+; together again each time, so a picker backed out of leaves nothing. What
+; is not yet picked is the first recall's, the hub's song's casting
+; (GameConfig::SetQuickplay, 0x126828), kept as picked: else each song
+; would play its own, a custom song's own cast (custom/cast.h).
 {func ghc_qp_recall
    {game set_quickplay}
-   {if {quickplay picked outfit} {game set_character {quickplay pick outfit} TRUE}}
-   {if {quickplay picked guitar} {game set_guitar {quickplay pick guitar} {quickplay pick skin}}}
-   {if {quickplay picked venue} {game set_venue {quickplay pick venue}}}
+   {if_else {quickplay picked outfit}
+      {game set_character {quickplay pick outfit} TRUE}
+      {quickplay pick outfit {game get_character_outfit}}
+   }
+   {if_else {quickplay picked guitar}
+      {game set_guitar {quickplay pick guitar} {quickplay pick skin}}
+      {do
+         {quickplay pick guitar {game get_guitar}}
+         {quickplay pick skin {game get_guitar_skin}}
+      }
+   }
+   {if_else {quickplay picked venue}
+      {game set_venue {quickplay pick venue}}
+      {quickplay pick venue {game get_venue}}
+   }
+   {if {! {quickplay picked venue_game}}
+      {quickplay pick venue_game {ghc_venue_game {campaigns active}}}
+   }
 }
 ; The song started: with song defaults, cast as its own game casts it, in
 ; its own game's venues, its guitarist and guitar picked again by what is
@@ -33,14 +50,20 @@
          {if {quickplay picked venue_game} {campaigns venues_from {quickplay pick venue_game}}}
       }
    }
-   ; A custom song's audio and chart for the instrument played, guitar or
-   ; bass (custom/song_files.h).
-   {if {custom ours {game get_song}}
-      {set_elem {find $syscfg songs {game get_song} song name} 1 {custom base {game get_song}}}
-      {set_elem {find $syscfg songs {game get_song} song midi_file} 1 {sprint {custom base {game get_song}} ".mid"}}
-   }
+   {ghc_custom_start FALSE}
    {campaigns text_outfit {game get_character_outfit}}
    {ui goto_screen loading_screen}
+}
+; A custom song's audio and chart for the instrument played, guitar or
+; bass, or with $lead its lead part, as on guitar (custom/song_files.h).
+{func ghc_custom_start ($lead)
+   {if {custom ours {game get_song}}
+      {do
+         ($base {custom base {game get_song} $lead})
+         {set_elem {find $syscfg songs {game get_song} song name} 1 $base}
+         {set_elem {find $syscfg songs {game get_song} song midi_file} 1 {sprint $base ".mid"}}
+      }
+   }
 }
 ; The venue map opens on the game's whose venue was last picked, else the
 ; menus' game's.

@@ -23,9 +23,9 @@ namespace gh2::custom
     void readyEntries(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::vector<std::string> &ids);
 
     // The song being started, kept in the config and named by
-    // playingSong() until the next: its files for the part it plays
-    // (custom/songs.h base).
-    std::string startSong(const std::string &id, std::shared_ptr<const Song> song);
+    // playingSong() until the next: its files for `part` (custom/songs.h
+    // base).
+    std::string startSong(const std::string &id, std::shared_ptr<const Song> song, Part part);
     std::shared_ptr<const Song> playingSong();
 
     // Its files served as the game asks for them (ark::addMaker).

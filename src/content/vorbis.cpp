@@ -17,10 +17,7 @@ namespace gh2::vorbis
         class Decoder final : public vgs::Pcm
         {
         public:
-            Decoder(std::shared_ptr<const std::vector<uint8_t>> bytes, size_t from)
-                : m_held(std::move(bytes)), m_file(m_held->data() + from), m_size(m_held->size() - from)
-            {
-            }
+            explicit Decoder(FileBytes bytes) : m_in{std::move(bytes)} {}
 
             ~Decoder() override
             {
@@ -51,42 +48,29 @@ namespace gh2::vorbis
                 return static_cast<uint32_t>(n);
             }
 
-            std::shared_ptr<const std::vector<uint8_t>> m_held;
-            const uint8_t *m_file;
-            size_t m_size;
-            size_t m_at = 0u; // the decoder's read position in m_file
+            FileCursor m_in;
 
         private:
             OggVorbis_File m_vorbis{};
             bool m_decoding = false;
         };
 
-        // vorbisfile's reads, from the bytes in memory.
-        const ov_callbacks kFromMemory = {
+        const ov_callbacks kFromBytes = {
             [](void *to, size_t size, size_t count, void *from) -> size_t
             {
-                Decoder &d = *static_cast<Decoder *>(from);
-                const size_t n = size ? std::min(count, (d.m_size - d.m_at) / size) : 0u;
-                std::memcpy(to, d.m_file + d.m_at, n * size);
-                d.m_at += n * size;
-                return n;
+                return size ? static_cast<Decoder *>(from)->m_in.take(to, size * count) / size : 0u;
             },
             [](void *from, ogg_int64_t offset, int whence) -> int
             {
-                Decoder &d = *static_cast<Decoder *>(from);
-                const int64_t base = whence == SEEK_CUR ? int64_t(d.m_at) : whence == SEEK_END ? int64_t(d.m_size) : 0;
-                if (base + offset < 0 || base + offset > int64_t(d.m_size))
-                    return -1;
-                d.m_at = static_cast<size_t>(base + offset);
-                return 0;
+                return static_cast<Decoder *>(from)->m_in.to(offset, whence) ? 0 : -1;
             },
             nullptr,
-            [](void *from) -> long { return static_cast<long>(static_cast<Decoder *>(from)->m_at); },
+            [](void *from) -> long { return static_cast<long>(static_cast<Decoder *>(from)->m_in.at); },
         };
 
         bool Decoder::start(const std::string &name)
         {
-            if (const int error = ov_open_callbacks(this, &m_vorbis, nullptr, 0, kFromMemory))
+            if (const int error = ov_open_callbacks(this, &m_vorbis, nullptr, 0, kFromBytes))
             {
                 std::cerr << "[vorbis] " << name << ": Vorbis error " << error << std::endl;
                 return false;
@@ -104,11 +88,9 @@ namespace gh2::vorbis
         }
     }
 
-    std::unique_ptr<vgs::Pcm> open(std::shared_ptr<const std::vector<uint8_t>> bytes, const std::string &name, size_t from)
+    std::unique_ptr<vgs::Pcm> open(FileBytes bytes, const std::string &name)
     {
-        if (!bytes || from > bytes->size())
-            return nullptr;
-        auto decoder = std::make_unique<Decoder>(std::move(bytes), from);
+        auto decoder = std::make_unique<Decoder>(std::move(bytes));
         if (!decoder->start(name))
             return nullptr;
         return decoder;

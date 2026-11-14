@@ -43,7 +43,9 @@ namespace gh2::guitar
         constexpr uint8_t kOpenChord = 0x20u;
 
         // The lane gem i is in: its first and last gems, and its masks (a
-        // tremolo's one, a trill's two).
+        // tremolo's one, a trill's two). A Face-Off lane is the player's own
+        // gems in it: the other's (the watcher holds every gem, Playable
+        // skipping theirs, 0x249088) end it.
         struct Lane
         {
             int first = 0, last = 0;
@@ -53,7 +55,7 @@ namespace gh2::guitar
         bool laned(uint8_t *rdram, uint32_t watcher, int i, bool *start = nullptr)
         {
             const GuitarTrackWatcherImpl view(rdram, watcher);
-            if (i < 0 || i >= view.gems().size())
+            if (i < 0 || i >= view.gems().size() || !view.mine(i))
                 return false;
             const Gh2Gem *gem = watcherChartGem(rdram, watcher, i);
             if (start)

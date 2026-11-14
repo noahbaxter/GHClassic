@@ -13,6 +13,8 @@
 //   {custom base <song>}                  its files for the part it
 //                                         plays, songs/<id>/<id>; it is
 //                                         the song being started
+//   Each with a TRUE after: the part its lead, as quickplay plays on
+//   guitar, whatever the instrument picked (Face-Off's).
 //   {custom tag <song> <key>}             its song.ini's tag, rich text
 //                                         taken out; "" if it has none;
 //                                         name, as the list shows it
@@ -21,11 +23,15 @@
 //                                         difficulty played, as played
 //                                         now: score, stars, percent
 //                                         or FC; else NOT PLAYED
-//   {custom art <song>}                   TRUE if it has album art,
+//   {custom art <song>}                   TRUE once its album art is
+//                                         read off its disk, which this
+//                                         starts, and the art of the
+//                                         20 songs either side of it:
 //                                         ui/image/ghc_art_<song>.png
-//   {custom ready <song>}                 TRUE once its audio is read
-//                                         off its disk, which this
-//                                         starts (audio.h stemsReady)
+//   {custom ready <song>}                 TRUE once what its preview
+//                                         plays is read off its disk,
+//                                         which this starts (audio.h
+//                                         stemsReady)
 //   {custom level <song> guitar|bass}     that instrument's difficulty
 //                                         in song.ini, "" if it has
 //                                         none or not the part

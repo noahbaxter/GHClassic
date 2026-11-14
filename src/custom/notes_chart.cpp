@@ -26,10 +26,20 @@ namespace gh2::custom
             return s;
         }
 
+        const char *const kDiffs[] = {"Easy", "Medium", "Hard", "Expert"};
+
+        // [HardDrums] as its difficulty for `instrument`, "Drums".
+        std::optional<size_t> difficultyOf(const std::string &name, const char *instrument)
+        {
+            for (size_t d = 0; d < 4u; ++d)
+                if (name == std::string(kDiffs[d]) + instrument)
+                    return d;
+            return std::nullopt;
+        }
+
         // [ExpertSingle] as a part and difficulty.
         std::optional<std::pair<Part, size_t>> chartTrack(const std::string &name)
         {
-            static const char *const kDiffs[] = {"Easy", "Medium", "Hard", "Expert"};
             static const std::pair<const char *, Part> kParts[] = {
                 {"Single", Part::Guitar},
                 {"DoubleGuitar", Part::Coop},
@@ -60,8 +70,11 @@ namespace gh2::custom
         std::map<std::pair<Part, size_t>, std::map<uint32_t, Raw>> rawsByTrack;
         std::map<std::pair<Part, size_t>, std::optional<uint32_t>> soloOn;
         std::optional<uint32_t> phraseOn;
-        std::vector<PadHit> padHits;                    // [ExpertDrums]' pads
-        std::set<std::pair<uint32_t, int>> cymbalMarks; // by tick and the pad's lane
+        // Each difficulty's drum hits by lane, cymbal markers by tick and
+        // the pad's lane, and keys hits.
+        std::array<std::vector<PadHit>, 4> drumHits;
+        std::array<std::set<std::pair<uint32_t, int>>, 4> cymbalMarks;
+        std::array<std::vector<uint32_t>, 4> keyHits;
         std::vector<uint32_t> lyrics;
         std::istringstream in(ini::withoutBom(text));
         std::string line, section;
@@ -139,20 +152,20 @@ namespace gh2::custom
             }
             // 0 the kick (32 the second pedal's), 1 to 5 the pads, 66 to 68
             // pro drums' yellow, blue and green cymbal markers.
-            if (section == "ExpertDrums")
+            if (const auto d = difficultyOf(section, "Drums"))
             {
                 int lane = -1;
                 if (type == "N" && (fields >> lane) && (lane == 32 || (lane >= 0 && lane <= 5)))
-                    addDrum(chart, padHits, tick, lane);
+                    drumHits[*d].push_back({tick, lane});
                 else if (type == "N" && lane >= 66 && lane <= 68)
-                    cymbalMarks.insert({tick, lane - 66 + kYellowPad});
+                    cymbalMarks[*d].insert({tick, lane - 66 + kYellowPad});
                 continue;
             }
-            if (section == "ExpertKeyboard")
+            if (const auto d = difficultyOf(section, "Keyboard"))
             {
                 int lane = -1;
                 if (type == "N" && (fields >> lane) && lane >= 0 && lane <= 4)
-                    chart.keys.push_back(tick);
+                    keyHits[*d].push_back(tick);
                 continue;
             }
             const auto track = chartTrack(section);
@@ -207,12 +220,20 @@ namespace gh2::custom
         for (const auto &[track, raws] : rawsByTrack)
             settleGems(chart.parts[track.first][track.second], raws, chart.resolution, chart.hopoThreshold);
         std::erase_if(chart.parts, [](const auto &p) { return !hasGems(p.second); });
-        // Pro drums' pads toms but where a cymbal marker is on them; with
-        // no marker, every pad a cymbal.
-        const bool pro = !cymbalMarks.empty();
+        // The drums' expert, else their highest difficulty with hits. Pro
+        // drums' pads toms but where that difficulty's cymbal marker is on
+        // them; with no marker, every pad a cymbal.
+        size_t drums = 3u;
+        while (drums > 0u && drumHits[drums].empty())
+            --drums;
+        const bool pro = !cymbalMarks[drums].empty();
+        std::vector<PadHit> padHits;
+        for (const PadHit &hit : drumHits[drums])
+            addDrum(chart, padHits, hit.tick, hit.lane);
         for (PadHit &hit : padHits)
-            hit.cymbal = !pro || cymbalMarks.count({hit.tick, hit.lane}) != 0u;
+            hit.cymbal = !pro || cymbalMarks[drums].count({hit.tick, hit.lane}) != 0u;
         cymbals(chart, padHits, pro);
+        chart.keys = fullest(keyHits);
         if (chart.vocals.empty())
             chart.vocals = phrasesFrom(lyrics, chart.resolution);
         finish(chart);

@@ -32,6 +32,7 @@ namespace gh2::settings
         kExportCard, // each save also written to GHClassic.ps2, a PCSX2 card
         kTrackOnAtStart, // the player's track heard before its first hit
         kSustainReleaseMs, // a sustain let go this close to its end stays heard
+        kMissMute,   // a miss or a sustain let go early cuts the played part's track
         kWhammyHold, // a whammy bar held down bends every sustain
         kStrumLimit, // a strum within 52 ms of the last taken is dropped, as retail
         kStarPowerOverlap, // a star phrase finished during star power adds to it

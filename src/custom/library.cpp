@@ -171,14 +171,14 @@ namespace gh2::custom
 
         std::string artIn(const Source &source) { return firstOf(source, {"album.png", "album.jpg", "album.jpeg"}); }
 
-        // The lead part's expert's beats a minute as the band plays it, from
-        // its first note to its last; 0 if none.
+        // The lead part's expert's (else its highest's) beats a minute as
+        // the band plays it, from its first note to its last; 0 if none.
         float leadBpm(const Chart &chart)
         {
             for (const Part part : {Part::Guitar, Part::Coop, Part::Rhythm, Part::Bass})
-                if (const auto it = chart.parts.find(part); it != chart.parts.end() && it->second[3].gems.size() > 1u)
+                if (const auto it = chart.parts.find(part); it != chart.parts.end() && fullest(it->second).gems.size() > 1u)
                 {
-                    const std::vector<Gem> &gems = it->second[3].gems;
+                    const std::vector<Gem> &gems = fullest(it->second).gems;
                     const double beats = double(gems.back().tick - gems.front().tick) / chart.resolution,
                                  seconds = chart.seconds(gems.back().tick) - chart.seconds(gems.front().tick);
                     return seconds > 0.0 ? static_cast<float>(bandBpm(60.0 * beats / seconds)) : 0.0f;
@@ -312,7 +312,7 @@ namespace gh2::custom
     // fast as how many are in flight. Each folder is listed once; a song
     // folder's listing finds its chart and stems too.
     std::vector<Song> scan(const std::vector<fs::path> &roots, const std::vector<Song> &known, unsigned workers,
-                           const std::function<void(const Song &)> &each)
+                           const std::function<void(const Song &)> &each, const std::function<void()> &before)
     {
         std::unordered_map<fs::path::string_type, const Song *> seen;
         for (const Song &s : known)
@@ -408,6 +408,8 @@ namespace gh2::custom
                                          queue.pop_front();
                                          ++busy;
                                          lock.unlock();
+                                         if (before)
+                                             before();
                                          visit(dir);
                                          lock.lock();
                                          --busy;

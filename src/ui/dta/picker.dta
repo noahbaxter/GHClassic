@@ -58,14 +58,18 @@
       (size 1.8)
       (margin 18)
       (width 0)
-      ; The widest the list goes, its margins in, near the screen's own
-      ; width (about 950 across in 16:9, 715 in 4:3): a row wider is cut
-      ; short with an ellipsis, and the picked one scrolls along to show
-      ; the rest, a character every marquee_polls.
-      (most_width_wide 900)
-      (most_width_square 670)
+      ; The widest the list goes, its margins in, on any screen: 4:3's
+      ; width (about 715 across) less a little either side. A row wider is
+      ; cut short with an ellipsis, and the picked one scrolls along to
+      ; show the rest, a character every marquee_polls.
+      (most_width 670)
       (marquee_polls 5)
       (marquee 0)
+      ; The width is set once, as it opens, from this many rows about the
+      ; one it opened on, never growing after: a custom setlist's
+      ; thousands of sections, all measured, would hold up a frame for a
+      ; second.
+      (chunk 16)
       (enter
          {$this build}
          {$this shut}
@@ -125,22 +129,28 @@
       (open_with
          ($options $current)
          {set [options] $options}
-         {set [picked] 0}
-         {set [width] 0}
          {set [polls] 0}
-         {foreach_int $i 0 {size $options}
-            {do
-               ($wide {'*' [size] {help_bar.txt get_string_width {$this text {elem $options $i}}}})
-               {if {> $wide [width]} {set [width] $wide}}
-               {if {== {elem $options $i} $current} {set [picked] $i}}
-            }
+         {do
+            ($at 0)
+            {find_elem $options $current $at}
+            {set [picked] $at}
          }
          {set [first] [picked]}
          {set [top]
             {max 0 {min {'-' {size $options} {$this visible}} {'-' [picked] {int {/ {$this visible} 2}}}}}}
-         {set [width]
-            {min {if_else {== {rnd aspect} kWidescreenAspect} [most_width_wide] [most_width_square]}
-               {'+' [width] {'*' 2 [margin]}}}}
+         {do
+            ($n {size $options})
+            ($from {max 0 {'-' [first] {int {/ [chunk] 2}}}})
+            ($widest 0)
+            {foreach_int $k 0 {min $n [chunk]}
+               {do
+                  ($wide {'*' [size]
+                     {help_bar.txt get_string_width {$this text {elem $options {mod {'+' $from $k} $n}}}}})
+                  {if {> $wide $widest} {set $widest $wide}}
+               }
+            }
+            {set [width] {min [most_width] {'+' $widest {'*' 2 [margin]}}}}
+         }
          {set [open] TRUE}
          {if [shown] {$this reveal}}
       )

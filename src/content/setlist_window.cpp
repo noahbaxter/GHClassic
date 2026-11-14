@@ -60,10 +60,14 @@ namespace gh2::setlist_window
             active.push_back(true);
         }
         // Rows found or gone since: the song the list is on where it was
-        // on the screen.
+        // on the screen, or as far down as scroll keeps it from the top
+        // with rows above it.
         if (rows != window.from && !window.at.empty())
             if (const auto at = rowOf(window, window.at))
-                window.first = *at - std::min(*at, window.atRow);
+            {
+                window.first = *at - std::min(*at, std::max(window.atRow, kWindowEdge));
+                window.atRow = *at - window.first;
+            }
         window.from = rows;
         window.tierNames = liveHeaders;
     }

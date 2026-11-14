@@ -34,10 +34,12 @@
 {func ghc_gh1_audio_rows ($panel)
    {do
       ($dir {$panel loaded_dir})
+      {ghc_audio_miss_row $panel}
       {{$dir find gs_band.sld} set nav_down {$dir find gs_guitar.sld}}
       {{$dir find gs_guitar.sld} set nav_down {$dir find gs_sfx.sld}}
       {{$dir find gs_sfx.sld} set nav_down {$dir find gs_stereo.btn}}
-      {{$dir find gs_stereo.btn} set nav_down {$dir find gs_band.sld}}
+      {{$dir find gs_stereo.btn} set nav_down {$dir find miss.btn}}
+      {{$dir find miss.btn} set nav_down {$dir find gs_band.sld}}
       {foreach $o (gs_left_p1.btn gs_left_p2.btn)
          {if {$dir exists $o}
             {{$dir find $o} set_showing FALSE}
@@ -47,6 +49,93 @@
       }
    }
 }
+
+; Audio Settings' MISS MUTE row under STEREO: a miss or a sustain let go early
+; cuts the played part ({miss_mute}, sustain_release.cpp). Its button and box
+; are STEREO's again, made once a scene load. STEREO stands a slider's gap
+; under the last slider, in a parent of its own; the five rows close to three
+; quarters of that gap, the first where it was, so MISS MUTE stands where
+; STEREO did. GH1's scenes make it from their own enter (ghc_gh1_audio_rows),
+; and toggle it from their own select (gh1/menus.dta).
+{func ghc_audio_miss_row ($panel)
+   {if {! {$panel find miss.btn FALSE}}
+      {do
+         ($x 0) ($y 0) ($z 0) ($top 0) ($gap 0) ($step 0)
+         {{$panel find gs_band.sld} get_local_pos $x $y $top}
+         {{$panel find gs_guitar.sld} get_local_pos $x $y $z}
+         {set $gap {'-' $z $top}}
+         {set $step {'*' 0.75 $gap}}
+         {{$panel find gs_guitar.sld} set_local_pos $x $y {'+' $top $step}}
+         {{$panel find gs_sfx.sld} get_local_pos $x $y $z}
+         {{$panel find gs_sfx.sld} set_local_pos $x $y {'+' $top {'*' 2 $step}}}
+         {foreach $row ((miss.btn gs_stereo.btn) (miss.chk stereo.chk))
+            {do
+               ($from {$panel find {elem $row 1}})
+               ($parent {$from get trans_parent})
+               {new {$from class_name} {elem $row 0}}
+               {{$panel find {elem $row 0}} copy $from 0}
+               {{$panel find {elem $row 0}} set trans_parent $parent}
+               ; GH1's scene draws its row by its Group's list.
+               {if {&& $parent {== {$parent class_name} Group}}
+                  {$parent insert (objects {$parent size objects}) {$panel find {elem $row 0}}}
+               }
+               {$from get_local_pos $x $y $z}
+               {{$panel find {elem $row 0}} set_local_pos $x $y {'+' {'+' $z {'*' 3 {'-' $step $gap}}} $step}}
+               {$from set_local_pos $x $y {'+' $z {'*' 3 {'-' $step $gap}}}}
+            }
+         }
+         {{$panel find miss.btn} set text_token {symbol "MISS MUTE"}}
+         {{$panel find gs_stereo.btn} set nav_down {$panel find miss.btn}}
+         {{$panel find miss.btn} set nav_down {$panel find gs_band.sld}}
+         {{$panel loaded_dir} sync_objects}
+      }
+   }
+   {{$panel find miss.chk} set_check {miss_mute}}
+}
+; GH1's after its own select and help bar: the box toggled when it is the
+; row picked ($a_picked), and the help bar's for a box while it is lit.
+{func ghc_gh1_audio_miss ($a_panel $a_picked)
+   {if {&& {$a_panel find miss.btn FALSE} {== $a_picked {$a_panel find miss.btn}}}
+      {{$a_panel find miss.chk} toggle}
+      {miss_mute {{$a_panel find miss.chk} get_check}}
+   }
+   {if {&& {! {$a_panel slider_selected}} {== {$a_panel focus_name} miss.btn}}
+      {helpbar set_display ((fret1 help_onoff) (fret2 help_back) (strum help_updown))}
+   }
+}
+; The game's own (options.dta's AUDIO_SETTINGS_PANEL_HANDLERS), restated
+; where they change.
+#define AUDIO_MISS_ROW (
+   (enter
+      {gs_band.sld set_current {options get band_volume_idx}}
+      {gs_guitar.sld set_current {options get guitar_volume_idx}}
+      {gs_sfx.sld set_current {options get fx_volume_idx}}
+      {stereo.chk set_check {options get_stereo}}
+      {ghc_audio_miss_row $this}
+   )
+   (update_help_display
+      {if_else {$this slider_selected}
+         {helpbar set_display ((fret1 help_confirm) (fret2 help_cancel) (strum help_adjvol))}
+         {if_else {|| {== [focus_component] "gs_stereo.btn"} {== [focus_component] "miss.btn"}}
+            {helpbar set_display ((fret1 help_onoff) (fret2 help_back) (strum help_updown))}
+            {helpbar set_display ((fret1 help_select) (fret2 help_back) (strum help_updown))}
+         }
+      }
+   )
+   (SELECT_START_MSG
+      {switch $component
+         (gs_band.sld {$this set orig_vol {gs_band.sld current}})
+         (gs_guitar.sld {$this set orig_vol {gs_guitar.sld current}})
+         (gs_sfx.sld {$this set orig_vol {gs_sfx.sld current}})
+         (gs_stereo.btn {stereo.chk toggle} {options set_stereo {stereo.chk get_check}})
+         (miss.btn {miss.chk toggle} {miss_mute {miss.chk get_check}})
+         kDataUnhandled
+      }
+      {$this update_help_display}
+   )
+)
+{amend audio_settings_panel AUDIO_MISS_ROW}
+{amend pause_audio_settings_panel AUDIO_MISS_ROW}
 
 ; The options menu, as the game's own (options.dta) with its Audio and Video
 ; rows folded into one Settings row, as the pause menu has: Settings, Manage

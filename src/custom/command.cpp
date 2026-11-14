@@ -18,6 +18,31 @@ namespace gh2::custom
 {
     namespace
     {
+        // The art of the song on and of the songs either side of it in the
+        // list, nearest first, read ahead for a scroll to find it there.
+        void artAround(const std::string &id)
+        {
+            constexpr ptrdiff_t kAround = 20;
+            // Again for the same song once the list is made again under it.
+            static std::string s_on;
+            static Snapshot s_list;
+            const Snapshot list = catalog().now();
+            if (id == s_on && list == s_list)
+                return;
+            s_on = id;
+            s_list = list;
+            const auto it = std::find_if(list->begin(), list->end(), [&](const Listed &l) { return l.id == id; });
+            if (it == list->end())
+                return wantArt({catalog().find(id)});
+            const ptrdiff_t at = it - list->begin(), n = static_cast<ptrdiff_t>(list->size());
+            std::vector<std::shared_ptr<const Song>> songs{it->song};
+            for (ptrdiff_t d = 1; d <= kAround; ++d)
+                for (const ptrdiff_t i : {at + d, at - d})
+                    if (i >= 0 && i < n)
+                        songs.push_back((*list)[static_cast<size_t>(i)].song);
+            wantArt(songs);
+        }
+
         // A chart's sections by name at most, each a locale token.
         constexpr size_t kMostSections = 200u;
 
@@ -93,7 +118,11 @@ namespace gh2::custom
                 return call.word(text);
             }
             if (op == "art")
-                return {song && !song->art.empty() ? 1u : 0u, script::kInt};
+            {
+                if (song)
+                    artAround(id);
+                return {song && heldArt(*song) ? 1u : 0u, script::kInt};
+            }
             if (op == "ready")
                 return {song && stemsReady(*song) ? 1u : 0u, script::kInt};
             if (op == "level")
@@ -105,13 +134,17 @@ namespace gh2::custom
                 return call.word(lengthText(song ? song->length : 0.0));
             if (op == "best")
                 return call.word(bestLine(id));
+            // The part it plays: quickplay's instrument's, or with a TRUE
+            // after the rest its lead, as on guitar (Face-Off's).
+            const auto part = [&](int lead)
+            { return call.size() > lead && call.number(lead) != 0.0f ? playedPart(song->parts) : played(*song); };
             if (op == "base")
             {
                 if (!song)
                     return {0u, script::kSymbol};
-                return call.word(startSong(id, song));
+                return call.word(startSong(id, song, part(3)));
             }
-            const uint8_t mask = song ? static_cast<uint8_t>((song->charted >> (4 * int(played(*song)))) & 0xfu) : 0xfu;
+            const uint8_t mask = song ? static_cast<uint8_t>((song->charted >> (4 * int(part(4)))) & 0xfu) : 0xfu;
             const int wanted = static_cast<int>(call.number(3));
             if (op == "has")
                 return {(mask >> std::clamp(wanted, 0, 3)) & 1u, script::kInt};

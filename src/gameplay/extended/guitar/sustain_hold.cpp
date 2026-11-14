@@ -261,7 +261,8 @@ namespace gh2::guitar
 
         // GuitarTrackWatcherImpl::FretButtonDown(int slot): an open's
         // sustain, held with no fret, let go by any; one under later gems
-        // held whatever is pressed, as Clone Hero's.
+        // of the player's own (Face-Off's other player's aside) held
+        // whatever is pressed, as Clone Hero's.
         struct FretDownTag;
         void onFretDown(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
@@ -272,11 +273,14 @@ namespace gh2::guitar
                 return;
             const EntryArgs args(ctx);
             const float now = watcherNow(rdram, ctx, runtime, watcher);
-            const guest::GameGemList gems = TrackWatcherImpl(rdram, watcher).gems();
+            const TrackWatcherImpl view(rdram, watcher);
+            const guest::GameGemList gems = view.gems();
             std::erase_if(found->second, [&](const Held &held)
                           {
-                              if (held.lanes != 0u ||
-                                  (held.gem + 1 < gems.size() && gems[held.gem + 1].ms() < held.end))
+                              int next = held.gem + 1;
+                              while (next < gems.size() && !view.mine(next))
+                                  ++next;
+                              if (held.lanes != 0u || (next < gems.size() && gems[next].ms() < held.end))
                                   return false;
                               if (held.end > now)
                                   letGo(rdram, ctx, runtime, watcher, held, now);
