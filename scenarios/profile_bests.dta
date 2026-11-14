@@ -18,7 +18,9 @@
 (wait_screen endgame_screen 120)
 (wait 1)
 (expect {best score {game get_song} expert} 0)
-(press green)
+; Past its high score table, where a guest types a name, to the screen
+; after it.
+{ui goto_screen complete_screen}
 (wait_screen complete_screen 30)
 
 {ghc_profile make 0 "The Testers"}
@@ -38,6 +40,10 @@
 (wait 1)
 (expect {game get_difficulty_sym 0} expert)
 (expect {== {best score {game get_song} expert} {player0 score}} 1)
+; Its high score table: the profile's run goes in, green past it.
+(press green)
+(wait_screen highscore_screen 30)
+(wait 1)
 (press green)
 (wait_screen complete_screen 30)
 

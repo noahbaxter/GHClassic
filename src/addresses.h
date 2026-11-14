@@ -107,6 +107,7 @@ namespace gh2
         uint32_t trackConfigTrackNum;         // TrackConfig::TrackNum
         uint32_t songDbGetGem;                // SongDB::GetGem(int track, int gem), a GameGem *
         uint32_t songDbIsStarPhraseEnd;       // SongDB::IsStarPhraseEnd(int track, int gem) const
+        uint32_t songDbGetBaseMaxPoints;      // SongDB::GetBaseMaxPoints(int player) const: its stars' measure
         uint32_t gemManagerAdvanceEnd;        // GemManager::AdvanceEnd, which adds the next gem to the track
         uint32_t gemManagerOnMissPhrase;      // GemManager::OnMissPhrase(int gem)
         uint32_t gemSetType;                  // Gem::SetType(GemRep::Type), each of its reps'
@@ -491,6 +492,7 @@ namespace gh2
         .trackConfigTrackNum = 0x152480u,
         .songDbGetGem = 0x11cf78u,
         .songDbIsStarPhraseEnd = 0x11dab8u,
+        .songDbGetBaseMaxPoints = 0x11cee8u,
         .gemManagerAdvanceEnd = 0x156868u,
         .gemManagerOnMissPhrase = 0x1570b0u,
         .gemSetType = 0x157b60u,

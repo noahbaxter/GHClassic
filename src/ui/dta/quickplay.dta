@@ -668,6 +668,8 @@
 ; The UI gets yellow as kPad_Circle and red as kPad_Tri.
 {func ghc_qp_button ($button)
    {cond
+      ; Only where its screen has it: one not loaded says it is showing.
+      ({&& {ghc_scores_panel loaded_dir} {ghc_scores_panel showing}} {ghc_scores_panel button $button})
       ({ghc_pick_button $button} TRUE)
       ; Back to the show's setup (quickplay_setup.dta), or practice's
       ; Training.
@@ -714,14 +716,14 @@
          ; A custom setlist's opens on RANDOM SONG, green straight away
          ; jumping to one.
          ; Practice's speed is its pause menu's, and it has no song
-         ; defaults.
+         ; defaults or high scores.
          {do
             ($p {== {gamecfg get mode} practice})
             {if_else {== {setlist shown} custom}
                {ghc_pick_panel open_sticky
-                  {if_else $p (random instrument) (random speed song_defaults instrument)} random}
+                  {if_else $p (random instrument) (random speed scores song_defaults instrument)} random}
                {ghc_pick_panel open_sticky
-                  {if_else $p (instrument) (speed song_defaults instrument)}
+                  {if_else $p (instrument) (speed scores song_defaults instrument)}
                   {if_else $p instrument speed}}
             }
          }
@@ -730,10 +732,12 @@
       (TRUE kDataUnhandled)
    }
 }
-; Select's menu (picker.dta): each row a setting, green flips it.
+; Select's menu (picker.dta): each row a setting, green flips it, or a
+; thing to do.
 {func ghc_qp_option_text ($option)
    {switch $option
       (random "RANDOM SONG")
+      (scores "HIGH SCORES")
       ; Changed as practice's is (ghc_pick_edit, content/song_speed.h).
       (speed {sprint "SPEED: " {song_speed} "%"})
       (song_defaults
@@ -753,19 +757,24 @@
    }
 }
 {func ghc_qp_chose ($c_panel $option)
-   {if_else {== $option random}
-      {do
+   {cond
+      ({== $option random}
          {ghc_pick_panel shut}
          {$c_panel ghc_random}
-      }
-      {do
+      )
+      ({== $option scores}
+         {ghc_pick_panel shut}
+         {synth play_sequence button_select}
+         {ghc_scores_panel open}
+      )
+      (TRUE
          {switch $option
             (song_defaults {quickplay song_defaults {! {quickplay song_defaults}}})
             (instrument {custom instrument {if_else {== {custom instrument} bass} guitar bass}})
          }
          {synth play_sequence button_toggle}
          {ghc_pick_panel relabel}
-      }
+      )
    }
 }
 ; Select's menu's rows that are values (picker.dta's ghc_pick_edit): the
@@ -827,9 +836,47 @@
       )
    }
 }
+; Select's HIGH SCORES: the song's board on player 0's difficulty, as the
+; high score screen shows it (highscore_panel.dta), its wall and all, in
+; place of the list and its backdrop; the screen stays, its preview
+; playing. Red, green or select puts it away.
+{if {! {exists ghc_scores_panel}} {new GHPanel ghc_scores_panel}}
+{retype ghc_scores_panel
+   (
+      (file ui/highscore.milo)
+      ; The screen's own, out of sight while it is up.
+      (under (meta sel_song_panel sel_song_twin_panel))
+      (enter {$this set_showing FALSE})
+      (open
+         {foreach $p [under] {$p set_showing FALSE}}
+         {ghc_score_stats $this}
+         {foreach_int $i 1 6
+            {{$this find {sprintf "hs_entry%d.ten" $i}} set_showing FALSE}
+            {{$this find {sprintf "hs_name%d.lbl" $i}} set_showing TRUE}
+            {ghc_score_slot $this $i {'-' $i 1}}
+         }
+         {{$this find hs_start.lbl} set_showing FALSE}
+         {{$this find hs_flush.tnm} set_frame 0}
+         {$this set_showing TRUE}
+         {helpbar set_display ((fret2 help_back))}
+      )
+      (shut
+         {$this set_showing FALSE}
+         {foreach $p [under] {$p set_showing TRUE}}
+         {synth play_sequence button_back.cue}
+         {ghc_qp_helpbar}
+      )
+      ; Every press while it is up.
+      (button
+         ($button)
+         {if {|| {== $button kPad_Tri} {== $button kPad_X} {== $button kPad_Select}} {$this shut}}
+         TRUE
+      )
+   )
+}
 {retype qp_selsong_screen
    (
-      (panels meta sel_song_panel helpbar ghc_pick_panel)
+      (panels meta sel_song_panel ghc_scores_panel helpbar ghc_pick_panel)
       (focus sel_song_panel)
       (sel_song_career FALSE)
       ; Back from a song in another game's venue (quickplay_pickers.dta), the
@@ -848,7 +895,7 @@
 {if {! {exists qp_selsong_twin_screen}} {new GHScreen qp_selsong_twin_screen}}
 {retype qp_selsong_twin_screen
    (
-      (panels meta sel_song_twin_panel helpbar ghc_pick_panel)
+      (panels meta sel_song_twin_panel ghc_scores_panel helpbar ghc_pick_panel)
       (focus sel_song_twin_panel)
       (sel_song_career FALSE)
       ; Back from a song in another game's venue (quickplay_pickers.dta), the
