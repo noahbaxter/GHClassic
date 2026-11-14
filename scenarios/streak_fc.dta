@@ -1,6 +1,7 @@
 ; The streak counter's digits purple while the run is a full combo, every
 ; gem hit in one streak, and white once a miss has broken it: the first 70
-; gems played, ten left to pass by, then 70 more.
+; gems played, ten left to pass by, then 70 more; then a run missing its
+; first ten.
 #include common/first_boot.dta
 {gamecfg set mode quickplay}
 {game set_song shoutatthedevil}
@@ -18,4 +19,13 @@
 (wait_until {>= {player0 current_streak} 60} 120)
 (expect {streak_counter_fc 0} 0)
 (shot broken_white)
+; Again from the start, the first ten passed by before any is hit: no full
+; combo, though the streak is every gem hit.
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait_until {> {ghc_play gems} 0})
+{ghc_play play 10 70}
+(wait_until {>= {player0 current_streak} 60} 120)
+(expect {streak_counter_fc 0} 0)
+(shot missed_first_white)
 (quit)

@@ -45,13 +45,17 @@
 
 {func streak_counter_coop {== {gamecfg get mode} multi_coop}}
 
-; A player's full combo still alive: every gem hit so far in one streak. A
-; miss, a pass or an overstrum ends the streak, which never again catches up
-; with the gems hit, as {campaigns finished} keeps a full combo.
+; A player's full combo still alive: no miss or pass yet this song, and
+; every gem hit so far in one streak. An overstrum ends the streak, which
+; never again catches up with the gems hit, as {campaigns finished} keeps a
+; full combo; a miss before the first hit leaves both at 0, so it is kept
+; as it comes.
+{set $streak_counter_broken0 FALSE}
+{set $streak_counter_broken1 FALSE}
 {func streak_counter_fc ($player)
    {if_else {== $player 0}
-      {== {player0 current_streak} {player0 gems_hit}}
-      {== {player1 current_streak} {player1 gems_hit}}
+      {&& {! $streak_counter_broken0} {== {player0 current_streak} {player0 gems_hit}}}
+      {&& {! $streak_counter_broken1} {== {player1 current_streak} {player1 gems_hit}}}
    }
 }
 
@@ -69,6 +73,7 @@
 }
 
 {func streak_counter_break ($player)
+   {if_else {== $player 0} {set $streak_counter_broken0 TRUE} {set $streak_counter_broken1 TRUE}}
    {if_else {streak_counter_coop}
       {do
          {set $streak_counter_band 0}
@@ -117,6 +122,8 @@
 
 {func streak_counter_enter
    {set $streak_counter_band 0}
+   {set $streak_counter_broken0 FALSE}
+   {set $streak_counter_broken1 FALSE}
    {set $streak_counter_display1 {hud find streak_counter1}}
    ; A second only in face-off, whatever else the HUD holds.
    {set $streak_counter_display2 {if_else {== {gamecfg get mode} multi_fo} {hud find streak_counter2} 0}}
