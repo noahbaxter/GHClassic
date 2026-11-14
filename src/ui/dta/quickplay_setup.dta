@@ -411,6 +411,7 @@
 ; its own: the question mark does instead.
 {func ghc_qp_show_guitarist ($panel)
    {ghc_qp_unpark $panel}
+   {set $ghc_qp_standing none}
    {set $ghc_qp_posed TRUE}
    {set $ghc_qp_posed_at 0}
    {{$panel find ghc_unknown.lbl} set_showing {quickplay song_defaults}}
@@ -434,6 +435,23 @@
             {set $ghc_qp_parked TRUE}
          }
          {ghc_preshow_char show_char 0 {ghc_preshow_name {game get_character_outfit}}}
+         {set $ghc_qp_standing {game get_character_outfit}}
+      }
+   }
+}
+; Song defaults turned off or on in the hub (ghc_defaults.btn): a guitarist
+; already shown there, in the outfit still to play, only shown or hidden,
+; never placed again behind an empty doorway.
+{set $ghc_qp_standing none}
+{func ghc_qp_toggle_guitarist ($panel)
+   {do
+      ($char {ghc_preshow_char get_char 0})
+      {if_else {&& $char $ghc_qp_posed {== $ghc_qp_posed_at 0} {== $ghc_qp_standing {game get_character_outfit}}}
+         {do
+            {{$panel find ghc_unknown.lbl} set_showing {quickplay song_defaults}}
+            {$char set_showing {! {quickplay song_defaults}}}
+         }
+         {ghc_qp_show_guitarist $panel}
       }
    }
 }
@@ -612,7 +630,7 @@
                {quickplay song_defaults {! {quickplay song_defaults}}}
                {ghc_qp_sync_rows sel_character_panel}
                {ghc_qp_show_venue sel_character_panel}
-               {ghc_qp_show_guitarist sel_character_panel}
+               {ghc_qp_toggle_guitarist sel_character_panel}
             )
          }
          kDataUnhandled
