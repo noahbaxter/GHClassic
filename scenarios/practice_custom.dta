@@ -39,6 +39,23 @@
 (wait 6)
 (expect {'/' {'-' {taskmgr seconds} $ghc_s0} {'-' {taskmgr ui_seconds} $ghc_t0}} 0.9 0.03)
 (shot playing)
+; Solo Stems is off on its page, unchecked though set, and does nothing.
+(press start)
+(wait_screen pract_pause_screen 10)
+{ui goto_screen ghc_practice_options_screen}
+(wait_screen ghc_practice_options_screen 10)
+(wait 0.5)
+(expect {practice_option solo_stems} 1)
+(expect {== {{ghc_practice_options_panel find widescreen.btn} get_state} kDisabled} 1)
+(expect {{ghc_practice_options_panel find widescreen.chk} get_check} 0)
+(shot no_stems)
+{ghc_practice_options_panel set_focus widescreen.btn}
+(press green)
+(wait 0.2)
+(expect {practice_option solo_stems} 1)
+(expect $ghc_practice_reload FALSE)
+(press start)
+(wait_screen practice_game_screen 10)
 (wait_until {> $ghc_practice_best 0} 120)
 (expect $ghc_practice_best 100)
 ; Autoplay misses nothing and strums nothing stray: the crown.

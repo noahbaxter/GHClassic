@@ -47,6 +47,8 @@
 (press down)
 (press down)
 (press down)
+(expect {pract_pause_panel focus_name} ghc_settings_career.btn)
+(press down)
 (expect {pract_pause_panel focus_name} quit_career.btn)
 (shot career_practice_pause)
 (press green)

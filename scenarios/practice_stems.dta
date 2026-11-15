@@ -56,4 +56,12 @@
 {set $ghc_from {practice_clicks played}}
 (wait 15)
 (expect {> {'-' {practice_clicks played} $ghc_from} 10} 1)
+; Its page's Solo Stems row is on.
+(press start)
+(wait_screen pract_pause_screen 10)
+{ui goto_screen ghc_practice_options_screen}
+(wait_screen ghc_practice_options_screen 10)
+(wait 0.5)
+(expect {== {{ghc_practice_options_panel find widescreen.btn} get_state} kDisabled} 0)
+(expect {{ghc_practice_options_panel find widescreen.chk} get_check} 1)
 (quit)

@@ -363,6 +363,10 @@ namespace gh2::song_speed
         std::vector<std::array<uint32_t, 3>> s_muted;
 
         // A song block's channels not the played part's put at -96 dB: the
+        // guitar's, else bass or rhythm's, never a drum track a hack's song
+        // has. TRUE if the part has channels of its own; with `apply`
+        // false, nothing is muted.
+        bool solo(uint8_t *rdram, uint32_t block, bool guitar, bool apply)
         {
             // (tracks ((guitar (2 3)) (bass 4))), (vols (-3.5 ...)): each's list.
             const auto list = [&](const char *key) -> uint32_t
@@ -380,6 +384,8 @@ namespace gh2::song_speed
             for (int t = 0; t < sizeOf(rdram, tracks); ++t)
             {
                 const uint32_t track = load<uint32_t>(rdram, nodeAt(rdram, tracks, t));
+                const std::string name = symbolAt(rdram, nodeAt(rdram, track, 0));
+                if ((guitar ? name != "guitar" : name != "bass" && name != "rhythm") || sizeOf(rdram, track) < 2)
                     continue;
                 const uint32_t channels = nodeAt(rdram, track, 1);
                 const bool many = load<uint32_t>(rdram, channels + 4u) == script::kArray;
@@ -391,6 +397,8 @@ namespace gh2::song_speed
                         mine[channel] = any = true;
                 }
             }
+            if (!any || !apply)
+                return any;
             for (int c = 0; c < sizeOf(rdram, vols); ++c)
                 if (static_cast<size_t>(c) >= mine.size() || !mine[c])
                 {
@@ -406,6 +414,8 @@ namespace gh2::song_speed
         // same, and the song playing in practice goes to it as it plays.
         // {song_speed name <audio name>}: that name at the speed; base: as
         // it was. {song_speed solo <song block> <guitar>}: only the played
+        // part heard (solo), TRUE if it can be; soloable: TRUE if it can
+        // be, nothing muted; unsolo: all of it again.
         // {song_speed practice <bool>}: whether the song made next plays in
         // practice (its BeatMatch's constructor). {song_speed playing}: the
         // speed the song in play plays at (playing()).
@@ -420,8 +430,11 @@ namespace gh2::song_speed
                 return {static_cast<uint32_t>(playing()), script::kInt};
             if (op == "live" && s_practice && s_beatMatch != 0u && s_percent != s_playing)
                 playAtSpeed(call.rdram, call.ctx, call.runtime);
+            if (op == "solo" || op == "soloable")
             {
                 const script::Node block = call.arg(2);
+                return {block.type == script::kArray && solo(call.rdram, block.value, call.number(3) != 0.0f, op == "solo"),
+                        script::kInt};
             }
             if (op == "unsolo")
             {

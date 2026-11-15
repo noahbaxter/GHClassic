@@ -26,6 +26,7 @@
 #include <cmath>
 
 #include <atomic>
+#include <set>
 #include <string>
 
 namespace ps2_stubs
@@ -149,10 +150,14 @@ namespace gh2
                                                                                 : SongScreen::kOther);
             // Practice draws no venue, which holds the seats in a song
             // (native_rnd.cpp), so its song's own screens do, from its
-            // loading on.
-            practicing(name == "practice_loading_screen" || name == "practice_game_screen" ||
-                       name == "pract_pause_screen" || name == "practice_pause_controller_screen" ||
-                       name == "practice_change_speed_screen" || name == "practice_end_screen");
+            // loading on: GH2's and ours, its pause settings' twins among
+            // them (ui/dta/game_settings.dta).
+            static const std::set<std::string> kPractice = {
+                "practice_loading_screen",     "practice_game_screen",      "pract_pause_screen",
+                "practice_pause_controller_screen", "ghc_practice_again_screen", "ghc_practice_settings_screen",
+                "ghc_practice_options_screen", "ghc_practice_audio_screen", "ghc_practice_video_screen",
+                "ghc_practice_game_screen",    "ghc_practice_controllers_screen", "ghc_practice_lag_screen"};
+            practicing(kPractice.count(name) != 0u);
         }
     }
 

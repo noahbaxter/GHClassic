@@ -1,0 +1,79 @@
+; Practice's settings from its pause menu: Settings in New Song's place
+; opens a song's settings over practice's own panels, Audio among them and
+; back, and a fifth row, Practice, whose rows each switch a box (the
+; metronome taken live). Red goes back a menu at a time, and the part alone
+; or not takes the song up again from the section's start as it resumes.
+#include common/first_boot.dta
+{practice_option metronome 0}
+{practice_option solo_stems 1}
+{gamecfg set mode practice}
+{game set_song shoutatthedevil}
+{gamecfg set_track 0 0}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{ui goto_screen practice_sel_section_screen}
+(wait_screen practice_sel_section_screen)
+(wait 1)
+{gamecfg set (practice_sections 0) 1}
+{gamecfg set (practice_sections 1) 2}
+{ui goto_screen practice_loading_screen}
+(wait_screen practice_game_screen 60)
+(expect $ghc_practice_solo 1)
+(wait 3)
+(press start)
+(wait_screen pract_pause_screen 10)
+(wait 0.5)
+(press down)
+(press down)
+(press down)
+(press down)
+(expect {pract_pause_panel focus_name} newsong.btn)
+(shot pause_settings_row)
+(press green)
+(wait_screen ghc_practice_settings_screen 10)
+(wait 0.5)
+(shot settings_hub)
+; Audio, over practice's panels, and back.
+(press green)
+(wait_screen ghc_practice_audio_screen 10)
+(wait 0.5)
+(shot settings_audio)
+(press red)
+(wait_screen ghc_practice_settings_screen 10)
+(wait 0.5)
+(press down)
+(press down)
+(press down)
+(expect {pause_settings_panel focus_name} video_options.btn)
+(press green)
+(wait_screen ghc_practice_options_screen 10)
+(wait 0.5)
+(press green)
+(wait 0.3)
+(expect {practice_option metronome} 1)
+(expect {{ghc_practice_options_panel find lefty1.chk} get_check} 1)
+; Three rows, no Keep Pitch (settings.ini's maintain_pitch): Solo Stems
+; third, and down from it round to the first.
+(press down)
+(press down)
+(expect {ghc_practice_options_panel focus_name} widescreen.btn)
+(expect {{ghc_practice_options_panel find p_scan.btn} showing} 0)
+(press down)
+(expect {ghc_practice_options_panel focus_name} gs_left_p1.btn)
+(press up)
+(press green)
+(wait 0.3)
+(expect {practice_option solo_stems} 0)
+(shot practice_page)
+(press red)
+(wait_screen ghc_practice_settings_screen 10)
+(press red)
+(wait_screen pract_pause_screen 10)
+(wait 0.5)
+(press start)
+(wait_screen practice_game_screen 60)
+(wait 1)
+(expect $ghc_practice_solo 0)
+{practice_option metronome 0}
+{practice_option solo_stems 1}
+(quit)
