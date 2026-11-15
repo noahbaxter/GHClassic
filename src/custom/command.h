@@ -32,9 +32,13 @@
 //                                         plays is read off its disk,
 //                                         which this starts (audio.h
 //                                         stemsReady)
-//   {custom level <song> guitar|bass}     that instrument's difficulty
-//                                         in song.ini, "" if it has
-//                                         none or not the part
+//   {custom level <song> <instrument>}    guitar, rhythm, bass, drums,
+//                                         vocals or keys: its difficulty in
+//                                         song.ini, "" if it has none
+//                                         or not the part
+//   {custom track <song> <instrument>}    TRUE if its chart has a track
+//                                         for guitar (any), lead, rhythm,
+//                                         bass, drums or vocals
 //   {custom sort [sort_<name>]}           the list's sort (catalog.h's
 //                                         Sort); with one, TRUE if it
 //                                         is that now and was not
