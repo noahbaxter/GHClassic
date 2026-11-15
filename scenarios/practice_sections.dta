@@ -19,6 +19,9 @@
 (expect {gamecfg get (practice_sections 1)} -1)
 (expect {< {taskmgr seconds} 3} 1)
 (wait 4)
+; The whole song's map: a tick at each of its sections but the first.
+(expect {practice_panel get map_ticks} {'-' {practice_section_count} 1})
+(shot full_song_map)
 (press start)
 (wait_screen pract_pause_screen 20)
 (wait 1)
@@ -68,11 +71,19 @@
 {do ($a 0) ($b 0) {gamecfg get_section_bounds 4 $a $b} {set $ghc_to {/ $b 1000}}}
 (print {taskmgr seconds} " " $ghc_from " " $ghc_to)
 (expect {&& {< {taskmgr seconds} $ghc_from} {> {taskmgr seconds} {'-' $ghc_from 5}}} 1)
+; The map under the stats empty in the bar ahead, filling through the
+; two sections, a tick where the second starts.
+(expect {practice_panel get map_fill} 0 0.01)
+(expect {{practice_panel find ghc_map_tick0_mid.mesh} showing} 1)
 (wait 4)
 (record off)
 (shot jumped)
+(wait_until {> {practice_panel get map_fill} 0.5} 60)
+(shot map_half)
+(wait_until {> {practice_panel get map_fill} 0.95} 60)
 (wait_until {> $ghc_practice_best 0} 120)
 (wait 1)
 (expect {< {taskmgr seconds} $ghc_from} 1)
 (expect $ghc_practice_best 100)
+(expect {practice_panel get map_fill} 0 0.01)
 (quit)

@@ -12,6 +12,7 @@
 //   {practice_option metronome|note_click|solo_stems [<0 or 1>]}
 //   the setting, set first if given: a click each beat, one each note, and
 //   the part played alone on its own stem with drum clicks where it can be.
+//   {practice_section_count}: the song's practice sections.
 
 #include "addresses.h"
 

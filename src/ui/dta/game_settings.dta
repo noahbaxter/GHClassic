@@ -652,6 +652,68 @@
             {ghc_crown.mesh set_showing $ghc_practice_fc}
          }
       }
+      {$this map_poll}
+   )
+   ; Under the stats, how far through the sections played it is: from the
+   ; first's start (not the bar ahead of it) to the last's end, a tick
+   ; where each of the others starts; the whole song's sections in Full
+   ; Song. Read off the song's clock, so speed changes and restarts carry.
+   (map_tall 6)
+   (map_fill 0) ; 0 to 1
+   (map_for '') ; the sections its ticks are for
+   (map_start 0)
+   (map_end 1)
+   (map_ticks 0) ; how many tick boxes are made
+   (map_x -16)   ; within the stats box, [stats_wide] 24 wider
+   (map_wide 184)
+   (map_z -112)  ; below its box, which ends 5.2 rows down
+   (map_most 64) ; ticks at most, past which a song's are too close to read
+   (map_poll
+      {do
+         ($first {gamecfg get (practice_sections 0)})
+         ($last {gamecfg get (practice_sections 1)})
+         ($from 0) ($to 0) ($n 0)
+         {if {!= [map_for] {sprint $first " " $last}}
+            {set [map_for] {sprint $first " " $last}}
+            {gamecfg get_section_bounds $first $from $to}
+            {set [map_start] $from}
+            {gamecfg get_section_bounds $last $from $to}
+            {set [map_end] {max $to {'+' [map_start] 1}}}
+            ; The sections starting inside: all past the first, or past
+            ; the first picked up to the last.
+            {foreach_int $s {if_else {== $first -1} 1 {'+' $first 1}} {if_else {== $first -1} {practice_section_count} {'+' $last 1}}
+               {if {< $n [map_most]}
+                  {gamecfg get_section_bounds $s $from $to}
+                  {$this map_tick $n {'+' [map_x] {'*' [map_wide] {/ {'-' $from [map_start]} {'-' [map_end] [map_start]}}}}}
+                  {set $n {'+' $n 1}}
+               }
+            }
+            {foreach_int $t $n [map_ticks] {ghc_box_show $this {sprint "ghc_map_tick" $t} FALSE}}
+         }
+         {set [map_fill] {max 0 {min 1 {/ {'-' {'*' 1000 {taskmgr seconds}} [map_start]} {'-' [map_end] [map_start]}}}}}
+         {ghc_box_put $this ghc_map_fill [map_x] 0 [map_z] {max 0.1 {'*' [map_fill] [map_wide]}} [map_tall] 0 0}
+      }
+   )
+   ; Tick $i at $x, made the first time.
+   (map_tick ($i $x)
+      {do
+         ($name {sprint "ghc_map_tick" $i})
+         {if {>= $i [map_ticks]}
+            {ghc_box_make $this $name ghc_stats.grp 13}
+            {ghc_box_color $this $name 1 1 1 0.8}
+            {$this map_draws $name}
+            {set [map_ticks] {'+' $i 1}}
+         }
+         {ghc_box_put $this $name {'-' $x 1} 0 [map_z] 2 [map_tall] 0 0}
+         {ghc_box_show $this $name TRUE}
+      }
+   )
+   ; Box $name drawn by the scene's own list.
+   (map_draws ($name)
+      {foreach $part ("_mid.mesh" "_left.mesh" "_right.mesh")
+         {{$this loaded_dir} insert (draws {{$this loaded_dir} size (draws)}) {$this find {sprint $name $part}}}
+      }
+      {{$this loaded_dir} sync_objects}
    )
    ; The rows on a group at their top left, each row's name ending at
    ; [stats_mid] and its number after, on a dark box: the section name's
@@ -692,6 +754,18 @@
          {foreach $m (ghc_stats_mid.mesh ghc_stats_left.mesh ghc_stats_right.mesh ghc_crown.mesh)
             {$dir insert (draws {$dir size (draws)}) {$this find $m}}
          }
+         ; The map's track, on a dark box of its own, and its fill
+         ; (map_poll), each tick made as it is first wanted.
+         {set [map_for] ''}
+         {set [map_ticks] 0}
+         {foreach $box ((ghc_map_back 0 0 0 0.8 10) (ghc_map_track 0.35 0.35 0.38 1 11) (ghc_map_fill 1 0.85 0.45 1 12))
+            {ghc_box_make $this {elem $box 0} ghc_stats.grp {elem $box 5}}
+            {ghc_box_color $this {elem $box 0} {elem $box 1} {elem $box 2} {elem $box 3} {elem $box 4}}
+            {ghc_box_show $this {elem $box 0} TRUE}
+            {$this map_draws {elem $box 0}}
+         }
+         {ghc_box_put $this ghc_map_back -24 0 [map_z] {'+' [stats_wide] 40} {'+' [map_tall] 12} 8 8}
+         {ghc_box_put $this ghc_map_track [map_x] 0 [map_z] [map_wide] [map_tall] 0 0}
          {foreach $row (title speed best percent notes)
             {do
                ($z {'*' {'-' -0.5 $i} [stats_row]})

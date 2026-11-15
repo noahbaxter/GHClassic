@@ -319,6 +319,15 @@ namespace gh2::practice_sounds
     {
         s_addresses = &addresses;
         addSounds();
+        // {practice_section_count}: the song's sections, GameConfig's
+        // PracticeSectionProvider's (+0x208), 0x18 bytes each from its +0x2c
+        // to its +0x30.
+        script::addCommand("practice_section_count", [](const script::Call &call) -> script::Node
+                           {
+                               const uint32_t provider = load<uint32_t>(call.rdram, s_addresses->theGameConfig) + 0x208u;
+                               return {(load<uint32_t>(call.rdram, provider + 0x30u) - load<uint32_t>(call.rdram, provider + 0x2cu)) / 0x18u,
+                                       script::kInt};
+                           });
         EntryHook<PollTag>::install(runtime, addresses.trackWatcherSustainTimeout, onPoll);
         // {practice_clicks start <song>}: that song's practice begun;
         // {practice_clicks drums <bool>}: its drum clicks played or not;
