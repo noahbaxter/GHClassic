@@ -168,6 +168,8 @@ namespace gh2
         uint32_t playerPoll;             // Player::Poll
         uint32_t playerIsInBounds;       // Player::IsInBounds(const GameGem &)
         uint32_t gameConfigGetPracticeBounds; // GameConfig::GetPracticeBounds(int &, int &)
+        uint32_t enterAsksPracticeBounds;     // where GamePanel::Enter's GetPracticeBounds returns to
+        uint32_t measureBeatTickToTick;       // MeasureMap::MeasureBeatTickToTick(int, int, int)
         uint32_t performerGetMultiplier; // Performer::GetMultiplier
         uint32_t starPowerHit;           // StarPower::Hit
         uint32_t starPowerMissOrPass;    // StarPower::MissOrPass
@@ -550,6 +552,8 @@ namespace gh2
         .playerPoll = 0x1110d8u,
         .playerIsInBounds = 0x111448u,
         .gameConfigGetPracticeBounds = 0x127008u,
+        .enterAsksPracticeBounds = 0x106938u,
+        .measureBeatTickToTick = 0x2cd258u,
         .performerGetMultiplier = 0x10f1a0u,
         .starPowerHit = 0x11e2b8u,
         .starPowerMissOrPass = 0x11e6a8u,

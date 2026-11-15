@@ -243,6 +243,42 @@ namespace gh2::practice_sounds
             }
             s_inBounds(rdram, ctx, runtime);
         }
+        // GameConfig::GetPracticeBounds, as GamePanel::Enter starts practice
+        // a bar ahead of its first tick's (MeasureBeatTickToTick of its bar
+        // less one, at once; from the song's first bar, a bar's count-in):
+        // its first gem's tick, not its first section's, so an intro with
+        // nothing to play is passed by. Its first two bars from the song's
+        // start, by the count-in: a start at 0 itself (bar 1's a bar ahead)
+        // has none, and audio set late keeps the clock under the -25 ms
+        // GamePanel::Poll starts the song at.
+        PS2Runtime::RecompiledFunction s_bounds = nullptr;
+        void practiceBounds(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t returnTo = GPR_U32(ctx, 31), startAt = GPR_U32(ctx, 5), endAt = GPR_U32(ctx, 6);
+            callOriginal(rdram, ctx, runtime, s_addresses->gameConfigGetPracticeBounds, s_bounds);
+            if (returnTo == s_addresses->enterAsksPracticeBounds)
+            {
+                const int32_t start = load<int32_t>(rdram, startAt), end = load<int32_t>(rdram, endAt);
+                const uint32_t songDb = load<uint32_t>(rdram, s_addresses->theSongDb);
+                // Player 1's: practice has one. GameGems are 0x10 bytes, the
+                // tick at +4, in order.
+                const uint32_t gems = static_cast<uint32_t>(
+                    runtime->callGuestFunction(rdram, ctx, s_addresses->songDbGetGems, {songDb, 0u}));
+                int32_t first = start;
+                for (uint32_t g = load<uint32_t>(rdram, gems), last = load<uint32_t>(rdram, gems + 4u); g < last; g += 0x10u)
+                    if (const int32_t tick = load<int32_t>(rdram, g + 4u); tick >= start && tick < end)
+                    {
+                        first = tick;
+                        break;
+                    }
+                // SongData (+0x4)'s MeasureMap (+0x98).
+                const uint32_t map = load<uint32_t>(rdram, load<uint32_t>(rdram, songDb + 4u) + 0x98u);
+                const int32_t bar2 = static_cast<int32_t>(
+                    runtime->callGuestFunction(rdram, ctx, s_addresses->measureBeatTickToTick, {map, 2u, 0u, 0u}));
+                store<int32_t>(rdram, startAt, first < bar2 ? 0 : first);
+            }
+            ctx->pc = returnTo;
+        }
         // SongDB::SetupPracticeSections, then in practice GameConfig's
         // sections read from it, which GH2 does only on its section screen:
         // what the song's Player and track are made with, and the pause
@@ -364,6 +400,7 @@ namespace gh2::practice_sounds
                                return {settings::get(key) ? 1u : 0u, script::kInt};
                            });
         replaceKeeping(runtime, addresses.playerIsInBounds, &inBounds, s_inBounds);
+        replaceKeeping(runtime, addresses.gameConfigGetPracticeBounds, &practiceBounds, s_bounds);
         replaceKeeping(runtime, addresses.songDbSetupPracticeSections, &setupSections, s_setupSections);
         replaceKeeping(runtime, addresses.practiceSectionsInitData, &initData, s_initData);
     }

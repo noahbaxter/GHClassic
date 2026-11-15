@@ -17,7 +17,9 @@
 (wait_screen practice_game_screen 60)
 (expect {gamecfg get (practice_sections 0)} -1)
 (expect {gamecfg get (practice_sections 1)} -1)
-(expect {< {taskmgr seconds} 3} 1)
+; From the bar ahead of its first note's, 2.56 s in, not a count-in
+; before its intro.
+(expect {&& {> {taskmgr seconds} 2} {< {taskmgr seconds} 3}} 1)
 (wait 4)
 ; The whole song's map: a tick at each of its sections but the first.
 (expect {practice_panel get map_ticks} {'-' {practice_section_count} 1})
