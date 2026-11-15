@@ -17,8 +17,8 @@
 ;
 ; Opened with open_sticky it is a menu instead: it stays open when yellow
 ; is let go, green tells the screen the row picked, (ghc_chose ($option)),
-; yellow the same the other way, (ghc_chose_back ($option)), and select or
-; red shuts it. Its rows' text is the screen's
+; or takes a value's row up (ghc_pick_edit), and select or red shuts it.
+; Its rows' text is the screen's
 ; (ghc_option_text ($option)), a setlist's name otherwise.
 {if {! {exists ghc_pick_panel}} {new GHPanel ghc_pick_panel}}
 {retype ghc_pick_panel
@@ -35,6 +35,7 @@
       ; How wide the box's round ends are, outside its text's room.
       (end 8)
       (options ())
+      (editing FALSE) ; the menu's row whose value is being changed (ghc_pick_edit)
       (picked 0)
       (first 0)
       ; The option the top row shows.
@@ -234,6 +235,12 @@
          {if_else [shown] {do {$this fill} {$this paint}} {$this reveal}}
       )
       (shut
+         ; A value being changed put back (ghc_pick_edit).
+         {if [editing]
+            {ghc_option_end [editing] FALSE}
+            {set [editing] FALSE}
+            {ghc_box_color $this pick_fill 1 1 1 0.25}
+         }
          {foreach $o [rows] {{$this find $o} set_showing FALSE}}
          {foreach $box [boxes] {ghc_box_show $this {elem $box 0} FALSE}}
          {set [open] FALSE}
@@ -281,21 +288,56 @@
       )
    )
 }
+; A menu's row that is a value, as practice's speed (game_settings.dta):
+; green takes it up, its fill lit, the strum steps the value, green keeps
+; it, red or select puts back what it was. Its value's own: TRUE from
+; {ghc_option_edits $option}, then {ghc_option_step $option $dir} and
+; {ghc_option_end $option $keep} (quickplay.dta).
+{func ghc_pick_edit ($option)
+   {ghc_pick_panel set editing $option}
+   {if_else $option
+      {ghc_box_color ghc_pick_panel pick_fill 1 0.85 0.2 0.5}
+      {ghc_box_color ghc_pick_panel pick_fill 1 1 1 0.25}
+   }
+   {ghc_pick_panel relabel}
+}
 ; A screen's press while the list may be open: with it open the strum steps
 ; it and nothing else gets the press.
 {func ghc_pick_button ($button)
    {if_else {ghc_pick_panel get open}
       {do
-         {if {== $button kPad_DUp} {ghc_pick_panel step -1}}
-         {if {== $button kPad_DDown} {ghc_pick_panel step 1}}
-         {if {ghc_pick_panel get sticky}
+         ($editing {ghc_pick_panel get editing})
+         {if_else $editing
             {cond
+               ({|| {== $button kPad_DUp} {== $button kPad_DDown}}
+                  {ghc_option_step $editing {if_else {== $button kPad_DUp} 1 -1}}
+                  {synth play_sequence button_toggle}
+                  {ghc_pick_panel relabel}
+               )
+               ({== $button kPad_X}
+                  {ghc_option_end $editing TRUE}
+                  {synth play_sequence button_select}
+                  {ghc_pick_edit FALSE}
+               )
+               ({|| {== $button kPad_Tri} {== $button kPad_Select}}
+                  {ghc_option_end $editing FALSE}
+                  {synth play_sequence button_back.cue}
+                  {ghc_pick_edit FALSE}
+               )
+            }
+            {do
+               {if {== $button kPad_DUp} {ghc_pick_panel step -1}}
+               {if {== $button kPad_DDown} {ghc_pick_panel step 1}}
+            }
+         }
+         {if {&& {ghc_pick_panel get sticky} {! $editing}}
+            {cond
+               ({&& {== $button kPad_X} {ghc_option_edits {elem {ghc_pick_panel get options} {ghc_pick_panel get picked}}}}
+                  {synth play_sequence button_select}
+                  {ghc_pick_edit {elem {ghc_pick_panel get options} {ghc_pick_panel get picked}}}
+               )
                ({== $button kPad_X}
                   {{ui current_screen} ghc_chose
-                     {elem {ghc_pick_panel get options} {ghc_pick_panel get picked}}}
-               )
-               ({== $button kPad_Circle}
-                  {{ui current_screen} ghc_chose_back
                      {elem {ghc_pick_panel get options} {ghc_pick_panel get picked}}}
                )
                ({|| {== $button kPad_Select} {== $button kPad_Tri}}

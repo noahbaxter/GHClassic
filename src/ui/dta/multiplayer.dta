@@ -580,7 +580,6 @@
       (ghc_picked ($game) {ghc_qp_picked sel_song_panel ghc_multi_selsong_twin_screen $game})
       (ghc_option_text ($option) {ghc_qp_option_text $option})
       (ghc_chose ($option) {ghc_qp_chose sel_song_panel $option})
-      (ghc_chose_back ($option) {ghc_qp_chose_back $option})
    )
 }
 {retype multi_vs_selsong_screen $ghc_multi_selsong_screen}
@@ -597,7 +596,6 @@
       (ghc_picked ($game) {ghc_qp_picked sel_song_twin_panel {ghc_multi_screen selsong} $game})
       (ghc_option_text ($option) {ghc_qp_option_text $option})
       (ghc_chose ($option) {ghc_qp_chose sel_song_twin_panel $option})
-      (ghc_chose_back ($option) {ghc_qp_chose_back $option})
    )
 }
 

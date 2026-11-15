@@ -18,6 +18,8 @@
 (wait 0.5)
 (expect {ghc_pick_panel get open} TRUE)
 (press green p1)
+(press up p1)
+(press green p1)
 (expect {song_speed} 105)
 (shot speed_menu)
 (press star_power p1)

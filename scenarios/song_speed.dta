@@ -1,5 +1,6 @@
-; Song speed: set on the quickplay song list's Select menu, green faster and
-; yellow slower; in quickplay the song runs at 150% against the clock with
+; Song speed: set on the quickplay song list's Select menu as practice's
+; is, green taking the row up, the strum stepping it, green keeping it and
+; red putting it back; in quickplay the song runs at 150% against the clock with
 ; its audio stretched to match (ghc_speed/...), its own audio name back once
 ; the song is left. Practice's is practice.dta's.
 #include common/first_boot.dta
@@ -10,10 +11,21 @@
 (wait 0.5)
 (expect {ghc_pick_panel get open} TRUE)
 (press green)
-(expect {song_speed} 105)
-(press yellow)
-(press yellow)
+(expect {ghc_pick_panel get editing} speed)
+(press up)
+(press up)
+(expect {song_speed} 110)
+(expect {ghc_pick_panel get editing} speed)
+(shot speed_editing)
+(press red)
+(expect {song_speed} 100)
+(expect {ghc_pick_panel get editing} FALSE)
+(expect {ghc_pick_panel get open} TRUE)
+(press green)
+(press down)
+(press green)
 (expect {song_speed} 95)
+(expect {ghc_pick_panel get editing} FALSE)
 (shot speed_menu)
 (press star_power)
 (wait 0.5)

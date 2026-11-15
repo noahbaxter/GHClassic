@@ -724,7 +724,7 @@
 {func ghc_qp_option_text ($option)
    {switch $option
       (random "RANDOM SONG")
-      ; Green faster, yellow slower (content/song_speed.h).
+      ; Changed as practice's is (ghc_pick_edit, content/song_speed.h).
       (speed {sprint "SPEED: " {song_speed} "%"})
       (song_defaults
          {sprint "SONG DEFAULTS: " {if_else {quickplay song_defaults} "ON" "OFF"}})
@@ -750,7 +750,6 @@
       }
       {do
          {switch $option
-            (speed {ghc_speed_step 1})
             (song_defaults {quickplay song_defaults {! {quickplay song_defaults}}})
             (instrument {custom instrument {if_else {== {custom instrument} bass} guitar bass}})
          }
@@ -759,12 +758,18 @@
       }
    }
 }
-{func ghc_qp_chose_back ($option)
-   {if {== $option speed}
-      {ghc_speed_step -1}
-      {synth play_sequence button_toggle}
-      {ghc_pick_panel relabel}
-   }
+; Select's menu's rows that are values (picker.dta's ghc_pick_edit): the
+; speed, its value before it was taken up kept to put back.
+{set $ghc_option_was 100}
+{func ghc_option_edits ($option)
+   {if {== $option speed} {set $ghc_option_was {song_speed}}}
+   {== $option speed}
+}
+{func ghc_option_step ($option $dir)
+   {if {== $option speed} {ghc_speed_step $dir}}
+}
+{func ghc_option_end ($option $keep)
+   {if {&& {== $option speed} {! $keep}} {song_speed set $ghc_option_was}}
 }
 ; The song speed a step faster ($dir 1) or slower (-1): 10% steps up to
 ; 50%, 5% to 150%, 25% to 500%.
@@ -813,7 +818,6 @@
       (ghc_picked ($game) {ghc_qp_picked sel_song_panel qp_selsong_twin_screen $game})
       (ghc_option_text ($option) {ghc_qp_option_text $option})
       (ghc_chose ($option) {ghc_qp_chose sel_song_panel $option})
-      (ghc_chose_back ($option) {ghc_qp_chose_back $option})
       (ghc_section_text ($tier) {setlist tier_name $tier})
       (ghc_section_picked ($tier) {sel_song_panel ghc_jump $tier})
       (ghc_section_next {ghc_qp_section_next sel_song_panel})
@@ -833,7 +837,6 @@
       (ghc_picked ($game) {ghc_qp_picked sel_song_twin_panel qp_selsong_screen $game})
       (ghc_option_text ($option) {ghc_qp_option_text $option})
       (ghc_chose ($option) {ghc_qp_chose sel_song_twin_panel $option})
-      (ghc_chose_back ($option) {ghc_qp_chose_back $option})
       (ghc_section_text ($tier) {setlist tier_name $tier})
       (ghc_section_picked ($tier) {sel_song_twin_panel ghc_jump $tier})
       (ghc_section_next {ghc_qp_section_next sel_song_twin_panel})
@@ -864,7 +867,6 @@
       (ghc_picked ($game) {ghc_qp_picked sel_song_panel ghc_practice_selsong_twin_screen $game})
       (ghc_option_text ($option) {ghc_qp_option_text $option})
       (ghc_chose ($option) {ghc_qp_chose sel_song_panel $option})
-      (ghc_chose_back ($option) {ghc_qp_chose_back $option})
       (ghc_section_text ($tier) {setlist tier_name $tier})
       (ghc_section_picked ($tier) {sel_song_panel ghc_jump $tier})
       (ghc_section_next {ghc_qp_section_next sel_song_panel})
@@ -882,7 +884,6 @@
       (ghc_picked ($game) {ghc_qp_picked sel_song_twin_panel practice_selsong_screen $game})
       (ghc_option_text ($option) {ghc_qp_option_text $option})
       (ghc_chose ($option) {ghc_qp_chose sel_song_twin_panel $option})
-      (ghc_chose_back ($option) {ghc_qp_chose_back $option})
       (ghc_section_text ($tier) {setlist tier_name $tier})
       (ghc_section_picked ($tier) {sel_song_twin_panel ghc_jump $tier})
       (ghc_section_next {ghc_qp_section_next sel_song_twin_panel})
