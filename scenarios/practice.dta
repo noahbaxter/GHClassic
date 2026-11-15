@@ -16,6 +16,7 @@
 {song_speed set 50}
 {ui goto_screen practice_loading_screen}
 (wait_screen practice_game_screen 60)
+(expect {elem {find $syscfg songs shoutatthedevil song name} 1} ghc_speed/50/songs/shoutatthedevil/shoutatthedevil)
 (wait 8)
 {set $ghc_t0 {taskmgr ui_seconds}}
 {set $ghc_s0 {taskmgr seconds}}

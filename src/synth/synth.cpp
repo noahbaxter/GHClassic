@@ -215,8 +215,9 @@ namespace gh2
             const auto now = ps2x::host_clock::now();
             const float timerRate = load<float>(rdram, self + kTimer + kTimerRate);
             const float ageMs = std::chrono::duration<float, std::milli>(now - at->second).count() * timerRate;
-            const float audioMs = static_cast<float>(played) * synth::kAdpcmBlockSamples * 1000.0f / static_cast<float>(rate) +
-                                  load<float>(rdram, self + kStartMs) + ageMs;
+            // Where it is heard: its pitch kept in the mix, that far behind.
+            const double samples = double(played) * synth::kAdpcmBlockSamples - s_module.heardBehind(id);
+            const float audioMs = static_cast<float>(samples * 1000.0 / rate) + load<float>(rdram, self + kStartMs) + ageMs;
             const float error = clockMs - audioMs;
             store<int32_t>(rdram, self + kPlayed, -1);
 
@@ -268,5 +269,10 @@ namespace gh2
     synth::Timeline &synth::timeline()
     {
         return s_module.timeline();
+    }
+
+    void synth::keepPitch(int percent)
+    {
+        s_module.keepPitch(percent * 10);
     }
 }

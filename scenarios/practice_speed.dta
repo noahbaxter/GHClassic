@@ -1,5 +1,7 @@
 ; Practice's speed changed in its pause menu: the speed row, taken up with
 ; green, steps by strum, red putting it back and green keeping it, and
+; resume takes up where it paused at the new speed. A Select tap restarts
+; the section.
 #include common/first_boot.dta
 {gamecfg set mode practice}
 {game set_song shoutatthedevil}
@@ -62,9 +64,12 @@
 (shot pause_row_kept)
 (press up)
 (press up)
+; Resumed from where it paused, at once, at 90%.
+{set $ghc_t0 {taskmgr ui_seconds}}
 (press green)
 (wait 0.5)
 (expect {{ui current_screen} name} practice_game_screen)
+(expect {taskmgr seconds} {'+' $ghc_paused {'*' 0.9 {'-' {taskmgr ui_seconds} $ghc_t0}}} 0.1)
 {set $ghc_t0 {taskmgr ui_seconds}}
 {set $ghc_s0 {taskmgr seconds}}
 (wait 2)

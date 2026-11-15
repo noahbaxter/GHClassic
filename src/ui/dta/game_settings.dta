@@ -501,6 +501,11 @@
    {ui goto_screen ghc_practice_again_screen}
 }
       {$this duck}
+      ; The keyboard's arrows, a step of the speed each as it plays.
+      {do
+         ($steps {practice_steps})
+         {if {&& {!= $steps 0} {! {game get game_over}}} {ghc_practice_speed_by $steps live}}
+      }
 ; ($ghc_practice_pct, quickplay.dta). Its name lights as any row's; green
 ; takes it up, its number lit too, as the audio settings' sliders; strum
 ; before the song goes straight on to its loading.
@@ -509,6 +514,12 @@
 {func ghc_practice_speed_edit ($panel $on)
    {set $ghc_speed_before {if_else $on {song_speed} FALSE}}
    {$panel speed_row}
+}
+; $by 5% steps faster, $op set ({song_speed}'s) or, as it plays, live.
+{func ghc_practice_speed_by ($by $op)
+   {song_speed $op {max 25 {min 200 {'+' {song_speed} {'*' 5 $by}}}}}
+   {set $ghc_practice_pct {song_speed}}
+   {synth play_sequence button_toggle}
 }
 ; Green on the row: taken up, else kept.
 {func ghc_practice_speed_select ($panel)
@@ -519,6 +530,7 @@
    {cond
       ({! $ghc_speed_before} FALSE)
       ({|| {== $button kPad_DUp} {== $button kPad_DDown}}
+         {ghc_practice_speed_by {if_else {== $button kPad_DUp} 1 -1} set}
          {ghc_practice_speed_label $panel}
          TRUE
       )
@@ -542,7 +554,16 @@
       (enter {ui goto_screen practice_loading_screen})
    )
 }
+; Practice resumed takes up where it was paused at the speed picked, as the
+; arrows change it as it plays (content/song_speed.h).
 {func ghc_practice_resume ($screen)
+   {if_else $ghc_practice_reload
+      {do
+      }
+      {do
+         {song_speed live {song_speed}}
+         {$screen resume}
+      }
    }
 }
 {retype pract_pause_panel

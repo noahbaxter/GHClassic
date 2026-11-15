@@ -65,6 +65,9 @@ namespace gh2
     void lockSeats(bool locked);
     // Practice's song is up, holding the seats as a venue's song does.
     void practicing(bool on);
+    // The keyboard's left and right arrows pressed as practice plays since
+    // last taken, right +1 and left -1 each. Callable from any thread.
+    int takePracticeSteps();
     // Which screen of a song is up: in one playing, the keyboard's menu
     // keys would be a guitar's frets and strums, so only its Esc works,
     // as Start; in its pause menu Esc is Start too, to resume. Callable

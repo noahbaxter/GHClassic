@@ -160,6 +160,10 @@ namespace gh2
     {
         script::addCommand("pad_held", padHeld);
         script::addCommand("seat_has", seatHasCommand);
+        // {practice_steps}: the arrows' steps of practice's speed since last
+        // asked (input.h's takePracticeSteps).
+        script::addCommand("practice_steps", [](const script::Call &)
+                           { return script::Node{static_cast<uint32_t>(takePracticeSteps()), script::kInt}; });
         EntryHook<GotoScreenTag>::install(runtime, addresses.uiGotoScreen, onGotoScreen);
         runtime.replaceFunction(addresses.scePadRead, padRead);
         runtime.replaceFunction(addresses.scePadInfoAct, padInfoAct);

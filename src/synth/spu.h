@@ -56,8 +56,11 @@ namespace gh2::synth
         void setMasterVolume(uint16_t left, uint16_t right); // both cores
         Reverb &reverb(uint32_t core);
 
-        // Adds `frames` of interleaved stereo at 48 kHz into `out`.
-        void mix(float *out, size_t frames);
+        // Adds `frames` of interleaved stereo at 48 kHz into `out`. With
+        // `side`, the voices of `diverted` (a bit each) are mixed there
+        // instead, dry, through the master volume, for the caller to treat
+        // and add itself.
+        void mix(float *out, size_t frames, float *side = nullptr, uint64_t diverted = 0u);
 
     private:
         enum class Phase : uint8_t
@@ -105,5 +108,6 @@ namespace gh2::synth
         std::vector<int32_t> m_dry[kCores];
         std::vector<int32_t> m_send[kCores];
         std::vector<int32_t> m_wet[kCores];
+        std::vector<int32_t> m_side;
     };
 }

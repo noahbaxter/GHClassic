@@ -12,6 +12,7 @@
 #include "script.h"
 #include "settings/settings.h"
 #include "synth/adpcm.h"
+#include "synth/synth.h"
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
 
@@ -193,9 +194,11 @@ namespace gh2::song_speed
 
         // Audio stretched by Signalsmith Stretch to 1 / speed its length,
         // its pitch kept, rated at its rate over the speed. Its frames are
+        // the song's time at any speed the game plays it at.
         class Stretched final : public vgs::Pcm
         {
         public:
+            Stretched(std::unique_ptr<vgs::Pcm> from, double speed) : m_from(std::move(from)), m_speed(speed)
             {
                 channels = m_from->channels;
                 rate = static_cast<uint32_t>(std::lround(m_from->rate / speed));
@@ -265,6 +268,17 @@ namespace gh2::song_speed
             if (s_percent != 100)
                 runtime->callGuestFunction(rdram, ctx, s_addresses->beatMatchSetPracticeSpeed, {beatMatch});
             ctx->pc = returnTo;
+        }
+
+        // The game plays at {song_speed} from now (SetPracticeSpeed, through
+        // setPracticeSpeed below), the audio it holds already with it: its
+        // pitch is put back in the mix, not in its data.
+        void playAtSpeed(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const R5900Context saved = *ctx;
+            runtime->callGuestFunction(rdram, ctx, s_addresses->beatMatchSetPracticeSpeed, {s_beatMatch});
+            *ctx = saved;
+            s_playing = s_percent;
         }
 
         // BeatMatch::SetPracticeSpeed(float) at our speed, the audio being
@@ -385,6 +399,8 @@ namespace gh2::song_speed
             return true;
         }
 
+        // {song_speed}: the percent. {song_speed set <percent>}; live: the
+        // same, and the song playing in practice goes to it as it plays.
         // {song_speed name <audio name>}: that name at the speed; base: as
         // it was. {song_speed solo <song block> <guitar>}: only the played
         // {song_speed practice <bool>}: whether the song made next plays in
@@ -393,11 +409,14 @@ namespace gh2::song_speed
         script::Node command(const script::Call &call)
         {
             const std::string op = call.size() > 1 ? call.symbol(1) : "";
+            if (op == "set" || op == "live")
                 s_percent = std::clamp(static_cast<int>(call.number(2)), kSlowest, kFastest);
             if (op == "practice")
                 s_practice = call.number(2) != 0.0f;
             if (op == "playing")
                 return {static_cast<uint32_t>(playing()), script::kInt};
+            if (op == "live" && s_practice && s_beatMatch != 0u && s_percent != s_playing)
+                playAtSpeed(call.rdram, call.ctx, call.runtime);
             {
                 const script::Node block = call.arg(2);
             }
@@ -416,9 +435,13 @@ namespace gh2::song_speed
                 if (name.rfind(kPrefix, 0) == 0)
                     name = name.substr(name.find('/', sizeof kPrefix - 1u) + 1u);
                 // Pitch let go, the song's own file plays at the speed, like
+                // a tape. Practice's is made at 50%, its pitch put back in
+                // the mix at whatever speed it plays.
                 const bool tape = !settings::get(settings::kMaintainPitch);
+                synth::keepPitch(op == "name" && s_practice && !tape ? kPracticeBase : 0);
                 if (op == "base" || tape || (s_percent == 100 && !s_practice))
                     return call.word(name);
+                return call.word(kPrefix + std::to_string(s_practice ? kPracticeBase : s_percent) + "/" + name);
             }
             return {static_cast<uint32_t>(s_percent), script::kInt};
         }
@@ -449,11 +472,13 @@ namespace gh2::song_speed
                               std::cerr << "[song_speed] no " << path << std::endl;
                               return std::nullopt;
                           }
+                          return vgs::made(path, [source, percent]() -> std::unique_ptr<vgs::Pcm>
                                            {
                                                auto file = ark::open(source);
                                                auto decoded = file ? Decoded::open(std::move(*file)) : nullptr;
                                                if (!decoded)
                                                    return nullptr;
+                                               return std::make_unique<Stretched>(std::move(decoded), percent / 100.0);
                                            });
                       });
     }

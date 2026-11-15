@@ -329,8 +329,11 @@ namespace gh2::synth
             v.phase = Phase::kOff;
     }
 
-    void Spu::mix(float *out, size_t frames)
+    void Spu::mix(float *out, size_t frames, float *side, uint64_t diverted)
     {
+        if (!side)
+            diverted = 0u;
+        m_side.assign(side ? frames * 2u : 0u, 0);
         for (uint32_t core = 0; core < kCores; ++core)
         {
             m_dry[core].assign(frames * 2u, 0);
@@ -344,7 +347,8 @@ namespace gh2::synth
             if (v.phase == Phase::kOff)
                 continue;
             const uint32_t core = n / kVoicesPerCore;
-            int32_t *coreDry = m_dry[core].data();
+            const bool aside = (diverted >> n) & 1u;
+            int32_t *coreDry = aside ? m_side.data() : m_dry[core].data();
             int32_t *send = m_send[core].data();
             const uint32_t step = std::min<uint32_t>(v.pitch, 0x3fffu);
             for (size_t f = 0; f < frames && v.phase != Phase::kOff; ++f)
@@ -354,7 +358,7 @@ namespace gh2::synth
                 const int32_t r = mul15(s, v.volR);
                 coreDry[f * 2u] += l;
                 coreDry[f * 2u + 1u] += r;
-                if (v.reverbSend)
+                if (v.reverbSend && !aside)
                 {
                     send[f * 2u] += l;
                     send[f * 2u + 1u] += r;
@@ -387,6 +391,8 @@ namespace gh2::synth
                     sum += mul15(in, master);
                 }
                 out[f * 2u + c] += clamp16(sum) / 32768.0f;
+                if (side)
+                    side[f * 2u + c] = clamp16(mul15(clamp16(m_side[f * 2u + c]), master)) / 32768.0f;
             }
         }
     }

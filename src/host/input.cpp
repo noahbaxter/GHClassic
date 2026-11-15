@@ -53,6 +53,8 @@ namespace gh2
         Seats s_seats; // the host thread's own
         std::atomic<bool> s_locked{false};     // a venue drawn
         std::atomic<bool> s_practicing{false}; // or practice's song up
+        std::atomic<int> s_practiceSteps{0};   // arrow presses not yet taken
+        bool s_arrowWas[2] = {};               // left and right, the host thread's
 
         // A song is up, holding the seats.
         bool songUp()
@@ -438,6 +440,16 @@ namespace gh2
                 timing::span(timing::kEventToPoll, pad.pressEventNs, pad.pressPollNs);
         }
         std::copy(std::begin(pads), std::end(pads), std::begin(s_pads));
+        // Practice's speed stepped on the arrows as it plays, which no
+        // layout plays: each press one step (takePracticeSteps).
+        if (keys)
+            for (int i = 0; i < 2; ++i)
+            {
+                const bool down = keys[i == 0 ? SDL_SCANCODE_LEFT : SDL_SCANCODE_RIGHT];
+                if (down && !s_arrowWas[i] && mode == Mode::kPlaying && s_practicing.load(std::memory_order_relaxed))
+                    s_practiceSteps.fetch_add(i == 0 ? -1 : 1, std::memory_order_relaxed);
+                s_arrowWas[i] = down;
+            }
         if (s_flying && keys)
         {
             s_fly.right = (keys[SDL_SCANCODE_D] ? 1.0f : 0.0f) - (keys[SDL_SCANCODE_A] ? 1.0f : 0.0f);
@@ -496,6 +508,11 @@ namespace gh2
     void practicing(bool on)
     {
         s_practicing.store(on, std::memory_order_relaxed);
+    }
+
+    int takePracticeSteps()
+    {
+        return s_practiceSteps.exchange(0, std::memory_order_relaxed);
     }
 
     void songScreen(SongScreen screen)
