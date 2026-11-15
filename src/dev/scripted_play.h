@@ -26,6 +26,8 @@
 //                                     go, the gem's pressed, then a strum; its
 //                                     frets stay held
 //   {ghc_play press <i> <offset>}     the gem's frets pressed then
+//   {ghc_play lift <i> <offset>}      the gem's frets let go then, those above
+//                                     every other held a pull-off
 //   {ghc_play hammer <i> <offset>}    its fret hammered on then, or pulled off to
 //                                     where it is below the frets held
 //   {ghc_play release <ms>}           every fret let go then

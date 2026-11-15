@@ -27,6 +27,7 @@ namespace gh2::scripted_play
             kStrum,   // every fret let go, `slots` pressed, a strum
             kPress,   // `slots` pressed
             kRelease, // every fret let go
+            kLift,    // `slots` let go
             kHammer,  // `slots` hammered on, or pulled off to from the frets above
             kMark,    // $var set to player 0's score or streak
         };
@@ -102,10 +103,10 @@ namespace gh2::scripted_play
                         down(slot);
             }
 
-            void release() const
+            void release(uint32_t slots = 0x1fu) const
             {
                 for (int slot = 0; slot < 5; ++slot)
-                    if ((s_held >> slot) & 1u)
+                    if ((slots & s_held) >> slot & 1u)
                         up(slot);
             }
 
@@ -144,6 +145,10 @@ namespace gh2::scripted_play
             case Kind::kRelease:
                 what = "release";
                 pad.release();
+                break;
+            case Kind::kLift:
+                what = "lift";
+                pad.release(action.slots);
                 break;
             case Kind::kHammer:
                 what = "hammer";
@@ -300,9 +305,12 @@ namespace gh2::scripted_play
                 if (field == "played")
                     return integer(track.played(i) ? 1 : 0);
             }
-            if ((op == "strum" || op == "press" || op == "hammer") && gemAt(i))
+            if ((op == "strum" || op == "press" || op == "lift" || op == "hammer") && gemAt(i))
             {
-                const Kind kind = op == "strum" ? Kind::kStrum : op == "press" ? Kind::kPress : Kind::kHammer;
+                const Kind kind = op == "strum"   ? Kind::kStrum
+                                  : op == "press" ? Kind::kPress
+                                  : op == "lift"  ? Kind::kLift
+                                                  : Kind::kHammer;
                 queue({gems[i].ms() + call.number(3), kind, gems[i].slots()});
                 return integer(1);
             }
