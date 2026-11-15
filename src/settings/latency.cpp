@@ -45,6 +45,7 @@
 #include <cmath>
 #include <cstring>
 #include <iostream>
+#include <optional>
 namespace gh2
 {
     namespace
@@ -84,23 +85,33 @@ namespace gh2
 
         // A PlayerMatcher's StreamEE: its BeatMatchAudio (+0x34), that's
         // MasterAudio (+0x8), its stream (+0xC), as BeatMatchAudio::GetStream.
-        constexpr uint32_t kStreamState = 0x4cu, kStreamPlaying = 4u; // StreamEE's; 3 is ready, 5 paused
+        constexpr uint32_t kStreamState = 0x4cu, kStreamPlaying = 4u, kStreamPaused = 5u; // StreamEE's; 3 is ready
         uint32_t songStream(uint8_t *rdram, uint32_t matcher)
         {
             return load<uint32_t>(rdram, load<uint32_t>(rdram, load<uint32_t>(rdram, matcher + 0x34u) + 0x8u) + 0xcu);
         }
+
+        // The shift is taken up over this much song after its stream starts
+        // playing, from none: GamePanel::Poll starts a song still to start
+        // only once this is past -25 ms, so a section restarted from the
+        // song's very start (a jump to 0, no lead-in) with audio 25 ms later
+        // than video would wait there for ever; and the clock it holds never
+        // goes back, so taken up at once it would stand still that long.
+        constexpr float kShiftInMs = 1000.0f;
+        std::optional<float> s_playingFrom; // the clock as its stream started, before the shift
 
         void getSongMs(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
             const uint32_t returnTo = GPR_U32(ctx, 31), matcher = GPR_U32(ctx, 4);
             timing::clockRead();
             runtime->callGuestFunction(rdram, ctx, s_addresses->playerMatcherGetSongMs, {matcher}, s_getSongMs);
-            // Not before its stream plays: GamePanel::Poll starts a song
-            // still to start only once this is past -25 ms, so a section
-            // restarted from the song's very start (a jump to 0, no lead-in)
-            // with audio 25 ms later than video would wait there for ever.
-            if (load<uint32_t>(rdram, songStream(rdram, matcher) + kStreamState) == kStreamPlaying)
-                ctx->f[0] += songMs(settings::get(settings::kVideoLagMs) - settings::get(settings::kAudioLagMs));
+            const uint32_t state = load<uint32_t>(rdram, songStream(rdram, matcher) + kStreamState);
+            if (state != kStreamPlaying && state != kStreamPaused)
+                s_playingFrom.reset();
+            else if (!s_playingFrom)
+                s_playingFrom = ctx->f[0];
+            const float in = s_playingFrom ? std::clamp((ctx->f[0] - *s_playingFrom) / kShiftInMs, 0.0f, 1.0f) : 0.0f;
+            ctx->f[0] += in * songMs(settings::get(settings::kVideoLagMs) - settings::get(settings::kAudioLagMs));
             ctx->pc = returnTo;
         }
 

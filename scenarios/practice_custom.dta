@@ -30,7 +30,8 @@
 ; Its one song.opus has no stem of its own: played whole, no clicks.
 (expect $ghc_practice_solo 0)
 (print {elem {find $syscfg songs {game get_song} song name} 1})
-(wait 2)
+; Past its start, where the clock eases to the music.
+(wait 4)
 {set $ghc_t0 {taskmgr ui_seconds}}
 {set $ghc_s0 {taskmgr seconds}}
 (wait 6)
@@ -71,13 +72,28 @@
 (wait 0.2)
 (expect $ghc_practice_best 0)
 (expect {{practice_panel find ghc_crown.mesh} showing} 0)
-; Its Intro from the song's very start, gone round with audio 110 ms behind
-; video: it plays (latency.cpp's shift waits for the stream to).
+; Gone round from the song's very start with audio 110 ms behind video: it
+; plays, and once its clock moves it never stands still, through the song's
+; start and the shift taken up (latency.cpp) and the clock pulled to the
+; music (synth.cpp): the least it moves a frame for 300 frames.
 (expect {latency get audio} 110)
+{func ghc_clock_watch
+   {do
+      ($t {taskmgr seconds})
+      {if {&& $ghc_moving {< {'-' $t $ghc_prev} $ghc_least}} {set $ghc_least {'-' $t $ghc_prev}}}
+      {if {&& {> $ghc_prev -99} {> $t $ghc_prev}} {set $ghc_moving TRUE}}
+      {if $ghc_moving {set $ghc_frames {'+' $ghc_frames 1}}}
+      {set $ghc_prev $t}
+      {> $ghc_frames 300}
+   }
+}
+{set $ghc_prev -100}
+{set $ghc_least 1}
+{set $ghc_frames 0}
+{set $ghc_moving FALSE}
 {ghc_practice_again}
 (wait_screen practice_game_screen 10)
-(wait 1)
-{set $ghc_s0 {taskmgr seconds}}
-(wait 3)
-(expect {> {'-' {taskmgr seconds} $ghc_s0} 2} 1)
+(wait_until {ghc_clock_watch} 10)
+(print "least a frame " $ghc_least)
+(expect {> $ghc_least 0.005} 1)
 (quit)

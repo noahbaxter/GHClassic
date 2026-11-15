@@ -168,6 +168,7 @@ namespace gh2
         constexpr uint32_t kTimerBase = 0x30u, kTimerRate = 0x34u;
         constexpr float kSnapMs = 50.0f;
         constexpr float kSlew = 0.03f;    // of time passed
+        constexpr float kSlewBack = 0.15f; // the clock that far ahead, slowed by
         constexpr float kSettleS = 0.5f;  // the time an error takes to be pulled in, under the slew
         constexpr float kStaleMs = 50.0f; // a position older (one from before a hitch) is dropped
         constexpr float kStepMs = 20.0f;  // the clock and host time apart by more since the last report: the EE caught up
@@ -236,6 +237,12 @@ namespace gh2
                     const float limit = kSlew * dtMs;
                     pull = std::clamp(error * std::min(1.0f, dtMs / (kSettleS * 1000.0f)), -limit, limit);
                 }
+                // Ahead, it is slowed and never snapped back: the song's
+                // clock never goes back (GamePanel::Poll), so it would stand
+                // still that long. Practice's shifter puts its stream that
+                // far behind once it starts.
+                else if (error > kSnapMs && !first)
+                    pull = std::min(error, kSlewBack * dtMs);
             }
             if (!first)
             {
