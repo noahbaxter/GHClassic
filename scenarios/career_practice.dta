@@ -1,6 +1,7 @@
 ; Practice from a career song's pause menu, its third row, as from
-; quickplay's: the song's sections in practice's career mode, then its pause
-; menu's Return, back to the career's setlist on that song.
+; quickplay's: the whole song at once in practice's career mode, then its
+; pause menu's Return, back to the career's setlist on that song. A failed
+; song's Practice the same.
 #include common/first_boot.dta
 {gamecfg set mode career}
 {campaign set_profile_name "The Testers" 0}
@@ -30,14 +31,10 @@
 (expect {pause_panel focus_name} ghc_practice.btn)
 (shot career_pause)
 (press green)
-(wait_screen practice_sel_section_screen 60)
-(wait 2)
+(wait_screen practice_game_screen 60)
 (expect {gamecfg get mode} practice)
 (expect {practice_sel_section_screen get career_mode} 1)
-{gamecfg set (practice_sections 0) 0}
-{gamecfg set (practice_sections 1) 1}
-{ui goto_screen practice_loading_screen}
-(wait_screen practice_game_screen 60)
+(expect {gamecfg get (practice_sections 0)} -1)
 (wait 3)
 (press start)
 (wait_screen pract_pause_screen 20)
@@ -59,4 +56,12 @@
 (expect {game get_song_index} $ghc_row)
 (expect {game get_song} shoutatthedevil)
 (expect {practice_sel_section_screen get career_mode} 0)
+; A failed song's Practice (lose.dta) the same: the whole song at once.
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 2)
+{lose_panel goto_practice_mode}
+(wait_screen practice_game_screen 60)
+(expect {practice_sel_section_screen get career_mode} 1)
+(expect {gamecfg get (practice_sections 0)} -1)
 (quit)

@@ -156,7 +156,8 @@ namespace gh2
                 "practice_loading_screen",     "practice_game_screen",      "pract_pause_screen",
                 "practice_pause_controller_screen", "ghc_practice_again_screen", "ghc_practice_settings_screen",
                 "ghc_practice_options_screen", "ghc_practice_audio_screen", "ghc_practice_video_screen",
-                "ghc_practice_game_screen",    "ghc_practice_controllers_screen", "ghc_practice_lag_screen"};
+                "ghc_practice_game_screen",    "ghc_practice_controllers_screen", "ghc_practice_lag_screen",
+                "ghc_practice_section_screen"};
             practicing(kPractice.count(name) != 0u);
         }
     }

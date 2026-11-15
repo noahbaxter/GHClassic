@@ -1,21 +1,19 @@
 ; Practice on two sections at 50%, autoplayed, round to their start again:
 ; the song clock at half speed against the wall, its audio stretched to
-; match, and practice's own screens. The section screen loads the song's sections from
-; its MIDI.
+; match, and practice's own screens. The whole song loaded, its sections
+; picked as it plays.
 #include common/first_boot.dta
 {gamecfg set mode practice}
 {game set_song shoutatthedevil}
 {gamecfg set_track 0 0}
 {{game get_player_config 0} set_difficulty expert}
 {{game get_player_config 0} set autoplay TRUE}
-{ui goto_screen practice_sel_section_screen}
-(wait_screen practice_sel_section_screen)
-(wait 2)
-{gamecfg set (practice_sections 0) 0}
-{gamecfg set (practice_sections 1) 1}
 {song_speed set 50}
+{ghc_practice_whole}
 {ui goto_screen practice_loading_screen}
 (wait_screen practice_game_screen 60)
+(wait 1)
+{ghc_practice_jump 0 1}
 (expect {elem {find $syscfg songs shoutatthedevil song name} 1} ghc_speed/50/songs/shoutatthedevil/shoutatthedevil)
 (wait 8)
 {set $ghc_t0 {taskmgr ui_seconds}}

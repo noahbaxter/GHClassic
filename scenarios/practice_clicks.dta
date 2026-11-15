@@ -19,14 +19,10 @@
 (wait 1)
 {{game get_player_config 0} set autoplay TRUE}
 (press green)
-(wait_screen practice_sel_section_screen 30)
-(wait 2)
-{gamecfg set (practice_sections 0) 0}
-{gamecfg set (practice_sections 1) 9}
-{ui goto_screen practice_loading_screen}
 (wait_screen practice_game_screen 60)
 (expect $ghc_practice_solo 0)
-(wait 1.5)
+; The whole song, from a bar ahead of it: its first note two bars in.
+(wait 2.5)
 {set $ghc_from {practice_clicks played}}
 (record on note_click)
 (wait 4)

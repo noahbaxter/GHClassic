@@ -9,14 +9,12 @@
 {{game get_player_config 0} set_difficulty expert}
 {{game get_player_config 0} set autoplay TRUE}
 {set $ghc_practice_pct 85}
-{ui goto_screen practice_sel_section_screen}
-(wait_screen practice_sel_section_screen)
-(wait 1)
-{gamecfg set (practice_sections 0) 1}
-{gamecfg set (practice_sections 1) 6}
 {song_speed set $ghc_practice_pct}
+{ghc_practice_whole}
 {ui goto_screen practice_loading_screen}
 (wait_screen practice_game_screen 60)
+(wait 1)
+{ghc_practice_jump 1 6}
 (expect {song_speed} 85)
 (wait 4)
 {set $ghc_t0 {taskmgr ui_seconds}}
@@ -94,8 +92,11 @@
 (wait 0.3)
 (expect {!= {{ui current_screen} name} practice_loading_screen} 1)
 (wait_screen practice_game_screen 5)
-(wait 1)
-(expect {game get paused} 0)
+(wait 0.5)
 (expect {player0 gems_hit} 0)
 (expect {< {taskmgr seconds} $ghc_paused} 1)
+; Playing, not paused.
+{set $ghc_s0 {taskmgr seconds}}
+(wait 0.5)
+(expect {> {taskmgr seconds} $ghc_s0} 1)
 (quit)

@@ -400,9 +400,9 @@
 }
 
 ; A quickplay or career song in practice, from its pause menu, as GH2 goes
-; there from a failed career song (lose.dta's goto_practice_mode): its
-; section picked first. Practice's Return then goes back to that song, until
-; the main menu.
+; there from a failed career song (lose.dta's goto_practice_mode): the whole
+; song at once, its sections picked in its pause menu. Practice's Return then
+; goes back to that song, until the main menu.
 {set $ghc_practice_from FALSE}
 {set $ghc_practice_row -1} ; a career song's setlist row, for Return to come back on
 {func ghc_practice_song
@@ -414,11 +414,11 @@
    {set $ghc_qp_speed {song_speed}}
    ; At the speed it was playing, within practice's.
    {song_speed set {max 25 {min 200 {song_speed}}}}
-   {meta_loading_goto practice_sel_section_screen}
+   {ghc_practice_whole}
+   {meta_loading_goto practice_loading_screen}
 }
-; Practice's Return, and red on its first section, back to the song list it
-; began from, on the song: the career's or quickplay's (at its own speed),
-; else practice's.
+; Practice's Return, back to the song list it began from, on the song: the
+; career's or quickplay's (at its own speed), else practice's.
 {func ghc_practice_exit
    {cond
       ({practice_sel_section_screen get career_mode}
@@ -434,31 +434,22 @@
       (TRUE {meta_loading_nosave_goto practice_selsong_screen})
    }
 }
-; Red on the section picker: from its end section back to its start, as the
-; game's own (practice.dta); from its start, back before it: a song from a
-; pause menu goes as Return does, one from practice's menus to its
-; difficulty.
-{amend practice_sel_section_panel
-   (BUTTON_DOWN_MSG
-      {cond
-         ({&& {== $button kPad_Tri} {== [section] 1}}
-            {set [section] 0}
-            {section_provider set_start_section -1}
-            {title.lbl set_text select_start_section}
-            TRUE
-         )
-         ({&& {== $button kPad_Tri} {! {ui in_transition}}}
-            {synth play_sequence button_back.cue}
-            {if_else {|| {practice_sel_section_screen get career_mode} $ghc_practice_from}
-               {ghc_practice_exit}
-               {ui goto_screen practice_diff_screen}
-            }
-            TRUE
-         )
-         (TRUE kDataUnhandled)
-      }
-   )
+; Practice loads the whole song, (practice_sections) -1 -1, its sections
+; picked as it plays: GH2 cuts the chart to the sections picked as it loads
+; (SongDB::Load's SongParser bounds), so only a song loaded whole can go to
+; any section in place (ghc_practice_jump). A reload keeps the sections it
+; was on, put back as practice begins again.
+{set $ghc_practice_kept -2} ; a reload's first section, -2 for none
+{set $ghc_practice_kept_to -1}
+{func ghc_practice_whole
+   {gamecfg set (practice_sections 0) -1}
+   {gamecfg set (practice_sections 1) -1}
 }
+{amend practice_diff_screen
+   (SELECT_START_MSG {ghc_practice_whole} {ui goto_screen practice_loading_screen} kDataUnhandled)
+}
+; A failed career song's Practice as its pause menu's.
+{amend lose_panel (goto_practice_mode {ghc_practice_song})}
 ; Practice plays the part alone where it has channels of its own (not a
 ; custom song with no stem for it, custom/audio.h), with its drum clicks
 ; at any speed: GH2's TRIGGERS, a custom song's from its drums. With
@@ -490,6 +481,12 @@
       ; reload (taken by this load) or a section's end.
       {set $ghc_practice_reload FALSE}
       {set $ghc_practice_end FALSE}
+      ; A reload's sections back, before the game panel starts at them.
+      {if {!= $ghc_practice_kept -2}
+         {gamecfg set (practice_sections 0) $ghc_practice_kept}
+         {gamecfg set (practice_sections 1) $ghc_practice_kept_to}
+         {set $ghc_practice_kept -2}
+      }
       ; The section's name in the screen's middle, not right of it beside
       ; where the caption was, and the song's name above it, in its face.
       {do
@@ -615,6 +612,16 @@
       {if {&& $ghc_practice_end {! {ui in_transition}} {!= {{ui current_screen} name} pract_pause_screen}}
          {set $ghc_practice_end FALSE}
          {ghc_practice_again}
+      }
+      ; The last section's end, the game's own coming only at the song's
+      ; (ghc_practice_whole).
+      {do
+         ($last {gamecfg get (practice_sections 1)})
+         ($from 0) ($to 0)
+         {if {&& {!= $last -1} {! $ghc_practice_end}}
+            {gamecfg get_section_bounds $last $from $to}
+            {if {>= {'*' 1000 {taskmgr seconds}} $to} {game practice_end}}
+         }
       }
       {$this duck}
       ; The keyboard's arrows, a step of the speed each as it plays.
@@ -783,6 +790,9 @@
       ; not (ghc_practice_options_screen).
       {do
          {set $ghc_practice_reload FALSE}
+         {set $ghc_practice_kept {gamecfg get (practice_sections 0)}}
+         {set $ghc_practice_kept_to {gamecfg get (practice_sections 1)}}
+         {ghc_practice_whole}
          {meta_loading_nosave_goto practice_loading_screen}
       }
       {do
@@ -790,6 +800,24 @@
          {$screen resume}
       }
    }
+}
+; From the pause menu, as Select in the song: the section again, nothing
+; loaded, unless a setting wants its audio made again.
+{func ghc_practice_restart
+   {if_else $ghc_practice_reload
+      {ghc_practice_resume pract_pause_screen}
+      {do
+         {set $game_unpause_on_enter TRUE}
+         {ghc_practice_again}
+      }
+   }
+}
+; Those sections played from Change Section, as the pause menu's Restart:
+; the song is loaded whole (ghc_practice_whole).
+{func ghc_practice_jump ($from $to)
+   {gamecfg set (practice_sections 0) $from}
+   {gamecfg set (practice_sections 1) $to}
+   {ghc_practice_restart}
 }
 ; Practice's pause menu, as the game's own (pause.dta) but for New Song,
 ; which is Settings (ghc_practice_settings_screen), and Exit, which is
@@ -803,7 +831,11 @@
             ($career {practice_sel_section_screen get career_mode})
             {tut_pause_career_buttons.view set_showing $career}
             {tut_pause_buttons.view set_showing {! $career}}
-            {$this set_focus {if_else $career resume_career.btn resume.btn}}
+            {$this set_focus
+               {if_else [from_sections]
+                  {if_else $career section_career.btn section.btn}
+                  {if_else $career resume_career.btn resume.btn}}}
+            {set [from_sections] FALSE}
          }
          {$this six_rows}
          ; A token with no string reads as itself.
@@ -814,6 +846,7 @@
          {ghc_practice_speed_label $this}
       )
       (exit {if $ghc_speed_before {ghc_practice_speed_edit $this FALSE}})
+      (from_sections FALSE) ; back from Change Section, on its row
       ; The speed row: its name the button's, moved left of the row's
       ; middle, and its number a label right of it, the two centred
       ; together; the number lit only while it is taken up. Made each time
@@ -908,22 +941,76 @@
       (SELECT_START_MSG
          {switch $component
             ((resume.btn resume_career.btn) {ghc_practice_resume $this})
-            ; As Select in the song: the section again, nothing loaded,
-            ; unless a setting wants its audio made again.
-            ((restart.btn restart_career.btn)
-               {if_else $ghc_practice_reload
-                  {ghc_practice_resume $this}
-                  {do
-                     {set $game_unpause_on_enter TRUE}
-                     {ghc_practice_again}
-                  }
-               }
-            )
-            (section.btn {meta_loading_nosave_goto practice_sel_section_screen})
-            (section_career.btn {meta_loading_goto practice_sel_section_screen})
+            ((restart.btn restart_career.btn) {ghc_practice_restart})
+            ((section.btn section_career.btn) {ui goto_screen ghc_practice_section_screen})
             ((change_speed.btn change_speed_career.btn) {ghc_practice_speed_select pract_pause_panel})
             ((newsong.btn ghc_settings_career.btn) {ui goto_screen ghc_practice_settings_screen})
             ((quit.btn quit_career.btn) {ghc_practice_exit})
+         }
+      )
+   )
+}
+; Change Section: GH2's section poster (practice.dta's, before the song)
+; over practice's panels, the song held paused under it. Green on the
+; whole song plays it, green on a section marks where it starts and green
+; on one after plays them, all at once (ghc_practice_jump); red takes the
+; mark off, then goes back to the pause menu.
+{if {! {exists ghc_practice_section_screen}} {new GHScreen ghc_practice_section_screen}}
+{retype ghc_practice_section_screen
+   (
+      (panels PRACTICE_PANELS practice_sel_section_panel helpbar)
+      (focus practice_sel_section_panel)
+      (in_game TRUE)
+      PAUSE_SCREEN_HANDLERS
+      (helpbar (default ((fret1 help_continue) (fret2 help_back) (strum help_updown))))
+      (BUTTON_DOWN_MSG {if_else {== $button kPad_Start} {do {ghc_practice_resume $this} TRUE} kDataUnhandled})
+   )
+}
+{retype practice_sel_section_panel
+   (
+      (file ui/practice_sel_section.milo)
+      (focus sel_section.lst)
+      (section 0) ; 1 once its start is marked
+      (start 0)
+      (enter
+         ; The poster alone, the song behind it, not its brick wall.
+         {speed_wall.mesh set_showing FALSE}
+         {sel_section.lst set_provider section_provider}
+         {$this unmark}
+      )
+      (unmark
+         {set [section] 0}
+         {section_provider set_start_section -1}
+         {title.lbl set_text select_start_section}
+      )
+      (SELECT_START_MSG
+         {do
+            ($idx {- {sel_section.lst selected_pos} 1})
+            {cond
+               ({&& {! [section]} {== $idx -1}} {ghc_practice_jump -1 -1} kDataUnhandled)
+               ({! [section]}
+                  {set [start] $idx}
+                  {set [section] 1}
+                  {section_provider set_start_section $idx}
+                  {title.lbl set_text select_end_section}
+                  kDataUnhandled
+               )
+               ({< $idx [start]} {handle (ui BAD_SELECT_START_MSG)})
+               (TRUE {ghc_practice_jump [start] $idx} kDataUnhandled)
+            }
+         }
+      )
+      (BUTTON_DOWN_MSG
+         {if_else {&& {== $button kPad_Tri} {! {ui in_transition}}}
+            {do
+               {synth play_sequence button_back.cue}
+               {if_else [section]
+                  {$this unmark}
+                  {do {pract_pause_panel set from_sections TRUE} {ui goto_screen pract_pause_screen}}
+               }
+               TRUE
+            }
+            kDataUnhandled
          }
       )
    )

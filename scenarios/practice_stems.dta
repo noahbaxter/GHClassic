@@ -19,14 +19,10 @@
 (wait 1)
 {{game get_player_config 0} set autoplay TRUE}
 (press green)
-(wait_screen practice_sel_section_screen 30)
-(wait 2)
+(wait_screen practice_game_screen 60)
 ; Its chart has no sections: one each tenth of the song.
 (expect {custom section 0} "0%")
 (expect {custom section 9} "90%")
-(shot sections)
-(press green)
-(wait_screen practice_game_screen 60)
 {set $ghc_from {practice_clicks played}}
 (expect $ghc_practice_solo 1)
 (expect {elem {elem {find $syscfg songs {game get_song} song vols} 1} 0} -96.0)
@@ -44,11 +40,7 @@
 {game set_song shoutatthedevil}
 {gamecfg set_track 0 0}
 {{game get_player_config 0} set_difficulty expert}
-{ui goto_screen practice_sel_section_screen}
-(wait_screen practice_sel_section_screen)
-(wait 2)
-{gamecfg set (practice_sections 0) 0}
-{gamecfg set (practice_sections 1) 1}
+{ghc_practice_whole}
 {ui goto_screen practice_loading_screen}
 (wait_screen practice_game_screen 60)
 (expect $ghc_practice_solo 1)

@@ -1,5 +1,5 @@
 ; Practice from a quickplay song at 120%, its pause menu's third row: the
-; song's sections, then practice, which starts at its 120%. Practice's pause
+; whole song at once, at its 120%. Practice's pause
 ; menu has six rows, Settings for New Song, and its Return goes back where practice
 ; began: that song in quickplay, at its 120%. Then the pause menus in GH1's
 ; scene, and practice begun from the menus, whose Return is practice's song
@@ -27,16 +27,11 @@
 (press up)
 (shot gh2_pause)
 (press green)
-(wait_screen practice_sel_section_screen 60)
-(wait 2)
+(wait_screen practice_game_screen 60)
 (expect {gamecfg get mode} practice)
 (expect {game get_song} shoutatthedevil)
-{gamecfg set (practice_sections 0) 0}
-{gamecfg set (practice_sections 1) 1}
+(expect {gamecfg get (practice_sections 0)} -1)
 (expect {song_speed} 120)
-{song_speed set 65}
-{ui goto_screen practice_loading_screen}
-(wait_screen practice_game_screen 60)
 (wait 5)
 (press start)
 (wait_screen pract_pause_screen 20)
@@ -60,8 +55,8 @@
 (expect {song_speed} 120)
 (expect {game get_song} shoutatthedevil)
 (shot back_in_quickplay)
-; Practice from its pause menu again: red on the first section goes back
-; to the list the same way.
+; Practice from its pause menu again: red on its sections' list goes back
+; to its pause menu, not out of practice; Return to the list the same way.
 {ui goto_screen loading_screen}
 (wait_screen game_screen 60)
 (wait 3)
@@ -72,9 +67,26 @@
 (press down)
 (expect {pause_panel focus_name} ghc_practice.btn)
 (press green)
-(wait_screen practice_sel_section_screen 60)
+(wait_screen practice_game_screen 60)
 (wait 2)
+(press start)
+(wait_screen pract_pause_screen 20)
+(wait 1)
+(press down)
+(press down)
+(press down)
+(expect {pract_pause_panel focus_name} section.btn)
+(press green)
+(wait_screen ghc_practice_section_screen 10)
+(wait 0.5)
 (press red)
+(wait_screen pract_pause_screen 10)
+(wait 0.3)
+(expect {gamecfg get mode} practice)
+(press down)
+(press down)
+(expect {pract_pause_panel focus_name} quit.btn)
+(press green)
 (wait_screen qp_selsong_screen 60)
 (expect {gamecfg get mode} quickplay)
 (expect {song_speed} 120)
@@ -107,15 +119,6 @@
 (wait_screen practice_diff_screen 60)
 (wait 1)
 (press green)
-(wait_screen practice_sel_section_screen 60)
-(wait 2)
-; Red on the first section: back to the difficulty before it.
-(press red)
-(wait_screen practice_diff_screen 10)
-(press green)
-(wait_screen practice_sel_section_screen 60)
-(wait 2)
-{ui goto_screen practice_loading_screen}
 (wait_screen practice_game_screen 60)
 ; No song caption: the section's name alone at the top.
 (wait 1.5)

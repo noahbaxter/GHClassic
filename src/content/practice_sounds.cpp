@@ -224,6 +224,54 @@ namespace gh2::practice_sounds
                 play(sound(*it), it->ms, gain);
         }
 
+        // Practice loads the whole song and picks its sections as it plays
+        // (game_settings.dta), but Player keeps the bounds it scores gems
+        // within from when it was made: they are read again for each gem.
+        constexpr uint32_t kSectionProvider = 0x208u; // GameConfig's PracticeSectionProvider
+        constexpr uint32_t kPlayerBounds = 0xfcu;     // Player's first tick and the one past its last
+        PS2Runtime::RecompiledFunction s_inBounds = nullptr;
+        void inBounds(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            if (s_on)
+            {
+                const R5900Context saved = *ctx;
+                const uint32_t player = GPR_U32(ctx, 4);
+                runtime->callGuestFunction(rdram, ctx, s_addresses->gameConfigGetPracticeBounds,
+                                           {load<uint32_t>(rdram, s_addresses->theGameConfig), player + kPlayerBounds,
+                                            player + kPlayerBounds + 4u});
+                *ctx = saved;
+            }
+            s_inBounds(rdram, ctx, runtime);
+        }
+        // SongDB::SetupPracticeSections, then in practice GameConfig's
+        // sections read from it, which GH2 does only on its section screen:
+        // what the song's Player and track are made with, and the pause
+        // menu's list, come from them. GameConfig's mode Symbol is its +0x3c.
+        PS2Runtime::RecompiledFunction s_setupSections = nullptr;
+        void setupSections(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t returnTo = GPR_U32(ctx, 31), songDb = GPR_U32(ctx, 4);
+            const uint32_t config = load<uint32_t>(rdram, s_addresses->theGameConfig);
+            callOriginal(rdram, ctx, runtime, s_addresses->songDbSetupPracticeSections, s_setupSections);
+            const uint32_t mode = load<uint32_t>(rdram, config + 0x3cu);
+            if (mode != 0u && std::strcmp(reinterpret_cast<const char *>(getMemPtr(rdram, mode)), "practice") == 0)
+                runtime->callGuestFunction(rdram, ctx, s_addresses->practiceSectionsInitFromDb,
+                                           {config + kSectionProvider, songDb});
+            ctx->pc = returnTo;
+        }
+        // PracticeSectionProvider::InitData, as Change Section's list takes it
+        // (game_settings.dta): it loads the song into a SongDB and
+        // MidiParserMgr of its own, the global one left 0 after, which the
+        // song in play holds. In practice its sections are read already.
+        PS2Runtime::RecompiledFunction s_initData = nullptr;
+        void initData(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            if (s_on)
+                ctx->pc = GPR_U32(ctx, 31);
+            else
+                s_initData(rdram, ctx, runtime);
+        }
+
         // TrackWatcherImpl::CheckForSustainedNoteTimeout(float ms), each
         // poll: what is due in the next kAheadMs given to the timeline,
         // player 1's notes (a chord or open one gem) and the beats.
@@ -306,5 +354,8 @@ namespace gh2::practice_sounds
                                    settings::set(key, call.number(2) != 0.0f ? 1 : 0);
                                return {settings::get(key) ? 1u : 0u, script::kInt};
                            });
+        replaceKeeping(runtime, addresses.playerIsInBounds, &inBounds, s_inBounds);
+        replaceKeeping(runtime, addresses.songDbSetupPracticeSections, &setupSections, s_setupSections);
+        replaceKeeping(runtime, addresses.practiceSectionsInitData, &initData, s_initData);
     }
 }

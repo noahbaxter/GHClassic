@@ -11,13 +11,11 @@
 {gamecfg set_track 0 0}
 {{game get_player_config 0} set_difficulty expert}
 {{game get_player_config 0} set autoplay TRUE}
-{ui goto_screen practice_sel_section_screen}
-(wait_screen practice_sel_section_screen)
-(wait 1)
-{gamecfg set (practice_sections 0) 1}
-{gamecfg set (practice_sections 1) 2}
+{ghc_practice_whole}
 {ui goto_screen practice_loading_screen}
 (wait_screen practice_game_screen 60)
+(wait 1)
+{ghc_practice_jump 1 2}
 (expect $ghc_practice_solo 1)
 (wait 3)
 (press start)
@@ -74,6 +72,9 @@
 (wait_screen practice_game_screen 60)
 (wait 1)
 (expect $ghc_practice_solo 0)
+; Loaded whole again, on the sections it was on.
+(expect {gamecfg get (practice_sections 0)} 1)
+(expect {gamecfg get (practice_sections 1)} 2)
 {practice_option metronome 0}
 {practice_option solo_stems 1}
 (quit)
