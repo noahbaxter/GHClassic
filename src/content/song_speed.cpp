@@ -45,6 +45,17 @@ namespace gh2::song_speed
         // The song being made plays in practice, whose speed changes as it
         // plays; its BeatMatch, from its Restart.
         bool s_practice = false;
+        // A song list's preview played at the speed, as it changes
+        // ({song_speed preview}): every stream at it in the mix, its pitch
+        // kept as maintain_pitch says, through the mix's shifter only off
+        // 100%, so a preview at its own speed is heard untouched.
+        bool s_previewing = false;
+        void preview(bool on)
+        {
+            s_previewing = on;
+            synth::playStreamsAt(on ? s_percent : 100);
+            synth::keepPitch(on && s_percent != 100 && settings::get(settings::kMaintainPitch) ? 100 : 0);
+        }
         uint32_t s_beatMatch = 0u;
         // The speed a practice song's audio is made at: played at 200% it is
         // at the SPU's most, 4x a 48 kHz stream (spu.cpp); below 50% it
@@ -314,6 +325,8 @@ namespace gh2::song_speed
         // tutorial song reached past the menus that set it plays at 100%.
         void onBeatMatch(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
+            // A song's own streams at their own speed: no list's preview.
+            preview(false);
             {
                 const EntryArgs args(ctx);
                 script::run(rdram, ctx, runtime,
@@ -418,12 +431,17 @@ namespace gh2::song_speed
         // be, nothing muted; unsolo: all of it again.
         // {song_speed practice <bool>}: whether the song made next plays in
         // practice (its BeatMatch's constructor). {song_speed playing}: the
-        // speed the song in play plays at (playing()).
+        // speed the song in play plays at (playing()). {song_speed preview
+        // <bool>}: a song list's preview played at the speed, set or not.
         script::Node command(const script::Call &call)
         {
             const std::string op = call.size() > 1 ? call.symbol(1) : "";
             if (op == "set" || op == "live")
                 s_percent = std::clamp(static_cast<int>(call.number(2)), kSlowest, kFastest);
+            if (op == "preview")
+                preview(call.number(2) != 0.0f);
+            if (op == "set" && s_previewing)
+                preview(true);
             if (op == "practice")
                 s_practice = call.number(2) != 0.0f;
             if (op == "playing")

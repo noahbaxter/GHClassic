@@ -65,6 +65,10 @@ namespace gh2::synth
         // How far behind its voice `stream` is heard, in the stream's
         // samples: the pitch shifter's latency, at the speeds it was played.
         double heardBehind(uint32_t stream);
+        // Every stream played at `speed` (thousandths) times its own, as a
+        // tape: a song list's preview at the song speed picked, its pitch
+        // kept by keepPitch(kSpeedOne). Taken up at once.
+        void playStreamsAt(int32_t speed);
 
     private:
         struct Channel;
@@ -109,6 +113,8 @@ namespace gh2::synth
         void setChannelSpeed(Channel &ch, int32_t speed);
         void slipJump(Stream &s, Channel &ch, int32_t offset);
         uint32_t position(const Channel &ch) const;
+        uint16_t channelPitch(const Channel &ch, int32_t speed) const;
+        int32_t m_streamSpeed = 1000; // playStreamsAt's
 
         void startSample(Sample &s);
         void stopSample(Sample &s);

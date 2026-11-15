@@ -275,4 +275,9 @@ namespace gh2
     {
         s_module.keepPitch(percent * 10);
     }
+
+    void synth::playStreamsAt(int percent)
+    {
+        s_module.playStreamsAt(percent * 10);
+    }
 }

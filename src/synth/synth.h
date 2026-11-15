@@ -21,5 +21,7 @@ namespace gh2
         // The song's audio is made at `percent` speed with its pitch kept,
         // and keeps it at any speed it plays at; 0: it plays as it is.
         void keepPitch(int percent);
+        // Every stream at `percent` speed, as a tape (a song list's preview).
+        void playStreamsAt(int percent);
     }
 }

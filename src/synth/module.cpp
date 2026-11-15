@@ -737,6 +737,24 @@ namespace gh2::synth
 
     // Streams -----------------------------------------------------------------
 
+    // A channel's pitch at `speed` (thousandths), times every stream's
+    // (playStreamsAt).
+    uint16_t Module::channelPitch(const Channel &ch, int32_t speed) const
+    {
+        return pitchFor(ch.rate, speed * m_streamSpeed / kSpeedOne);
+    }
+
+    void Module::playStreamsAt(int32_t speed)
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if (speed == m_streamSpeed)
+            return;
+        m_streamSpeed = speed;
+        for (auto &[id, s] : m_streams)
+            for (Channel &ch : s->channels)
+                setChannelSpeed(ch, ch.speed);
+    }
+
     // 0x2f68: a voice for the channel at `address`, set up and keyed on,
     // pitched without the slip speed.
     int32_t Module::keyChannel(Channel &ch, uint32_t address)
@@ -745,7 +763,7 @@ namespace gh2::synth
         if (v < 0)
             return -1;
         setVolumePan(v, ch.volume, ch.pan);
-        setPitch(v, pitchFor(ch.rate, ch.speed));
+        setPitch(v, channelPitch(ch, ch.speed));
         m_spu.setAdsr(static_cast<uint32_t>(v), ch.adsr1, ch.adsr2);
         m_spu.setStart(static_cast<uint32_t>(v), address);
         m_spu.setReverbSend(static_cast<uint32_t>(v), ch.fx);
@@ -781,14 +799,14 @@ namespace gh2::synth
             {
                 resume(ch.main);
                 setVolumePan(ch.main, ch.volume, ch.pan);
-                setPitch(ch.main, pitchFor(ch.rate, ch.speed * ch.slipSpeed / kSpeedOne));
+                setPitch(ch.main, channelPitch(ch, ch.speed * ch.slipSpeed / kSpeedOne));
                 m_spu.setReverbSend(static_cast<uint32_t>(ch.main), ch.fx);
             }
             if (ch.slip && ch.reference >= 0)
             {
                 resume(ch.reference);
                 setVolumePan(ch.reference, 0, 0);
-                setPitch(ch.reference, pitchFor(ch.rate, ch.speed));
+                setPitch(ch.reference, channelPitch(ch, ch.speed));
             }
         }
     }
@@ -813,9 +831,9 @@ namespace gh2::synth
         if (ch.state != kPlaying)
             return;
         if (ch.main >= 0)
-            setPitch(ch.main, pitchFor(ch.rate, ch.speed * ch.slipSpeed / kSpeedOne));
+            setPitch(ch.main, channelPitch(ch, ch.speed * ch.slipSpeed / kSpeedOne));
         if (ch.slip && ch.reference >= 0)
-            setPitch(ch.reference, pitchFor(ch.rate, ch.speed));
+            setPitch(ch.reference, channelPitch(ch, ch.speed));
     }
 
     // 0x3490: the heard voice re-keyed `offset` samples from where the

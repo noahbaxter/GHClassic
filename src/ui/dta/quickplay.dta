@@ -472,6 +472,9 @@
       (joypad (hold_ms 500) (repeat_ms 80))
       (enter
          {set $ghc_preview_live TRUE}
+         ; The preview at the song speed, as it changes (content/song_speed.h);
+         ; a career's is at 100%.
+         {song_speed preview {! {{ui current_screen} sel_song_career}}}
          {{ui current_screen} turn_off_ambient}
          {if {! {{ui current_screen} sel_song_career}} {song_provider set_quickplay TRUE}}
          {ss_song.lst set_provider song_provider}
@@ -523,6 +526,7 @@
       (exit
          {set $ghc_preview_live FALSE}
          {song_preview ''}
+         {song_speed preview FALSE}
          {set $ghc_preview_on ''}
          {if [metamusic_on_exit] {meta_music start}}
          {set [metamusic_on_exit] TRUE}
