@@ -1103,7 +1103,10 @@
                   {set [section] 1}
                   {section_provider set_start_section $idx}
                   {title.lbl set_text select_end_section}
-                  kDataUnhandled
+                  ; Handled: the list's own select would hold it still as
+                  ; it plays its select, the end not pickable for a moment.
+                  {synth play_sequence button_select}
+                  TRUE
                )
                ({< $idx [start]} {handle (ui BAD_SELECT_START_MSG)})
                (TRUE {ghc_practice_jump [start] $idx} kDataUnhandled)
