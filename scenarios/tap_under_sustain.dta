@@ -1,0 +1,34 @@
+; A custom song's taps and HOPOs played under a sustain, as YARG's are
+; (gameplay/extended/guitar/hammer_ons.h): an orange held for two seconds,
+; a green tap pressed under it, a red hammered on, a green pulled off to
+; (red let go), each with orange still held; then a yellow. Every gem is
+; hit, and the orange's sustain keeps scoring after them.
+(songs tap_under_sustain)
+#include common/first_boot.dta
+{gamecfg set mode quickplay}
+{setlist select custom}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+(press green)
+(wait_screen game_screen 60)
+(wait_until {> {ghc_play gems} 0} 30)
+(expect {ghc_play gems} 5)
+{ghc_play strum 0 0}
+{ghc_play press 1 0}
+{ghc_play press 2 0}
+{ghc_play lift 2 {- {ghc_play gem 3 ms} {ghc_play gem 2 ms}}}
+{ghc_play mark {+ {ghc_play gem 3 ms} 150} after_taps score}
+{ghc_play mark {+ {ghc_play gem 0 ms} 1900} sustain_end score}
+{ghc_play strum 4 0}
+(record on tap_under_sustain)
+(wait_until {ghc_play idle} 30)
+(record off)
+(wait 2)
+(expect {player0 gems_passed} 0)
+(expect {player0 gems_hit} 5)
+(expect {> $sustain_end $after_taps} 1)
+(quit)
