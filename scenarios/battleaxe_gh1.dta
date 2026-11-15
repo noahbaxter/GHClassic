@@ -5,9 +5,9 @@
 #include common/first_boot.dta
 {set $pick gh1}
 #include common/career_start.dta
-(expect {campaign is_unlocked battleaxe} 0)
-(expect {localize battleaxe} "Battle Axe")
-(expect {localize battleaxe_desc} "Judge this race not by its remains.")
+(expect {campaign is_unlocked gh2_battleaxe} 0)
+(expect {localize gh2_battleaxe} "Battle Axe")
+(expect {localize gh2_battleaxe_desc} "Judge this race not by its remains.")
 ; The same band's expert career.
 {ui goto_screen sel_difficulty_screen}
 (wait_screen sel_difficulty_screen)
@@ -25,7 +25,7 @@
 (wait_screen career_screen 40)
 (wait 1)
 (expect {game get_difficulty 0} 3)
-(expect {campaign is_unlocked battleaxe} 0)
+(expect {campaign is_unlocked gh2_battleaxe} 0)
 {foreach $s
    (gh1_iloverockandroll gh1_iwannabesedated gh1_thunderkiss65 gh1_smokeonthewater gh1_infected
       gh1_ironman gh1_morethanafeeling gh1_yougotanotherthingcomin gh1_takemeout gh1_sharpdressedman
@@ -50,13 +50,13 @@
 (wait_until {win_game_screen can_continue} 30)
 (wait 1)
 (shot won)
-(expect {campaign is_unlocked battleaxe} 0)
+(expect {campaign is_unlocked gh2_battleaxe} 0)
 (press green)
 (wait 0.5)
 (shot to_white)
 (wait 6)
 (shot battleaxe)
-(expect {campaign is_unlocked battleaxe} 1)
+(expect {campaign is_unlocked gh2_battleaxe} 1)
 (wait 2)
 (press green)
 (wait 6)

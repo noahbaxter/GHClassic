@@ -7,6 +7,7 @@
 #include "milo/milo.h"
 
 #include "content/hidden_guitars.h"
+#include "content/sources.h"
 #include "flyingv_old_layout.h"
 
 #include <algorithm>
@@ -169,6 +170,27 @@ namespace gh2::gh1
             gh1 = gh1.substr(7);
         const auto it = kBodies.find(gh1);
         return it != kBodies.end() ? it->second : gh1;
+    }
+
+    std::string modelId(const char *scene)
+    {
+        const std::string name = scene;
+        return name.rfind("gh1_", 0) == 0 ? name : sources::id("gh2", name);
+    }
+
+    std::string finishId(const Finish &f)
+    {
+        if (f.outfit && std::string(f.outfit).rfind("gh1_", 0) == 0)
+            return sources::add(sources::Kind::Finish, "gh1", f.key).id;
+        return sources::addShared(sources::Kind::Finish, "gh2", f.key).id;
+    }
+
+    std::string guitarId(const std::string &gh1)
+    {
+        const std::string name = body(gh1);
+        if (name == kExtra.guitar)
+            return sources::add(sources::Kind::Guitar, "gh1", name).id;
+        return sources::addShared(sources::Kind::Guitar, "gh2", name).id;
     }
 
     void addGuitars(size_t gh1Disc)

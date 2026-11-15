@@ -162,7 +162,7 @@ namespace gh2::campaigns
     // `game`'s own, the same way, cheapest first (config order among a
     // price).
     std::vector<Finish> finishesOf(const std::string &game);
-    // `game`'s Grim Ripper's scythe, by its finish's key ("scythe" for none).
+    // `game`'s Grim Ripper's scythe, by its finish's key ("gh2_scythe" for none).
     std::string scytheOf(const std::string &game);
     // Whether a song may play in that game's venue outside its career, as
     // {campaigns venue_open}.

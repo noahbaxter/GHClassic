@@ -3,6 +3,7 @@
 #include "content/campaigns.h"
 #include "content/locale.h"
 #include "content/payouts.h"
+#include "content/sources.h"
 #include "content/tour_or_higher.h"
 #include "disc/ark.h"
 #include "dta.h"
@@ -69,7 +70,11 @@ namespace gh2
             return array({symbol(key), array({symbol("price"), dtb::integer(price)})});
         }
 
-        dtb::Node skin(const char *key, const char *outfit, const char *mat)
+        // GH2's guitar or finish of that name, by id (content/sources.h).
+        std::string guitarId(const char *name) { return sources::addShared(sources::Kind::Guitar, "gh2", name).id; }
+        std::string finishId(const char *name) { return sources::addShared(sources::Kind::Finish, "gh2", name).id; }
+
+        dtb::Node skin(const std::string &key, const std::string &outfit, const char *mat)
         {
             return array({symbol(key), array({symbol("outfit"), symbol(outfit)}), array({symbol("mat"), symbol(mat)})});
         }
@@ -267,17 +272,18 @@ namespace gh2
         return faceFront(scene, stand);
     }
 
-    bool offerHiddenGuitars(dtb::Node &guitars, dtb::Node &store, bool gh1)
+    bool offerHiddenGuitars(dtb::Node &guitars, dtb::Node &store, const std::string &source, bool gh1)
     {
         dtb::Node *sold = child(store, "guitar"), *finishes = child(store, "skin");
-        dtb::Node *controller = child(guitars, kController);
+        dtb::Node *controller = child(guitars, guitarId(kController));
         if (!sold || !finishes || !controller)
             return false;
         for (const Finish &f : kFinishes)
-            if (dtb::Node *skins = !gh1 && child(guitars, f.guitar) ? child(*child(guitars, f.guitar), "skins") : nullptr)
+            if (dtb::Node *skins = !gh1 && child(guitars, guitarId(f.guitar)) ? child(*child(guitars, guitarId(f.guitar)), "skins")
+                                                                             : nullptr)
             {
-                skins->nodes.push_back(skin(f.key, f.outfit, f.mat));
-                finishes->nodes.push_back(priced(f.key, f.price));
+                skins->nodes.push_back(skin(finishId(f.key), sources::id(source, f.outfit), f.mat));
+                finishes->nodes.push_back(priced(finishId(f.key), f.price));
             }
         // A guitar, in stock once hard's tour or expert's is passed, as a
         // reward guitar is once its one is (StoreGuitarProvider::InStock,
@@ -290,16 +296,17 @@ namespace gh2
         else
             controller->nodes.insert(controller->nodes.begin() + 1, array({symbol("type"), symbol("guitar")}));
         controller->nodes.insert(controller->nodes.begin() + 2, terms.begin(), terms.end());
-        sold->nodes.push_back(priced(kController, kControllerPrice));
-        // Each game's is the controller it came with, and that one alone.
+        sold->nodes.push_back(priced(guitarId(kController), kControllerPrice));
+        // Each game's is the controller it came with, and that one alone:
+        // the others' GH2's red, its scene GH2's turned one.
         if (dtb::Node *skins = child(*controller, "skins"); skins && !gh1)
         {
             skins->nodes.resize(1u);
-            skins->nodes.push_back(skin(kRed, kControllerScene, kRedMat));
+            skins->nodes.push_back(skin(finishId(kRed), sources::id("gh2", kControllerScene), kRedMat));
         }
-        guitars.nodes.push_back(array({symbol(kAir), array({symbol("type"), symbol("guitar")}),
-                                       array({symbol("skins"), skin(kAir, kAir, kAirMat)})}));
-        sold->nodes.push_back(priced(kAir, kAirPrice));
+        guitars.nodes.push_back(array({symbol(guitarId(kAir)), array({symbol("type"), symbol("guitar")}),
+                                       array({symbol("skins"), skin(finishId(kAir), sources::id("gh2", kAir), kAirMat)})}));
+        sold->nodes.push_back(priced(guitarId(kAir), kAirPrice));
         return true;
     }
 
@@ -324,15 +331,16 @@ namespace gh2
         dtb::Macros none;
         auto guitars = dtb::read("config/guitars.dta", none, game);
         auto store = dtb::read("config/store.dta", none, game);
-        if (!guitars || !store || !offerHiddenGuitars(*guitars, *store, false))
+        if (!guitars || !store || !offerHiddenGuitars(*guitars, *store, "gh2", false))
         {
             std::cerr << "[guitars] cannot read the game disc's guitars and store" << std::endl;
             return;
         }
-        // The scenes are served ahead of every disc, so whichever game is
-        // played has them.
+        // The scenes are served ahead of every disc at GH2's ids, which
+        // every game's config names them by.
         {
             const std::string path = std::string(kScenes) + kControllerScene + ".milo_ps2";
+            const std::string served = std::string(kScenes) + sources::id("gh2", kControllerScene) + ".milo_ps2";
             const auto file = ark::readFile(0u, path), like = ark::readFile(0u, std::string(kScenes) + kMeshFrom + ".milo_ps2");
             auto scene = file ? milo::read(*file) : std::nullopt;
             const auto ours = like ? milo::read(*like) : std::nullopt;
@@ -347,7 +355,7 @@ namespace gh2
                 }
                 else
                     std::cerr << "[guitars] cannot paint the controller as GH2's" << std::endl;
-                ark::addFile(path, milo::write(*scene));
+                ark::addFile(served, milo::write(*scene));
             }
             else
                 std::cerr << "[guitars] cannot turn the controller to face the front" << std::endl;
@@ -359,7 +367,7 @@ namespace gh2
         if (const auto mesh = hiddenMesh(); air && mesh && !milo::find(*air, kMesh))
         {
             milo::add(*air, "Mesh", kMesh, *mesh);
-            ark::addFile(airPath, milo::write(*air));
+            ark::addFile(std::string(kScenes) + sources::id("gh2", kAir) + ".milo_ps2", milo::write(*air));
         }
         else
             std::cerr << "[guitars] cannot make the air guitar a guitar to pick" << std::endl;

@@ -15,6 +15,7 @@
 #include "gh2x/models.h"
 
 #include "content/games.h"
+#include "content/sources.h"
 #include "disc/ark.h"
 #include "formats/dtb.h"
 #include "gh2x/scene.h"
@@ -75,7 +76,8 @@ namespace gh2
             std::map<std::string, std::vector<Skin>> skins;
         };
 
-        // Each skin of a guitars.dta: guitar and skin, outfit and Mat.
+        // Each skin of a guitars.dta: guitar and skin, outfit and Mat, by
+        // their names on the disc (the game disc's config names ids).
         std::map<std::pair<std::string, std::string>, std::pair<std::string, std::string>>
         readSkins(size_t disc)
         {
@@ -95,7 +97,8 @@ namespace gh2
                 {
                     const dtb::Node &skin = skins->nodes[i];
                     if (skin.type == dtb::kArray && !skin.nodes.empty())
-                        out[{guitar.nodes[0].text, skin.nodes[0].text}] = {value(skin, "outfit"), value(skin, "mat")};
+                        out[{sources::own(guitar.nodes[0].text), sources::own(skin.nodes[0].text)}] = {
+                            sources::own(value(skin, "outfit")), value(skin, "mat")};
                 }
             }
             return out;

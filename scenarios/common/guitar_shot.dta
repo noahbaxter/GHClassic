@@ -14,7 +14,7 @@
 ; A character picked takes its own guitar, in a career the Grim Ripper the
 ; one nobody else can be handed.
 {{game get_player_config 0} set_character $ghc_character TRUE}
-{if {|| {!= $ghc_guitar scythe} {== {campaigns live} gh2}}
+{if {|| {!= $ghc_guitar gh2_scythe} {== {campaigns live} gh2}}
    {{game get_player_config 0} set_guitar $ghc_guitar $ghc_finish}}
 {ui goto_screen loading_screen}
 (wait_screen game_screen 60)

@@ -40,9 +40,10 @@ namespace gh2
 
     // Those in a game's guitars and its store's, for every game whose disc
     // holds them: all four in GH2's, the 360's and the 80s', and with `gh1`
-    // the controller and the air guitar in GH1's. False, with nothing
-    // changed, if the two are not that game's config.
-    bool offerHiddenGuitars(dtb::Node &guitars, dtb::Node &store, bool gh1);
+    // the controller and the air guitar in GH1's. The finishes are drawn by
+    // `source`'s scenes, the controller and air guitar by GH2's. False, with
+    // nothing changed, if the two are not that game's config.
+    bool offerHiddenGuitars(dtb::Node &guitars, dtb::Node &store, const std::string &source, bool gh1);
 
     // guitar_copy.dta's text. Before any game adds its own for the same
     // tokens (GH1 names the finishes it shares by the whole guitar): the

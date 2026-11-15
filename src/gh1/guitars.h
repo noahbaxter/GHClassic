@@ -60,6 +60,14 @@ namespace gh2::gh1
     // by its own.
     std::string body(std::string gh1);
 
+    // Ours by id (content/sources.h): a finish drawn by one of GH1's scenes
+    // (gh1_sg) is GH1's, gh1_sg_worn; any other GH2's, gh2_lp_cherry, as a
+    // GH1 guitar is GH2's of its body (gh2_lespaul) but for the tobacco one,
+    // gh1_tobac. A scene of GH1's is named as an id already, GH2's by GH2's.
+    std::string finishId(const Finish &f);
+    std::string modelId(const char *scene);
+    std::string guitarId(const std::string &gh1);
+
     // The scenes those finishes name that no disc has, from GH1's disc.
     void addGuitars(size_t gh1Disc);
 }

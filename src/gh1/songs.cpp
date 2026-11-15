@@ -375,7 +375,7 @@ namespace gh2::gh1
             for (const Guitarist &g : kGuitarists)
                 if (character && character->text == g.folder)
                     outfit = g.name();
-            const std::string axe = body(guitar ? guitar->text : "lespaul");
+            const std::string axe = guitarId(guitar ? guitar->text : "lespaul");
 
             dtb::Node out = array({gh1.nodes[0]});
             for (const char *key : {"name", "artist"})

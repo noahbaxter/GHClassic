@@ -64,7 +64,7 @@ namespace gh2
             auto guitars = dtb::read("config/guitars.dta", none, theirs);
             auto store = dtb::read("config/store.dta", none, theirs);
             auto campaign = dtb::read("config/campaign.dta", none, theirs);
-            if (guitars && store && offerHiddenGuitars(*guitars, *store, false))
+            if (guitars && store && offerHiddenGuitars(*guitars, *store, "gh80s", false))
             {
                 ark::addFile(layer, "config/gen/guitars.dtb", dtb::write(*guitars));
                 ark::addFile(layer, "config/gen/store.dtb", dtb::write(*store));

@@ -48,8 +48,9 @@ namespace gh2::save::gh2
     std::string ourSong(const std::string &game, const std::string &stored);
 
     // Any item of that game's as its sections name it: a song as above, one
-    // of that game's own or a character by the name its files go by
-    // (content/sources.h), as saves always have; another game's by its id.
+    // of that game's own or a character, guitar or finish by the name its
+    // files go by (content/sources.h), as saves always have; another game's
+    // by its id.
     std::string storedItem(const std::string &game, const std::string &item);
     // The item of that kind a name in that game's sections stands for:
     // another game's outfit also by the name it went by before ids (punk3,

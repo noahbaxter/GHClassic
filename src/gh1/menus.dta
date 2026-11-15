@@ -122,7 +122,7 @@
       ; Below expert there is no guitar: the scene's own stand-in for one
       ; goes too.
       {if_else {== kDifficultyExpert {game get_difficulty 0}}
-         {unlock_guitar_display_panel show_guitar 0 battleaxe '' ug_guitar.pxy ug_guitar.filt}
+         {unlock_guitar_display_panel show_guitar 0 gh2_battleaxe '' ug_guitar.pxy ug_guitar.filt}
          {ug_guitar.pxy set_showing FALSE}}
       {unlock_guitar_display_panel set_showing FALSE}))
 (win_game_screen
@@ -136,7 +136,7 @@
                {! {{win_game_panel find win_screen2.view} showing}}}
             {do
                {synth play_sequence button_select}
-               {campaign buy_item battleaxe 0}
+               {campaign buy_item gh2_battleaxe 0}
                {helpbar set_display ()}
                {set [continue_time] {'+' {taskmgr ui_seconds} 6}}
                {fade_panel start_fade 1 (color 1 1 1) (fade_synth FALSE) (fade_out TRUE)}

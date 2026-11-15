@@ -200,6 +200,9 @@ namespace gh2
         uint32_t dataReadString;
         uint32_t dataNodeEvaluate; // DataNode::Evaluate
         uint32_t symbolCtor;       // Symbol::Symbol(const char *)
+        // The Grim Ripper's guitar, a literal SelectGuitarProvider::InitData
+        // alone makes a Symbol of.
+        uint32_t scytheText; // "scythe"
         uint32_t builtinNew;
         uint32_t builtinDelete;
         uint32_t dataNodeGetObj;   // DataNode::GetObj
@@ -335,6 +338,9 @@ namespace gh2
         uint32_t campaignDataGetNextVenue;            // (Symbol venue, Difficulty)
         uint32_t campaignItemsFind;                   // CampaignItemVec::Find(Symbol)
         uint32_t campaignItemSetPassed;               // CampaignItem::SetPassed(bool)
+        uint32_t campaignItemCtor;                    // CampaignItem::CampaignItem(Type, Symbol, bool, ...)
+        uint32_t profileStateInitGuitars;             // ProfileState::InitGuitars
+        uint32_t profileStateInitGuitarsEnd;
         uint32_t campaignGetRequiredSongs;            // Campaign's, for the venue and difficulty being played
         uint32_t campaignGetStatusProgress;           // (Difficulty)
         uint32_t campaignGetCampaign;                 // (Difficulty): that difficulty's CampaignState
@@ -580,6 +586,7 @@ namespace gh2
         .dataReadString = 0x2b28d0u,
         .dataNodeEvaluate = 0x2b7d38u,
         .symbolCtor = 0x2d3a48u,
+        .scytheText = 0x3f85e0u,
         .builtinNew = 0x2cf138u,
         .builtinDelete = 0x2cf160u,
         .dataNodeGetObj = 0x2b7f80u,
@@ -715,6 +722,9 @@ namespace gh2
         .campaignDataGetNextVenue = 0x1310c8u,
         .campaignItemsFind = 0x140cf8u,
         .campaignItemSetPassed = 0x140a90u,
+        .campaignItemCtor = 0x140950u,
+        .profileStateInitGuitars = 0x13a888u,
+        .profileStateInitGuitarsEnd = 0x13aa4cu,
         .campaignGetRequiredSongs = 0x12e2d8u,
         .campaignGetStatusProgress = 0x12f828u,
         .campaignGetCampaign = 0x12e5e0u,

@@ -22,13 +22,20 @@ namespace gh2::custom
         };
 
         // Gibson's, Epiphone's and Kramer's (realGuitars()).
-        const std::vector<std::string> kRealGuitars = {
+        // GH2's, by id (content/sources.h).
+        std::vector<std::string> gh2(std::vector<std::string> names)
+        {
+            for (std::string &name : names)
+                name = sources::id("gh2", name);
+            return names;
+        }
+        const std::vector<std::string> kRealGuitars = gh2({
             "lespaul",          "sg",       "flying_v",          "explorer",   "lespaul_doublecut",
             "firebird",         "epiphone_coronet", "kramer_vanguard", "moderne", "corvus",
             "es335",            "kramer_650", "eds",             "lespaul_doublecut_sticker", "lespaul_sonex",
-            "lespaul_marauder", "epiphone_casino", "epiphone_sheraton", "chet_atkins"};
+            "lespaul_marauder", "epiphone_casino", "epiphone_sheraton", "chet_atkins"});
         // Of those, the ones a band has from the start.
-        const std::vector<std::string> kStarterGuitars = {"lespaul", "sg", "flying_v"};
+        const std::vector<std::string> kStarterGuitars = gh2({"lespaul", "sg", "flying_v"});
         // Out of a hundred songs, how many play any guitarist rather than
         // their genre's, and in how many the Grim Ripper plays where he may.
         constexpr uint64_t kAnyIn100 = 15u, kGrimIn100 = 5u;

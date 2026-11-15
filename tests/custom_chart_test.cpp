@@ -1018,7 +1018,7 @@ namespace
         for (int i = 0; i < 2000; ++i)
         {
             const Cast c = castOf({{"artist", std::to_string(i)}, {"genre", "Thrash Metal"}, {"diff_guitar", "3"}});
-            CHECK(c.outfit != "gh2_grim" && (c.guitar == "lespaul" || c.guitar == "sg" || c.guitar == "flying_v"));
+            CHECK(c.outfit != "gh2_grim" && (c.guitar == "gh2_lespaul" || c.guitar == "gh2_sg" || c.guitar == "gh2_flying_v"));
             CHECK(c.venue == "gh2_small1" || c.venue == "gh2_small2" || c.venue == "gh2_big" || c.venue == "gh2_theatre" ||
                   c.venue == "gh2_fest");
             grims += c.character == "gh2_grim" ? 1 : 0;

@@ -1,12 +1,14 @@
 #pragma once
 
 // A source is anything content comes from: a game's disc, a romhack, a
-// folder of customs. Every song, venue, character and outfit of one goes by
-// <source>_<name> everywhere past its files, GH2's own included
-// ("gh2_surrender", "gh2_small1", "gh2_punk1"), so no two sources can share
-// a name and nothing is anyone's by default. A character is a person,
-// whichever disc names them: the 80s' punk is GH2's, gh2_punk, its new
-// outfit gh80s_punk1. The band (metal_singer) are outfits of no character.
+// folder of customs. Every song, venue, character, outfit, guitar, finish and
+// guitar model of one goes by <source>_<name> everywhere past its files,
+// GH2's own included ("gh2_surrender", "gh2_small1", "gh2_punk1"), so no two
+// sources can share a name and nothing is anyone's by default. A character
+// is a person and a guitar or finish a product, whichever disc names them:
+// the 80s' punk is GH2's, gh2_punk, its new outfit gh80s_punk1; its Les Paul
+// in cherry is gh2_lespaul's gh2_lp_cherry, drawn by its own model,
+// gh80s_lespaull. The band (metal_singer) are outfits of no character.
 //
 // Each is a row of one table: its kind, its source, its name on that
 // source's disc, its id, and its own name, what its files and saves call
@@ -35,6 +37,9 @@ namespace gh2::sources
         Venue,
         Character,
         Outfit,
+        Guitar,
+        Finish,
+        Model, // a guitar's scene, char/og/guitars/<model>.milo
     };
 
     struct Row
@@ -95,14 +100,14 @@ namespace gh2::sources
         return table().emplace_back(Row{kind, source, name, id(source, name), own.empty() ? name : own});
     }
 
-    // A character of that source's: the one of that name another source
-    // added first, else its own.
-    inline const Row &addCharacter(const std::string &source, const std::string &name)
+    // A character, guitar or finish of that source's: the one of that kind
+    // and name another source added first, else its own.
+    inline const Row &addShared(Kind kind, const std::string &source, const std::string &name)
     {
         for (const Row &row : table())
-            if (row.kind == Kind::Character && row.name == name)
+            if (row.kind == kind && row.name == name)
                 return row;
-        return add(Kind::Character, source, name);
+        return add(kind, source, name);
     }
 
     // That kind's rows of that source, in the order added.
@@ -127,7 +132,9 @@ namespace gh2::sources
     // header (the executable's song_header_%s) and its address on the cash
     // award (endgame.dta's %s_address), an outfit's name on the picker
     // (multiplayer.dta's <outfit>_outfit), a character's blurbs (career.dta's
-    // <character>_blurb, sel_character.dta's _outfit_blurb).
+    // <character>_blurb, sel_character.dta's _outfit_blurb), what the store
+    // says of an item (career.dta's %s_shop_desc, _locked_desc) and the
+    // picker of a guitar or finish (the executable's %s_desc).
     struct KeyForm
     {
         Kind kind;
@@ -136,6 +143,9 @@ namespace gh2::sources
     inline constexpr KeyForm kKeyForms[] = {
         {Kind::Venue, "song_header_", ""}, {Kind::Venue, "", "_address"},     {Kind::Outfit, "", "_outfit"},
         {Kind::Character, "", "_blurb"},   {Kind::Character, "", "_outfit_blurb"},
+        {Kind::Song, "", "_shop_desc"},    {Kind::Character, "", "_shop_desc"},   {Kind::Outfit, "", "_shop_desc"},
+        {Kind::Guitar, "", "_desc"},       {Kind::Guitar, "", "_shop_desc"},      {Kind::Guitar, "", "_locked_desc"},
+        {Kind::Finish, "", "_desc"},       {Kind::Finish, "", "_shop_desc"},
     };
 
     // The `kind` named by a locale key, made from `name` by a form of that

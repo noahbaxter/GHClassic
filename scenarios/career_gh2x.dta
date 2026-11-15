@@ -91,13 +91,13 @@
 (shot store)
 (expect {elem {find $syscfg store character gh2_classic price} 1} 5000)
 (expect {elem {find $syscfg store song gh2x_drinkup price} 1} 550)
-(expect {elem {find $syscfg store guitar log_reward price} 1} 8000)
-(expect {elem {find $syscfg store skin exp_lipstick price} 1} 550)
-(expect {elem {find $syscfg store guitar guitar_red_octane price} 1} 6000)
-(expect {elem {find $syscfg guitars air_guitar type} 1} guitar)
+(expect {elem {find $syscfg store guitar gh2_log_reward price} 1} 8000)
+(expect {elem {find $syscfg store skin gh2_exp_lipstick price} 1} 550)
+(expect {elem {find $syscfg store guitar gh2_guitar_red_octane price} 1} 6000)
+(expect {elem {find $syscfg guitars gh2_air_guitar type} 1} guitar)
 ; A bass asks what the 360 asks, of PS2's model.
-(expect {elem {find $syscfg guitars bass_sg_mahogany require songs} 1} 1)
-(expect {elem {find $syscfg guitars bass_sg_mahogany skins bass_sg_mahog mat} 1} bass_sg_mahog.mat)
+(expect {elem {find $syscfg guitars gh2_bass_sg_mahogany require songs} 1} 1)
+(expect {elem {find $syscfg guitars gh2_bass_sg_mahogany skins gh2_bass_sg_mahog mat} 1} bass_sg_mahog.mat)
 {ui goto_screen career_screen}
 (wait_screen career_screen)
 
@@ -127,5 +127,5 @@
 (expect {campaign new_campaign} 1)
 (expect {campaign cash} 0)
 (expect {elem {find $syscfg store character gh2_classic price} 1} 3000)
-(expect {elem {find $syscfg guitars bass_sg_mahogany require songs} 1} 10)
+(expect {elem {find $syscfg guitars gh2_bass_sg_mahogany require songs} 1} 10)
 (quit)

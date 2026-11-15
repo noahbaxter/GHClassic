@@ -9,19 +9,19 @@
 {gamecfg set mode quickplay}
 {game set_quickplay}
 {game set_character gh2_punk1 TRUE}
-(expect {elem {find $syscfg guitars sg skins sg_worn outfit} 1} gh1_sg)
-(expect {elem {find $syscfg guitars battleaxe_reward skins battleaxe_gh1 outfit} 1} gh1_battleaxe)
-(expect {elem {find $syscfg guitars scythe skins scythe_gh1 outfit} 1} gh1_ripper)
+(expect {elem {find $syscfg guitars gh2_sg skins gh1_sg_worn outfit} 1} gh1_sg)
+(expect {elem {find $syscfg guitars gh2_battleaxe_reward skins gh1_battleaxe_gh1 outfit} 1} gh1_battleaxe)
+(expect {elem {find $syscfg guitars gh2_scythe skins gh1_scythe_gh1 outfit} 1} gh1_ripper)
 ; GH1's guitar that GH2 has none of comes whole, a band's from the start.
-(expect {elem {find $syscfg guitars tobac skins tobac_sunburst outfit} 1} gh1_tobac)
-(expect {campaign is_unlocked tobac} 1)
-(expect {campaign is_unlocked lp_cherry} 1)
-(expect {campaign is_unlocked sg_worn} 0)
-(expect {campaign is_unlocked es_triburst} 0)
-(expect {campaign is_unlocked battleaxe_reward} 0)
-(expect {campaign is_unlocked battleaxe_gh1} 0)
-(expect {campaign is_unlocked scythe} 0)
-(expect {campaign is_unlocked scythe_gh1} 0)
+(expect {elem {find $syscfg guitars gh1_tobac skins gh1_tobac_sunburst outfit} 1} gh1_tobac)
+(expect {campaign is_unlocked gh1_tobac} 1)
+(expect {campaign is_unlocked gh2_lp_cherry} 1)
+(expect {campaign is_unlocked gh1_sg_worn} 0)
+(expect {campaign is_unlocked gh1_es_triburst} 0)
+(expect {campaign is_unlocked gh2_battleaxe_reward} 0)
+(expect {campaign is_unlocked gh1_battleaxe_gh1} 0)
+(expect {campaign is_unlocked gh2_scythe} 0)
+(expect {campaign is_unlocked gh1_scythe_gh1} 0)
 
 ; GH1's career, with those three its band's.
 {ui goto_screen main_screen}
@@ -29,11 +29,11 @@
 {set $pick gh1}
 #include common/career_start.dta
 ; In a career another game's finish is nobody's.
-(expect {campaign is_unlocked sg_white} 0)
-{campaign buy_item sg_worn 0}
+(expect {campaign is_unlocked gh2_sg_white} 0)
+{campaign buy_item gh1_sg_worn 0}
 {campaign buy_item gh2_grim 0}
-{campaign buy_item guitar_red_octane 0}
-{campaign buy_item battleaxe 0}
+{campaign buy_item gh2_guitar_red_octane 0}
+{campaign buy_item gh2_battleaxe 0}
 {set $ghc_switch gh2}
 {set $ghc_switch_next main_screen}
 {ui goto_screen ghc_switch_screen}
@@ -42,46 +42,46 @@
 {gamecfg set mode quickplay}
 {game set_quickplay}
 {game set_character gh2_punk1 TRUE}
-(expect {campaign is_unlocked sg_worn} 1)
-(expect {campaign is_unlocked sg_ebony} 0)
-(expect {campaign is_unlocked battleaxe_reward} 1)
-(expect {campaign is_unlocked battleaxe_gh1} 1)
-(expect {campaign is_unlocked battleaxe} 0)
-(expect {campaign is_unlocked scythe_gh1} 1)
+(expect {campaign is_unlocked gh1_sg_worn} 1)
+(expect {campaign is_unlocked gh1_sg_ebony} 0)
+(expect {campaign is_unlocked gh2_battleaxe_reward} 1)
+(expect {campaign is_unlocked gh1_battleaxe_gh1} 1)
+(expect {campaign is_unlocked gh2_battleaxe} 0)
+(expect {campaign is_unlocked gh1_scythe_gh1} 1)
 
 ; The picker on each, then a song with it. A guitar on show turns once in
 ; four seconds, so a shot four in sees its front.
-{game set_guitar sg sg_worn}
+{game set_guitar gh2_sg gh1_sg_worn}
 {ui goto_screen ghc_qp_guitar_screen}
 (wait_screen ghc_qp_guitar_screen)
 (wait 4)
-(expect {sel_guitar_panel get_selected_guitar 0} sg)
-(expect {sel_guitar_panel get_selected_skin 0} sg_worn)
+(expect {sel_guitar_panel get_selected_guitar 0} gh2_sg)
+(expect {sel_guitar_panel get_selected_skin 0} gh1_sg_worn)
 (shot picker_sg_worn)
 {ui goto_screen main_screen}
 (wait_screen main_screen)
-{game set_guitar tobac tobac_sunburst}
+{game set_guitar gh1_tobac gh1_tobac_sunburst}
 {ui goto_screen ghc_qp_guitar_screen}
 (wait_screen ghc_qp_guitar_screen)
 (wait 4)
-(expect {sel_guitar_panel get_selected_guitar 0} tobac)
+(expect {sel_guitar_panel get_selected_guitar 0} gh1_tobac)
 (shot picker_tobac)
 {ui goto_screen main_screen}
 (wait_screen main_screen)
 {set $ghc_character gh2_punk1}
-{set $ghc_guitar sg}
-{set $ghc_finish sg_worn}
+{set $ghc_guitar gh2_sg}
+{set $ghc_finish gh1_sg_worn}
 #include common/guitar_shot.dta
 #include common/guitar_near.dta
 (shot sg_worn)
-{set $ghc_guitar battleaxe_reward}
-{set $ghc_finish battleaxe_gh1}
+{set $ghc_guitar gh2_battleaxe_reward}
+{set $ghc_finish gh1_battleaxe_gh1}
 #include common/guitar_shot.dta
 #include common/guitar_near.dta
 (shot battleaxe_gh1)
 ; Anyone with the Grim Ripper's, and him with anyone's.
-{set $ghc_guitar scythe}
-{set $ghc_finish scythe_gh1}
+{set $ghc_guitar gh2_scythe}
+{set $ghc_finish gh1_scythe_gh1}
 #include common/guitar_shot.dta
 (shot scythe_gh1_far)
 #include common/guitar_near.dta
@@ -90,39 +90,39 @@
 ; GH1's of each and not GH2's, whose Grim Ripper and controller no band has.
 {meta_loading_nosave_goto main_screen}
 (wait_screen main_screen 60)
-{game set_guitar scythe scythe_gh1}
+{game set_guitar gh2_scythe gh1_scythe_gh1}
 {ui goto_screen ghc_qp_guitar_screen}
 (wait_screen ghc_qp_guitar_screen)
 (wait 4)
-(expect {sel_guitar_panel get_selected_guitar 0} scythe)
-(expect {sel_guitar_panel get_selected_skin 0} scythe_gh1)
-(expect {if_else {find_exists $syscfg guitars scythe skins scythe_gh1} 1 0} 1)
-(expect {if_else {find_exists $syscfg guitars scythe skins scythe} 1 0} 0)
-(expect {if_else {find_exists $syscfg guitars guitar_red_octane skins guitar_red_octane} 1 0} 1)
-(expect {campaign is_unlocked guitar_red_octane} 1)
-(expect {campaign is_unlocked guitar_red_octane_gh2} 0)
+(expect {sel_guitar_panel get_selected_guitar 0} gh2_scythe)
+(expect {sel_guitar_panel get_selected_skin 0} gh1_scythe_gh1)
+(expect {if_else {find_exists $syscfg guitars gh2_scythe skins gh1_scythe_gh1} 1 0} 1)
+(expect {if_else {find_exists $syscfg guitars gh2_scythe skins gh2_scythe} 1 0} 0)
+(expect {if_else {find_exists $syscfg guitars gh2_guitar_red_octane skins gh2_guitar_red_octane} 1 0} 1)
+(expect {campaign is_unlocked gh2_guitar_red_octane} 1)
+(expect {campaign is_unlocked gh2_guitar_red_octane_gh2} 0)
 (shot picker_scythe)
 {ui goto_screen main_screen}
 (wait_screen main_screen)
-{game set_guitar guitar_red_octane guitar_red_octane}
+{game set_guitar gh2_guitar_red_octane gh2_guitar_red_octane}
 {ui goto_screen ghc_qp_guitar_screen}
 (wait_screen ghc_qp_guitar_screen)
 (wait 4)
-(expect {sel_guitar_panel get_selected_guitar 0} guitar_red_octane)
-(expect {sel_guitar_panel get_selected_skin 0} guitar_red_octane)
+(expect {sel_guitar_panel get_selected_guitar 0} gh2_guitar_red_octane)
+(expect {sel_guitar_panel get_selected_skin 0} gh2_guitar_red_octane)
 (shot picker_controller)
 {ui goto_screen main_screen}
 (wait_screen main_screen)
 {set $ghc_character gh2_grim}
-{set $ghc_guitar sg}
-{set $ghc_finish sg_worn}
+{set $ghc_guitar gh2_sg}
+{set $ghc_finish gh1_sg_worn}
 #include common/guitar_shot.dta
 (shot grim_sg_far)
 #include common/guitar_near.dta
 (shot grim_sg)
 {set $ghc_character gh2_punk1}
-{set $ghc_guitar tobac}
-{set $ghc_finish tobac_sunburst}
+{set $ghc_guitar gh1_tobac}
+{set $ghc_finish gh1_tobac_sunburst}
 #include common/guitar_shot.dta
 #include common/guitar_near.dta
 (shot tobac)

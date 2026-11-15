@@ -16,7 +16,7 @@
 ; locked on a new save, so its tier's stands in (GameConfig::SetQuickplay,
 ; 0x126828).
 (expect {game get_character_outfit} gh2_glam1)
-(expect {game get_guitar} flying_v)
+(expect {game get_guitar} gh2_flying_v)
 (expect {game get_venue} gh2_battle)
 {game set_character gh2_punk1 TRUE}
 {ghc_sel_character_done ghc_qp_character_screen}

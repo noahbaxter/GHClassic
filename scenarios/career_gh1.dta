@@ -42,7 +42,7 @@
 (shot career)
 (expect {game get_difficulty_sym 0} medium)
 ; A finish GH2's store sells too keeps GH1's name for it here.
-(expect {localize lp_gold} "Goldtop Gibson Les Paul Standard")
+(expect {localize gh2_lp_gold} "Goldtop Gibson Les Paul Standard")
 {set $cash {campaign cash}}
 (expect $cash 0)
 (press green)
@@ -91,7 +91,7 @@
 (shot store)
 (expect {elem {find $syscfg store character gh2_glam price} 1} 5000)
 (expect {elem {find $syscfg store character gh2_grim price} 1} 8000)
-(expect {elem {find $syscfg store guitar explorer price} 1} 600)
+(expect {elem {find $syscfg store guitar gh2_explorer price} 1} 600)
 (expect {elem {find $syscfg store song gh1_fireitup price} 1} 300)
 ; A song is headed by its title, which GH1 keeps with the song.
 (expect {localize gh1_fireitup} "Fire It Up")

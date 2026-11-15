@@ -278,15 +278,19 @@ namespace
         // A game's own outfit by its name on the disc, a character by its own
         // whichever game's sections, another game's outfit by its id, and the
         // names the outfits other games add went by before.
-        sources::addCharacter("gh2", "punk");
+        sources::addShared(sources::Kind::Character, "gh2", "punk");
         sources::add(sources::Kind::Outfit, "gh2", "punk1");
         sources::add(sources::Kind::Outfit, "gh80s", "punk1");
         CHECK(codec::storedItem("gh2", "gh2_punk1") == "punk1" && codec::storedItem("gh80s", "gh80s_punk1") == "punk1");
         CHECK(codec::storedItem("gh2", "gh80s_punk1") == "gh80s_punk1");
-        CHECK(sources::addCharacter("gh80s", "punk").id == "gh2_punk" && codec::storedItem("gh80s", "gh2_punk") == "punk");
+        CHECK(sources::addShared(sources::Kind::Character, "gh80s", "punk").id == "gh2_punk" && codec::storedItem("gh80s", "gh2_punk") == "punk");
         CHECK(codec::ourItem("gh80s", "punk1", sources::Kind::Outfit) == "gh80s_punk1");
         CHECK(codec::ourItem("gh80s", "punk", sources::Kind::Character) == "gh2_punk");
         CHECK(codec::ourItem("gh2", "punk3", sources::Kind::Outfit) == "gh80s_punk1");
+        // A guitar's finish is GH2's whichever game's sections hold it.
+        sources::addShared(sources::Kind::Finish, "gh2", "lp_cherry");
+        CHECK(codec::storedItem("gh80s", "gh2_lp_cherry") == "lp_cherry");
+        CHECK(codec::ourItem("gh80s", "lp_cherry", sources::Kind::Finish) == "gh2_lp_cherry");
         codec::Save outfitFresh = bareFresh;
         outfitFresh.profileItems[0].name = "gh80s_punk1";
         outfitFresh.profileItems[0].type = 2;

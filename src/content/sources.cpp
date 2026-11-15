@@ -3,6 +3,7 @@
 #include "disc/ark.h"
 #include "formats/dtb.h"
 #include "guest.h"
+#include "hook.h"
 #include "script.h"
 
 #include "ps2_runtime.h"
@@ -120,6 +121,16 @@ namespace gh2::sources
                 ownNames(child);
         }
 
+        // A list's entry: a name, or the name of a (<name> ...); never a
+        // command ((character {...}), a switch's case).
+        void renameEntry(dtb::Node &entry, const Ids &ids)
+        {
+            if (entry.type == dtb::kSymbol)
+                rename(entry, ids);
+            else if (entry.type == dtb::kArray && !entry.nodes.empty())
+                rename(entry.nodes[0], ids);
+        }
+
         // The (<name> ...) entries of a list: their names.
         void renameKeys(dtb::Node &list, const Ids &ids)
         {
@@ -152,7 +163,7 @@ namespace gh2::sources
                     }
             if (head("character"))
                 for (size_t i = 1u; i < n.size(); ++i)
-                    rename(n[i].type == dtb::kArray && !n[i].nodes.empty() ? n[i].nodes[0] : n[i], characters);
+                    renameEntry(n[i], characters);
             if (head("outfit"))
                 renameKeys(node, outfits);
             if (n.size() == 2u && (head("character_outfit") || head("char_outfit")))
@@ -214,34 +225,30 @@ namespace gh2::sources
         // A disc's names by kind, each to its id.
         struct Named
         {
-            std::shared_ptr<Names> songs;
-            std::shared_ptr<Ids> venues, characters, outfits;
+            std::map<Kind, Ids> ids;
 
-            const Ids *of(Kind kind) const
+            const Ids &of(Kind kind) const
             {
-                return kind == Kind::Venue ? venues.get() : kind == Kind::Character ? characters.get()
-                                                          : kind == Kind::Outfit   ? outfits.get()
-                                                                                   : nullptr;
+                static const Ids s_none;
+                const auto it = ids.find(kind);
+                return it == ids.end() ? s_none : it->second;
             }
         };
 
-        // The locale keys `key` is as ids: a song's or venue's name, a
-        // character's or outfit's, or one made from them. A name both a
-        // character's and an outfit's (grim) is both keys.
-        std::vector<std::string> localeKeys(const std::string &key, const std::string &source, const Named &named)
+        // The locale keys `key` is as ids: a name of anything the disc has,
+        // or one made from one. A name of two kinds (grim) is both keys.
+        std::vector<std::string> localeKeys(const std::string &key, const Named &named)
         {
-            if (named.songs->count(key) != 0u)
-                return {id(source, key)};
             std::vector<std::string> keys;
-            for (const Kind kind : {Kind::Venue, Kind::Character, Kind::Outfit})
-                if (const auto it = named.of(kind)->find(key); it != named.of(kind)->end())
+            for (const auto &[kind, ids] : named.ids)
+                if (const auto it = ids.find(key); it != ids.end())
                     keys.push_back(it->second);
             for (const KeyForm &form : kKeyForms)
             {
                 const std::string prefix = form.prefix, suffix = form.suffix;
                 if (key.size() <= prefix.size() + suffix.size() || !key.starts_with(prefix) || !key.ends_with(suffix))
                     continue;
-                const Ids &ids = *named.of(form.kind);
+                const Ids &ids = named.of(form.kind);
                 if (const auto it = ids.find(key.substr(prefix.size(), key.size() - prefix.size() - suffix.size()));
                     it != ids.end())
                     keys.push_back(prefix + it->second + suffix);
@@ -304,6 +311,90 @@ namespace gh2::sources
                     outfits.insert(outfit);
             }
             return {characters, outfits};
+        }
+
+        // The guitars, finishes and models on that disc: its guitars.dta's
+        // (<g> (type ...) (skins (<f> (outfit <m>) (mat ...)) ...)), and any
+        // char/og/guitars/<m>.milo (the air guitar's). None on a disc with no
+        // guitar scenes there: GH1's are GH1's own form (charsys/guitars/),
+        // which its career converts (gh1/guitars.h).
+        struct Guitars
+        {
+            Names guitars, finishes, models;
+        };
+        Guitars guitarsOn(size_t disc)
+        {
+            Guitars found;
+            const std::string folder = "char/og/guitars/gen/", suffix = ".milo_ps2";
+            const std::vector<std::string> scenes = ark::paths(disc, folder);
+            if (scenes.empty())
+                return found;
+            if (const auto file = ark::readFile(disc, "config/gen/guitars.dtb"))
+                if (const auto root = dtb::raw(*file))
+                    for (const dtb::Node &guitar : root->nodes)
+                    {
+                        if (guitar.type != dtb::kArray || guitar.nodes.empty() || guitar.nodes[0].type != dtb::kSymbol)
+                            continue;
+                        found.guitars.insert(guitar.nodes[0].text);
+                        if (const dtb::Node *skins = dtb::find(guitar, "skins"))
+                            for (size_t i = 1u; i < skins->nodes.size(); ++i)
+                                if (skins->nodes[i].type == dtb::kArray && !skins->nodes[i].nodes.empty())
+                                {
+                                    found.finishes.insert(skins->nodes[i].nodes[0].text);
+                                    if (const dtb::Node *model = dtb::find(skins->nodes[i], "outfit"); model && model->nodes.size() > 1u)
+                                        found.models.insert(model->nodes[1].text);
+                                }
+                    }
+            for (const std::string &path : scenes)
+                if (path.ends_with(suffix) && path.find('/', folder.size()) == std::string::npos)
+                    found.models.insert(path.substr(folder.size(), path.size() - folder.size() - suffix.size()));
+            return found;
+        }
+
+        // A guitar, finish or model wherever a script names one as one, never
+        // a word that is also one's name elsewhere (a guitar's (type guitar),
+        // the controller's guitar): guitars.dta's entries, the store's
+        // (guitar (<g> ...)) and (skin (<f> ...)), a song's (guitar <g>),
+        // what {<x> set_guitar <g> <f>} is given, and the air guitar cheat's
+        // model ($cheat_guitar).
+        void qualifyGuitars(dtb::Node &node, const Named &named, bool config)
+        {
+            const Ids &guitars = named.of(Kind::Guitar), &finishes = named.of(Kind::Finish), &models = named.of(Kind::Model);
+            auto &n = node.nodes;
+            const auto head = [&](const char *name) { return node.type == dtb::kArray && !n.empty() && isSymbol(n[0], name); };
+            if (config)
+                for (dtb::Node &guitar : n)
+                    if (guitar.type == dtb::kArray && !guitar.nodes.empty() && guitars.count(guitar.nodes[0].text) != 0u)
+                    {
+                        rename(guitar.nodes[0], guitars);
+                        for (dtb::Node &skins : guitar.nodes)
+                            if (skins.type == dtb::kArray && !skins.nodes.empty() && isSymbol(skins.nodes[0], "skins"))
+                                for (size_t i = 1u; i < skins.nodes.size(); ++i)
+                                    if (dtb::Node &skin = skins.nodes[i]; skin.type == dtb::kArray && !skin.nodes.empty())
+                                    {
+                                        rename(skin.nodes[0], finishes);
+                                        for (dtb::Node &model : skin.nodes)
+                                            if (model.type == dtb::kArray && model.nodes.size() > 1u && isSymbol(model.nodes[0], "outfit"))
+                                                rename(model.nodes[1], models);
+                                    }
+                    }
+            if (head("guitar"))
+                for (size_t i = 1u; i < n.size(); ++i)
+                    renameEntry(n[i], guitars);
+            if (head("skin"))
+                renameKeys(node, finishes);
+            if (node.type == dtb::kCommand && n.size() >= 3u && isSymbol(n[1], "set_guitar"))
+            {
+                rename(n[2], guitars);
+                if (n.size() >= 4u)
+                    rename(n[3], finishes);
+            }
+            if (node.type == dtb::kCommand && n.size() == 3u && n[1].type == dtb::kVar && n[1].text == "cheat_guitar")
+                rename(n[2], models);
+            if (node.type == dtb::kCommand && n.size() == 3u && n[2].type == dtb::kVar && n[2].text == "cheat_guitar")
+                rename(n[1], models);
+            for (dtb::Node &child : n)
+                qualifyGuitars(child, named, false);
         }
 
         // GameConfig::GetVenue (0x1264d0) gives the venue's own name while
@@ -401,6 +492,39 @@ namespace gh2::sources
             ctx->pc = returnTo;
         }
 
+        // Symbol::Symbol(const char *) (0x2d3a48) made from the executable's
+        // "scythe" (the Grim Ripper's guitar) is made from its id: GH2's,
+        // whichever disc's guitar of that name it is.
+        struct SymbolTag;
+        uint32_t s_scythe = 0u;
+        void onSymbol(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            if (GPR_U32(ctx, 5) != s_addresses->scytheText)
+                return;
+            if (s_scythe == 0u)
+            {
+                const EntryArgs args(ctx);
+                s_scythe = script::symbol(rdram, ctx, runtime, id("gh2", "scythe"));
+                args.restore(ctx);
+            }
+            SET_GPR_U32(ctx, 5, s_scythe);
+        }
+
+        // ProfileState::InitGuitars (0x13a888) makes each guitar's item
+        // (CampaignItem::CampaignItem(Type, Symbol, bool unlocked, ...),
+        // 0x140950) unlocked unless strcmp says it is named "battleaxe", the
+        // guitar a band is handed: so the one of that own name too.
+        struct CampaignItemTag;
+        void onCampaignItem(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
+        {
+            const uint32_t from = GPR_U32(ctx, 31), name = GPR_U32(ctx, 6);
+            if (from < s_addresses->profileStateInitGuitars || from >= s_addresses->profileStateInitGuitarsEnd || name == 0u)
+                return;
+            const Row *row = find(reinterpret_cast<const char *>(getMemPtr(rdram, name)), Kind::Guitar);
+            if (row && row->own == "battleaxe")
+                SET_GPR_U32(ctx, 8, 0u);
+        }
+
         script::Node sourcesCommand(const script::Call &call)
         {
             const std::string op = call.symbol(1);
@@ -450,16 +574,24 @@ namespace gh2::sources
         names->insert(unlisted.begin(), unlisted.end());
         for (const std::string &name : *names)
             add(Kind::Song, source, name);
-        auto venues = std::make_shared<Ids>();
+        auto named = std::make_shared<Named>();
+        for (const std::string &name : *names)
+            named->ids[Kind::Song][name] = id(source, name);
         for (const std::string &venue : venuesOn(disc))
-            (*venues)[venue] = add(Kind::Venue, source, venue).id;
-        auto characters = std::make_shared<Ids>(), outfits = std::make_shared<Ids>();
+            named->ids[Kind::Venue][venue] = add(Kind::Venue, source, venue).id;
         const auto [castCharacters, castOutfits] = castOn(disc);
         for (const std::string &character : castCharacters)
-            (*characters)[character] = addCharacter(source, character).id;
+            named->ids[Kind::Character][character] = addShared(Kind::Character, source, character).id;
         for (const std::string &outfit : castOutfits)
-            (*outfits)[outfit] = add(Kind::Outfit, source, outfit).id;
-        const Named named{names, venues, characters, outfits};
+            named->ids[Kind::Outfit][outfit] = add(Kind::Outfit, source, outfit).id;
+        const Guitars guitars = guitarsOn(disc);
+        for (const std::string &guitar : guitars.guitars)
+            named->ids[Kind::Guitar][guitar] = addShared(Kind::Guitar, source, guitar).id;
+        for (const std::string &finish : guitars.finishes)
+            named->ids[Kind::Finish][finish] = addShared(Kind::Finish, source, finish).id;
+        for (const std::string &model : guitars.models)
+            named->ids[Kind::Model][model] = add(Kind::Model, source, model).id;
+        const auto venues = std::make_shared<Ids>(named->of(Kind::Venue));
 
         fix(disc, kConfigs[0], [source, names](dtb::Node &root)
             {
@@ -488,12 +620,27 @@ namespace gh2::sources
         for (const char *prefix : {"config/gen/", "ui/gen/"})
             for (const std::string &path : ark::paths(disc, prefix))
                 if (path.ends_with(".dtb"))
-                    fix(disc, path, [named](dtb::Node &root)
+                    fix(disc, path, [named, path](dtb::Node &root)
                         {
-                            qualifyVenues(root, *named.venues);
-                            qualifyCast(root, *named.characters, *named.outfits);
+                            qualifyVenues(root, named->of(Kind::Venue));
+                            qualifyCast(root, named->of(Kind::Character), named->of(Kind::Outfit));
+                            qualifyGuitars(root, *named, path == "config/gen/guitars.dtb");
                             ownNames(root);
                         });
+
+        // A guitar's OutfitLoader loads the scenes its category lists
+        // (char_objects.dta's (guitars (<m>) ...)) and no other.
+        fix(disc, "char/gen/char_objects.dtb", [named](dtb::Node &root)
+            {
+                const std::function<void(dtb::Node &)> walk = [&](dtb::Node &node)
+                {
+                    if (node.type == dtb::kArray && !node.nodes.empty() && isSymbol(node.nodes[0], "guitars"))
+                        renameKeys(node, named->of(Kind::Model));
+                    for (dtb::Node &n : node.nodes)
+                        walk(n);
+                };
+                walk(root);
+            });
 
         // A song's title is the locale token of its name, a venue's,
         // character's or outfit's of its: one entry for each it names.
@@ -507,7 +654,7 @@ namespace gh2::sources
                         entries.push_back(std::move(entry));
                         continue;
                     }
-                    const std::vector<std::string> keys = localeKeys(entry.nodes[0].text, source, named);
+                    const std::vector<std::string> keys = localeKeys(entry.nodes[0].text, *named);
                     for (size_t i = 1u; i < keys.size(); ++i)
                     {
                         entries.push_back(entry);
@@ -537,7 +684,7 @@ namespace gh2::sources
         // char/<id>/og/<id>.milo is char/<o>/og/<o>.milo, and so on; the
         // highway (track/surfaces/%s_keep.bmp) and the results' photos
         // (ui/image/og/photo_%s%i_keep.bmp) go by outfit too.
-        for (const auto &[name, ours] : *outfits)
+        for (const auto &[name, ours] : named->of(Kind::Outfit))
         {
             ark::rename("char/" + ours + "/og/gen/" + ours, disc, "char/" + name + "/og/gen/" + name);
             ark::rename("char/" + ours + "/", disc, "char/" + name + "/");
@@ -548,12 +695,18 @@ namespace gh2::sources
                 ark::rename("ui/image/og/gen/photo_" + ours + index, disc, "ui/image/og/gen/photo_" + name + index);
             }
         }
+        // char/og/guitars/<id>.milo (the executable's char/og/guitars/%s.milo)
+        // is char/og/guitars/<m>.milo.
+        for (const auto &[name, ours] : named->of(Kind::Model))
+            ark::rename("char/og/guitars/gen/" + ours + ".", disc, "char/og/guitars/gen/" + name + ".");
     }
 
     void install(PS2Runtime &runtime, const Addresses &addresses)
     {
         s_addresses = &addresses;
         script::addCommand("sources", sourcesCommand);
+        EntryHook<SymbolTag>::install(runtime, addresses.symbolCtor, onSymbol);
+        EntryHook<CampaignItemTag>::install(runtime, addresses.campaignItemCtor, onCampaignItem);
         s_getVenue = runtime.lookupFunction(addresses.gameConfigGetVenue);
         runtime.replaceFunction(addresses.gameConfigGetVenue, &getVenue);
         s_onFilterClips = runtime.lookupFunction(addresses.gameConfigOnFilterClips);

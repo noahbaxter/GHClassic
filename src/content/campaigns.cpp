@@ -1372,7 +1372,7 @@ namespace gh2::campaigns
         for (const Guitar &guitar : usable(s_campaigns[*index]).guitars)
         {
             if (guitar.key == item)
-                return item == "battleaxe" ? save::unlockedItem(game, item) : guitar.type != "grim" || unlockedIn(game, "gh2_grim");
+                return item == "gh2_battleaxe" ? save::unlockedItem(game, item) : guitar.type != "grim" || unlockedIn(game, "gh2_grim");
             for (const auto &skin : guitar.skins)
                 if (skin[0] == item)
                     return unlockedIn(game, guitar.key);
@@ -1514,9 +1514,9 @@ namespace gh2::campaigns
     {
         if (const auto index = indexOf(game))
             for (const Guitar &guitar : usable(s_campaigns[*index]).guitars)
-                if (guitar.liveKey() == "scythe" && !guitar.skins.empty())
+                if (guitar.liveKey() == "gh2_scythe" && !guitar.skins.empty())
                     return guitar.skins.front()[0];
-        return "scythe";
+        return "gh2_scythe";
     }
 
     bool venueOpen(const std::string &game, const std::string &venue)

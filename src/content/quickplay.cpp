@@ -69,6 +69,14 @@ namespace gh2::quickplay
             return "char/" + (row && row->source == "gh2" ? row->own : outfit) + "/";
         }
 
+        // A guitar model's scene on the game disc, which the 360's stand in
+        // at: GH2's alone have any.
+        std::string discModel(const std::string &model)
+        {
+            const sources::Row *row = sources::find(model, sources::Kind::Model);
+            return "char/og/guitars/gen/" + (row && row->source == "gh2" ? row->own : model) + ".milo_ps2";
+        }
+
         // The game an outfit is from: its source.
         std::string gameOf(const std::string &outfit)
         {
@@ -159,7 +167,7 @@ namespace gh2::quickplay
         PS2Runtime::RecompiledFunction s_guitarsInitData = nullptr;
         std::string configGuitars(uint8_t *rdram, bool free)
         {
-            return std::string("{if {find_exists $syscfg guitars scythe type} {set_elem {find $syscfg guitars scythe type} 1 ") +
+            return std::string("{if {find_exists $syscfg guitars gh2_scythe type} {set_elem {find $syscfg guitars gh2_scythe type} 1 ") +
                    (free ? "guitar" : "grim") + "}}\n" + (free ? campaigns::lendFinishes() : std::string()) +
                    campaigns::ownFinishes(rdram);
         }
@@ -269,7 +277,7 @@ namespace gh2::quickplay
             const bool hd = settings::hd(settings::kLookGuitars);
             std::vector<const campaigns::Finish *> finishes;
             for (const campaigns::Finish &f : from)
-                if (has(guitars, f.guitar) && (!hd || gh2xHasModel("char/og/guitars/gen/" + f.model + ".milo_ps2")))
+                if (has(guitars, f.guitar) && (!hd || gh2xHasModel(discModel(f.model))))
                     finishes.push_back(&f);
             if (finishes.empty())
                 return "";
@@ -334,7 +342,7 @@ namespace gh2::quickplay
                     outfit = pick;
                 if (cast.character == "gh2_grim" && outfit != retail)
                     // Each Grim Ripper his own game's scythe, which comes with him.
-                    guitar = "scythe " + campaigns::scytheOf(gameOf(outfit));
+                    guitar = "gh2_scythe " + campaigns::scytheOf(gameOf(outfit));
                 else
                     guitar = openGuitar(campaigns::finishes(), {cast.realGuitar}, cast.seed, std::nullopt, unlockAll);
             }
@@ -434,8 +442,7 @@ namespace gh2::quickplay
             // file by its (outfit ...).
             if (op == "has_hd" && call.size() > 3)
             {
-                const std::string path = call.symbol(2) == "guitar" ? "char/og/guitars/gen/" + call.symbol(3) + ".milo_ps2"
-                                                                    : discFolder(call.symbol(3));
+                const std::string path = call.symbol(2) == "guitar" ? discModel(call.symbol(3)) : discFolder(call.symbol(3));
                 return {gh2xHasModel(path) ? 1u : 0u, script::kInt};
             }
             // One outfit's or finish's look by itself, the 360's or the PS2's
@@ -456,8 +463,7 @@ namespace gh2::quickplay
                 if (call.size() > 4)
                 {
                     const bool guitar = what == "guitar";
-                    const std::string path = guitar ? "char/og/guitars/gen/" + call.symbol(3) + ".milo_ps2"
-                                                    : discFolder(call.symbol(3));
+                    const std::string path = guitar ? discModel(call.symbol(3)) : discFolder(call.symbol(3));
                     const std::string look = call.symbol(4);
                     const bool was = gh2xServes(path);
                     setGh2xLook(path, look == "default" ? std::nullopt : std::optional<bool>(look == "hd"));

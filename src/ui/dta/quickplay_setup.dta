@@ -685,7 +685,7 @@
          }
       )
       (sync
-         {lefty1.chk set_check {== $cheat_guitar air_guitar}}
+         {lefty1.chk set_check {== $cheat_guitar gh2_air_guitar}}
          {lefty2.chk set_check $cheat_enabled_performance_mode}
          {widescreen.chk set_check $cheat_enabled_horse_head_mode}
          {p_scan.chk set_check $cheat_enabled_flaming_head}
@@ -694,7 +694,7 @@
       )
       (SELECT_START_MSG
          {switch $component
-            (gs_left_p1.btn {set $cheat_guitar {if_else {== $cheat_guitar air_guitar} 0 air_guitar}})
+            (gs_left_p1.btn {set $cheat_guitar {if_else {== $cheat_guitar gh2_air_guitar} 0 gh2_air_guitar}})
             (gs_left_p2.btn {set $cheat_enabled_performance_mode {! $cheat_enabled_performance_mode}})
             (widescreen.btn {set $cheat_enabled_horse_head_mode {! $cheat_enabled_horse_head_mode}})
             (p_scan.btn {set $cheat_enabled_flaming_head {! $cheat_enabled_flaming_head}})

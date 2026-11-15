@@ -320,21 +320,27 @@ namespace gh2::gh1
             if (const dtb::Node *skins = dtb::find(guitar, "skins"))
                 for (size_t i = 1u; i < skins->nodes.size(); ++i)
                     gameSkins[keyOf(skins->nodes[i])] = skins->nodes[i];
+        // By id (gh1/guitars.h).
+        const auto skinOf = [](const Finish &f, const char *outfit)
+        {
+            return array({symbol(finishId(f)), array({symbol("outfit"), symbol(modelId(outfit))}),
+                          array({symbol("mat"), symbol(f.mat)})});
+        };
         // The Battle Axe under GH1's name for it: a guitar no store sells is
         // a band's from the start unless it is named battleaxe
         // (ProfileState::InitGuitars, 0x13a888), so it is locked as GH1's
         // is, until its career is won on expert (menus.dta).
-        if (dtb::Node *axe = child(*guitars, "battleaxe_reward"))
+        if (dtb::Node *axe = child(*guitars, "gh2_battleaxe_reward"))
         {
-            axe->nodes[0].text = "battleaxe";
+            axe->nodes[0].text = guitarId("battleaxe");
             // Outside a career it is a finish of GH2's (content/campaigns.h).
-            axe->nodes.push_back(array({symbol("as"), symbol("battleaxe_reward")}));
+            axe->nodes.push_back(array({symbol("as"), symbol("gh2_battleaxe_reward")}));
             std::erase_if(axe->nodes, [](const dtb::Node &n) { return keyOf(n) == "require" || keyOf(n) == "difficulty"; });
         }
         std::set<std::string> bodies;
         for (const dtb::Node &guitar : theirGuitars->nodes)
         {
-            dtb::Node *ours = child(*guitars, body(keyOf(guitar)));
+            dtb::Node *ours = child(*guitars, guitarId(keyOf(guitar)));
             dtb::Node *skins = ours ? child(*ours, "skins") : nullptr;
             const dtb::Node *theirSkins = dtb::find(guitar, "skins");
             if (!skins || !theirSkins)
@@ -347,22 +353,18 @@ namespace gh2::gh1
                 if (!f)
                     continue;
                 if (f->outfit)
-                    skins->nodes.push_back(array({symbol(f->key), array({symbol("outfit"), symbol(f->outfit)}),
-                                                  array({symbol("mat"), symbol(f->mat)})}));
-                else if (const auto own = gameSkins.find(f->key); own != gameSkins.end())
+                    skins->nodes.push_back(skinOf(*f, f->outfit));
+                else if (const auto own = gameSkins.find(finishId(*f)); own != gameSkins.end())
                     skins->nodes.push_back(own->second);
             }
         }
         for (const Unoffered &u : kUnoffered)
-            if (dtb::Node *guitar = child(*guitars, u.guitar))
+            if (dtb::Node *guitar = child(*guitars, guitarId(u.guitar)))
                 if (dtb::Node *skins = child(*guitar, "skins"))
-                    skins->nodes.push_back(array({symbol(u.finish.key), array({symbol("outfit"), symbol(u.finish.outfit)}),
-                                                  array({symbol("mat"), symbol(u.finish.mat)})}));
-        guitars->nodes.push_back(
-            array({symbol(kExtra.guitar), array({symbol("type"), symbol("guitar")}),
-                   array({symbol("skins"), array({symbol(kExtra.finish.key), array({symbol("outfit"), symbol(kExtra.finish.outfit)}),
-                                                  array({symbol("mat"), symbol(kExtra.finish.mat)})})})}));
-        bodies.insert(kExtra.guitar);
+                    skins->nodes.push_back(skinOf(u.finish, u.finish.outfit));
+        guitars->nodes.push_back(array({symbol(guitarId(kExtra.guitar)), array({symbol("type"), symbol("guitar")}),
+                                        array({symbol("skins"), skinOf(kExtra.finish, kExtra.finish.outfit)})}));
+        bodies.insert(guitarId(kExtra.guitar));
         std::erase_if(guitars->nodes, [&](const dtb::Node &guitar)
                       {
                           const dtb::Node *type = dtb::find(guitar, "type");
@@ -375,15 +377,15 @@ namespace gh2::gh1
         dtb::Node list = array({symbol("guitar")});
         if (const dtb::Node *sold = dtb::find(*theirStore, "guitar"))
             for (size_t i = 1u; i < sold->nodes.size(); ++i)
-                list.nodes.push_back(priced(body(keyOf(sold->nodes[i])), priceOf(sold->nodes[i])));
+                list.nodes.push_back(priced(guitarId(keyOf(sold->nodes[i])), priceOf(sold->nodes[i])));
         store.nodes.push_back(list);
         list = array({symbol("skin")});
         if (const dtb::Node *sold = dtb::find(*theirStore, "skin"))
             for (size_t i = 1u; i < sold->nodes.size(); ++i)
                 if (const Finish *f = finish(keyOf(sold->nodes[i])))
-                    list.nodes.push_back(priced(f->key, priceOf(sold->nodes[i])));
+                    list.nodes.push_back(priced(finishId(*f), priceOf(sold->nodes[i])));
         for (const Unoffered &u : kUnoffered)
-            list.nodes.push_back(priced(u.finish.key, u.price));
+            list.nodes.push_back(priced(finishId(u.finish), u.price));
         store.nodes.push_back(list);
         if (const dtb::Node *sold = dtb::find(*theirStore, "song"))
             store.nodes.push_back(*sold);
@@ -414,7 +416,7 @@ namespace gh2::gh1
         store.nodes.push_back(array({symbol("outfit")}));
         // The controller and the air guitar, cheats' on GH1's disc, are its
         // store's (content/hidden_guitars.h).
-        offerHiddenGuitars(*guitars, store, true);
+        offerHiddenGuitars(*guitars, store, "gh1", true);
 
         // Tips: GH1's are the general ones.
         if (dtb::Node *general = child(*tips, "tips_general"))
@@ -484,11 +486,11 @@ namespace gh2::gh1
             // scythe are named as both.
             const std::string of = stem != key ? stem : ends(key, "_desc") ? key.substr(0, key.size() - 5u) : key;
             const Finish *f = finish(of);
-            const bool guitar = dtb::find(*theirGuitars, of) != nullptr && bodies.count(body(of)) != 0u;
+            const bool guitar = dtb::find(*theirGuitars, of) != nullptr && bodies.count(guitarId(of)) != 0u;
             if (f)
-                text[f->key + key.substr(of.size())] = entry.nodes[1].text;
+                text[finishId(*f) + key.substr(of.size())] = entry.nodes[1].text;
             if (guitar)
-                text[body(of) + key.substr(of.size())] = entry.nodes[1].text;
+                text[guitarId(of) + key.substr(of.size())] = entry.nodes[1].text;
             if (f || guitar)
                 continue;
             // A song's blurb by our name for it (content/sources.h).

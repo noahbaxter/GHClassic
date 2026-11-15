@@ -77,8 +77,8 @@ namespace gh2
             dtb::Node entry = *found;
             entry.nodes[0].text = ours(name);
             retarget(entry, name);
-            // Its quickplay venue and guitarist, (quickplay (venue <v>)
-            // (character_outfit <o>)), and its band are PS2 GH2's.
+            // Its quickplay venue, guitarist and guitar, (quickplay (venue <v>)
+            // (character_outfit <o>) (guitar <g>)), and its band are PS2 GH2's.
             for (dtb::Node &n : entry.nodes)
             {
                 const std::string key = n.type == dtb::kArray && !n.nodes.empty() ? n.nodes[0].text : "";
@@ -88,7 +88,8 @@ namespace gh2
                 if (key == "quickplay")
                     for (dtb::Node &pick : n.nodes)
                         if (pick.type == dtb::kArray && pick.nodes.size() == 2u &&
-                            (pick.nodes[0].text == "venue" || pick.nodes[0].text == "character_outfit"))
+                            (pick.nodes[0].text == "venue" || pick.nodes[0].text == "character_outfit" ||
+                             pick.nodes[0].text == "guitar"))
                             pick.nodes[1].text = sources::id("gh2", pick.nodes[1].text);
             }
             for (const char *key : {"song", "song_coop"})
@@ -141,7 +142,7 @@ namespace gh2
         {
             for (dtb::Node &guitar : guitars.nodes)
             {
-                const dtb::Node *other = dtb::find(theirs, keyOf(guitar));
+                const dtb::Node *other = dtb::find(theirs, sources::own(keyOf(guitar)));
                 if (guitar.type != dtb::kArray || !other)
                     continue;
                 const dtb::Node *require = dtb::find(*other, "require");
@@ -223,14 +224,15 @@ namespace gh2
                 }
             if (dtb::Node *songs = child(*store, "song"))
                 rename(*songs);
-            // The characters and outfits it sells are PS2 GH2's.
-            for (const char *kind : {"character", "outfit"})
+            // The characters, outfits, guitars and finishes it sells are PS2
+            // GH2's.
+            for (const char *kind : {"character", "outfit", "guitar", "skin"})
                 if (dtb::Node *list = child(*store, kind))
                     for (size_t i = 1u; i < list->nodes.size(); ++i)
                         if (list->nodes[i].type == dtb::kArray && !list->nodes[i].nodes.empty())
                             list->nodes[i].nodes[0].text = sources::id("gh2", list->nodes[i].nodes[0].text);
             requireAs(*guitars, *theirGuitars);
-            offerHiddenGuitars(*guitars, *store, false);
+            offerHiddenGuitars(*guitars, *store, "gh2", false);
             if (!scalePayouts(campaign, *store))
                 std::cerr << "[gh2x] cannot scale the 360 career's cash to its store" << std::endl;
             // loading_tip13 is about the Xbox Live leaderboards.

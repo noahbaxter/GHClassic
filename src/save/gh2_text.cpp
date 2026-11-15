@@ -18,8 +18,13 @@ namespace gh2::save::gh2
         // difficulty, the rest per band. Outfits include the characters.
         const char *const kTypes[] = {"venue", "song", "outfit", "guitar", "finish", "video", "mode"};
         const char *const kLook[4] = {"character", "outfit", "guitar", "finish"};
-        const sources::Kind kLookKinds[4] = {sources::Kind::Character, sources::Kind::Outfit, sources::Kind::Outfit,
-                                             sources::Kind::Outfit};
+        const sources::Kind kLookKinds[4] = {sources::Kind::Character, sources::Kind::Outfit, sources::Kind::Guitar,
+                                             sources::Kind::Finish};
+        // Kinds whose rows any game shares: GH2's whichever disc names them.
+        bool shared(sources::Kind kind)
+        {
+            return kind == sources::Kind::Character || kind == sources::Kind::Guitar || kind == sources::Kind::Finish;
+        }
         const char *const kFlags[3] = {"store", "unlocked", "passed"};
         constexpr uint8_t kGold = 0x80u;
 
@@ -387,7 +392,7 @@ namespace gh2::save::gh2
             return item;
         if (row->kind == sources::Kind::Song)
             return storedSong(section, item);
-        return row->kind == sources::Kind::Character || row->source == game ? row->own : item;
+        return shared(row->kind) || row->source == game ? row->own : item;
     }
 
     std::string ourItem(const std::string &section, const std::string &stored, sources::Kind kind)
@@ -396,7 +401,7 @@ namespace gh2::save::gh2
         if (const auto old = kOldNames.find(stored); old != kOldNames.end())
             return old->second;
         for (const sources::Row &row : sources::table())
-            if (row.kind == kind && row.own == stored && (kind == sources::Kind::Character || row.source == game))
+            if (row.kind == kind && row.own == stored && (shared(kind) || row.source == game))
                 return row.id;
         return stored;
     }
