@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- A four-tuner bass headstock, after Warriors of Rock's setlist icon: horned
+       top, pointed foot, two oval tuner knobs a side, fitted to its 64px texture. -->
+  <g fill="#3d3d45">
+    <path d="M20.7 12.49 L31.49 21.3 A1 1 0 0 0 32.84 21.22 L43.13 10.57 A1 1 0 0 1 44.84 11.38 L42.51 30.4 L40.61 45.36 A1 1 0 0 1 40.36 45.9 L32.97 54.04 A1 1 0 0 1 31.46 54.01 L23.13 44.04 A1 1 0 0 1 22.9 43.53 L19.08 13.39 A1 1 0 0 1 20.7 12.49 Z"/>
+    <rect x="14.39" y="20.79" width="6.54" height="5"/>
+    <rect x="15.96" y="36.62" width="6.98" height="5"/>
+    <rect x="42.79" y="20.71" width="6.81" height="5"/>
+    <rect x="40.81" y="36.57" width="7.15" height="5"/>
+    <ellipse cx="14.39" cy="23.29" rx="6" ry="7.75" transform="rotate(-23.8 14.39 23.29)"/>
+    <ellipse cx="15.96" cy="39.12" rx="6" ry="7.76" transform="rotate(-25.23 15.96 39.12)"/>
+    <ellipse cx="49.6" cy="23.21" rx="5.98" ry="7.9" transform="rotate(30.95 49.6 23.21)"/>
+    <ellipse cx="47.96" cy="39.07" rx="5.9" ry="7.86" transform="rotate(25.21 47.96 39.07)"/>
+  </g>
+</svg>
