@@ -1,0 +1,37 @@
+; Song speed in Face-Off as in quickplay: Select's menu on its song list,
+; its one row the speed, green faster; the song plays at it against the
+; clock, its Face-Off audio (song_vs) stretched.
+#include common/first_boot.dta
+(device p1)
+(device p2)
+(press start p1)
+{ui goto_screen multi_screen}
+(wait_screen multi_screen)
+(press start p2)
+(wait 0.5)
+{gamecfg set mode multi_vs}
+{game set_num_players 2}
+{ui goto_screen multi_vs_selsong_screen}
+(wait_screen multi_vs_selsong_screen)
+(wait 2)
+(press star_power p1)
+(wait 0.5)
+(expect {ghc_pick_panel get open} TRUE)
+(press green p1)
+(expect {song_speed} 105)
+(shot speed_menu)
+(press star_power p1)
+(wait 0.5)
+{song_speed set 150}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set autoplay TRUE}
+{{game get_player_config 1} set autoplay TRUE}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(print {find $syscfg songs shoutatthedevil song_vs name})
+(wait_until {> {taskmgr seconds} 5} 60)
+{set $ghc_t0 {taskmgr ui_seconds}}
+{set $ghc_s0 {taskmgr seconds}}
+(wait 10)
+(expect {'/' {'-' {taskmgr seconds} $ghc_s0} {'-' {taskmgr ui_seconds} $ghc_t0}} 1.5 0.03)
+(quit)

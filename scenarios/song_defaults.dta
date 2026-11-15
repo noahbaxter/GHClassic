@@ -14,11 +14,12 @@
 (wait_screen qp_selsong_screen)
 (wait 1)
 (expect {setlist shown} gh2)
-; Select opens the menu and it stays open; green flips its row; select
-; shuts it.
+; Select opens the menu, on SPEED, and it stays open; green flips song
+; defaults' row; select shuts it.
 (press star_power)
 (wait 0.5)
 (expect {ghc_pick_panel get open} 1)
+(press down)
 (shot menu)
 (expect {quickplay song_defaults} 0)
 (press green)

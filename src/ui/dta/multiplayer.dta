@@ -560,6 +560,12 @@
          {ghc_pick_panel open_with {ghc_setlists} {setlist shown}}
          TRUE
       )
+      ; Select's menu, quickplay's speed (quickplay.dta).
+      ({&& {== $button kPad_Select} {! {ui in_transition}}}
+         {synth play_sequence button_select}
+         {ghc_pick_panel open_sticky (speed) speed}
+         TRUE
+      )
       (TRUE kDataUnhandled)
    }
 }
@@ -572,6 +578,9 @@
       (SELECT_START_MSG {ghc_custom_start TRUE} {ui goto_screen {ghc_multi_screen seldiff}} kDataUnhandled)
       (BUTTON_DOWN_MSG {ghc_multi_selsong_button $button})
       (ghc_picked ($game) {ghc_qp_picked sel_song_panel ghc_multi_selsong_twin_screen $game})
+      (ghc_option_text ($option) {ghc_qp_option_text $option})
+      (ghc_chose ($option) {ghc_qp_chose sel_song_panel $option})
+      (ghc_chose_back ($option) {ghc_qp_chose_back $option})
    )
 }
 {retype multi_vs_selsong_screen $ghc_multi_selsong_screen}
@@ -586,6 +595,9 @@
       (SELECT_START_MSG {ghc_custom_start TRUE} {ui goto_screen {ghc_multi_screen seldiff}} kDataUnhandled)
       (BUTTON_DOWN_MSG {ghc_multi_selsong_button $button})
       (ghc_picked ($game) {ghc_qp_picked sel_song_twin_panel {ghc_multi_screen selsong} $game})
+      (ghc_option_text ($option) {ghc_qp_option_text $option})
+      (ghc_chose ($option) {ghc_qp_chose sel_song_twin_panel $option})
+      (ghc_chose_back ($option) {ghc_qp_chose_back $option})
    )
 }
 

@@ -708,6 +708,8 @@
 {func ghc_qp_option_text ($option)
    {switch $option
       (random "RANDOM SONG")
+      ; Green faster, yellow slower (content/song_speed.h).
+      (speed {sprint "SPEED: " {song_speed} "%"})
       (song_defaults
          {sprint "SONG DEFAULTS: " {if_else {quickplay song_defaults} "ON" "OFF"}})
       ; The part a custom song plays (custom/songs.h); one without it
@@ -732,11 +734,32 @@
       }
       {do
          {switch $option
+            (speed {ghc_speed_step 1})
             (song_defaults {quickplay song_defaults {! {quickplay song_defaults}}})
             (instrument {custom instrument {if_else {== {custom instrument} bass} guitar bass}})
          }
          {synth play_sequence button_toggle}
          {ghc_pick_panel relabel}
+      }
+   }
+}
+{func ghc_qp_chose_back ($option)
+   {if {== $option speed}
+      {ghc_speed_step -1}
+      {synth play_sequence button_toggle}
+      {ghc_pick_panel relabel}
+   }
+}
+; The song speed a step faster ($dir 1) or slower (-1): 10% steps up to
+; 50%, 5% to 150%, 25% to 500%.
+{func ghc_speed_step ($dir)
+   {do
+      ($s {song_speed})
+      {song_speed set
+         {if_else {> $dir 0}
+            {cond ({< $s 50} {'+' $s 10}) ({< $s 150} {'+' $s 5}) (TRUE {'+' $s 25})}
+            {cond ({<= $s 50} {'-' $s 10}) ({<= $s 150} {'-' $s 5}) (TRUE {'-' $s 25})}
+         }
       }
    }
 }
@@ -774,6 +797,7 @@
       (ghc_picked ($game) {ghc_qp_picked sel_song_panel qp_selsong_twin_screen $game})
       (ghc_option_text ($option) {ghc_qp_option_text $option})
       (ghc_chose ($option) {ghc_qp_chose sel_song_panel $option})
+      (ghc_chose_back ($option) {ghc_qp_chose_back $option})
       (ghc_section_text ($tier) {setlist tier_name $tier})
       (ghc_section_picked ($tier) {sel_song_panel ghc_jump $tier})
       (ghc_section_next {ghc_qp_section_next sel_song_panel})
@@ -793,6 +817,7 @@
       (ghc_picked ($game) {ghc_qp_picked sel_song_twin_panel qp_selsong_screen $game})
       (ghc_option_text ($option) {ghc_qp_option_text $option})
       (ghc_chose ($option) {ghc_qp_chose sel_song_twin_panel $option})
+      (ghc_chose_back ($option) {ghc_qp_chose_back $option})
       (ghc_section_text ($tier) {setlist tier_name $tier})
       (ghc_section_picked ($tier) {sel_song_twin_panel ghc_jump $tier})
       (ghc_section_next {ghc_qp_section_next sel_song_twin_panel})

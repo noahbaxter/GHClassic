@@ -17,7 +17,8 @@
 ;
 ; Opened with open_sticky it is a menu instead: it stays open when yellow
 ; is let go, green tells the screen the row picked, (ghc_chose ($option)),
-; and select or red shuts it. Its rows' text is the screen's
+; yellow the same the other way, (ghc_chose_back ($option)), and select or
+; red shuts it. Its rows' text is the screen's
 ; (ghc_option_text ($option)), a setlist's name otherwise.
 {if {! {exists ghc_pick_panel}} {new GHPanel ghc_pick_panel}}
 {retype ghc_pick_panel
@@ -291,6 +292,10 @@
             {cond
                ({== $button kPad_X}
                   {{ui current_screen} ghc_chose
+                     {elem {ghc_pick_panel get options} {ghc_pick_panel get picked}}}
+               )
+               ({== $button kPad_Circle}
+                  {{ui current_screen} ghc_chose_back
                      {elem {ghc_pick_panel get options} {ghc_pick_panel get picked}}}
                )
                ({|| {== $button kPad_Select} {== $button kPad_Tri}}
