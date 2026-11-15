@@ -18,6 +18,7 @@
 #include <signalsmith-stretch/signalsmith-stretch.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
 #include <deque>
@@ -289,9 +290,13 @@ namespace gh2::song_speed
             args.restore(ctx);
         }
 
+        // BeatMatch reads its song's audio at the speed, practice's with
+        // the played part alone (ghc_practice_solo, ui/dta/game_settings.dta),
         // and leaves the song as it was for the menus' previews. Only
         // quickplay, practice and multiplayer play at a speed: a career or
         // tutorial song reached past the menus that set it plays at 100%.
+        void onBeatMatch(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
             {
                 const EntryArgs args(ctx);
                 script::run(rdram, ctx, runtime,
@@ -300,9 +305,88 @@ namespace gh2::song_speed
                             " {song_speed set 100}}");
                 args.restore(ctx);
             }
+            rename(rdram, ctx, runtime, "name");
+            const EntryArgs args(ctx);
+            script::run(rdram, ctx, runtime, "{if {== {gamecfg get mode} practice} {ghc_practice_solo}}");
+            args.restore(ctx);
+        }
+        void onBeatMatchGone(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            rename(rdram, ctx, runtime, "base");
             s_beatMatch = 0u;
+            const EntryArgs args(ctx);
+            script::run(rdram, ctx, runtime, "{song_speed unsolo} {set $ghc_practice_solo FALSE}");
+            args.restore(ctx);
+        }
+
+        // A DataArray: nodes at +0, their count at +8; a node is a value and
+        // a type, a symbol's value its text.
+        uint32_t nodeAt(uint8_t *rdram, uint32_t array, int i) { return load<uint32_t>(rdram, array) + 8u * uint32_t(i); }
+        int sizeOf(uint8_t *rdram, uint32_t array) { return load<int16_t>(rdram, array + 8u); }
+        std::string symbolAt(uint8_t *rdram, uint32_t node)
+        {
+            if (load<uint32_t>(rdram, node + 4u) != script::kSymbol)
+                return "";
+            return reinterpret_cast<const char *>(getMemPtr(rdram, load<uint32_t>(rdram, node)));
+        }
+        // The (key ...) in an array, 0 if none.
+        uint32_t entry(uint8_t *rdram, uint32_t array, const std::string &key)
+        {
+            for (int i = 0; i < sizeOf(rdram, array); ++i)
+            {
+                const uint32_t node = nodeAt(rdram, array, i);
+                if (load<uint32_t>(rdram, node + 4u) == script::kArray &&
+                    symbolAt(rdram, nodeAt(rdram, load<uint32_t>(rdram, node), 0)) == key)
+                    return load<uint32_t>(rdram, node);
+            }
+            return 0u;
+        }
+
+        // The vols put at silence, each node as it was.
+        std::vector<std::array<uint32_t, 3>> s_muted;
+
+        // A song block's channels not the played part's put at -96 dB: the
+        {
+            // (tracks ((guitar (2 3)) (bass 4))), (vols (-3.5 ...)): each's list.
+            const auto list = [&](const char *key) -> uint32_t
+            {
+                const uint32_t e = entry(rdram, block, key);
+                return e && sizeOf(rdram, e) > 1 && load<uint32_t>(rdram, nodeAt(rdram, e, 1) + 4u) == script::kArray
+                           ? load<uint32_t>(rdram, nodeAt(rdram, e, 1))
+                           : 0u;
+            };
+            const uint32_t tracks = list("tracks"), vols = list("vols");
+            if (!tracks || !vols)
+                return false;
+            std::vector<bool> mine(16, false);
+            bool any = false;
+            for (int t = 0; t < sizeOf(rdram, tracks); ++t)
+            {
+                const uint32_t track = load<uint32_t>(rdram, nodeAt(rdram, tracks, t));
+                    continue;
+                const uint32_t channels = nodeAt(rdram, track, 1);
+                const bool many = load<uint32_t>(rdram, channels + 4u) == script::kArray;
+                const uint32_t array = load<uint32_t>(rdram, channels);
+                for (int c = 0; c < (many ? sizeOf(rdram, array) : 1); ++c)
+                {
+                    const uint32_t channel = load<uint32_t>(rdram, many ? nodeAt(rdram, array, c) : channels);
+                    if (channel < mine.size())
+                        mine[channel] = any = true;
+                }
+            }
+            for (int c = 0; c < sizeOf(rdram, vols); ++c)
+                if (static_cast<size_t>(c) >= mine.size() || !mine[c])
+                {
+                    const uint32_t node = nodeAt(rdram, vols, c);
+                    s_muted.push_back({node, load<uint32_t>(rdram, node), load<uint32_t>(rdram, node + 4u)});
+                    store<uint32_t>(rdram, node, script::floatNode(-96.0f).value);
+                    store<uint32_t>(rdram, node + 4u, script::kFloat);
+                }
+            return true;
+        }
 
         // {song_speed name <audio name>}: that name at the speed; base: as
+        // it was. {song_speed solo <song block> <guitar>}: only the played
         // {song_speed practice <bool>}: whether the song made next plays in
         // practice (its BeatMatch's constructor). {song_speed playing}: the
         // speed the song in play plays at (playing()).
@@ -314,6 +398,18 @@ namespace gh2::song_speed
                 s_practice = call.number(2) != 0.0f;
             if (op == "playing")
                 return {static_cast<uint32_t>(playing()), script::kInt};
+            {
+                const script::Node block = call.arg(2);
+            }
+            if (op == "unsolo")
+            {
+                for (const auto &[node, value, type] : s_muted)
+                {
+                    store<uint32_t>(call.rdram, node, value);
+                    store<uint32_t>(call.rdram, node + 4u, type);
+                }
+                s_muted.clear();
+            }
             if (op == "name" || op == "base")
             {
                 std::string name = call.text(2);

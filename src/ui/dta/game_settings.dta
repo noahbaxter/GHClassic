@@ -458,6 +458,18 @@
       }
    )
 }
+; Practice plays the part alone where it has channels of its own (not a
+; custom song with no stem for it, custom/audio.h), with its drum clicks
+{set $ghc_practice_solo FALSE}
+{func ghc_practice_solo
+   }
+}
+{amend practice_panel
+   (update
+      {if {! [keep_section_text]} {section.lbl set_text ''}}
+      {set [keep_section_text] FALSE}
+   )
+}
             ({&& {== $button kPad_Select} {! {ui in_transition}}} {ghc_practice_again})
 {func ghc_practice_again
    {synth stop_all_sfx}

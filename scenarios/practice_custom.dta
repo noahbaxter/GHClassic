@@ -30,6 +30,8 @@
 (press green)
 (wait_screen practice_game_screen 60)
 (expect {song_speed} 90)
+; Its one song.opus has no stem of its own: played whole, no clicks.
+(expect $ghc_practice_solo 0)
 (print {elem {find $syscfg songs {game get_song} song name} 1})
 (wait 2)
 {set $ghc_t0 {taskmgr ui_seconds}}

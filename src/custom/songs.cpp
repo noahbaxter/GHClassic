@@ -37,6 +37,11 @@ namespace gh2::custom
         return s_instrument == Part::Bass && hasPart(song.parts, Part::Bass) ? Part::Bass : playedPart(song.parts);
     }
 
+    std::string playedStem(Part part)
+    {
+        return part == Part::Guitar || part == Part::Coop ? "guitar" : part == Part::Rhythm ? "rhythm" : "bass";
+    }
+
     std::string base(const std::string &id, uint8_t parts, Part part)
     {
         const std::string dir = "songs/" + id + "/" + id;

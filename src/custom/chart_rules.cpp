@@ -238,6 +238,8 @@ namespace gh2::custom::rules
         for (const PadHit &hit : pads)
             if (hit.cymbal && (hit.lane == kGreenPad || (pro && hit.lane == kBluePad)))
                 chart.crashes.push_back(hit.tick);
+            else if (hit.cymbal && hit.lane == kYellowPad)
+                chart.hats.push_back(hit.tick);
     }
 
     void addLyric(Chart &chart, uint32_t tick, uint32_t length, const std::string &text)
@@ -273,7 +275,7 @@ namespace gh2::custom::rules
         for (auto &[part, difficulties] : chart.parts)
             for (Difficulty &d : difficulties)
                 sortByTick(d.solos);
-        for (std::vector<uint32_t> *hits : {&chart.kicks, &chart.snares, &chart.crashes, &chart.drums, &chart.keys})
+        for (std::vector<uint32_t> *hits : {&chart.kicks, &chart.snares, &chart.crashes, &chart.hats, &chart.drums, &chart.keys})
             std::sort(hits->begin(), hits->end());
         holdSyllables(chart);
     }

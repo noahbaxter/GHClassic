@@ -1,4 +1,48 @@
+; Practice plays the part alone where it has a stem of its own, with drum
+; clicks from the chart's drums: a custom song with a guitar stem and a drum
+; chart has its backing at -96 dB and its clicks heard at 100%, the
+; backing back once the song is left. GH2's own song the same, its clicks
+; GH2's TRIGGERS. practice_custom has a song with no stem, played whole.
+(songs songs_stems)
+#include common/first_boot.dta
+{gamecfg set mode practice}
+{setlist select custom}
+{ui goto_screen practice_selsong_screen}
+(wait_screen practice_selsong_screen)
+(wait 3)
+(press green)
+(wait_screen practice_diff_screen)
+(wait 1)
+{{game get_player_config 0} set autoplay TRUE}
+(press green)
+(wait_screen practice_sel_section_screen 30)
+(wait 2)
 ; Its chart has no sections: one each tenth of the song.
 (expect {custom section 0} "0%")
 (expect {custom section 9} "90%")
 (shot sections)
+(press green)
+(wait_screen practice_game_screen 60)
+(expect $ghc_practice_solo 1)
+(expect {elem {elem {find $syscfg songs {game get_song} song vols} 1} 0} -96.0)
+(expect {elem {elem {find $syscfg songs {game get_song} song vols} 1} 2} 0.0)
+{ui goto_screen main_screen}
+(wait_screen main_screen 30)
+(expect $ghc_practice_solo 0)
+(expect {elem {elem {find $syscfg songs {game get_song} song vols} 1} 0} 0.0)
+
+{gamecfg set mode practice}
+{game set_song shoutatthedevil}
+{gamecfg set_track 0 0}
+{{game get_player_config 0} set_difficulty expert}
+{ui goto_screen practice_sel_section_screen}
+(wait_screen practice_sel_section_screen)
+(wait 2)
+{gamecfg set (practice_sections 0) 0}
+{gamecfg set (practice_sections 1) 1}
+{ui goto_screen practice_loading_screen}
+(wait_screen practice_game_screen 60)
+(expect $ghc_practice_solo 1)
+(expect {elem {elem {find $syscfg songs shoutatthedevil song vols} 1} 0} -96.0)
+(wait 15)
+(quit)

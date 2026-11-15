@@ -105,10 +105,10 @@ namespace gh2::custom
         std::map<Part, std::array<Difficulty, 4>> parts; // easy first
         // The drums' expert, else their highest difficulty with hits
         // (PART DRUMS, [ExpertDrums] to [EasyDrums]), by tick: kicks, snares
-        // (red), crashes (blue or green cymbal) and every hit. The
-        // drummer's animation notes replace the snares and crashes where
-        // the chart has them.
-        std::vector<uint32_t> kicks, snares, crashes, drums;
+        // (red), crashes (blue or green cymbal), hi-hats (yellow cymbal)
+        // and every hit. The drummer's animation notes replace the snares
+        // and crashes where the chart has them.
+        std::vector<uint32_t> kicks, snares, crashes, hats, drums;
         // When someone sings: PART VOCALS' phrases (105, 106), else runs
         // of its notes or lyrics, else HARM1's the same; .chart's [Events]
         // phrase_start and phrase_end, else runs of its lyrics.
@@ -131,7 +131,7 @@ namespace gh2::custom
         // as written, for the band and venue to follow (custom/stage/stage.h):
         // each text event ([play], [map HandMap_Solo], [lighting (verse)])
         // and each note no gem is on: below 60 (hand positions 40 to 59,
-        // drum animations 24 to 51, EVENTS' practice clicks 24 to 26), and
+        // drum animations 24 to 51, TRIGGERS' practice clicks 24 to 26), and
         // every one of VENUE's; the singers' texts alone. A chart made for
         // GH2 has GH2's own band tracks (BAND BASS, BAND DRUMS, BAND KEYS,
         // BAND SINGER) and TRIGGERS, kept the same. .chart's [Events] texts

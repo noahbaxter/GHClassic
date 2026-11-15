@@ -148,4 +148,14 @@ namespace gh2::custom
                 if (b + kBeat * 4u >= band.playing.front().tick)
                     addShortNote(band.triggers, b, 48u);
     }
+
+    void addPracticeClicks(BandTracks &band)
+    {
+        // A tick long: a 16th hi-hat a tick early would land on the last
+        // one's held note, and the parser drops it.
+        const Chart &chart = band.in.chart;
+        for (const auto &[hits, pitch] : {std::pair{&chart.kicks, 24u}, {&chart.snares, 25u}, {&chart.hats, 26u}})
+            for (const uint32_t t : *hits)
+                addNote(band.triggers, band.in.toGh2(t), band.in.toGh2(t) + 1u, static_cast<uint8_t>(pitch));
+    }
 }
