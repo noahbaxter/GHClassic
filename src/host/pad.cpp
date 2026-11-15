@@ -142,7 +142,9 @@ namespace gh2
             const uint32_t screen = GPR_U32(ctx, 5);
             const uint32_t text = screen != 0u ? load<uint32_t>(rdram, screen + milo::object::kName) : 0u;
             const std::string name = text != 0u ? reinterpret_cast<const char *>(getMemPtr(rdram, text)) : "";
-            songScreen(name == "game_screen" || name == "practice_game_screen"  ? SongScreen::kPlaying
+            songScreen(name == "game_screen" || name == "practice_game_screen" ||
+                               name == "ghc_practice_again_screen"
+                           ? SongScreen::kPlaying
                        : name == "pause_screen" || name == "pract_pause_screen" ? SongScreen::kPaused
                                                                                 : SongScreen::kOther);
             // Practice draws no venue, which holds the seats in a song

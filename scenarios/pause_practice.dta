@@ -1,0 +1,12 @@
+; Practice from a quickplay song at 120%, its pause menu's third row: the
+; song's sections, then practice, which starts at 100%. Practice's pause
+; began: that song in quickplay, at its 120%. Then the pause menus in GH1's
+; scene, and practice begun from the menus, whose Return is practice's song
+; list.
+{song_speed set 120}
+(expect {{pause_panel find ghc_practice.btn} showing} 1)
+(expect {pause_panel focus_name} ghc_practice.btn)
+(expect {song_speed} 100)
+{song_speed set 65}
+(expect {song_speed} 120)
+(expect {pause_panel focus_name} ghc_practice.btn)

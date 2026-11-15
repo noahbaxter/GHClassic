@@ -23,6 +23,7 @@
 #include <deque>
 #include <iostream>
 #include <numeric>
+#include <optional>
 
 namespace gh2::song_speed
 {
@@ -38,6 +39,15 @@ namespace gh2::song_speed
         const Addresses *s_addresses = nullptr;
         PS2Runtime::RecompiledFunction s_restart = nullptr, s_setPracticeSpeed = nullptr;
         int s_percent = 100;
+        // The song being made plays in practice, whose speed changes as it
+        // plays; its BeatMatch, from its Restart.
+        bool s_practice = false;
+        uint32_t s_beatMatch = 0u;
+        // The speed a practice song's audio is made at: played at 200% it is
+        // at the SPU's most, 4x a 48 kHz stream (spu.cpp); below 50% it
+        // plays under its own rate, its highest highs lost.
+        constexpr int kPracticeBase = 50;
+        int s_playing = 100; // the speed the game plays at now
 
         // A .vgs decoded, every channel read at the fastest one's rate.
         class Decoded final : public vgs::Pcm
@@ -181,6 +191,7 @@ namespace gh2::song_speed
         };
 
         // Audio stretched by Signalsmith Stretch to 1 / speed its length,
+        // its pitch kept, rated at its rate over the speed. Its frames are
         class Stretched final : public vgs::Pcm
         {
         public:
@@ -247,6 +258,9 @@ namespace gh2::song_speed
         {
             const uint32_t returnTo = GPR_U32(ctx, 31), beatMatch = GPR_U32(ctx, 4);
             callOriginal(rdram, ctx, runtime, s_addresses->beatMatchRestart, s_restart);
+            // The audio is read again from here, all of it at this speed.
+            s_beatMatch = beatMatch;
+            s_playing = s_percent;
             if (s_percent != 100)
                 runtime->callGuestFunction(rdram, ctx, s_addresses->beatMatchSetPracticeSpeed, {beatMatch});
             ctx->pc = returnTo;
@@ -256,6 +270,7 @@ namespace gh2::song_speed
         // stretched already.
         void setPracticeSpeed(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
+            if (s_percent != 100 || s_practice)
             {
                 ctx->f[12] = s_percent / 100.0f;
                 store<uint32_t>(rdram, GPR_U32(ctx, 4) + kPitchCorrect, 0u);
@@ -274,18 +289,40 @@ namespace gh2::song_speed
             args.restore(ctx);
         }
 
+        // and leaves the song as it was for the menus' previews. Only
+        // quickplay, practice and multiplayer play at a speed: a career or
+        // tutorial song reached past the menus that set it plays at 100%.
+            {
+                const EntryArgs args(ctx);
+                script::run(rdram, ctx, runtime,
+                            "{song_speed practice {== {gamecfg get mode} practice}}"
+                            "{if {! {find_elem (quickplay practice multi_coop multi_fo multi_vs) {gamecfg get mode}}}"
+                            " {song_speed set 100}}");
+                args.restore(ctx);
+            }
+            s_beatMatch = 0u;
 
         // {song_speed name <audio name>}: that name at the speed; base: as
+        // {song_speed practice <bool>}: whether the song made next plays in
+        // practice (its BeatMatch's constructor). {song_speed playing}: the
+        // speed the song in play plays at (playing()).
         script::Node command(const script::Call &call)
         {
             const std::string op = call.size() > 1 ? call.symbol(1) : "";
                 s_percent = std::clamp(static_cast<int>(call.number(2)), kSlowest, kFastest);
+            if (op == "practice")
+                s_practice = call.number(2) != 0.0f;
+            if (op == "playing")
+                return {static_cast<uint32_t>(playing()), script::kInt};
             if (op == "name" || op == "base")
             {
                 std::string name = call.text(2);
                 if (name.rfind(kPrefix, 0) == 0)
                     name = name.substr(name.find('/', sizeof kPrefix - 1u) + 1u);
                 // Pitch let go, the song's own file plays at the speed, like
+                const bool tape = !settings::get(settings::kMaintainPitch);
+                if (op == "base" || tape || (s_percent == 100 && !s_practice))
+                    return call.word(name);
             }
             return {static_cast<uint32_t>(s_percent), script::kInt};
         }

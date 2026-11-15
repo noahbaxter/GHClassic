@@ -10,6 +10,8 @@
 // that .vgs at that percent, 10 to 500, made as the game reads it. With
 // maintain_pitch off the song's own file plays at the speed, like a tape.
 //
+// plays the part alone where it has channels of its own ({song_speed solo},
+// ui/dta/game_settings.dta's ghc_practice_solo).
 
 #include "addresses.h"
 

@@ -1,6 +1,7 @@
 ; Practice on two sections at the slowest speed, autoplayed, to its end
 ; screen: the slowed stream path and practice's own screens. The section
 ; screen loads the song's sections from its MIDI.
+; its MIDI.
 #include common/first_boot.dta
 {gamecfg set mode practice}
 {game set_song shoutatthedevil}
@@ -12,10 +13,16 @@
 (wait 2)
 {gamecfg set (practice_sections 0) 0}
 {gamecfg set (practice_sections 1) 1}
-{gamecfg set practice_speed 3}
+{song_speed set 50}
 {ui goto_screen practice_loading_screen}
 (wait_screen practice_game_screen 60)
-(wait 10)
+(wait 8)
+{set $ghc_t0 {taskmgr ui_seconds}}
+{set $ghc_s0 {taskmgr seconds}}
+(record on practice_50)
+(wait 20)
+(record off)
+(expect {'/' {'-' {taskmgr seconds} $ghc_s0} {'-' {taskmgr ui_seconds} $ghc_t0}} 0.5 0.03)
 (shot playing)
 (wait_screen practice_end_screen 180)
 (wait 2)

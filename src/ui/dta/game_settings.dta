@@ -319,6 +319,7 @@
          ; A token with no string reads as itself.
          {audio_options.btn set text_token "SETTINGS"}
          {video_options.btn set text_token "PHOTO MODE"}
+         {ghc_practice.btn set text_token "PRACTICE"}
       )
       ; GH1's scene has four rows, and Video Settings' put away: that one
       ; as Quit's again, the fourth of five. Its frame has little room
@@ -328,6 +329,7 @@
       (five_gap 0.9)
       (five_rows
          {if {! {video_options.btn showing}}
+         {if {! {exists ghc_practice.btn}}
             {do
                ($x 0) ($y 0) ($z 0) ($above 0) ($row 0) ($i 0)
                {audio_options.btn get_local_pos $x $y $above}
@@ -341,6 +343,13 @@
                {video_options.btn set_state kNormal}
                {audio_options.btn set nav_down video_options.btn}
                {video_options.btn set nav_down quit.btn}
+                     (resume.btn restart.btn ghc_practice.btn audio_options.btn video_options.btn quit.btn)
+               {new {restart.btn class_name} ghc_practice.btn}
+               {ghc_practice.btn copy restart.btn 0}
+               {ghc_practice.btn set trans_parent {restart.btn get trans_parent}}
+               {{restart.btn get trans_parent} insert (objects {{restart.btn get trans_parent} size objects}) ghc_practice.btn}
+               {ghc_practice.btn set_showing {== {size $rows} 6}}
+               {ghc_practice.btn set_state {if_else {== {size $rows} 6} kNormal kDisabled}}
                {resume.btn get_local_pos $x $y $z}
                {foreach $btn (resume.btn restart.btn audio_options.btn video_options.btn quit.btn)
                   {$btn set_local_pos $x $y
@@ -364,6 +373,7 @@
          {switch $component
             (resume.btn {$this resume})
             (restart.btn {$this restart})
+            (ghc_practice.btn {ghc_practice_song})
             (audio_options.btn {ui goto_screen pause_settings_screen})
             (video_options.btn {ui goto_screen photo_screen})
             (quit.btn
@@ -375,6 +385,120 @@
       (BUTTON_DOWN_MSG {if {== $button kPad_Start} {$this resume}} kDataUnhandled)
    )
 }
+   {set $ghc_qp_speed {song_speed}}
+   {song_speed set $ghc_practice_pct}
+            ({&& {== $button kPad_Select} {! {ui in_transition}}} {ghc_practice_again})
+{func ghc_practice_again
+   {synth stop_all_sfx}
+   {game exit}
+   {ui goto_screen ghc_practice_again_screen}
+}
+; ($ghc_practice_pct, quickplay.dta). Its name lights as any row's; green
+; takes it up, its number lit too, as the audio settings' sliders; strum
+; before the song goes straight on to its loading.
+{set $ghc_speed_before FALSE} ; the speed it was taken up at, FALSE when not
+{func ghc_practice_speed_label ($panel) {$panel speed_row}}
+{func ghc_practice_speed_edit ($panel $on)
+   {set $ghc_speed_before {if_else $on {song_speed} FALSE}}
+   {$panel speed_row}
+}
+; Green on the row: taken up, else kept.
+{func ghc_practice_speed_select ($panel)
+   {ghc_practice_speed_edit $panel {! $ghc_speed_before}}
+}
+; A button while it is taken up: TRUE if it was the row's.
+{func ghc_practice_speed_button ($panel $button)
+   {cond
+      ({! $ghc_speed_before} FALSE)
+      ({|| {== $button kPad_DUp} {== $button kPad_DDown}}
+         {ghc_practice_speed_label $panel}
+         TRUE
+      )
+      ({== $button kPad_Tri}
+         {song_speed set $ghc_speed_before}
+         {set $ghc_practice_pct {song_speed}}
+         {synth play_sequence button_back.cue}
+         {ghc_practice_speed_edit $panel FALSE}
+         TRUE
+      )
+      ; Green is the row's select, Start keeps it and goes on; the rest do
+      ; nothing.
+      ({== $button kPad_X} FALSE)
+      ({== $button kPad_Start} {ghc_practice_speed_edit $panel FALSE} FALSE)
+      (TRUE TRUE)
+   }
+}
+{retype practice_sel_speed_screen
+   (
+      (panels meta helpbar)
+      (enter {ui goto_screen practice_loading_screen})
+   )
+}
+{func ghc_practice_resume ($screen)
+   }
+}
+         {ghc_practice_speed_label $this}
+      (exit {if $ghc_speed_before {ghc_practice_speed_edit $this FALSE}})
+      ; The speed row: its name the button's, moved left of the row's
+      ; middle, and its number a label right of it, the two centred
+      ; together; the number lit only while it is taken up. Made each time
+      ; the scene loads. SPEED is 89 wide in the scene's face, a number
+      ; about 70.
+      (speed_name_dx -43)
+      (speed_number_dx 20)
+      (speed_row
+         {do
+            ($dir {$this loaded_dir})
+            ($career {practice_sel_section_screen get career_mode})
+            ($btn {$this find {if_else $career change_speed_career.btn change_speed.btn}})
+            ($x 0) ($y 0) ($z 0)
+            {if {! {$dir exists ghc_speed_num.lbl}}
+               {foreach $name (change_speed.btn change_speed_career.btn)
+                  {if {$dir exists $name}
+                     {do
+                        ($b {$this find $name})
+                        {$b get_local_pos $x $y $z}
+                        {$b set_local_pos {'+' $x [speed_name_dx]} $y $z}
+                        ; A token with no string reads as itself.
+                        {$b set text_token "SPEED"}
+                     }
+                  }
+               }
+               {new BandLabel ghc_speed_num.lbl}
+               {ghc_speed_num.lbl copy {practice_panel find section.lbl} 0}
+               {ghc_speed_num.lbl set_local_rot 0 0 0}
+               {ghc_speed_num.lbl set_local_scale 1 1 1}
+               {ghc_speed_num.lbl set wrap_width 4000}
+            }
+            {ghc_speed_num.lbl set_type {$btn get_type}}
+            {foreach $prop (text_size kerning deltaZ deltaRot)
+               {ghc_speed_num.lbl set $prop {$btn get $prop}}
+            }
+            {ghc_speed_num.lbl set fit_text 0}
+            {ghc_speed_num.lbl set alignment 33}
+            ; The rows draw through their parent, over the frame.
+            {if {!= {ghc_speed_num.lbl get trans_parent} {$btn get trans_parent}}
+               {ghc_speed_num.lbl set trans_parent {$btn get trans_parent}}
+               {{$btn get trans_parent} insert (objects {{$btn get trans_parent} size objects}) ghc_speed_num.lbl}
+            }
+            {$btn get_local_pos $x $y $z}
+            {ghc_speed_num.lbl set_local_pos {'+' $x {'-' [speed_number_dx] [speed_name_dx]}} $y $z}
+            {ghc_speed_num.lbl set draw_order {$btn get draw_order}}
+            {ghc_speed_num.lbl set_showing TRUE}
+            ; A label given a colour goes back to its token's text.
+            {ghc_speed_num.lbl set color {$dir get {if_else $ghc_speed_before focus_color normal_color}}}
+            {ghc_speed_num.lbl set_localized {sprint {song_speed} "%"}}
+         }
+      )
+      (BUTTON_DOWN_MSG
+         {cond
+            ({ghc_practice_speed_button pract_pause_panel $button} TRUE)
+            ({== $button kPad_Start} {ghc_practice_resume $this} TRUE)
+            (TRUE kDataUnhandled)
+         }
+      )
+            ((resume.btn resume_career.btn) {ghc_practice_resume $this})
+            ((change_speed.btn change_speed_career.btn) {ghc_practice_speed_select pract_pause_panel})
 {if {! {exists pause_settings_screen}}
    {new GHPanel pause_settings_panel}
    {new GHScreen pause_settings_screen}
