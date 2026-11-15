@@ -5,7 +5,9 @@
 //
 // A song's vgs is encoded a round at a time from wherever it is read,
 // carrying on from the last read when the next follows it, so the decoder's
-// history matches across reads; a jump starts afresh from that sample.
+// history matches across reads; a jump starts afresh from that sample. What
+// follows a jump is kept a while, so a jump back there (practice's section
+// again) has it at once, as the game reads it all again before it plays.
 
 #include "content/vgs.h"
 
@@ -27,8 +29,9 @@ namespace gh2::vgs
         constexpr uint32_t kChannelSlots = 15u;
         constexpr uint32_t kRoundsAtOnce = 512u;   // decoded per step
         constexpr uint32_t kFollowRounds = 4096u;  // a read this far ahead decodes through
-        constexpr size_t kOpenSongs = 3u;          // preview, song, one spare
         constexpr size_t kOpenSongs = 4u;          // preview, song, the song a speed's is made from, one spare
+        constexpr uint32_t kKeptRounds = 16384u;   // after a jump, kept: more than the game reads before it plays
+        constexpr size_t kKeptJumps = 3u;          // the file's start, a section's, one spare
 
         struct Source
         {
@@ -45,6 +48,17 @@ namespace gh2::vgs
             std::vector<synth::AdpcmState> states;
             uint32_t windowStart = 0u; // the first round in window
             std::vector<uint8_t> window;
+            // From each of the last jumps on, the rounds encoded, up to
+            // kKeptRounds, and the encoder as it was after them. The newest
+            // first; the one being added to, if any.
+            struct Kept
+            {
+                uint32_t from = 0u;
+                std::vector<uint8_t> bytes;
+                std::vector<synth::AdpcmState> states;
+            };
+            std::list<Kept> kept;
+            Kept *keeping = nullptr;
 
             uint32_t channels() const { return pcm->channels; }
             uint32_t roundBytes() const { return channels() * synth::kAdpcmBlockBytes; }
@@ -116,6 +130,14 @@ namespace gh2::vgs
                     synth::encodeAdpcm(pcm[c].data() + r * synth::kAdpcmBlockSamples, s.states[c],
                                        static_cast<uint8_t>(c), out);
                 }
+            if (s.keeping)
+            {
+                s.keeping->bytes.insert(s.keeping->bytes.end(), s.window.begin() + static_cast<std::ptrdiff_t>(from),
+                                        s.window.end());
+                s.keeping->states = s.states;
+                if (s.keeping->bytes.size() >= size_t(kKeptRounds) * s.roundBytes())
+                    s.keeping = nullptr;
+            }
             s.next += count;
         }
 
@@ -124,10 +146,34 @@ namespace gh2::vgs
         {
             if (first < s.windowStart || first > s.next + kFollowRounds)
             {
-                s.pcm->seek(uint64_t(first) * synth::kAdpcmBlockSamples);
-                s.states.assign(s.channels(), {});
-                s.next = s.windowStart = first;
-                s.window.clear();
+                const auto at = std::find_if(s.kept.begin(), s.kept.end(),
+                                             [&](const Stream::Kept &k) { return k.from == first && !k.bytes.empty(); });
+                if (at != s.kept.end())
+                {
+                    // Back where a jump went before: what was kept, then on
+                    // from its end as it was encoded, kept on with it.
+                    s.kept.splice(s.kept.begin(), s.kept, at);
+                    s.keeping = &s.kept.front();
+                    s.window = s.keeping->bytes;
+                    s.windowStart = first;
+                    s.next = first + static_cast<uint32_t>(s.window.size() / s.roundBytes());
+                    s.states = s.keeping->states;
+                    s.pcm->seek(uint64_t(s.next) * synth::kAdpcmBlockSamples);
+                    if (s.window.size() >= size_t(kKeptRounds) * s.roundBytes())
+                        s.keeping = nullptr;
+                }
+                else
+                {
+                    s.pcm->seek(uint64_t(first) * synth::kAdpcmBlockSamples);
+                    s.states.assign(s.channels(), {});
+                    s.next = s.windowStart = first;
+                    s.window.clear();
+                    s.kept.remove_if([&](const Stream::Kept &k) { return k.from == first; });
+                    s.kept.push_front(Stream::Kept{first, {}, {}});
+                    s.keeping = &s.kept.front();
+                    if (s.kept.size() > kKeptJumps)
+                        s.kept.pop_back();
+                }
             }
             // Keep from `first` on, so a reread a little back still finds
             // what it read.
@@ -176,7 +222,20 @@ namespace gh2::vgs
     std::optional<ark::Made> made(const std::string &path, std::function<std::unique_ptr<Pcm>()> open)
     {
         static std::deque<Source> s_sources; // the reader and open list point at them
-        const Source *source = &s_sources.emplace_back(Source{path, std::move(open)});
+        // One a path, so a file opened again (a section gone round) finds
+        // its song still open, and what it kept; opened afresh (reopen) with
+        // the newest way to open it.
+        const auto known = std::find_if(s_sources.begin(), s_sources.end(), [&](const Source &s) { return s.path == path; });
+        Source *source = nullptr;
+        if (known == s_sources.end())
+        {
+            source = &s_sources.emplace_back(Source{path, std::move(open)});
+        }
+        else
+        {
+            source = &*known;
+            source->open = std::move(open);
+        }
         Stream *s = opened(*source);
         if (!s)
             return std::nullopt;

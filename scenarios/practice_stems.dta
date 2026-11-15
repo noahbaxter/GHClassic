@@ -31,6 +31,7 @@
 (expect $ghc_practice_solo 1)
 (expect {elem {elem {find $syscfg songs {game get_song} song vols} 1} 0} -96.0)
 (expect {elem {elem {find $syscfg songs {game get_song} song vols} 1} 2} 0.0)
+(wait_until {> $ghc_practice_best 0} 120)
 ; Four kicks, four snares, eight hi-hats: GH2's snare and hi-hat each a
 ; left and a right sample.
 (expect {'-' {practice_clicks played} $ghc_from} 28)

@@ -1,6 +1,6 @@
-; Practice on two sections at the slowest speed, autoplayed, to its end
-; screen: the slowed stream path and practice's own screens. The section
-; screen loads the song's sections from its MIDI.
+; Practice on two sections at 50%, autoplayed, round to their start again:
+; the song clock at half speed against the wall, its audio stretched to
+; match, and practice's own screens. The section screen loads the song's sections from
 ; its MIDI.
 #include common/first_boot.dta
 {gamecfg set mode practice}
@@ -25,9 +25,11 @@
 (record off)
 (expect {'/' {'-' {taskmgr seconds} $ghc_s0} {'-' {taskmgr ui_seconds} $ghc_t0}} 0.5 0.03)
 (shot playing)
-(wait_screen practice_end_screen 180)
+; Its end goes round to its start again, every note hit the best.
+(wait_until {> $ghc_practice_best 0} 240)
+(expect $ghc_practice_best 100)
 (wait 2)
-(expect {taskmgr seconds} 36.75 0.1)
-(expect {player0 gems_hit} 56)
-(shot end)
+(expect {{ui current_screen} name} practice_game_screen)
+(expect {< {taskmgr seconds} 20} 1)
+(shot again)
 (quit)

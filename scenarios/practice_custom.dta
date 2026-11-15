@@ -39,4 +39,6 @@
 (wait 6)
 (expect {'/' {'-' {taskmgr seconds} $ghc_s0} {'-' {taskmgr ui_seconds} $ghc_t0}} 0.9 0.03)
 (shot playing)
+(wait_until {> $ghc_practice_best 0} 120)
+(expect $ghc_practice_best 100)
 (quit)
