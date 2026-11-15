@@ -25,4 +25,7 @@ namespace gh2::song_speed
     void install(PS2Runtime &runtime, const Addresses &addresses);
     // The speed songs play at, in percent.
     int percent();
+    // The speed the song in play plays at now, in percent (percent() may be
+    // a pause menu's pick not yet taken up); with none, the next one's.
+    int playing();
 }

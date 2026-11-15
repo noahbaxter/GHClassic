@@ -57,9 +57,16 @@ namespace gh2
         const Addresses *s_addresses = nullptr;
         PS2Runtime::RecompiledFunction s_getSongMs = nullptr;
 
+        // Lateness is real time; the clock and the hit window count song
+        // time, which a song slowed to s moves only s ms of in each.
+        float songMs(int realMs)
+        {
+            return static_cast<float>(realMs) * static_cast<float>(song_speed::playing()) / 100.0f;
+        }
+
         float syncOffset()
         {
-            return -static_cast<float>(settings::get(settings::kVideoLagMs));
+            return -songMs(settings::get(settings::kVideoLagMs));
         }
 
         struct SetSyncOffsetTag;
@@ -81,8 +88,7 @@ namespace gh2
             timing::clockRead();
             runtime->callGuestFunction(rdram, ctx, s_addresses->playerMatcherGetSongMs, {GPR_U32(ctx, 4)},
                                        s_getSongMs);
-            ctx->f[0] += static_cast<float>(settings::get(settings::kVideoLagMs) -
-                                            settings::get(settings::kAudioLagMs));
+            ctx->f[0] += songMs(settings::get(settings::kVideoLagMs) - settings::get(settings::kAudioLagMs));
             ctx->pc = returnTo;
         }
 
@@ -118,6 +124,8 @@ namespace gh2
             const float dSec = load<float>(rdram, seconds + 0xcu) - load<float>(rdram, seconds + 0x10u);
             if (dBeat <= 0.0f || dSec <= 0.0f)
                 return 0.0f;
+            const float lateS = songMs(settings::get(settings::kAudioLagMs) - settings::get(settings::kVideoLagMs)) / 1000.0f;
+            return lateS * dBeat / dSec;
         }
 
         // TaskMgr::AddTask(task, units, delay), retail 0x2c6b18: the delay
@@ -175,6 +183,16 @@ namespace gh2
             }
             return {static_cast<uint32_t>(settings::get(key)), script::kInt};
         }
+    }
+
+    void pushSyncOffset(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        const uint32_t options = load<uint32_t>(rdram, s_addresses->theOptions);
+        if (options == 0u)
+            return;
+        const R5900Context saved = *ctx;
+        runtime->callGuestFunction(rdram, ctx, s_addresses->optionsSetSyncOffset, {options});
+        *ctx = saved;
     }
 
     void installLatency(PS2Runtime &runtime, const Addresses &addresses)

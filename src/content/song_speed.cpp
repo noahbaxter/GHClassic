@@ -10,6 +10,7 @@
 #include "guest.h"
 #include "hook.h"
 #include "script.h"
+#include "settings/latency.h"
 #include "settings/settings.h"
 #include "synth/adpcm.h"
 #include "synth/synth.h"
@@ -267,6 +268,7 @@ namespace gh2::song_speed
             s_playing = s_percent;
             if (s_percent != 100)
                 runtime->callGuestFunction(rdram, ctx, s_addresses->beatMatchSetPracticeSpeed, {beatMatch});
+            pushSyncOffset(rdram, ctx, runtime);
             ctx->pc = returnTo;
         }
 
@@ -279,6 +281,7 @@ namespace gh2::song_speed
             runtime->callGuestFunction(rdram, ctx, s_addresses->beatMatchSetPracticeSpeed, {s_beatMatch});
             *ctx = saved;
             s_playing = s_percent;
+            pushSyncOffset(rdram, ctx, runtime);
         }
 
         // BeatMatch::SetPracticeSpeed(float) at our speed, the audio being
@@ -451,6 +454,7 @@ namespace gh2::song_speed
     }
 
     int percent() { return s_percent; }
+    int playing() { return s_beatMatch != 0u ? s_playing : s_percent; }
 
     void install(PS2Runtime &runtime, const Addresses &addresses)
     {
