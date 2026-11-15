@@ -277,4 +277,20 @@ namespace gh2::custom::rules
             std::sort(hits->begin(), hits->end());
         holdSyllables(chart);
     }
+
+    std::vector<std::pair<uint32_t, std::string>> practiceSections(const Chart &chart)
+    {
+        if (!chart.sections.empty())
+            return chart.sections;
+        uint32_t first = UINT32_MAX, end = 0u;
+        for (const auto &[part, difficulties] : chart.parts)
+            for (const Difficulty &d : difficulties)
+                for (const Gem &g : d.gems)
+                    first = std::min(first, g.tick), end = std::max(end, g.tick + g.longest());
+        std::vector<std::pair<uint32_t, std::string>> out;
+        if (end > first)
+            for (uint32_t k = 0; k < 10u; ++k)
+                out.emplace_back(first + uint32_t(uint64_t(end - first) * k / 10u), std::to_string(k * 10u) + "%");
+        return out;
+    }
 }

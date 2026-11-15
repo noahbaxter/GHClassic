@@ -1,0 +1,4 @@
+; Its chart has no sections: one each tenth of the song.
+(expect {custom section 0} "0%")
+(expect {custom section 9} "90%")
+(shot sections)

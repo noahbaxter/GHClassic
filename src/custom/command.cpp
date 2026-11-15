@@ -43,8 +43,9 @@ namespace gh2::custom
             wantArt(songs);
         }
 
-        // A chart's sections by name at most, each a locale token.
-        constexpr size_t kMostSections = 200u;
+        // A chart's sections by name at most, each a locale token: past
+        // this a row shows its token.
+        constexpr size_t kMostSections = 1000u;
 
         // Its best on the hardest difficulty with one: score, stars, and percent
         // or FC.

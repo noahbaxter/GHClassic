@@ -22,7 +22,7 @@ namespace gh2::custom
         namespace fs = std::filesystem;
 
         // The index's first line, changed with its fields.
-        constexpr const char *kIndexVersion = "# GH Classic songs index 9";
+        constexpr const char *kIndexVersion = "# GH Classic songs index 10";
 
         std::string flat(std::string s)
         {

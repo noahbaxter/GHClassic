@@ -78,4 +78,9 @@ namespace gh2::custom::rules
     // signatures, sections, phrases, solos, stage tracks and hits in order;
     // syllables held.
     void finish(Chart &chart);
+
+    // The sections practice picks from: the chart's, else one each tenth
+    // of the song from its first note to its last's end, "0%" on. Not the stage's, which
+    // makes its own where a chart has none.
+    std::vector<std::pair<uint32_t, std::string>> practiceSections(const Chart &chart);
 }

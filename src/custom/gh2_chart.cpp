@@ -1,4 +1,5 @@
 #include "custom/gh2_chart.h"
+#include "custom/chart_rules.h"
 
 #include "custom/stage/stage.h"
 
@@ -191,7 +192,7 @@ namespace gh2::custom
         events.name = "EVENTS";
         // Each name's token by the order names first come.
         std::vector<std::string> names;
-        for (const auto &[tick, name] : chart.sections)
+        for (const auto &[tick, name] : rules::practiceSections(chart))
         {
             auto it = std::find(names.begin(), names.end(), name);
             if (it == names.end())
