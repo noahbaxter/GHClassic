@@ -44,6 +44,10 @@ namespace gh2::guitar
         // their frets' reps, each lifted how far.
         std::set<uint32_t> s_openChords;
         std::map<uint32_t, float> s_lifted;
+        // The Gems GH2 hides, outside its track's gems range (practice's
+        // sections, GemManager::SetupGems): no frets, as an open, though
+        // their GameGem has some.
+        std::set<uint32_t> s_hidden;
 
         // A star power open's cap: its streak runs right to left, a bar's
         // length in this many seconds, its uv offset in tex_xfm, about the
@@ -152,7 +156,7 @@ namespace gh2::guitar
             for (const uint32_t rep : s_openFree[pool])
                 runtime->callGuestFunction(rdram, ctx, s_addresses->gemRepPoolReturnGem, {pool, rep});
             s_openFree.erase(pool);
-            s_openChords.clear(), s_lifted.clear();
+            s_openChords.clear(), s_lifted.clear(), s_hidden.clear();
             // Those still out are deleted with their gems (~Gem), never
             // through Gem::RemoveRep.
             for (auto out = s_openOut.begin(); out != s_openOut.end();)
@@ -169,9 +173,14 @@ namespace gh2::guitar
         void gemAdded(uint8_t *rdram, R5900Context *, PS2Runtime *, const GemAdded &added)
         {
             s_openChords.erase(added.gem);
-            if (!playingCustom() || added.game == 0u)
+            s_hidden.erase(added.gem);
+            if (added.game == 0u)
                 return;
             const guest::GameGem game(rdram, added.game);
+            if (load<uint8_t>(rdram, added.gem + gem::kFrets) == 0u && game.slots() != 0u)
+                s_hidden.insert(added.gem);
+            if (!playingCustom())
+                return;
             if (const Gh2Gem *chart = chartGem(added.track, static_cast<uint32_t>(game.tick()), game.slots());
                 chart && chart->openChord)
                 s_openChords.insert(added.gem);
@@ -220,7 +229,7 @@ namespace gh2::guitar
         {
             const uint32_t gem = GPR_U32(ctx, 4);
             const bool chord = s_openChords.count(gem) != 0u;
-            if (load<uint8_t>(rdram, gem + gem::kFrets) != 0u && !chord)
+            if (s_hidden.count(gem) || (load<uint8_t>(rdram, gem + gem::kFrets) != 0u && !chord))
                 return s_addRep(rdram, ctx, runtime);
             const uint32_t returnTo = GPR_U32(ctx, 31), config = GPR_U32(ctx, 8);
             const EntryArgs args(ctx);
