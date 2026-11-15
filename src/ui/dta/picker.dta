@@ -194,9 +194,11 @@
                ($row {$this find {elem [rows] $i}})
                {$row set_showing {< $i {$this visible}}}
                {if {< $i {$this visible}}
+                  ; The widest, which the width is made from, measures a
+                  ; hair over it here: half a unit spare.
                   {$row set_text
                      {text_fit fit_text {$this text {elem [options] {'+' [top] $i}}} $row [size]
-                        {'-' [width] {'*' 2 [margin]}}}}
+                        {'+' 0.5 {'-' [width] {'*' 2 [margin]}}}}}
                   {$row set_local_pos {/ [width] -2.0} 0 {$this row_z $i}}
                }
             }
