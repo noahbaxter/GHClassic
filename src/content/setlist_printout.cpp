@@ -3,6 +3,7 @@
 #include "disc/ark.h"
 #include "formats/bitmap.h"
 #include "gh1/scene.h"
+#include "instrument_icons.h"
 #include "render/texture_store.h"
 
 #include <algorithm>
@@ -31,10 +32,14 @@ namespace gh2::setlist_printout
         //   ghc_tape.mesh      a strip of the multiplayer menu's masking
         //                      tape (multi.milo's dl_maskingtape3.tex,
         //                      copied whole), holding the picture up
+        //   ghc_icon_<part>.mesh  each instrument's icon, ghc_icon_<part>.tex
+        //                      (instrument_icons.h), as the script's
+        //                      $ghc_info_icon is
         constexpr float kPrintout[2] = {230.0f, 478.0f};
         constexpr float kSticker[2] = {138.0f, 138.0f};
         constexpr float kArt[2] = {118.6f, 118.6f};
         constexpr float kTape[2] = {40.0f, 20.0f};
+        constexpr float kIcon[2] = {34.0f, 34.0f};
         constexpr const char *kStickerFile = "ui/image/og/gen/us_logo_generic_keep.png_ps2";
 
         // setlist1.mesh's quad (600 a side, x across and z up, its middle 0)
@@ -260,5 +265,17 @@ namespace gh2::setlist_printout
         milo::add(scene, "Tex", "ghc_tape.tex", milo::Bytes(multi->bodies[*tapeTex]));
         milo::add(scene, "Mat", "ghc_tape.mat", std::move(tapeMat));
         milo::add(scene, "Mesh", "ghc_tape.mesh", std::move(*tape));
+        for (const InstrumentIcon &icon : kInstrumentIcons)
+        {
+            const std::string name = std::string("ghc_icon_") + icon.part;
+            auto mesh = quad(scene, name + ".mesh", kIcon);
+            milo::Bytes iconTex = gh1::texWith(scene.bodies[*tex], milo::Bytes(icon.bitmap, icon.bitmap + icon.size), true);
+            milo::Bytes iconMat = scene.bodies[*mat];
+            if (!mesh || iconTex.empty() || !milo::replaceStr(iconMat, "setlist1.tex", name + ".tex"))
+                continue;
+            milo::add(scene, "Tex", name + ".tex", std::move(iconTex));
+            milo::add(scene, "Mat", name + ".mat", std::move(iconMat));
+            milo::add(scene, "Mesh", name + ".mesh", std::move(*mesh));
+        }
     }
 }

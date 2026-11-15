@@ -130,6 +130,8 @@ namespace gh2::custom
                 const auto at = song ? level(*song, call.symbol(3)) : std::nullopt;
                 return call.word(at ? std::to_string(*at) : "");
             }
+            if (op == "track")
+                return {song && has(*song, call.symbol(3)) ? 1u : 0u, script::kInt};
             if (op == "length")
                 return call.word(lengthText(song ? song->length : 0.0));
             if (op == "best")
@@ -156,7 +158,7 @@ namespace gh2::custom
                             return {static_cast<uint32_t>(d), script::kInt};
                 return {static_cast<uint32_t>(std::clamp(wanted, 0, 3)), script::kInt};
             }
-            std::cerr << "[custom] usage: {custom ours|has|nearest|base|tag|length|best|art|ready|level <song> ...}, "
+            std::cerr << "[custom] usage: {custom ours|has|nearest|base|tag|length|best|art|ready|level|track <song> ...}, "
                       << "{custom instrument [guitar|bass]}, {custom sort [sort_<name>]}, "
                       << "{custom scan [<seen> <expected>]}, {custom section <n>}" << std::endl;
             return {};

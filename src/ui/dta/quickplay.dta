@@ -110,6 +110,19 @@
                {$mesh set draw_order {elem $piece 4}}
             }
          }
+         ; The instruments' icons, put in place by ghc_info_parts.
+         {foreach $part $ghc_info_parts
+            {do
+               ($mesh {$i_dir find {sprint "ghc_icon_" $part ".mesh"}})
+               ($mat {$i_dir find {sprint "ghc_icon_" $part ".mat"}})
+               {$mat set z_mode 3}
+               {$mesh set_mat $mat}
+               {$mesh set trans_parent $paper}
+               {$mesh set_local_rot 0 0 0}
+               ; under the labels, so rhythm's R prints over its guitar
+               {$mesh set draw_order 10.8}
+            }
+         }
          {foreach_int $n 0 $ghc_info_pool
             {do
                ($l {new BandLabel {sprint "ghc_info_" $n ".lbl"}})
@@ -220,6 +233,7 @@
          {{$s_dir find ghc_sticker.mesh} set_showing $shown}
          {{$s_dir find ghc_tape.mesh} set_showing $shown}
          {foreach_int $n 0 $ghc_info_pool {{$s_dir find {sprint "ghc_info_" $n ".lbl"}} set_showing FALSE}}
+         {foreach $part $ghc_info_parts {{$s_dir find {sprint "ghc_icon_" $part ".mesh"}} set_showing FALSE}}
          {ghc_info_art $s_dir}
          {if $shown
             {set $ghc_info_n 0}
@@ -235,8 +249,8 @@
                ($scan {!= {custom scan} ''})
                ($top {if_else $scan {'-' $ghc_scan_z 4} $ghc_info_top})
                ; Four gaps: over the title, either side of the first rule
-               ; and over the second.
-               ($gap {/ {'-' {'-' {'-' $top $ghc_info_rule2} $ghc_info_rule} {'+' $names $details}} 4})
+               ; and over the parts' row, which stays put over the second.
+               ($gap {/ {'-' {'-' {'-' $top {ghc_info_parts_top}} $ghc_info_rule} {'+' $names $details}} 4})
                ($at {'-' $top {if_else $scan {max 0 $gap} $gap}})
                {ghc_info_lines $s_dir $title $ghc_info_title $ghc_info_room
                   {'+' {'-' $at {elem $ghc_info_title 1}} 2} FALSE}
@@ -250,6 +264,7 @@
                {ghc_info_dashes $s_dir $at}
                {set $at {'-' $at {'+' $ghc_info_rule $gap}}}
                {ghc_info_details $s_dir $song {'+' {'-' $at {elem $ghc_info_detail 1}} 3} TRUE}
+               {ghc_info_parts $s_dir $song}
                {ghc_info_dashes $s_dir $ghc_info_rule2}
                {ghc_info_key $s_dir {text_fit upper best} 8 $ghc_info_best}
                {ghc_info_line $s_dir {custom best $song} 8 $ghc_info_best TRUE}
@@ -277,17 +292,12 @@
 ; The details a song has, a key on the left and its value on the right of
 ; its row, or on its own rows under the key where it runs too wide for
 ; that; their rows' feet from z down if placed. How many rows they take.
-; Each instrument it has is keyed by its name, its difficulty the value.
 {func ghc_info_details ($d_dir $d_song $d_z $d_place)
    {set $ghc_info_rows 0}
-   {foreach $key (album year genre length charter guitar bass)
+   {foreach $key (album year genre length charter)
       {do
          ($v {text_fit upper
-            {switch $key
-               (length {custom length $d_song})
-               ((guitar bass) {custom level $d_song $key})
-               {custom tag $d_song $key}
-            }
+            {if_else {== $key length} {custom length $d_song} {custom tag $d_song $key}}
          })
          ($pitch {elem $ghc_info_detail 1})
          ($z {'-' $d_z {'*' $ghc_info_rows $pitch}})
@@ -308,6 +318,70 @@
       }
    }
    $ghc_info_rows
+}
+; The parts the chart has, as Warriors of Rock's setlist draws them: a row
+; of icons (ghc_icon_<part>.mesh, content/setlist_printout.cpp) across the
+; paper's middle, centred, each song.ini difficulty under its icon, or a
+; dash where it gives none (GH1 to GH3 rips give none). The guitar, or
+; lead's and rhythm's with an L and an R where the chart has both, then
+; bass, drums and vocals; drums and vocals faded, not played yet. The row
+; stays put whatever is over it, as the best does, its numbers' feet just
+; over the second rule. An icon's side, their middles apart, the gap under
+; them, the numbers' size, the gap under them, a faded icon's alpha and
+; the letters' size.
+{set $ghc_info_parts (guitar rhythm bass drums vocals)}
+{set $ghc_info_icon 34}
+{set $ghc_info_step 36}
+{set $ghc_info_icon_gap 2}
+{set $ghc_info_level 9}
+{set $ghc_info_level_gap 5}
+{set $ghc_info_faded 0.3}
+{set $ghc_info_r 12}
+; The icons' top.
+{func ghc_info_parts_top
+   {'+' $ghc_info_rule2 {'+' $ghc_info_level_gap {'+' $ghc_info_level {'+' $ghc_info_icon_gap $ghc_info_icon}}}}
+}
+{func ghc_info_parts ($p_dir $p_song)
+   {do
+      ($slots)
+      {set $slots ()}
+      {resize $slots 0}
+      {if_else {&& {custom track $p_song lead} {custom track $p_song rhythm}}
+         {do {push_back $slots lead} {push_back $slots rhythm}}
+         {if {custom track $p_song guitar} {push_back $slots guitar}}
+      }
+      {foreach $part (bass drums vocals)
+         {if {custom track $p_song $part} {push_back $slots $part}}
+      }
+      {foreach_int $k 0 {size $slots}
+         {ghc_info_part $p_dir $p_song {elem $slots $k} {'*' $ghc_info_step {'-' $k {/ {'-' {size $slots} 1} 2}}}}
+      }
+   }
+}
+; One part's icon at x on the row, and its difficulty or a dash under it.
+; Lead and rhythm are the guitar with an L or an R over it.
+{func ghc_info_part ($q_dir $q_song $q_slot $q_x)
+   {do
+      ($mid {'-' {ghc_info_parts_top} {/ $ghc_info_icon 2}})
+      ($mesh {if_else {== $q_slot lead} guitar $q_slot})
+      ($level {custom level $q_song {if_else {== $q_slot lead} guitar $q_slot}})
+      ($dim {|| {== $q_slot drums} {== $q_slot vocals}})
+      {{$q_dir find {sprint "ghc_icon_" $mesh ".mat"}} set alpha {if_else $dim $ghc_info_faded 1}}
+      {{$q_dir find {sprint "ghc_icon_" $mesh ".mesh"}} set_local_pos $q_x -0.5 $mid}
+      {{$q_dir find {sprint "ghc_icon_" $mesh ".mesh"}} set_showing TRUE}
+      ; The number centred under it (RndText's kBottomCenter, 0x42), in the
+      ; keys' lighter grey when faded.
+      {set $ghc_info_ink {if_else $dim $ghc_info_key_color $ghc_info_value_ink}}
+      {ghc_info_put $q_dir {if_else {== $level ''} "-" $level} $ghc_info_level $q_x
+         {'+' $ghc_info_rule2 $ghc_info_level_gap} 66}
+      ; The L or R in the paper's white, centred on the guitar
+      ; (kMiddleCenter, 0x22).
+      {if {|| {== $q_slot lead} {== $q_slot rhythm}}
+         {set $ghc_info_ink 0.96}
+         {ghc_info_put $q_dir {if_else {== $q_slot lead} L R} $ghc_info_r $q_x $mid 34}
+      }
+      {set $ghc_info_ink $ghc_info_value_ink}
+   }
 }
 ; How many lines text takes at a part's size in that room, broken between
 ; words (ui/text_fit.h's wrap).
@@ -338,19 +412,23 @@
 ; ink $ghc_info_ink says.
 {set $ghc_info_ink $ghc_info_value_ink}
 {func ghc_info_line ($l_dir $l_text $l_size $l_z $l_right)
+   {ghc_info_put $l_dir $l_text $l_size
+      {if_else $l_right
+         {'-' {/ $ghc_info_width 2} $ghc_info_margin}
+         {'-' $ghc_info_margin {/ $ghc_info_width 2}}
+      }
+      $l_z {if_else $l_right 68 65}}
+}
+; Or with its foot at x and z, by that alignment.
+{func ghc_info_put ($t_dir $t_text $t_size $t_x $t_z $t_align)
    {if {< $ghc_info_n $ghc_info_pool}
       {do
-         ($l {$l_dir find {sprint "ghc_info_" $ghc_info_n ".lbl"}})
+         ($l {$t_dir find {sprint "ghc_info_" $ghc_info_n ".lbl"}})
          {$l set color {pack_color $ghc_info_ink $ghc_info_ink {'+' $ghc_info_ink 0.03}}}
-         {$l set alignment {if_else $l_right 68 65}}
-         {$l set text_size $l_size}
-         {$l set_local_pos
-            {if_else $l_right
-               {'-' {/ $ghc_info_width 2} $ghc_info_margin}
-               {'-' $ghc_info_margin {/ $ghc_info_width 2}}
-            }
-            -1 $l_z}
-         {$l set_localized_text $l_text}
+         {$l set alignment $t_align}
+         {$l set text_size $t_size}
+         {$l set_local_pos $t_x -1 $t_z}
+         {$l set_localized_text $t_text}
          {$l set_showing TRUE}
          {set $ghc_info_n {'+' $ghc_info_n 1}}
       }
@@ -406,7 +484,9 @@
          ; the sheet they were cut from is, in its paper (content/setlist_printout.cpp).
          {set $ghc_info_since -2}
          {set $ghc_art_on ''}
-         {foreach $piece (ghc_printout.mesh ghc_sticker.mesh ghc_art.mesh ghc_tape.mesh)
+         {foreach $piece
+               (ghc_printout.mesh ghc_sticker.mesh ghc_art.mesh ghc_tape.mesh ghc_icon_guitar.mesh
+                  ghc_icon_rhythm.mesh ghc_icon_bass.mesh ghc_icon_drums.mesh ghc_icon_vocals.mesh)
             {if {$this find $piece FALSE} {{$this find $piece} set_showing FALSE}}
          }
          {if {$this find ghc_info_0.lbl FALSE}

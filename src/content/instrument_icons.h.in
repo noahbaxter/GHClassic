@@ -1,0 +1,24 @@
+#pragma once
+
+// assets/instruments/<part>.bin (content/setlist_printout.cpp), tools/procedural/instrument_icons.py's
+// bitmaps of the parts the custom list's printout shows.
+#include <cstddef>
+
+struct InstrumentIcon
+{
+    const char *part;
+    const unsigned char *bitmap;
+    size_t size;
+};
+
+inline constexpr unsigned char kIconGuitar[] = {@GHC_ICON_GUITAR@};
+inline constexpr unsigned char kIconBass[] = {@GHC_ICON_BASS@};
+inline constexpr unsigned char kIconDrums[] = {@GHC_ICON_DRUMS@};
+inline constexpr unsigned char kIconVocals[] = {@GHC_ICON_VOCALS@};
+inline constexpr InstrumentIcon kInstrumentIcons[] = {
+    {"guitar", kIconGuitar, sizeof kIconGuitar},
+    {"rhythm", kIconGuitar, sizeof kIconGuitar}, // the second guitar, beside lead's (quickplay.dta)
+    {"bass", kIconBass, sizeof kIconBass},
+    {"drums", kIconDrums, sizeof kIconDrums},
+    {"vocals", kIconVocals, sizeof kIconVocals},
+};

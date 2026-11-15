@@ -101,8 +101,13 @@ namespace gh2::custom
     std::string title(const Song &song);
     // A length in seconds as m:ss, to the nearest second.
     std::string lengthText(double seconds);
-    // song.ini's diff_ for `part`, "guitar" or "bass"; guitar's is the
-    // part played in its place, lead, else co-op, else rhythm. None if it
-    // has none or not the part.
+    // Whether its chart has a track for `part`: "guitar" (any of lead, co-op
+    // or rhythm), "lead" (lead or co-op), "rhythm", "bass", "drums" or
+    // "vocals" (Song::chartHas).
+    bool has(const Song &song, const std::string &part);
+    // song.ini's diff_ for `part`: "guitar", "rhythm" or "bass", or one
+    // never played (drums, vocals, keys); guitar's is the part played in
+    // its place, lead, else co-op, else rhythm. None if it has none, -1, or
+    // not the guitar, rhythm or bass part.
     std::optional<long> level(const Song &song, const std::string &part);
 }

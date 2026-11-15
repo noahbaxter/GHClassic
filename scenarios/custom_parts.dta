@@ -1,0 +1,44 @@
+; The custom list's printout shows a row of the parts each chart has, each
+; difficulty under its icon or a dash where song.ini gives none: the guitar,
+; or lead's and rhythm's with an L and an R where it has both, then bass,
+; drums and vocals. The first song has every part and every detail; the
+; second lead and rhythm only and no guitar difficulty, as GH1 to GH3 rips;
+; the third guitar and bass, with song.ini difficulties for a rhythm and
+; drums it has no tracks for. {custom track} for the parts beside {custom
+; has} for the charted difficulties, which the pickers read.
+(songs parts)
+#include common/first_boot.dta
+{gamecfg set mode quickplay}
+{setlist select custom}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(expect {custom tag {game get_song} name} "All Parts")
+(expect {custom has {game get_song} 3} 1)
+(expect {custom has {game get_song} 2} 0)
+(expect {custom track {game get_song} lead} 1)
+(expect {custom track {game get_song} rhythm} 1)
+(expect {custom track {game get_song} bass} 1)
+(expect {custom track {game get_song} drums} 1)
+(expect {custom track {game get_song} vocals} 1)
+(expect {custom level {game get_song} rhythm} "5")
+(expect {custom level {game get_song} vocals} "2")
+(shot all_parts)
+(press down)
+(wait 2)
+(expect {custom tag {game get_song} name} "Lead and Rhythm")
+(expect {custom track {game get_song} lead} 1)
+(expect {custom track {game get_song} rhythm} 1)
+(expect {== {custom level {game get_song} guitar} ""} 1)
+(expect {custom track {game get_song} bass} 0)
+(expect {custom track {game get_song} vocals} 0)
+(shot lead_and_rhythm)
+(press down)
+(wait 2)
+(expect {custom tag {game get_song} name} "Some Parts")
+(expect {custom track {game get_song} guitar} 1)
+(expect {custom track {game get_song} rhythm} 0)
+(expect {== {custom level {game get_song} rhythm} ""} 1)
+(expect {custom track {game get_song} drums} 0)
+(shot some_parts)
+(quit)

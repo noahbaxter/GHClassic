@@ -147,14 +147,30 @@ namespace gh2::custom
         return text;
     }
 
+    bool has(const Song &song, const std::string &part)
+    {
+        if (part == "guitar")
+            return (song.parts & ~(1u << int(Part::Bass))) != 0u;
+        if (part == "lead")
+            return hasPart(song.parts, Part::Guitar) || hasPart(song.parts, Part::Coop);
+        if (part == "rhythm")
+            return hasPart(song.parts, Part::Rhythm);
+        if (part == "drums")
+            return song.chartHas & kHasDrums;
+        if (part == "vocals")
+            return song.chartHas & kHasVocals;
+        return part == "bass" && hasPart(song.parts, Part::Bass);
+    }
+
     std::optional<long> level(const Song &song, const std::string &part)
     {
         static constexpr const char *kKeys[] = {"guitar", "guitar_coop", "rhythm", "bass"};
-        const bool bass = part == "bass";
-        const uint8_t guitars = song.parts & ~(1u << int(Part::Bass));
-        if (bass ? !hasPart(song.parts, Part::Bass) : guitars == 0u)
+        const bool charted = part == "guitar" || part == "rhythm" || part == "bass";
+        if (charted && !has(song, part))
             return std::nullopt;
-        const auto at = number(song.tags, std::string("diff_") + kKeys[int(bass ? Part::Bass : *leadPart(guitars))]);
+        const auto at = number(song.tags, part == "guitar" ? std::string("diff_") +
+                                                                 kKeys[int(*leadPart(song.parts & ~(1u << int(Part::Bass))))]
+                                                           : "diff_" + part);
         return at && *at >= 0 ? at : std::nullopt;
     }
 
