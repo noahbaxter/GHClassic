@@ -18,4 +18,6 @@ class PS2Runtime;
 namespace gh2::song_speed
 {
     void install(PS2Runtime &runtime, const Addresses &addresses);
+    // The speed songs play at, in percent.
+    int percent();
 }

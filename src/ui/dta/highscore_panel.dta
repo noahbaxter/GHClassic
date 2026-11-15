@@ -20,8 +20,9 @@
                {localize {game get_difficulty_sym 0}}
             }
          }
-         ; A custom song is in no table (its best is save.bin's), so on.
-         {if_else {custom ours {game get_song}}
+         ; A custom song is in no table (its best is save.bin's), nor a run
+         ; at another speed (content/song_speed.h), so on.
+         {if_else {|| {custom ours {game get_song}} {!= {song_speed} 100}}
             {ui goto_screen complete_screen}
             {do
                ($score {player0 score})

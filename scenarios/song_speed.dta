@@ -41,4 +41,23 @@
 (wait_screen main_screen 30)
 (expect {elem {find $syscfg songs shoutatthedevil song name} 1} songs/shoutatthedevil/shoutatthedevil)
 
+; A song won at 150% is kept at that speed alone, and skips GH2's own high
+; score table.
+{quickplay song_defaults 0}
+{gamecfg set mode quickplay}
+{{game get_player_config 0} set_difficulty expert}
+{game set_song shoutatthedevil}
+{game set_quickplay}
+{song_speed set 150}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 5)
+{player0 win 5}
+(wait_screen endgame_screen 60)
+(wait 2)
+(press green)
+(wait_screen complete_screen 30)
+(expect {> {best score shoutatthedevil expert} 0} 1)
+{song_speed set 100}
+(expect {best score shoutatthedevil expert} 0)
 (quit)

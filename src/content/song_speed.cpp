@@ -294,6 +294,8 @@ namespace gh2::song_speed
         struct DtorTag;
     }
 
+    int percent() { return s_percent; }
+
     void install(PS2Runtime &runtime, const Addresses &addresses)
     {
         s_addresses = &addresses;

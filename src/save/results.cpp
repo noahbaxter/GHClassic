@@ -1,4 +1,5 @@
 #include "save/results.h"
+#include "content/song_speed.h"
 
 #include "gameplay/engine/note_engine.h"
 #include "hook.h"
@@ -82,8 +83,10 @@ namespace gh2::save
                           const std::string &controller)
     {
         const auto name = s_namer ? s_namer(song) : std::nullopt;
+        const int speed = song_speed::percent();
         return bestKey(name ? name->song : gameOfSong(song) + '.' + song, noteEngineName(noteEngine()),
-                       name ? name->part : part, difficulty, controller);
+                       name ? name->part : part, difficulty, controller) +
+               (speed == 100 ? "" : ".s" + std::to_string(speed));
     }
 
     void installResults(PS2Runtime &runtime, const Addresses &addresses)

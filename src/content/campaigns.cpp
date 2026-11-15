@@ -3,6 +3,7 @@
 #include "content/locale.h"
 #include "content/outfits.h"
 #include "content/setlists.h"
+#include "content/song_speed.h"
 #include "disc/ark.h"
 #include "formats/dtb.h"
 #include "gameplay/engine/note_engine.h"
@@ -958,10 +959,11 @@ namespace gh2::campaigns
                 return {};
             }
             // From onGameOver, a quickplay song alone: difficulty, song, then
-            // as finished's. A song lost has gems passed.
+            // as finished's. A song lost has gems passed. One at another
+            // speed is only its [best] (save/results.h).
             if (op == "finished_quickplay")
             {
-                if (fullCombo(call, 4) && !save::hasFullCombo(call.symbol(3), static_cast<int>(call.number(2))))
+                if (fullCombo(call, 4) && song_speed::percent() == 100 && !save::hasFullCombo(call.symbol(3), static_cast<int>(call.number(2))))
                 {
                     save::keepQuickplayFullCombo(static_cast<int>(call.number(2)), call.symbol(3));
                     // Quickplay saves only when something asks it to.
