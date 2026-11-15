@@ -1,0 +1,55 @@
+; The 360's highway (its first boot's look with the 360 disc) fades its far
+; end into the venue in the 360's shading, which draws the board whatever
+; fretboard is on it: GH2's and GH1's, Judy Nails' of each, Johnny Napalm's
+; GH1 one and Axel Steel's GH2 one, on GH2's track, then Judy's GH1 one on
+; GH1's.
+(needs gh1 gh2x)
+#include common/first_boot.dta
+{quickplay song_defaults 0}
+{func ghc_far ($outfit $ui)
+   {quickplay in_song_ui $ui}
+   {{game get_player_config 0} set_difficulty expert}
+   {{game get_player_config 0} set autoplay TRUE}
+   {gamecfg set mode quickplay}
+   {game set_song shoutatthedevil}
+   {game set_quickplay}
+   {game set_venue battle}
+   {campaigns venues_from gh2}
+   {{game get_player_config 0} set_character $outfit TRUE}
+   {ui goto_screen loading_screen}
+}
+{ghc_far alternagh1 venue}
+(wait_screen game_screen 60)
+(wait 20)
+(expect {board_shaded} 1)
+(shot alternagh1)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+{ghc_far alterna1 venue}
+(wait_screen game_screen 60)
+(wait 20)
+(expect {board_shaded} 1)
+(shot alterna1)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+{ghc_far punkgh1 venue}
+(wait_screen game_screen 60)
+(wait 20)
+(expect {board_shaded} 1)
+(shot punkgh1)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+{ghc_far metal1 venue}
+(wait_screen game_screen 60)
+(wait 20)
+(expect {board_shaded} 1)
+(shot metal1)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+{ghc_far alternagh1 gh1}
+(wait_screen game_screen 60)
+(expect {campaigns highway} gh1)
+(wait 20)
+(expect {board_shaded} 1)
+(shot alternagh1_gh1_highway)
+(quit)

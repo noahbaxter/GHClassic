@@ -3,6 +3,7 @@
 #include "hook.h"
 #include "ps2_runtime_macros.h"
 #include "render/look.h"
+#include "script.h"
 #include "settings/settings.h"
 
 namespace gh2::gh2x
@@ -21,6 +22,9 @@ namespace gh2::gh2x
 
         void onStartStarPower(uint8_t *, R5900Context *, PS2Runtime *) { look::setStarPower(true); }
         void onStopStarPower(uint8_t *, R5900Context *, PS2Runtime *) { look::setStarPower(false); }
+
+        // {board_shaded}: 1 when the board last drawn had the 360's look.
+        script::Node boardShaded(const script::Call &) { return {look::boardShaded() ? 1u : 0u, script::kInt}; }
     }
 
     void installTrack(PS2Runtime &runtime, const Addresses &addresses)
@@ -28,5 +32,6 @@ namespace gh2::gh2x
         EntryHook<SurfaceTag>::install(runtime, addresses.charTrackSurfaceSetCharTexture, onSetCharTexture);
         EntryHook<StarOnTag>::install(runtime, addresses.playerMatcherOnStartStarpower, onStartStarPower);
         EntryHook<StarOffTag>::install(runtime, addresses.playerMatcherOnStopStarpower, onStopStarPower);
+        script::addCommand("board_shaded", boardShaded);
     }
 }
