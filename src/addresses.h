@@ -191,6 +191,7 @@ namespace gh2
         uint32_t beatMatchDtor;             // BeatMatch::~BeatMatch
         uint32_t beatMatchRestart;          // BeatMatch::Restart
         uint32_t beatMatchSetPracticeSpeed; // BeatMatch::SetPracticeSpeed(float)
+        uint32_t gameConfigGetSongText;     // GameConfig::GetSongText, {game get_song_text}'s
         uint32_t playerMatcherGetSongMs;
         uint32_t ghUtlInit;        // where GH2 registers its DataFuncs
         uint32_t metaInit;
@@ -567,6 +568,7 @@ namespace gh2
         .beatMatchDtor = 0x121528u,
         .beatMatchRestart = 0x122660u,
         .beatMatchSetPracticeSpeed = 0x1224f0u,
+        .gameConfigGetSongText = 0x126310u,
         .playerMatcherGetSongMs = 0x115738u,
         .ghUtlInit = 0x11fbf0u,
         .metaInit = 0x133f78u,

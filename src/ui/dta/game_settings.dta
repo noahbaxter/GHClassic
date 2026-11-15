@@ -632,9 +632,11 @@
             {set $ghc_practice_best 0}
             {set $ghc_practice_fc FALSE}
          }
-         {if {!= {sprint {song_speed} " " $ghc_practice_best " " $ghc_practice_fc " " $hit " " $all} [stats_shown]}
-            {set [stats_shown] {sprint {song_speed} " " $ghc_practice_best " " $ghc_practice_fc " " $hit " " $all}}
+         {if {!= {sprint {song_speed} " " {song_speed playing} " " $ghc_practice_best " " $ghc_practice_fc " " $hit " " $all} [stats_shown]}
+            {set [stats_shown] {sprint {song_speed} " " {song_speed playing} " " $ghc_practice_best " " $ghc_practice_fc " " $hit " " $all}}
             {ghc_stats_speed_value.lbl set_localized_text {sprint {song_speed} "%"}}
+            ; The song's name, its speed after it (content/song_speed.cpp).
+            {ghc_song.lbl set_localized_text {game get_song_text}}
             {ghc_stats_best_value.lbl set_localized_text {sprint $ghc_practice_best "%"}}
             {ghc_stats_percent_value.lbl set_localized_text {sprint {ghc_practice_hit_pct} "%"}}
             {ghc_stats_notes_value.lbl set_localized_text {sprint $hit "/" $all}}

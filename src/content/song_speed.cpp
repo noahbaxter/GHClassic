@@ -40,7 +40,7 @@ namespace gh2::song_speed
         constexpr uint32_t kPitchCorrect = 0xC0u;
 
         const Addresses *s_addresses = nullptr;
-        PS2Runtime::RecompiledFunction s_restart = nullptr, s_setPracticeSpeed = nullptr;
+        PS2Runtime::RecompiledFunction s_restart = nullptr, s_setPracticeSpeed = nullptr, s_getSongText = nullptr;
         int s_percent = 100;
         // The song being made plays in practice, whose speed changes as it
         // plays; its BeatMatch, from its Restart.
@@ -307,6 +307,23 @@ namespace gh2::song_speed
             s_setPracticeSpeed(rdram, ctx, runtime);
         }
 
+        // GameConfig::GetSongText, every screen's name of the song in play
+        // (its intro's caption, the results, practice's), with its speed
+        // after it off 100%: "SHOUT AT THE DEVIL (120%)".
+        void getSongText(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t text = static_cast<uint32_t>(
+                callOriginal(rdram, ctx, runtime, s_addresses->gameConfigGetSongText, s_getSongText));
+            if (playing() == 100 || text == 0u)
+                return;
+            const std::string named = std::string(reinterpret_cast<const char *>(getMemPtr(rdram, text))) + " (" +
+                                      std::to_string(playing()) + "%)";
+            const R5900Context saved = *ctx;
+            const uint32_t symbol = script::symbol(rdram, ctx, runtime, named);
+            *ctx = saved;
+            SET_GPR_U32(ctx, 2, symbol);
+        }
+
         // The song's blocks' audio names passed through {song_speed <op>}.
         void rename(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const char *op)
         {
@@ -492,6 +509,7 @@ namespace gh2::song_speed
         s_addresses = &addresses;
         replaceKeeping(runtime, addresses.beatMatchRestart, &restart, s_restart);
         replaceKeeping(runtime, addresses.beatMatchSetPracticeSpeed, &setPracticeSpeed, s_setPracticeSpeed);
+        replaceKeeping(runtime, addresses.gameConfigGetSongText, &getSongText, s_getSongText);
         EntryHook<CtorTag>::install(runtime, addresses.beatMatchCtor, onBeatMatch);
         EntryHook<DtorTag>::install(runtime, addresses.beatMatchDtor, onBeatMatchGone);
         script::addCommand("song_speed", command);

@@ -238,7 +238,7 @@
          {if $shown
             {set $ghc_info_n 0}
             {do
-               ($title {text_fit upper {custom tag $song name}})
+               ($title {text_fit upper {ghc_speed_title {custom tag $song name}}})
                ($artist {text_fit upper {custom tag $song artist}})
                ($tn {ghc_info_count $s_dir $title $ghc_info_title $ghc_info_room})
                ($an {ghc_info_count $s_dir $artist $ghc_info_artist $ghc_info_room})
@@ -770,10 +770,21 @@
    {== $option speed}
 }
 {func ghc_option_step ($option $dir)
-   {if {== $option speed} {ghc_speed_step $dir}}
+   {if {== $option speed}
+      {ghc_speed_step $dir}
+      ; The paper's title and best, at that speed.
+      {set $ghc_info_due TRUE}
+   }
 }
 {func ghc_option_end ($option $keep)
-   {if {&& {== $option speed} {! $keep}} {song_speed set $ghc_option_was}}
+   {if {&& {== $option speed} {! $keep}}
+      {song_speed set $ghc_option_was}
+      {set $ghc_info_due TRUE}
+   }
+}
+; A song's title with its speed after it, off 100%: "FINISH IT (120%)".
+{func ghc_speed_title ($title)
+   {if_else {== {song_speed} 100} $title {sprint $title " (" {song_speed} "%)"}}
 }
 ; The song speed a step faster ($dir 1) or slower (-1): 10% steps up to
 ; 50%, 5% to 150%, 25% to 500%.
