@@ -1,6 +1,7 @@
 #include "custom/library.h"
 
 #include "content/audio_kind.h"
+#include "custom/chart_rules.h"
 #include "custom/song_facts.h"
 #include "custom/stage/stage.h"
 #include "custom/text.h"
@@ -227,7 +228,7 @@ namespace gh2::custom
                         song.length = std::max(song.length, chart->seconds(gems.back().tick + gems.back().longest()));
                     }
                 }
-                for (const auto &[tick, name] : chart->sections)
+                for (const auto &[tick, name] : rules::practiceSections(*chart))
                     if (std::find(song.sections.begin(), song.sections.end(), name) == song.sections.end())
                         song.sections.push_back(name);
                 song.chartHas = static_cast<uint8_t>((chart->vocals.empty() ? 0u : kHasVocals) |

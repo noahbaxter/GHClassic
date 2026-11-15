@@ -129,7 +129,8 @@
    {set $streak_counter_display2 {if_else {== {gamecfg get mode} multi_fo} {hud find streak_counter2} 0}}
    {if $streak_counter_display1 {streak_counter_setup 1 $streak_counter_display1}}
    {if $streak_counter_display2 {streak_counter_setup 2 $streak_counter_display2}}
-   {if {&& $streak_counter_display1 {!= tutorial {gamecfg get mode}}}
+   ; None in the tutorial, nor in practice, whose stats take its place.
+   {if {&& $streak_counter_display1 {! {find_elem (tutorial practice) {gamecfg get mode}}}}
       {if {exists player_matcher0} {player_matcher0 add_sink streak_counter_p0}}
       {if {exists player_matcher1} {player_matcher1 add_sink streak_counter_p1}}
    }

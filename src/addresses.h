@@ -156,6 +156,9 @@ namespace gh2
         uint32_t theSongDb;              // SongDB *
         uint32_t songDbGetGems;          // SongDB::GetGems(track)
         uint32_t songDbSetupStarPhrases; // SongDB::SetupStarPhrasesForTrack
+        uint32_t songDbSetupPracticeSections;   // SongDB::SetupPracticeSections
+        uint32_t practiceSectionsInitFromDb;    // PracticeSectionProvider::InitFromDB(SongDB &)
+        uint32_t practiceSectionsInitData;      // PracticeSectionProvider::InitData(RndDir *)
         uint32_t songDbIsStarPhraseStart;
         uint32_t songDbIsInStarPhrase;
         uint32_t penalizeAsksStarPhraseStart; // where Player::Penalize's IsStarPhraseStart returns to
@@ -163,6 +166,10 @@ namespace gh2
         uint32_t starPowerHitAsksStarPhraseStart; // and StarPower::Hit's
         uint32_t playerHit;              // Player::Hit
         uint32_t playerPoll;             // Player::Poll
+        uint32_t playerIsInBounds;       // Player::IsInBounds(const GameGem &)
+        uint32_t gameConfigGetPracticeBounds; // GameConfig::GetPracticeBounds(int &, int &)
+        uint32_t enterAsksPracticeBounds;     // where GamePanel::Enter's GetPracticeBounds returns to
+        uint32_t measureBeatTickToTick;       // MeasureMap::MeasureBeatTickToTick(int, int, int)
         uint32_t performerGetMultiplier; // Performer::GetMultiplier
         uint32_t starPowerHit;           // StarPower::Hit
         uint32_t starPowerMissOrPass;    // StarPower::MissOrPass
@@ -188,6 +195,10 @@ namespace gh2
         uint32_t optionsSyncVideo; // Options::SyncVideoOptions
         uint32_t optionsSetSyncOffset;
         uint32_t beatMatchCtor;
+        uint32_t beatMatchDtor;             // BeatMatch::~BeatMatch
+        uint32_t beatMatchRestart;          // BeatMatch::Restart
+        uint32_t beatMatchSetPracticeSpeed; // BeatMatch::SetPracticeSpeed(float)
+        uint32_t gameConfigGetSongText;     // GameConfig::GetSongText, {game get_song_text}'s
         uint32_t playerMatcherGetSongMs;
         uint32_t ghUtlInit;        // where GH2 registers its DataFuncs
         uint32_t metaInit;
@@ -529,6 +540,9 @@ namespace gh2
         .theSongDb = 0x3da2f8u,
         .songDbGetGems = 0x11cf58u,
         .songDbSetupStarPhrases = 0x11d850u,
+        .songDbSetupPracticeSections = 0x11d560u,
+        .practiceSectionsInitFromDb = 0x11b678u,
+        .practiceSectionsInitData = 0x11b818u,
         .songDbIsStarPhraseStart = 0x11da68u,
         .songDbIsInStarPhrase = 0x11da90u,
         .penalizeAsksStarPhraseStart = 0x1117d0u,
@@ -536,6 +550,10 @@ namespace gh2
         .starPowerHitAsksStarPhraseStart = 0x11e468u,
         .playerHit = 0x1111d0u,
         .playerPoll = 0x1110d8u,
+        .playerIsInBounds = 0x111448u,
+        .gameConfigGetPracticeBounds = 0x127008u,
+        .enterAsksPracticeBounds = 0x106938u,
+        .measureBeatTickToTick = 0x2cd258u,
         .performerGetMultiplier = 0x10f1a0u,
         .starPowerHit = 0x11e2b8u,
         .starPowerMissOrPass = 0x11e6a8u,
@@ -561,6 +579,10 @@ namespace gh2
         .optionsSyncVideo = 0x10db80u,
         .optionsSetSyncOffset = 0x10ded8u,
         .beatMatchCtor = 0x120f48u,
+        .beatMatchDtor = 0x121528u,
+        .beatMatchRestart = 0x122660u,
+        .beatMatchSetPracticeSpeed = 0x1224f0u,
+        .gameConfigGetSongText = 0x126310u,
         .playerMatcherGetSongMs = 0x115738u,
         .ghUtlInit = 0x11fbf0u,
         .metaInit = 0x133f78u,

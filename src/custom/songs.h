@@ -25,6 +25,8 @@ namespace gh2::custom
     Part playedPart(uint8_t parts);
     // The part it plays now, as the instrument picked says.
     Part played(const Song &song);
+    // A part's stem's name.
+    std::string playedStem(Part part);
     // A song's files for that part, songs/<id>/<id>: its own part's there,
     // the bass in place of another part's at <id>_bass.
     std::string base(const std::string &id, uint8_t parts, Part part);

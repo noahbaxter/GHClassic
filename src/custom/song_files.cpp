@@ -95,12 +95,6 @@ namespace gh2::custom
             return dtb::text(out);
         }
 
-        // Its stem's name.
-        std::string playedStem(Part part)
-        {
-            return part == Part::Guitar || part == Part::Coop ? "guitar" : part == Part::Rhythm ? "rhythm" : "bass";
-        }
-
         // The chart in GH2's form, made from the song's folder, PART GUITAR
         // that part.
         std::optional<Gh2Chart> gh2Of(const Song &song, Part part)

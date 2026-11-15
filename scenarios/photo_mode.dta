@@ -1,4 +1,4 @@
-; Photo mode, the pause menu's fourth row: the paused song with no track or
+; Photo mode, the pause menu's fifth row: the paused song with no track or
 ; HUD, the help bar at the bottom and the venue's shots listed at the right
 ; while strumming steps through them, with a camera flown free. Orange puts the
 ; help bar and the list away. Red leads back to the pause menu from any of
@@ -19,6 +19,7 @@
 (wait 1)
 {set $shot {world current_shot}}
 {set $frame {$shot frame}}
+(press down)
 (press down)
 (press down)
 (press down)
@@ -82,6 +83,7 @@
 
 ; Free, from where the shot has the camera: the same picture, with the
 ; help bar and the list away for both.
+(press down)
 (press down)
 (press down)
 (press down)

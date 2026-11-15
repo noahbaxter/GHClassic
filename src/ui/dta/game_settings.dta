@@ -279,7 +279,8 @@
 
 ; The pause menu, as the game's own (pause.dta) with one Settings row where
 ; it has one for audio and one for video, and Video Settings' row as Photo
-; Mode (photo_mode.dta): Resume, Restart, Settings, Photo Mode, Quit.
+; (photo_mode.dta): Resume, Restart, Practice in quickplay, Settings, Photo,
+; Quit.
 ; Settings leads to a menu of its own, the same scene again with its rows
 ; named Audio, Video, Game and Controllers (controllers.dta), and each
 ; settings screen leads back to that (the screens take the selects and the
@@ -315,39 +316,60 @@
       (focus resume.btn)
       (reset_focus TRUE)
       (enter
-         {$this five_rows}
+         {$this lay_rows}
          ; A token with no string reads as itself.
          {audio_options.btn set text_token "SETTINGS"}
-         {video_options.btn set text_token "PHOTO MODE"}
+         {video_options.btn set text_token "PHOTO"}
+         {ghc_practice.btn set text_token "PRACTICE"}
       )
-      ; GH1's scene has four rows, and Video Settings' put away: that one
-      ; as Quit's again, the fourth of five. Its frame has little room
-      ; over four rows, so the five start a little higher and stand a
-      ; little closer. Each time the scene loads.
-      (five_up 0.2)
-      (five_gap 0.9)
-      (five_rows
-         {if {! {video_options.btn showing}}
+      ; In quickplay and career, Practice under Restart, Restart cloned: the song again
+      ; in practice (ghc_practice_song). GH1's scene has four rows, and Video
+      ; Settings' put away: that one as Quit's again. A frame has little room
+      ; past its own rows, so more rows start higher and stand closer: [up]
+      ; rows above Resume and [gap] rows apart, by the scene and the rows
+      ; shown, and the title [raise] rows higher. Each time the scene loads.
+      (rows_at ((gh2_5 0 1 0) (gh2_6 0.5 1 0) (gh1_5 0.2 0.9 0) (gh1_6 1.45 0.95 2.2)))
+      (lay_rows
+         {if {! {exists ghc_practice.btn}}
             {do
-               ($x 0) ($y 0) ($z 0) ($above 0) ($row 0) ($i 0)
-               {audio_options.btn get_local_pos $x $y $above}
-               {quit.btn get_local_pos $x $y $z}
-               {set $row {'-' $z $above}}
-               {video_options.btn copy quit.btn 0}
-               ; Not drawn in to QUIT's width: its own, as the other rows.
-               {video_options.btn set fit_text 0}
-               {video_options.btn set trans_parent {quit.btn get trans_parent}}
-               {video_options.btn set_showing TRUE}
-               {video_options.btn set_state kNormal}
-               {audio_options.btn set nav_down video_options.btn}
-               {video_options.btn set nav_down quit.btn}
-               {resume.btn get_local_pos $x $y $z}
-               {foreach $btn (resume.btn restart.btn audio_options.btn video_options.btn quit.btn)
-                  {$btn set_local_pos $x $y
-                     {'+' {'-' $z {'*' [five_up] $row}} {'*' {'*' [five_gap] $row} $i}}
+               ($gh1 {! {video_options.btn showing}})
+               ($rows
+                  {if_else {|| {== {gamecfg get mode} quickplay} {== {gamecfg get mode} career}}
+                     (resume.btn restart.btn ghc_practice.btn audio_options.btn video_options.btn quit.btn)
+                     (resume.btn restart.btn audio_options.btn video_options.btn quit.btn)
                   }
+               )
+               ($at {find [rows_at] {symbol {sprint {if_else $gh1 gh1 gh2} "_" {size $rows}}}})
+               ($x 0) ($y 0) ($z 0) ($row 0) ($i 0)
+               {new {restart.btn class_name} ghc_practice.btn}
+               {ghc_practice.btn copy restart.btn 0}
+               {ghc_practice.btn set trans_parent {restart.btn get trans_parent}}
+               ; The rows draw through their parent, over the frame.
+               {{restart.btn get trans_parent} insert (objects {{restart.btn get trans_parent} size objects}) ghc_practice.btn}
+               {ghc_practice.btn set_showing {== {size $rows} 6}}
+               {ghc_practice.btn set_state {if_else {== {size $rows} 6} kNormal kDisabled}}
+               {if $gh1
+                  {video_options.btn copy quit.btn 0}
+                  {video_options.btn set trans_parent {quit.btn get trans_parent}}
+                  {video_options.btn set_showing TRUE}
+                  {video_options.btn set_state kNormal}
+               }
+               {resume.btn get_local_pos $x $y $z}
+               {restart.btn get_local_pos $x $y $row}
+               {set $row {'-' $row $z}}
+               {do
+                  ($tx 0) ($ty 0) ($tz 0)
+                  {pause_title.lbl get_local_pos $tx $ty $tz}
+                  {pause_title.lbl set_local_pos $tx $ty {'-' $tz {'*' {elem $at 3} $row}}}
+               }
+               {foreach $btn $rows
+                  {$btn set_local_pos $x $y
+                     {'+' {'-' $z {'*' {elem $at 1} $row}} {'*' {'*' {elem $at 2} $row} $i}}
+                  }
+                  {if {> $i 0} {{elem $rows {'-' $i 1}} set nav_down $btn}}
                   {set $i {'+' $i 1}}
                }
+               {{$this loaded_dir} sync_objects}
             }
          }
       )
@@ -364,6 +386,7 @@
          {switch $component
             (resume.btn {$this resume})
             (restart.btn {$this restart})
+            (ghc_practice.btn {ghc_practice_song})
             (audio_options.btn {ui goto_screen pause_settings_screen})
             (video_options.btn {ui goto_screen photo_screen})
             (quit.btn
@@ -375,6 +398,840 @@
       (BUTTON_DOWN_MSG {if {== $button kPad_Start} {$this resume}} kDataUnhandled)
    )
 }
+
+; A quickplay or career song in practice, from its pause menu, as GH2 goes
+; there from a failed career song (lose.dta's goto_practice_mode): the whole
+; song at once, its sections picked in its pause menu. Practice's Return then
+; goes back to that song, until the main menu.
+{set $ghc_practice_from FALSE}
+{set $ghc_practice_row -1} ; a career song's setlist row, for Return to come back on
+{func ghc_practice_song
+   {set $ghc_practice_from {gamecfg get mode}}
+   {set $ghc_practice_row {if_else {== $ghc_practice_from career} {game get_song_index} -1}}
+   {gamecfg set mode practice}
+   {gamecfg set_track 0 0}
+   {practice_sel_section_screen set career_mode {== $ghc_practice_from career}}
+   {set $ghc_qp_speed {song_speed}}
+   ; At the speed it was playing, within practice's.
+   {song_speed set {max 25 {min 200 {song_speed}}}}
+   {ghc_practice_whole}
+   {meta_loading_goto practice_loading_screen}
+}
+; Practice's Return, back to the song list it began from, on the song: the
+; career's or quickplay's (at its own speed), else practice's.
+{func ghc_practice_exit
+   {cond
+      ({practice_sel_section_screen get career_mode}
+         {career_screen resume_from_practice}
+         {song_speed set 100}
+         {meta_loading_goto sel_song_screen}
+      )
+      ({== $ghc_practice_from quickplay}
+         {gamecfg set mode quickplay}
+         {song_speed set $ghc_qp_speed}
+         {meta_loading_nosave_goto qp_selsong_screen}
+      )
+      (TRUE {meta_loading_nosave_goto practice_selsong_screen})
+   }
+}
+; Practice loads the whole song, (practice_sections) -1 -1, its sections
+; picked as it plays: GH2 cuts the chart to the sections picked as it loads
+; (SongDB::Load's SongParser bounds), so only a song loaded whole can go to
+; any section in place (ghc_practice_jump). A reload keeps the sections it
+; was on, put back as practice begins again.
+{set $ghc_practice_kept -2} ; a reload's first section, -2 for none
+{set $ghc_practice_kept_to -1}
+{func ghc_practice_whole
+   {gamecfg set (practice_sections 0) -1}
+   {gamecfg set (practice_sections 1) -1}
+}
+{amend practice_diff_screen
+   (SELECT_START_MSG {ghc_practice_whole} {ui goto_screen practice_loading_screen} kDataUnhandled)
+}
+; A failed song's Practice as its pause menu's: the career's buttons, which
+; have it, for a quickplay song too (lose.dta gives quickplay's none). The
+; rest is the game's own.
+{amend lose_panel
+   (enter
+      {crowd_audio turn_off}
+      {lose_song_data.lbl set_localized_text {game get_song_text}}
+      {lose_diff_data.lbl set_text
+         {if_else
+            {== {gamecfg get mode} multi_coop}
+            {sprintf "%s/%s" {game get_difficulty_sym 0} {game get_difficulty_sym 1}}
+            {game get_difficulty_sym 0}
+         }
+      }
+      {lose_progress_data.lbl set_localized_text
+         {sprintf {localize percent_complete_format} {player0 percent_complete}}}
+      {do
+         ; GH1's screen has one list, without Practice (gh1/menus.dta).
+         ($practice {&& {!= {campaigns look} gh1} {find_elem (career quickplay) {gamecfg get mode}}})
+         {career_buttons.view set_showing $practice}
+         {normal_buttons.view set_showing {! $practice}}
+         {$this set_focus {if_else $practice lose_restart_career.btn lose_restart_normal.btn}}
+      }
+   )
+   (goto_practice_mode {ghc_practice_song})
+}
+; Practice plays the part alone where it has channels of its own (not a
+; custom song with no stem for it, custom/audio.h), with its drum clicks
+; at any speed: GH2's TRIGGERS, a custom song's from its drums. With
+; {practice_option solo_stems} off, the whole song.
+{set $ghc_practice_solo FALSE}
+{func ghc_practice_solo
+   {set $ghc_practice_solo {if_else {practice_option solo_stems} {ghc_practice_stems solo} FALSE}}
+}
+; TRUE if the part has a stem of its own: soloable asks, solo mutes the
+; rest. A custom song's played part is its block's guitar track whatever
+; it is.
+{func ghc_practice_stems ($op)
+   {if_else {|| {! {custom ours {game get_song}}} {custom stem {game get_song}}}
+      {song_speed $op {find $syscfg songs {game get_song} {gamecfg full_speed_block}}
+         {|| {custom ours {game get_song}} {== {gamecfg get_track_type 0} kTrackGuitar}}}
+      FALSE
+   }
+}
+{amend practice_panel
+   ; As the game's own (practice.dta), but its drum clicks, metronome and
+   ; note click are its song's, played by the mix to the sample
+   ; (content/practice_sounds.h), not by a MIDI parser's sink.
+   (enter
+      {events_parser add_sink $this section}
+      {game add_sink $this intro_skip}
+      {practice_clicks start {game get_song}}
+      {mtv_overlay_panel show_overlay FALSE}
+      ; Nothing left over from a practice left another way: a setting's
+      ; reload (taken by this load) or a section's end.
+      {set $ghc_practice_reload FALSE}
+      {set $ghc_practice_end FALSE}
+      ; A reload's sections back, before the game panel starts at them.
+      {if {!= $ghc_practice_kept -2}
+         {gamecfg set (practice_sections 0) $ghc_practice_kept}
+         {gamecfg set (practice_sections 1) $ghc_practice_kept_to}
+         {set $ghc_practice_kept -2}
+      }
+      ; The section's name in the screen's middle, not right of it beside
+      ; where the caption was, and the song's name above it, in its face.
+      {do
+         ($x 0) ($y 0) ($z 0)
+         {section.lbl get_local_pos $x $y $z}
+         ; From where the scene has it, kept once: this runs each load.
+         {if {== [section_z] ''} {set [section_z] $z}}
+         {set $z {'-' [section_z] [section_down]}}
+         {section.lbl set_local_pos 0 $y $z}
+         {if {! {{$this loaded_dir} exists ghc_song.lbl}}
+            {new BandLabel ghc_song.lbl}
+            {ghc_song.lbl copy section.lbl 0}
+            ; In the intro caption's face ("AS MADE FAMOUS BY"), as the stats'.
+            {ghc_song.lbl set_type helveticablack}
+            {ghc_song.lbl set trans_parent {section.lbl get trans_parent}}
+            {ghc_song.lbl set_local_rot 0 0 0}
+            {ghc_song.lbl set_local_scale [song_size] 1 [song_size]}
+            {ghc_song.lbl set fit_text 0}
+            {ghc_song.lbl set wrap_width 4000}
+            {ghc_song.lbl set_showing TRUE}
+         }
+         {ghc_song.lbl set_local_pos 0 $y {'+' $z [song_dz]}}
+         {ghc_song.lbl set_localized_text {game get_song_text}}
+      }
+   )
+   (song_size 0.95)   ; the song's name against the section's
+   (song_dz 36)       ; how far above the section's it stands
+   (section_down 14)  ; the section's below where the scene has it, for the song's room
+   (section_z '')     ; where the scene has it
+   ; The music this many dB down while the metronome or note click is on,
+   ; so they are heard over it.
+   (duck_db -6)
+   (duck
+      {music_fader set_val
+         {if_else {|| {practice_option metronome} {practice_option note_click}} [duck_db] 0}}
+   )
+   (exit
+      {events_parser remove_sink $this}
+      {game remove_sink $this}
+      {practice_clicks stop}
+      {music_fader set_val 0}
+   )
+   ; As the game's own (practice.dta), but no song caption (its panel shows
+   ; as it loads; the game's own hid it 3 s in): the section's name has the
+   ; top to itself.
+   (intro_skip
+      {mtv_overlay_panel show_overlay FALSE}
+      {set [ignore_section] {section_provider section_after_last}}
+   )
+   (update
+      {practice_clicks drums $ghc_practice_solo}
+      {if {! [keep_section_text]} {section.lbl set_text ''}}
+      {set [keep_section_text] FALSE}
+   )
+}
+; Practice as the game's own (practice.dta), and Select, star power's
+; button, restarts the section with nothing loaded again: the game panel
+; left and entered on a screen of the same panels (GamePanel::Enter starts
+; at the section, a bar ahead), which goes straight back.
+{if {! {exists ghc_practice_again_screen}} {new GHScreen ghc_practice_again_screen}}
+{retype ghc_practice_again_screen
+   (
+      (panels practice_panel game hud track_panel mtv_overlay_panel)
+      (allow_back FALSE)
+      (animate_transition FALSE)
+      (in_game TRUE)
+      (enter {ui goto_screen practice_game_screen})
+   )
+}
+{amend practice_game_screen
+   (BUTTON_DOWN_MSG
+      {if {! {game get game_over}}
+         {cond
+            ({== $button kPad_Start} {game set_paused TRUE} {ui goto_screen pract_pause_screen})
+            ({&& {== $button kPad_Select} {! {ui in_transition}}} {ghc_practice_again})
+         }
+      }
+   )
+}
+{func ghc_practice_again
+   {synth stop_all_sfx}
+   {game exit}
+   {ui goto_screen ghc_practice_again_screen}
+}
+; The section's end goes round again, as Select's restart, not to the
+; game's end screen (game.dta's practice_end); its hits made the best. Gone
+; round from the practice panel's poll: the game left from its own task
+; frees that task as it runs.
+{set $ghc_practice_end FALSE}
+{amend game
+   (practice_end
+      {set $ghc_practice_best {max $ghc_practice_best {ghc_practice_hit_pct}}}
+      ; A full combo as every song keeps one (save/results.cpp): no miss,
+      ; and every hit one streak, which a stray strum would have ended.
+      {if {&& {> {player0 gems_hit} 0} {== {player0 gems_passed} 0} {== {player0 longest_streak} {player0 gems_hit}}}
+         {set $ghc_practice_fc TRUE}
+      }
+      {set $ghc_practice_end TRUE}
+   )
+}
+; Practice's stats, top right over the song, as Clone Hero's: the speed,
+; the best of the section's ends since it was picked, and its hits so far.
+{set $ghc_practice_best 0}
+{set $ghc_practice_fc FALSE} ; a full combo among those ends
+{set $ghc_practice_best_for ''}
+{func ghc_practice_hit_pct
+   {do
+      ($all {'+' {player0 gems_hit} {player0 gems_passed}})
+      {if_else {> $all 0} {int {'*' 100 {/ {player0 gems_hit} $all}}} 0}
+   }
+}
+{amend practice_panel
+   (stats_x 150)   ; the rows' left edge
+   (stats_z 150)   ; their top
+   (stats_wide 160)
+   (stats_mid 90)  ; where the names end and the numbers begin
+   (stats_row 18)
+   (stats_size 0.5)
+   (stats_crown_x 144) ; the crown's left edge, past Best Hit's number
+   (stats_shown '')
+   (poll
+      ; Not under the pause menu, which this panel is also on: a section
+      ; ended as it opened goes round once it resumes. (Not by the game's
+      ; paused: its practice end pauses it.)
+      {if {&& $ghc_practice_end {! {ui in_transition}} {!= {{ui current_screen} name} pract_pause_screen}}
+         {set $ghc_practice_end FALSE}
+         {ghc_practice_again}
+      }
+      ; The last section's end, the game's own coming only at the song's
+      ; (ghc_practice_whole).
+      {do
+         ($last {gamecfg get (practice_sections 1)})
+         ($from 0) ($to 0)
+         {if {&& {!= $last -1} {! $ghc_practice_end}}
+            {gamecfg get_section_bounds $last $from $to}
+            {if {>= {'*' 1000 {taskmgr seconds}} $to} {game practice_end}}
+         }
+      }
+      {$this duck}
+      ; The keyboard's arrows, a step of the speed each as it plays.
+      {do
+         ($steps {practice_steps})
+         {if {&& {!= $steps 0} {! {game get game_over}}} {ghc_practice_speed_by $steps live}}
+      }
+      {if {! {{$this loaded_dir} exists ghc_stats.grp}} {$this make_stats}}
+      {do
+         ; Best of the section at this speed: a new speed starts it over.
+         ($for {sprint {game get_song} " " {gamecfg get (practice_sections 0)} " " {gamecfg get (practice_sections 1)} " " {song_speed playing}})
+         ($hit {player0 gems_hit})
+         ($all {'+' $hit {player0 gems_passed}})
+         ; This run still a full combo from its first hit on, as Hit Percent
+         ; is 100% from it: nothing missed, every hit one streak (a stray
+         ; strum ends it).
+         ($live {&& {> $hit 0} {== {player0 gems_passed} 0} {== {player0 current_streak} $hit}})
+         {if {!= $for $ghc_practice_best_for}
+            {set $ghc_practice_best_for $for}
+            {set $ghc_practice_best 0}
+            {set $ghc_practice_fc FALSE}
+         }
+         {if {!= {sprint {song_speed} " " {song_speed playing} " " $ghc_practice_best " " $ghc_practice_fc " " $live " " $hit " " $all} [stats_shown]}
+            {set [stats_shown] {sprint {song_speed} " " {song_speed playing} " " $ghc_practice_best " " $ghc_practice_fc " " $live " " $hit " " $all}}
+            {ghc_stats_speed_value.lbl set_localized_text {sprint {song_speed} "%"}}
+            ; The song's name, its speed after it (content/song_speed.cpp).
+            {ghc_song.lbl set_localized_text {game get_song_text}}
+            {ghc_stats_best_value.lbl set_localized_text {sprint $ghc_practice_best "%"}}
+            {ghc_stats_percent_value.lbl set_localized_text {sprint {ghc_practice_hit_pct} "%"}}
+            {ghc_stats_notes_value.lbl set_localized_text {sprint $hit "/" $all}}
+            ; The full combo crowns: Best Hit's for a run ended as one, Hit
+            ; Percent's while this one still is, gone at the first miss.
+            {ghc_crown.mesh set_showing $ghc_practice_fc}
+            {ghc_crown_live.mesh set_showing $live}
+         }
+      }
+      {$this map_poll}
+   )
+   ; Under the stats, how far through the sections played it is: from the
+   ; first's start (not the bar ahead of it) to the last's end, a tick
+   ; where each of the others starts; the whole song's sections in Full
+   ; Song. Read off the song's clock, so speed changes and restarts carry.
+   (map_tall 6)
+   (map_fill 0) ; 0 to 1
+   (map_for '') ; the sections its ticks are for
+   (map_start 0)
+   (map_end 1)
+   (map_ticks 0) ; how many tick boxes are made
+   (map_x -16)   ; within the stats box, [stats_wide] 24 wider
+   (map_wide 184)
+   (map_z -112)  ; below its box, which ends 5.2 rows down
+   (map_most 64) ; ticks at most, past which a song's are too close to read
+   (map_poll
+      {do
+         ($first {gamecfg get (practice_sections 0)})
+         ($last {gamecfg get (practice_sections 1)})
+         ($from 0) ($to 0) ($n 0)
+         {if {!= [map_for] {sprint $first " " $last}}
+            {set [map_for] {sprint $first " " $last}}
+            {gamecfg get_section_bounds $first $from $to}
+            {set [map_start] $from}
+            {gamecfg get_section_bounds $last $from $to}
+            {set [map_end] {max $to {'+' [map_start] 1}}}
+            ; The sections starting inside: all past the first, or past
+            ; the first picked up to the last.
+            {foreach_int $s {if_else {== $first -1} 1 {'+' $first 1}} {if_else {== $first -1} {practice_section_count} {'+' $last 1}}
+               {if {< $n [map_most]}
+                  {gamecfg get_section_bounds $s $from $to}
+                  {$this map_tick $n {'+' [map_x] {'*' [map_wide] {/ {'-' $from [map_start]} {'-' [map_end] [map_start]}}}}}
+                  {set $n {'+' $n 1}}
+               }
+            }
+            {foreach_int $t $n [map_ticks] {ghc_box_show $this {sprint "ghc_map_tick" $t} FALSE}}
+         }
+         {set [map_fill] {max 0 {min 1 {/ {'-' {'*' 1000 {taskmgr seconds}} [map_start]} {'-' [map_end] [map_start]}}}}}
+         {ghc_box_put $this ghc_map_fill [map_x] 0 [map_z] {max 0.1 {'*' [map_fill] [map_wide]}} [map_tall] 0 0}
+      }
+   )
+   ; Tick $i at $x, made the first time.
+   (map_tick ($i $x)
+      {do
+         ($name {sprint "ghc_map_tick" $i})
+         {if {>= $i [map_ticks]}
+            {ghc_box_make $this $name ghc_stats.grp 13}
+            {ghc_box_color $this $name 1 1 1 0.8}
+            {$this map_draws $name}
+            {set [map_ticks] {'+' $i 1}}
+         }
+         {ghc_box_put $this $name {'-' $x 1} 0 [map_z] 2 [map_tall] 0 0}
+         {ghc_box_show $this $name TRUE}
+      }
+   )
+   ; Box $name drawn by the scene's own list.
+   (map_draws ($name)
+      {foreach $part ("_mid.mesh" "_left.mesh" "_right.mesh")
+         {{$this loaded_dir} insert (draws {{$this loaded_dir} size (draws)}) {$this find {sprint $name $part}}}
+      }
+      {{$this loaded_dir} sync_objects}
+   )
+   ; The rows on a group at their top left, each row's name ending at
+   ; [stats_mid] and its number after, on a dark box: the section name's
+   ; label in a plain font. The scene draws what its own list holds, so the
+   ; box and crown go on it, before the labels.
+   (make_stats
+      {do
+         ($names ("STATS" "Speed" "Best Hit" "Hit Percent" "Hit Notes"))
+         ($i 0)
+         ($dir {$this loaded_dir})
+         ; New labels, so the poll fills them whatever it showed last.
+         {set [stats_shown] ''}
+         {new Group ghc_stats.grp}
+         {ghc_stats.grp set_local_pos [stats_x] 0 [stats_z]}
+         ; Drawn by order, after the room's walls.
+         {ghc_box_make $this ghc_stats ghc_stats.grp 10}
+         {ghc_box_color $this ghc_stats 0 0 0 0.8}
+         {ghc_box_put $this ghc_stats -24 0 {'*' -2.5 [stats_row]} {'+' [stats_wide] 40} {'*' 5.4 [stats_row]} 8 8}
+         {ghc_box_show $this ghc_stats TRUE}
+         ; The song lists' crown (ui/song_crown.cpp) by Best Hit, after its
+         ; number.
+         {new Tex ghc_crown.tex}
+         {ghc_crown.tex set_bitmap "ui/image/ghc_crown.png"}
+         {new Mat ghc_crown.mat}
+         {ghc_crown.mat copy ghc_stats_end.mat 1}
+         {ghc_crown.mat set color {pack_color 1 1 1}}
+         {ghc_crown.mat set alpha 1}
+         {ghc_crown.mat set diffuse_tex ghc_crown.tex}
+         {new {{helpbar find help_box_right.mesh} class_name} ghc_crown.mesh}
+         {ghc_crown.mesh copy {helpbar find help_box_right.mesh} 1}
+         {ghc_crown.mesh set_mat ghc_crown.mat}
+         {ghc_crown.mesh set trans_parent ghc_stats.grp}
+         {ghc_crown.mesh set_local_rot 0 0 0}
+         {ghc_crown.mesh set_local_pos [stats_crown_x] 0 {'*' -2.5 [stats_row]}}
+         {ghc_crown.mesh set_local_scale {/ [stats_row] 12.0} 1 {/ [stats_row] 12.0}}
+         {ghc_crown.mesh set draw_order 11}
+         {ghc_crown.mesh set_showing FALSE}
+         {new {ghc_crown.mesh class_name} ghc_crown_live.mesh}
+         {ghc_crown_live.mesh copy ghc_crown.mesh 1}
+         {ghc_crown_live.mesh set trans_parent ghc_stats.grp}
+         {ghc_crown_live.mesh set_local_pos [stats_crown_x] 0 {'*' -3.5 [stats_row]}}
+         {foreach $m (ghc_stats_mid.mesh ghc_stats_left.mesh ghc_stats_right.mesh ghc_crown.mesh ghc_crown_live.mesh)
+            {$dir insert (draws {$dir size (draws)}) {$this find $m}}
+         }
+         ; The map's track, on a dark box of its own, and its fill
+         ; (map_poll), each tick made as it is first wanted.
+         {set [map_for] ''}
+         {set [map_ticks] 0}
+         {foreach $box ((ghc_map_back 0 0 0 0.8 10) (ghc_map_track 0.35 0.35 0.38 1 11) (ghc_map_fill 1 0.85 0.45 1 12))
+            {ghc_box_make $this {elem $box 0} ghc_stats.grp {elem $box 5}}
+            {ghc_box_color $this {elem $box 0} {elem $box 1} {elem $box 2} {elem $box 3} {elem $box 4}}
+            {ghc_box_show $this {elem $box 0} TRUE}
+            {$this map_draws {elem $box 0}}
+         }
+         {ghc_box_put $this ghc_map_back -24 0 [map_z] {'+' [stats_wide] 40} {'+' [map_tall] 12} 8 8}
+         {ghc_box_put $this ghc_map_track [map_x] 0 [map_z] [map_wide] [map_tall] 0 0}
+         {foreach $row (title speed best percent notes)
+            {do
+               ($z {'*' {'-' -0.5 $i} [stats_row]})
+               ($name {$this stats_label {sprint "ghc_stats_" $row ".lbl"}})
+               {if_else {== $i 0}
+                  {do
+                     {$name set alignment 34}
+                     {$name set_local_pos {/ [stats_wide] 2} 0 $z}
+                  }
+                  {do
+                     {$name set alignment 36}
+                     {$name set_local_pos [stats_mid] 0 $z}
+                     {{$this stats_label {sprint "ghc_stats_" $row "_value.lbl"}} set_local_pos {'+' [stats_mid] 4} 0 $z}
+                  }
+               }
+               {$name set_localized_text {elem $names $i}}
+               {set $i {'+' $i 1}}
+            }
+         }
+         {{$this loaded_dir} sync_objects}
+      }
+   )
+   (stats_label ($name)
+      {do
+         ($l {new BandLabel {symbol $name}})
+         {$l copy section.lbl 0}
+         {$l set_type helveticablack}
+         {$l set trans_parent ghc_stats.grp}
+         {$l set_local_rot 0 0 0}
+         {$l set_local_scale [stats_size] 1 [stats_size]}
+         {$l set fit_text 0}
+         {$l set wrap_width 4000}
+         {$l set alignment 33}
+         {$l set draw_order 20}
+         {$l set_showing TRUE}
+         $l
+      }
+   )
+}
+; Practice's speed, a row of its pause menu where Change Speed was, 25% to
+; 200% (content/song_speed.h's practice audio), kept for the next practice
+; ($ghc_practice_pct, quickplay.dta). Its name lights as any row's; green
+; takes it up, its number lit too, as the audio settings' sliders; strum
+; steps it 5%, green keeps it and red puts it back. GH2's speed screen
+; before the song goes straight on to its loading.
+{set $ghc_speed_before FALSE} ; the speed it was taken up at, FALSE when not
+{func ghc_practice_speed_label ($panel) {$panel speed_row}}
+{func ghc_practice_speed_edit ($panel $on)
+   {set $ghc_speed_before {if_else $on {song_speed} FALSE}}
+   {$panel speed_row}
+}
+; $by 5% steps faster, $op set ({song_speed}'s) or, as it plays, live.
+{func ghc_practice_speed_by ($by $op)
+   {song_speed $op {max 25 {min 200 {'+' {song_speed} {'*' 5 $by}}}}}
+   {set $ghc_practice_pct {song_speed}}
+   {synth play_sequence button_toggle}
+}
+; Green on the row: taken up, else kept.
+{func ghc_practice_speed_select ($panel)
+   {ghc_practice_speed_edit $panel {! $ghc_speed_before}}
+}
+; A button while it is taken up: TRUE if it was the row's.
+{func ghc_practice_speed_button ($panel $button)
+   {cond
+      ({! $ghc_speed_before} FALSE)
+      ({|| {== $button kPad_DUp} {== $button kPad_DDown}}
+         {ghc_practice_speed_by {if_else {== $button kPad_DUp} 1 -1} set}
+         {ghc_practice_speed_label $panel}
+         TRUE
+      )
+      ({== $button kPad_Tri}
+         {song_speed set $ghc_speed_before}
+         {set $ghc_practice_pct {song_speed}}
+         {synth play_sequence button_back.cue}
+         {ghc_practice_speed_edit $panel FALSE}
+         TRUE
+      )
+      ; Green is the row's select, Start keeps it and goes on; the rest do
+      ; nothing.
+      ({== $button kPad_X} FALSE)
+      ({== $button kPad_Start} {ghc_practice_speed_edit $panel FALSE} FALSE)
+      (TRUE TRUE)
+   }
+}
+{retype practice_sel_speed_screen
+   (
+      (panels meta helpbar)
+      (enter {ui goto_screen practice_loading_screen})
+   )
+}
+; Practice resumed takes up where it was paused at the speed picked, as the
+; arrows change it as it plays (content/song_speed.h).
+{func ghc_practice_resume ($screen)
+   {if_else $ghc_practice_reload
+      ; Its audio made again from its section's start: the part alone or
+      ; not (ghc_practice_options_screen).
+      {do
+         {set $ghc_practice_reload FALSE}
+         {set $ghc_practice_kept {gamecfg get (practice_sections 0)}}
+         {set $ghc_practice_kept_to {gamecfg get (practice_sections 1)}}
+         {ghc_practice_whole}
+         {meta_loading_nosave_goto practice_loading_screen}
+      }
+      {do
+         {song_speed live {song_speed}}
+         {$screen resume}
+      }
+   }
+}
+; From the pause menu, as Select in the song: the section again, nothing
+; loaded, unless a setting wants its audio made again.
+{func ghc_practice_restart
+   {if_else $ghc_practice_reload
+      {ghc_practice_resume pract_pause_screen}
+      {do
+         {set $game_unpause_on_enter TRUE}
+         {ghc_practice_again}
+      }
+   }
+}
+; Those sections played from Change Section, as the pause menu's Restart:
+; the song is loaded whole (ghc_practice_whole).
+{func ghc_practice_jump ($from $to)
+   {gamecfg set (practice_sections 0) $from}
+   {gamecfg set (practice_sections 1) $to}
+   {ghc_practice_restart}
+}
+; Practice's pause menu, as the game's own (pause.dta) but for New Song,
+; which is Settings (ghc_practice_settings_screen), and Exit, which is
+; Return. A career's has no New Song: its Settings is Change Section's,
+; cloned. Each time the scene loads.
+{retype pract_pause_panel
+   (
+      (file ui/pract_pause.milo)
+      (enter
+         {do
+            ($career {practice_sel_section_screen get career_mode})
+            {tut_pause_career_buttons.view set_showing $career}
+            {tut_pause_buttons.view set_showing {! $career}}
+            {$this set_focus
+               {if_else [from_sections]
+                  {if_else $career section_career.btn section.btn}
+                  {if_else $career resume_career.btn resume.btn}}}
+            {set [from_sections] FALSE}
+         }
+         {$this six_rows}
+         ; A token with no string reads as itself.
+         {newsong.btn set text_token "SETTINGS"}
+         {ghc_settings_career.btn set text_token "SETTINGS"}
+         {quit.btn set text_token "RETURN"}
+         {quit_career.btn set text_token "RETURN"}
+         {ghc_practice_speed_label $this}
+      )
+      (exit {if $ghc_speed_before {ghc_practice_speed_edit $this FALSE}})
+      (from_sections FALSE) ; back from Change Section, on its row
+      ; The speed row: its name the button's, moved left of the row's
+      ; middle, and its number a label right of it, the two centred
+      ; together; the number lit only while it is taken up. Made each time
+      ; the scene loads. SPEED is 89 wide in the scene's face, a number
+      ; about 70.
+      (speed_name_dx -43)
+      (speed_number_dx 20)
+      (speed_row
+         {do
+            ($dir {$this loaded_dir})
+            ($career {practice_sel_section_screen get career_mode})
+            ($btn {$this find {if_else $career change_speed_career.btn change_speed.btn}})
+            ($x 0) ($y 0) ($z 0)
+            {if {! {$dir exists ghc_speed_num.lbl}}
+               {foreach $name (change_speed.btn change_speed_career.btn)
+                  {if {$dir exists $name}
+                     {do
+                        ($b {$this find $name})
+                        {$b get_local_pos $x $y $z}
+                        {$b set_local_pos {'+' $x [speed_name_dx]} $y $z}
+                        ; A token with no string reads as itself.
+                        {$b set text_token "SPEED"}
+                     }
+                  }
+               }
+               {new BandLabel ghc_speed_num.lbl}
+               {ghc_speed_num.lbl copy {practice_panel find section.lbl} 0}
+               {ghc_speed_num.lbl set_local_rot 0 0 0}
+               {ghc_speed_num.lbl set_local_scale 1 1 1}
+               {ghc_speed_num.lbl set wrap_width 4000}
+            }
+            {ghc_speed_num.lbl set_type {$btn get_type}}
+            {foreach $prop (text_size kerning deltaZ deltaRot)
+               {ghc_speed_num.lbl set $prop {$btn get $prop}}
+            }
+            {ghc_speed_num.lbl set fit_text 0}
+            {ghc_speed_num.lbl set alignment 33}
+            ; The rows draw through their parent, over the frame.
+            {if {!= {ghc_speed_num.lbl get trans_parent} {$btn get trans_parent}}
+               {ghc_speed_num.lbl set trans_parent {$btn get trans_parent}}
+               {{$btn get trans_parent} insert (objects {{$btn get trans_parent} size objects}) ghc_speed_num.lbl}
+            }
+            {$btn get_local_pos $x $y $z}
+            {ghc_speed_num.lbl set_local_pos {'+' $x {'-' [speed_number_dx] [speed_name_dx]}} $y $z}
+            {ghc_speed_num.lbl set draw_order {$btn get draw_order}}
+            {ghc_speed_num.lbl set_showing TRUE}
+            ; A label given a colour goes back to its token's text.
+            {ghc_speed_num.lbl set color {$dir get {if_else $ghc_speed_before focus_color normal_color}}}
+            {ghc_speed_num.lbl set_localized {sprint {song_speed} "%"}}
+         }
+      )
+      ; The career's six rows where the others are.
+      (six_rows
+         {if {! {{$this loaded_dir} exists ghc_settings_career.btn}}
+            {do
+               ($rows (resume_career.btn restart_career.btn change_speed_career.btn section_career.btn
+                  ghc_settings_career.btn quit_career.btn))
+               ($group {section_career.btn get trans_parent})
+               ($x 0) ($y 0) ($top 0) ($bottom 0) ($i 0)
+               {new {section_career.btn class_name} ghc_settings_career.btn}
+               {ghc_settings_career.btn copy section_career.btn 0}
+               {ghc_settings_career.btn set trans_parent $group}
+               ; The rows draw through their parent, over the frame.
+               {$group insert (objects {$group size objects}) ghc_settings_career.btn}
+               {resume.btn get_local_pos $x $y $top}
+               {quit.btn get_local_pos $x $y $bottom}
+               {foreach $btn $rows
+                  {$btn set_local_pos $x $y {'+' $top {'*' {'-' $bottom $top} {'/' $i 5}}}}
+                  {if {> $i 0} {{elem $rows {'-' $i 1}} set nav_down $btn}}
+                  {set $i {'+' $i 1}}
+               }
+               {{$this loaded_dir} sync_objects}
+            }
+         }
+      )
+   )
+}
+{retype pract_pause_screen
+   (
+      (panels PRACTICE_PANELS pract_pause_panel)
+      (focus pract_pause_panel)
+      (clear_vram TRUE)
+      (in_game TRUE)
+      PAUSE_SCREEN_HANDLERS
+      (BUTTON_DOWN_MSG
+         {cond
+            ({ghc_practice_speed_button pract_pause_panel $button} TRUE)
+            ({== $button kPad_Start} {ghc_practice_resume $this} TRUE)
+            (TRUE kDataUnhandled)
+         }
+      )
+      (SELECT_START_MSG
+         {switch $component
+            ((resume.btn resume_career.btn) {ghc_practice_resume $this})
+            ((restart.btn restart_career.btn) {ghc_practice_restart})
+            ((section.btn section_career.btn) {ui goto_screen ghc_practice_section_screen})
+            ((change_speed.btn change_speed_career.btn) {ghc_practice_speed_select pract_pause_panel})
+            ((newsong.btn ghc_settings_career.btn) {ui goto_screen ghc_practice_settings_screen})
+            ((quit.btn quit_career.btn) {ghc_practice_exit})
+         }
+      )
+   )
+}
+; Change Section: GH2's section poster (practice.dta's, before the song)
+; over practice's panels, the song held paused under it. Green on the
+; whole song plays it, green on a section marks where it starts and green
+; on one after plays them, all at once (ghc_practice_jump); red takes the
+; mark off, then goes back to the pause menu.
+{if {! {exists ghc_practice_section_screen}} {new GHScreen ghc_practice_section_screen}}
+{retype ghc_practice_section_screen
+   (
+      (panels PRACTICE_PANELS practice_sel_section_panel helpbar)
+      (focus practice_sel_section_panel)
+      (in_game TRUE)
+      PAUSE_SCREEN_HANDLERS
+      (helpbar (default ((fret1 help_continue) (fret2 help_back) (strum help_updown))))
+      (BUTTON_DOWN_MSG {if_else {== $button kPad_Start} {do {ghc_practice_resume $this} TRUE} kDataUnhandled})
+   )
+}
+{retype practice_sel_section_panel
+   (
+      (file ui/practice_sel_section.milo)
+      (focus sel_section.lst)
+      (section 0) ; 1 once its start is marked
+      (start 0)
+      (enter
+         ; The poster alone, the song behind it, not its brick wall.
+         {speed_wall.mesh set_showing FALSE}
+         {sel_section.lst set_provider section_provider}
+         {$this unmark}
+      )
+      (unmark
+         {set [section] 0}
+         {section_provider set_start_section -1}
+         {title.lbl set_text select_start_section}
+      )
+      (SELECT_START_MSG
+         {do
+            ($idx {- {sel_section.lst selected_pos} 1})
+            {cond
+               ({&& {! [section]} {== $idx -1}} {ghc_practice_jump -1 -1} kDataUnhandled)
+               ({! [section]}
+                  {set [start] $idx}
+                  {set [section] 1}
+                  {section_provider set_start_section $idx}
+                  {title.lbl set_text select_end_section}
+                  ; Handled: the list's own select would hold it still as
+                  ; it plays its select, the end not pickable for a moment.
+                  {synth play_sequence button_select}
+                  TRUE
+               )
+               ({< $idx [start]} {handle (ui BAD_SELECT_START_MSG)})
+               (TRUE {ghc_practice_jump [start] $idx} kDataUnhandled)
+            }
+         }
+      )
+      (BUTTON_DOWN_MSG
+         {if_else {&& {== $button kPad_Tri} {! {ui in_transition}}}
+            {do
+               {synth play_sequence button_back.cue}
+               {if_else [section]
+                  {$this unmark}
+                  {do {pract_pause_panel set from_sections TRUE} {ui goto_screen pract_pause_screen}}
+               }
+               TRUE
+            }
+            kDataUnhandled
+         }
+      )
+   )
+}
+; Practice's own settings, the fifth row of its pause menu's Settings: the
+; metronome, the note click, and the part alone on its own stem or the
+; whole song ({practice_option}, content/practice_sounds.h). Each a row and
+; box of GH2's video settings' scene, its lefty and widescreen rows', in
+; their order, its progressive scan row put away. The part alone takes the
+; song up again from the section's start as it resumes. Whether a slowed
+; song keeps its pitch is settings.ini's maintain_pitch, an audio setting.
+{if {! {exists ghc_practice_options_screen}}
+   {new GHPanel ghc_practice_options_panel}
+   {new GHScreen ghc_practice_options_screen}
+}
+{set $ghc_practice_reload FALSE}
+{retype ghc_practice_options_panel
+   (
+      (file ui/pause_video_settings.milo)
+      (focus gs_left_p1.btn)
+      (reset_focus TRUE)
+      (rows
+         (
+            (gs_left_p1.btn lefty1.chk metronome "METRONOME")
+            (gs_left_p2.btn lefty2.chk note_click "NOTE CLICK")
+            (widescreen.btn widescreen.chk solo_stems "SOLO STEMS")
+         )
+      )
+      (enter
+         {foreach $off (calibrate_lag.btn p_scan.btn p_scan.chk)
+            {{$this find $off} set_showing FALSE}
+         }
+         {foreach $off (calibrate_lag.btn p_scan.btn)
+            {{$this find $off} set_state kDisabled}
+            {{$this find $off} set nav_down {$this find $off}}
+         }
+         {gs_title.lbl set_localized "PRACTICE"}
+         {do
+            ($i 0)
+            {foreach $row [rows]
+               ; A token with no string reads as itself.
+               {{$this find {elem $row 0}} set text_token {elem $row 3}}
+               {{$this find {elem $row 0}} set nav_down
+                  {$this find {elem {elem [rows] {mod {'+' $i 1} {size [rows]}}} 0}}}
+               {set $i {'+' $i 1}}
+            }
+         }
+         ; The part alone only where it has a stem of its own: else its
+         ; row is off, its box in the scene's colour for that, unchecked,
+         ; and passed by. Up finds the row whose down leads here, so its
+         ; own leads to itself.
+         {set [stems] {ghc_practice_stems soloable}}
+         {if_else [stems]
+            {do
+               {if {== {widescreen.btn get_state} kDisabled} {widescreen.btn set_state kNormal}}
+               {slider_scales on widescreen.chk}
+            }
+            {do
+               {widescreen.btn set_state kDisabled}
+               {slider_scales off widescreen.chk {{$this loaded_dir} get disabled_color}}
+               {gs_left_p2.btn set nav_down gs_left_p1.btn}
+               {widescreen.btn set nav_down widescreen.btn}
+            }
+         }
+         {$this sync}
+      )
+      (stems TRUE)
+      (sync
+         {foreach $row [rows]
+            {{$this find {elem $row 1}} set_check
+               {if_else {&& {== {elem $row 2} solo_stems} {! [stems]}} FALSE {practice_option {elem $row 2}}}}
+         }
+      )
+      (SELECT_START_MSG
+         {switch $component
+            (gs_left_p1.btn {$this toggle metronome})
+            (gs_left_p2.btn {$this toggle note_click})
+            (widescreen.btn {if [stems] {$this toggle solo_stems}})
+         }
+      )
+      (toggle ($option)
+         {practice_option $option {! {practice_option $option}}}
+         {if {== $option solo_stems} {set $ghc_practice_reload TRUE}}
+         {synth play_sequence button_toggle}
+         {$this sync}
+      )
+   )
+}
+{retype ghc_practice_options_screen
+   (
+      (panels PRACTICE_PANELS ghc_practice_options_panel helpbar)
+      (focus ghc_practice_options_panel)
+      (in_game TRUE)
+      PAUSE_SCREEN_HANDLERS
+      (helpbar (default ((fret1 help_onoff) (fret2 help_back) (strum help_updown))))
+      (BUTTON_DOWN_MSG
+         {cond
+            ({== $button kPad_Start} {ghc_practice_resume $this} TRUE)
+            ({== $button kPad_Tri}
+               {synth play_sequence button_back.cue}
+               {ui goto_screen ghc_practice_settings_screen}
+               TRUE
+            )
+            (TRUE kDataUnhandled)
+         }
+      )
+   )
+}
 {if {! {exists pause_settings_screen}}
    {new GHPanel pause_settings_panel}
    {new GHScreen pause_settings_screen}
@@ -384,8 +1241,16 @@
       (file ui/pause.milo)
       (focus resume.btn)
       (reset_focus TRUE)
+      ; In practice a fifth row, the scene's own, is Practice's page
+      ; (ghc_practice_options_screen).
       (enter
-         {$this four_rows}
+         {if_else {== {gamecfg get mode} practice}
+            {do
+               {if {! {video_options.btn showing}} {$this gh1_five_rows}}
+               {video_options.btn set text_token "PRACTICE"}
+            }
+            {$this four_rows}
+         }
          ; Up goes to the row whose down leads here: Video Settings' put
          ; away points at itself, or up from Controllers would find it.
          {if {&& {exists video_options.btn} {! {video_options.btn showing}}}
@@ -400,68 +1265,117 @@
          {quit.btn set fit_text 0}
       )
       PAUSE_FOUR_ROWS
+      ; GH1's scene has four rows, its fifth put away: in practice that one
+      ; back as Quit's twin, for Practice's page, the five laid as the pause
+      ; menu lays GH1's five (pause_panel's rows_at, gh1_5).
+      (gh1_five_rows
+         {do
+            ($rows (resume.btn restart.btn audio_options.btn video_options.btn quit.btn))
+            ($x 0) ($y 0) ($z 0) ($row 0) ($i 0)
+            {video_options.btn copy quit.btn 0}
+            {video_options.btn set trans_parent {quit.btn get trans_parent}}
+            {video_options.btn set_showing TRUE}
+            {video_options.btn set_state kNormal}
+            {resume.btn get_local_pos $x $y $z}
+            {restart.btn get_local_pos $x $y $row}
+            {set $row {'-' $row $z}}
+            {foreach $btn $rows
+               {$btn set_local_pos $x $y {'+' {'-' $z {'*' 0.2 $row}} {'*' {'*' 0.9 $row} $i}}}
+               {if {> $i 0} {{elem $rows {'-' $i 1}} set nav_down $btn}}
+               {set $i {'+' $i 1}}
+            }
+         }
+      )
    )
 }
-{retype pause_settings_screen
+; A song's settings screens from its pause menu, and in practice their twins:
+; the same, over practice's panels (PRACTICE_PANELS, no venue) rather than a
+; song's. Each goes to the others through this, which gives the twin in
+; practice.
+{set $ghc_practice_twins
    (
-      (panels GAME_PANELS pause_settings_panel helpbar)
-      (focus pause_settings_panel)
-      (in_game TRUE)
-      PAUSE_SCREEN_HANDLERS
-      (helpbar (default ((fret1 help_select) (fret2 help_back) (strum help_updown))))
-      (SELECT_START_MSG
-         {switch $component
-            (resume.btn {ui goto_screen pause_audio_settings_screen})
-            (restart.btn {ui goto_screen pause_video_settings_screen})
-            (audio_options.btn {ui goto_screen pause_game_settings_screen})
-            (quit.btn {ui goto_screen ghc_pause_controllers_screen})
-         }
-      )
-      (BUTTON_DOWN_MSG
-         {if {== $button kPad_Start} {$this resume}}
-         {if {== $button kPad_Tri}
-            {synth play_sequence button_back.cue}
-            {ui goto_screen pause_screen}
-         }
-         kDataUnhandled
-      )
+      (pause_screen pract_pause_screen)
+      (pause_settings_screen ghc_practice_settings_screen)
+      (pause_audio_settings_screen ghc_practice_audio_screen)
+      (pause_video_settings_screen ghc_practice_video_screen)
+      (pause_game_settings_screen ghc_practice_game_screen)
+      (ghc_pause_controllers_screen ghc_practice_controllers_screen)
+      (pause_lag_screen ghc_practice_lag_screen)
    )
 }
+{func ghc_pause_screen ($screen)
+   {if_else {== {gamecfg get mode} practice} {elem {find $ghc_practice_twins $screen} 1} $screen}
+}
+{foreach $twin $ghc_practice_twins
+   {if {! {exists {elem $twin 1}}} {new GHScreen {elem $twin 1}}}
+}
+; Start resumes the song, practice's as its pause menu does.
+{func ghc_pause_resume ($screen)
+   {if_else {== {gamecfg get mode} practice} {ghc_practice_resume $screen} {$screen resume}}
+}
+#define PAUSE_SETTINGS_SCREEN (
+   (focus pause_settings_panel)
+   (in_game TRUE)
+   PAUSE_SCREEN_HANDLERS
+   (helpbar (default ((fret1 help_select) (fret2 help_back) (strum help_updown))))
+   (SELECT_START_MSG
+      {switch $component
+         (resume.btn {ui goto_screen {ghc_pause_screen pause_audio_settings_screen}})
+         (restart.btn {ui goto_screen {ghc_pause_screen pause_video_settings_screen}})
+         (audio_options.btn {ui goto_screen {ghc_pause_screen pause_game_settings_screen}})
+         (video_options.btn {ui goto_screen ghc_practice_options_screen})
+         (quit.btn {ui goto_screen {ghc_pause_screen ghc_pause_controllers_screen}})
+      }
+   )
+   (BUTTON_DOWN_MSG
+      {if {== $button kPad_Start} {ghc_pause_resume $this}}
+      {if {== $button kPad_Tri}
+         {synth play_sequence button_back.cue}
+         {ui goto_screen {ghc_pause_screen pause_screen}}
+      }
+      kDataUnhandled
+   )
+)
+{retype pause_settings_screen ((panels GAME_PANELS pause_settings_panel helpbar) PAUSE_SETTINGS_SCREEN)}
+{retype ghc_practice_settings_screen ((panels PRACTICE_PANELS pause_settings_panel helpbar) PAUSE_SETTINGS_SCREEN)}
 ; The game's own two settings screens there (options.dta), each leading back
 ; to that menu where it led to the pause menu.
-{retype pause_audio_settings_screen
-   (
-      (panels GAME_PANELS pause_audio_settings_panel helpbar)
-      (focus pause_audio_settings_panel)
-      (in_game TRUE)
-      (allow_back FALSE)
-      (animate_transition FALSE)
-      ; Under Settings each is named for what it holds.
-      (enter {{pause_audio_settings_panel find gs_title.lbl} set_localized "AUDIO"})
-      (BUTTON_DOWN_MSG
-         {if {&& {! {pause_audio_settings_panel slider_selected}} {== $button kPad_Tri}}
-            {$this set_volumes}
-            {synth play_sequence button_back.cue}
-            {ui goto_screen pause_settings_screen}
-         }
-         kDataUnhandled
-      )
+#define PAUSE_AUDIO_SCREEN (
+   (focus pause_audio_settings_panel)
+   (in_game TRUE)
+   (allow_back FALSE)
+   (animate_transition FALSE)
+   ; Under Settings each is named for what it holds.
+   (enter {{pause_audio_settings_panel find gs_title.lbl} set_localized "AUDIO"})
+   (BUTTON_DOWN_MSG
+      {if {&& {! {pause_audio_settings_panel slider_selected}} {== $button kPad_Tri}}
+         {$this set_volumes}
+         {synth play_sequence button_back.cue}
+         {ui goto_screen {ghc_pause_screen pause_settings_screen}}
+      }
+      kDataUnhandled
    )
-}
-{retype pause_video_settings_screen
+)
+{retype pause_audio_settings_screen ((panels GAME_PANELS pause_audio_settings_panel helpbar) PAUSE_AUDIO_SCREEN)}
+{retype ghc_practice_audio_screen ((panels PRACTICE_PANELS pause_audio_settings_panel helpbar) PAUSE_AUDIO_SCREEN)}
+#define PAUSE_VIDEO_SCREEN (
+   (focus pause_video_settings_panel)
+   (in_game TRUE)
+   (allow_back FALSE)
+   (animate_transition FALSE)
+   (BUTTON_DOWN_MSG
+      {if {&& {== $button kPad_Tri} {== {pause_video_settings_panel get picking} none}}
+         {synth play_sequence button_back.cue}
+         {ui goto_screen {ghc_pause_screen pause_settings_screen}}
+      }
+      kDataUnhandled
+   )
+)
+{retype pause_video_settings_screen ((panels GAME_PANELS pause_video_settings_panel helpbar) PAUSE_VIDEO_SCREEN)}
+{retype ghc_practice_video_screen
    (
-      (panels GAME_PANELS pause_video_settings_panel helpbar)
-      (focus pause_video_settings_panel)
-      (in_game TRUE)
-      (allow_back FALSE)
-      (animate_transition FALSE)
-      (BUTTON_DOWN_MSG
-         {if {&& {== $button kPad_Tri} {== {pause_video_settings_panel get picking} none}}
-            {synth play_sequence button_back.cue}
-            {ui goto_screen pause_settings_screen}
-         }
-         kDataUnhandled
-      )
+      (panels PRACTICE_PANELS pause_video_settings_panel helpbar)
+      PAUSE_VIDEO_SCREEN
    )
 }
 {retype video_settings_screen
@@ -1282,7 +2196,7 @@
                ; where the game's own Video Settings asked for a restart.
                (gm_p1.btn {gm_p1.chk toggle} {options set_lefty 0 {gm_p1.chk get_check}} {$this retrack})
                (gm_p2.btn {gm_p2.chk toggle} {options set_lefty 1 {gm_p2.chk get_check}} {$this retrack})
-               (gm_lag.btn {lag_panel set from_panel $this} {ui goto_screen [lag_screen]})
+               (gm_lag.btn {lag_panel set from_panel $this} {ui goto_screen {ghc_pause_screen [lag_screen]}})
                ; Judged from the next song loaded: in one, this one again.
                (gm_engine.btn
                   {if {&& {note_engine set {note_engine next {note_engine}}} {$this in_song}}
@@ -1312,6 +2226,19 @@
          }
          kDataUnhandled
       }
+   )
+)
+#define PAUSE_GAME_SCREEN (
+   (focus pause_game_settings_panel)
+   (in_game TRUE)
+   (allow_back FALSE)
+   (animate_transition FALSE)
+   (BUTTON_DOWN_MSG
+      {if {&& {! {pause_game_settings_panel slider_selected}} {== $button kPad_Tri}}
+         {synth play_sequence button_back.cue}
+         {ui goto_screen {ghc_pause_screen pause_settings_screen}}
+      }
+      kDataUnhandled
    )
 )
 ; Made once, where this is run again.
@@ -1381,18 +2308,16 @@
    (two_players {> {game num_players} 1})
    GAME_SETTINGS_HANDLERS
 }
-{new GHScreen pause_game_settings_screen
-   (panels GAME_PANELS pause_game_settings_panel helpbar)
-   (focus pause_game_settings_panel)
-   (in_game TRUE)
-   (allow_back FALSE)
-   (animate_transition FALSE)
-   (BUTTON_DOWN_MSG
-      {if {&& {! {pause_game_settings_panel slider_selected}} {== $button kPad_Tri}}
-         {synth play_sequence button_back.cue}
-         {ui goto_screen pause_settings_screen}
-      }
-      kDataUnhandled
-   )
+{new GHScreen pause_game_settings_screen (panels GAME_PANELS pause_game_settings_panel helpbar) PAUSE_GAME_SCREEN}
 }
+{retype ghc_practice_game_screen ((panels PRACTICE_PANELS pause_game_settings_panel helpbar) PAUSE_GAME_SCREEN)}
+; The lag screen from it, as the game's own (options.dta's pause_lag_screen),
+; in practice.
+{retype ghc_practice_lag_screen
+   (
+      (panels PRACTICE_PANELS lag_panel helpbar)
+      (focus lag_panel)
+      (clear_vram TRUE)
+      (enter {hud set_showing FALSE} {track_panel set_showing FALSE})
+   )
 }

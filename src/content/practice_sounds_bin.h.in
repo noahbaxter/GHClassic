@@ -1,0 +1,5 @@
+#pragma once
+
+// assets/practice_sounds/practice_sounds.bin (content/practice_sounds.cpp):
+// practice's metronome and note click.
+inline constexpr unsigned char kPracticeSounds[] = {@GHC_PRACTICE_SOUNDS@};

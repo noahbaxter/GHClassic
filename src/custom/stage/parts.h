@@ -119,4 +119,9 @@ namespace gh2::custom
     // TRIGGERS: the lighting's next keyframe each bar from a bar before
     // the lead, for the lighting made.
     void addKeyframes(BandTracks &band, bool chartHasLighting);
+
+    // TRIGGERS: practice's drum clicks, 24 the kick, 25 the snare and 26
+    // the hi-hat, on the chart's expert drums (ui/dta/game_settings.dta,
+    // ghc_practice_solo).
+    void addPracticeClicks(BandTracks &band);
 }

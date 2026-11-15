@@ -256,6 +256,16 @@ target_include_directories(opusfile SYSTEM PUBLIC "${opusfile_SOURCE_DIR}/includ
 target_link_libraries(opusfile PUBLIC opus vorbisfile)
 set_target_properties(opusfile PROPERTIES C_STANDARD 99)
 
+# Songs slowed and sped up with their pitch kept: Signalsmith Stretch and
+# its Linear (MIT), header-only.
+FetchContent_Declare(signalsmith-linear
+    GIT_REPOSITORY https://github.com/Signalsmith-Audio/linear.git
+    GIT_TAG 7bb1c8f36794d6980080ce817c91f8da8fe56a66) # 0.6.6
+FetchContent_Declare(signalsmith-stretch
+    GIT_REPOSITORY https://github.com/Signalsmith-Audio/signalsmith-stretch.git
+    GIT_TAG 88061fd4eda56a2353c5d65c74aa3f4ccf76f9da) # 1.4.0, on Linear 0.6.6
+FetchContent_MakeAvailable(signalsmith-linear signalsmith-stretch)
+
 # Without a disc's generated code, everything above still builds: what CI
 # checks (tools/ghc.py ci).
 file(GLOB GHC_GENERATED_SOURCES CONFIGURE_DEPENDS
@@ -298,6 +308,8 @@ set(GHC_GAME_SOURCES
     src/content/setlist_window.cpp
     src/content/setlists.cpp
     src/content/songs.cpp
+    src/content/song_speed.cpp
+    src/content/practice_sounds.cpp
     src/content/status_line.cpp
     src/content/tour_or_higher.cpp
     src/content/vgs.cpp
@@ -438,6 +450,7 @@ set(GHC_GAME_SOURCES
     src/synth/reverb.cpp
     src/synth/spu.cpp
     src/synth/synth.cpp
+    src/synth/timeline.cpp
     src/ui/fast_boot.cpp
     src/ui/locale.cpp
     src/ui/help_bar.cpp
@@ -639,6 +652,11 @@ foreach(GHC_PART guitar bass drums vocals)
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/instruments/${GHC_PART}.bin)
 endforeach()
 configure_file(src/content/instrument_icons.h.in "${GHC_DTA_DIR}/instrument_icons.h" @ONLY)
+# Practice's metronome and note click (content/practice_sounds.cpp), tools/procedural/practice_sounds.py's.
+file(READ assets/practice_sounds/practice_sounds.bin GHC_PRACTICE_SOUNDS HEX)
+string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_PRACTICE_SOUNDS "${GHC_PRACTICE_SOUNDS}")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/practice_sounds/practice_sounds.bin)
+configure_file(src/content/practice_sounds_bin.h.in "${GHC_DTA_DIR}/practice_sounds_bin.h" @ONLY)
 # The help bar's glyphs (ui/help_bar.cpp), tools/procedural/helpbar_glyphs.py's sheet.
 file(READ assets/helpbar/glyphs.bin GHC_HELPBAR_GLYPHS HEX)
 string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_HELPBAR_GLYPHS "${GHC_HELPBAR_GLYPHS}")
@@ -731,6 +749,7 @@ target_link_libraries(GHClassic PRIVATE
     mpeg2
     vorbisfile
     opusfile
+    signalsmith-stretch
     miniz # libchdr's, for save.bin
 )
 # Calls go through volk's pointers, never a linked loader.

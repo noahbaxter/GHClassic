@@ -20,6 +20,8 @@
 #include "content/campaigns.h"
 #include "content/setlists.h"
 #include "content/songs.h"
+#include "content/practice_sounds.h"
+#include "content/song_speed.h"
 #include "content/status_line.h"
 #include "ui/fast_boot.h"
 #include "frame_step.h"
@@ -113,6 +115,8 @@ namespace
         gh2::installClassicLogo();
         gh2::installGh2x();
         gh2::installCustomSongs();
+        gh2::song_speed::install(runtime, gh2::kSlus21447);
+        gh2::practice_sounds::install(runtime, gh2::kSlus21447);
         gh2::installHiddenGuitars();
         gh2::installGh1Face(runtime, gh2::kSlus21447);
         gh2::outfits::install(runtime, gh2::kSlus21447);

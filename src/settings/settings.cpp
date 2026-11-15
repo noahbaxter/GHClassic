@@ -80,6 +80,9 @@ namespace gh2::settings
             {"guitar_volume", Type::kInt, 0, 11, 1, 11},
             {"fx_volume", Type::kInt, 0, 11, 1, 11},
             {"stereo", Type::kBool, 0, 1, 1, 1},
+            // Retail's practice slices the song to keep it, on its own
+            // slowed files.
+            {"maintain_pitch", Type::kBool, 0, 1, 1, 1},
             {"fast_boot", Type::kBool, 0, 1, 1, 0},
             {"lefty", Type::kBool, 0, 1, 1, 0},
             {"lefty_p2", Type::kBool, 0, 1, 1, 0},
@@ -137,6 +140,9 @@ namespace gh2::settings
             {"folders", Type::kText, 0, 0, 1, 0},
             {"show_duplicates", Type::kBool, 0, 1, 1, 0},
             {"disc_song_guitars", Type::kBool, 0, 1, 1, 0},
+            {"practice_metronome", Type::kBool, 0, 1, 1, 0},
+            {"practice_note_click", Type::kBool, 0, 1, 1, 0},
+            {"practice_solo_stems", Type::kBool, 0, 1, 1, 1},
         };
 
         const Entry *entryNamed(const std::string &name)

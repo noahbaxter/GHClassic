@@ -43,8 +43,9 @@ namespace gh2::custom
             wantArt(songs);
         }
 
-        // A chart's sections by name at most, each a locale token.
-        constexpr size_t kMostSections = 200u;
+        // A chart's sections by name at most, each a locale token: past
+        // this a row shows its token.
+        constexpr size_t kMostSections = 1000u;
 
         // Its best on the hardest difficulty with one: score, stars, and percent
         // or FC.
@@ -125,6 +126,13 @@ namespace gh2::custom
             }
             if (op == "ready")
                 return {song && stemsReady(*song) ? 1u : 0u, script::kInt};
+            if (op == "stem")
+                return {song && std::any_of(song->stems.begin(), song->stems.end(),
+                                            [&](const std::string &file)
+                                            { return partStem(file, playedStem(played(*song))); })
+                            ? 1u
+                            : 0u,
+                        script::kInt};
             if (op == "level")
             {
                 const auto at = song ? level(*song, call.symbol(3)) : std::nullopt;

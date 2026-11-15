@@ -126,6 +126,8 @@ namespace gh2::ark
     // The layer in front's own file at `path`, or its disc's, read in place
     // as it is asked for. None with no layer in front, or none there.
     std::optional<Made> openFront(const std::string &path);
+    // A file as the game would get it, read in place as it is asked for.
+    std::optional<Made> open(const std::string &path);
 
     // Where a file's bytes live, its part and offset there, as it is found
     // now: one disc's copy differs from another's.

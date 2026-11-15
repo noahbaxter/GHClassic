@@ -13,4 +13,12 @@
 (expect {taskmgr seconds} 33.47 0.1)
 (wait 2)
 (shot lost)
+; Practice is offered, as a career song's is, and plays the song from there.
+(expect {{lose_panel find lose_practice_career.btn} showing} 1)
+(press down)
+(expect {lose_panel focus_name} lose_practice_career.btn)
+(press green)
+(wait_screen practice_game_screen 60)
+(expect {gamecfg get mode} practice)
+(expect {game get_song} shoutatthedevil)
 (quit)

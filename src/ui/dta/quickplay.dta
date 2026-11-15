@@ -238,7 +238,7 @@
          {if $shown
             {set $ghc_info_n 0}
             {do
-               ($title {text_fit upper {custom tag $song name}})
+               ($title {text_fit upper {ghc_speed_title {custom tag $song name}}})
                ($artist {text_fit upper {custom tag $song artist}})
                ($tn {ghc_info_count $s_dir $title $ghc_info_title $ghc_info_room})
                ($an {ghc_info_count $s_dir $artist $ghc_info_artist $ghc_info_room})
@@ -463,7 +463,7 @@
       (file
          {switch {gamecfg get mode}
             ((career multi_coop) ui/sel_song.milo)
-            ((quickplay multi_vs multi_fo) {setlist look})
+            ((quickplay multi_vs multi_fo practice) {setlist look})
             ui/sel_song_quickplay.milo
          }
       )
@@ -472,6 +472,9 @@
       (joypad (hold_ms 500) (repeat_ms 80))
       (enter
          {set $ghc_preview_live TRUE}
+         ; The preview at the song speed, as it changes (content/song_speed.h);
+         ; a career's is at 100%.
+         {song_speed preview {! {{ui current_screen} sel_song_career}}}
          {{ui current_screen} turn_off_ambient}
          {if {! {{ui current_screen} sel_song_career}} {song_provider set_quickplay TRUE}}
          {ss_song.lst set_provider song_provider}
@@ -506,6 +509,13 @@
             }
          }
          {$this update_song_info}
+         ; Back from practice on a career song: on that song, not the one the
+         ; career wants next (Game::SetCareerSong, update_song_info).
+         {if {>= $ghc_practice_row 0}
+            {ss_song.lst set_selected $ghc_practice_row}
+            {$this update_pos}
+            {set $ghc_practice_row -1}
+         }
       )
       (update_song_info
          {if {== 0 {song_provider get_quickplay}} {game set_career_song}}
@@ -516,6 +526,7 @@
       (exit
          {set $ghc_preview_live FALSE}
          {song_preview ''}
+         {song_speed preview FALSE}
          {set $ghc_preview_on ''}
          {if [metamusic_on_exit] {meta_music start}}
          {set [metamusic_on_exit] TRUE}
@@ -652,10 +663,11 @@
 {func ghc_qp_button ($button)
    {cond
       ({ghc_pick_button $button} TRUE)
-      ; Back to the show's setup (quickplay_setup.dta).
+      ; Back to the show's setup (quickplay_setup.dta), or practice's
+      ; Training.
       ({== $button kPad_Tri}
          {synth play_sequence button_back.cue}
-         {ui goto_screen ghc_qp_setup_screen}
+         {ui goto_screen {if_else {== {gamecfg get mode} practice} training_screen ghc_qp_setup_screen}}
          TRUE
       )
       ({&& {== $button kPad_Circle} {> {size {ghc_setlists}} 1} {! {ui in_transition}}}
@@ -695,9 +707,17 @@
          {synth play_sequence button_select}
          ; A custom setlist's opens on RANDOM SONG, green straight away
          ; jumping to one.
-         {if_else {== {setlist shown} custom}
-            {ghc_pick_panel open_sticky (random song_defaults instrument) random}
-            {ghc_pick_panel open_sticky (song_defaults instrument) song_defaults}
+         ; Practice's speed is its pause menu's, and it has no song
+         ; defaults.
+         {do
+            ($p {== {gamecfg get mode} practice})
+            {if_else {== {setlist shown} custom}
+               {ghc_pick_panel open_sticky
+                  {if_else $p (random instrument) (random speed song_defaults instrument)} random}
+               {ghc_pick_panel open_sticky
+                  {if_else $p (instrument) (speed song_defaults instrument)}
+                  {if_else $p instrument speed}}
+            }
          }
          TRUE
       )
@@ -708,6 +728,8 @@
 {func ghc_qp_option_text ($option)
    {switch $option
       (random "RANDOM SONG")
+      ; Changed as practice's is (ghc_pick_edit, content/song_speed.h).
+      (speed {sprint "SPEED: " {song_speed} "%"})
       (song_defaults
          {sprint "SONG DEFAULTS: " {if_else {quickplay song_defaults} "ON" "OFF"}})
       ; The part a custom song plays (custom/songs.h); one without it
@@ -737,6 +759,43 @@
          }
          {synth play_sequence button_toggle}
          {ghc_pick_panel relabel}
+      }
+   }
+}
+; Select's menu's rows that are values (picker.dta's ghc_pick_edit): the
+; speed, its value before it was taken up kept to put back.
+{set $ghc_option_was 100}
+{func ghc_option_edits ($option)
+   {if {== $option speed} {set $ghc_option_was {song_speed}}}
+   {== $option speed}
+}
+{func ghc_option_step ($option $dir)
+   {if {== $option speed}
+      {ghc_speed_step $dir}
+      ; The paper's title and best, at that speed.
+      {set $ghc_info_due TRUE}
+   }
+}
+{func ghc_option_end ($option $keep)
+   {if {&& {== $option speed} {! $keep}}
+      {song_speed set $ghc_option_was}
+      {set $ghc_info_due TRUE}
+   }
+}
+; A song's title with its speed after it, off 100%: "FINISH IT (120%)".
+{func ghc_speed_title ($title)
+   {if_else {== {song_speed} 100} $title {sprint $title " (" {song_speed} "%)"}}
+}
+; The song speed a step faster ($dir 1) or slower (-1): 10% steps up to
+; 50%, 5% to 150%, 25% to 500%.
+{func ghc_speed_step ($dir)
+   {do
+      ($s {song_speed})
+      {song_speed set
+         {if_else {> $dir 0}
+            {cond ({< $s 50} {'+' $s 10}) ({< $s 150} {'+' $s 5}) (TRUE {'+' $s 25})}
+            {cond ({<= $s 50} {'-' $s 10}) ({<= $s 150} {'-' $s 5}) (TRUE {'-' $s 25})}
+         }
       }
    }
 }
@@ -791,6 +850,53 @@
       (SELECT_START_MSG {ui goto_screen qp_diff_screen} kDataUnhandled)
       (BUTTON_DOWN_MSG {ghc_qp_button $button})
       (ghc_picked ($game) {ghc_qp_picked sel_song_twin_panel qp_selsong_screen $game})
+      (ghc_option_text ($option) {ghc_qp_option_text $option})
+      (ghc_chose ($option) {ghc_qp_chose sel_song_twin_panel $option})
+      (ghc_section_text ($tier) {setlist tier_name $tier})
+      (ghc_section_picked ($tier) {sel_song_twin_panel ghc_jump $tier})
+      (ghc_section_next {ghc_qp_section_next sel_song_twin_panel})
+   )
+}
+; Practice's song list is quickplay's, every setlist and custom songs. A
+; custom song plays the part Select's menu set, as in quickplay. A song
+; picked here is practice's own: Return comes back to this list.
+{func ghc_practice_part
+   {set $ghc_practice_from FALSE}
+   {practice_sel_section_screen set career_mode FALSE}
+   {if_else {custom ours {game get_song}}
+      {do {gamecfg set_track 0 0} {ghc_custom_start FALSE} {ui goto_screen practice_diff_screen}}
+      {ui goto_screen practice_selpart_screen}
+   }
+}
+; Practice's speed, set in its pause menu (game_settings.dta), for every
+; practice after.
+{set $ghc_practice_pct 100}
+{retype practice_selsong_screen
+   (
+      (panels meta sel_song_panel helpbar ghc_pick_panel)
+      (focus sel_song_panel)
+      (sel_song_career FALSE)
+      (enter {song_speed set $ghc_practice_pct} {ghc_qp_helpbar})
+      (SELECT_START_MSG {ghc_practice_part} kDataUnhandled)
+      (BUTTON_DOWN_MSG {ghc_qp_button $button})
+      (ghc_picked ($game) {ghc_qp_picked sel_song_panel ghc_practice_selsong_twin_screen $game})
+      (ghc_option_text ($option) {ghc_qp_option_text $option})
+      (ghc_chose ($option) {ghc_qp_chose sel_song_panel $option})
+      (ghc_section_text ($tier) {setlist tier_name $tier})
+      (ghc_section_picked ($tier) {sel_song_panel ghc_jump $tier})
+      (ghc_section_next {ghc_qp_section_next sel_song_panel})
+   )
+}
+{if {! {exists ghc_practice_selsong_twin_screen}} {new GHScreen ghc_practice_selsong_twin_screen}}
+{retype ghc_practice_selsong_twin_screen
+   (
+      (panels meta sel_song_twin_panel helpbar ghc_pick_panel)
+      (focus sel_song_twin_panel)
+      (sel_song_career FALSE)
+      (enter {song_speed set $ghc_practice_pct} {ghc_qp_helpbar})
+      (SELECT_START_MSG {ghc_practice_part} kDataUnhandled)
+      (BUTTON_DOWN_MSG {ghc_qp_button $button})
+      (ghc_picked ($game) {ghc_qp_picked sel_song_twin_panel practice_selsong_screen $game})
       (ghc_option_text ($option) {ghc_qp_option_text $option})
       (ghc_chose ($option) {ghc_qp_chose sel_song_twin_panel $option})
       (ghc_section_text ($tier) {setlist tier_name $tier})

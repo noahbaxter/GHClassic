@@ -26,7 +26,8 @@ namespace gh2::save
 
     // [best]'s key for `song` played now on `difficulty` (easy .. expert),
     // as `part` where no namer says otherwise, on `controller`. Every run is
-    // a guitar's until input tells a gamepad's apart.
+    // a guitar's until input tells a gamepad's apart. At another speed than
+    // 100% the key ends in it, ".s150", each speed's runs kept apart.
     std::string playedKey(const std::string &song, const std::string &difficulty, const std::string &part = "guitar",
                           const std::string &controller = "guitar");
 

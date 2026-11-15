@@ -234,7 +234,7 @@
                      {synth play_sequence button_back.cue}
                      {if_else {== [from_panel] game_settings_panel}
                         {ui goto_screen game_settings_screen}
-                        {ui goto_screen pause_game_settings_screen}
+                        {ui goto_screen {ghc_pause_screen pause_game_settings_screen}}
                      }
                   }
                   kDataUnhandled

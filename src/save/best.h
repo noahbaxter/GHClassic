@@ -9,7 +9,8 @@
 //   custom.3f9a12c4d5e6f708.gh1.bass.hard.gamepad = ...
 //
 // the song (its game's and name, or a custom chart's hash), engine, part,
-// difficulty and controller (guitar or gamepad, a keyboard a guitar); then
+// difficulty and controller (guitar or gamepad, a keyboard a guitar), and
+// the speed where it is not 100% (".s150", save/results.h); then
 // the best run's score, stars, percent hit and longest streak, all one run's,
 // and whether any run was a full combo (1 or 0).
 

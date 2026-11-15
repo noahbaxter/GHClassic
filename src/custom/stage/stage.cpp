@@ -265,6 +265,7 @@ namespace gh2::custom
         addSectionCrashes(band, sections);
         addWails(band, sections);
         addKeyframes(band, chartHasLighting);
+        addPracticeClicks(band);
         addBandTempo(band);
 
         // The chart's own lanes in place of those made.

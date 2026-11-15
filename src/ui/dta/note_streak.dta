@@ -2,7 +2,8 @@
 ; as Guitar Hero III on have them, in Deluxe 2.0's way of adding them to
 ; GH2 (its ui/hud_panel.dta). A player's streak is the game's own; co-op's
 ; is the band's, a note either player hits, broken by a miss or a pass from
-; either. No popups in the tutorial.
+; either. No popups in the tutorial, nor in practice, whose stats take
+; their place.
 ;
 ; note_streak.cpp calls note_streak_enter as each song's HUD enters, when
 ; its player matchers are there to take the sinks, and gives the messages'
@@ -65,7 +66,7 @@
    {set $note_streak_band 0}
    {set $note_streak_0 0}
    {set $note_streak_1 0}
-   {if {!= tutorial {gamecfg get mode}}
+   {if {! {find_elem (tutorial practice) {gamecfg get mode}}}
       {do
          {if {exists player_matcher0} {player_matcher0 add_sink note_streak_p0}}
          {if {exists player_matcher1} {player_matcher1 add_sink note_streak_p1}}

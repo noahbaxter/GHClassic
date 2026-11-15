@@ -244,6 +244,10 @@
          {ghc_multi_forget}
          ; A 360 song quit to here is over (content/quickplay.h).
          {quickplay next_gen_song 0}
+         ; As a practice begun from quickplay's pause (game_settings.dta).
+         {set $ghc_practice_from FALSE}
+         ; Song speed is quickplay's and practice's alone.
+         {song_speed set 100}
          {do
             ($array)
             {set $array ()}

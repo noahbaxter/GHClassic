@@ -32,6 +32,8 @@
 //                                         plays is read off its disk,
 //                                         which this starts (audio.h
 //                                         stemsReady)
+//   {custom stem <song>}                  TRUE if the part it plays has a
+//                                         stem of its own
 //   {custom level <song> <instrument>}    guitar, rhythm, bass, drums,
 //                                         vocals or keys: its difficulty in
 //                                         song.ini, "" if it has none

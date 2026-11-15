@@ -64,7 +64,8 @@ namespace gh2::custom::rules
     // A drum hit by .chart's lane: 0 or 32 the kick, 1 the snare, 2 and up
     // a pad, added to `pads`.
     void addDrum(Chart &chart, std::vector<PadHit> &pads, uint32_t tick, int lane);
-    // Crashes from cymbal hits: green, and blue on pro drums only.
+    // Crashes from cymbal hits: green, and blue on pro drums only; yellow's
+    // the hi-hat.
     void cymbals(Chart &chart, const std::vector<PadHit> &pads, bool pro);
 
     // A lyric at `tick` held `length` (0 for no note): markup stripped, a
@@ -78,4 +79,9 @@ namespace gh2::custom::rules
     // signatures, sections, phrases, solos, stage tracks and hits in order;
     // syllables held.
     void finish(Chart &chart);
+
+    // The sections practice picks from: the chart's, else one each tenth
+    // of the song from its first note to its last's end, "0%" on. Not the stage's, which
+    // makes its own where a chart has none.
+    std::vector<std::pair<uint32_t, std::string>> practiceSections(const Chart &chart);
 }

@@ -60,6 +60,8 @@
 (wait_screen pause_screen 20)
 (wait 2)
 (shot pause)
+; Past Practice to Settings.
+(press down)
 (press down)
 (press down)
 (press green)
@@ -87,6 +89,8 @@
 (wait_screen pause_settings_screen 20)
 (press red)
 (wait_screen pause_screen 20)
+; Round the six rows to Resume.
+(press down)
 (press down)
 (press down)
 (press down)
