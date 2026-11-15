@@ -2,12 +2,9 @@
 // as a quickplay setlist and its guitarists as outfits.
 //
 // The 80s guitarists are GH2's characters in new outfits, built on the same
-// rigs (every anim but goth1_main is byte-identical), and they sit at GH2's
-// outfit paths. Each goes in under a name of its own as one more outfit of
-// its character, served from the 80s disc and playing GH2's anims.
-//
-// An outfit loads char/<outfit>/og/<outfit>.milo (AddLoadChar, 0x128778),
-// with _ui and _horse beside it.
+// rigs (every anim but goth1_main is byte-identical), at GH2's outfit paths
+// on its disc: gh80s_punk1 is its char/punk1/ (content/sources.h). Each is
+// one more outfit of its GH2 character, playing GH2's anims.
 
 #include "gh80s/install.h"
 
@@ -32,20 +29,17 @@ namespace gh2
         {
             const char *character; // in config's (characters ...)
             const char *label;     // the outfit picker's (sel_character.dta)
-            const char *base;      // GH2's outfit it sits beside, here replaced
-            const char *name;      // ours
+            const char *name;      // on both discs: the 80s' and GH2's it sits beside
         };
 
-        // The 80s disc names its outfits as GH2 does the ones they replaced,
-        // so base is also the folder and file stem it is read from.
         constexpr Outfit kOutfits[] = {
-            // character  label          base        name
-            {"punk",      "SIDE SWEEP",  "punk1",    "punk3"},
-            {"alterna",   "LACE",        "alterna1", "alterna3"},
-            {"metal",     "JACKET",      "metal1",   "metal3"},
-            {"glam",      "BANDANAS",    "glam1",    "glam3"},
-            {"goth",      "BLAZERS",     "goth2",    "goth3"},
-            {"grim",      "WATCHIN'",    "grim",     "grim2"},
+            // character  label          name
+            {"punk",      "SIDE SWEEP",  "punk1"},
+            {"alterna",   "LACE",        "alterna1"},
+            {"metal",     "JACKET",      "metal1"},
+            {"glam",      "BANDANAS",    "glam1"},
+            {"goth",      "BLAZERS",     "goth2"},
+            {"grim",      "WATCHIN'",    "grim"},
         };
 
     }
@@ -89,13 +83,8 @@ namespace gh2
         content::addCardGame(*disc, "gh80s", false, 0x29c00u, "Guitar Hero: Rocks the 80s", 13);
         for (const Outfit &outfit : kOutfits)
         {
-            const std::string base = outfit.base, name = outfit.name;
-            ark::rename("char/" + name + "/og/gen/" + name, *disc, "char/" + base + "/og/gen/" + base);
-            // The highway (track/surfaces/%s_keep.bmp) and photos go by
-            // outfit too.
-            ark::rename("track/surfaces/gen/" + name + "_keep", *disc, "track/surfaces/gen/" + base + "_keep");
-            outfits::photosFrom(name, *disc, base);
-            outfits::add("gh80s", base, outfit.character, name, base, outfit.label);
+            const std::string name = sources::id("gh80s", outfit.name);
+            outfits::add(name, sources::id("gh2", outfit.character), sources::id("gh2", outfit.name), outfit.label);
             // The 80s' picker draws each of its six as GH2's did, its own art.
             const std::string tex = std::string("char_") + outfit.character + ".tex";
             outfits::portrait(name, false, [disc = *disc, tex](const std::vector<uint8_t> &)

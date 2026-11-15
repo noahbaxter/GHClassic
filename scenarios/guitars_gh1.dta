@@ -38,7 +38,7 @@
 {campaign set_all_access 1}
 {set $disable_save 1}
 
-{set $ghc_character metalgh1}
+{set $ghc_character gh1_metal}
 {set $ghc_guitar sg}
 {set $ghc_finish sg_cherry}
 #include common/guitar_shot.dta
@@ -100,7 +100,7 @@
 (shot battleaxe_gh1_near)
 
 ; The Grim Ripper's own.
-{set $ghc_character grimgh1}
+{set $ghc_character gh1_grim}
 {set $ghc_guitar scythe}
 {set $ghc_finish scythe_gh1}
 #include common/guitar_shot.dta
@@ -108,7 +108,7 @@
 #include common/guitar_near.dta
 (shot scythe_gh1_near)
 
-{set $ghc_character metalgh1}
+{set $ghc_character gh1_metal}
 {set $ghc_guitar lespaul}
 {set $ghc_finish lp_gold}
 #include common/guitar_shot.dta

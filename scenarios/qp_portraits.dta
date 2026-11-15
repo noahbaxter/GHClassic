@@ -12,39 +12,39 @@
 (wait_screen ghc_qp_character_screen)
 (wait_until {char_single are_chars_loaded})
 {set $tile {{sel_character_panel loaded_dir} find char_punk.mesh}}
-{sel_character_panel set char_focus punk}
-{sel_character_panel set char_outfit punk3}
+{sel_character_panel set char_focus gh2_punk}
+{sel_character_panel set char_outfit gh80s_punk1}
 {sel_character_panel show_portraits}
-(expect {{$tile mat} name} portrait_punk3.mat)
+(expect {{$tile mat} name} portrait_gh80s_punk1.mat)
 (wait 1)
 (shot punk3)
-{sel_character_panel set char_outfit punkgh1}
+{sel_character_panel set char_outfit gh1_punk}
 {sel_character_panel show_portraits}
-(expect {{$tile mat} name} portrait_punkgh1.mat)
+(expect {{$tile mat} name} portrait_gh1_punk.mat)
 (wait 1)
 (shot punkgh1)
-{sel_character_panel set char_outfit punk1}
+{sel_character_panel set char_outfit gh2_punk1}
 {sel_character_panel show_portraits}
 (expect {{$tile mat} name} char_punk.mat)
 (wait 1)
 (shot punk1)
 ; Red out of grim's outfits keeps the one last looked at: hovering grim
 ; again shows it, and so does grim's tile while another is focused.
-{sel_character_panel set char_focus grim}
-{sel_character_panel set char_outfit grim}
+{sel_character_panel set char_focus gh2_grim}
+{sel_character_panel set char_outfit gh2_grim}
 {sel_character_panel choose_skins}
 (wait 1)
 (press down)
 (wait 1)
-(expect {sel_character_panel get char_outfit} grim2)
+(expect {sel_character_panel get char_outfit} gh80s_grim)
 (press red)
 (wait 1)
-(expect {quickplay look grim} grim2)
-(expect {sel_character_panel hover_outfit grim} grim2)
-{sel_character_panel set char_focus punk}
-{sel_character_panel set char_outfit punk1}
+(expect {quickplay look gh2_grim} gh80s_grim)
+(expect {sel_character_panel hover_outfit gh2_grim} gh80s_grim)
+{sel_character_panel set char_focus gh2_punk}
+{sel_character_panel set char_outfit gh2_punk1}
 {sel_character_panel show_portraits}
-(expect {{{{sel_character_panel loaded_dir} find char_grim.mesh} mat} name} portrait_grim2.mat)
+(expect {{{{sel_character_panel loaded_dir} find char_grim.mesh} mat} name} portrait_gh80s_grim.mat)
 ; Leaving the screen and coming back keeps it.
 (press red)
 (wait_screen ghc_qp_setup_screen)
@@ -52,8 +52,8 @@
 {ui goto_screen ghc_qp_character_screen}
 (wait_screen ghc_qp_character_screen)
 (wait_until {char_single are_chars_loaded})
-(expect {{{{sel_character_panel loaded_dir} find char_grim.mesh} mat} name} portrait_grim2.mat)
-(expect {sel_character_panel hover_outfit grim} grim2)
+(expect {{{{sel_character_panel loaded_dir} find char_grim.mesh} mat} name} portrait_gh80s_grim.mat)
+(expect {sel_character_panel hover_outfit gh2_grim} gh80s_grim)
 (wait 1)
 (shot grim2_kept_unfocused)
 (quit)

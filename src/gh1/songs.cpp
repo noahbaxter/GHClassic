@@ -371,7 +371,7 @@ namespace gh2::gh1
             const dtb::Node *character = value(*quickplay, "character");
             const dtb::Node *guitar = value(*quickplay, "guitar");
             const dtb::Node *stage = value(*quickplay, "venue");
-            std::string outfit = "punk1";
+            std::string outfit = "gh2_punk1";
             for (const Guitarist &g : kGuitarists)
                 if (character && character->text == g.folder)
                     outfit = g.name();
@@ -386,7 +386,8 @@ namespace gh2::gh1
                 if (const dtb::Node *n = dtb::find(gh1, key))
                     out.nodes.push_back(*n);
             // A band is GH1's archetypes (band_chars.dta), each in the folder
-            // GH2 names the same character by: charsys/metal_bass.
+            // GH2 names the same character by (charsys/metal_bass): GH2's,
+            // which plays as GH1's (content/band.h).
             if (const dtb::Node *band = dtb::find(gh1, "band"))
             {
                 dtb::Node members = array({symbol("band")});
@@ -394,7 +395,7 @@ namespace gh2::gh1
                 {
                     const dtb::Node *model = dtb::find(band->nodes[i], "outfit");
                     if (const dtb::Node *folder = model ? value(*model, "directory") : nullptr)
-                        members.nodes.push_back(symbol(folder->text.substr(folder->text.rfind('/') + 1u)));
+                        members.nodes.push_back(symbol(sources::id("gh2", folder->text.substr(folder->text.rfind('/') + 1u))));
                 }
                 out.nodes.push_back(std::move(members));
             }

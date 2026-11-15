@@ -735,8 +735,8 @@ namespace gh2::campaigns
             return nullptr;
         }
 
-        // The active game's own, read off its disc: punk1 and rockabill1 in
-        // GH2, goth2 the second in the 80s.
+        // The active game's own, read off its disc: gh2_punk1 and
+        // gh2_rockabill1 in GH2, gh80s_goth2 the second in the 80s.
         std::string defaultCharacter(bool second)
         {
             static std::map<std::pair<size_t, bool>, std::string> s_found;
@@ -746,7 +746,7 @@ namespace gh2::campaigns
             dtb::Macros macros;
             const auto main = dtb::read("ui/main.dta", macros, [front](const std::string &path) { return ark::readFront(front, path); });
             const dtb::Node *outfit = main ? setCharacter(*main, second) : nullptr;
-            return s_found[{s_active, second}] = outfit ? outfit->text : "punk1";
+            return s_found[{s_active, second}] = outfit ? outfit->text : "gh2_punk1";
         }
 
         // How far band `slot` is through `game`'s career, 0 to 100: each
@@ -1020,8 +1020,8 @@ namespace gh2::campaigns
             // Whose a character's name and blurbs are: the outfit's game's.
             if (op == "text_outfit")
             {
-                const auto own = outfits::ownOf(call.symbol(2));
-                const auto index = indexOf(own ? own->first : active());
+                const sources::Row *row = sources::find(call.symbol(2));
+                const auto index = indexOf(row ? row->source : active());
                 if (!index)
                     return {0u, script::kInt};
                 textBuilt(Guest{call}, *index);
@@ -1372,7 +1372,7 @@ namespace gh2::campaigns
         for (const Guitar &guitar : usable(s_campaigns[*index]).guitars)
         {
             if (guitar.key == item)
-                return item == "battleaxe" ? save::unlockedItem(game, item) : guitar.type != "grim" || unlockedIn(game, "grim");
+                return item == "battleaxe" ? save::unlockedItem(game, item) : guitar.type != "grim" || unlockedIn(game, "gh2_grim");
             for (const auto &skin : guitar.skins)
                 if (skin[0] == item)
                     return unlockedIn(game, guitar.key);

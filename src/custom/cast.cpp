@@ -1,5 +1,7 @@
 #include "custom/cast.h"
 
+#include "content/sources.h"
+
 #include "custom/song_facts.h"
 #include "custom/text.h"
 
@@ -172,9 +174,10 @@ namespace gh2::custom
             kind && roll(out.seed, kSaltAnyCharacter) % 100u >= kAnyIn100
                 ? kind->characters[pickOf(out.seed, kSaltCharacter, kind->characters.size())]
                 : kCharacters[pickOf(out.seed, kSaltCharacter, kCharacters.size())].first;
-        out.outfit =
-            std::find_if(kCharacters.begin(), kCharacters.end(), [&](const auto &c) { return c.first == character; })->second;
-        out.character = (!kind || kind->grim) && roll(out.seed, kSaltGrim) % 100u < kGrimIn100 ? "grim" : character;
+        out.outfit = sources::id(
+            "gh2", std::find_if(kCharacters.begin(), kCharacters.end(), [&](const auto &c) { return c.first == character; })->second);
+        out.character =
+            sources::id("gh2", (!kind || kind->grim) && roll(out.seed, kSaltGrim) % 100u < kGrimIn100 ? "grim" : character);
         out.realGuitar = pick(kRealGuitars, kSaltGuitar);
         out.guitar = pick(kStarterGuitars, kSaltStarterGuitar);
 

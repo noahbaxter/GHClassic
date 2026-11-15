@@ -2,6 +2,7 @@
 
 #include "content/campaigns.h"
 #include "content/games.h"
+#include "content/sources.h"
 #include "disc/ark.h"
 #include "guest.h"
 #include "hook.h"
@@ -29,18 +30,18 @@ namespace gh2::outfits
         // The one outfit of a GH2 character that had only one, which the
         // locale never names: its picker never showed.
         const std::map<std::string, std::string> kOwnNames = {
-            {"funk1", "VELVET"},
-            {"classic", "YANK"},
-            {"grim", "SLAYIN'"},
+            {"gh2_funk1", "VELVET"},
+            {"gh2_classic", "YANK"},
+            {"gh2_grim", "SLAYIN'"},
         };
         bool s_configured = false;
         std::unordered_set<uint32_t> s_panelDefs;
 
         // Run on config before the profiles are made: each outfit of another
         // game than the one being played, where this one has its character
-        // and the outfit it sits beside. (extra <game> <own name>) marks it
+        // and the outfit it sits beside. (extra <game> <character>) marks it
         // as no part of the career, there once its own game's career has it
-        // (sel_character.dta).
+        // and its character (sel_character.dta).
         std::string configText()
         {
             std::string text;
@@ -51,7 +52,7 @@ namespace gh2::outfits
                     continue;
                 const std::string character = "{find $syscfg characters " + o.character + "}";
                 std::string add = "{push_back " + character + " (" + o.outfit + " (name \"" + o.label + "\") (extra " +
-                                  o.game + " " + o.own + "))}";
+                                  o.game + " " + o.character + "))}";
                 if (const auto own = kOwnNames.find(o.character); own != kOwnNames.end() && labelled.insert(o.character).second)
                     add += " {if {! {find_exists " + character + " " + o.character + " name}} {push_back {find " +
                            character + " " + o.character + "} (name \"" + own->second + "\")}}";
@@ -156,6 +157,28 @@ namespace gh2::outfits
             *ctx = saved;
         }
 
+        // CharsysPanel::ShowChar(int, Symbol outfit) (0x143120): the store
+        // shows a character it sells by the character's name, an outfit's in
+        // GH2 (classic, grim). A character's id is the GH2 one's
+        // (content/sources.h), so it shows the character's first outfit in
+        // config: the 80s' own Grim Ripper in the 80s' store.
+        struct ShowCharTag;
+        void onShowChar(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t shown = GPR_U32(ctx, 6);
+            const sources::Row *row = shown ? sources::find(reinterpret_cast<const char *>(getMemPtr(rdram, shown))) : nullptr;
+            if (!row || row->kind != sources::Kind::Character)
+                return;
+            for (const auto &[character, outfits] : campaigns::characters(campaigns::active()))
+                if (character == row->id && !outfits.empty() && outfits.front() != row->id)
+                {
+                    const EntryArgs args(ctx);
+                    const uint32_t outfit = script::symbol(rdram, ctx, runtime, outfits.front());
+                    args.restore(ctx);
+                    SET_GPR_U32(ctx, 6, outfit);
+                }
+        }
+
         // CharsysPanel::NextCharacter(index, direction, Symbol &outfit)
         // (0x142c70) steps through the models until one is valid
         // (ValidChar, 0x142bc0) and another character's than `index`'s, and
@@ -195,8 +218,7 @@ namespace gh2::outfits
         }
     }
 
-    void add(const std::string &game, const std::string &own, const std::string &character, const std::string &outfit,
-             const std::string &beside, const std::string &label)
+    void add(const std::string &outfit, const std::string &character, const std::string &beside, const std::string &label)
     {
         // The picker hands the playing clips from one outfit's driver to the
         // next (CharDriver::Transfer, 0x170db0), so they must share beside's
@@ -216,42 +238,17 @@ namespace gh2::outfits
             ark::addFile(path, milo::write(*dir));
         }
 
-        s_outfits.push_back({game, own, character, outfit, beside, label});
+        const sources::Row *row = sources::find(outfit);
+        s_outfits.push_back({row ? row->source : "", outfit, character, beside, label});
     }
 
     const std::vector<Outfit> &added() { return s_outfits; }
-
-    std::optional<std::pair<std::string, std::string>> ownOf(const std::string &outfit)
-    {
-        for (const Outfit &o : s_outfits)
-            if (o.outfit == outfit)
-                return std::make_pair(o.game, o.own);
-        return std::nullopt;
-    }
-
-    std::optional<std::string> named(const std::string &game, const std::string &own)
-    {
-        for (const Outfit &o : s_outfits)
-            if (o.game == game && o.own == own)
-                return o.outfit;
-        return std::nullopt;
-    }
 
     void campaignChanged()
     {
         s_configured = false;
         s_panelDefs.clear();
         s_characterOf.clear();
-    }
-
-    void photosFrom(const std::string &outfit, size_t disc, const std::string &source)
-    {
-        // Whole names: grim2's photo 0 is photo_grim20, grim's 2 photo_grim2.
-        for (int i = 0; i < 4; ++i)
-        {
-            const std::string index = std::to_string(i) + "_keep";
-            ark::rename("ui/image/og/gen/photo_" + outfit + index, disc, "ui/image/og/gen/photo_" + source + index);
-        }
     }
 
     namespace
@@ -285,7 +282,7 @@ namespace gh2::outfits
                                  const std::string &name = p.outfit;
                                  const auto o = std::find_if(s_outfits.begin(), s_outfits.end(),
                                                              [&](const Outfit &x) { return x.outfit == name; });
-                                 const std::string own = o == s_outfits.end() ? "" : "char_" + o->character;
+                                 const std::string own = o == s_outfits.end() ? "" : "char_" + sources::own(o->character);
                                  const auto tex = milo::find(*scene, own + ".tex"), mat = milo::find(*scene, own + ".mat");
                                  milo::Bytes image = tex && mat ? p.make(scene->bodies[*tex]) : milo::Bytes();
                                  if (image.empty())
@@ -343,6 +340,7 @@ namespace gh2::outfits
         EntryHook<PanelDefTag>::install(runtime, addresses.charsysPanelSetTypeDef, onPanelDef);
         s_addresses = &addresses;
         EntryHook<PollCharLoadingTag>::install(runtime, addresses.charsysPanelPollCharLoading, onPollCharLoading);
+        EntryHook<ShowCharTag>::install(runtime, addresses.charsysPanelShowChar, onShowChar);
         s_nextCharacter = runtime.lookupFunction(addresses.charsysPanelNextCharacter);
         runtime.replaceFunction(addresses.charsysPanelNextCharacter, &nextCharacter);
     }

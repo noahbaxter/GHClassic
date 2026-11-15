@@ -8,7 +8,7 @@
 {quickplay song_defaults 0}
 {gamecfg set mode quickplay}
 {game set_quickplay}
-{game set_character punk1 TRUE}
+{game set_character gh2_punk1 TRUE}
 (expect {elem {find $syscfg guitars sg skins sg_worn outfit} 1} gh1_sg)
 (expect {elem {find $syscfg guitars battleaxe_reward skins battleaxe_gh1 outfit} 1} gh1_battleaxe)
 (expect {elem {find $syscfg guitars scythe skins scythe_gh1 outfit} 1} gh1_ripper)
@@ -31,7 +31,7 @@
 ; In a career another game's finish is nobody's.
 (expect {campaign is_unlocked sg_white} 0)
 {campaign buy_item sg_worn 0}
-{campaign buy_item grim 0}
+{campaign buy_item gh2_grim 0}
 {campaign buy_item guitar_red_octane 0}
 {campaign buy_item battleaxe 0}
 {set $ghc_switch gh2}
@@ -41,7 +41,7 @@
 (expect {campaigns live} gh2)
 {gamecfg set mode quickplay}
 {game set_quickplay}
-{game set_character punk1 TRUE}
+{game set_character gh2_punk1 TRUE}
 (expect {campaign is_unlocked sg_worn} 1)
 (expect {campaign is_unlocked sg_ebony} 0)
 (expect {campaign is_unlocked battleaxe_reward} 1)
@@ -68,7 +68,7 @@
 (shot picker_tobac)
 {ui goto_screen main_screen}
 (wait_screen main_screen)
-{set $ghc_character punk1}
+{set $ghc_character gh2_punk1}
 {set $ghc_guitar sg}
 {set $ghc_finish sg_worn}
 #include common/guitar_shot.dta
@@ -113,14 +113,14 @@
 (shot picker_controller)
 {ui goto_screen main_screen}
 (wait_screen main_screen)
-{set $ghc_character grim}
+{set $ghc_character gh2_grim}
 {set $ghc_guitar sg}
 {set $ghc_finish sg_worn}
 #include common/guitar_shot.dta
 (shot grim_sg_far)
 #include common/guitar_near.dta
 (shot grim_sg)
-{set $ghc_character punk1}
+{set $ghc_character gh2_punk1}
 {set $ghc_guitar tobac}
 {set $ghc_finish tobac_sunburst}
 #include common/guitar_shot.dta

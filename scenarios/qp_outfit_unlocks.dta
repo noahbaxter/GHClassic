@@ -5,8 +5,8 @@
 #include common/first_boot.dta
 {set $pick gh1}
 #include common/career_start.dta
-{campaign buy_item grim 0}
-(expect {campaign is_unlocked grim} 1)
+{campaign buy_item gh2_grim 0}
+(expect {campaign is_unlocked gh2_grim} 1)
 {autosave_goto career_screen}
 (wait_screen career_screen 40)
 (wait 1)
@@ -23,20 +23,20 @@
 {ui goto_screen ghc_qp_character_screen}
 (wait_screen ghc_qp_character_screen)
 (wait_until {char_single are_chars_loaded})
-{sel_character_panel set char_focus grim}
-(expect {sel_character_panel hover_outfit grim} grimgh1)
+{sel_character_panel set char_focus gh2_grim}
+(expect {sel_character_panel hover_outfit gh2_grim} gh1_grim)
 {sel_character_panel find_outfits}
 (print grim {sel_character_panel get outfits})
 (expect {size {sel_character_panel get outfits}} 1)
-(expect {if_else {find_elem {sel_character_panel get outfits} grim} 1 0} 0)
+(expect {if_else {find_elem {sel_character_panel get outfits} gh2_grim} 1 0} 0)
 ; GH2's other two store characters, which GH1 has and does not sell: bought
 ; in no career, so GH2's own outfit of each is not listed.
-{sel_character_panel set char_focus funk1}
+{sel_character_panel set char_focus gh2_funk1}
 {sel_character_panel find_outfits}
 (print funk1 {sel_character_panel get outfits})
-(expect {if_else {find_elem {sel_character_panel get outfits} funk1} 1 0} 0)
-{sel_character_panel set char_focus classic}
+(expect {if_else {find_elem {sel_character_panel get outfits} gh2_funk1} 1 0} 0)
+{sel_character_panel set char_focus gh2_classic}
 {sel_character_panel find_outfits}
 (print classic {sel_character_panel get outfits})
-(expect {if_else {find_elem {sel_character_panel get outfits} classic} 1 0} 0)
+(expect {if_else {find_elem {sel_character_panel get outfits} gh2_classic} 1 0} 0)
 (quit)

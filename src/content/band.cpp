@@ -1,6 +1,7 @@
 #include "content/band.h"
 
 #include "content/campaigns.h"
+#include "content/sources.h"
 #include "guest.h"
 #include "hook.h"
 #include "script.h"
@@ -46,13 +47,17 @@ namespace gh2::band
         {
             const char *object = reinterpret_cast<const char *>(getMemPtr(rdram, GPR_U32(ctx, 5)));
             const char *character = reinterpret_cast<const char *>(getMemPtr(rdram, GPR_U32(ctx, 6)));
-            if (s_own.empty() || std::strncmp(object, "guitarist", 9u) == 0)
+            const sources::Row *row = sources::find(character, sources::Kind::Outfit);
+            if (!row || std::strncmp(object, "guitarist", 9u) == 0)
                 return;
             const std::string from = game();
-            const auto own = s_own.find({from, character});
-            if (own == s_own.end())
+            std::string name = sources::id(from, row->name);
+            if (const auto own = s_own.find({from, row->name}); own != s_own.end())
+                name = campaigns::venueGame() == from ? own->second.home : own->second.away;
+            else if (!sources::find(name, sources::Kind::Outfit))
                 return;
-            const std::string &name = campaigns::venueGame() == from ? own->second.home : own->second.away;
+            if (name == character)
+                return;
             auto symbol = s_symbols.find(name);
             if (symbol == s_symbols.end())
             {

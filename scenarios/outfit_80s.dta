@@ -13,7 +13,7 @@
 {ui goto_screen sel_character_edit_screen}
 (wait_screen sel_character_edit_screen)
 (wait 2)
-{sel_character_panel set char_focus metal}
+{sel_character_panel set char_focus gh2_metal}
 {sel_character_panel find_outfits}
 (expect {size {sel_character_panel get outfits}} 1)
 {gamecfg set mode quickplay}
@@ -24,9 +24,9 @@
 (wait 2)
 
 ; As the list's scroll brings a character on, then select opens the picker.
-{sel_character_panel set char_focus metal}
-{sel_character_panel set char_outfit metal1}
-{char_single show_char 0 metal1}
+{sel_character_panel set char_focus gh2_metal}
+{sel_character_panel set char_outfit gh2_metal1}
+{char_single show_char 0 gh2_metal1}
 {char_single char_event 0 animate}
 (wait 8)
 {sel_character_panel choose_skins}
@@ -39,9 +39,9 @@
 {sel_character_panel unchoose_skins}
 (wait 2)
 
-{sel_character_panel set char_focus punk}
-{sel_character_panel set char_outfit punk1}
-{char_single show_char 0 punk1}
+{sel_character_panel set char_focus gh2_punk}
+{sel_character_panel set char_outfit gh2_punk1}
+{char_single show_char 0 gh2_punk1}
 {char_single char_event 0 animate}
 (wait 8)
 {sel_character_panel choose_skins}

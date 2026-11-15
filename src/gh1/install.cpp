@@ -104,6 +104,7 @@ namespace gh2
         for (const Guitarist &guitarist : kGuitarists)
         {
             const std::string base = guitarist.base, name = guitarist.name(), folder = guitarist.folder;
+            sources::add(sources::Kind::Outfit, "gh1", folder, guitarist.saved());
             // CharFace reads both from the archetype (GH1 0x2a6cb0).
             const dtb::Node *archetype = dtb::find(*types, folder);
             const dtb::Node *faceFile = archetype ? dtb::find(*archetype, "face_file") : nullptr;
@@ -175,7 +176,7 @@ namespace gh2
                 ark::rename("ui/image/og/gen/photo_" + name + std::to_string(i) + "_keep", *gh1Disc,
                             "ghui/image/gen/photo_" + folder + std::to_string(i));
             // GH1's store sells the character, by GH2's name here (gh1/career.cpp).
-            outfits::add("gh1", guitarist.character, guitarist.character, name, base, guitarist.label);
+            outfits::add(name, guitarist.characterId(), sources::id("gh2", base), guitarist.label);
             // GH1's hero screen portrait, unframed: GH2's highlight frames it.
             outfits::portrait(name, true, [disc = *gh1Disc, path = "ghui/image/gen/char_select_" + folder + ".png_ps2"](
                                         const std::vector<uint8_t> &tex)

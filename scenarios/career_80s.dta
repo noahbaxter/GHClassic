@@ -39,7 +39,7 @@
 (wait 1)
 (shot career)
 (expect {game get_difficulty_sym 0} medium)
-(expect {game get_character_outfit} punk1)
+(expect {game get_character_outfit} gh80s_punk1)
 (expect {game get_guitar} flying_v)
 ; What its disc holds unoffered is its store's (content/hidden_guitars.h).
 (expect {elem {find $syscfg store skin exp_lipstick price} 1} 550)

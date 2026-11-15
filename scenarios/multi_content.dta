@@ -47,23 +47,23 @@
 (press green p1)
 (wait 1)
 (expect {size {elem $ghc_multi_outfits 0}} 3)
-(expect {elem {elem $ghc_multi_outfits 0} 2} punkgh1)
+(expect {elem {elem $ghc_multi_outfits 0} 2} gh1_punk)
 (shot outfits_three)
 (press down p1)
 (wait 0.7)
 (expect {multi_char_outfit0 focus_name} outfit2.btn)
 (press down p1)
 (wait 2)
-(expect {{game get_player_config 0} get_character_outfit} punkgh1)
-(expect {elem {find $syscfg characters punk punkgh1 extra} 1} gh1)
+(expect {{game get_player_config 0} get_character_outfit} gh1_punk)
+(expect {elem {find $syscfg characters gh2_punk gh1_punk extra} 1} gh1)
 (shot outfit_gh1)
 ; Past the last round to the first, and back up to GH1's.
 (press down p1)
 (wait 0.7)
-(expect {{game get_player_config 0} get_character_outfit} punk1)
+(expect {{game get_player_config 0} get_character_outfit} gh2_punk1)
 (press up p1)
 (wait 0.7)
-(expect {{game get_player_config 0} get_character_outfit} punkgh1)
+(expect {{game get_player_config 0} get_character_outfit} gh1_punk)
 
 ; GH1's has no HD of its own, so its label reads SD where there was none to
 ; turn.
@@ -78,11 +78,11 @@
 (expect {size {elem $ghc_multi_outfits 0}} 4)
 (shot outfits_four)
 (expect {multi_char_outfit0 focus_name} ghc_p1_outfit4.btn)
-(expect {{game get_player_config 0} get_character_outfit} punkgh1)
+(expect {{game get_player_config 0} get_character_outfit} gh1_punk)
 (press down p1)
 (wait 1)
 (expect {multi_char_outfit0 focus_name} outfit1.btn)
-(expect {{game get_player_config 0} get_character_outfit} punk1)
+(expect {{game get_player_config 0} get_character_outfit} gh2_punk1)
 (press up p1)
 (wait 1)
 (expect {multi_char_outfit0 focus_name} ghc_p1_outfit4.btn)
@@ -93,7 +93,7 @@
 (press down p1)
 (wait 1)
 (expect {multi_char_outfit0 focus_name} ghc_p1_outfit3.btn)
-(expect {{game get_player_config 0} get_character_outfit} punk3)
+(expect {{game get_player_config 0} get_character_outfit} gh80s_punk1)
 (shot outfits_four_third)
 ; Back to what a new save has open, which the picker lists again, three.
 {campaign set_all_access 0}
@@ -209,7 +209,7 @@
 ; Every look let go at the main menu, which would show in quickplay's.
 {meta_loading_nosave_goto main_screen}
 (wait_screen main_screen 60)
-(expect {quickplay model outfit punk1 default} 1)
+(expect {quickplay model outfit gh2_punk1 default} 1)
 
 ; The basement has two walk spots 20 apart, which stacked two guitarists:
 ; the second steps aside across the stage.

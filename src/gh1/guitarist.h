@@ -9,13 +9,17 @@ namespace gh2
         // A GH1 guitarist, as one more outfit of a GH2 character.
         struct Guitarist
         {
-            const char *character; // in config's (characters ...)
+            const char *character; // GH2's, in its config's (characters ...)
             const char *label;     // the outfit picker's (sel_character.dta)
             const char *base;      // GH2's outfit it sits beside, here grafted onto
             const char *folder;    // GH1's, charsys/<folder>/
             bool doorOpens;        // the picker door stands open behind them
 
-            std::string name() const { return std::string(character) + "gh1"; } // ours
+            // Ours: gh1_<folder> (content/sources.h), its character GH2's.
+            std::string name() const { return std::string("gh1_") + folder; }
+            std::string characterId() const { return std::string("gh2_") + character; }
+            // What saves have called it.
+            std::string saved() const { return std::string(character) + "gh1"; }
             // GH1's clip names and some files go by the folder's first word:
             // hair_idle_ui for hair_metal, nu for nu_metal.
             std::string prefix() const

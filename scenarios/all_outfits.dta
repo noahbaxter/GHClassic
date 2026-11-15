@@ -29,7 +29,7 @@
 {ui goto_screen ghc_qp_character_screen}
 (wait_screen ghc_qp_character_screen)
 
-{ghc_char punk} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_char gh2_punk} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
 {ghc_pick 0} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print punk_1 {sel_character_panel get char_outfit}) (shot punk_1)
 {ghc_pick 1} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
@@ -37,7 +37,7 @@
 {ghc_pick 2} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print punk_3 {sel_character_panel get char_outfit}) (shot punk_3)
 
-{ghc_char alterna} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_char gh2_alterna} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
 {ghc_pick 0} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print alterna_1 {sel_character_panel get char_outfit}) (shot alterna_1)
 {ghc_pick 1} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
@@ -45,7 +45,7 @@
 {ghc_pick 2} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print alterna_3 {sel_character_panel get char_outfit}) (shot alterna_3)
 
-{ghc_char glam} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_char gh2_glam} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
 {ghc_pick 0} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print glam_1 {sel_character_panel get char_outfit}) (shot glam_1)
 {ghc_pick 1} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
@@ -53,7 +53,7 @@
 {ghc_pick 2} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print glam_3 {sel_character_panel get char_outfit}) (shot glam_3)
 
-{ghc_char goth} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_char gh2_goth} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
 {ghc_pick 0} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print goth_1 {sel_character_panel get char_outfit}) (shot goth_1)
 {ghc_pick 1} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
@@ -61,7 +61,7 @@
 {ghc_pick 2} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print goth_3 {sel_character_panel get char_outfit}) (shot goth_3)
 
-{ghc_char metal} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_char gh2_metal} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
 {ghc_pick 0} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print metal_1 {sel_character_panel get char_outfit}) (shot metal_1)
 {ghc_pick 1} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
@@ -69,31 +69,31 @@
 {ghc_pick 2} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print metal_3 {sel_character_panel get char_outfit}) (shot metal_3)
 
-{ghc_char rockabill} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_char gh2_rockabill} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
 {ghc_pick 0} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print rockabill_1 {sel_character_panel get char_outfit}) (shot rockabill_1)
 {ghc_pick 1} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print rockabill_2 {sel_character_panel get char_outfit}) (shot rockabill_2)
 
-{ghc_char rock} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_char gh2_rock} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
 {ghc_pick 0} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print rock_1 {sel_character_panel get char_outfit}) (shot rock_1)
 {ghc_pick 1} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print rock_2 {sel_character_panel get char_outfit}) (shot rock_2)
 
-{ghc_char deathmetal} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_char gh2_deathmetal} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
 {ghc_pick 0} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print deathmetal_1 {sel_character_panel get char_outfit}) (shot deathmetal_1)
 {ghc_pick 1} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print deathmetal_2 {sel_character_panel get char_outfit}) (shot deathmetal_2)
 
 ; One outfit each: no picker, as select goes straight on.
-{ghc_char classic} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+{ghc_char gh2_classic} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print classic_1 {sel_character_panel get char_outfit}) (shot classic_1)
-{ghc_char funk1} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
+{ghc_char gh2_funk1} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print funk1_1 {sel_character_panel get char_outfit}) (shot funk1_1)
 
-{ghc_char grim} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_char gh2_grim} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
 {ghc_pick 0} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print grim_1 {sel_character_panel get char_outfit}) (shot grim_1)
 {ghc_pick 1} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)

@@ -18,6 +18,8 @@ namespace gh2::save::gh2
         // difficulty, the rest per band. Outfits include the characters.
         const char *const kTypes[] = {"venue", "song", "outfit", "guitar", "finish", "video", "mode"};
         const char *const kLook[4] = {"character", "outfit", "guitar", "finish"};
+        const sources::Kind kLookKinds[4] = {sources::Kind::Character, sources::Kind::Outfit, sources::Kind::Outfit,
+                                             sources::Kind::Outfit};
         const char *const kFlags[3] = {"store", "unlocked", "passed"};
         constexpr uint8_t kGold = 0x80u;
 
@@ -61,8 +63,8 @@ namespace gh2::save::gh2
         }
 
         // "<type>.<name>", with "#2" on for an item listed twice: the
-        // characters share their outfits' names. Anything but a song by the
-        // name its files go by (content/sources.h), as saves always have.
+        // characters share their outfits' names. Anything but a song by its
+        // stored name (storedItem).
         std::vector<std::string> itemKeys(const std::vector<Item> &items, const Games &games)
         {
             std::map<std::string, int> seen;
@@ -70,7 +72,7 @@ namespace gh2::save::gh2
             for (const Item &item : items)
             {
                 std::string key = typeName(item.type) + "." +
-                                  (item.type == kSongType ? storeName(games, item.name) : sources::own(item.name));
+                                  (item.type == kSongType ? storeName(games, item.name) : storedItem(games.own, item.name));
                 if (const int n = ++seen[key]; n > 1)
                     key += "#" + std::to_string(n);
                 keys.push_back(key);
@@ -164,12 +166,33 @@ namespace gh2::save::gh2
             }
         }
 
+        // An outfit another game added, by the name it went by before ids.
+        const std::map<std::string, std::string> kOldNames = {
+            {"punk3", "gh80s_punk1"},     {"alterna3", "gh80s_alterna1"}, {"metal3", "gh80s_metal1"},
+            {"glam3", "gh80s_glam1"},     {"goth3", "gh80s_goth2"},       {"grim2", "gh80s_grim"},
+            {"punkgh1", "gh1_punk"},      {"alternagh1", "gh1_alterna"},  {"metalgh1", "gh1_metal"},
+            {"glamgh1", "gh1_hair_metal"}, {"gothgh1", "gh1_nu_metal"},   {"funk1gh1", "gh1_hiphop"},
+            {"classicgh1", "gh1_classic"}, {"grimgh1", "gh1_grim"},
+        };
+
+        // An item key ("outfit.punk3#2") with an old name in it as the id.
+        std::string currentKey(const std::string &key)
+        {
+            const size_t dot = key.find('.'), hash = key.find('#');
+            if (dot == std::string::npos)
+                return key;
+            const auto old = kOldNames.find(key.substr(dot + 1u, hash == std::string::npos ? hash : hash - dot - 1u));
+            if (old == kOldNames.end())
+                return key;
+            return key.substr(0u, dot + 1u) + old->second + (hash == std::string::npos ? "" : key.substr(hash));
+        }
+
         bool readItem(std::vector<Item> &items, const std::vector<std::string> &keys, size_t index,
                       const std::string &key, const std::string &value)
         {
             for (size_t i = 0; i < items.size(); ++i)
             {
-                if (keys[i] != key)
+                if (keys[i] != key && keys[i] != currentKey(key))
                     continue;
                 const std::optional<ItemState> state = parseState(value, items[i].type);
                 if (!state)
@@ -327,7 +350,7 @@ namespace gh2::save::gh2
                     for (int part = 0; part < 4; ++part)
                         if (key == kLook[part])
                         {
-                            profile.look[*d][part] = value;
+                            profile.look[*d][part] = ourItem(own, value, kLookKinds[part]);
                             return true;
                         }
                     return readItem(save.campaignItems, keys.campaign, p * kDifficulties + *d, key, value);
@@ -354,6 +377,28 @@ namespace gh2::save::gh2
         if (game == "gh2x" && stored.rfind("x_", 0) == 0)
             return sources::id(game, stored.substr(2));
         return sources::id(game, stored);
+    }
+
+    std::string storedItem(const std::string &section, const std::string &item)
+    {
+        const std::string game = section.substr(0u, section.find('@'));
+        const sources::Row *row = sources::find(item);
+        if (!row)
+            return item;
+        if (row->kind == sources::Kind::Song)
+            return storedSong(section, item);
+        return row->kind == sources::Kind::Character || row->source == game ? row->own : item;
+    }
+
+    std::string ourItem(const std::string &section, const std::string &stored, sources::Kind kind)
+    {
+        const std::string game = section.substr(0u, section.find('@'));
+        if (const auto old = kOldNames.find(stored); old != kOldNames.end())
+            return old->second;
+        for (const sources::Row &row : sources::table())
+            if (row.kind == kind && row.own == stored && (kind == sources::Kind::Character || row.source == game))
+                return row.id;
+        return stored;
     }
 
     namespace
@@ -434,7 +479,7 @@ namespace gh2::save::gh2
                 Section &diff = out.section(band(p) + " " + games.own + " " + kDifficultyNames[d]);
                 for (int part = 0; part < 4; ++part)
                     if (profile.look[d][part] != base.look[d][part])
-                        diff.set(kLook[part], profile.look[d][part]);
+                        diff.set(kLook[part], storedItem(games.own, profile.look[d][part]));
                 writeItems(diff, save.campaignItems, fresh.campaignItems, p * kDifficulties + d, games);
             }
         }

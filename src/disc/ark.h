@@ -88,7 +88,7 @@ namespace gh2::ark
     std::optional<size_t> discWithSerial(const std::string &serial);
 
     // Paths starting `as` are found as `source` plus the rest, on that disc
-    // alone: "char/punk3/anims/" -> 80s "char/punk1/anims/".
+    // alone: "char/gh80s_punk1/" -> 80s "char/punk1/".
     void rename(const std::string &as, size_t disc, const std::string &source);
 
     // A layer: files of its own over a disc's archive, or over none. The

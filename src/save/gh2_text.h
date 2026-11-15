@@ -20,6 +20,7 @@
 // Under a note engine other than GH2's (note_engine.h), each game's name
 // carries it: [band 1 gh2@gh1 expert], [gh1@gh1 scores expert].
 
+#include "content/sources.h"
 #include "save/gh2_stream.h"
 #include "save/store.h"
 
@@ -45,6 +46,15 @@ namespace gh2::save::gh2
     std::string storedSong(const std::string &game, const std::string &song);
     // The song a key in that game's sections, or its card save, names.
     std::string ourSong(const std::string &game, const std::string &stored);
+
+    // Any item of that game's as its sections name it: a song as above, one
+    // of that game's own or a character by the name its files go by
+    // (content/sources.h), as saves always have; another game's by its id.
+    std::string storedItem(const std::string &game, const std::string &item);
+    // The item of that kind a name in that game's sections stands for:
+    // another game's outfit also by the name it went by before ids (punk3,
+    // punkgh1).
+    std::string ourItem(const std::string &game, const std::string &stored, sources::Kind kind);
 
     // A save of that game's with its songs as its card holds them, and back.
     Save asCard(const Save &save, const std::string &game);

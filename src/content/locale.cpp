@@ -193,10 +193,10 @@ namespace gh2::locale
     {
         if (s_game != "gh2" || token == nullptr)
             return 0u;
-        // A venue's name and what is made from it are its venue's source's
-        // (content/sources.h).
-        const sources::Row *venue = sources::venueOfKey(token);
-        const std::string &from = venue ? venue->source
+        // A venue's or outfit's name and what is made from it are its
+        // source's (content/sources.h).
+        const sources::Row *row = sources::rowOfKey(token);
+        const std::string &from = row ? row->source
                                   : s_ownTokens[kCharacter].count(token) != 0u ? s_owners[kCharacter]
                                                                                 : s_owners[kScreen];
         if (from == "gh2")

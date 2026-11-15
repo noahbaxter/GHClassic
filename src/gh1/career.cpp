@@ -401,7 +401,7 @@ namespace gh2::gh1
         list = array({symbol("character")});
         std::map<std::string, std::string> characters; // GH1's folder to GH2's character
         for (const Guitarist &g : guitarists)
-            characters[g.folder] = g.character;
+            characters[g.folder] = g.characterId();
         dtb::Node soldCharacters = array({});
         if (const dtb::Node *sold = dtb::find(*theirStore, "character"))
             for (size_t i = 1u; i < sold->nodes.size(); ++i)
@@ -437,10 +437,10 @@ namespace gh2::gh1
         std::string first, second;
         for (const Guitarist &g : ordered)
         {
-            config.nodes.push_back(array({symbol(g.character), array({symbol(g.name())})}));
-            all.nodes.push_back(symbol(g.character));
+            config.nodes.push_back(array({symbol(g.characterId()), array({symbol(g.name())})}));
+            all.nodes.push_back(symbol(g.characterId()));
             outfits.nodes.push_back(symbol(g.name()));
-            names[g.folder] = g.character;
+            names[g.folder] = g.characterId();
             if (first.empty())
                 first = g.name();
             else if (second.empty())
@@ -574,22 +574,13 @@ namespace gh2::gh1
                     openEasyStore(*file);
                 if (name == "main" || name == "career")
                 {
-                    replaceSymbol(*file, "punk1", first);
-                    replaceSymbol(*file, "rockabill1", second.empty() ? first : second);
+                    replaceSymbol(*file, "gh2_punk1", first);
+                    replaceSymbol(*file, "gh2_rockabill1", second.empty() ? first : second);
                 }
                 else if (!fitted)
                     continue;
                 ark::addFile(layer, script, dtb::write(*file));
             }
-        // The store shows a character it sells by the character's name, as
-        // GH2's sold characters' outfits are named: the guitarist again.
-        const dtb::Node *sold = dtb::find(store, "character");
-        for (const Guitarist &g : guitarists)
-            if (sold && dtb::find(*sold, g.character))
-                for (const char *suffix : {"", "_ui"})
-                    if (auto file = ark::readFile("char/" + g.name() + "/og/gen/" + g.name() + suffix + ".milo_ps2"))
-                        ark::addFile(layer, std::string("char/") + g.character + "/og/gen/" + g.character + suffix + ".milo_ps2",
-                                     std::move(*file));
         addVenues(layer, disc);
         campaigns::add("gh1", layer);
     }

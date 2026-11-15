@@ -260,16 +260,39 @@ namespace
         CHECK(codec::storedSong("gh2@gh1", "gh2_surrender") == "surrender");
         CHECK(codec::ourSong("gh2@gh1", "surrender") == "gh2_surrender");
 
-        // A venue goes by its own name: GH1's basement by GH2's battle, which
-        // it was saved as when it stood in for it.
-        gh2::sources::add(gh2::sources::Kind::Venue, "gh1", "basement", "battle");
+        // A venue goes by its own name in its game's sections: GH1's basement
+        // by GH2's battle, which GH1's career saved it as when it stood in
+        // for it.
+        namespace sources = gh2::sources;
+        sources::add(sources::Kind::Venue, "gh1", "basement", "battle");
+        codec::Games gh1;
+        gh1.own = "gh1";
         codec::Save stoodIn = bareSave, room = bareSave, roomFresh = bareFresh;
         stoodIn.profileItems[0].states[0].flags = room.profileItems[0].states[0].flags = 0x2;
         room.profileItems[0].name = roomFresh.profileItems[0].name = "gh1_basement";
         Store before, after;
-        codec::toStore(stoodIn, bareFresh, before);
-        codec::toStore(room, roomFresh, after);
+        codec::toStore(stoodIn, bareFresh, before, gh1);
+        codec::toStore(room, roomFresh, after, gh1);
         CHECK(before.text().find("venue.battle") != std::string::npos && after.text() == before.text());
+
+        // A game's own outfit by its name on the disc, a character by its own
+        // whichever game's sections, another game's outfit by its id, and the
+        // names the outfits other games add went by before.
+        sources::addCharacter("gh2", "punk");
+        sources::add(sources::Kind::Outfit, "gh2", "punk1");
+        sources::add(sources::Kind::Outfit, "gh80s", "punk1");
+        CHECK(codec::storedItem("gh2", "gh2_punk1") == "punk1" && codec::storedItem("gh80s", "gh80s_punk1") == "punk1");
+        CHECK(codec::storedItem("gh2", "gh80s_punk1") == "gh80s_punk1");
+        CHECK(sources::addCharacter("gh80s", "punk").id == "gh2_punk" && codec::storedItem("gh80s", "gh2_punk") == "punk");
+        CHECK(codec::ourItem("gh80s", "punk1", sources::Kind::Outfit) == "gh80s_punk1");
+        CHECK(codec::ourItem("gh80s", "punk", sources::Kind::Character) == "gh2_punk");
+        CHECK(codec::ourItem("gh2", "punk3", sources::Kind::Outfit) == "gh80s_punk1");
+        codec::Save outfitFresh = bareFresh;
+        outfitFresh.profileItems[0].name = "gh80s_punk1";
+        outfitFresh.profileItems[0].type = 2;
+        Store named;
+        named.section("band 1 gh2").set("outfit.punk3", "unlocked");
+        CHECK(codec::fromStore(named, outfitFresh).profileItems[0].states[0].flags == 0x2);
     }
 
     void ps2Card(const fs::path &dir)

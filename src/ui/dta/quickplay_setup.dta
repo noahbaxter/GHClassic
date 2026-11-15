@@ -115,8 +115,8 @@
 ; Where the guitarist stands: out of the doorway, in front of its frame,
 ; toward the rows enough that a guitar's head clears the open door (x toward
 ; the hall, y toward the rows). Its picks keep within the room this leaves
-; (hub/preshow_picks.dta); or its character's own spot: grim's
-; wings reach the rows from there. The view looks across both, measured at
+; (hub/preshow_picks.dta); or its outfit's or character's own spot: the Grim
+; Ripper's wings reach the rows from there. The view looks across both, measured at
 ; 720 lines (2026-10-24): +x goes right 5.7 px a unit and away, +y left
 ; 2.7 px and away. So right on screen at the same size is (+1 -0.77) a
 ; step (8 px), toward the camera in the same place (-1 -2.07) (bigger by
@@ -124,18 +124,18 @@
 {set $ghc_qp_stand_pos (-6 -9 0)}
 {set $ghc_qp_stand_for
    (
-      (grim (-9 -29 0) 8) ; GH2's: right and well toward the camera, his wings off the wall
-      (grimgh1 (-12 -30 0)) ; right and well toward the camera, his wings off the wall
-      (punk1 (-5 -15 0)) ; right and a little forward, his intro_03 clear of the door
-      (punk (-5.5 -9.5 0)) ; a little right, his jumps and spins off the wall
-      (alternagh1 (-6 -16 0) 10)
-      (glam1 (-4 -18 0)) ; well right
-      (goth1 (-6 -9 0) 10)
-      (metal1 (-1 -13 0) -18) ; right, turned clockwise toward the camera
-      (rock1 (-16 -6.3 0) 10) ; left, intro_03's long walk in starting on screen
-      (rockabill1 (4 -8 0) 10) ; back, his hair under the top, and right of the rows
-      (funk1 (-11 -21.4 0)) ; toward the camera, win_02's jump off the wall
-      (deathmetal1 (-12 -21.4 0)) ; toward the camera, intro_01's step back off the wall
+      (gh2_grim (-9 -29 0) 8) ; GH2's: right and well toward the camera, his wings off the wall
+      (gh1_grim (-12 -30 0)) ; right and well toward the camera, his wings off the wall
+      (gh2_punk1 (-5 -15 0)) ; right and a little forward, his intro_03 clear of the door
+      (gh2_punk (-5.5 -9.5 0)) ; a little right, his jumps and spins off the wall
+      (gh1_alterna (-6 -16 0) 10)
+      (gh2_glam1 (-4 -18 0)) ; well right
+      (gh2_goth1 (-6 -9 0) 10)
+      (gh2_metal1 (-1 -13 0) -18) ; right, turned clockwise toward the camera
+      (gh2_rock1 (-16 -6.3 0) 10) ; left, intro_03's long walk in starting on screen
+      (gh2_rockabill1 (4 -8 0) 10) ; back, his hair under the top, and right of the rows
+      (gh2_funk1 (-11 -21.4 0)) ; toward the camera, win_02's jump off the wall
+      (gh2_deathmetal1 (-12 -21.4 0)) ; toward the camera, intro_01's step back off the wall
    )
 }
 ; Character select's own placer, as its scene has it, for its turn: read as
@@ -187,7 +187,7 @@
          {$o set_showing {! $hub}}
       }
       {foreach_int $i 1 {size {find $syscfg characters}}
-         {{symbol {sprint "char_" {elem {elem {find $syscfg characters} $i} 0} ".mesh"}} set_showing {! $hub}}
+         {{symbol {sprint "char_" {sources own {elem {elem {find $syscfg characters} $i} 0}} ".mesh"}} set_showing {! $hub}}
       }
       {foreach $row $ghc_qp_rows {{elem $row 0} set_showing $hub}}
       {ghc_arrow_head.mesh set_showing $hub}
@@ -413,7 +413,7 @@
 {func ghc_qp_place ($panel)
    {do
       ($for $ghc_qp_stand_for)
-      ; The outfit's own spot (alternagh1), else its character's (alterna).
+      ; The outfit's own spot (gh1_alterna), else its character's (gh2_alterna).
       ($own {if_else {find_exists $for {game get_character_outfit}}
          {find $for {game get_character_outfit}}
          {if_else {find_exists $for {game get_character}} {find $for {game get_character}} 0}

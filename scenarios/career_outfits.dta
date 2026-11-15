@@ -22,12 +22,12 @@
 (press green)
 (wait_screen sel_character_new_screen)
 (wait_until {char_single are_chars_loaded})
-{sel_character_panel set char_focus metal}
+{sel_character_panel set char_focus gh2_metal}
 {sel_character_panel find_outfits}
 (print gh2 {sel_character_panel get outfits})
-(expect {if_else {find_elem {sel_character_panel get outfits} metal1} 1 0} 1)
-(expect {if_else {find_elem {sel_character_panel get outfits} metalgh1} 1 0} 0)
-(expect {if_else {find_elem {sel_character_panel get outfits} metal3} 1 0} 0)
+(expect {if_else {find_elem {sel_character_panel get outfits} gh2_metal1} 1 0} 1)
+(expect {if_else {find_elem {sel_character_panel get outfits} gh1_metal} 1 0} 0)
+(expect {if_else {find_elem {sel_character_panel get outfits} gh80s_metal1} 1 0} 0)
 ; GH1's.
 {ui goto_screen main_screen}
 (wait_screen main_screen)
@@ -46,10 +46,10 @@
 (press green)
 (wait_screen sel_character_new_screen)
 (wait_until {char_single are_chars_loaded})
-{sel_character_panel set char_focus metal}
+{sel_character_panel set char_focus gh2_metal}
 {sel_character_panel find_outfits}
 (print gh1 {sel_character_panel get outfits})
-(expect {if_else {find_elem {sel_character_panel get outfits} metalgh1} 1 0} 1)
-(expect {if_else {find_elem {sel_character_panel get outfits} metal1} 1 0} 0)
-(expect {if_else {find_elem {sel_character_panel get outfits} metal3} 1 0} 0)
+(expect {if_else {find_elem {sel_character_panel get outfits} gh1_metal} 1 0} 1)
+(expect {if_else {find_elem {sel_character_panel get outfits} gh2_metal1} 1 0} 0)
+(expect {if_else {find_elem {sel_character_panel get outfits} gh80s_metal1} 1 0} 0)
 (quit)

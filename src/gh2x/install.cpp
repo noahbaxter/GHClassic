@@ -77,12 +77,20 @@ namespace gh2
             dtb::Node entry = *found;
             entry.nodes[0].text = ours(name);
             retarget(entry, name);
-            // Its quickplay venue, (quickplay (venue <v>)), is PS2 GH2's.
-            for (dtb::Node &quickplay : entry.nodes)
-                if (quickplay.type == dtb::kArray && !quickplay.nodes.empty() && quickplay.nodes[0].text == "quickplay")
-                    for (dtb::Node &venue : quickplay.nodes)
-                        if (venue.type == dtb::kArray && venue.nodes.size() == 2u && venue.nodes[0].text == "venue")
-                            venue.nodes[1].text = sources::id("gh2", venue.nodes[1].text);
+            // Its quickplay venue and guitarist, (quickplay (venue <v>)
+            // (character_outfit <o>)), and its band are PS2 GH2's.
+            for (dtb::Node &n : entry.nodes)
+            {
+                const std::string key = n.type == dtb::kArray && !n.nodes.empty() ? n.nodes[0].text : "";
+                if (key == "band")
+                    for (size_t i = 1u; i < n.nodes.size(); ++i)
+                        n.nodes[i].text = sources::id("gh2", n.nodes[i].text);
+                if (key == "quickplay")
+                    for (dtb::Node &pick : n.nodes)
+                        if (pick.type == dtb::kArray && pick.nodes.size() == 2u &&
+                            (pick.nodes[0].text == "venue" || pick.nodes[0].text == "character_outfit"))
+                            pick.nodes[1].text = sources::id("gh2", pick.nodes[1].text);
+            }
             for (const char *key : {"song", "song_coop"})
             {
                 const dtb::Node *audio = dtb::find(*found, key);
@@ -215,6 +223,12 @@ namespace gh2
                 }
             if (dtb::Node *songs = child(*store, "song"))
                 rename(*songs);
+            // The characters and outfits it sells are PS2 GH2's.
+            for (const char *kind : {"character", "outfit"})
+                if (dtb::Node *list = child(*store, kind))
+                    for (size_t i = 1u; i < list->nodes.size(); ++i)
+                        if (list->nodes[i].type == dtb::kArray && !list->nodes[i].nodes.empty())
+                            list->nodes[i].nodes[0].text = sources::id("gh2", list->nodes[i].nodes[0].text);
             requireAs(*guitars, *theirGuitars);
             offerHiddenGuitars(*guitars, *store, false);
             if (!scalePayouts(campaign, *store))

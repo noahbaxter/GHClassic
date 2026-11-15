@@ -37,7 +37,7 @@
 (wait_screen ghc_qp_character_screen)
 (wait_until {char_single are_chars_loaded})
 (wait 2)
-{game set_character punk1 TRUE}
+{game set_character gh2_punk1 TRUE}
 {ghc_sel_character_done ghc_qp_character_screen}
 (wait_screen ghc_qp_setup_screen)
 (wait 1)
@@ -59,7 +59,7 @@
 (press green)
 (wait_screen ghc_qp_setup_screen)
 (wait 1)
-(expect {quickplay pick outfit} punk1)
+(expect {quickplay pick outfit} gh2_punk1)
 (expect {quickplay pick guitar} tobac)
 (expect {quickplay pick venue_game} gh1)
 (press green)
@@ -72,7 +72,7 @@
 (press green)
 (wait_screen game_screen 60)
 (expect {custom ours {game get_song}} 1)
-(expect {game get_character_outfit} punk1)
+(expect {game get_character_outfit} gh2_punk1)
 (expect {game get_guitar} tobac)
 (expect {game get_guitar_skin} {quickplay pick skin})
 (expect {game get_venue} {quickplay pick venue})

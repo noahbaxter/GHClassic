@@ -2,6 +2,7 @@
 
 #include "content/games.h"
 #include "content/setlist_printout.h"
+#include "content/sources.h"
 #include "content/vgs.h"
 #include "custom/audio.h"
 #include "custom/cast.h"
@@ -73,9 +74,10 @@ namespace gh2::custom
             });
             if (const char *front = bandFront(song))
             {
-                dtb::Node band = array({symbol("band"), symbol("metal_bass"), symbol("metal_drummer")});
+                // GH2's band, by id (content/band.h).
+                dtb::Node band = array({symbol("band"), symbol("gh2_metal_bass"), symbol("gh2_metal_drummer")});
                 if (*front)
-                    band.nodes.push_back(symbol(front));
+                    band.nodes.push_back(symbol(sources::id("gh2", front)));
                 out.nodes.push_back(std::move(band));
             }
             // Fifteen seconds from song.ini's start, 30 s in where it has

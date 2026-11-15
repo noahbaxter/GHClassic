@@ -8,6 +8,7 @@
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
 
+#include <algorithm>
 #include <functional>
 #include <iostream>
 #include <map>
@@ -34,10 +35,13 @@ namespace gh2::sources
         // {meta_music stop} is no song.
         const Names kWords = {"stop"};
 
-        // Names a script makes from a venue to find an object in a scene:
-        // its button on the venue map (career.dta's venue_button), made
-        // from its own name.
+        // Names a script makes from a venue or character to find an object
+        // in a scene, made from its own name: a venue's button on the venue
+        // map ({sprintf "sv_%s.btn" ...}, career.dta's venue_button), a
+        // character's portrait ({sprint "char_" $c ".mesh"}, career.dta and
+        // multiplayer.dta's pickers).
         constexpr const char *kOwnFormats[] = {"sv_%s.btn"};
+        constexpr const char *kOwnPrefixes[] = {"char_"};
 
         // Each symbol that is one of `names` as `source` names it.
         void qualify(dtb::Node &node, const std::string &source, const Names &names, const Names &skip)
@@ -92,13 +96,86 @@ namespace gh2::sources
                 if (isGetVenue(n[2]))
                     rename(n[1], ids);
             }
-            if (node.type == dtb::kCommand && n.size() >= 3u && (isSymbol(n[0], "sprintf")) && n[1].type == dtb::kString)
+            for (dtb::Node &child : n)
+                qualifyVenues(child, ids);
+        }
+
+        // Any name a script makes into an object's ({sprintf "sv_%s.btn"
+        // $v}, {sprint "char_" $c ".mesh"}) made from what it is given's own
+        // name.
+        void ownNames(dtb::Node &node)
+        {
+            auto &n = node.nodes;
+            const auto own = [](dtb::Node &arg) { arg = dtb::command({dtb::symbol("sources"), dtb::symbol("own"), arg}); };
+            if (node.type == dtb::kCommand && n.size() >= 3u && isSymbol(n[0], "sprintf") && n[1].type == dtb::kString)
                 for (const char *format : kOwnFormats)
                     if (n[1].text == format)
                         for (size_t i = 2u; i < n.size(); ++i)
-                            n[i] = dtb::command({dtb::symbol("sources"), dtb::symbol("own"), n[i]});
+                            own(n[i]);
+            if (node.type == dtb::kCommand && n.size() >= 3u && isSymbol(n[0], "sprint") && n[1].type == dtb::kString)
+                for (const char *prefix : kOwnPrefixes)
+                    if (n[1].text == prefix)
+                        own(n[2]);
             for (dtb::Node &child : n)
-                qualifyVenues(child, ids);
+                ownNames(child);
+        }
+
+        // The (<name> ...) entries of a list: their names.
+        void renameKeys(dtb::Node &list, const Ids &ids)
+        {
+            for (size_t i = 1u; i < list.nodes.size(); ++i)
+                if (list.nodes[i].type == dtb::kArray && !list.nodes[i].nodes.empty())
+                    rename(list.nodes[i].nodes[0], ids);
+        }
+
+        // The UI's lists of characters and of outfits (ui.dta).
+        constexpr const char *kCharacterLists[] = {"CHARACTERS", "STORE_CHARACTERS"};
+        constexpr const char *kOutfitLists[] = {"LOAD_CHARACTERS", "STORE_OUTFITS"};
+
+        // A character or outfit wherever a script names one as one, never a
+        // word that is also one's name elsewhere (the classic look, the
+        // store's (outfit ...) of a guitar): config's (characters (<c> (<o>)
+        // ...) ...), the store's (character (<c> ...)) and (outfit (<o> ...)),
+        // the UI's lists, a song's (character_outfit <o>) and (band <o> ...),
+        // the default band, the career picker's (char_focus <c>) and
+        // (char_outfit <o>), and what {<x> set_character <o>} is given.
+        void qualifyCast(dtb::Node &node, const Ids &characters, const Ids &outfits)
+        {
+            auto &n = node.nodes;
+            const auto head = [&](const char *name) { return node.type == dtb::kArray && !n.empty() && isSymbol(n[0], name); };
+            if (head("characters"))
+                for (size_t i = 1u; i < n.size(); ++i)
+                    if (n[i].type == dtb::kArray && !n[i].nodes.empty())
+                    {
+                        rename(n[i].nodes[0], characters);
+                        renameKeys(n[i], outfits);
+                    }
+            if (head("character"))
+                for (size_t i = 1u; i < n.size(); ++i)
+                    rename(n[i].type == dtb::kArray && !n[i].nodes.empty() ? n[i].nodes[0] : n[i], characters);
+            if (head("outfit"))
+                renameKeys(node, outfits);
+            if (n.size() == 2u && (head("character_outfit") || head("char_outfit")))
+                rename(n[1], outfits);
+            if (n.size() == 2u && head("char_focus"))
+                rename(n[1], characters);
+            if (head("band") || head("default_band"))
+                for (size_t i = 1u; i < n.size(); ++i)
+                    rename(n[i], outfits);
+            if (node.type == dtb::kCommand && n.size() >= 3u && isSymbol(n[1], "set_character"))
+                rename(n[2], outfits);
+            for (size_t i = 0u; i + 1u < n.size(); ++i)
+                if (n[i].type == dtb::kDefine)
+                {
+                    for (const char *list : kCharacterLists)
+                        if (n[i].text == list)
+                            rename(n[i + 1u], characters);
+                    for (const char *list : kOutfitLists)
+                        if (n[i].text == list)
+                            rename(n[i + 1u], outfits);
+                }
+            for (dtb::Node &child : n)
+                qualifyCast(child, characters, outfits);
         }
 
         // Paths under songs/<name>/ moved to songs/<ours>/, the files named
@@ -134,24 +211,45 @@ namespace gh2::sources
                         });
         }
 
-        // The locale key `key` names, as an id: a song's or venue's name, or
-        // one made from a venue's.
-        std::optional<std::string> localeKey(const std::string &key, const std::string &source, const Names &songs,
-                                             const Ids &venues)
+        // A disc's names by kind, each to its id.
+        struct Named
         {
-            if (songs.count(key) != 0u)
-                return id(source, key);
-            if (const auto it = venues.find(key); it != venues.end())
-                return it->second;
-            for (const char *prefix : kVenueKeyPrefixes)
-                if (key.rfind(prefix, 0) == 0)
-                    if (const auto it = venues.find(key.substr(std::string(prefix).size())); it != venues.end())
-                        return prefix + it->second;
-            for (const std::string suffix : kVenueKeySuffixes)
-                if (key.size() > suffix.size() && key.ends_with(suffix))
-                    if (const auto it = venues.find(key.substr(0u, key.size() - suffix.size())); it != venues.end())
-                        return it->second + suffix;
-            return std::nullopt;
+            std::shared_ptr<Names> songs;
+            std::shared_ptr<Ids> venues, characters, outfits;
+
+            const Ids *of(Kind kind) const
+            {
+                return kind == Kind::Venue ? venues.get() : kind == Kind::Character ? characters.get()
+                                                          : kind == Kind::Outfit   ? outfits.get()
+                                                                                   : nullptr;
+            }
+        };
+
+        // The locale keys `key` is as ids: a song's or venue's name, a
+        // character's or outfit's, or one made from them. A name both a
+        // character's and an outfit's (grim) is both keys.
+        std::vector<std::string> localeKeys(const std::string &key, const std::string &source, const Named &named)
+        {
+            if (named.songs->count(key) != 0u)
+                return {id(source, key)};
+            std::vector<std::string> keys;
+            for (const Kind kind : {Kind::Venue, Kind::Character, Kind::Outfit})
+                if (const auto it = named.of(kind)->find(key); it != named.of(kind)->end())
+                    keys.push_back(it->second);
+            for (const KeyForm &form : kKeyForms)
+            {
+                const std::string prefix = form.prefix, suffix = form.suffix;
+                if (key.size() <= prefix.size() + suffix.size() || !key.starts_with(prefix) || !key.ends_with(suffix))
+                    continue;
+                const Ids &ids = *named.of(form.kind);
+                if (const auto it = ids.find(key.substr(prefix.size(), key.size() - prefix.size() - suffix.size()));
+                    it != ids.end())
+                    keys.push_back(prefix + it->second + suffix);
+            }
+            // GH2's grim is one id either way.
+            std::sort(keys.begin(), keys.end());
+            keys.erase(std::unique(keys.begin(), keys.end()), keys.end());
+            return keys;
         }
 
         // The venues on that disc: its config's list (config/gh2.dta's
@@ -175,6 +273,37 @@ namespace gh2::sources
                     found.insert(venue);
             }
             return found;
+        }
+
+        // The characters and outfits on that disc: its config's (characters
+        // (<c> (<o>) ...) ...), and any char/<o>/ with char/<o>/og/<o>.milo,
+        // the band among them.
+        std::pair<Names, Names> castOn(size_t disc)
+        {
+            Names characters, outfits;
+            if (const auto file = ark::readFile(disc, "config/gen/gh2.dtb"))
+                if (const auto root = dtb::raw(*file))
+                    if (const dtb::Node *list = dtb::find(*root, "characters"))
+                        for (size_t i = 1u; i < list->nodes.size(); ++i)
+                        {
+                            const dtb::Node &c = list->nodes[i];
+                            if (c.type != dtb::kArray || c.nodes.empty() || c.nodes[0].type != dtb::kSymbol)
+                                continue;
+                            characters.insert(c.nodes[0].text);
+                            for (size_t j = 1u; j < c.nodes.size(); ++j)
+                                if (c.nodes[j].type == dtb::kArray && !c.nodes[j].nodes.empty())
+                                    outfits.insert(c.nodes[j].nodes[0].text);
+                        }
+            for (const std::string &path : ark::paths(disc, "char/"))
+            {
+                const size_t slash = path.find('/', 5u);
+                if (slash == std::string::npos)
+                    continue;
+                const std::string outfit = path.substr(5u, slash - 5u);
+                if (path == "char/" + outfit + "/og/gen/" + outfit + ".milo_ps2")
+                    outfits.insert(outfit);
+            }
+            return {characters, outfits};
         }
 
         // GameConfig::GetVenue (0x1264d0) gives the venue's own name while
@@ -324,6 +453,13 @@ namespace gh2::sources
         auto venues = std::make_shared<Ids>();
         for (const std::string &venue : venuesOn(disc))
             (*venues)[venue] = add(Kind::Venue, source, venue).id;
+        auto characters = std::make_shared<Ids>(), outfits = std::make_shared<Ids>();
+        const auto [castCharacters, castOutfits] = castOn(disc);
+        for (const std::string &character : castCharacters)
+            (*characters)[character] = addCharacter(source, character).id;
+        for (const std::string &outfit : castOutfits)
+            (*outfits)[outfit] = add(Kind::Outfit, source, outfit).id;
+        const Named named{names, venues, characters, outfits};
 
         fix(disc, kConfigs[0], [source, names](dtb::Node &root)
             {
@@ -352,15 +488,36 @@ namespace gh2::sources
         for (const char *prefix : {"config/gen/", "ui/gen/"})
             for (const std::string &path : ark::paths(disc, prefix))
                 if (path.ends_with(".dtb"))
-                    fix(disc, path, [venues](dtb::Node &root) { qualifyVenues(root, *venues); });
+                    fix(disc, path, [named](dtb::Node &root)
+                        {
+                            qualifyVenues(root, *named.venues);
+                            qualifyCast(root, *named.characters, *named.outfits);
+                            ownNames(root);
+                        });
 
-        // A song's title is the locale token of its name, a venue's of its.
-        fix(disc, "ui/eng/gen/locale.dtb", [source, names, venues](dtb::Node &root)
+        // A song's title is the locale token of its name, a venue's,
+        // character's or outfit's of its: one entry for each it names.
+        fix(disc, "ui/eng/gen/locale.dtb", [source, named](dtb::Node &root)
             {
+                std::vector<dtb::Node> entries;
                 for (dtb::Node &entry : root.nodes)
-                    if (entry.type == dtb::kArray && !entry.nodes.empty() && entry.nodes[0].type == dtb::kSymbol)
-                        if (const auto key = localeKey(entry.nodes[0].text, source, *names, *venues))
-                            entry.nodes[0].text = *key;
+                {
+                    if (entry.type != dtb::kArray || entry.nodes.empty() || entry.nodes[0].type != dtb::kSymbol)
+                    {
+                        entries.push_back(std::move(entry));
+                        continue;
+                    }
+                    const std::vector<std::string> keys = localeKeys(entry.nodes[0].text, source, named);
+                    for (size_t i = 1u; i < keys.size(); ++i)
+                    {
+                        entries.push_back(entry);
+                        entries.back().nodes[0].text = keys[i];
+                    }
+                    if (!keys.empty())
+                        entry.nodes[0].text = keys[0];
+                    entries.push_back(std::move(entry));
+                }
+                root.nodes = std::move(entries);
             });
 
         // The specific before the folder: the first rename that matches wins.
@@ -376,6 +533,20 @@ namespace gh2::sources
             ark::rename("world/" + ours + "/" + ours, disc, "world/" + name + "/" + name);
             ark::rename("world/" + ours + "/gen/" + ours, disc, "world/" + name + "/gen/" + name);
             ark::rename("world/" + ours + "/", disc, "world/" + name + "/");
+        }
+        // char/<id>/og/<id>.milo is char/<o>/og/<o>.milo, and so on; the
+        // highway (track/surfaces/%s_keep.bmp) and the results' photos
+        // (ui/image/og/photo_%s%i_keep.bmp) go by outfit too.
+        for (const auto &[name, ours] : *outfits)
+        {
+            ark::rename("char/" + ours + "/og/gen/" + ours, disc, "char/" + name + "/og/gen/" + name);
+            ark::rename("char/" + ours + "/", disc, "char/" + name + "/");
+            ark::rename("track/surfaces/gen/" + ours + "_keep", disc, "track/surfaces/gen/" + name + "_keep");
+            for (int i = 0; i < 4; ++i)
+            {
+                const std::string index = std::to_string(i) + "_keep";
+                ark::rename("ui/image/og/gen/photo_" + ours + index, disc, "ui/image/og/gen/photo_" + name + index);
+            }
         }
     }
 

@@ -6,7 +6,7 @@
 (expect {campaigns live} gh2)
 {set $fest {localize gh2_fest}}
 {set $battle {localize gh2_battle}}
-{set $blurb {localize alterna_blurb}}
+{set $blurb {localize gh2_alterna_blurb}}
 {set $tip {localize loading_tip1}}
 (print gh2 $fest $battle)
 
@@ -18,11 +18,11 @@
 (print gh1 {localize gh1_basement})
 
 ; A character's blurb: the 80s' for its outfit, GH2's for GH2's.
-{campaigns text_outfit alterna3}
-(expect {== {localize alterna_blurb} $blurb} 0)
-(print alterna3 {localize alterna_blurb})
-{campaigns text_outfit alterna1}
-(expect {localize alterna_blurb} $blurb)
+{campaigns text_outfit gh80s_alterna1}
+(expect {== {localize gh2_alterna_blurb} $blurb} 0)
+(print alterna3 {localize gh2_alterna_blurb})
+{campaigns text_outfit gh2_alterna1}
+(expect {localize gh2_alterna_blurb} $blurb)
 
 ; The screens around a song: GH1's tips on GH1's loading screen, the
 ; venues' names their own all the while.

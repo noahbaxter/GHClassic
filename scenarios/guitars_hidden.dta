@@ -92,7 +92,7 @@
 {ui goto_screen main_screen}
 (wait_screen main_screen)
 
-{set $ghc_character punk1}
+{set $ghc_character gh2_punk1}
 {set $ghc_guitar explorer}
 {set $ghc_finish exp_peppermint}
 #include common/guitar_shot.dta

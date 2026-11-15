@@ -29,35 +29,35 @@
 {ui goto_screen ghc_qp_character_screen}
 (wait_screen ghc_qp_character_screen)
 
-{ghc_char punk} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_char gh2_punk} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
 {ghc_pick_last} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print punk {sel_character_panel get char_outfit} of {size {sel_character_panel get outfits}}) (shot punk)
 
-{ghc_char alterna} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_char gh2_alterna} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
 {ghc_pick_last} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print alterna {sel_character_panel get char_outfit} of {size {sel_character_panel get outfits}}) (shot alterna)
 
-{ghc_char metal} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_char gh2_metal} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
 {ghc_pick_last} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print metal {sel_character_panel get char_outfit} of {size {sel_character_panel get outfits}}) (shot metal)
 
-{ghc_char glam} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_char gh2_glam} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
 {ghc_pick_last} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print glam {sel_character_panel get char_outfit} of {size {sel_character_panel get outfits}}) (shot glam)
 
-{ghc_char goth} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_char gh2_goth} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
 {ghc_pick_last} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print goth {sel_character_panel get char_outfit} of {size {sel_character_panel get outfits}}) (shot goth)
 
-{ghc_char funk1} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_char gh2_funk1} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
 {ghc_pick_last} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print funk1 {sel_character_panel get char_outfit} of {size {sel_character_panel get outfits}}) (shot funk1)
 
-{ghc_char classic} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_char gh2_classic} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
 {ghc_pick_last} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print classic {sel_character_panel get char_outfit} of {size {sel_character_panel get outfits}}) (shot classic)
 
-{ghc_char grim} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
+{ghc_char gh2_grim} (wait 0.5) (wait_until {char_single are_chars_loaded}) {sel_character_panel choose_skins} (wait 1)
 {ghc_pick_last} (wait 0.5) (wait_until {char_single are_chars_loaded}) (wait 1.5)
 (print grim {sel_character_panel get char_outfit} of {size {sel_character_panel get outfits}}) (shot grim)
 (wait 1)

@@ -15,14 +15,14 @@
 ; The song's own casting is where each pick starts: its venue, arena, is
 ; locked on a new save, so its tier's stands in (GameConfig::SetQuickplay,
 ; 0x126828).
-(expect {game get_character_outfit} glam1)
+(expect {game get_character_outfit} gh2_glam1)
 (expect {game get_guitar} flying_v)
 (expect {game get_venue} gh2_battle)
-{game set_character punk1 TRUE}
+{game set_character gh2_punk1 TRUE}
 {ghc_sel_character_done ghc_qp_character_screen}
 (wait_screen ghc_qp_setup_screen)
 (wait 1)
-(expect {quickplay pick outfit} punk1)
+(expect {quickplay pick outfit} gh2_punk1)
 {ui goto_screen ghc_qp_guitar_screen}
 (wait_screen ghc_qp_guitar_screen)
 (wait 3)
@@ -47,7 +47,7 @@
 (press green)
 (wait_screen game_screen 60)
 (expect {gamecfg get_song} gh2_shoutatthedevil)
-(expect {game get_character_outfit} punk1)
+(expect {game get_character_outfit} gh2_punk1)
 (wait 20)
 (shot song)
 (quit)

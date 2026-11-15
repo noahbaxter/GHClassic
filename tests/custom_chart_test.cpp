@@ -1018,14 +1018,14 @@ namespace
         for (int i = 0; i < 2000; ++i)
         {
             const Cast c = castOf({{"artist", std::to_string(i)}, {"genre", "Thrash Metal"}, {"diff_guitar", "3"}});
-            CHECK(c.outfit != "grim" && (c.guitar == "lespaul" || c.guitar == "sg" || c.guitar == "flying_v"));
+            CHECK(c.outfit != "gh2_grim" && (c.guitar == "lespaul" || c.guitar == "sg" || c.guitar == "flying_v"));
             CHECK(c.venue == "gh2_small1" || c.venue == "gh2_small2" || c.venue == "gh2_big" || c.venue == "gh2_theatre" ||
                   c.venue == "gh2_fest");
-            grims += c.character == "grim" ? 1 : 0;
+            grims += c.character == "gh2_grim" ? 1 : 0;
             ++models[c.realGuitar];
             const Cast p = castOf({{"artist", std::to_string(i)}, {"genre", "Pop Punk"}});
-            CHECK(p.character != "grim");
-            punks += p.character == "punk" || p.character == "alterna" ? 1 : 0;
+            CHECK(p.character != "gh2_grim");
+            punks += p.character == "gh2_punk" || p.character == "gh2_alterna" ? 1 : 0;
         }
         CHECK(grims > 50 && grims < 160 && punks > 1700 && punks < 1950);
         CHECK(models.size() == 19u);

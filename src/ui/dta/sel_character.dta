@@ -23,17 +23,17 @@
       }
    }
 }
-; Another game's outfit ((extra <game> <its name there>), content/outfits.h)
-; is no part of a career, which is its own game's alone. In the other modes
-; it is there once its own game's career has it, or with all access.
-; Config's own outfit in quickplay's modes is GH2's, whose unlock answers
-; for any game's item of that name, so GH1's grim would open GH2's: GH2's
-; career alone does.
+; Another game's outfit ((extra <game> <character>), content/outfits.h) is
+; no part of a career, which is its own game's alone. In the other modes it
+; is there once its own game's career has it and its character (a store
+; sells the Grim Ripper), or with all access. Config's own outfit in
+; quickplay's modes is GH2's, there once GH2's career has it.
 {func ghc_may_wear ($entry)
    {if_else {find_exists $entry extra}
       {&& {!= {gamecfg get mode} career}
          {|| {campaign all_access}
-            {campaigns owns {elem {find $entry extra} 1} {elem {find $entry extra} 2}}}}
+            {&& {campaigns owns {elem {find $entry extra} 1} {elem $entry 0}}
+               {campaigns owns {elem {find $entry extra} 1} {elem {find $entry extra} 2}}}}}
       {|| {! {ghc_free_mode}}
          {campaign all_access}
          {campaigns owns gh2 {elem $entry 0}}}
@@ -56,8 +56,8 @@
       ; from, and this one comes from no file. Quickplay's is GH2's with
       ; every game's portraits in (content/outfits.h).
       (file {if_else {== {gamecfg get mode} quickplay} ghc/gh2/ui/sel_character.milo ui/sel_character.milo})
-      (char_focus punk)
-      (char_outfit punk1)
+      (char_focus gh2_punk)
+      (char_outfit gh2_punk1)
       (old_scroll_pos 0)
       (focus character.lst)
       (skin_select FALSE)
@@ -124,12 +124,12 @@
          {foreach_int $i 1 {size {find $syscfg characters}}
             {do
                ($c {elem {elem {find $syscfg characters} $i} 0})
-               ($mesh {sprint "char_" $c ".mesh"})
+               ($mesh {sprint "char_" {sources own $c} ".mesh"})
                ($own {sprint "portrait_" {$this shown_outfit $c} ".mat"})
                {cond
                   ({! {campaign is_unlocked $c}} {$mesh set_mat char_locked.mat})
                   ({exists $own} {$mesh set_mat $own})
-                  (TRUE {$mesh set_mat {sprint "char_" $c ".mat"}})
+                  (TRUE {$mesh set_mat {sprint "char_" {sources own $c} ".mat"}})
                }
             }
          }
@@ -187,14 +187,14 @@
                {foreach_int $i 1 {size $all}
                   {do
                      ($c {elem {elem $all $i} 0})
-                     {{$dir find {sprint "sc_char_" $c "_focus.view"}} set_showing {== $c [char_focus]}}
+                     {{$dir find {sprint "sc_char_" {sources own $c} "_focus.view"}} set_showing {== $c [char_focus]}}
                   }
                }
                {foreach_int $i 1 {size $sold}
                   {do
                      ($c {elem {elem $sold $i} 0})
-                     {{$dir find {sprint "sc_char_" $c ".pic"}} set_showing {campaign is_unlocked $c}}
-                     {{$dir find {sprint "sc_char_" $c "_lock.pic"}} set_showing {! {campaign is_unlocked $c}}}
+                     {{$dir find {sprint "sc_char_" {sources own $c} ".pic"}} set_showing {campaign is_unlocked $c}}
+                     {{$dir find {sprint "sc_char_" {sources own $c} "_lock.pic"}} set_showing {! {campaign is_unlocked $c}}}
                   }
                }
             }

@@ -5,7 +5,7 @@
 #include common/first_boot.dta
 (needs gh1)
 {quickplay song_defaults 0}
-{quickplay pick outfit glam1}
+{quickplay pick outfit gh2_glam1}
 {quickplay pick guitar sg}
 {quickplay pick skin sg_white}
 {quickplay pick venue gh2_battle}
@@ -16,7 +16,7 @@
 (wait 1)
 {ui goto_screen ghc_qp_character_screen}
 (wait_screen ghc_qp_character_screen)
-(expect {game get_character_outfit} glam1)
+(expect {game get_character_outfit} gh2_glam1)
 (expect {game get_guitar} sg)
 (expect {game get_venue} gh2_battle)
 (wait_until {char_single are_chars_loaded})
@@ -45,7 +45,7 @@
 (press green)
 (wait_screen game_screen 60)
 (expect {quickplay pick venue_game} gh1)
-(expect {quickplay pick outfit} glam1)
-(expect {game get_character_outfit} glam1)
+(expect {quickplay pick outfit} gh2_glam1)
+(expect {game get_character_outfit} gh2_glam1)
 (expect {game get_venue} gh1_basement)
 (quit)

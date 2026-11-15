@@ -4,7 +4,7 @@
 (songs songs)
 #include common/first_boot.dta
 {quickplay song_defaults 1}
-{quickplay pick outfit punk1}
+{quickplay pick outfit gh2_punk1}
 {quickplay pick guitar tobac}
 {quickplay pick skin tobac_sunburst}
 {quickplay pick venue gh1_basement}
@@ -22,7 +22,7 @@
 (wait_screen game_screen 60)
 (expect {custom ours {game get_song}} 1)
 (print "cast " {game get_character_outfit} " " {game get_guitar} " " {game get_guitar_skin} " " {game get_venue} " " {campaigns venue_game})
-(expect {!= {game get_character_outfit} punk1} 1)
+(expect {!= {game get_character_outfit} gh2_punk1} 1)
 (expect {game get_guitar} sg)
 (expect {game get_venue} gh2_small1)
 (expect {campaigns venue_game} gh2)

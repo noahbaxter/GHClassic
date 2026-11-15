@@ -312,7 +312,7 @@ namespace gh2::gh1
         // the character, for the script to load (menus.dta).
         for (const Guitarist &g : kGuitarists)
             if (auto photo = ark::readFile(disc, std::string(kFolder) + "image/gen/status_" + g.folder + "0.png_ps2"))
-                ark::addFile(layer, std::string("ui/image/gen/gh1_status_") + g.character + ".png_ps2", std::move(*photo));
+                ark::addFile(layer, "ui/image/gen/gh1_status_" + g.characterId() + ".png_ps2", std::move(*photo));
         // GH1's credits are in its serif face, their headings in its
         // impactor in orange (resources.rnd's credit_title.txt and
         // credits_center.mat): GH2's list for credits with those of its own

@@ -4,6 +4,7 @@
 #include "content/games.h"
 #include "content/outfits.h"
 #include "content/setlists.h"
+#include "content/sources.h"
 #include "custom/cast.h"
 #include "custom/songs.h"
 #include "disc/ark.h"
@@ -43,9 +44,9 @@ namespace gh2::quickplay
             return nullptr;
         }
 
-        // That game's own name for the outfit it boots with, off its disc:
-        // punk1 in GH2 and the 80s, metal in GH1, whose UI is under ghui/.
-        // GH2's where the disc gives none.
+        // The outfit that game boots with, off its disc: gh2_punk1 in GH2,
+        // gh80s_punk1 in the 80s, GH1's metal guitarist in GH1, whose UI is
+        // under ghui/. GH2's where the disc gives none.
         std::string bootOutfit(const std::string &game)
         {
             static std::map<std::string, std::string> s_found;
@@ -56,15 +57,31 @@ namespace gh2::quickplay
             const auto main = dtb::read(game == "gh1" ? "ghui/main.dta" : "ui/main.dta", macros,
                                         [disc](const std::string &path) { return ark::readFile(disc, path); });
             const dtb::Node *outfit = main ? setCharacter(*main) : nullptr;
-            return s_found[game] = outfit ? outfit->text : "punk1";
+            // GH1's script names its guitarist by GH1's name for them.
+            return s_found[game] = !outfit ? "gh2_punk1" : game == "gh1" ? sources::id("gh1", outfit->text) : outfit->text;
+        }
+
+        // An outfit's folder on the game disc, which the 360's scenes stand in
+        // at (gh2x/models.h): GH2's alone have any.
+        std::string discFolder(const std::string &outfit)
+        {
+            const sources::Row *row = sources::find(outfit, sources::Kind::Outfit);
+            return "char/" + (row && row->source == "gh2" ? row->own : outfit) + "/";
+        }
+
+        // The game an outfit is from: its source.
+        std::string gameOf(const std::string &outfit)
+        {
+            const sources::Row *row = sources::find(outfit);
+            return row ? row->source : campaigns::active();
         }
 
         // Unlocked outside a career where any game's career has it to use:
-        // an added outfit by its own game's name for it.
+        // an outfit by its own game's.
         bool anywhere(const std::string &item)
         {
-            if (const auto own = outfits::ownOf(item))
-                return campaigns::unlockedIn(own->first, own->second) || campaigns::unlockedIn(own->first, item);
+            if (const sources::Row *row = sources::find(item, sources::Kind::Outfit))
+                return campaigns::unlockedIn(row->source, item);
             for (const std::string &game : campaigns::games())
                 if (campaigns::unlockedIn(game, item))
                     return true;
@@ -130,13 +147,14 @@ namespace gh2::quickplay
         }
 
         // SelectGuitarProvider::InitData (0x119060) lists a player's
-        // guitars: for the Grim Ripper (+0x3c) the scythe alone, else
-        // quickplay's (Campaign::GetQuickplayGuitars, 0x12df48: config's of
-        // type guitar that are unlocked) or the career's. Outside a career
-        // the config has every game's finishes, the scythe is a guitar like
-        // any other, and the Grim Ripper has them all. The list is
-        // quickplay's (+0x40) there whoever asks: the career's is the
-        // band's items, which a guitar lent whole is not one of.
+        // guitars: for the Grim Ripper (+0x3c, strcmp'd with "grim", his own
+        // name: content/sources.h) the scythe alone, else quickplay's
+        // (Campaign::GetQuickplayGuitars, 0x12df48: config's of type guitar
+        // that are unlocked) or the career's. Outside a career the config has
+        // every game's finishes, the scythe is a guitar like any other, and
+        // the Grim Ripper has them all. The list is quickplay's (+0x40) there
+        // whoever asks: the career's is the band's items, which a guitar lent
+        // whole is not one of.
         constexpr uint32_t kProviderCharacter = 0x3cu, kProviderQuickplay = 0x40u;
         PS2Runtime::RecompiledFunction s_guitarsInitData = nullptr;
         std::string configGuitars(uint8_t *rdram, bool free)
@@ -151,10 +169,10 @@ namespace gh2::quickplay
             const bool free = !campaigns::inCareer(rdram);
             script::run(rdram, ctx, runtime, configGuitars(rdram, free));
             const uint32_t character = load<uint32_t>(rdram, provider + kProviderCharacter);
-            const bool grim = free && character != 0u &&
-                              std::string(reinterpret_cast<const char *>(getMemPtr(rdram, character))) == "grim";
+            const bool grim =
+                character != 0u && sources::own(reinterpret_cast<const char *>(getMemPtr(rdram, character))) == "grim";
             if (grim)
-                store<uint32_t>(rdram, provider + kProviderCharacter, script::symbol(rdram, ctx, runtime, ""));
+                store<uint32_t>(rdram, provider + kProviderCharacter, script::symbol(rdram, ctx, runtime, free ? "" : "grim"));
             const uint32_t quickplay = load<uint32_t>(rdram, provider + kProviderQuickplay);
             if (free)
                 store<uint32_t>(rdram, provider + kProviderQuickplay, 1u);
@@ -227,7 +245,7 @@ namespace gh2::quickplay
             for (const auto &[character, characterOutfits] : campaigns::characters(activeGame))
                 for (const std::string &outfit : characterOutfits)
                     out.push_back({character, outfit,
-                                   unlockAll || (anywhere(outfit) && (character == "grim" ? campaigns::unlockedIn(activeGame, character)
+                                   unlockAll || (anywhere(outfit) && (character == "gh2_grim" ? campaigns::unlockedIn(activeGame, character)
                                                                                          : anywhere(character)))});
             for (const outfits::Outfit &added : outfits::added())
                 if (added.game != activeGame)
@@ -267,9 +285,8 @@ namespace gh2::quickplay
         // as songs.dta says: `song` from `game`'s setlist, `retail` its
         // outfit there.
         //
-        // A disc song keeps that cast, its guitarist under the name its
-        // game's outfit is added as; GH2's bonus songs (PS2 and 360) play the
-        // same guitarist's alternate outfit once unlocked (GH1's and the
+        // A disc song keeps that cast; GH2's bonus songs (PS2 and 360) play
+        // the same guitarist's alternate outfit once unlocked (GH1's and the
         // 80s' keep theirs).
         //
         // A custom song plays its guitarist in an outfit and its guitar in a
@@ -285,8 +302,6 @@ namespace gh2::quickplay
             const std::string song = call.symbol(2), game = call.symbol(3), retail = call.symbol(4);
             s_nextGenSong = song.rfind("gh2x_", 0) == 0u;
             const std::string &activeGame = campaigns::active();
-            const auto liveName = [&](const std::string &outfit)
-            { return game == activeGame ? outfit : outfits::named(game, outfit).value_or(outfit); };
             const uint32_t campaign = load<uint32_t>(call.rdram, s_addresses->theCampaign);
             const bool unlockAll = campaign != 0u && load<uint32_t>(call.rdram, campaign + kAllAccess) != 0u;
             const std::vector<Look> all = looks(unlockAll);
@@ -298,7 +313,7 @@ namespace gh2::quickplay
             {
                 if (hdCharacters)
                     choices.erase(std::remove_if(choices.begin(), choices.end(),
-                                                 [](const std::string &o) { return !gh2xHasModel("char/" + o + "/"); }),
+                                                 [](const std::string &o) { return !gh2xHasModel(discFolder(o)); }),
                                   choices.end());
                 if (choices.empty())
                     return "";
@@ -306,7 +321,7 @@ namespace gh2::quickplay
                 return isOpen(pick) ? pick : "";
             };
 
-            std::string outfit = liveName(retail), guitar;
+            std::string outfit = retail, guitar;
             const auto customSong = custom::catalog().find(song);
             if (customSong)
             {
@@ -317,12 +332,9 @@ namespace gh2::quickplay
                         characterOutfits.push_back(look.outfit);
                 if (const std::string pick = pickIfOpen(characterOutfits, cast.seed); !pick.empty())
                     outfit = pick;
-                if (cast.character == "grim" && outfit != retail)
-                {
+                if (cast.character == "gh2_grim" && outfit != retail)
                     // Each Grim Ripper his own game's scythe, which comes with him.
-                    const auto origin = outfits::ownOf(outfit);
-                    guitar = "scythe " + campaigns::scytheOf(origin ? origin->first : activeGame);
-                }
+                    guitar = "scythe " + campaigns::scytheOf(gameOf(outfit));
                 else
                     guitar = openGuitar(campaigns::finishes(), {cast.realGuitar}, cast.seed, std::nullopt, unlockAll);
             }
@@ -335,7 +347,7 @@ namespace gh2::quickplay
                             std::vector<std::string> alternates;
                             for (const std::string &other : characterOutfits)
                                 if (other != retail)
-                                    alternates.push_back(liveName(other));
+                                    alternates.push_back(other);
                             if (const std::string pick = pickIfOpen(alternates, custom::seedOf(song)); !pick.empty())
                                 outfit = pick;
                         }
@@ -355,8 +367,8 @@ namespace gh2::quickplay
             // them: another game's outfit is in it only once that game's
             // career has it (content/outfits.h). Else, and for a custom
             // song, the one its game boots with.
-            if (!isOpen(outfit) && (customSong || outfits::ownOf(outfit)))
-                outfit = liveName(bootOutfit(game));
+            if (!isOpen(outfit) && (customSong || gameOf(outfit) != activeGame))
+                outfit = bootOutfit(game);
 
             // Every game's finishes in the config first, as the guitar
             // picker has them (guitarsInitData).
@@ -418,12 +430,12 @@ namespace gh2::quickplay
                 return models(settings::kGuitars, reloadGuitars);
             if (op == "venues")
                 return choice(settings::kVenues, {"sd", "hd"});
-            // An outfit's scenes are a folder by its name, a finish's one
+            // An outfit's scenes are its folder on the disc, a finish's one
             // file by its (outfit ...).
             if (op == "has_hd" && call.size() > 3)
             {
                 const std::string path = call.symbol(2) == "guitar" ? "char/og/guitars/gen/" + call.symbol(3) + ".milo_ps2"
-                                                                    : "char/" + call.symbol(3) + "/";
+                                                                    : discFolder(call.symbol(3));
                 return {gh2xHasModel(path) ? 1u : 0u, script::kInt};
             }
             // One outfit's or finish's look by itself, the 360's or the PS2's
@@ -445,7 +457,7 @@ namespace gh2::quickplay
                 {
                     const bool guitar = what == "guitar";
                     const std::string path = guitar ? "char/og/guitars/gen/" + call.symbol(3) + ".milo_ps2"
-                                                    : "char/" + call.symbol(3) + "/";
+                                                    : discFolder(call.symbol(3));
                     const std::string look = call.symbol(4);
                     const bool was = gh2xServes(path);
                     setGh2xLook(path, look == "default" ? std::nullopt : std::optional<bool>(look == "hd"));

@@ -807,7 +807,7 @@ namespace gh2::save
         for (const NoteEngine engine : kNoteEngines)
             games.insert(sectionGame(game, engine));
         const sources::Row *row = sources::find(item);
-        const std::string stored = row && row->kind != sources::Kind::Song ? row->own : gh2::storedSong(game, item);
+        const std::string stored = row ? gh2::storedItem(game, item) : gh2::storedSong(game, item);
         for (const Section &section : s_store.sections)
         {
             // [band N <game>] and [band N <game> <difficulty>], under any engine.
@@ -817,9 +817,11 @@ namespace gh2::save
                 continue;
             for (const auto &[key, value] : section.values)
             {
-                // "<type>.<item>", "#2" on for one listed twice.
+                // "<type>.<item>", "#2" on for one listed twice; an outfit
+                // maybe by its old name (gh2_text.h's ourItem).
                 const size_t dot = key.find('.');
-                if (dot == std::string::npos || key.substr(dot + 1, key.find('#') - dot - 1) != stored)
+                const std::string named = dot == std::string::npos ? "" : key.substr(dot + 1, key.find('#') - dot - 1);
+                if (named.empty() || (named != stored && !(row && gh2::ourItem(game, named, row->kind) == item)))
                     continue;
                 std::istringstream words(value);
                 for (std::string word; words >> word;)

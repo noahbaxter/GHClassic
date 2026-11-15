@@ -30,7 +30,7 @@ namespace gh2::custom
 {
     struct Cast
     {
-        std::string character; // its guitarist, by GH2's config's name ("grim" for the Grim Ripper)
+        std::string character; // its guitarist, GH2's by id ("gh2_grim" for the Grim Ripper)
         std::string outfit;    // songs.dta's: a GH2 guitarist's first outfit, never the Grim Ripper's
         std::string guitar;    // songs.dta's: a Les Paul, SG or Flying V
         std::string realGuitar; // the guitar it plays once unlocked: any real one

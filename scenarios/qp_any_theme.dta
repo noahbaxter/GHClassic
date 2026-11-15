@@ -19,8 +19,8 @@
 (shot gh1_main)
 {gamecfg set mode quickplay}
 {setlist select {campaigns active}}
-(expect {if_else {find_exists $syscfg characters metal metalgh1} 1 0} 1)
-(expect {campaign is_unlocked metalgh1} 1)
+(expect {if_else {find_exists $syscfg characters gh2_metal gh1_metal} 1 0} 1)
+(expect {campaign is_unlocked gh1_metal} 1)
 {ui goto_screen ghc_qp_setup_screen}
 (wait_screen ghc_qp_setup_screen)
 (wait 1)
@@ -29,10 +29,10 @@
 (wait_until {char_single are_chars_loaded})
 (wait 2)
 (shot gh1_character)
-{sel_character_panel set char_focus grim}
-{sel_character_panel set char_outfit grim}
+{sel_character_panel set char_focus gh2_grim}
+{sel_character_panel set char_outfit gh2_grim}
 {sel_character_panel show_portraits}
-{char_single show_char 0 grim}
+{char_single show_char 0 gh2_grim}
 (wait_until {char_single are_chars_loaded} 10)
 (wait 2)
 (shot gh1_menus_grim_slayin)

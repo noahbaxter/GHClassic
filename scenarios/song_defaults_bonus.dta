@@ -17,6 +17,6 @@
 {{game get_player_config 0} set autoplay TRUE}
 (press green)
 (wait_screen game_screen 60)
-(expect {game get_character_outfit} rock1)
+(expect {game get_character_outfit} gh2_rock1)
 (expect {game get_venue} gh2_theatre)
 (quit)

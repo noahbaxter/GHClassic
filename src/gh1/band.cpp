@@ -1,6 +1,7 @@
 #include "gh1/band.h"
 
 #include "content/band.h"
+#include "content/sources.h"
 #include "disc/ark.h"
 #include "gh1/clip_set.h"
 #include "gh1/face.h"
@@ -125,7 +126,7 @@ namespace gh2::gh1
     {
         for (const Member &member : kMembers)
         {
-            const std::string name = member.name, ours = name + "gh1";
+            const std::string name = member.name, ours = sources::add(sources::Kind::Outfit, "gh1", name).id;
             const std::string theirs = "charsys/" + name + "/gen/", gh2Dir = "char/" + name + "/";
             const auto gh1 = load(theirs + name + ".rnd_ps2");
             const auto face = *member.face ? load(theirs + member.face + ".rnd_ps2") : std::optional(milo::Dir{});
