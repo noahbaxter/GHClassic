@@ -152,6 +152,9 @@ namespace gh2
     void installSongCrown(PS2Runtime &runtime, const Addresses &addresses)
     {
         s_addresses = &addresses;
+        // The crown as a file too, for a Tex the script makes
+        // ({set_bitmap "ui/image/ghc_crown.png"}): practice's stats.
+        ark::addFile("ui/image/gen/ghc_crown.png_ps2", std::vector<uint8_t>(std::begin(kCrown), std::end(kCrown)));
         ark::addFix(0u, "ui/gen/ui_objects.dtb", [](std::vector<uint8_t> &file)
                     {
                         auto root = dtb::raw(file);

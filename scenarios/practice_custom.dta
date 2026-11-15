@@ -41,4 +41,13 @@
 (shot playing)
 (wait_until {> $ghc_practice_best 0} 120)
 (expect $ghc_practice_best 100)
+; Autoplay misses nothing and strums nothing stray: the crown.
+(expect $ghc_practice_fc 1)
+(wait 0.2)
+(expect {{practice_panel find ghc_crown.mesh} showing} 1)
+; A best is at its speed: another starts it over.
+{song_speed live 95}
+(wait 0.2)
+(expect $ghc_practice_best 0)
+(expect {{practice_panel find ghc_crown.mesh} showing} 0)
 (quit)

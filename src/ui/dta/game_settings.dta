@@ -474,7 +474,38 @@
       {events_parser add_sink $this section}
       {game add_sink $this intro_skip}
       {practice_clicks start {game get_song}}
+      {mtv_overlay_panel show_overlay FALSE}
+      ; Nothing left over from a practice left another way: a setting's
+      ; reload (taken by this load) or a section's end.
+      {set $ghc_practice_reload FALSE}
+      {set $ghc_practice_end FALSE}
+      ; The section's name in the screen's middle, not right of it beside
+      ; where the caption was, and the song's name above it, in its face.
+      {do
+         ($x 0) ($y 0) ($z 0)
+         {section.lbl get_local_pos $x $y $z}
+         ; From where the scene has it, kept once: this runs each load.
+         {if {== [section_z] ''} {set [section_z] $z}}
+         {set $z {'-' [section_z] [section_down]}}
+         {section.lbl set_local_pos 0 $y $z}
+         {if {! {{$this loaded_dir} exists ghc_song.lbl}}
+            {new BandLabel ghc_song.lbl}
+            {ghc_song.lbl copy section.lbl 0}
+            {ghc_song.lbl set trans_parent {section.lbl get trans_parent}}
+            {ghc_song.lbl set_local_rot 0 0 0}
+            {ghc_song.lbl set_local_scale [song_size] 1 [song_size]}
+            {ghc_song.lbl set fit_text 0}
+            {ghc_song.lbl set wrap_width 4000}
+            {ghc_song.lbl set_showing TRUE}
+         }
+         {ghc_song.lbl set_local_pos 0 $y {'+' $z [song_dz]}}
+         {ghc_song.lbl set_localized_text {game get_song_text}}
+      }
    )
+   (song_size 0.95)   ; the song's name against the section's
+   (song_dz 36)       ; how far above the section's it stands
+   (section_down 14)  ; the section's below where the scene has it, for the song's room
+   (section_z '')     ; where the scene has it
    ; The music this many dB down while the metronome or note click is on,
    ; so they are heard over it.
    (duck_db -6)
@@ -488,7 +519,11 @@
       {practice_clicks stop}
       {music_fader set_val 0}
    )
+   ; As the game's own (practice.dta), but no song caption (its panel shows
+   ; as it loads; the game's own hid it 3 s in): the section's name has the
+   ; top to itself.
    (intro_skip
+      {mtv_overlay_panel show_overlay FALSE}
       {set [ignore_section] {section_provider section_after_last}}
    )
    (update
@@ -534,10 +569,19 @@
 {amend game
    (practice_end
       {set $ghc_practice_best {max $ghc_practice_best {ghc_practice_hit_pct}}}
+      ; A full combo as every song keeps one (save/results.cpp): no miss,
+      ; and every hit one streak, which a stray strum would have ended.
+      {if {&& {> {player0 gems_hit} 0} {== {player0 gems_passed} 0} {== {player0 longest_streak} {player0 gems_hit}}}
+         {set $ghc_practice_fc TRUE}
+      }
       {set $ghc_practice_end TRUE}
    )
 }
+; Practice's stats, top right over the song, as Clone Hero's: the speed,
+; the best of the section's ends since it was picked, and its hits so far.
 {set $ghc_practice_best 0}
+{set $ghc_practice_fc FALSE} ; a full combo among those ends
+{set $ghc_practice_best_for ''}
 {func ghc_practice_hit_pct
    {do
       ($all {'+' {player0 gems_hit} {player0 gems_passed}})
@@ -545,6 +589,14 @@
    }
 }
 {amend practice_panel
+   (stats_x 150)   ; the rows' left edge
+   (stats_z 150)   ; their top
+   (stats_wide 160)
+   (stats_mid 90)  ; where the names end and the numbers begin
+   (stats_row 18)
+   (stats_size 0.5)
+   (stats_crown_x 144) ; the crown's left edge, past Best Hit's number
+   (stats_shown '')
    (poll
       ; Not under the pause menu, which this panel is also on: a section
       ; ended as it opened goes round once it resumes. (Not by the game's
@@ -558,6 +610,104 @@
       {do
          ($steps {practice_steps})
          {if {&& {!= $steps 0} {! {game get game_over}}} {ghc_practice_speed_by $steps live}}
+      }
+      {if {! {{$this loaded_dir} exists ghc_stats.grp}} {$this make_stats}}
+      {do
+         ; Best of the section at this speed: a new speed starts it over.
+         ($for {sprint {game get_song} " " {gamecfg get (practice_sections 0)} " " {gamecfg get (practice_sections 1)} " " {song_speed playing}})
+         ($hit {player0 gems_hit})
+         ($all {'+' $hit {player0 gems_passed}})
+         {if {!= $for $ghc_practice_best_for}
+            {set $ghc_practice_best_for $for}
+            {set $ghc_practice_best 0}
+            {set $ghc_practice_fc FALSE}
+         }
+         {if {!= {sprint {song_speed} " " $ghc_practice_best " " $ghc_practice_fc " " $hit " " $all} [stats_shown]}
+            {set [stats_shown] {sprint {song_speed} " " $ghc_practice_best " " $ghc_practice_fc " " $hit " " $all}}
+            {ghc_stats_speed_value.lbl set_localized_text {sprint {song_speed} "%"}}
+            {ghc_stats_best_value.lbl set_localized_text {sprint $ghc_practice_best "%"}}
+            {ghc_stats_percent_value.lbl set_localized_text {sprint {ghc_practice_hit_pct} "%"}}
+            {ghc_stats_notes_value.lbl set_localized_text {sprint $hit "/" $all}}
+            ; The full combo crown: no miss and no stray strum.
+            {ghc_crown.mesh set_showing $ghc_practice_fc}
+         }
+      }
+   )
+   ; The rows on a group at their top left, each row's name ending at
+   ; [stats_mid] and its number after, on a dark box: the section name's
+   ; label in a plain font. The scene draws what its own list holds, so the
+   ; box and crown go on it, before the labels.
+   (make_stats
+      {do
+         ($names ("STATS" "Speed" "Best Hit" "Hit Percent" "Hit Notes"))
+         ($i 0)
+         ($dir {$this loaded_dir})
+         ; New labels, so the poll fills them whatever it showed last.
+         {set [stats_shown] ''}
+         {new Group ghc_stats.grp}
+         {ghc_stats.grp set_local_pos [stats_x] 0 [stats_z]}
+         ; Drawn by order, after the room's walls.
+         {ghc_box_make $this ghc_stats ghc_stats.grp 10}
+         {ghc_box_color $this ghc_stats 0 0 0 0.8}
+         {ghc_box_put $this ghc_stats -24 0 {'*' -2.5 [stats_row]} {'+' [stats_wide] 40} {'*' 5.4 [stats_row]} 8 8}
+         {ghc_box_show $this ghc_stats TRUE}
+         ; The song lists' crown (ui/song_crown.cpp) by Best Hit, after its
+         ; number.
+         {new Tex ghc_crown.tex}
+         {ghc_crown.tex set_bitmap "ui/image/ghc_crown.png"}
+         {new Mat ghc_crown.mat}
+         {ghc_crown.mat copy ghc_stats_end.mat 1}
+         {ghc_crown.mat set color {pack_color 1 1 1}}
+         {ghc_crown.mat set alpha 1}
+         {ghc_crown.mat set diffuse_tex ghc_crown.tex}
+         {new {{helpbar find help_box_right.mesh} class_name} ghc_crown.mesh}
+         {ghc_crown.mesh copy {helpbar find help_box_right.mesh} 1}
+         {ghc_crown.mesh set_mat ghc_crown.mat}
+         {ghc_crown.mesh set trans_parent ghc_stats.grp}
+         {ghc_crown.mesh set_local_rot 0 0 0}
+         {ghc_crown.mesh set_local_pos [stats_crown_x] 0 {'*' -2.5 [stats_row]}}
+         {ghc_crown.mesh set_local_scale {/ [stats_row] 12.0} 1 {/ [stats_row] 12.0}}
+         {ghc_crown.mesh set draw_order 11}
+         {ghc_crown.mesh set_showing FALSE}
+         {foreach $m (ghc_stats_mid.mesh ghc_stats_left.mesh ghc_stats_right.mesh ghc_crown.mesh)
+            {$dir insert (draws {$dir size (draws)}) {$this find $m}}
+         }
+         {foreach $row (title speed best percent notes)
+            {do
+               ($z {'*' {'-' -0.5 $i} [stats_row]})
+               ($name {$this stats_label {sprint "ghc_stats_" $row ".lbl"}})
+               {if_else {== $i 0}
+                  {do
+                     {$name set alignment 34}
+                     {$name set_local_pos {/ [stats_wide] 2} 0 $z}
+                  }
+                  {do
+                     {$name set alignment 36}
+                     {$name set_local_pos [stats_mid] 0 $z}
+                     {{$this stats_label {sprint "ghc_stats_" $row "_value.lbl"}} set_local_pos {'+' [stats_mid] 4} 0 $z}
+                  }
+               }
+               {$name set_localized_text {elem $names $i}}
+               {set $i {'+' $i 1}}
+            }
+         }
+         {{$this loaded_dir} sync_objects}
+      }
+   )
+   (stats_label ($name)
+      {do
+         ($l {new BandLabel {symbol $name}})
+         {$l copy section.lbl 0}
+         {$l set_type helveticablack}
+         {$l set trans_parent ghc_stats.grp}
+         {$l set_local_rot 0 0 0}
+         {$l set_local_scale [stats_size] 1 [stats_size]}
+         {$l set fit_text 0}
+         {$l set wrap_width 4000}
+         {$l set alignment 33}
+         {$l set draw_order 20}
+         {$l set_showing TRUE}
+         $l
       }
    )
 }
