@@ -448,8 +448,32 @@
 {amend practice_diff_screen
    (SELECT_START_MSG {ghc_practice_whole} {ui goto_screen practice_loading_screen} kDataUnhandled)
 }
-; A failed career song's Practice as its pause menu's.
-{amend lose_panel (goto_practice_mode {ghc_practice_song})}
+; A failed song's Practice as its pause menu's: the career's buttons, which
+; have it, for a quickplay song too (lose.dta gives quickplay's none). The
+; rest is the game's own.
+{amend lose_panel
+   (enter
+      {crowd_audio turn_off}
+      {lose_song_data.lbl set_localized_text {game get_song_text}}
+      {lose_diff_data.lbl set_text
+         {if_else
+            {== {gamecfg get mode} multi_coop}
+            {sprintf "%s/%s" {game get_difficulty_sym 0} {game get_difficulty_sym 1}}
+            {game get_difficulty_sym 0}
+         }
+      }
+      {lose_progress_data.lbl set_localized_text
+         {sprintf {localize percent_complete_format} {player0 percent_complete}}}
+      {do
+         ; GH1's screen has one list, without Practice (gh1/menus.dta).
+         ($practice {&& {!= {campaigns look} gh1} {find_elem (career quickplay) {gamecfg get mode}}})
+         {career_buttons.view set_showing $practice}
+         {normal_buttons.view set_showing {! $practice}}
+         {$this set_focus {if_else $practice lose_restart_career.btn lose_restart_normal.btn}}
+      }
+   )
+   (goto_practice_mode {ghc_practice_song})
+}
 ; Practice plays the part alone where it has channels of its own (not a
 ; custom song with no stem for it, custom/audio.h), with its drum clicks
 ; at any speed: GH2's TRIGGERS, a custom song's from its drums. With

@@ -927,6 +927,9 @@ namespace gh2::campaigns
                 return {script::symbol(call.rdram, call.ctx, call.runtime, s_campaigns[s_menus].game), script::kSymbol};
             if (op == "live")
                 return {script::symbol(call.rdram, call.ctx, call.runtime, active()), script::kSymbol};
+            // The game whose screens are around the song in play (lookFor).
+            if (op == "look")
+                return {script::symbol(call.rdram, call.ctx, call.runtime, s_campaigns[s_lookFrom].game), script::kSymbol};
             if (op == "has")
                 return {indexOf(call.symbol(2)) ? 1u : 0u, script::kInt};
             if (op == "first_character" || op == "second_character")
