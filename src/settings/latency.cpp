@@ -82,13 +82,25 @@ namespace gh2
             store<float>(rdram, load<uint32_t>(rdram, s_addresses->theOptions) + kSyncOffset, syncOffset());
         }
 
+        // A PlayerMatcher's StreamEE: its BeatMatchAudio (+0x34), that's
+        // MasterAudio (+0x8), its stream (+0xC), as BeatMatchAudio::GetStream.
+        constexpr uint32_t kStreamState = 0x4cu, kStreamPlaying = 4u; // StreamEE's; 3 is ready, 5 paused
+        uint32_t songStream(uint8_t *rdram, uint32_t matcher)
+        {
+            return load<uint32_t>(rdram, load<uint32_t>(rdram, load<uint32_t>(rdram, matcher + 0x34u) + 0x8u) + 0xcu);
+        }
+
         void getSongMs(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
-            const uint32_t returnTo = GPR_U32(ctx, 31);
+            const uint32_t returnTo = GPR_U32(ctx, 31), matcher = GPR_U32(ctx, 4);
             timing::clockRead();
-            runtime->callGuestFunction(rdram, ctx, s_addresses->playerMatcherGetSongMs, {GPR_U32(ctx, 4)},
-                                       s_getSongMs);
-            ctx->f[0] += songMs(settings::get(settings::kVideoLagMs) - settings::get(settings::kAudioLagMs));
+            runtime->callGuestFunction(rdram, ctx, s_addresses->playerMatcherGetSongMs, {matcher}, s_getSongMs);
+            // Not before its stream plays: GamePanel::Poll starts a song
+            // still to start only once this is past -25 ms, so a section
+            // restarted from the song's very start (a jump to 0, no lead-in)
+            // with audio 25 ms later than video would wait there for ever.
+            if (load<uint32_t>(rdram, songStream(rdram, matcher) + kStreamState) == kStreamPlaying)
+                ctx->f[0] += songMs(settings::get(settings::kVideoLagMs) - settings::get(settings::kAudioLagMs));
             ctx->pc = returnTo;
         }
 

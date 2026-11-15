@@ -4,6 +4,7 @@
 ; played to its end on autoplay.
 (songs songs)
 #include common/first_boot.dta
+{latency set audio 110}
 {gamecfg set mode practice}
 {{game get_player_config 0} set_difficulty easy}
 {setlist select custom}
@@ -67,4 +68,13 @@
 (wait 0.2)
 (expect $ghc_practice_best 0)
 (expect {{practice_panel find ghc_crown.mesh} showing} 0)
+; Its Intro from the song's very start, gone round with audio 110 ms behind
+; video: it plays (latency.cpp's shift waits for the stream to).
+(expect {latency get audio} 110)
+{ghc_practice_again}
+(wait_screen practice_game_screen 10)
+(wait 1)
+{set $ghc_s0 {taskmgr seconds}}
+(wait 3)
+(expect {> {'-' {taskmgr seconds} $ghc_s0} 2} 1)
 (quit)
