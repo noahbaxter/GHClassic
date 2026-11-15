@@ -281,7 +281,8 @@ namespace gh2
         // A device just seated, or just off the Controllers screen, plays
         // from when it lets go of what it held. Anywhere but a song playing
         // it is in a menu, where its green picks and red backs out, a song's
-        // own menus too.
+        // own menus too. Up and down step but on the breakdown (input.h).
+        const bool stepped = s_songScreen.load(std::memory_order_relaxed) != SongScreen::kBreakdown;
         HostPad pads[kSeats];
         for (int seat = 0; seat < kSeats; ++seat)
         {
@@ -293,7 +294,8 @@ namespace gh2
                 if (mode != Mode::kPlaying)
                 {
                     uint16_t menu = menuOf[seated[seat]->id];
-                    menu = navRepeat(menu, gameMs(), s_navSeat[seat]);
+                    if (stepped)
+                        menu = navRepeat(menu, gameMs(), s_navSeat[seat]);
                     if (s_modeWas == Mode::kPlaying)
                         s_menuWait[seat] = menu;
                     s_menuWait[seat] &= menu;
@@ -379,7 +381,7 @@ namespace gh2
                         (k.bit == pad::kUp || k.bit == pad::kDown ? nav : port.pressed) |= bit;
                     }
                 }
-                port.pressed |= navRepeat(nav, gameMs(), s_navKeys);
+                port.pressed |= stepped ? navRepeat(nav, gameMs(), s_navKeys) : nav;
             }
         s_modeWas = mode;
         if (mode == Mode::kControllers)
