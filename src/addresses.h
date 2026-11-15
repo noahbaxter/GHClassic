@@ -188,6 +188,9 @@ namespace gh2
         uint32_t optionsSyncVideo; // Options::SyncVideoOptions
         uint32_t optionsSetSyncOffset;
         uint32_t beatMatchCtor;
+        uint32_t beatMatchDtor;             // BeatMatch::~BeatMatch
+        uint32_t beatMatchRestart;          // BeatMatch::Restart
+        uint32_t beatMatchSetPracticeSpeed; // BeatMatch::SetPracticeSpeed(float)
         uint32_t playerMatcherGetSongMs;
         uint32_t ghUtlInit;        // where GH2 registers its DataFuncs
         uint32_t metaInit;
@@ -561,6 +564,9 @@ namespace gh2
         .optionsSyncVideo = 0x10db80u,
         .optionsSetSyncOffset = 0x10ded8u,
         .beatMatchCtor = 0x120f48u,
+        .beatMatchDtor = 0x121528u,
+        .beatMatchRestart = 0x122660u,
+        .beatMatchSetPracticeSpeed = 0x1224f0u,
         .playerMatcherGetSongMs = 0x115738u,
         .ghUtlInit = 0x11fbf0u,
         .metaInit = 0x133f78u,

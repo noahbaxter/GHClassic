@@ -28,6 +28,7 @@ namespace gh2::vgs
         constexpr uint32_t kRoundsAtOnce = 512u;   // decoded per step
         constexpr uint32_t kFollowRounds = 4096u;  // a read this far ahead decodes through
         constexpr size_t kOpenSongs = 3u;          // preview, song, one spare
+        constexpr size_t kOpenSongs = 4u;          // preview, song, the song a speed's is made from, one spare
 
         struct Source
         {

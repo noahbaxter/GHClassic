@@ -25,6 +25,7 @@ namespace gh2::settings
         kGuitarVolume,
         kFxVolume,
         kStereo,
+        kMaintainPitch, // a song at another speed keeps its pitch (content/song_speed.h)
         kFastBoot,   // straight to the main menu, past the logos and splash
         kLefty,      // player 1's frets mirrored
         kLeftyP2,
