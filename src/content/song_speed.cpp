@@ -57,10 +57,12 @@ namespace gh2::song_speed
             synth::keepPitch(on && s_percent != 100 && settings::get(settings::kMaintainPitch) ? 100 : 0);
         }
         uint32_t s_beatMatch = 0u;
-        // The speed a practice song's audio is made at: played at 200% it is
-        // at the SPU's most, 4x a 48 kHz stream (spu.cpp); below 50% it
-        // plays under its own rate, its highest highs lost.
-        constexpr int kPracticeBase = 50;
+        // A practice song's audio is made at the speed it starts at, so it
+        // plays as quickplay's does until the speed changes; at least 50%,
+        // so 200% is at most the SPU's 4x a 48 kHz stream (spu.cpp). Below
+        // the speed it is made at it plays under its own rate, its highest
+        // highs lost.
+        constexpr int kPracticeSlowestBase = 50;
         int s_playing = 100; // the speed the game plays at now
 
         // A .vgs decoded, every channel read at the fastest one's rate.
@@ -486,13 +488,14 @@ namespace gh2::song_speed
                 if (name.rfind(kPrefix, 0) == 0)
                     name = name.substr(name.find('/', sizeof kPrefix - 1u) + 1u);
                 // Pitch let go, the song's own file plays at the speed, like
-                // a tape. Practice's is made at 50%, its pitch put back in
-                // the mix at whatever speed it plays.
+                // a tape. Practice's is made at its starting speed, its pitch
+                // put back in the mix at whatever speed it plays.
                 const bool tape = !settings::get(settings::kMaintainPitch);
-                synth::keepPitch(op == "name" && s_practice && !tape ? kPracticeBase : 0);
-                if (op == "base" || tape || (s_percent == 100 && !s_practice))
+                const int made = s_practice ? std::max(s_percent, kPracticeSlowestBase) : s_percent;
+                synth::keepPitch(op == "name" && s_practice && !tape ? made : 0);
+                if (op == "base" || tape || made == 100)
                     return call.word(name);
-                return call.word(kPrefix + std::to_string(s_practice ? kPracticeBase : s_percent) + "/" + name);
+                return call.word(kPrefix + std::to_string(made) + "/" + name);
             }
             return {static_cast<uint32_t>(s_percent), script::kInt};
         }

@@ -412,7 +412,8 @@
    {gamecfg set_track 0 0}
    {practice_sel_section_screen set career_mode {== $ghc_practice_from career}}
    {set $ghc_qp_speed {song_speed}}
-   {song_speed set $ghc_practice_pct}
+   ; At the speed it was playing, within practice's.
+   {song_speed set {max 25 {min 200 {song_speed}}}}
    {meta_loading_goto practice_sel_section_screen}
 }
 ; Practice's Return, and red on its first section, back to the song list it

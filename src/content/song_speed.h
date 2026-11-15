@@ -10,8 +10,9 @@
 // that .vgs at that percent, 10 to 500, made as the game reads it. With
 // maintain_pitch off the song's own file plays at the speed, like a tape.
 //
-// Practice's audio is "ghc_speed/50/...", made at 50% once and played at
-// any speed, changed as it plays, its pitch put back in the mix as it is
+// Practice's audio is made at the speed it starts at (at least 50%;
+// at 100% the song's own file) and played at any speed, changed as it
+// plays, its pitch put back in the mix as it is
 // heard (synth::keepPitch), so nothing it has read ahead is wrong. It also
 // plays the part alone where it has channels of its own ({song_speed solo},
 // ui/dta/game_settings.dta's ghc_practice_solo).

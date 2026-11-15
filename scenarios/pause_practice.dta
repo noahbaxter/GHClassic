@@ -1,5 +1,5 @@
 ; Practice from a quickplay song at 120%, its pause menu's third row: the
-; song's sections, then practice, which starts at 100%. Practice's pause
+; song's sections, then practice, which starts at its 120%. Practice's pause
 ; menu has six rows, Settings for New Song, and its Return goes back where practice
 ; began: that song in quickplay, at its 120%. Then the pause menus in GH1's
 ; scene, and practice begun from the menus, whose Return is practice's song
@@ -33,7 +33,7 @@
 (expect {game get_song} shoutatthedevil)
 {gamecfg set (practice_sections 0) 0}
 {gamecfg set (practice_sections 1) 1}
-(expect {song_speed} 100)
+(expect {song_speed} 120)
 {song_speed set 65}
 {ui goto_screen practice_loading_screen}
 (wait_screen practice_game_screen 60)
