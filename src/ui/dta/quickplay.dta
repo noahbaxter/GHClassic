@@ -471,6 +471,8 @@
       (focus ss_song.lst)
       (joypad (hold_ms 500) (repeat_ms 80))
       (enter
+         ; A setlist picked on the paper turned away, on its first song.
+         {if {setlist take} {game set_song_index 0}}
          {set $ghc_preview_live TRUE}
          ; The preview at the song speed, as it changes (content/song_speed.h);
          ; a career's is at 100%.
@@ -528,9 +530,13 @@
          {song_preview ''}
          {song_speed preview FALSE}
          {set $ghc_preview_on ''}
-         {if [metamusic_on_exit] {meta_music start}}
+         {if [metamusic_on_exit]
+            {meta_music start}
+            ; Not on the turn to the twin (ghc_qp_picked): this paper still
+            ; shows its list as it turns away, which would show the career's.
+            {song_provider set_quickplay FALSE}
+         }
          {set [metamusic_on_exit] TRUE}
-         {song_provider set_quickplay FALSE}
       )
       (SCROLL_MSG {$this update_pos})
       (poll
@@ -545,8 +551,8 @@
          }
          {if {&& {! $ghc_info_due} {$this find ghc_info_0.lbl FALSE}} {ghc_info_art $this}}
          ; Songs a scan finds or loses since the list filled, put in while
-         ; it rests (content/setlists.h).
-         {if {&& {! $ghc_scroll_rushing} {setlist stale}} {$this ghc_renew}}
+         ; it rests (content/setlists.h); a new sort turning away, never.
+         {if {&& {! $ghc_scroll_rushing} {! {ui in_transition}} {setlist stale}} {$this ghc_renew}}
       )
       ; The list filled again with the same song on, where it was on the
       ; screen; one gone leaves the highlight on the row there.
@@ -804,20 +810,13 @@
    {$n_panel ghc_jump {mod {'+' {setlist tier_at} 1} {setlist tiers}}}
 }
 ; The setlist or sort picked, shown by that screen: a new sort keeps the
-; song the list is on (content/setlists.cpp).
+; song the list is on (content/setlists.cpp). The paper turning away keeps
+; the setlist it shows; the twin loads the next one's scene.
 {func ghc_qp_picked ($panel $twin $game)
-   {cond
-      ({custom sort $game}
-         {synth play_sequence button_select}
-         {$panel set metamusic_on_exit FALSE}
-         {ui goto_screen $twin}
-      )
-      ({setlist select $game}
-         {synth play_sequence button_select}
-         {$panel set metamusic_on_exit FALSE}
-         {game set_song_index 0}
-         {ui goto_screen $twin}
-      )
+   {if {|| {custom sort $game} {setlist next $game}}
+      {synth play_sequence button_select}
+      {$panel set metamusic_on_exit FALSE}
+      {ui goto_screen $twin}
    }
 }
 {retype qp_selsong_screen

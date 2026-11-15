@@ -1,0 +1,44 @@
+; A new sort or setlist picked on the custom setlist turns the paper to the
+; twin screen (quickplay.dta's ghc_qp_picked): the paper turning away keeps
+; its rows as they were, never the career's or the new ones, and the twin's
+; comes in on the same song for a sort, the first for a setlist.
+(songs sort_rotation)
+#include common/first_boot.dta
+{gamecfg set mode quickplay}
+{setlist select custom}
+{custom sort sort_title}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(press down)
+(press down)
+(wait 1)
+(expect {game get_song_index} 2)
+{set $row2 {song_provider get_symbol 2}}
+(record on sort_artist)
+{qp_selsong_screen ghc_picked sort_artist}
+(expect {song_provider get_quickplay} 1)
+(wait 0.2)
+(expect {ui in_transition} 1)
+(expect {song_provider get_quickplay} 1)
+(expect {song_provider get_symbol 2} $row2)
+(expect {game get_song_index} 2)
+(wait_screen qp_selsong_twin_screen)
+(wait 1)
+(record off)
+(expect {game get_song_index} 4)
+(wait 2)
+{set $row2 {song_provider get_symbol 2}}
+(record on setlist_gh2)
+{qp_selsong_twin_screen ghc_picked gh2}
+(wait 0.2)
+(expect {ui in_transition} 1)
+(expect {setlist shown} custom)
+(expect {song_provider get_symbol 2} $row2)
+(expect {game get_song_index} 4)
+(wait_screen qp_selsong_screen)
+(wait 1)
+(record off)
+(expect {setlist shown} gh2)
+(expect {game get_song_index} 0)
+(quit)

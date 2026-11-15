@@ -47,6 +47,7 @@ namespace gh2::setlists
         const Addresses *s_addresses = nullptr;
         std::map<std::string, Setlist> s_setlists;
         std::string s_selected = "gh2";
+        std::string s_next; // picked, shown once the list it turns to enters
         std::string s_campaign = "gh2"; // the game played when it was picked
 
         // Whether there is such a setlist with songs to show.
@@ -447,19 +448,20 @@ namespace gh2::setlists
 
         // The shown one's song list scene. The game played's own list is in
         // its own scene, at the game's path for it.
-        std::string shownLook()
+        std::string shownLook(const std::string &name = selected())
         {
-            return selected() == campaigns::active() ? kOwnLook : s_setlists.at(selected()).look;
+            return name == campaigns::active() ? kOwnLook : s_setlists.at(name).look;
         }
 
         script::Node setlistCommand(const script::Call &call)
         {
             const std::string op = call.symbol(1);
-            if (op == "select")
+            if (op == "select" || op == "next" || op == "take")
             {
-                const std::string name = call.symbol(2);
+                const std::string name = op == "take" ? s_next : call.symbol(2);
                 const bool changed = s_setlists.count(name) != 0u && name != selected();
-                if (changed)
+                s_next = op == "next" && changed ? name : "";
+                if (changed && op != "next")
                 {
                     s_selected = name;
                     save::keepState("setlist", "shown", s_selected);
@@ -467,8 +469,10 @@ namespace gh2::setlists
                 }
                 return {changed ? 1u : 0u, script::kInt};
             }
+            // The next one's, for the list it turns to, loaded as it is picked.
             if (op == "look")
-                return {symbol(call.rdram, call.ctx, call.runtime, shownLook()), script::kSymbol};
+                return {symbol(call.rdram, call.ctx, call.runtime, shownLook(s_next.empty() ? selected() : s_next)),
+                        script::kSymbol};
             if (op == "shown")
                 return {symbol(call.rdram, call.ctx, call.runtime, selected()), script::kSymbol};
             if (op == "has")
@@ -561,7 +565,7 @@ namespace gh2::setlists
             // moved to keep it away from either end, -1 if it has not.
             if (op == "scroll")
                 return rowNode(s_shown ? scroll(window, call.index(2)) : std::nullopt);
-            std::cerr << "[setlist] usage: {setlist select|has <name>}, {setlist look|shown|tiers|tier_at|random}, "
+            std::cerr << "[setlist] usage: {setlist select|next|has <name>}, {setlist take|look|shown|tiers|tier_at|random}, "
                       << "{setlist song [row]}, {setlist scroll|frame <row>}, {setlist header|tier_name|jump <n>}, "
                       << "{setlist paper_base <piece> <x> <z>}, {setlist paper <piece> x|z}, "
                       << "{setlist paper_pose <piece> <object>} (content/setlists.h)" << std::endl;

@@ -8,7 +8,10 @@
 // run to run (save::state).
 //
 //   {setlist select <name>}  TRUE if it exists and was not already shown
-//   {setlist look}           the shown one's song list scene
+//   {setlist next <name>}    that, shown only once taken: a list turning
+//                            away keeps the one it shows
+//   {setlist take}           the next one shown, TRUE if there was one
+//   {setlist look}           the next one's song list scene, else the shown one's
 //   {setlist shown}          the shown one's name
 //   {setlist has <name>}     TRUE if it exists
 //   {setlist song [row]}     the shown one's song row last on, -1 if none;
