@@ -279,7 +279,8 @@
 
 ; The pause menu, as the game's own (pause.dta) with one Settings row where
 ; it has one for audio and one for video, and Video Settings' row as Photo
-; Mode (photo_mode.dta): Resume, Restart, Settings, Photo Mode, Quit.
+; (photo_mode.dta): Resume, Restart, Practice in quickplay, Settings, Photo,
+; Quit.
 ; Settings leads to a menu of its own, the same scene again with its rows
 ; named Audio, Video, Game and Controllers (controllers.dta), and each
 ; settings screen leads back to that (the screens take the selects and the
@@ -315,48 +316,60 @@
       (focus resume.btn)
       (reset_focus TRUE)
       (enter
-         {$this five_rows}
+         {$this lay_rows}
          ; A token with no string reads as itself.
          {audio_options.btn set text_token "SETTINGS"}
-         {video_options.btn set text_token "PHOTO MODE"}
+         {video_options.btn set text_token "PHOTO"}
          {ghc_practice.btn set text_token "PRACTICE"}
       )
-      ; GH1's scene has four rows, and Video Settings' put away: that one
-      ; as Quit's again, the fourth of five. Its frame has little room
-      ; over four rows, so the five start a little higher and stand a
-      ; little closer. Each time the scene loads.
-      (five_up 0.2)
-      (five_gap 0.9)
-      (five_rows
-         {if {! {video_options.btn showing}}
+      ; In quickplay and career, Practice under Restart, Restart cloned: the song again
+      ; in practice (ghc_practice_song). GH1's scene has four rows, and Video
+      ; Settings' put away: that one as Quit's again. A frame has little room
+      ; past its own rows, so more rows start higher and stand closer: [up]
+      ; rows above Resume and [gap] rows apart, by the scene and the rows
+      ; shown, and the title [raise] rows higher. Each time the scene loads.
+      (rows_at ((gh2_5 0 1 0) (gh2_6 0.5 1 0) (gh1_5 0.2 0.9 0) (gh1_6 1.45 0.95 2.2)))
+      (lay_rows
          {if {! {exists ghc_practice.btn}}
             {do
-               ($x 0) ($y 0) ($z 0) ($above 0) ($row 0) ($i 0)
-               {audio_options.btn get_local_pos $x $y $above}
-               {quit.btn get_local_pos $x $y $z}
-               {set $row {'-' $z $above}}
-               {video_options.btn copy quit.btn 0}
-               ; Not drawn in to QUIT's width: its own, as the other rows.
-               {video_options.btn set fit_text 0}
-               {video_options.btn set trans_parent {quit.btn get trans_parent}}
-               {video_options.btn set_showing TRUE}
-               {video_options.btn set_state kNormal}
-               {audio_options.btn set nav_down video_options.btn}
-               {video_options.btn set nav_down quit.btn}
+               ($gh1 {! {video_options.btn showing}})
+               ($rows
+                  {if_else {|| {== {gamecfg get mode} quickplay} {== {gamecfg get mode} career}}
                      (resume.btn restart.btn ghc_practice.btn audio_options.btn video_options.btn quit.btn)
+                     (resume.btn restart.btn audio_options.btn video_options.btn quit.btn)
+                  }
+               )
+               ($at {find [rows_at] {symbol {sprint {if_else $gh1 gh1 gh2} "_" {size $rows}}}})
+               ($x 0) ($y 0) ($z 0) ($row 0) ($i 0)
                {new {restart.btn class_name} ghc_practice.btn}
                {ghc_practice.btn copy restart.btn 0}
                {ghc_practice.btn set trans_parent {restart.btn get trans_parent}}
+               ; The rows draw through their parent, over the frame.
                {{restart.btn get trans_parent} insert (objects {{restart.btn get trans_parent} size objects}) ghc_practice.btn}
                {ghc_practice.btn set_showing {== {size $rows} 6}}
                {ghc_practice.btn set_state {if_else {== {size $rows} 6} kNormal kDisabled}}
+               {if $gh1
+                  {video_options.btn copy quit.btn 0}
+                  {video_options.btn set trans_parent {quit.btn get trans_parent}}
+                  {video_options.btn set_showing TRUE}
+                  {video_options.btn set_state kNormal}
+               }
                {resume.btn get_local_pos $x $y $z}
-               {foreach $btn (resume.btn restart.btn audio_options.btn video_options.btn quit.btn)
+               {restart.btn get_local_pos $x $y $row}
+               {set $row {'-' $row $z}}
+               {do
+                  ($tx 0) ($ty 0) ($tz 0)
+                  {pause_title.lbl get_local_pos $tx $ty $tz}
+                  {pause_title.lbl set_local_pos $tx $ty {'-' $tz {'*' {elem $at 3} $row}}}
+               }
+               {foreach $btn $rows
                   {$btn set_local_pos $x $y
-                     {'+' {'-' $z {'*' [five_up] $row}} {'*' {'*' [five_gap] $row} $i}}
+                     {'+' {'-' $z {'*' {elem $at 1} $row}} {'*' {'*' {elem $at 2} $row} $i}}
                   }
+                  {if {> $i 0} {{elem $rows {'-' $i 1}} set nav_down $btn}}
                   {set $i {'+' $i 1}}
                }
+               {{$this loaded_dir} sync_objects}
             }
          }
       )
@@ -385,8 +398,66 @@
       (BUTTON_DOWN_MSG {if {== $button kPad_Start} {$this resume}} kDataUnhandled)
    )
 }
+
+; A quickplay or career song in practice, from its pause menu, as GH2 goes
+; there from a failed career song (lose.dta's goto_practice_mode): its
+; section picked first. Practice's Return then goes back to that song, until
+; the main menu.
+{set $ghc_practice_from FALSE}
+{set $ghc_practice_row -1} ; a career song's setlist row, for Return to come back on
+{func ghc_practice_song
+   {set $ghc_practice_from {gamecfg get mode}}
+   {set $ghc_practice_row {if_else {== $ghc_practice_from career} {game get_song_index} -1}}
+   {gamecfg set mode practice}
+   {gamecfg set_track 0 0}
+   {practice_sel_section_screen set career_mode {== $ghc_practice_from career}}
    {set $ghc_qp_speed {song_speed}}
    {song_speed set $ghc_practice_pct}
+   {meta_loading_goto practice_sel_section_screen}
+}
+; Practice's Return, and red on its first section, back to the song list it
+; began from, on the song: the career's or quickplay's (at its own speed),
+; else practice's.
+{func ghc_practice_exit
+   {cond
+      ({practice_sel_section_screen get career_mode}
+         {career_screen resume_from_practice}
+         {song_speed set 100}
+         {meta_loading_goto sel_song_screen}
+      )
+      ({== $ghc_practice_from quickplay}
+         {gamecfg set mode quickplay}
+         {song_speed set $ghc_qp_speed}
+         {meta_loading_nosave_goto qp_selsong_screen}
+      )
+      (TRUE {meta_loading_nosave_goto practice_selsong_screen})
+   }
+}
+; Red on the section picker: from its end section back to its start, as the
+; game's own (practice.dta); from its start, back before it: a song from a
+; pause menu goes as Return does, one from practice's menus to its
+; difficulty.
+{amend practice_sel_section_panel
+   (BUTTON_DOWN_MSG
+      {cond
+         ({&& {== $button kPad_Tri} {== [section] 1}}
+            {set [section] 0}
+            {section_provider set_start_section -1}
+            {title.lbl set_text select_start_section}
+            TRUE
+         )
+         ({&& {== $button kPad_Tri} {! {ui in_transition}}}
+            {synth play_sequence button_back.cue}
+            {if_else {|| {practice_sel_section_screen get career_mode} $ghc_practice_from}
+               {ghc_practice_exit}
+               {ui goto_screen practice_diff_screen}
+            }
+            TRUE
+         )
+         (TRUE kDataUnhandled)
+      }
+   )
+}
             ({&& {== $button kPad_Select} {! {ui in_transition}}} {ghc_practice_again})
 {func ghc_practice_again
    {synth stop_all_sfx}
@@ -437,7 +508,21 @@
 {func ghc_practice_resume ($screen)
    }
 }
+{retype pract_pause_panel
+   (
+      (file ui/pract_pause.milo)
+      (enter
+         {do
+            ($career {practice_sel_section_screen get career_mode})
+            {tut_pause_career_buttons.view set_showing $career}
+            {tut_pause_buttons.view set_showing {! $career}}
+            {$this set_focus {if_else $career resume_career.btn resume.btn}}
+         }
+         ; A token with no string reads as itself.
+         {quit.btn set text_token "RETURN"}
+         {quit_career.btn set text_token "RETURN"}
          {ghc_practice_speed_label $this}
+      )
       (exit {if $ghc_speed_before {ghc_practice_speed_edit $this FALSE}})
       ; The speed row: its name the button's, moved left of the row's
       ; middle, and its number a label right of it, the two centred
@@ -490,6 +575,23 @@
             {ghc_speed_num.lbl set_localized {sprint {song_speed} "%"}}
          }
       )
+            {do
+               {foreach $btn $rows
+                  {if {> $i 0} {{elem $rows {'-' $i 1}} set nav_down $btn}}
+                  {set $i {'+' $i 1}}
+               }
+            }
+         }
+      )
+   )
+}
+{retype pract_pause_screen
+   (
+      (panels PRACTICE_PANELS pract_pause_panel)
+      (focus pract_pause_panel)
+      (clear_vram TRUE)
+      (in_game TRUE)
+      PAUSE_SCREEN_HANDLERS
       (BUTTON_DOWN_MSG
          {cond
             ({ghc_practice_speed_button pract_pause_panel $button} TRUE)
@@ -497,8 +599,16 @@
             (TRUE kDataUnhandled)
          }
       )
+      (SELECT_START_MSG
+         {switch $component
             ((resume.btn resume_career.btn) {ghc_practice_resume $this})
+            (section.btn {meta_loading_nosave_goto practice_sel_section_screen})
+            (section_career.btn {meta_loading_goto practice_sel_section_screen})
             ((change_speed.btn change_speed_career.btn) {ghc_practice_speed_select pract_pause_panel})
+         }
+      )
+   )
+}
 {if {! {exists pause_settings_screen}}
    {new GHPanel pause_settings_panel}
    {new GHScreen pause_settings_screen}

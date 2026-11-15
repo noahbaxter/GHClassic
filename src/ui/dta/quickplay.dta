@@ -506,6 +506,13 @@
             }
          }
          {$this update_song_info}
+         ; Back from practice on a career song: on that song, not the one the
+         ; career wants next (Game::SetCareerSong, update_song_info).
+         {if {>= $ghc_practice_row 0}
+            {ss_song.lst set_selected $ghc_practice_row}
+            {$this update_pos}
+            {set $ghc_practice_row -1}
+         }
       )
       (update_song_info
          {if {== 0 {song_provider get_quickplay}} {game set_career_song}}
