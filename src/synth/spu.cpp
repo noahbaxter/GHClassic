@@ -213,6 +213,19 @@ namespace gh2::synth
         return static_cast<uint16_t>(m_voices[voice].level);
     }
 
+    uint16_t Spu::pitch(uint32_t voice) const
+    {
+        return m_voices[voice].pitch;
+    }
+
+    // NAX moves on past a block as its last sample is taken (nextSample),
+    // so with all of one taken it is already the next.
+    uint32_t Spu::playedInBlock(uint32_t voice) const
+    {
+        const Voice &v = m_voices[voice];
+        return v.blockPos >= kAdpcmBlockSamples ? 0u : v.blockPos;
+    }
+
     void Spu::setMasterVolume(uint16_t left, uint16_t right)
     {
         m_masterL = fixedVolume(left);

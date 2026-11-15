@@ -191,6 +191,8 @@ namespace gh2::synth
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         m_spu.reset();
+        m_timeline.clear();
+        m_timeline.setClock(std::nullopt);
         m_streams.clear();
         m_samples.clear();
         freeAllVoices();
@@ -1039,13 +1041,29 @@ namespace gh2::synth
             {
                 tick();
                 m_framesToTick = kTickFrames;
+                markSong();
             }
             const size_t n = std::min<size_t>(frames, m_framesToTick);
             m_spu.mix(out, n);
+            double ms = 0.0, msPerFrame = 0.0;
+            {
+                ms = samples * 1000.0 / m_songClock->rate + m_songClock->startMs;
+                msPerFrame = step * 1000.0 / m_songClock->rate;
+            }
+            m_timeline.mix(out, n, ms, msPerFrame);
+            m_songFrames += n;
             out += n * 2u;
             frames -= n;
             m_framesToTick -= static_cast<uint32_t>(n);
         }
+    }
+
+    // The timeline's stream, as the tick left it: its first channel's
+    // reference voice (the one the song clock follows, position) where it
+    void Module::markSong()
+    {
+        m_songClock = m_timeline.clock();
+        m_songFrames = 0u;
     }
 
     // Positions, slip offsets and sample progress each overwrite what the

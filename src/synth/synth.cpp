@@ -186,9 +186,12 @@ namespace gh2
         void lockClock(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
             const uint32_t self = GPR_U32(ctx, 4);
+            const uint32_t id = load<uint32_t>(rdram, self + kStreamId);
             if (load<uint32_t>(rdram, self + kStreamState) != kStreamPlaying)
             {
                 s_locks.erase(self);
+                if (const auto clock = s_module.timeline().clock(); clock && clock->stream == id)
+                    s_module.timeline().setClock(std::nullopt);
                 return;
             }
             const int32_t played = load<int32_t>(rdram, self + kPlayed);
@@ -205,6 +208,9 @@ namespace gh2
             SET_GPR_U32(ctx, 4, self);
             if (rate == 0u)
                 return;
+            // The song's stream, the one its clock is held to, times the
+            // timeline's sounds (GH2 plays one stream through a song).
+            s_module.timeline().setClock(synth::Timeline::Clock{id, rate, load<float>(rdram, self + kStartMs)});
 
             const auto now = ps2x::host_clock::now();
             const float timerRate = load<float>(rdram, self + kTimer + kTimerRate);
@@ -257,5 +263,10 @@ namespace gh2
     void synth::render(float *out, size_t frames)
     {
         s_module.render(out, frames);
+    }
+
+    synth::Timeline &synth::timeline()
+    {
+        return s_module.timeline();
     }
 }

@@ -10,6 +10,7 @@
 // voices it reads positions from have played exactly that long.
 
 #include "synth/spu.h"
+#include "synth/timeline.h"
 
 #include "runtime/host_clock.h"
 
@@ -52,6 +53,10 @@ namespace gh2::synth
 
         // Audio thread: `frames` of interleaved stereo at 48 kHz added to `out`.
         void render(float *out, size_t frames);
+
+        // Sounds at the song's time, mixed with the rest (synth/timeline.h).
+        Timeline &timeline() { return m_timeline; }
+
 
     private:
         struct Channel;
@@ -126,5 +131,11 @@ namespace gh2::synth
         std::vector<Reply> m_tickReplies;
         std::vector<Reply> m_sent;
         uint32_t m_framesToTick = 0;
+
+        // Where the timeline's stream is: taken each tick from its voice,
+        void markSong();
+        Timeline m_timeline;
+        std::optional<Timeline::Clock> m_songClock;
+        size_t m_songFrames = 0;
     };
 }

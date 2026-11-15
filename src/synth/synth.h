@@ -12,7 +12,11 @@ namespace gh2
 
     namespace synth
     {
+        class Timeline;
+
         // The mix, as the audio device pulls it: see host/audio.h.
         void render(float *out, size_t frames);
+        // Sounds played at the song's time (synth/timeline.h).
+        Timeline &timeline();
     }
 }

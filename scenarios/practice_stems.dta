@@ -5,6 +5,10 @@
 ; GH2's TRIGGERS. practice_custom has a song with no stem, played whole.
 (songs songs_stems)
 #include common/first_boot.dta
+; The clicks counted as the mix plays them, the metronome's and note
+; click's off.
+{practice_option metronome 0}
+{practice_option note_click 0}
 {gamecfg set mode practice}
 {setlist select custom}
 {ui goto_screen practice_selsong_screen}
@@ -23,9 +27,13 @@
 (shot sections)
 (press green)
 (wait_screen practice_game_screen 60)
+{set $ghc_from {practice_clicks played}}
 (expect $ghc_practice_solo 1)
 (expect {elem {elem {find $syscfg songs {game get_song} song vols} 1} 0} -96.0)
 (expect {elem {elem {find $syscfg songs {game get_song} song vols} 1} 2} 0.0)
+; Four kicks, four snares, eight hi-hats: GH2's snare and hi-hat each a
+; left and a right sample.
+(expect {'-' {practice_clicks played} $ghc_from} 28)
 {ui goto_screen main_screen}
 (wait_screen main_screen 30)
 (expect $ghc_practice_solo 0)
@@ -44,5 +52,7 @@
 (wait_screen practice_game_screen 60)
 (expect $ghc_practice_solo 1)
 (expect {elem {elem {find $syscfg songs shoutatthedevil song vols} 1} 0} -96.0)
+{set $ghc_from {practice_clicks played}}
 (wait 15)
+(expect {> {'-' {practice_clicks played} $ghc_from} 10} 1)
 (quit)

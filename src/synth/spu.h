@@ -48,6 +48,10 @@ namespace gh2::synth
         uint32_t nextAddress(uint32_t voice) const; // NAX
         bool ended(uint32_t voice) const;           // ENDX
         uint16_t envelope(uint32_t voice) const;    // ENVX
+        uint16_t pitch(uint32_t voice) const;
+        // Samples of the block at NAX played: 0 when NAX is the next to
+        // fetch, so NAX's line plus this is where the voice is.
+        uint32_t playedInBlock(uint32_t voice) const;
 
         void setMasterVolume(uint16_t left, uint16_t right); // both cores
         Reverb &reverb(uint32_t core);

@@ -309,6 +309,7 @@ set(GHC_GAME_SOURCES
     src/content/setlists.cpp
     src/content/songs.cpp
     src/content/song_speed.cpp
+    src/content/practice_sounds.cpp
     src/content/status_line.cpp
     src/content/tour_or_higher.cpp
     src/content/vgs.cpp
@@ -449,6 +450,7 @@ set(GHC_GAME_SOURCES
     src/synth/reverb.cpp
     src/synth/spu.cpp
     src/synth/synth.cpp
+    src/synth/timeline.cpp
     src/ui/fast_boot.cpp
     src/ui/locale.cpp
     src/ui/help_bar.cpp
@@ -650,6 +652,11 @@ foreach(GHC_PART guitar bass drums vocals)
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/instruments/${GHC_PART}.bin)
 endforeach()
 configure_file(src/content/instrument_icons.h.in "${GHC_DTA_DIR}/instrument_icons.h" @ONLY)
+# Practice's metronome and note click (content/practice_sounds.cpp), tools/procedural/practice_sounds.py's.
+file(READ assets/practice_sounds/practice_sounds.bin GHC_PRACTICE_SOUNDS HEX)
+string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_PRACTICE_SOUNDS "${GHC_PRACTICE_SOUNDS}")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/practice_sounds/practice_sounds.bin)
+configure_file(src/content/practice_sounds_bin.h.in "${GHC_DTA_DIR}/practice_sounds_bin.h" @ONLY)
 # The help bar's glyphs (ui/help_bar.cpp), tools/procedural/helpbar_glyphs.py's sheet.
 file(READ assets/helpbar/glyphs.bin GHC_HELPBAR_GLYPHS HEX)
 string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_HELPBAR_GLYPHS "${GHC_HELPBAR_GLYPHS}")

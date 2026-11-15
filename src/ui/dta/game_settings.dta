@@ -460,12 +460,36 @@
 }
 ; Practice plays the part alone where it has channels of its own (not a
 ; custom song with no stem for it, custom/audio.h), with its drum clicks
+; at any speed: GH2's TRIGGERS, a custom song's from its drums. With
+; {practice_option solo_stems} off, the whole song.
 {set $ghc_practice_solo FALSE}
 {func ghc_practice_solo
    }
 }
 {amend practice_panel
+   ; As the game's own (practice.dta), but its drum clicks, metronome and
+   ; note click are its song's, played by the mix to the sample
+   ; (content/practice_sounds.h), not by a MIDI parser's sink.
+   (enter
+      {events_parser add_sink $this section}
+      {game add_sink $this intro_skip}
+      {practice_clicks start {game get_song}}
+   )
+   ; The music this many dB down while the metronome or note click is on,
+   ; so they are heard over it.
+   (duck_db -6)
+   (duck
+      {music_fader set_val
+         {if_else {|| {practice_option metronome} {practice_option note_click}} [duck_db] 0}}
+   )
+   (exit
+      {events_parser remove_sink $this}
+      {game remove_sink $this}
+      {practice_clicks stop}
+      {music_fader set_val 0}
+   )
    (update
+      {practice_clicks drums $ghc_practice_solo}
       {if {! [keep_section_text]} {section.lbl set_text ''}}
       {set [keep_section_text] FALSE}
    )
@@ -476,6 +500,7 @@
    {game exit}
    {ui goto_screen ghc_practice_again_screen}
 }
+      {$this duck}
 ; ($ghc_practice_pct, quickplay.dta). Its name lights as any row's; green
 ; takes it up, its number lit too, as the audio settings' sliders; strum
 ; before the song goes straight on to its loading.

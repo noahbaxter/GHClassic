@@ -140,6 +140,9 @@ namespace gh2::settings
             {"folders", Type::kText, 0, 0, 1, 0},
             {"show_duplicates", Type::kBool, 0, 1, 1, 0},
             {"disc_song_guitars", Type::kBool, 0, 1, 1, 0},
+            {"practice_metronome", Type::kBool, 0, 1, 1, 0},
+            {"practice_note_click", Type::kBool, 0, 1, 1, 0},
+            {"practice_solo_stems", Type::kBool, 0, 1, 1, 1},
         };
 
         const Entry *entryNamed(const std::string &name)

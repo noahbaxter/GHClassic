@@ -65,6 +65,9 @@ namespace gh2::settings
         kSongFolders, // text: chart folders custom songs are read from, ';' between (custom/install.h)
         kShowDuplicates, // every copy of a custom chart listed, not just the first by folder
         kDiscSongGuitars, // song defaults give a disc song a guitar by how far into its career it is, not its own (no menu has it)
+        kPracticeMetronome, // practice clicks each beat, its bar's first another click (content/practice_sounds.h)
+        kPracticeNoteClick, // practice clicks each note as it reaches the strikeline
+        kPracticeSoloStems, // practice plays the part alone with drum clicks where it can, else the whole song
         kKeyCount,
     };
 

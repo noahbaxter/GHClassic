@@ -26,10 +26,12 @@
 // against the music. The one musical case: game.dta's beat handler claps in
 // star power through a script task 0.9 beats on. So a script task on the
 // beat clock that plays a sound starts that much sooner, back on the music's
-// timeline; ones on song seconds (an explosion) stay with the picture.
+// timeline (ones on song seconds, an explosion, stay with the picture).
+// Practice's clicks are the mix's own, at the song's time (synth/timeline.h).
 
 #include "settings/latency.h"
 
+#include "content/song_speed.h"
 #include "dev/timing.h"
 #include "dta.h"
 #include "guest.h"
@@ -104,9 +106,22 @@ namespace gh2
             return false;
         }
 
+        // How many beats the song clock trails its music by: audio - video
+        // ms at the song's beats a second, 0 before it moves. TaskMgr's
+        // clocks are at [+0x28] + units * 0x14, now at +0xC and the last
+        // poll's at +0x10.
+        float lateBeats(uint8_t *rdram)
+        {
+            const uint32_t clocks = load<uint32_t>(rdram, s_addresses->theTaskMgr + 0x28u);
+            const uint32_t seconds = clocks, beats = clocks + 0x14u * kTaskBeats;
+            const float dBeat = load<float>(rdram, beats + 0xcu) - load<float>(rdram, beats + 0x10u);
+            const float dSec = load<float>(rdram, seconds + 0xcu) - load<float>(rdram, seconds + 0x10u);
+            if (dBeat <= 0.0f || dSec <= 0.0f)
+                return 0.0f;
+        }
+
         // TaskMgr::AddTask(task, units, delay), retail 0x2c6b18: the delay
-        // counts on the clock at [+0x28] + units * 0x14, now at +0xC and the
-        // last poll's at +0x10.
+        // counts on the clock at [+0x28] + units * 0x14.
         struct AddTaskTag;
         void onAddTask(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
@@ -114,15 +129,7 @@ namespace gh2
             if (GPR_U32(ctx, 6) != kTaskBeats || load<uint32_t>(rdram, task) != s_addresses->scriptTaskVtable ||
                 !playsSound(rdram, load<uint32_t>(rdram, task + kScript)))
                 return;
-            const uint32_t clocks = load<uint32_t>(rdram, s_addresses->theTaskMgr + 0x28u);
-            const uint32_t seconds = clocks, beats = clocks + 0x14u * kTaskBeats;
-            const float dBeat = load<float>(rdram, beats + 0xcu) - load<float>(rdram, beats + 0x10u);
-            const float dSec = load<float>(rdram, seconds + 0xcu) - load<float>(rdram, seconds + 0x10u);
-            if (dBeat <= 0.0f || dSec <= 0.0f)
-                return;
-            const float lateS = static_cast<float>(settings::get(settings::kAudioLagMs) -
-                                                   settings::get(settings::kVideoLagMs)) / 1000.0f;
-            ctx->f[12] = std::max(0.0f, ctx->f[12] - lateS * dBeat / dSec);
+            ctx->f[12] = std::max(0.0f, ctx->f[12] - lateBeats(rdram));
         }
 
         // {latency get video|audio}, {latency set video|audio <ms>}: the value
