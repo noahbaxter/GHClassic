@@ -499,6 +499,8 @@
          {if {! {{$this loaded_dir} exists ghc_song.lbl}}
             {new BandLabel ghc_song.lbl}
             {ghc_song.lbl copy section.lbl 0}
+            ; In the intro caption's face ("AS MADE FAMOUS BY"), as the stats'.
+            {ghc_song.lbl set_type helveticablack}
             {ghc_song.lbl set trans_parent {section.lbl get trans_parent}}
             {ghc_song.lbl set_local_rot 0 0 0}
             {ghc_song.lbl set_local_scale [song_size] 1 [song_size]}
@@ -635,21 +637,27 @@
          ($for {sprint {game get_song} " " {gamecfg get (practice_sections 0)} " " {gamecfg get (practice_sections 1)} " " {song_speed playing}})
          ($hit {player0 gems_hit})
          ($all {'+' $hit {player0 gems_passed}})
+         ; This run still a full combo from its first hit on, as Hit Percent
+         ; is 100% from it: nothing missed, every hit one streak (a stray
+         ; strum ends it).
+         ($live {&& {> $hit 0} {== {player0 gems_passed} 0} {== {player0 current_streak} $hit}})
          {if {!= $for $ghc_practice_best_for}
             {set $ghc_practice_best_for $for}
             {set $ghc_practice_best 0}
             {set $ghc_practice_fc FALSE}
          }
-         {if {!= {sprint {song_speed} " " {song_speed playing} " " $ghc_practice_best " " $ghc_practice_fc " " $hit " " $all} [stats_shown]}
-            {set [stats_shown] {sprint {song_speed} " " {song_speed playing} " " $ghc_practice_best " " $ghc_practice_fc " " $hit " " $all}}
+         {if {!= {sprint {song_speed} " " {song_speed playing} " " $ghc_practice_best " " $ghc_practice_fc " " $live " " $hit " " $all} [stats_shown]}
+            {set [stats_shown] {sprint {song_speed} " " {song_speed playing} " " $ghc_practice_best " " $ghc_practice_fc " " $live " " $hit " " $all}}
             {ghc_stats_speed_value.lbl set_localized_text {sprint {song_speed} "%"}}
             ; The song's name, its speed after it (content/song_speed.cpp).
             {ghc_song.lbl set_localized_text {game get_song_text}}
             {ghc_stats_best_value.lbl set_localized_text {sprint $ghc_practice_best "%"}}
             {ghc_stats_percent_value.lbl set_localized_text {sprint {ghc_practice_hit_pct} "%"}}
             {ghc_stats_notes_value.lbl set_localized_text {sprint $hit "/" $all}}
-            ; The full combo crown: no miss and no stray strum.
+            ; The full combo crowns: Best Hit's for a run ended as one, Hit
+            ; Percent's while this one still is, gone at the first miss.
             {ghc_crown.mesh set_showing $ghc_practice_fc}
+            {ghc_crown_live.mesh set_showing $live}
          }
       }
       {$this map_poll}
@@ -751,7 +759,11 @@
          {ghc_crown.mesh set_local_scale {/ [stats_row] 12.0} 1 {/ [stats_row] 12.0}}
          {ghc_crown.mesh set draw_order 11}
          {ghc_crown.mesh set_showing FALSE}
-         {foreach $m (ghc_stats_mid.mesh ghc_stats_left.mesh ghc_stats_right.mesh ghc_crown.mesh)
+         {new {ghc_crown.mesh class_name} ghc_crown_live.mesh}
+         {ghc_crown_live.mesh copy ghc_crown.mesh 1}
+         {ghc_crown_live.mesh set trans_parent ghc_stats.grp}
+         {ghc_crown_live.mesh set_local_pos [stats_crown_x] 0 {'*' -3.5 [stats_row]}}
+         {foreach $m (ghc_stats_mid.mesh ghc_stats_left.mesh ghc_stats_right.mesh ghc_crown.mesh ghc_crown_live.mesh)
             {$dir insert (draws {$dir size (draws)}) {$this find $m}}
          }
          ; The map's track, on a dark box of its own, and its fill

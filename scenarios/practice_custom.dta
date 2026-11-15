@@ -59,6 +59,13 @@
 (expect $ghc_practice_fc 1)
 (wait 0.2)
 (expect {{practice_panel find ghc_crown.mesh} showing} 1)
+; Hit Percent's crown while this run is still one, from its first hit: none
+; just gone round, before any.
+(expect {player0 gems_hit} 0)
+(expect {{practice_panel find ghc_crown_live.mesh} showing} 0)
+(wait_until {> {player0 gems_hit} 0} 20)
+(wait 0.2)
+(expect {{practice_panel find ghc_crown_live.mesh} showing} 1)
 ; A best is at its speed: another starts it over.
 {song_speed live 95}
 (wait 0.2)
