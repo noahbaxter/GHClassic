@@ -38,11 +38,9 @@
 {ui goto_screen main_screen}
 (wait_screen main_screen)
 (wait 1.5)
-(key Down)
-(key Down)
-(key Down)
-(key Down)
-(key Down)
+; The focus is wherever the walk came back to, so put on Training.
+{main_panel set_focus {main_panel find main_tutorial.btn}}
+(wait 0.3)
 (expect {main_screen focus_name} main_tutorial.btn)
 (key Return)
 (wait_screen training_screen 10)
