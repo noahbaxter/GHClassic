@@ -78,6 +78,22 @@ namespace gh2::custom
             return std::any_of(cues.begin(), cues.end(), [&](const Chart::Cue &c) { return c.text == text; });
         }
 
+        // GH2's own singers never idle under three beats: a shorter rest is
+        // played through.
+        constexpr uint32_t kShortRest = 3u * kBeat;
+
+        // `spans`, in order, as one where a short rest parts them.
+        std::vector<Span> heldThrough(const std::vector<Span> &spans)
+        {
+            std::vector<Span> held;
+            for (const Span &s : spans)
+                if (!held.empty() && s.tick < held.back().tick + held.back().length + kShortRest)
+                    held.back().length = std::max(held.back().length, s.tick + s.length - held.back().tick);
+                else
+                    held.push_back(s);
+            return held;
+        }
+
         // A member's texts on `out`: the chart's own [play] and [idle] where
         // it has them, else [play] a half beat before each of `playing` and
         // [idle] a beat past it; its other cues either way.
@@ -502,10 +518,20 @@ namespace gh2::custom
     {
         const Chart &chart = band.in.chart;
         band.bass.name = "BAND BASS";
+        const auto &toGh2 = band.in.toGh2;
         std::vector<uint32_t> pulses = kicks;
+        // No bass part: playing as the lead's notes do, short rests played
+        // through.
+        std::vector<Span> playing;
+        for (const Gem &g : band.in.lead.gems)
+            playing.push_back({toGh2(g.tick), toGh2(g.tick + g.longest()) - toGh2(g.tick)});
+        playing = heldThrough(playing);
         if (const auto it = chart.parts.find(Part::Bass); it != chart.parts.end())
-            pulses = toGh2Sorted(ticksOf(fullest(it->second).gems), band.in.toGh2);
-        addMemberCues(band.bass, memberCues(stageTrack(chart, "PART BASS")), playingRuns(pulses), band.in.toGh2);
+        {
+            pulses = toGh2Sorted(ticksOf(fullest(it->second).gems), toGh2);
+            playing = playingRuns(pulses);
+        }
+        addMemberCues(band.bass, memberCues(stageTrack(chart, "PART BASS")), playing, toGh2);
         for (const uint32_t t : pulses)
             addShortNote(band.bass, t, 36u);
     }
@@ -533,16 +559,8 @@ namespace gh2::custom
         if (chart.vocals.empty())
             singerSpans = playingOutsideSolos(band);
         addMemberCues(band.singer, singerCues, {}, toGh2);
-        // GH2's own singers never idle under three beats: a shorter rest
-        // between phrases is sung through.
-        std::vector<Span> held;
-        for (const Span &s : singerSpans)
-            if (!held.empty() && s.tick < held.back().tick + held.back().length + 3u * kBeat)
-                held.back().length = std::max(held.back().length, s.tick + s.length - held.back().tick);
-            else
-                held.push_back(s);
         if (!has(singerCues, "[play]"))
-            for (const Span &s : held)
+            for (const Span &s : heldThrough(singerSpans))
             {
                 band.singer.events.push_back(midi::text(s.tick, "[play]"));
                 band.singer.events.push_back(midi::text(s.tick + s.length, "[idle]"));

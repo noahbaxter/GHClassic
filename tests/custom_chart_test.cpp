@@ -1177,6 +1177,17 @@ namespace
             const std::vector<std::pair<uint32_t, std::string>> played = {{3600u, "[play]"}, {4800u, "[idle]"}};
             CHECK(textsOf(keyed[4]) == played);
         }
+
+        // No bass part: the bassist plays with the lead as the singer
+        // sings, two beats' rest past a sustain played through, four idled.
+        Difficulty rests;
+        rests.gems = {{0u, 1u}, {480u, 1u}, {1920u, 1u}, {3840u, 1u}, {4320u, 1u}};
+        rests.gems[1].length[0] = 480u;
+        midi::Track guitar3, events3;
+        const auto rested = addStage({chart480(), rests, kSameTicks, 8u * 1920u}, guitar3, events3);
+        const std::vector<std::pair<uint32_t, std::string>> bassed = {
+            {0u, "[play]"}, {2400u, "[idle]"}, {3600u, "[play]"}, {4800u, "[idle]"}};
+        CHECK(rested.size() == 5u && textsOf(rested[1]) == bassed);
     }
 
     void midTypes()
