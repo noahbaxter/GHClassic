@@ -1,7 +1,7 @@
-; A new sort or setlist picked on the custom setlist turns the paper to the
-; twin screen (quickplay.dta's ghc_qp_picked): the paper turning away keeps
-; its rows as they were, never the career's or the new ones, and the twin's
-; comes in on the same song for a sort, the first for a setlist.
+; A new sort on the custom setlist reorders it at once in place, on the same
+; song. A new setlist turns the paper to the twin screen (quickplay.dta's
+; ghc_qp_picked): the paper turning away keeps its rows as they were, never
+; the career's or the new ones, and the twin comes in on its first song.
 (songs sort_rotation)
 #include common/first_boot.dta
 {gamecfg set mode quickplay}
@@ -14,29 +14,28 @@
 (press down)
 (wait 1)
 (expect {game get_song_index} 2)
-{set $row2 {song_provider get_symbol 2}}
+{set $song {game get_song}}
 (record on sort_artist)
 {qp_selsong_screen ghc_picked sort_artist}
-(expect {song_provider get_quickplay} 1)
-(wait 0.2)
-(expect {ui in_transition} 1)
-(expect {song_provider get_quickplay} 1)
-(expect {song_provider get_symbol 2} $row2)
-(expect {game get_song_index} 2)
-(wait_screen qp_selsong_twin_screen)
+; A sort at once, in place: no turn, the same song on its new row.
+(expect {ui in_transition} 0)
+(expect {{ui current_screen} name} qp_selsong_screen)
+(expect {game get_song_index} 4)
+(expect {game get_song} $song)
+(expect {{sel_song_panel find ss_song.lst} selected_pos} 4)
 (wait 1)
 (record off)
-(expect {game get_song_index} 4)
-(wait 2)
+(expect {ui in_transition} 0)
+(wait 1)
 {set $row2 {song_provider get_symbol 2}}
 (record on setlist_gh2)
-{qp_selsong_twin_screen ghc_picked gh2}
+{qp_selsong_screen ghc_picked gh2}
 (wait 0.2)
 (expect {ui in_transition} 1)
 (expect {setlist shown} custom)
 (expect {song_provider get_symbol 2} $row2)
 (expect {game get_song_index} 4)
-(wait_screen qp_selsong_screen)
+(wait_screen qp_selsong_twin_screen)
 (wait 1)
 (record off)
 (expect {setlist shown} gh2)

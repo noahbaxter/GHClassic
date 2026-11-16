@@ -813,10 +813,18 @@
 ; song the list is on (content/setlists.cpp). The paper turning away keeps
 ; the setlist it shows; the twin loads the next one's scene.
 {func ghc_qp_picked ($panel $twin $game)
-   {if {|| {custom sort $game} {setlist next $game}}
-      {synth play_sequence button_select}
-      {$panel set metamusic_on_exit FALSE}
-      {ui goto_screen $twin}
+   {cond
+      ; A sort in place at once, on the same song: the paper is the same.
+      ({custom sort $game}
+         {synth play_sequence button_select}
+         {$panel ghc_renew}
+      )
+      ; A setlist turns to the twin, whose paper is its own.
+      ({setlist next $game}
+         {synth play_sequence button_select}
+         {$panel set metamusic_on_exit FALSE}
+         {ui goto_screen $twin}
+      )
    }
 }
 {retype qp_selsong_screen
