@@ -449,8 +449,10 @@
    (SELECT_START_MSG {ghc_practice_whole} {ui goto_screen practice_loading_screen} kDataUnhandled)
 }
 ; A failed song's Practice as its pause menu's: the career's buttons, which
-; have it, for a quickplay song too (lose.dta gives quickplay's none). The
-; rest is the game's own.
+; have it, for a quickplay song too (lose.dta gives quickplay's none). GH1's
+; screen has one list, its Practice a row of it (gh1/screens.cpp), passed
+; over hidden (up goes to the row whose nav_down is this one) and the rest
+; then at GH1's own three heights. The rest is the game's own.
 {amend lose_panel
    (enter
       {crowd_audio turn_off}
@@ -465,11 +467,23 @@
       {lose_progress_data.lbl set_localized_text
          {sprintf {localize percent_complete_format} {player0 percent_complete}}}
       {do
-         ; GH1's screen has one list, without Practice (gh1/menus.dta).
-         ($practice {&& {!= {campaigns look} gh1} {find_elem (career quickplay) {gamecfg get mode}}})
-         {career_buttons.view set_showing $practice}
-         {normal_buttons.view set_showing {! $practice}}
-         {$this set_focus {if_else $practice lose_restart_career.btn lose_restart_normal.btn}}
+         ($practice {find_elem (career quickplay) {gamecfg get mode}})
+         {if_else {== {campaigns look} gh1}
+            {do
+               {lose_practice_career.btn set_showing $practice}
+               {lose_restart_normal.btn set nav_down {if_else $practice lose_practice_career.btn lose_selsong_normal.btn}}
+               {lose_practice_career.btn set nav_down {if_else $practice lose_selsong_normal.btn lose_practice_career.btn}}
+               {lose_restart_normal.btn set_local_pos 0 0 {if_else $practice -75 -80}}
+               {lose_selsong_normal.btn set_local_pos 0 0 {if_else $practice -103 -95}}
+               {lose_quit_normal.btn set_local_pos 0 0 {if_else $practice -117 -110}}
+               {$this set_focus lose_restart_normal.btn}
+            }
+            {do
+               {career_buttons.view set_showing $practice}
+               {normal_buttons.view set_showing {! $practice}}
+               {$this set_focus {if_else $practice lose_restart_career.btn lose_restart_normal.btn}}
+            }
+         }
       }
    )
    (goto_practice_mode {ghc_practice_song})

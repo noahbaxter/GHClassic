@@ -235,15 +235,6 @@
          (bm_video4.btn video4)
          {fail "unknown button: " $btn}}))
 
-; In a song.
-
-; GH1's song failed screen has one list of buttons, in a career too.
-(lose_panel
-   (needs lose)
-   (enter
-      {normal_buttons.view set_showing TRUE}
-      {$this set_focus lose_restart_normal.btn}))
-
 ; Settings.
 
 ; GH1's game settings have rows for playing left handed, which are GH2's
