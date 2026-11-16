@@ -137,6 +137,8 @@ namespace gh2::text_fit
         //                                            get_string_width
         //   {text_fit width <text> <Text> <size>}    its width, as fit_text
         //                                            measures it
+        //   {text_fit label_width <text> <label> <size>}  a label's, at that
+        //                                            size, as wrap measures
         //   {text_fit marquee <text> <Text> <size> <width> <step>}  that at
         //                                            the nth step of
         //                                            scrolling along it, where
@@ -171,9 +173,9 @@ namespace gh2::text_fit
                     }
                 return call.word(text);
             }
-            if (op != "fit_text" && op != "marquee" && op != "wrap" && op != "width")
+            if (op != "fit_text" && op != "marquee" && op != "wrap" && op != "width" && op != "label_width")
             {
-                std::cerr << "[text_fit] usage: {text_fit upper <text>}, {text_fit width <text> <Text> <size>}, "
+                std::cerr << "[text_fit] usage: {text_fit upper <text>}, {text_fit width|label_width <text> <Text|label> <size>}, "
                              "{text_fit fit_text|marquee|wrap <text> <Text|label> <size> <width> ...}"
                           << std::endl;
                 return {};
@@ -184,7 +186,7 @@ namespace gh2::text_fit
             // (BandLabel::BandLabel, 0x28dc10); a Text's own Hmx::Object is
             // the last 0x30 of its 0x1b0 (RndText::NewObject, 0x365fc0).
             constexpr uint32_t kLabelObject = 0x1a0u, kLabelText = 0x140u, kTextObject = 0x180u;
-            const bool ownText = op != "wrap";
+            const bool ownText = op != "wrap" && op != "label_width";
             const uint32_t object = call.object(3);
             const uint32_t text = object == 0u ? 0u
                                   : ownText    ? object - kTextObject
@@ -194,7 +196,7 @@ namespace gh2::text_fit
             constexpr uint32_t kTextSize = 0x150u;
             const float size = call.number(4) * (ownText && text != 0u ? load<float>(call.rdram, text + kTextSize) : 1.0f);
             const float room = call.number(5);
-            if (op == "width")
+            if (op == "width" || op == "label_width")
                 return script::floatNode(width(call.rdram, call.ctx, call.runtime, text, call.text(2), size));
             std::string out;
             if (op == "marquee")

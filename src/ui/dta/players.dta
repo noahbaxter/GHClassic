@@ -114,18 +114,17 @@
       )
    )
 }
-; Start, or joining, opens the player's menu (profiles.dta).
+; Start opens the player's menu, joining their profile list (profiles.dta).
 {retype multi_screen
    (
-      (panels meta multi_panel ghc_players_panel ghc_profile_panel helpbar ghc_pick_panel)
+      (panels meta multi_panel ghc_players_panel ghc_dim_panel dialog ghc_profile_panel helpbar)
       (focus multi_panel)
       (helpbar (default ((fret1 help_continue) (fret2 help_back) (fret3 ghc_players_reorder) (strum help_updown))))
       (ghc_help
          {helpbar set_display ((fret1 help_continue) (fret2 help_back) (fret3 ghc_players_reorder) (strum help_updown))}
       )
+      ; A player's menu puts up its own help bar (profiles.dta).
       (ghc_help_set ($array) {helpbar set_display $array})
-      (ghc_option_text ($option) {ghc_profile_panel text $option})
-      (ghc_chose ($option) {ghc_profile_panel chose $option})
       (exit {ghc_profile_panel leave})
       (BUTTON_DOWN_MSG
          {if_else {ghc_profile_panel button $player_num $button}

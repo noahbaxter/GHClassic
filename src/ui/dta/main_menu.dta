@@ -233,7 +233,7 @@
 ; one picked becomes the theme, its menus and music, back on this screen.
 {retype main_screen
    (
-      (panels meta main_panel ghc_profile_panel helpbar ghc_pick_panel fade_panel)
+      (panels meta main_panel ghc_dim_panel dialog ghc_profile_panel helpbar ghc_pick_panel fade_panel)
       (focus main_panel)
       (access_all {main_panel reset_player_settings})
       ; The help bar puts up a screen's (helpbar ...) after its enter, so
@@ -261,6 +261,8 @@
          {ghc_profile_panel set badges FALSE}
          {ghc_profile_panel paint_badges}
       )
+      ; A player's menu puts up its own help bar (profiles.dta).
+      (ghc_help_set ($array) {helpbar set_display $array})
       (ghc_help
          {do
             ($array)
@@ -269,13 +271,12 @@
             {push_back $array (fret1 help_continue)}
             {if {> {size {ghc_themes}} 1} {push_back $array (fret3 ghc_theme)}}
             {push_back $array (strum help_updown)}
+            ; Start puts up a seated player's menu, or joins another
+            ; controller (profiles.dta).
+            {push_back $array (start ghc_profile_help)}
             {helpbar set_display $array}
          }
       )
-      ; Start opens the player's menu (profiles.dta).
-      (ghc_help_set ($array) {helpbar set_display $array})
-      (ghc_option_text ($option) {ghc_profile_panel text $option})
-      (ghc_chose ($option) {ghc_profile_panel chose $option})
       (BUTTON_DOWN_MSG
          {cond
             ({ghc_profile_panel button $player_num $button} TRUE)

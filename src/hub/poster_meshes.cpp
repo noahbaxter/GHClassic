@@ -82,6 +82,21 @@ namespace gh2::poster_meshes
         return out;
     }
 
+    Mesh ring(float inside)
+    {
+        constexpr int kSides = 48;
+        Mesh out;
+        for (int i = 0; i < kSides; ++i)
+        {
+            const float a = 2.0f * 3.14159265f * static_cast<float>(i) / kSides;
+            for (const float r : {1.0f, inside})
+                out.verts.insert(out.verts.end(), {r * std::cos(a), 0, r * std::sin(a), 0, -1, 0, 0.5f, 0.5f});
+            const auto at = [](int side, int inner) { return static_cast<uint16_t>((side % kSides) * 2 + inner); };
+            out.faces.insert(out.faces.end(), {at(i, 0), at(i, 1), at(i + 1, 0), at(i + 1, 0), at(i, 1), at(i + 1, 1)});
+        }
+        return out;
+    }
+
     milo::Bytes texOf(const milo::Bytes &like, const textures::Source &picture)
     {
         return gh1::texWith(like, textures::standIn(textures::add(picture), kStandIn, kStandIn), true);

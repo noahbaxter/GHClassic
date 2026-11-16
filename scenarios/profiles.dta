@@ -1,13 +1,15 @@
 ; Who plays (save/profiles.h, ui/dta/profiles.dta). The splash's Start, only
 ; Start, picks P1's profile on GH2's band list made one of profiles, opening
-; on the top row, never GUEST, NEW PROFILE naming one on its band naming
-; screen. Fast boot stops on the splash. On the main menu Start opens P1's
-; menu: CHANGE PROFILE back to the list. Joining Multiplayer's screen picks
-; P2's on the list, only P2's controller working it, and P2's DROP OUT frees
-; the seat. The main menu's corner and Multiplayer's rows show who holds
-; each seat, and a quickplay high score goes in under the profile's name,
-; continuing flushing it. On the list yellow renames a profile and blue
-; deletes one no seat plays as; on the band list a band.
+; on the top row, never GUEST, a seat's row showing its emblem, NEW PROFILE
+; naming one on its band naming screen. Fast boot stops on the splash. On
+; the main menu Start puts up P1's menu on GH2's popup poster: CHANGE
+; PROFILE back to the list, DROP OUT greyed alone. Joining Multiplayer's
+; screen picks P2's on the list, only P2's
+; controller working it, and P2's DROP OUT frees the seat. The main menu's
+; corner and Multiplayer's rows show who holds each seat, and a quickplay
+; high score goes in under the profile's name, continuing flushing it. On
+; the list yellow renames a profile and blue deletes one no seat plays as; on
+; the band list a band.
 #include common/first_boot.dta
 (device guitar)
 (device guitar2)
@@ -52,11 +54,15 @@
 (expect {ghc_profile badge 0} "P1  Alpha")
 (shot corner)
 
-; Start opens P1's menu; CHANGE PROFILE goes to the list, on Alpha's row.
+; Start puts up P1's menu on the poster, CHANGE PROFILE picked and DROP OUT
+; greyed alone; CHANGE PROFILE goes to the list, on Alpha's row.
 (press start guitar)
 (wait 0.5)
 (expect {ghc_profile_panel get seat} 0)
-(expect {ghc_pick_panel get open} 1)
+(expect {ghc_profile_panel get poster} 1)
+(expect {ghc_profile_panel get pick} 0)
+(expect {{ghc_profile_panel find ghc_row1.lbl} showing} 1)
+(expect {ghc_profile_panel usable 1} 0)
 (shot menu)
 (press green guitar)
 (wait_screen ghc_profile_screen 10)
@@ -128,6 +134,12 @@
 (wait_screen ghc_delete_screen 10)
 (wait 1)
 (shot delete)
+; GH2's own dialog, none of the poster's rows.
+(expect {{dialog find dialog.view} showing} 1)
+(expect {{dialog find dl_button1.btn} showing} 1)
+(expect
+   {if_else {{ghc_profile_panel loaded_dir} exists ghc_row0.lbl} {{ghc_profile_panel find ghc_row0.lbl} showing} 0}
+   0)
 (press green guitar)
 (wait_screen ghc_profile_screen 10)
 (wait 1)
@@ -174,8 +186,10 @@
 (wait_screen ghc_profile_screen 10)
 (expect {seat_has 1 guitar2} 1)
 (wait 1)
-; A guest opens on the top row too, Alpha's.
+; A guest opens on the top row too, Alpha's, P1's emblem on it.
 (expect {chooseprof_panel get button_idx} 0)
+(expect {{chooseprof_panel find ghc_mark0.mesh} showing} 1)
+(expect {{chooseprof_panel find ghc_mark1.mesh} showing} 0)
 (shot list_p2)
 (press green guitar)
 (wait 0.3)
@@ -190,12 +204,15 @@
 (expect {ghc_players row 0} "P1  Alpha")
 (expect {ghc_players row 1} "P2  Beta")
 (shot multiplayer)
-; P2 drops out: the seat is free.
+; P2 drops out from the poster: the seat is free.
 (press start guitar2)
 (wait 0.5)
 (expect {ghc_profile_panel get seat} 1)
+(expect {ghc_profile_panel usable 1} 1)
+(shot menu_p2)
 (press down guitar2)
 (wait 0.3)
+(expect {ghc_profile_panel get pick} 1)
 (press green guitar2)
 (wait 0.5)
 (expect {seat_has 1 guitar2} 0)
@@ -237,16 +254,10 @@
 (expect {{ui current_screen} name} highscore_screen)
 (wait_screen complete_screen 30)
 
-; DROP OUT for P1 goes back to the splash, whose Start picks again on the
-; list, on the profile the controller last played as.
-{ui goto_screen main_screen}
-(wait_screen main_screen)
-(press start guitar)
-(wait 0.5)
-(press down guitar)
-(wait 0.3)
-(press green guitar)
-(wait_screen splash_screen 10)
+; The splash's Start always picks on the list, on the profile the
+; controller last played as.
+{ui goto_screen splash_screen}
+(wait_screen splash_screen)
 (wait 1)
 (press start guitar)
 (wait_screen ghc_profile_screen 10)
@@ -273,6 +284,11 @@
 (wait_screen ghc_delete_screen 10)
 (wait 1)
 (shot delete_band)
+(expect {{dialog find dialog.view} showing} 1)
+(expect {{dialog find dl_button1.btn} showing} 1)
+(expect
+   {if_else {{ghc_profile_panel loaded_dir} exists ghc_row0.lbl} {{ghc_profile_panel find ghc_row0.lbl} showing} 0}
+   0)
 (press up guitar)
 (wait 0.3)
 (press green guitar)

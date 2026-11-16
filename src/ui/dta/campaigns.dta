@@ -426,9 +426,11 @@
       (focus chooseprof_panel)
       (allow_back FALSE)
       (helpbar (default ((fret1 help_select) (fret2 help_back) (strum help_updown))))
-      ; The profile screen, on the same panel, leaves its own title there.
+      ; The profile screen, on the same panel, leaves its own title and seat
+      ; marks there.
       (enter
          {ghc_profile_title chooseprof_panel cp_title.mesh cp_title.lbl choose_band}
+         {chooseprof_panel ghc_marks FALSE}
       )
       (TRANSITION_COMPLETE_MSG {$this help})
       ; Rename and delete on a band.

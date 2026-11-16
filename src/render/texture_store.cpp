@@ -96,7 +96,8 @@ namespace gh2::textures
 
         bool same(const Source &a, const Source &b)
         {
-            return a.disc == b.disc && a.path == b.path && a.tex == b.tex && bool(a.file) == bool(b.file);
+            return a.disc == b.disc && a.path == b.path && a.tex == b.tex && bool(a.file) == bool(b.file) &&
+                   a.variant == b.variant;
         }
 
         uint32_t hash(const Source &source)
@@ -115,6 +116,8 @@ namespace gh2::textures
                 mix(1u);
             if (source.file)
                 mix(2u);
+            for (const char c : source.variant)
+                mix(static_cast<uint8_t>(c));
             return hash;
         }
 

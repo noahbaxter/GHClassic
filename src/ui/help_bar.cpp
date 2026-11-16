@@ -6,6 +6,8 @@
 #include "guest.h"
 #include "helpbar_glyphs.h"
 #include "hook.h"
+#include "hub/poster_meshes.h"
+#include "ui/seat_colors.h"
 #include "host/devices.h"
 #include "milo/milo.h"
 #include "render/texture_store.h"
@@ -355,6 +357,31 @@ namespace gh2
                 }
             }
             addGlyphs(*dir);
+            // A seat's mark in the note engine's style (profiles.dta): the
+            // engine's ring, ghc_ring_<game>_<seat>.mesh, in that seat's
+            // colour from that game's menus (ui/seat_colors.h), the colour in
+            // its verts as the engine's is (a Mat's colour does not reach a
+            // prelit mesh), on the white box's Mat with no picture.
+            const milo::Bytes *like = body("Mesh", "help_box_mid.mesh"), *white = body("Mat", "ghc_box_mid.mat");
+            if (like && white && !body("Mat", "ghc_ring.mat"))
+            {
+                milo::Bytes mat = *white;
+                milo::replaceStr(mat, "ghc_box_mid.tex", "");
+                milo::add(*dir, "Mat", "ghc_ring.mat", std::move(mat));
+                for (const seat_colors::Game &c : seat_colors::kGames)
+                    for (size_t seat = 0; seat < c.seats.size(); ++seat)
+                    {
+                        const std::string name = std::string("ghc_ring_") + c.game + "_" + std::to_string(seat) + ".mesh";
+                        if (const auto ring = poster_meshes::meshBody(*like, "help_box_mid.mat", poster_meshes::ring(), name,
+                                                                      "ghc_ring.mat", nullptr, c.seats[seat]))
+                            milo::add(*dir, "Mesh", name, *ring);
+                    }
+                // A black disc to go behind a ring where it stands on a
+                // picture (profiles.dta's poster).
+                if (const auto disc = poster_meshes::meshBody(*like, "help_box_mid.mat", poster_meshes::ring(0.0f),
+                                                              "ghc_disc.mesh", "ghc_ring.mat", nullptr, {0.0f, 0.0f, 0.0f}))
+                    milo::add(*dir, "Mesh", "ghc_disc.mesh", *disc);
+            }
             ark::addFile(path, milo::write(*dir));
         }
 

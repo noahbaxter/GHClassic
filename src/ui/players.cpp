@@ -1,14 +1,21 @@
 #include "ui/players.h"
 
+#include "content/games.h"
 #include "content/locale.h"
+#include "disc/ark.h"
 #include "dta.h"
 #include "host/input.h"
+#include "render/texture_store.h"
 #include "save/profiles.h"
 #include "script.h"
+#include "ui/seat_colors.h"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
+#include <cmath>
 #include <string>
+#include <vector>
 
 namespace gh2
 {
@@ -35,6 +42,101 @@ namespace gh2
             return text;
         }
 
+        // The poster's red in `to`, its cream, black and paper left as they
+        // are: each pixel by how red it is, by hue and saturation, takes the
+        // seat's hue and its saturation and brightness as far from the
+        // poster's red as its own are.
+        void recolor(std::vector<uint8_t> &rgba, const std::array<float, 3> &to)
+        {
+            const auto hsv = [](float r, float g, float b, float &h, float &s, float &v)
+            {
+                v = std::max({r, g, b});
+                const float c = v - std::min({r, g, b});
+                s = v > 0.0f ? c / v : 0.0f;
+                h = c == 0.0f   ? 0.0f
+                    : v == r    ? std::fmod((g - b) / c + 6.0f, 6.0f)
+                    : v == g    ? (b - r) / c + 2.0f
+                                : (r - g) / c + 4.0f;
+                h *= 60.0f;
+            };
+            // The poster's red's own saturation and brightness.
+            constexpr float kRedS = 0.82f, kRedV = 0.78f;
+            float th = 0.0f, ts = 0.0f, tv = 0.0f;
+            hsv(to[0], to[1], to[2], th, ts, tv);
+            for (size_t i = 0; i + 3 < rgba.size(); i += 4)
+            {
+                const float r = rgba[i] / 255.0f, g = rgba[i + 1] / 255.0f, b = rgba[i + 2] / 255.0f;
+                float h = 0.0f, s = 0.0f, v = 0.0f;
+                hsv(r, g, b, h, s, v);
+                const float off = std::min(h, 360.0f - h); // degrees from red
+                const float red = std::clamp((40.0f - off) / 20.0f, 0.0f, 1.0f) * std::clamp((s - 0.3f) / 0.2f, 0.0f, 1.0f);
+                if (red <= 0.0f)
+                    continue;
+                const float ns = std::min(1.0f, s * ts / kRedS), nv = std::min(1.0f, v * tv / kRedV);
+                // hsv back to rgb at the seat's hue.
+                const float c = nv * ns, x = c * (1.0f - std::fabs(std::fmod(th / 60.0f, 2.0f) - 1.0f)), m = nv - c;
+                const int sector = static_cast<int>(th / 60.0f) % 6;
+                const std::array<float, 3> out = sector == 0   ? std::array<float, 3>{c, x, 0}
+                                                 : sector == 1 ? std::array<float, 3>{x, c, 0}
+                                                 : sector == 2 ? std::array<float, 3>{0, c, x}
+                                                 : sector == 3 ? std::array<float, 3>{0, x, c}
+                                                 : sector == 4 ? std::array<float, 3>{x, 0, c}
+                                                               : std::array<float, 3>{c, 0, x};
+                const float was[3] = {r, g, b};
+                for (int k = 0; k < 3; ++k)
+                    rgba[i + size_t(k)] =
+                        static_cast<uint8_t>(std::lround(255.0f * (was[k] + (out[size_t(k)] + m - was[k]) * red)));
+            }
+        }
+
+        // GH2's popup poster in each seat's colour from each game's menus
+        // (ui/seat_colors.h), a picture of its own for each, its bitmap
+        // ui/image/gen/ghc_poster_<game>_<seat>.png_ps2 naming it: a player's
+        // Start menu (dta/profiles.dta). Drawn from the 360's poster where
+        // that disc is, else the PS2's.
+        void seatPosters()
+        {
+            textures::Source base{0u, "ui/gen/dialog.milo_ps2", "dl_poster.tex", true};
+            if (const auto xbox = games::disc("gh2x"))
+                base = {*xbox, "ui/gen/dialog.milo_xbox", "dl_poster.tex"};
+            for (const seat_colors::Game &game : seat_colors::kGames)
+                for (size_t seat = 0; seat < game.seats.size(); ++seat)
+                {
+                    const std::string name = std::string("ghc_poster_") + game.game + "_" + std::to_string(seat);
+                    textures::Source source = base;
+                    source.variant = name;
+                    const uint32_t id = textures::add(source);
+                    textures::addEdit(id,
+                                      [to = game.seats[seat]](TextureData &data)
+                                      {
+                                          recolor(data.rgba, to);
+                                          for (std::vector<uint8_t> &mip : data.mips)
+                                              recolor(mip, to);
+                                      });
+                    ark::addFile("ui/image/gen/" + name + ".png_ps2", textures::standIn(id, 256u, 512u));
+                }
+            // A strip of its black, the name's bar: its paper's grain and
+            // creases, so the bar is printed with the rest.
+            textures::Source black = base;
+            black.variant = "ghc_poster_black";
+            const uint32_t id = textures::add(black);
+            textures::addEdit(id,
+                              [](TextureData &data)
+                              {
+                                  const uint32_t x0 = data.width / 5u, x1 = data.width * 4u / 5u;
+                                  const uint32_t y0 = data.height * 55u / 100u, y1 = data.height * 65u / 100u;
+                                  std::vector<uint8_t> strip;
+                                  for (uint32_t y = y0; y < y1; ++y)
+                                      strip.insert(strip.end(), data.rgba.begin() + (y * data.width + x0) * 4u,
+                                                   data.rgba.begin() + (y * data.width + x1) * 4u);
+                                  data.rgba = std::move(strip);
+                                  data.width = x1 - x0;
+                                  data.height = y1 - y0;
+                                  data.mips.clear();
+                              });
+            ark::addFile("ui/image/gen/ghc_poster_black.png_ps2", textures::standIn(id, 128u, 32u));
+        }
+
         // Who holds a seat: the profile it plays as, else GUEST; "" for no
         // controller.
         std::string holder(int seat)
@@ -51,7 +153,10 @@ namespace gh2
         // {ghc_profile name_of <row>}: that profile's name.
         // {ghc_profile name <seat>}: the seat's profile's name, "" for a guest.
         // {ghc_profile current <seat>}: the seat's profile, -1 for a guest.
+        // {ghc_profile holder <seat>}: "Noah", "GUEST", "" for none.
         // {ghc_profile badge <seat>}: "P1  Noah", "P1  GUEST", "" for none.
+        // {ghc_profile ink <seat> <game> <colour>}: a packed red (pack_color)
+        //   in the seat's colour from that game's menus, as its poster's.
         // {ghc_profile pick <seat> <row>}: it plays as that one, -1 a guest.
         // {ghc_profile taken <name> [<row>]}: whether a profile has it, any
         //   case, but for the one in <row>.
@@ -85,10 +190,21 @@ namespace gh2
             }
             if (op == "current")
                 return number(save::seatProfile(n).value_or(-1));
+            if (op == "holder")
+                return word(holder(n));
             if (op == "badge")
             {
                 const std::string who = holder(n);
                 return word(who.empty() ? who : seatTag(n) + who);
+            }
+            if (op == "ink")
+            {
+                const uint32_t was = static_cast<uint32_t>(call.number(4));
+                std::vector<uint8_t> rgba = {uint8_t(was), uint8_t(was >> 8), uint8_t(was >> 16), 255};
+                for (const seat_colors::Game &game : seat_colors::kGames)
+                    if (call.symbol(3) == game.game)
+                        recolor(rgba, game.seats[static_cast<size_t>(n % 4)]);
+                return number(int(rgba[0] | rgba[1] << 8 | rgba[2] << 16));
             }
             if (op == "pick")
             {
@@ -225,8 +341,12 @@ namespace gh2
     {
         script::addCommand("ghc_players", command);
         script::addCommand("ghc_profile", profile);
+        seatPosters();
         // Profiles' (dta/profiles.dta, patched with the menus, which hold it).
+        // The splash takes only Start, which picks a profile (main_menu.dta).
         locale::add("ghc_press_start", "PRESS START");
+        locale::add("ghc_join", "press START");
+        locale::add("ghc_profile_help", "PROFILE");
         locale::add("ghc_choose_profile", "CHOOSE PROFILE");
         locale::add("ghc_profile_p0", "P1 PROFILE");
         locale::add("ghc_profile_p1", "P2 PROFILE");

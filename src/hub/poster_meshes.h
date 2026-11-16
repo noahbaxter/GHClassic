@@ -40,6 +40,11 @@ namespace gh2::poster_meshes
     // across from u0 to u1.
     Mesh quad(float halfWide, float halfHigh, float u0 = 0.0f, float u1 = 1.0f);
 
+    // A flat ring 1 across its outside, `inside` of that within, facing -y:
+    // the note engine's mark (content/campaign_case.h) and a seat's
+    // (ui/help_bar.cpp); a disc at 0.
+    Mesh ring(float inside = 0.84f);
+
     // A Tex like `like` whose bitmap is a small stand-in for that picture,
     // which the host draws at its own size (render/texture_store.h).
     milo::Bytes texOf(const milo::Bytes &like, const textures::Source &picture);

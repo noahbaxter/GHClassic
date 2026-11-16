@@ -2,21 +2,101 @@
 ; profile screen, GH2's band list made one of profiles: each a row, a free
 ; one NEW PROFILE, GUEST last. NEW PROFILE names one on GH2's band naming
 ; screen, as the profile naming screen; yellow renames one there, blue
-; deletes one once asked. On the main menu and Multiplayer's
-; screen a player's Start dims the screen and opens their menu (picker.dta's
-; list, as a menu), their profile over it: CHANGE PROFILE goes to the profile
-; screen, DROP OUT sends P1 back to the splash and frees any other seat. A
-; controller joining there by Start picks its profile on the profile
-; screen, backing out of it leaving the seat free. Only the controller a
-; screen or menu is for works it, and no seat changes while one is up. The
-; main menu shows who holds each seat in its top left corner.
+; deletes one once asked. On the main menu and Multiplayer's screen a
+; seated player's Start dims the screen and puts up their menu on GH2's
+; popup poster, their profile over it: CHANGE PROFILE goes to the profile
+; screen, DROP OUT, there only with another seated, frees the seat, P2
+; moving up for P1. A controller joining there by Start picks its profile
+; on the profile screen, backing out of it leaving the seat free. Only the
+; controller a screen or menu is for works it, and no seat changes while
+; one is up. The main menu shows each seat in its top left corner, a free
+; one's "press START".
 ;
-; A screen with ghc_profile_panel among its panels, before the help bar, and
-; picker.dta's after it, sends its presses here first ({ghc_profile_panel
-; button $player_num $button}), passes on the list's (ghc_option_text
-; ($option)) and (ghc_chose ($option)) to it, has (ghc_help) put its own help
-; bar back and (ghc_help_set ($array)) put up the menu's, and calls
+; A screen with a player's menu lists ghc_dim_panel, dialog and
+; ghc_profile_panel in that order before the help bar, the dimmer under the
+; poster and the seat's ring over it; sends its presses here first
+; ({ghc_profile_panel button $player_num $button}); has (ghc_help) put its
+; own help bar back and (ghc_help_set ($array)) put up the menu's; and calls
 ; {ghc_profile_panel leave} as it exits.
+; A seat's emblem, its one look wherever it shows (the main menu's corner,
+; its Start menu's poster, the profile list): the note engine's ring
+; (campaigns.dta) in the seat's colour from the menus' game, GH2's for a
+; game with none (ghc_ring_<game>_<seat>.mesh, ui/help_bar.cpp), on a black
+; disc, the tag P1.. in the help bar's text in its middle. Made once in a
+; panel by ghc_emblem_make, from that panel if it is a copy of the help bar
+; else from the help bar's: $e_ring, $e_disc and $e_tag under $e_parent,
+; out of sight, for the panel to add to what it draws, disc first. Put up
+; by ghc_emblem for seat $e_seat at $e_size, the ring's left edge at $e_x
+; and middle at $e_z, hidden for -1; it returns its width, which
+; ghc_emblem_width gives beforehand. At size 1 the tag is the help bar's
+; text's size, the ring its ink's width past it, the disc 1.15 the ring's,
+; each seat's tag's middle right of the ring's by its letters' ink, P1 to
+; P4, not their advances.
+{func ghc_emblem_src ($e_dir)
+   {if_else {{$e_dir loaded_dir} exists ghc_disc.mesh} $e_dir helpbar}
+}
+{func ghc_emblem_make ($e_dir $e_ring $e_disc $e_tag $e_parent)
+   {new Mesh $e_disc}
+   {{$e_dir find $e_disc} set draw_order 0.5}
+   {new Mesh $e_ring}
+   {{$e_dir find $e_ring} set draw_order 1}
+   {new Text $e_tag}
+   {{$e_dir find $e_tag} copy {{ghc_emblem_src $e_dir} find help_bar.txt} 0}
+   {{$e_dir find $e_tag} set_wrap_width 10000}
+   {{$e_dir find $e_tag} set_align 34} ; kMiddleCenter
+   {{$e_dir find $e_tag} set draw_order 2}
+   {{$e_dir find $e_disc} set trans_parent $e_parent}
+   {{$e_dir find $e_ring} set trans_parent $e_parent}
+   {{$e_dir find $e_tag} set trans_parent $e_parent}
+   {{$e_dir find $e_disc} set_showing FALSE}
+   {{$e_dir find $e_ring} set_showing FALSE}
+   {{$e_dir find $e_tag} set_showing FALSE}
+}
+{func ghc_emblem_width ($e_tag $e_seat $e_size)
+   {'+' {'*' {text_fit width {sprint "P" {'+' $e_seat 1}} $e_tag 1} {'*' $e_size 0.62}} {'*' 10 $e_size}}
+}
+{func ghc_emblem ($e_dir $e_ring $e_disc $e_tag $e_seat $e_x $e_z $e_size)
+   {do
+      ($src {ghc_emblem_src $e_dir})
+      ($r {$e_dir find $e_ring})
+      ($d {$e_dir find $e_disc})
+      ($t {$e_dir find $e_tag})
+      ($on {>= $e_seat 0})
+      ($across 0)
+      {$r set_showing $on}
+      {$d set_showing $on}
+      {$t set_showing $on}
+      {if $on
+         {do
+            ($parent {$r get trans_parent})
+            ($game
+               {if_else {{$src loaded_dir} exists {sprint "ghc_ring_" {campaigns active} "_0.mesh"}} {campaigns active} gh2})
+            ; Prelit: the colour is in the verts.
+            {{$src find ghc_ring.mat} set prelit TRUE}
+            {set $across {ghc_emblem_width $t $e_seat $e_size}}
+            {$d copy {$src find ghc_disc.mesh} 1}
+            {$d set_mat {$src find ghc_ring.mat}}
+            {$d set trans_parent $parent}
+            {$d set draw_order 0.5}
+            {$d set_local_rot 0 0 0}
+            {$d set_local_pos {'+' $e_x {/ $across 2.0}} 0 $e_z}
+            {$d set_local_scale {'*' 1.15 {/ $across 2.0}} 1 {'*' 1.15 {/ $across 2.0}}}
+            {$r copy {$src find {sprint "ghc_ring_" $game "_" {mod $e_seat 4} ".mesh"}} 1}
+            {$r set_mat {$src find ghc_ring.mat}}
+            {$r set trans_parent $parent}
+            {$r set draw_order 1}
+            {$r set_local_rot 0 0 0}
+            {$r set_local_pos {'+' $e_x {/ $across 2.0}} 0 $e_z}
+            {$r set_local_scale {/ $across 2.0} 1 {/ $across 2.0}}
+            {$t set_text {sprint "P" {'+' $e_seat 1}}}
+            {$t set_local_scale {'*' $e_size 0.62} {'*' $e_size 0.62} {'*' $e_size 0.62}}
+            {$t set_local_pos
+               {'+' {'+' $e_x {/ $across 2.0}} {'*' {elem (-0.4 -1 -0.95 -1) {mod $e_seat 4}} $e_size}} 0 $e_z}
+         }
+      }
+      $across
+   }
+}
 {if {! {exists ghc_profile_panel}} {new GHPanel ghc_profile_panel}}
 {retype ghc_profile_panel
    (
@@ -25,60 +105,50 @@
       (file ui/helpbar.milo)
       ; The seat whose menu is up, -1 for none.
       (seat -1)
-      ; The dimmer: a box behind the menu nearly as wide as the screen, as
-      ; wide as a box goes (one with a corner much past 390 either side of
-      ; the middle draws nothing), its round ends that wide, and its colour.
-      (dim_wide 780)
-      (dim_tall 520)
-      (dim_end 30)
-      (dim_color (0 0 0 0.7))
       ; Whether this screen shows who holds each seat in its corner.
       (badges FALSE)
-      ; The title's and the corner's text, their size against the help
-      ; bar's, the title's height over the list, and the corner's left edge
+      ; The corner's text's size against the help bar's, and its left edge
       ; (16:9 and 4:3), top and row height (x right, z up, the screen's
-      ; middle 0).
+      ; middle 0). Each badge is the seat's emblem (ghc_emblem) and the name
+      ; after it, [ring_gap] on at size 1.
       (texts (prof_title.txt prof_p0.txt prof_p1.txt prof_name.txt))
-      (title_size 1.8)
-      (title_gap 34)
+      ; The poster's emblem and each corner seat's: ring, disc and tag.
+      (emblems
+         (
+            (prof_ring.mesh prof_disc.mesh prof_title_tag.txt)
+            (prof_ring0.mesh prof_disc0.mesh prof_t0.txt)
+            (prof_ring1.mesh prof_disc1.mesh prof_t1.txt)
+         )
+      )
+      (ring_gap 8)
       (badge_size 1.1)
       (badge_x_wide -405)
       (badge_x_square -288)
       (badge_z 200)
-      (badge_tall 26)
+      (badge_tall 34)
       (enter
          {$this build}
          {set [seat] -1}
+         {set [poster] FALSE}
          {$this hide}
+         ; Its screen's poster, where it has one, down till Start.
+         {if {dialog loaded_dir} {{dialog find dialog.view} set_showing FALSE}}
          ; Who sits now sat before this screen.
          {ghc_profile seen}
          {$this paint_badges}
       )
       ; Its screen going, a menu up shuts, its seats let go.
-      (leave
-         {if {>= [seat] 0}
-            {ghc_pick_panel shut}
-            {ghc_profile hold 0}
-            {set [seat] -1}
-            {$this hide}
-         }
-      )
-      ; The dimmer, and the texts, each the help bar's text copied; the help
+      (leave {if {>= [seat] 0} {$this release}})
+      ; The emblems and the texts, each the help bar's text copied; the help
       ; bar's own stays out of sight.
       (build
          {if {! {exists prof_title.txt}}
-            {foreach $o
-               (
-                  help_bar_strum.mesh help_bar_starting.mesh help_bar_strumbar.mesh help_bar.mesh help_bar.txt
-                  help_box_left.mesh help_box_mid.mesh help_box_right.mesh
-               )
-               {{$this find $o} set_showing FALSE}
-            }
-            {ghc_box_make $this prof_dim {help_box_mid.mesh get trans_parent} 1}
-            {ghc_box_color $this prof_dim
-               {elem [dim_color] 0} {elem [dim_color] 1} {elem [dim_color] 2} {elem [dim_color] 3}}
-            {foreach $part ("_left.mesh" "_mid.mesh" "_right.mesh")
-               {helpbar.view insert (objects 0) {$this find {sprint prof_dim $part}}}
+            {ghc_helpbar_blank $this}
+            {foreach $e [emblems]
+               {ghc_emblem_make $this {elem $e 0} {elem $e 1} {elem $e 2} {help_box_mid.mesh get trans_parent}}
+               {helpbar.view insert (objects 0) {$this find {elem $e 0}}}
+               {helpbar.view insert (objects 0) {$this find {elem $e 1}}}
+               {helpbar.view insert (objects {helpbar.view size objects}) {$this find {elem $e 2}}}
             }
             {foreach $t [texts]
                {new Text $t}
@@ -86,17 +156,142 @@
                {{$this find $t} set draw_order 2}
                {helpbar.view insert (objects {helpbar.view size objects}) {$this find $t}}
             }
-            {prof_title.txt set_local_scale [title_size] [title_size] [title_size]}
-            {prof_p0.txt set_local_scale [badge_size] [badge_size] [badge_size]}
-            {prof_p1.txt set_local_scale [badge_size] [badge_size] [badge_size]}
+            {foreach $t (prof_p0.txt prof_p1.txt)
+               {{$this find $t} set_local_scale [badge_size] [badge_size] [badge_size]}
+            }
             {helpbar.view sort_draws}
             {{$this loaded_dir} sync_objects}
          }
       )
       (hide
-         {ghc_box_show $this prof_dim FALSE}
-         {prof_title.txt set_showing FALSE}
+         {ghc_dim_panel show FALSE}
+         {$this badge prof_title_tag.txt prof_title.txt prof_ring.mesh -1 0 0 1}
          {prof_name.txt set_showing FALSE}
+      )
+      ; What a free seat's badge says in its name's place, none for "".
+      (free_text "")
+      ; The last badge's ring's width.
+      (across 0)
+      ; Seat $seat's Start menu's poster's header: the seat's emblem here,
+      ; on the help bar, over the speaker on the poster's emblem, its middle
+      ; at [ring_x] [ring_z] in the help bar's units (the screen's middle 0)
+      ; at [ring_size], its tag at the poster's tilt; and
+      ; the name over the face's eyes, a censor's bar: ghc_name.lbl, a copy
+      ; of the dialog's title in [name_font], in the seat's colour, on
+      ; prof_plate, a bar of the poster's own black. Both in the dialog's
+      ; text group, so they lie on the poster: the name [name_size] of the
+      ; title's size and [name_lift] over its place, the bar [plate_pad]
+      ; past the name's ink each side, its letters [plate_tall] high and
+      ; their middle [plate_dz] over the label's place at the title's size,
+      ; in the dialog's units. A name's width in the help bar's units is
+      ; [name_scale] of its label's, and in the dialog's [name_dialog].
+      (ring_x 7)
+      (ring_z -120)
+      (ring_size 2.4)
+      (name_font impact)
+      (name_size 1.08)
+      (name_lift 89)
+      (name_scale 0.875)
+      (name_dialog 1.03)
+      (plate_pad (7.3 4.7))
+      (plate_tall 26)
+      (plate_dz 20.7)
+      ; The face's eyes, which the bar always covers: its left and right
+      ; against the title's middle, in the dialog's units. The name is
+      ; centred in the bar, which sits as near the title's middle as that
+      ; lets it.
+      (plate_eyes (-24.2 43.5))
+      ; The widest a name is, at the poster's width, in the help bar's
+      ; units; a wider one shrinks to fit.
+      (header_room 250)
+      (header
+         ($seat)
+         {$this tilt prof_title_tag.txt dl_title.lbl}
+         {$this badge prof_title_tag.txt prof_title.txt prof_ring.mesh $seat
+            {'-' [ring_x] {/ {ghc_emblem_width {$this find prof_title_tag.txt} $seat [ring_size]} 2.0}} [ring_z] [ring_size]}
+         {prof_title.txt set_showing FALSE}
+         {{dialog find dl_title.lbl} set_showing FALSE}
+         {do
+            ($lbl {$this find ghc_name.lbl})
+            ($group {{dialog find dl_title.lbl} get trans_parent})
+            ($x {elem [title_was] 0})
+            ($y {elem [title_was] 1})
+            ($z {'+' {elem [title_was] 2} [name_lift]})
+            {$this fit_name {$this badge_text $seat} [header_room]}
+            {do
+               ($size {/ {$lbl get text_size} [title_size_was]})
+               ($left {elem [plate_eyes] 0})
+               ($right {elem [plate_eyes] 1})
+               ($wide
+                  {max {'-' $right $left}
+                     {'+' {'*' 2 {elem [plate_pad] 0}}
+                        {'*' [name_dialog]
+                           {text_fit label_width {text_fit upper {$this badge_text $seat}} $lbl {$lbl get text_size}}}}})
+               ($tall {'+' {'*' 2 {elem [plate_pad] 1}} {'*' [plate_tall] $size}})
+               ; As near the title's middle as covers both eyes.
+               ($mid {'+' $x {max {'-' $right {/ $wide 2.0}} {min {'+' $left {/ $wide 2.0}} 0}}})
+               {$lbl set trans_parent $group}
+               {$lbl set color [title_ink]}
+               {$lbl set_local_pos $mid $y $z}
+               {$lbl set_showing TRUE}
+               {prof_plate_mid.mesh set trans_parent $group}
+               {prof_plate_mid.mesh set_local_rot 0 0 0}
+               {ghc_box_put $this prof_plate {'-' $mid {/ $wide 2.0}} $y {'+' $z {'*' [plate_dz] $size}} $wide $tall 0 0}
+               {prof_plate_mid.mesh set_showing TRUE}
+            }
+         }
+      )
+      ; $text on the name's label, at [name_size] of the title's, smaller
+      ; to fit $room of the help bar's units: measured as drawn, in capitals.
+      (fit_name
+         ($text $room)
+         {do
+            ($lbl {$this find ghc_name.lbl})
+            ($size {'*' [title_size_was] [name_size]})
+            ($wide {text_fit label_width {text_fit upper $text} $lbl $size})
+            {$lbl set text_size {'*' $size {min 1 {/ {/ $room [name_scale]} $wide}}}}
+            {$lbl set_localized_text $text}
+         }
+      )
+      ; What seat $seat's badge says after its tag: its holder, else
+      ; [free_text], "" for none.
+      (badge_text
+         ($seat)
+         {cond
+            ({< $seat 0} "")
+            ({!= {ghc_profile holder $seat} ""} {ghc_profile holder $seat})
+            (TRUE [free_text])
+         }
+      )
+      ; Seat $seat's badge, its emblem (ring $ring, [emblems]' row) with its
+      ; left edge at $x, and the name $name after it, at $z and $size; none
+      ; for $seat -1. A method takes 7 arguments at most.
+      (badge
+         ($tag $name $ring $seat $x $z $size)
+         {do
+            ($who {$this badge_text $seat})
+            ($n {$this find $name})
+            ($disc "")
+            ; Named by sprint, a string, which find does not match.
+            {foreach $e [emblems] {if {== {elem $e 0} $ring} {set $disc {elem $e 1}}}}
+            {set [across]
+               {ghc_emblem $this $ring $disc $tag {if_else {!= $who ""} $seat -1} $x $z $size}}
+            {$n set_showing {!= $who ""}}
+            {if {!= $who ""}
+               {$n set_text $who}
+               {$n set_local_pos {'+' {'+' $x [across]} {'*' [ring_gap] $size}} 0 $z}
+            }
+         }
+      )
+      ; Text $text of this panel turned as the dialog's label $label is, so
+      ; it lies on the poster.
+      (tilt
+         ($text $label)
+         {do
+            ($x 0) ($y 0) ($z 0)
+            {{dialog find $label} get_world_rot $x $y $z}
+            {{$this find $text} set_local_rot $x $y $z}
+         }
       )
       ; A name typed in, under a dialog's message, at the poster's tilt, on
       ; one line: the first size and height that fit the poster's width,
@@ -105,11 +300,7 @@
       (name_fits ((2 0) (1.6 4)))
       (show_name
          ($text)
-         {do
-            ($x 0) ($y 0) ($z 0)
-            {{dialog find dl_message.lbl} get_world_rot $x $y $z}
-            {prof_name.txt set_local_rot $x $y $z}
-         }
+         {$this tilt prof_name.txt dl_message.lbl}
          {do
             ($i 0)
             ($wide {text_fit width $text prof_name.txt 1})
@@ -130,22 +321,32 @@
          {prof_name.txt set_showing TRUE}
       )
       (paint_badges
+         {set [free_text] {localize ghc_join}}
          {foreach_int $i 0 2
-            {do
-               ($t {$this find {elem [texts] {'+' $i 1}}})
-               ($text {ghc_profile badge $i})
-               {$t set_text $text}
-               {$t set_local_pos
-                  {if_else {== {rnd aspect} kWidescreenAspect} [badge_x_wide] [badge_x_square]}
-                  0
-                  {'-' [badge_z] {'*' [badge_tall] $i}}}
-               {$t set_showing {&& [badges] {== [seat] -1} {!= $text ""}}}
+            {$this badge
+               {sprint prof_t $i ".txt"} {sprint prof_p $i ".txt"} {sprint prof_ring $i ".mesh"}
+               {if_else {&& [badges] {== [seat] -1}} $i -1}
+               {if_else {== {rnd aspect} kWidescreenAspect} [badge_x_wide] [badge_x_square]}
+               {'-' [badge_z] {'*' [badge_tall] $i}}
+               [badge_size]}
+         }
+         {set [free_text] ""}
+      )
+      ; Who held the seats when the corner and help bar were last drawn, and
+      ; who holds them now.
+      (held "")
+      (holders {sprint {ghc_profile holder 0} "|" {ghc_profile holder 1}})
+      (poll
+         {if {< [seat] 0} {$this join}}
+         ; A seat changing, a drop taking effect a poll on, draws them again.
+         {do
+            ($now {$this holders})
+            {if {&& {!= $now [held]} {< [seat] 0}}
+               {set [held] $now}
+               {$this paint_badges}
+               {if [badges] {{ui current_screen} ghc_help}}
             }
          }
-      )
-      (poll
-         {if {&& {>= [seat] 0} {! {ghc_pick_panel get open}}} {$this shut}}
-         {if {< [seat] 0} {$this join}}
       )
       ; Another controller taking a seat picks its profile on the notebook:
       ; one joining Multiplayer's screen, or the main menu's by Start. TRUE
@@ -157,60 +358,379 @@
             {>= $joined 0}
          }
       )
+      ; A seated player's Start: their menu on GH2's popup poster, the
+      ; dialog panel their screen lists (dialog.dta's), put up in front of
+      ; the screen with the dimmer behind, without the dialog's own wall,
+      ; light and stickers, so the screen stays where it is. The profile's
+      ; name barred across the face's eyes, the seat's ring on its emblem,
+      ; then its rows: CHANGE PROFILE, to the profile screen, and DROP OUT,
+      ; working only with another seated, freeing the seat, P2 moving up for
+      ; P1. This panel works them, from the seat's controller alone.
+      (poster FALSE)
+      ; Not its light.mesh: the screen's own has that name, and is the one
+      ; found.
+      (dialog_wall (brick.mesh dl_stickers1.mesh dl_stickers2.mesh))
+      ; Its rows, each a copy of the dialog's title, ghc_row<n>.lbl, in its
+      ; text group. The first's height under the title's and each next's,
+      ; in the dialog's units, their size against the title's, and the
+      ; picked one's scale.
+      (rows (ghc_profile_change ghc_profile_drop))
+      (row_top -12)
+      (row_pitch -28)
+      (row_size 0.75)
+      (row_focus 1.12)
+      ; The picked row, and whether DROP OUT works: not with P1 alone.
+      (pick 0)
+      (can_drop FALSE)
+      (usable ($i) {|| [can_drop] {!= {elem [rows] $i} ghc_profile_drop}})
+      ; The text group the rows went into, so a dialog loaded again gets
+      ; them.
+      (rows_group 0)
+      ; Where the dialog has its title and at what size, which the name and
+      ; rows go by, and the seat's colours: the title's red and the
+      ; buttons' theirs.
+      (title_was (0 0 0))
+      (title_size_was 0)
+      (title_ink 0)
+      (row_ink 0)
+      ; Its size against the dialog's, all of it on screen.
+      (poster_size 0.8)
       (open
+         ($seat)
+         {set [poster] TRUE}
+         {$this take $seat}
+         {foreach $o [dialog_wall] {{dialog find $o} set_showing FALSE}}
+         {$this tint $seat}
+         {{dialog find dialog.view} set_local_scale [poster_size] [poster_size] [poster_size]}
+         {{dialog find dialog.view} set_showing TRUE}
+         {do
+            ($lbl {dialog find dl_title.lbl})
+            ($x 0) ($y 0) ($z 0)
+            ($was)
+            {$lbl get_local_pos $x $y $z}
+            {set $was ()}
+            {resize $was 0}
+            {push_back $was $x}
+            {push_back $was $y}
+            {push_back $was $z}
+            {set [title_was] $was}
+            {set [title_size_was] {$lbl get text_size}}
+            {set [title_ink] {ghc_profile ink $seat {campaigns active} {$lbl get color}}}
+            {set [row_ink] {ghc_profile ink $seat {campaigns active} {{dialog loaded_dir} get normal_color}}}
+            {{dialog find dl_message.lbl} set_localized_text ""}
+            {{dialog find dl_button1.btn} set_showing FALSE}
+            {{dialog find dl_button2.btn} set_showing FALSE}
+         }
+         {set [can_drop] {|| {!= $seat 0} {!= {ghc_profile holder 1} ""}}}
+         {$this build_rows}
+         {$this pick_row 0}
+         {$this header $seat}
+         {{ui current_screen} ghc_help_set
+            {if_else [can_drop]
+               ((fret1 help_select) (fret2 help_back) (strum help_updown))
+               ((fret1 help_select) (fret2 help_back))}}
+      )
+      ; The name's bar, the name and the rows made, put in the dialog's text
+      ; group in that order, each drawn over the one before; the rows
+      ; placed and named.
+      (build_rows
+         {do
+            ($title {dialog find dl_title.lbl})
+            ($group {$title get trans_parent})
+            ($labels)
+            {set $labels ()}
+            {resize $labels 0}
+            {push_back $labels ghc_name.lbl}
+            {foreach_int $i 0 {size [rows]} {push_back $labels {sprint "ghc_row" $i ".lbl"}}}
+            ; The bar: a strip of the poster's black (ui/players.cpp's
+            ; ghc_poster_black), opaque, neither tested against nor written
+            ; to the depth buffer, so the name drawn after it shows over it.
+            {if {! {{$this loaded_dir} exists prof_plate_mid.mesh}}
+               {ghc_box_make $this prof_plate $group -10}
+               {new Tex prof_plate.tex}
+               {prof_plate.tex set_bitmap "ui/image/ghc_poster_black.png"}
+               {prof_plate.mat set diffuse_tex prof_plate.tex}
+               {prof_plate.mat set z_mode 0}
+               {ghc_box_color $this prof_plate 1 1 1 1}
+            }
+            {if {!= [rows_group] $group}
+               {$group insert (objects {$group size objects}) {$this find prof_plate_mid.mesh}}
+            }
+            {ghc_box_show $this prof_plate FALSE}
+            {foreach $name $labels
+               {do
+                  {if {! {{$this loaded_dir} exists $name}}
+                     {new BandLabel $name}
+                     {{$this find $name} copy $title 0}
+                     {if {== $name ghc_name.lbl} {{$this find $name} set_type [name_font]}}
+                     {{$this find $name} set fit_text 0}
+                  }
+                  {if {!= [rows_group] $group}
+                     {$group insert (objects {$group size objects}) {$this find $name}}
+                  }
+                  {{$this find $name} set_showing FALSE}
+               }
+            }
+            {if {!= [rows_group] $group} {{$this loaded_dir} sync_objects}}
+            {set [rows_group] $group}
+            {foreach_int $k 0 {size [rows]}
+               {do
+                  ($l {$this find {sprint "ghc_row" $k ".lbl"}})
+                  {$l set trans_parent {$title get trans_parent}}
+                  {$l set_text {elem [rows] $k}}
+                  {$l set_local_pos
+                     {elem [title_was] 0}
+                     {elem [title_was] 1}
+                     {'+' {elem [title_was] 2} {'+' [row_top] {'*' $k [row_pitch]}}}}
+                  {$l set_showing TRUE}
+               }
+            }
+         }
+      )
+      ; Row $k picked: the dialog's focus colour and a size up, the usable
+      ; others in the seat's, the rest the dialog's disabled colour.
+      (pick_row
+         ($k)
+         {set [pick] $k}
+         {foreach_int $j 0 {size [rows]}
+            {do
+               ($l {$this find {sprint "ghc_row" $j ".lbl"}})
+               ($s {if_else {== $j $k} [row_focus] 1})
+               {$l set color
+                  {cond
+                     ({! {$this usable $j}} {{dialog loaded_dir} get disabled_color})
+                     ({== $j $k} {{dialog loaded_dir} get focus_color})
+                     (TRUE [row_ink])
+                  }
+               }
+               {$l set text_size {'*' [title_size_was] {'*' [row_size] $s}}}
+            }
+         }
+      )
+      ; The next usable row $step (1 or -1) from the picked one, -1 for
+      ; none.
+      (next_row
+         ($step)
+         {do
+            ($k {'+' [pick] $step})
+            ($found -1)
+            {while {&& {== $found -1} {>= $k 0} {< $k {size [rows]}}}
+               {if_else {$this usable $k}
+                  {set $found $k}
+                  {set $k {'+' $k $step}}}
+            }
+            $found
+         }
+      )
+      ; The poster in seat $seat's colour from the menus' game, its red
+      ; theirs (ui/players.cpp's ghc_poster_<game>_<seat>): a Tex and Mat of
+      ; this panel's for each, made the first time, the dialog's own Mat
+      ; copied, the poster's Mesh put back on that as it comes down.
+      (tint
+         ($seat)
+         {do
+            ($name {sprint "ghc_poster_" {campaigns active} "_" {mod $seat 4}})
+            ($tex {sprint $name ".tex"})
+            ($mat {sprint $name ".mat"})
+            {if {! {{$this loaded_dir} exists $mat}}
+               {new Tex $tex}
+               {{$this find $tex} set_bitmap {sprint "ui/image/" $name ".png"}}
+               {new Mat $mat}
+               {{$this find $mat} copy {dialog find dl_poster.mat} 1}
+               {{$this find $mat} set diffuse_tex {$this find $tex}}
+            }
+            {{dialog find dl_poster.mesh} set_mat {$this find $mat}}
+         }
+      )
+      ; GH2's dialog as its own screens show it, for one that puts it up with
+      ; this panel (ghc_delete_screen): whatever a poster changed put back,
+      ; and the dialog shown, which this panel's enter hides.
+      (plain
+         {set [poster] FALSE}
+         {if {$this loaded_dir}
+            {foreach_int $i 0 {size [rows]}
+               {if {{$this loaded_dir} exists {sprint "ghc_row" $i ".lbl"}}
+                  {{$this find {sprint "ghc_row" $i ".lbl"}} set_showing FALSE}
+               }
+            }
+            {if {{$this loaded_dir} exists ghc_name.lbl} {ghc_name.lbl set_showing FALSE}}
+            {foreach $box (prof_chk prof_chk_in prof_chk_on prof_plate)
+               {if {{$this loaded_dir} exists {sprint $box "_mid.mesh"}} {ghc_box_show $this $box FALSE}}
+            }
+         }
+         {if {dialog loaded_dir}
+            {{dialog find dl_poster.mesh} set_mat {dialog find dl_poster.mat}}
+            {foreach $o [dialog_wall] {{dialog find $o} set_showing TRUE}}
+            {foreach $o (dl_title.lbl dl_message.lbl dl_button1.btn dl_button2.btn)
+               {{dialog find $o} set_showing TRUE}
+            }
+            {{dialog find dialog.view} set_local_scale 1 1 1}
+            {{dialog find dialog.view} set_showing TRUE}
+         }
+      )
+      ; The poster down, the dialog's title and buttons back.
+      (take_down
+         {if [poster]
+            {set [poster] FALSE}
+            {{dialog find dialog.view} set_showing FALSE}
+            {{dialog find dl_poster.mesh} set_mat {dialog find dl_poster.mat}}
+            {foreach $o (dl_title.lbl dl_button1.btn dl_button2.btn) {{dialog find $o} set_showing TRUE}}
+            {foreach_int $i 0 {size [rows]}
+               {{$this find {sprint "ghc_row" $i ".lbl"}} set_showing FALSE}
+            }
+            {ghc_name.lbl set_showing FALSE}
+            {ghc_box_show $this prof_plate FALSE}
+         }
+      )
+      ; A press on the poster from its seat.
+      (poster_button
+         ($button)
+         {do
+            ($row {elem [rows] [pick]})
+            ($strum {|| {== $button kPad_DUp} {== $button kPad_DDown}})
+            {cond
+               ($strum
+                  {do
+                     ($k {$this next_row {if_else {== $button kPad_DUp} -1 1}})
+                     {if {>= $k 0}
+                        {synth play_sequence button_toggle}
+                        {$this pick_row $k}
+                     }
+                  }
+               )
+               ({== $button kPad_Tri}
+                  {synth play_sequence button_back.cue}
+                  {$this shut}
+               )
+               ({== $button kPad_X}
+                  {synth play_sequence button_select}
+                  {do
+                     ($seat [seat])
+                     {$this shut}
+                     {if_else {== $row ghc_profile_change}
+                        {ghc_profile_screen show $seat {ui current_screen} {ui current_screen}}
+                        {do
+                           ; The drop takes effect a poll on: the corner
+                           ; stays blank till poll sees it, never showing
+                           ; who left.
+                           {ghc_profile drop $seat}
+                           {set [held] {$this holders}}
+                           {foreach_int $i 0 2
+                              {$this badge
+                                 {sprint prof_t $i ".txt"} {sprint prof_p $i ".txt"} {sprint prof_ring $i ".mesh"}
+                                 -1 0 0 1}
+                           }
+                        }
+                     }
+                  }
+               )
+            }
+         }
+      )
+      (shut
+         {$this release}
+         {$this paint_badges}
+         {{ui current_screen} ghc_help}
+      )
+      ; Seat $seat's menu going up and coming down: no seat changes while one
+      ; is up.
+      (take
          ($seat)
          {set [seat] $seat}
          {ghc_profile hold 1}
          {ghc_profile seen}
-         {ghc_pick_panel open_sticky (change drop) change}
          {synth play_sequence button_select}
          {$this paint_badges}
-         ; Placed as shown: placed in build, before the view takes it, it
-         ; draws nothing.
-         {ghc_box_show $this prof_dim TRUE}
-         {ghc_box_put $this prof_dim {/ [dim_wide] -2.0} 0 0 [dim_wide] [dim_tall] [dim_end] [dim_end]}
-         {prof_title.txt set_text {ghc_profile badge $seat}}
-         {prof_title.txt set_local_pos
-            {/ {ghc_pick_panel get width} -2.0}
-            0
-            {'+' {'*' {ghc_pick_panel get height} {/ {ghc_pick_panel visible} 2.0}} [title_gap]}}
-         {prof_title.txt set_showing TRUE}
-         ; The screen's: here helpbar is this panel's own copy.
-         {{ui current_screen} ghc_help_set ((fret1 help_select) (fret2 help_back) (strum help_updown))}
+         {ghc_dim_panel show TRUE}
       )
-      (shut
-         {ghc_pick_panel shut}
+      (release
+         {$this take_down}
          {ghc_profile hold 0}
          {set [seat] -1}
          {$this hide}
-         {$this paint_badges}
-         {{ui current_screen} ghc_help}
       )
       ; A press, from port $player: TRUE where the menu took it, every
-      ; press while it is up.
+      ; press while it is up. Red from anyone shuts a poster, so one whose
+      ; player's controller went away is no dead end.
       (button
          ($player $button)
-         {if_else {>= [seat] 0}
-            {do
-               {if {== $player [seat]} {ghc_pick_button $button}}
+         {cond
+            ({>= [seat] 0}
+               {if {! {ui in_transition}}
+                  {cond
+                     ({== $player [seat]} {$this poster_button $button})
+                     ({== $button kPad_Tri}
+                        {synth play_sequence button_back.cue}
+                        {$this shut})
+                  }
+               }
                TRUE
-            }
-            {if_else {&& {== $button kPad_Start} {! {ui in_transition}}}
-               {do {if {! {$this join}} {$this open $player}} TRUE}
-               FALSE
-            }
+            )
+            ({&& {== $button kPad_Start} {! {ui in_transition}}}
+               {if {! {$this join}} {$this open $player}}
+               TRUE
+            )
+            (TRUE FALSE)
          }
       )
-      (text ($option) {localize {sprint ghc_profile_ $option}})
-      (chose
-         ($option)
-         {do
-            ($seat [seat])
-            {$this shut}
-            {cond
-               ({== $option change} {ghc_profile_screen show $seat {ui current_screen} {ui current_screen}})
-               ({== $seat 0} {ui goto_screen splash_screen})
-               (TRUE {ghc_profile drop $seat})
+   )
+}
+; A panel on a copy of the help bar's scene with the help bar's own out of
+; sight.
+{func ghc_helpbar_blank ($h_panel)
+   {foreach $o
+      (
+         help_bar_strum.mesh help_bar_starting.mesh help_bar_strumbar.mesh help_bar.mesh help_bar.txt
+         help_box_left.mesh help_box_mid.mesh help_box_right.mesh
+      )
+      {{$h_panel find $o} set_showing FALSE}
+   }
+}
+; The dimmer behind a player's menu, its own panel so a screen draws it
+; under the poster or list and the ring over: {ghc_dim_panel show <on>}.
+; Over the whole screen at any shape: a box's middle is drawn only while
+; the end it stands on is on screen, so it is three, one across the middle
+; and one from each of its edges outward, as far as `reach`.
+{if {! {exists ghc_dim_panel}} {new GHPanel ghc_dim_panel}}
+{retype ghc_dim_panel
+   (
+      (file ui/helpbar.milo)
+      (half 380)
+      (reach 600)
+      (tall 520)
+      (color (0 0 0 0.7))
+      (enter
+         {if {! {{$this loaded_dir} exists prof_dim_mid.mesh}}
+            {ghc_helpbar_blank $this}
+            {foreach $box (prof_dim prof_dim_l prof_dim_r)
+               {ghc_box_make $this $box {help_box_mid.mesh get trans_parent} 0}
+               {ghc_box_color $this $box {elem [color] 0} {elem [color] 1} {elem [color] 2} {elem [color] 3}}
+               {foreach $part ("_left.mesh" "_mid.mesh" "_right.mesh")
+                  {helpbar.view insert (objects 0) {$this find {sprint $box $part}}}
+               }
+            }
+            {helpbar.view sort_draws}
+            {{$this loaded_dir} sync_objects}
+         }
+         {$this show FALSE}
+      )
+      ; Its middles only, its ends flat, placed as shown: placed before the
+      ; view takes them, they draw nothing.
+      (show
+         ($on)
+         {foreach $box (prof_dim prof_dim_l prof_dim_r)
+            {ghc_box_show $this $box FALSE}
+            {{$this find {sprint $box "_mid.mesh"}} set_showing $on}
+         }
+         {if $on
+            {ghc_box_put $this prof_dim {'-' 0 [half]} 0 0 {'*' [half] 2} [tall] 0 0}
+            {foreach $side ((prof_dim_r_mid.mesh 1) (prof_dim_l_mid.mesh -1))
+               {do
+                  ($m {$this find {elem $side 0}})
+                  ($s {elem $side 1})
+                  {$m set_local_pos {'*' $s [half]} 0 0}
+                  {$m set_local_scale {'*' $s {/ [reach] 16.0}} 1 {/ [tall] 40.0}}
+               }
             }
          }
       )
@@ -261,6 +781,103 @@
       {ghc_nameprof_band TRUE}
    )
 }
+; Each row a seat plays as shows the seat's emblem (ghc_emblem) left of the
+; name, drawn with its button. GH2's fit, which
+; squeezes a long line to the page, is off on such a row, so the name is
+; where it is measured: it leads with spaces for the emblem, the two
+; centred together, the whole smaller only where the page needs it. In the
+; button's units: [mark_room] the widest line the page holds, [mark_grow]
+; the fit's growth of a short name over its size (measured), [mark_across]
+; the emblem's width, [mark_gap] from its disc to the name and [mark_z] its
+; lift to the letters' middle. The rows' own fit and size are kept to put
+; back. Hidden with $show FALSE, for the band list.
+{amend chooseprof_panel
+   (mark_room 225)
+   (mark_grow 1.13)
+   (mark_across 28)
+   (mark_gap 5)
+   (mark_z -6)
+   (mark_fit none)
+   (mark_size none)
+   (ghc_marks
+      ($show)
+      {if {== [mark_fit] none}
+         {set [mark_fit] {cp_band0.btn get fit_text}}
+         {set [mark_size] {cp_band0.btn get text_size}}
+      }
+      {foreach_int $i 0 7
+         {do
+            ; What draws the row: its group, GH1's list its buttons' view.
+            ($grp
+               {if_else {{$this loaded_dir} exists {sprint "cp_band" $i ".grp"}}
+                  {$this find {sprint "cp_band" $i ".grp"}}
+                  {$this find cp_buttons.view}})
+            ($btn {$this find {sprint "cp_band" $i ".btn"}})
+            ($ring {sprint "ghc_mark" $i ".mesh"})
+            ($disc {sprint "ghc_mark" $i "_disc.mesh"})
+            ($tag {sprint "ghc_mark" $i ".txt"})
+            ($seat {if_else $show {ghc_profile seat_of $i} -1})
+            ($x 0)
+            {if {! {{$this loaded_dir} exists $ring}}
+               {ghc_emblem_make $this $ring $disc $tag $btn}
+               {$grp insert (objects {$grp size objects}) {$this find $disc}}
+               {$grp insert (objects {$grp size objects}) {$this find $ring}}
+               {$grp insert (objects {$grp size objects}) {$this find $tag}}
+               {{$this loaded_dir} sync_objects}
+            }
+            ; Its size first: setting it reads the button's own text again.
+            {$btn set fit_text {if_else {>= $seat 0} 0 [mark_fit]}}
+            {$btn set text_size [mark_size]}
+            {if {>= $seat 0}
+               {do
+                  ; The disc's width: the ring's, 1.15 times.
+                  ($side {'+' [mark_gap] {'*' 1.15 [mark_across]}})
+                  ($size {'*' [mark_grow] [mark_size]})
+                  ($wide
+                     {text_fit label_width {text_fit upper {ghc_profile name_of $i}} $btn $size})
+                  ($lead "")
+                  ($pad 0)
+                  ($k 1)
+                  ; Spaces before the name till, at the size the line
+                  ; fits the page at, they hold the emblem: the two are
+                  ; centred together.
+                  {while {&& {< {'*' $k $pad} $side} {< {length $lead} 30}}
+                     {set $lead {sprint $lead " "}}
+                     ; Between two letters, so no space is trimmed.
+                     {set $pad
+                        {'-' {text_fit label_width {sprint "I" $lead "I"} $btn $size}
+                           {text_fit label_width "II" $btn $size}}}
+                     {set $k {min 1 {/ [mark_room] {'+' $pad $wide}}}}
+                  }
+                  {$btn set text_size {'*' $k $size}}
+                  {$btn set_localized_text {sprint $lead {ghc_profile name_of $i}}}
+                  ; The ring's left edge, its disc against the name's first
+                  ; letter, the line's middle 0.
+                  {set $x
+                     {'-' {'*' $k {'-' $pad {/ {'+' $pad $wide} 2.0}}}
+                        {'+' [mark_gap] {'*' 1.075 [mark_across]}}}}
+               }
+            }
+            {ghc_emblem $this $ring $disc $tag $seat $x [mark_z]
+               {if_else {>= $seat 0}
+                  {/ [mark_across] {ghc_emblem_width {$this find $tag} $seat 1}}
+                  1}}
+         }
+      }
+   )
+   ; The rows' marks shown or not, laid out as they are: the notebook's
+   ; cover, opening, draws under them, so they wait for it.
+   (ghc_marks_showing
+      ($on)
+      {foreach_int $i 0 7
+         {if {&& {>= {ghc_profile seat_of $i} 0} {{$this loaded_dir} exists {sprint "ghc_mark" $i ".mesh"}}}
+            {{$this find {sprint "ghc_mark" $i ".mesh"}} set_showing $on}
+            {{$this find {sprint "ghc_mark" $i "_disc.mesh"}} set_showing $on}
+            {{$this find {sprint "ghc_mark" $i ".txt"}} set_showing $on}
+         }
+      }
+   )
+}
 ; GH2's band list (manage_bands.dta's chooseprof_panel) as the profiles:
 ; {ghc_profile_screen show <seat> <back> <next>} picks that seat's, back to
 ; <back> on red, on to <next> once picked or named.
@@ -303,19 +920,22 @@
                ($btn {chooseprof_panel find {sprintf "cp_band%d.btn" $i}})
                {cond
                   ({== $i [guest_row]} {$btn set_text ghc_guest})
-                  ; One a seat plays as is marked as the corner marks it.
-                  ({>= {ghc_profile seat_of $i} 0}
-                     {$btn set_localized_text {ghc_profile badge {ghc_profile seat_of $i}}})
                   ({ghc_profile named $i} {$btn set_localized_text {ghc_profile name_of $i}})
                   (TRUE {$btn set_text ghc_new_profile})
                }
             }
          }
+         {chooseprof_panel ghc_marks TRUE}
+         {chooseprof_panel ghc_marks_showing FALSE}
          ; On the top row, never GUEST, which is a pick of its own.
          {chooseprof_panel set_focus {chooseprof_panel find cp_band0.btn}}
       )
+      ; The marks stay on the page as it goes; the band list hides them.
       (exit {ghc_profile hold 0})
-      (TRANSITION_COMPLETE_MSG {$this help})
+      (TRANSITION_COMPLETE_MSG
+         {chooseprof_panel ghc_marks_showing TRUE}
+         {$this help}
+      )
       ; Rename on a profile, delete on one no seat plays as.
       (help
          {do
@@ -511,6 +1131,7 @@
       )
       (enter
          {if {== [kind] profile} {ghc_profile hold 1}}
+         {ghc_profile_panel plain}
          {foreach $b (button1 button2)
             {do
                ($btn {dialog find {sprint "dl_" $b ".btn"}})
@@ -533,6 +1154,8 @@
          {ghc_profile_panel show_name [name]}
          {helpbar set_display ((fret1 help_select) (fret2 help_back) (strum help_updown))}
       )
+      ; Again once its panels are all in, whichever entered last.
+      (TRANSITION_COMPLETE_MSG {ghc_profile_panel plain})
       (exit
          {if {== [kind] profile} {ghc_profile hold 0}}
          {ghc_profile_panel hide}
