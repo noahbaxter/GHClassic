@@ -1,6 +1,6 @@
 ; The help bar shows the controls P1's menus are read from on its gems: with
 ; none seated the keyboard's Enter, Esc, Tab and arrow keys; a guitar's own
-; gems; an Xbox pad's A, B and d-pad; a DualSense's Cross and Circle; in
+; gems, the keyboard's again while it is what drives them; an Xbox pad's A, B and d-pad; a DualSense's Cross and Circle; in
 ; GH2's menus and then GH1's. Each label is its index in ui/help_bar.cpp's
 ; kLabels.
 (needs gh1)
@@ -20,6 +20,16 @@
 (expect {{{helpbar find hb_fret1.mat} get diffuse_tex} name} hb_fret1.tex)
 (expect {{{helpbar find hb_strum.mat} get diffuse_tex} name} hb_strum.tex)
 (shot guitar)
+; The keyboard driving P1's menus, the guitar still seated: its keys shown,
+; till the guitar is used again.
+(key Down)
+(wait 0.5)
+(expect {seat_has 0 guitar} 1)
+(expect {{{helpbar find hb_fret1.mat} get diffuse_tex} name} ghc_hb_fret1_28.tex)
+(expect {{{helpbar find hb_strum.mat} get diffuse_tex} name} ghc_hb_strum_keys.tex)
+(press down guitar)
+(wait 0.5)
+(expect {{{helpbar find hb_fret1.mat} get diffuse_tex} name} hb_fret1.tex)
 (controller xbox "045e:028e" pad)
 (wait 1)
 (hold xbox dpdown)

@@ -105,8 +105,9 @@ namespace gh2
         std::array<bool, SDL_SCANCODE_COUNT> s_keyWait{};
         // The keyboard: anything of its held last poll, and whether it plays
         // nothing until it lets go, the press that stood it in for a seat or
-        // what it held as the mode changed.
-        bool s_keyboardWas = false, s_keyboardQuiet = false;
+        // what it held as the mode changed; and whether it, not P1's seat,
+        // last drove P1's menus.
+        bool s_keyboardWas = false, s_keyboardQuiet = false, s_menuFromKeys = false;
         // The keyboard's mode line says pad, as the last poll outside a song
         // saw it.
         bool s_keyboardPad = false;
@@ -305,6 +306,9 @@ namespace gh2
             pads[seat].joypad = joypad;
         }
 
+        // P1's seat pressed something in a menu itself: its prompts again.
+        if (pads[0].pressed != 0u)
+            s_menuFromKeys = false;
         // The keyboard drives P1, or mid-song the first seat whose controller
         // is gone, whose pause it is. A press there stands it in for that
         // controller until it is back, and plays nothing itself.
@@ -342,6 +346,9 @@ namespace gh2
                     s_keyboardQuiet = true;
                     std::cerr << "[input] P" << to + 1 << ": keyboard, standing in" << std::endl;
                 }
+                // A fresh press on P1's menus: the help bar names its keys.
+                if (any && !s_keyboardWas && to == 0)
+                    s_menuFromKeys = true;
                 s_keyboardWas = any;
                 // Nor does what it holds as the mode changes: the Enter that
                 // resumed would pause again, as Start.
@@ -406,7 +413,9 @@ namespace gh2
         if (s_open)
             SDL_GetRelativeMouseState(&mouseX, &mouseY);
         MenuControls menu;
-        const Device *p1 = seated[0] ? deviceById(seated[0]->id) : nullptr;
+        // The keyboard, last to drive P1, never takes the seat: its keys
+        // shown while it is what was used.
+        const Device *p1 = seated[0] && !s_menuFromKeys ? deviceById(seated[0]->id) : nullptr;
         if (p1)
             menu.kind = p1->kind;
         // The help bar names what a menu reads: the fixed controls of a
