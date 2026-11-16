@@ -1,0 +1,29 @@
+; GH2's card screens read and write the card at once, not after a second on
+; "Checking status" (campaigns.dta); the second after, the result shown,
+; stays. From each screen up to the next in, under 1.7 s, from 2.5 (the
+; camera's turn back in included): the save made on a first boot, Data
+; Settings' load, and a save made through the autosave screen.
+(wait_screen bootup_create_save_check)
+{set $t {taskmgr ui_seconds}}
+{ui goto_screen bootup_create_save}
+(wait_screen guitar_help_screen)
+(expect {< {- {taskmgr ui_seconds} $t} 1.7} 1)
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+(wait 1)
+{set $mc_post_load_screen main_screen}
+{set $mc_load_failed_screen main_screen}
+{ui goto_screen memcard_load}
+(wait_until {== {{ui current_screen} name} memcard_load} 10)
+{set $t {taskmgr ui_seconds}}
+(wait_screen main_screen)
+(expect {< {- {taskmgr ui_seconds} $t} 1.7} 1)
+(wait 1)
+{set $mc_save_success_screen main_screen}
+{set $mc_save_failed_screen main_screen}
+{ui goto_screen autosave}
+(wait_until {== {{ui current_screen} name} autosave} 10)
+{set $t {taskmgr ui_seconds}}
+(wait_screen main_screen)
+(expect {< {- {taskmgr ui_seconds} $t} 1.7} 1)
+(quit)

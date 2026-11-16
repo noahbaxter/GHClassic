@@ -65,6 +65,41 @@
       }
    }
 }
+; GH2's card screens (mem_card.dta) waited a second on "Checking status"
+; before reading or writing, as the PS2's card had to; ours is a file, so
+; at once, still a task as theirs. The second after, the result shown,
+; stays. bootup_load's comes up before these scripts and keeps its own.
+{amend bootup_create_save
+   (enter
+      {dialog message mc_checking mc_title_saving}
+      {script_task (delay 0) (units kTaskUISeconds)
+         (script {dialog set_message bootup_create_save} {memcard save_data $this $mc_overwrite})}
+   )
+}
+{amend autosave
+   (enter
+      {dialog message mc_checking mc_title_saving}
+      {script_task (delay 0) (units kTaskUISeconds)
+         (script {dialog set_message save_saving} {memcard save_data $this $mc_overwrite})}
+   )
+}
+{amend memcard_load
+   (enter
+      {dialog message mc_checking mc_title_loading}
+      {switch {memcard get_info}
+         (kMCNoCard {set $mc_load_text mc_nocard_error} {ui goto_screen memcard_load_error})
+         {script_task (delay 0) (units kTaskUISeconds)
+            (script {dialog set_message load_loading} {memcard load_data $this})}
+      }
+   )
+}
+{amend mc_format
+   (enter
+      {dialog message mc_checking mc_title_caution}
+      {script_task (delay 0) (units kTaskUISeconds)
+         (script {dialog set_message format_card} {memcard format $this})}
+   )
+}
 {if {! {exists ghc_campaign_panel}} {new GHPanel ghc_campaign_panel}}
 {retype ghc_campaign_panel
    (
