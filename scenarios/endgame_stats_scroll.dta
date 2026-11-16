@@ -1,0 +1,39 @@
+; The results' breakdown held down on a gamepad scrolls at its one steady
+; pace to the end, as GH2's does: a menu's held up and down, let go for a
+; beat each step (host/menu_layer.h), stopped it for each beat.
+#include common/first_boot.dta
+(controller pad "045e:028e" pad)
+(wait 0.5)
+(press dpdown pad)
+(expect {seat_has 0 pad} 1)
+{gamecfg set mode quickplay}
+; 23 sections, a receipt longer than a second's scroll.
+{game set_song hangar18}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait_screen endgame_screen 500)
+(wait 2)
+{endgame_stats_screen set prev_screen {ui current_screen}}
+{ui goto_screen endgame_stats_screen}
+(wait_screen endgame_stats_screen)
+(wait 2)
+{set $t {endgame_stats_panel find receipt_scroll.tnm}}
+(record on held_scroll)
+(hold pad dpdown)
+(wait_until {> {$t frame} -3})
+{set $from {taskmgr ui_seconds}}
+{set $f0 {$t frame}}
+(wait_until {>= {'-' {taskmgr ui_seconds} $from} 1.2})
+; 30 frames a second throughout.
+(expect {'-' {$t frame} $f0} 36 1)
+(wait 1)
+(hold pad)
+(wait 0.5)
+(hold pad dpup)
+(wait 2.5)
+(hold pad)
+(record off)
+(quit)

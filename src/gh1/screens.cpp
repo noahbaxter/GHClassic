@@ -149,13 +149,22 @@ namespace gh2::gh1
                          {"tut_pause_quit.btn", "quit.btn"}}},
             {"tut_pause_controller"},
             // GH1 has one list of buttons where GH2 has one for a career
-            // and one for the rest: its own is GH2's for the rest, shown in
-            // a career too (menus.dta).
+            // and one for the rest: its own is GH2's for the rest, with the
+            // career's Practice in it, shown where GH2's is (ui/dta/
+            // game_settings.dta), and the career's goes. Its View is 2.2
+            // times as tall: four rows 31 apart where GH1's three are 33,
+            // from under the difficulty down to the frame.
             {.gh1 = "lose",
              .renamed = {{"lose_buttons.view", "normal_buttons.view"},
                          {"lose_restart.btn", "lose_restart_normal.btn"},
                          {"lose_selsong.btn", "lose_selsong_normal.btn"},
-                         {"lose_quit.btn", "lose_quit_normal.btn"}}},
+                         {"lose_quit.btn", "lose_quit_normal.btn"}},
+             .without = {"career_buttons.view", "lose_restart_career.btn", "lose_selsong_career.btn",
+                         "lose_quit_career.btn"},
+             .rows = {{"lose_restart_normal.btn", -75.0f},
+                      {"lose_practice_career.btn", -89.0f, "lose_selsong_normal.btn", "PRACTICE"},
+                      {"lose_selsong_normal.btn", -103.0f},
+                      {"lose_quit_normal.btn", -117.0f}}},
             // GH1 has one screen for beating medium, hard and expert,
             // where GH2 has a letter for each (endgame.dta's
             // win_game_panel).

@@ -70,13 +70,15 @@ namespace gh2
     int takePracticeSteps();
     // Which screen of a song is up: in one playing, the keyboard's menu
     // keys would be a guitar's frets and strums, so only its Esc works,
-    // as Start; in its pause menu Esc is Start too, to resume. Callable
-    // from any thread.
+    // as Start; in its pause menu Esc is Start too, to resume. The results'
+    // breakdown scrolls while up or down is held, so they stay held there,
+    // not stepped as a menu's. Callable from any thread.
     enum class SongScreen
     {
         kOther,
         kPlaying,
         kPaused,
+        kBreakdown,
     };
     void songScreen(SongScreen screen);
 

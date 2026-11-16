@@ -42,6 +42,7 @@ namespace gh2::look
         // Game thread only.
         std::vector<uint32_t> s_boards;
         Clock::time_point s_boardsAt{};
+        bool s_boardShaded = false;
         constexpr size_t kPlayers = 2;
         bool s_star = false;
         bool s_swung = false; // star power has been on since the boards were made
@@ -77,9 +78,12 @@ namespace gh2::look
             // A Mat with no picture of its own is known by its name alone
             // when only one scene has it. One the 360 gave a picture, asked
             // for without it, is the PS2's Mat of that name: its guitar
-            // beside the 360's guitarist, drawn as the PS2 shades it.
+            // beside the 360's guitarist, drawn as the PS2 shades it. The
+            // board is the 360's whatever fretboard is on it, GH1's too, as
+            // the 360's track puts each on the one Mat.
             auto byDiffuse = byMat->second.find(diffuse);
-            if (byDiffuse == byMat->second.end() && byMat->second.size() == 1u && byMat->second.begin()->first == 0u)
+            if (byDiffuse == byMat->second.end() && byMat->second.size() == 1u &&
+                (byMat->second.begin()->first == 0u || std::strcmp(mat, kBoardMat) == 0))
                 byDiffuse = byMat->second.begin();
             if (byDiffuse == byMat->second.end())
                 return nullptr;
@@ -165,6 +169,8 @@ namespace gh2::look
 
     bool isBoard(uint32_t mat) { return std::find(s_boards.begin(), s_boards.end(), mat) != s_boards.end(); }
     bool hasBoard() { return !s_boards.empty(); }
+    void setBoardShaded(bool shaded) { s_boardShaded = shaded; }
+    bool boardShaded() { return s_boardShaded; }
 
     bool trackFades()
     {

@@ -1,0 +1,83 @@
+; A full combo's crown on the results and the breakdown, in GH2's look and
+; GH1's: Notes Hit says FC with the crown on its bar, and the breakdown has a
+; Full Combo row with it. A run that passes a gem by has neither.
+(needs gh1)
+(songs songs)
+#include common/first_boot.dta
+{gamecfg set mode quickplay}
+{setlist select custom}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+{{game get_player_config 0} set autoplay TRUE}
+; Easy and Expert only, as charted.
+(press down)
+(press green)
+(wait_screen game_screen 60)
+(wait_screen endgame_screen 120)
+(wait 1)
+(expect {ghc_full_combo} 1)
+(expect {{endgame_panel find ghc_fc.mesh} showing} 1)
+(shot gh2_fc_results)
+{endgame_stats_screen set prev_screen {ui current_screen}}
+{ui goto_screen endgame_stats_screen}
+(wait_screen endgame_stats_screen)
+(wait 1)
+(expect {{endgame_stats_panel find label_fc.lbl} showing} 1)
+(expect {{endgame_stats_panel find ghc_fc.mesh} showing} 1)
+(shot gh2_fc_breakdown)
+
+; The first gem passed by, the rest hit.
+{{game get_player_config 0} set autoplay FALSE}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait_until {> {ghc_play gems} 0})
+{ghc_play play 1 {'-' {ghc_play gems} 1}}
+(wait_screen endgame_screen 120)
+(wait 1)
+(expect {player0 gems_passed} 1)
+(expect {ghc_full_combo} 0)
+(expect {{endgame_panel find ghc_fc.mesh} showing} 0)
+(shot gh2_miss_results)
+{endgame_stats_screen set prev_screen {ui current_screen}}
+{ui goto_screen endgame_stats_screen}
+(wait_screen endgame_stats_screen)
+(wait 1)
+(expect {{endgame_stats_panel find label_fc.lbl} showing} 0)
+(shot gh2_miss_breakdown)
+
+; GH1's screens around the song.
+{quickplay in_song_ui gh1}
+{campaigns venues_from gh2}
+{{game get_player_config 0} set autoplay TRUE}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait_screen endgame_screen 120)
+(wait 1)
+(expect {{endgame_panel find ghc_fc.mesh} showing} 1)
+(shot gh1_fc_results)
+{endgame_stats_screen set prev_screen {ui current_screen}}
+{ui goto_screen endgame_stats_screen}
+(wait_screen endgame_stats_screen)
+(wait 1)
+(expect {{endgame_stats_panel find label_fc.lbl} showing} 1)
+(shot gh1_fc_breakdown)
+{{game get_player_config 0} set autoplay FALSE}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait_until {> {ghc_play gems} 0})
+{ghc_play play 1 {'-' {ghc_play gems} 1}}
+(wait_screen endgame_screen 120)
+(wait 1)
+(expect {{endgame_panel find ghc_fc.mesh} showing} 0)
+(shot gh1_miss_results)
+{endgame_stats_screen set prev_screen {ui current_screen}}
+{ui goto_screen endgame_stats_screen}
+(wait_screen endgame_stats_screen)
+(wait 1)
+(expect {{endgame_stats_panel find label_fc.lbl} showing} 0)
+(shot gh1_miss_breakdown)
+(quit)

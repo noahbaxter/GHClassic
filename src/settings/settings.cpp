@@ -65,15 +65,15 @@ namespace gh2::settings
             // Off: a sphere that holds only part of its mesh hides what still
             // shows (flashpot_4.mesh in battle's fail sequence).
             {"frustum_cull", Type::kBool, 0, 1, 1, 1},
-            // 5 ms: finer is below what a player can feel. 45 by default, as
-            // audio: a frame reaches the screen two or three refreshes after
-            // it is drawn (FIFO presentation, two frames in flight), and with
-            // 0 every animation, light and gem showed late against the music
-            // (Noah's Mac matched at video 80 with audio 80, 2026-10-10).
+            // 5 ms: finer is below what a player can feel. 0 by default, as
+            // reset sets it: calibration is the player's own setup. A frame
+            // reaches the screen two or three refreshes after it is drawn
+            // (FIFO presentation, two frames in flight); Noah's Mac matched
+            // at video 80 with audio 80, 2026-10-10.
             {"video_ms", Type::kInt, -500, 500, 5, 0},
-            // 45 by default: the port's own delay on macOS, SDL's CoreAudio
-            // queue (about 43 ms; the song clock is held to the mixed audio,
-            // synth.cpp). Not measured on Windows or Linux yet.
+            // 0 by default, as video. The port's own delay on macOS, SDL's
+            // CoreAudio queue, is about 43 ms (the song clock is held to the
+            // mixed audio, synth.cpp); not measured on Windows or Linux yet.
             {"audio_ms", Type::kInt, -500, 500, 5, 0},
             // OptionData's (retail 0x10d2e0), which the save carried.
             {"band_volume", Type::kInt, 0, 11, 1, 11},

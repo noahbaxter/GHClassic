@@ -1,0 +1,28 @@
+; A custom song's open notes in practice, a section picked partway in: GH2
+; hides the gems outside the track's range (GemManager::SetupGems), and the
+; opens drawn here are hidden with them (highway/extended/guitar/
+; open_gems.cpp), none showing before the section's start in its lead-in.
+(songs practice_opens)
+#include common/first_boot.dta
+{gamecfg set mode practice}
+{{game get_player_config 0} set_difficulty expert}
+{setlist select custom}
+{ui goto_screen practice_selsong_screen}
+(wait_screen practice_selsong_screen)
+(wait 3)
+(press green)
+(wait_screen practice_diff_screen)
+(wait 1)
+(press green)
+(wait_screen practice_game_screen 60)
+(wait 2)
+; Opens B alone, from its bar ahead.
+{ghc_practice_jump 1 1}
+(wait_screen practice_game_screen 10)
+(wait 0.3)
+(expect {< {taskmgr seconds} 4.0} 1)
+(shot lead_in)
+; Its own opens coming up to the strikeline as it starts.
+(wait_until {> {taskmgr seconds} 3.6} 5)
+(shot section_start)
+(quit)

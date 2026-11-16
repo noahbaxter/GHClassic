@@ -122,26 +122,56 @@ namespace gh2::guitar
             s_chordGem = 0u, s_chordFrets = 0u;
         }
 
+        // GuitarController::OnMsg tries a hammer-on (NonStrumSwing) for a
+        // fret pressed with none above it held (ButtonDownMsg, 0x2368ac), a
+        // pull-off for one let go above every fret left, to the highest of
+        // those (ButtonUpMsg, 0x236a08). Tried here where only frets held for
+        // sustains stop GH2's, as YARG leaves them out, for every song: a
+        // disc song's never has one held under a later gem, as GH2 holds its
+        // sustains itself (sustain_hold.h).
+        void swingUnder(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t watcher, uint32_t slot,
+                        bool press)
+        {
+            if (sustainedLanes(rdram, watcher, 0u) == 0u)
+                return;
+            const int32_t index = closestUnplayed(rdram, ctx, runtime, watcher);
+            if (index < 0)
+                return;
+            const uint32_t held = GuitarTrackWatcherImpl(rdram, watcher).held();
+            const uint32_t rest =
+                held & ~sustainedLanes(rdram, watcher, gemFrets(rdram, watcherGem(rdram, watcher, index)));
+            if (rest == 0u || (held >> (slot + 1u)) == 0u)
+                return;
+            const uint32_t top = 31u - static_cast<uint32_t>(__builtin_clz(rest));
+            if (press ? top == slot : top < slot)
+                runtime->callGuestFunction(rdram, ctx, s_addresses->guitarWatcherNonStrumSwing,
+                                           {watcher, top, press ? 1u : 0u});
+        }
+
         PS2Runtime::RecompiledFunction s_fretButtonUp = nullptr;
 
         // GuitarTrackWatcherImpl::FretButtonUp(int slot), 0x24d938: a chord
-        // pulled off to, or an open with every fret let go (those held for
-        // sustains aside). GH2 tries a hammer-on or pull-off (TryToHopo,
-        // 0x24dc20, by way of NonStrumSwing) for a fret pressed or one left
-        // held, never for none, and matches the gem's frets to that one
-        // alone: so an open HOPO is tried as the middle lane's.
+        // or a fret under a sustain pulled off to, or an open with every fret
+        // let go (those held for sustains aside). GH2 tries a hammer-on or
+        // pull-off (TryToHopo, 0x24dc20, by way of NonStrumSwing) for a fret
+        // pressed or one left held, never for none, and matches the gem's
+        // frets to that one alone: so an open HOPO is tried as the middle
+        // lane's.
         void fretButtonUp(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
-            const uint32_t watcher = GPR_U32(ctx, 4);
+            const uint32_t watcher = GPR_U32(ctx, 4), slot = GPR_U32(ctx, 5);
             callOriginal(rdram, ctx, runtime, s_addresses->guitarWatcherFretButtonUp, s_fretButtonUp);
             if (!playingCustom())
-                return;
+                return swingUnder(rdram, ctx, runtime, watcher, slot, false);
             const int32_t index = closestUnplayed(rdram, ctx, runtime, watcher);
             if (index < 0)
                 return;
             const GameGem gem(rdram, watcherGem(rdram, watcher, index));
             if (GuitarTrackWatcherImpl(rdram, watcher).held() & ~sustainedLanes(rdram, watcher, gem.slots()))
-                return hammerChord(rdram, ctx, runtime, watcher, index);
+            {
+                hammerChord(rdram, ctx, runtime, watcher, index);
+                return swingUnder(rdram, ctx, runtime, watcher, slot, false);
+            }
             if (gem.slots() != 0u || !gem.hopo())
                 return;
             s_hammeredOpen = gem.address;
@@ -152,16 +182,16 @@ namespace gh2::guitar
         PS2Runtime::RecompiledFunction s_fretButtonDown = nullptr;
 
         // GuitarTrackWatcherImpl::FretButtonDown(int slot), 0x24d890: a chord
-        // hammered on. (An open's sustain, let go by any fret, is
-        // gameplay/extended/guitar/sustain_hold'.)
+        // hammered on, or a fret under a sustain. (An open's sustain, let go
+        // by any fret, is gameplay/extended/guitar/sustain_hold'.)
         void fretButtonDown(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
-            const uint32_t watcher = GPR_U32(ctx, 4);
+            const uint32_t watcher = GPR_U32(ctx, 4), slot = GPR_U32(ctx, 5);
             callOriginal(rdram, ctx, runtime, s_addresses->guitarWatcherFretButtonDown, s_fretButtonDown);
-            if (!playingCustom())
-                return;
-            if (const int32_t index = closestUnplayed(rdram, ctx, runtime, watcher); index >= 0)
-                hammerChord(rdram, ctx, runtime, watcher, index);
+            if (playingCustom())
+                if (const int32_t index = closestUnplayed(rdram, ctx, runtime, watcher); index >= 0)
+                    hammerChord(rdram, ctx, runtime, watcher, index);
+            swingUnder(rdram, ctx, runtime, watcher, slot, true);
         }
 
         // GuitarTrackWatcherImpl's gem i may be hammered on (0x24df30, from
