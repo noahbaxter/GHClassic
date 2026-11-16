@@ -240,7 +240,7 @@
             (game_settings.btn {ui goto_screen game_settings_screen})
             (controllers.btn {ui goto_screen ghc_controllers_screen})
             (memory_card.btn {ui goto_screen mem_card_screen})
-            (op_bonus.btn {ui goto_screen bonus_material_screen})
+            (op_bonus.btn {ui goto_screen {ghc_bonus_screen {campaigns active}}})
             (op_credit.btn {ui goto_screen credits_screen})
          }
          kDataUnhandled
@@ -273,6 +273,150 @@
             (TRUE kDataUnhandled)
          }
       )
+   )
+}
+; Bonus videos: each game's poster a screen of its own over the theme's room
+; (GH1's three videos, GH2's two; the 80s sells none), loading that game's
+; own scene (ghc/<game>/, disc/ark.h's alias), its rows' text, unlocks and
+; files that game's whatever the theme. Options opens the theme's game's,
+; GH2's for the 80s; the pick fret tapped, the other's, the camera still
+; between them (config/menus.toml's same_room).
+{func ghc_bonus_screen ($game) {if_else {== $game gh1} ghc_bonus_gh1_screen ghc_bonus_gh2_screen}}
+{func ghc_bonus_movie ($btn)
+   {switch $btn (bm_video1.btn video1) (bm_video2.btn video2) (bm_video3.btn video3) none}
+}
+; Bought in that game's career, or everything unlocked.
+{func ghc_bonus_unlocked ($game $movie)
+   {||
+      {campaigns unlock_all}
+      {if_else {== $game {campaigns live}} {campaign is_video_unlocked $movie} {campaigns owns $game $movie}}
+   }
+}
+; Where a video played goes back to.
+{set $ghc_bonus_back ghc_bonus_gh2_screen}
+; Both posters' scenes are up on either screen, each its wall and light
+; (bm_wall.mesh in GH1's, brick.mesh in GH2's) and its poster: the theme's
+; game's wall behind, the one shown's poster in front, the rest hidden.
+{func ghc_bonus_parts ($game $wall $poster)
+   {do
+      ($panel {if_else {== $game gh1} ghc_bonus_gh1_panel ghc_bonus_gh2_panel})
+      {foreach $o {if_else {== $game gh1} (bm_wall.mesh bm_light.mesh) (brick.mesh light.mesh)}
+         {{$panel find $o} set_showing $wall}
+      }
+      {foreach $o (bm_poster.mesh bm_maskingtape2.mesh bm_maskingtape3.mesh bm_title.lbl bm_buy.lbl bm_buttons.view bm_tape.view)
+         {{$panel find $o} set_showing $poster}
+      }
+   }
+}
+#define GHC_BONUS_SCREEN (
+   (allow_back FALSE)
+   (enter
+      {set $ghc_bonus_back $this}
+      {do
+         ($home {if_else {== {campaigns active} gh1} gh1 gh2})
+         {ghc_bonus_parts [other] {== [other] $home} FALSE}
+         {ghc_bonus_parts [game] {== [game] $home} TRUE}
+      }
+      {do
+         ($locked FALSE)
+         ($first none)
+         {foreach $row [rows]
+            {do
+               ($b {[panel] find $row})
+               ($movie {ghc_bonus_movie $row})
+               ($text {campaigns text [game] $movie})
+               {$b set_localized_text {if_else {== $text ""} {localize $movie} $text}}
+               {if_else {ghc_bonus_unlocked [game] $movie}
+                  {do
+                     {$this enable $b}
+                     {if {== $first none} {set $first $row}}
+                  }
+                  {do
+                     {$this disable $b kPad_DDown}
+                     {set $locked TRUE}
+                  }
+               }
+            }
+         }
+         {if_else {== $first none}
+            {do
+               {$this enable {[panel] find bm_hidden.btn}}
+               {[panel] set_focus {[panel] find bm_hidden.btn}}
+            }
+            {do
+               {$this disable {[panel] find bm_hidden.btn} kPad_DDown}
+               {[panel] set_focus {[panel] find $first}}
+            }
+         }
+         {{[panel] find bm_buy.lbl} set_showing $locked}
+      }
+   )
+   (BUTTON_DOWN_MSG
+      {cond
+         ({&& {ghc_pressed $button pick} {campaigns has gh1}}
+            {ghc_select}
+            {ui goto_screen {ghc_bonus_screen [other]}}
+            TRUE
+         )
+         ({== $button kPad_Tri}
+            {ghc_back}
+            {ui goto_screen options_screen}
+            TRUE
+         )
+         ; As the game's own: green does nothing on the locked row.
+         ({&& {== {$this focus_name} bm_hidden.btn} {== $button kPad_X}} TRUE)
+         (TRUE kDataUnhandled)
+      }
+   )
+   (SELECT_START_MSG
+      {play_bonus_video_screen set video {campaigns video_file [game] {ghc_bonus_movie $component}}}
+      {ui goto_screen play_bonus_video_screen}
+   )
+)
+{if {! {exists ghc_bonus_gh1_panel}} {new GHPanel ghc_bonus_gh1_panel}}
+{retype ghc_bonus_gh1_panel ((file ghc/gh1/ui/bonus_material.milo) (focus bm_video1.btn))}
+{if {! {exists ghc_bonus_gh2_panel}} {new GHPanel ghc_bonus_gh2_panel}}
+{retype ghc_bonus_gh2_panel ((file ghc/gh2/ui/bonus_material.milo) (focus bm_video3.btn))}
+{if {! {exists ghc_bonus_gh1_screen}} {new GHScreen ghc_bonus_gh1_screen}}
+{retype ghc_bonus_gh1_screen
+   (
+      ; The other's first: its wall drawn behind this one's poster.
+      (panels meta ghc_bonus_gh2_panel ghc_bonus_gh1_panel helpbar)
+      (focus ghc_bonus_gh1_panel)
+      (panel ghc_bonus_gh1_panel)
+      (game gh1)
+      (other gh2)
+      (rows (bm_video1.btn bm_video2.btn bm_video3.btn))
+      (helpbar
+         (default ((fret1 help_select) (fret2 help_back) (fret3 setlist_gh2) (strum help_updown)))
+         (bm_hidden.btn ((fret2 help_back) (fret3 setlist_gh2)))
+      )
+      GHC_BONUS_SCREEN
+   )
+}
+{if {! {exists ghc_bonus_gh2_screen}} {new GHScreen ghc_bonus_gh2_screen}}
+{retype ghc_bonus_gh2_screen
+   (
+      (panels meta ghc_bonus_gh1_panel ghc_bonus_gh2_panel helpbar)
+      (focus ghc_bonus_gh2_panel)
+      (panel ghc_bonus_gh2_panel)
+      (game gh2)
+      (other gh1)
+      (rows (bm_video3.btn bm_video2.btn)) ; as the poster has them, top first
+      (helpbar
+         (default ((fret1 help_select) (fret2 help_back) (fret3 setlist_gh1) (strum help_updown)))
+         (bm_hidden.btn ((fret2 help_back) (fret3 setlist_gh1)))
+      )
+      GHC_BONUS_SCREEN
+   )
+}
+; A video played goes back to the poster it was picked on.
+{amend play_bonus_video_screen
+   (TRANSITION_COMPLETE_MSG
+      {meta set_tool_movie TRUE}
+      {meta play_movie [video]}
+      {meta set_tool_movie FALSE}
+      {ui goto_screen $ghc_bonus_back}
    )
 }
 

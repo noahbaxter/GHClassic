@@ -57,4 +57,6 @@ still = [
 # Screens in one room, between which the camera stays: it only moves.
 same_room = [
     ["ghc_qp_setup_screen", "ghc_qp_character_screen"],
+    # the bonus videos' posters, GH1's and GH2's (game_settings.dta)
+    ["ghc_bonus_gh1_screen", "ghc_bonus_gh2_screen"],
 ]

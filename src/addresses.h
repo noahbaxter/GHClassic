@@ -237,6 +237,7 @@ namespace gh2
         uint32_t spuStartSend;
         uint32_t metaMusicPoll;
         uint32_t metaMusicStop;
+        uint32_t videoProviderGetVideoData; // VideoProvider::GetVideoData(Symbol) const
         uint32_t metaPanelPoll;
         uint32_t metaPanelPickLoopIndex; // (int size)
         uint32_t systemConfig3; // SystemConfig(Symbol, Symbol, Symbol)
@@ -632,6 +633,7 @@ namespace gh2
         .spuStartSend = 0x231a78u,
         .metaMusicPoll = 0x21f180u,
         .metaMusicStop = 0x21f668u,
+        .videoProviderGetVideoData = 0x11b350u,
         .metaPanelPoll = 0x134850u,
         .metaPanelPickLoopIndex = 0x1349d8u,
         .systemConfig3 = 0x2a8700u,
