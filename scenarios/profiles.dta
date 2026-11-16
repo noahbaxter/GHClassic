@@ -1,31 +1,44 @@
-; Who plays (save/profiles.h, ui/dta/profiles.dta). The splash's press picks
-; P1's profile on GH2's band list made one of profiles, NEW PROFILE naming
-; one on its band naming screen. On the main menu Start opens P1's menu:
-; CHANGE PROFILE back to the list, DROP OUT to the splash. Joining
-; Multiplayer's screen opens P2's, only P2's controller working it, and DROP
-; OUT frees P2's seat. The main menu's corner and Multiplayer's rows show
-; who holds each seat, and a quickplay high score goes in under the
-; profile's name, continuing flushing it. On the list yellow renames a
-; profile and blue deletes one no seat plays as; on the band list a band. A
-; boot's first press skips the list for a controller with a profile.
+; Who plays (save/profiles.h, ui/dta/profiles.dta). The splash's Start, only
+; Start, picks P1's profile on GH2's band list made one of profiles, opening
+; on the top row, never GUEST, NEW PROFILE naming one on its band naming
+; screen. Fast boot stops on the splash. On the main menu Start opens P1's
+; menu: CHANGE PROFILE back to the list. Joining Multiplayer's screen picks
+; P2's on the list, only P2's controller working it, and P2's DROP OUT frees
+; the seat. The main menu's corner and Multiplayer's rows show who holds
+; each seat, and a quickplay high score goes in under the profile's name,
+; continuing flushing it. On the list yellow renames a profile and blue
+; deletes one no seat plays as; on the band list a band.
 #include common/first_boot.dta
 (device guitar)
 (device guitar2)
 {ui goto_screen splash_screen}
 (wait_screen splash_screen)
 (wait 1)
+; Only Start leaves it.
 (press green guitar)
+(wait 1)
+(expect {{ui current_screen} name} splash_screen)
+; Red on the list goes back to the splash, P1 free again.
+(press start guitar)
+(wait_screen ghc_profile_screen 10)
+(wait 1)
+(press red guitar)
+(wait_screen splash_screen 10)
+(wait 1)
+(expect {seat_has 0 guitar} 0)
+(press start guitar)
 (wait_screen ghc_profile_screen 10)
 (wait 1)
 (expect {seat_has 0 guitar} 1)
 (expect {ghc_profile current 0} -1)
-(expect {chooseprof_panel get button_idx} 7)
+; On the top row, not GUEST.
+(expect {chooseprof_panel get button_idx} 0)
 (shot list_empty)
 ; A new profile, named, is P1's, in the first row whichever NEW PROFILE
 ; row it was picked from.
-(press up guitar)
+(press down guitar)
 (wait 0.3)
-(expect {chooseprof_panel get button_idx} 6)
+(expect {chooseprof_panel get button_idx} 1)
 (press green guitar)
 (wait_screen ghc_nameprofile_screen 10)
 (wait 1)
@@ -65,6 +78,9 @@
 (press green guitar)
 (wait_screen ghc_profile_screen 10)
 (wait 1)
+(expect {chooseprof_panel get button_idx} 0)
+(press down guitar)
+(wait 0.3)
 (shot list)
 (expect {chooseprof_panel get button_idx} 1)
 ; Beta is P1's, so blue does not delete it, but yellow renames it: Alpha's
@@ -91,10 +107,9 @@
 (expect {ghc_profile name_of 1} Gamma)
 (expect {ghc_profile name 0} Gamma)
 (shot list_renamed)
-; Alpha's, then blue deletes Gamma, no first: no keeps it, yes deletes it.
-; The title stays the profiles' as the list goes.
-(press up guitar)
-(wait 0.3)
+; Alpha's, back on the top row, then blue deletes Gamma, no first: no
+; keeps it, yes deletes it. The title stays the profiles' as the list goes.
+(expect {chooseprof_panel get button_idx} 0)
 (record on leaving)
 (press green guitar)
 (wait_screen main_screen 10)
@@ -145,44 +160,27 @@
 (press green guitar)
 (wait_screen ghc_profile_screen 10)
 (wait 1)
-(press up guitar)
-(wait 0.3)
 (expect {chooseprof_panel get button_idx} 0)
 (press green guitar)
 (wait_screen main_screen 10)
 (wait 0.5)
 (expect {ghc_profile name 0} Alpha)
 
-; Joining Multiplayer's screen opens P2's menu, as a guest; P1's controller
-; does nothing to it. P2 picks Beta.
+; Joining Multiplayer's screen picks P2's profile on the list; P1's
+; controller does nothing to it. P2 picks Beta.
 {ui goto_screen multi_screen}
 (wait_screen multi_screen)
 (press start guitar2)
-(wait 0.5)
-(expect {seat_has 1 guitar2} 1)
-(expect {ghc_profile_panel get seat} 1)
-(press down guitar)
-(wait 0.3)
-(expect {ghc_pick_panel get picked} 0)
-(press green guitar2)
 (wait_screen ghc_profile_screen 10)
+(expect {seat_has 1 guitar2} 1)
 (wait 1)
-(expect {chooseprof_panel get button_idx} 7)
+; A guest opens on the top row too, Alpha's.
+(expect {chooseprof_panel get button_idx} 0)
 (shot list_p2)
 (press green guitar)
 (wait 0.3)
 (expect {{ui current_screen} name} ghc_profile_screen)
-(press up guitar2)
-(wait 0.2)
-(press up guitar2)
-(wait 0.2)
-(press up guitar2)
-(wait 0.2)
-(press up guitar2)
-(wait 0.2)
-(press up guitar2)
-(wait 0.2)
-(press up guitar2)
+(press down guitar2)
 (wait 0.3)
 (expect {chooseprof_panel get button_idx} 1)
 (press green guitar2)
@@ -239,7 +237,8 @@
 (expect {{ui current_screen} name} highscore_screen)
 (wait_screen complete_screen 30)
 
-; DROP OUT for P1 goes back to the splash, whose press picks again.
+; DROP OUT for P1 goes back to the splash, whose Start picks again on the
+; list, on the profile the controller last played as.
 {ui goto_screen main_screen}
 (wait_screen main_screen)
 (press start guitar)
@@ -249,14 +248,9 @@
 (press green guitar)
 (wait_screen splash_screen 10)
 (wait 1)
-(press green guitar)
+(press start guitar)
 (wait_screen ghc_profile_screen 10)
 (expect {chooseprof_panel get button_idx} 0)
-; A boot's first press plays as the profile its controller last did.
-{set $ghc_profile_booted FALSE}
-{ui goto_screen splash_screen}
-(wait_screen splash_screen)
-(wait 1)
 (press green guitar)
 (wait_screen main_screen 10)
 (expect {ghc_profile name 0} Alpha)
@@ -285,4 +279,12 @@
 (wait_screen chooseprof_screen 20)
 (wait 1)
 (expect {campaign is_empty_profile 0} 1)
+
+; A boot with a save that has a band: fast boot's intro goes on to the
+; splash and waits there for Start, not past it.
+{campaign set_profile_name "The Rest" 0}
+{ui goto_screen cut_scene_screen}
+(wait_screen splash_screen 10)
+(wait 2)
+(expect {{ui current_screen} name} splash_screen)
 (quit)

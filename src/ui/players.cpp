@@ -61,6 +61,7 @@ namespace gh2
         //   first free row, so the profiles stay at the top.
         // {ghc_profile hold <0|1>}: a menu is up, so no controller takes,
         //   leaves or trades a seat (host/input.h).
+        // {ghc_profile joins <0|1>}: the main menu is up, where Start joins.
         // {ghc_profile drop <seat>}: its player drops out.
         // {ghc_profile joined <menu>}: a seat taken by another controller
         //   since the last call, on Multiplayer's screen or, with <menu> 1,
@@ -134,6 +135,11 @@ namespace gh2
             if (op == "hold")
             {
                 holdSeats(n != 0);
+                return {};
+            }
+            if (op == "joins")
+            {
+                setMenuJoins(n != 0);
                 return {};
             }
             if (op == "drop")
@@ -220,6 +226,7 @@ namespace gh2
         script::addCommand("ghc_players", command);
         script::addCommand("ghc_profile", profile);
         // Profiles' (dta/profiles.dta, patched with the menus, which hold it).
+        locale::add("ghc_press_start", "PRESS START");
         locale::add("ghc_choose_profile", "CHOOSE PROFILE");
         locale::add("ghc_profile_p0", "P1 PROFILE");
         locale::add("ghc_profile_p1", "P2 PROFILE");

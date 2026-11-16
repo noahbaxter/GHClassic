@@ -1,15 +1,15 @@
-; Who plays (save/profiles.h). The splash's press picks P1's profile on the
+; Who plays (save/profiles.h). The splash's Start picks P1's profile on the
 ; profile screen, GH2's band list made one of profiles: each a row, a free
 ; one NEW PROFILE, GUEST last. NEW PROFILE names one on GH2's band naming
 ; screen, as the profile naming screen; yellow renames one there, blue
 ; deletes one once asked. On the main menu and Multiplayer's
 ; screen a player's Start dims the screen and opens their menu (picker.dta's
 ; list, as a menu), their profile over it: CHANGE PROFILE goes to the profile
-; screen, DROP OUT sends P1 back to the splash and frees any other seat.
-; Joining on Multiplayer's screen, or taking P1 on the main menu by Start,
-; opens the joining player's. Only the controller it opened for works it,
-; and no seat changes while it is up. The main menu shows who holds each
-; seat in its top left corner.
+; screen, DROP OUT sends P1 back to the splash and frees any other seat. A
+; controller joining there by Start picks its profile on the profile
+; screen, backing out of it leaving the seat free. Only the controller a
+; screen or menu is for works it, and no seat changes while one is up. The
+; main menu shows who holds each seat in its top left corner.
 ;
 ; A screen with ghc_profile_panel among its panels, before the help bar, and
 ; picker.dta's after it, sends its presses here first ({ghc_profile_panel
@@ -145,13 +145,16 @@
       )
       (poll
          {if {&& {>= [seat] 0} {! {ghc_pick_panel get open}}} {$this shut}}
-         ; Another controller taking a seat opens its menu: one joining
-         ; Multiplayer's screen, or taking P1 on the main menu by Start.
-         {if {< [seat] 0}
-            {do
-               ($joined {ghc_profile joined [badges]})
-               {if {>= $joined 0} {$this open $joined}}
-            }
+         {if {< [seat] 0} {$this join}}
+      )
+      ; Another controller taking a seat picks its profile on the notebook:
+      ; one joining Multiplayer's screen, or the main menu's by Start. TRUE
+      ; if one did.
+      (join
+         {do
+            ($joined {ghc_profile joined [badges]})
+            {if {>= $joined 0} {ghc_profile_screen join $joined {ui current_screen} {ui current_screen}}}
+            {>= $joined 0}
          }
       )
       (open
@@ -193,7 +196,7 @@
                TRUE
             }
             {if_else {&& {== $button kPad_Start} {! {ui in_transition}}}
-               {do {$this open $player} TRUE}
+               {do {if {! {$this join}} {$this open $player}} TRUE}
                FALSE
             }
          }
@@ -270,15 +273,23 @@
       (seat 0)
       (back_screen main_screen)
       (next_screen main_screen)
+      ; Whether the seat is joining: backing out frees it.
+      (joining FALSE)
       ; Its last row; the rest are the profiles'.
       (guest_row 7)
       (helpbar (default ((fret1 help_select) (fret2 help_back) (strum help_updown))))
       (show
          ($seat $back $next)
+         {set [joining] FALSE}
          {set [seat] $seat}
          {set [back_screen] $back}
          {set [next_screen] $next}
          {ui goto_screen $this}
+      )
+      (join
+         ($seat $back $next)
+         {$this show $seat $back $next}
+         {set [joining] TRUE}
       )
       (enter
          {ghc_profile hold 1}
@@ -300,11 +311,8 @@
                }
             }
          }
-         {do
-            ($now {ghc_profile current [seat]})
-            {chooseprof_panel set_focus
-               {chooseprof_panel find {sprintf "cp_band%d.btn" {if_else {>= $now 0} $now [guest_row]}}}}
-         }
+         ; On the top row, never GUEST, which is a pick of its own.
+         {chooseprof_panel set_focus {chooseprof_panel find cp_band0.btn}}
       )
       (exit {ghc_profile hold 0})
       (TRANSITION_COMPLETE_MSG {$this help})
@@ -360,6 +368,7 @@
             {cond
                ({!= $player_num [seat]} TRUE)
                ({== $button kPad_Tri}
+                  {if [joining] {ghc_profile drop [seat]}}
                   {$this backwards_anim}
                   {synth play_sequence button_back.cue}
                   {ui goto_screen [back_screen]}

@@ -249,11 +249,14 @@
          ; Song speed is quickplay's and practice's alone.
          {song_speed set 100}
          {$this ghc_help}
-         ; Who holds each seat, in the corner (profiles.dta).
+         ; Who holds each seat, in the corner (profiles.dta), where a
+         ; controller's Start joins.
          {ghc_profile_panel set badges TRUE}
          {ghc_profile_panel paint_badges}
+         {ghc_profile joins 1}
       )
       (exit
+         {ghc_profile joins 0}
          {ghc_profile_panel leave}
          {ghc_profile_panel set badges FALSE}
          {ghc_profile_panel paint_badges}
@@ -302,6 +305,8 @@
       (player_num 0)
       (finish_load {splash.view set_frame 0} {splash_legal.view set_showing TRUE})
       (enter
+         ; Start only, not GH2's any button.
+         {splash_press_start.lbl set_text ghc_press_start}
          {splash.view animate (period 3.333) (range 0 100)}
          {set $enter_time {taskmgr ui_seconds}}
          {game_screen set attract_mode FALSE}
@@ -329,16 +334,13 @@
          {game_screen set attract_mode TRUE}
          {ui goto_screen loading_screen}
       )
-      ; The first press of a boot plays as the profile P1's controller last
-      ; did, if one; any other, or none, picks one.
+      ; Start only, which picks P1's profile on the notebook, on the one its
+      ; controller last played as, then the main menu. Joining: backing out
+      ; to here frees P1, for whichever controller presses Start next.
       (BUTTON_DOWN_MSG
-         {if {meta is_any_button $button $player_num}
+         {if {== $button kPad_Start}
             {synth play_sequence button_select}
-            {if_else {&& {! $ghc_profile_booted} {>= {ghc_profile current 0} 0}}
-               {ui goto_screen main_screen}
-               {ghc_profile_screen show 0 splash_screen main_screen}
-            }
-            {set $ghc_profile_booted TRUE}
+            {ghc_profile_screen join 0 splash_screen main_screen}
          }
       )
    )

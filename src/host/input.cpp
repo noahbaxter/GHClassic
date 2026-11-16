@@ -63,6 +63,7 @@ namespace gh2
             return s_locked.load(std::memory_order_relaxed) || s_practicing.load(std::memory_order_relaxed);
         }
         std::atomic<bool> s_playersStep{false};
+        std::atomic<bool> s_menuJoins{false};
         std::atomic<bool> s_seatsHeld{false};
         std::atomic<int> s_dropSeat{-1};
         std::atomic<SongScreen> s_songScreen{SongScreen::kOther};
@@ -135,7 +136,9 @@ namespace gh2
                 default:
                     return Mode::kSong;
                 }
-            return s_playersStep.load(std::memory_order_relaxed) ? Mode::kPlayers : Mode::kMenu;
+            if (s_playersStep.load(std::memory_order_relaxed))
+                return Mode::kPlayers;
+            return s_menuJoins.load(std::memory_order_relaxed) ? Mode::kJoin : Mode::kMenu;
         }
 
         // Each action on a DualShock, as GH2's joypad layout takes it
@@ -591,6 +594,11 @@ namespace gh2
     void setPlayersStep(bool on)
     {
         s_playersStep.store(on, std::memory_order_relaxed);
+    }
+
+    void setMenuJoins(bool on)
+    {
+        s_menuJoins.store(on, std::memory_order_relaxed);
     }
 
     uint32_t seatTrades()

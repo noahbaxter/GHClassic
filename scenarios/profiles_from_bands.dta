@@ -20,10 +20,10 @@
 (wait_screen autosave)
 (wait_screen main_screen)
 (expect {ghc_profile named 2} 0)
-; And so it loads.
+; And so it loads, on to the splash, which waits for Start.
 {ui goto_screen bootup_load}
 (wait 2)
-(wait_screen main_screen 30)
+(wait_screen splash_screen 30)
 (expect {ghc_profile name_of 1} "Other Band")
 (expect {ghc_profile named 2} 0)
 (quit)

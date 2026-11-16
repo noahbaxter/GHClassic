@@ -143,6 +143,9 @@ namespace gh2
     // Whether Multiplayer's screen is up, where a controller joins with
     // Start and yellow moves a player up a seat. Callable from any thread.
     void setPlayersStep(bool on);
+    // Whether the main menu is up, where Start on a controller with no seat
+    // joins the next free one (Seats::seat). Callable from any thread.
+    void setMenuJoins(bool on);
     // How many times P1 and P2 have traded places, by yellow there or by
     // P2 moving up when P1's controller is let go. Callable from any thread.
     uint32_t seatTrades();

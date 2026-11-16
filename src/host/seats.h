@@ -24,6 +24,7 @@ namespace gh2::input
     {
         kMenu,
         kPlayers,     // Multiplayer's screen, where players join and reorder
+        kJoin,        // the main menu, where Start joins the next free seat
         kControllers, // the Controllers screen, where devices only show
         // A song is up and holds the seats: on a screen of its own besides
         // these two (loading, results), played, or paused.

@@ -56,8 +56,9 @@ namespace gh2::input
     // Start on another controller takes P1 from whatever had it: the one
     // player picking up another controller. Otherwise only Start on a
     // controller with no seat does anything to the seats: on Multiplayer's
-    // screen it joins, into the first free seat, and anywhere else it takes
-    // P1. There, too, yellow moves a seated player up a seat, the first round
+    // screen and the main menu it joins, into the first free seat, and
+    // anywhere else it takes P1. On Multiplayer's screen, too, yellow moves
+    // a seated player up a seat, the first round
     // to the last. Not off a press a seated controller made in the same poll:
     // Steam Input's mirror of a pad presses with it. P1 is never empty while
     // P2 is not. The keyboard takes no seat.
@@ -65,7 +66,7 @@ namespace gh2::input
     {
         std::vector<Read> reads;
         std::copy_if(all.begin(), all.end(), std::back_inserter(reads), [](const Read &r) { return !r.keyboard(); });
-        const bool playersStep = mode == Mode::kPlayers;
+        const bool playersStep = mode == Mode::kPlayers, joins = playersStep || mode == Mode::kJoin;
         // Only devices here are remembered, and a seat's while it is away.
         const auto here = [&](const DeviceId &id) {
             return std::any_of(reads.begin(), reads.end(), [&](const Read &r) { return r.id == id; });
@@ -139,9 +140,9 @@ namespace gh2::input
                 for (int seat = 0; seat < kPlayers && free < 0; ++seat)
                     if (m_seats[seat].none())
                         free = seat;
-                if (started[i] && !seatedStart && playersStep && free >= 0)
+                if (started[i] && !seatedStart && joins && free >= 0)
                     sit(free, reads[i], true);
-                else if (started[i] && !seatedStart && !playersStep)
+                else if (started[i] && !seatedStart && !joins)
                     sit(0, reads[i], true);
                 // One player: whatever they last pressed is theirs, the press
                 // playing as it would on it.
