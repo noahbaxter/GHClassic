@@ -203,6 +203,10 @@ namespace gh2
         // The Grim Ripper's guitar, a literal SelectGuitarProvider::InitData
         // alone makes a Symbol of.
         uint32_t scytheText; // "scythe"
+        uint32_t strcmp;
+        // The venue Campaign::PickAttractSong strcmps a song's quickplay
+        // venue with, to leave its songs out.
+        uint32_t stoneText; // "stone"
         uint32_t builtinNew;
         uint32_t builtinDelete;
         uint32_t dataNodeGetObj;   // DataNode::GetObj
@@ -587,6 +591,8 @@ namespace gh2
         .dataNodeEvaluate = 0x2b7d38u,
         .symbolCtor = 0x2d3a48u,
         .scytheText = 0x3f85e0u,
+        .strcmp = 0x305b54u,
+        .stoneText = 0x3fe4d0u,
         .builtinNew = 0x2cf138u,
         .builtinDelete = 0x2cf160u,
         .dataNodeGetObj = 0x2b7f80u,

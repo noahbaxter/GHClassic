@@ -1,0 +1,14 @@
+; The attract mode leaves out a song whose quickplay venue is the
+; executable's "stone" (Campaign::PickAttractSong): any disc's venue of that
+; own name (content/sources.cpp). No disc song plays there, so every one but
+; Shout at the Devil is moved there: that one alone is picked.
+#include common/first_boot.dta
+{foreach_int $i 1 {size {find $syscfg songs}}
+   {set $s {elem {find $syscfg songs} $i}}
+   {if {&& {find_exists $s quickplay venue} {!= {elem $s 0} gh2_shoutatthedevil}}
+      {set_elem {find $s quickplay venue} 1 gh2_stone}}}
+(expect {elem {find $syscfg songs gh2_mother quickplay venue} 1} gh2_stone)
+{set $stone FALSE}
+{foreach_int $i 0 12{if {!= {campaign pick_attract_song} gh2_shoutatthedevil} {set $stone TRUE}}}
+(expect $stone 0)
+(quit)

@@ -510,6 +510,18 @@ namespace gh2::sources
             SET_GPR_U32(ctx, 5, s_scythe);
         }
 
+        // Campaign::PickAttractSong (0x12e430) picks again while a song's
+        // quickplay venue strcmps equal to the executable's "stone": so
+        // while it is any disc's venue of that own name.
+        struct StrcmpTag;
+        void onStrcmp(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
+        {
+            const uint32_t venue = GPR_U32(ctx, 4);
+            if (GPR_U32(ctx, 5) == s_addresses->stoneText && venue != 0u &&
+                own(reinterpret_cast<const char *>(getMemPtr(rdram, venue))) == "stone")
+                SET_GPR_U32(ctx, 5, venue);
+        }
+
         // ProfileState::InitGuitars (0x13a888) makes each guitar's item
         // (CampaignItem::CampaignItem(Type, Symbol, bool unlocked, ...),
         // 0x140950) unlocked unless strcmp says it is named "battleaxe", the
@@ -707,6 +719,7 @@ namespace gh2::sources
         script::addCommand("sources", sourcesCommand);
         EntryHook<SymbolTag>::install(runtime, addresses.symbolCtor, onSymbol);
         EntryHook<CampaignItemTag>::install(runtime, addresses.campaignItemCtor, onCampaignItem);
+        EntryHook<StrcmpTag>::install(runtime, addresses.strcmp, onStrcmp);
         s_getVenue = runtime.lookupFunction(addresses.gameConfigGetVenue);
         runtime.replaceFunction(addresses.gameConfigGetVenue, &getVenue);
         s_onFilterClips = runtime.lookupFunction(addresses.gameConfigOnFilterClips);
