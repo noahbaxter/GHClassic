@@ -1,0 +1,17 @@
+; A song loading in GH1's look: GH1's poster turns its knobs (gh1/menus.dta's
+; loading_panel), as GH1's own does, where GH2's script finds none of its
+; own tape and word to animate.
+(needs gh1)
+#include common/first_boot.dta
+{quickplay song_defaults 0}
+{gamecfg set mode quickplay}
+{{game get_player_config 0} set_difficulty expert}
+{game set_song shoutatthedevil}
+{game set_quickplay}
+{game set_venue battle}
+{campaigns venues_from gh1}
+{ui goto_screen loading_screen}
+(wait 0.5)
+(expect {campaigns look} gh1)
+(wait_until {> {{loading_panel find load_poster.view} frame} 2} 5)
+(quit)
