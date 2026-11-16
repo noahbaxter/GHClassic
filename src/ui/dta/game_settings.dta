@@ -488,6 +488,72 @@
    )
    (goto_practice_mode {ghc_practice_song})
 }
+; Player 0's song a full combo, as the song lists' crown has it
+; (save/results.cpp): none missed, and every gem hit in one streak.
+{func ghc_full_combo
+   {&& {! {gamecfg multiplayer}} {> {player0 gems_hit} 0} {== {player0 gems_passed} 0}
+      {== {player0 longest_streak} {player0 gems_hit}}}
+}
+; The results' Notes Hit says FC for a full combo, the crown after it on its
+; bar. The rest is the game's own (endgame.dta).
+{amend endgame_panel
+   (enter
+      {endgame_song_data.lbl set_localized_text {game get_song_text}}
+      {endgame_diff_data.lbl set_text {game get_difficulty_sym 0}}
+      {endgame_score_data.lbl set_localized_text {sprint {player0 score}}}
+      {endgame_percent_data.lbl set_localized_text
+         {if_else {ghc_full_combo} "FC" {sprintf {localize eg_percent_format} {player0 percent_hit}}}}
+      {endgame_streak_data.lbl set_localized_text {sprintf {localize eg_streak_format} {player0 longest_streak}}}
+      {endgame_review_data.lbl set_text {player0 star_rating}}
+      {percentbar_p1.mesh set_local_scale {/ {player0 percent_hit} 100.0} 1 1}
+      {$this set_headline endgame_headline.lbl}
+      {if {! {{$this loaded_dir} exists ghc_fc.mesh}}
+         {ghc_crown_make $this ghc_fc endgame_percent_data.lbl 100}
+         ; GH1's, black on the paper, has its Notes Hit right after it: the
+         ; crown goes before it.
+         {if_else {== {campaigns look} gh1}
+            {do {ghc_fc.mesh set_local_pos -24 0 -20} {ghc_fc.mesh set_local_scale 1.6 1 1.6}}
+            {do {ghc_fc.mesh set_local_pos 46 0 0} {ghc_fc.mesh set_local_scale 2.4 1 2.4}}
+         }
+      }
+      {ghc_fc.mesh set_showing {ghc_full_combo}}
+   )
+}
+; The breakdown's Full Combo, a row after Avg Multiplier with the crown,
+; and the section stats a row down for it, for a full combo.
+{amend endgame_stats_panel
+   (update_singleplayer_stats
+      {do
+         ($avg_multi {max 1 {player0 avg_multiplier}})
+         {player0_avg_multi.lbl set_localized_text
+            {sprintf {localize stat_avg_multi_format} {int $avg_multi} {mod {int {'*' 10 $avg_multi}} 10}}}
+      }
+      {do
+         ($x 0) ($y 0) ($z 0)
+         ($fc {ghc_full_combo})
+         {if {! {{$this loaded_dir} exists label_fc.lbl}}
+            {new BandLabel label_fc.lbl}
+            {label_fc.lbl copy label_avg_multi.lbl 0}
+            {label_avg_multi.lbl get_local_pos $x $y $z}
+            {label_fc.lbl set_local_pos $x $y {'-' $z 30}}
+            {label_fc.lbl set_localized_text "FULL COMBO"}
+            {ghc_crown_make $this ghc_fc label_fc.lbl 100}
+            {ghc_fc.mesh set_local_pos 412 0 4}
+            {ghc_fc.mesh set_local_scale 2.4 1 2.4}
+            {section_stats.lbl get_local_pos $x $y $z}
+            {set [ghc_section_z] $z}
+            {stats_sections.lst get_local_pos $x $y $z}
+            {set [ghc_list_z] $z}
+         }
+         {label_fc.lbl set_showing $fc}
+         {ghc_fc.mesh set_showing $fc}
+         {section_stats.lbl set_local_pos 0 0 {'-' [ghc_section_z] {if_else $fc 30 0}}}
+         {stats_sections.lst set_local_pos 0 0 {'-' [ghc_list_z] {if_else $fc 30 0}}}
+      }
+   )
+   (ghc_section_z 0)
+   (ghc_list_z 0)
+}
 ; Practice plays the part alone where it has channels of its own (not a
 ; custom song with no stem for it, custom/audio.h), with its drum clicks
 ; at any speed: GH2's TRIGGERS, a custom song's from its drums. With
@@ -779,30 +845,16 @@
          {ghc_box_color $this ghc_stats 0 0 0 0.8}
          {ghc_box_put $this ghc_stats -24 0 {'*' -2.5 [stats_row]} {'+' [stats_wide] 40} {'*' 5.4 [stats_row]} 8 8}
          {ghc_box_show $this ghc_stats TRUE}
-         ; The song lists' crown (ui/song_crown.cpp) by Best Hit, after its
-         ; number.
-         {new Tex ghc_crown.tex}
-         {ghc_crown.tex set_bitmap "ui/image/ghc_crown.png"}
-         {new Mat ghc_crown.mat}
-         {ghc_crown.mat copy ghc_stats_end.mat 1}
-         {ghc_crown.mat set color {pack_color 1 1 1}}
-         {ghc_crown.mat set alpha 1}
-         {ghc_crown.mat set diffuse_tex ghc_crown.tex}
-         {new {{helpbar find help_box_right.mesh} class_name} ghc_crown.mesh}
-         {ghc_crown.mesh copy {helpbar find help_box_right.mesh} 1}
-         {ghc_crown.mesh set_mat ghc_crown.mat}
-         {ghc_crown.mesh set trans_parent ghc_stats.grp}
-         {ghc_crown.mesh set_local_rot 0 0 0}
-         {ghc_crown.mesh set_local_pos [stats_crown_x] 0 {'*' -2.5 [stats_row]}}
-         {ghc_crown.mesh set_local_scale {/ [stats_row] 12.0} 1 {/ [stats_row] 12.0}}
-         {ghc_crown.mesh set draw_order 11}
-         {ghc_crown.mesh set_showing FALSE}
-         {new {ghc_crown.mesh class_name} ghc_crown_live.mesh}
-         {ghc_crown_live.mesh copy ghc_crown.mesh 1}
-         {ghc_crown_live.mesh set trans_parent ghc_stats.grp}
-         {ghc_crown_live.mesh set_local_pos [stats_crown_x] 0 {'*' -3.5 [stats_row]}}
-         {foreach $m (ghc_stats_mid.mesh ghc_stats_left.mesh ghc_stats_right.mesh ghc_crown.mesh ghc_crown_live.mesh)
+         {foreach $m (ghc_stats_mid.mesh ghc_stats_left.mesh ghc_stats_right.mesh)
             {$dir insert (draws {$dir size (draws)}) {$this find $m}}
+         }
+         ; The full combo crowns after Best Hit's number and Hit Percent's.
+         {foreach $crown ((ghc_crown -2.5) (ghc_crown_live -3.5))
+            {do
+               ($m {ghc_crown_make $this {elem $crown 0} ghc_stats.grp 11})
+               {$m set_local_pos [stats_crown_x] 0 {'*' {elem $crown 1} [stats_row]}}
+               {$m set_local_scale {/ [stats_row] 12.0} 1 {/ [stats_row] 12.0}}
+            }
          }
          ; The map's track, on a dark box of its own, and its fill
          ; (map_poll), each tick made as it is first wanted.

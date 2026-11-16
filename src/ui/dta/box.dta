@@ -77,3 +77,34 @@
       {{$b_dir find {sprint $b_name $part}} set_showing $b_on}
    }
 }
+
+; The song lists' full combo crown (ui/song_crown.cpp), <name>.mesh in panel
+; $c_dir on a box end's quad: 16 square, its left edge and middle where it
+; stands, out of sight, drawn after what the scene's list holds so far (that
+; list and any new labels taking effect). Returns it.
+{func ghc_crown_make ($c_dir $c_name $c_parent $c_order)
+   {do
+      ($c_tex {sprint $c_name ".tex"})
+      ($c_mat {sprint $c_name ".mat"})
+      ($c_mesh {sprint $c_name ".mesh"})
+      {new Tex $c_tex}
+      {{$c_dir find $c_tex} set_bitmap "ui/image/ghc_crown.png"}
+      {new Mat $c_mat}
+      {{$c_dir find $c_mat} copy {helpbar find ghc_box_corner.mat} 1}
+      {{$c_dir find $c_mat} set blend 3}
+      {{$c_dir find $c_mat} set z_mode 3}
+      {{$c_dir find $c_mat} set color {pack_color 1 1 1}}
+      {{$c_dir find $c_mat} set alpha 1}
+      {{$c_dir find $c_mat} set diffuse_tex {$c_dir find $c_tex}}
+      {new {{helpbar find help_box_right.mesh} class_name} $c_mesh}
+      {{$c_dir find $c_mesh} copy {helpbar find help_box_right.mesh} 1}
+      {{$c_dir find $c_mesh} set_mat {$c_dir find $c_mat}}
+      {{$c_dir find $c_mesh} set trans_parent $c_parent}
+      {{$c_dir find $c_mesh} set_local_rot 0 0 0}
+      {{$c_dir find $c_mesh} set draw_order $c_order}
+      {{$c_dir find $c_mesh} set_showing FALSE}
+      {{$c_dir loaded_dir} insert (draws {{$c_dir loaded_dir} size (draws)}) {$c_dir find $c_mesh}}
+      {{$c_dir loaded_dir} sync_objects}
+      {$c_dir find $c_mesh}
+   }
+}
