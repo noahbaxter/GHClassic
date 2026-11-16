@@ -353,6 +353,7 @@ set(GHC_GAME_SOURCES
     src/disc/volume.cpp
     src/formats/bitmap.cpp
     src/formats/dtb.cpp
+    src/formats/ps2_icon.cpp
     src/formats/dtb_text.cpp
     src/formats/dxt.cpp
     src/formats/md5.cpp
@@ -453,6 +454,7 @@ set(GHC_GAME_SOURCES
     src/synth/spu.cpp
     src/synth/synth.cpp
     src/synth/timeline.cpp
+    src/ui/background_save.cpp
     src/ui/fast_boot.cpp
     src/ui/locale.cpp
     src/ui/help_bar.cpp

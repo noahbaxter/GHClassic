@@ -278,6 +278,7 @@ namespace gh2
         uint32_t freeCameraPoll; // FreeCamera::Poll
         uint32_t rndFlareDrawFlare;
         uint32_t saveData1;     // the card write, on GHMCSaveData's worker thread
+        uint32_t saveData2;     // (int result) back on the main thread: the result to the UI's screen
         uint32_t loadData1;     // the card read, on GHMCLoadData's
         uint32_t loadData2;     // back on the main thread, where Campaign::Load runs
         uint32_t sceMcInit;
@@ -682,6 +683,7 @@ namespace gh2
         .freeCameraPoll = 0x1b9370u,
         .rndFlareDrawFlare = 0x1f9330u,
         .saveData1 = 0x14b3e0u,
+        .saveData2 = 0x14b5b8u,
         .loadData1 = 0x14ba00u,
         .loadData2 = 0x14bae0u,
         .sceMcInit = 0x2f3860u,

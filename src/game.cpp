@@ -23,6 +23,7 @@
 #include "content/practice_sounds.h"
 #include "content/song_speed.h"
 #include "content/status_line.h"
+#include "ui/background_save.h"
 #include "ui/fast_boot.h"
 #include "frame_step.h"
 #include "game_overrides.h"
@@ -210,6 +211,7 @@ namespace
         gh2::installFrameStep(runtime, gh2::kSlus21447);
         gh2::installMenus(runtime);
         gh2::installPhotoMode(runtime, gh2::kSlus21447);
+        gh2::background_save::install(runtime, gh2::kSlus21447);
         gh2::installHelpBar(runtime, gh2::kSlus21447);
         gh2::menu_guitarist::install(runtime, gh2::kSlus21447);
         gh2::installPlayers(runtime);

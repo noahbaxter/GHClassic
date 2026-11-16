@@ -14,8 +14,9 @@
 {highscores add UNLOCKED 654321}
 {campaign mark_needs_save}
 {autosave_goto main_screen}
-(wait_screen autosave)
+; Saved in the background, no screen.
 (wait_screen main_screen)
+(wait_until {! {campaign needs_save}})
 (expect {campaign all_access} 1)
 {ui goto_screen bootup_load}
 (wait_screen guitar_help_screen)

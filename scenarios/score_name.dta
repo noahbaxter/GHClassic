@@ -17,8 +17,9 @@
 (expect {highscores get_default_name} EDDIE)
 {campaign mark_needs_save}
 {autosave_goto main_screen}
-(wait_screen autosave)
+; Saved in the background, no screen.
 (wait_screen main_screen)
+(wait_until {! {campaign needs_save}})
 ; Not saved: the load must drop it.
 {highscores set_default_name UNSAVED}
 {ui goto_screen bootup_load}

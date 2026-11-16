@@ -17,14 +17,52 @@
 ; unlock-all cheat turns saving off with it. Game Settings' unlock all puts
 ; all access on too, saving left on ({campaigns cheat_access}). GH1's has no
 ; all access, and is this one otherwise.
+;
+; No autosave screen (mem_card.dta's, two 1 s waits around a save that takes
+; under a millisecond): the save is started here and the next screen comes at
+; once, the theme's card icon in the corner while it is made
+; (ui/background_save.h). One that fails puts the autosave screen up over
+; wherever the player is, to retry it or go on. A save asked for while one is
+; being made is made after it.
 {func autosave_goto ($next_screen)
-   {if_else {&& {campaign needs_save} {! {campaigns cheat_access}} $autosave {! $disable_save}}
+   {if {&& {campaign needs_save} {! {campaigns cheat_access}} $autosave {! $disable_save}}
+      {ghc_save}
+   }
+   {ui goto_screen $next_screen}
+}
+{set $ghc_saving FALSE}
+{set $ghc_save_again FALSE}
+{func ghc_save
+   {if_else $ghc_saving
+      {set $ghc_save_again TRUE}
       {do
-         {set $mc_save_success_screen $next_screen}
-         {set $mc_save_failed_screen $next_screen}
+         {set $ghc_saving TRUE}
+         {ghc_save_start {campaigns active}}
+         {memcard save_data {ui current_screen} $mc_overwrite}
+      }
+   }
+}
+; As the autosave screen takes its result (mem_card.dta); the next save
+; asked for starts once the card code has let this one go.
+{func ghc_saved ($result)
+   {set $ghc_saving FALSE}
+   {if_else {== $result 0}
+      {do
+         {campaign save_complete}
+         {set $mc_overwrite TRUE}
+         {if $ghc_save_again
+            {set $ghc_save_again FALSE}
+            {script_task (delay 0.1) (units kTaskUISeconds)
+               (script {if {campaign needs_save} {ghc_save}})
+            }
+         }
+      }
+      {do
+         {set $ghc_save_again FALSE}
+         {set $mc_save_success_screen {ui current_screen}}
+         {set $mc_save_failed_screen {ui current_screen}}
          {ui goto_screen autosave}
       }
-      {ui goto_screen $next_screen}
    }
 }
 {if {! {exists ghc_campaign_panel}} {new GHPanel ghc_campaign_panel}}
