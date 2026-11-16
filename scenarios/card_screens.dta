@@ -1,13 +1,20 @@
 ; GH2's card screens read and write the card at once, not after a second on
-; "Checking status" (campaigns.dta); the second after, the result shown,
-; stays. From each screen up to the next in, under 1.7 s, from 2.5 (the
-; camera's turn back in included): the save made on a first boot, Data
-; Settings' load, and a save made through the autosave screen.
-(wait_screen bootup_create_save_check)
-{set $t {taskmgr ui_seconds}}
-{ui goto_screen bootup_create_save}
+; "Checking status" (campaigns.dta). Booting, the save is made unasked and
+; read or made goes straight on: no prompt, no second on its result, the
+; save there after. Data Settings' load and a save made through the autosave
+; screen keep the second after, the result shown: from each screen up to the
+; next in, under 1.7 s, from 2.5 (the camera's turn back in included).
 (wait_screen guitar_help_screen)
-(expect {< {- {taskmgr ui_seconds} $t} 1.7} 1)
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+(wait 1)
+; A second boot reads it and goes on, nothing asked: to the guitar help
+; again, as this save has no profiles.
+{set $t {taskmgr ui_seconds}}
+{ui goto_screen bootup_load}
+(wait_until {== {{ui current_screen} name} bootup_load} 10)
+(wait_until {== {{ui current_screen} name} guitar_help_screen} 10)
+(expect {< {- {taskmgr ui_seconds} $t} 3} 1)
 {ui goto_screen main_screen}
 (wait_screen main_screen)
 (wait 1)

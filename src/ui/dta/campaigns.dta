@@ -76,6 +76,45 @@
          (script {dialog set_message bootup_create_save} {memcard save_data $this $mc_overwrite})}
    )
 }
+; Booting, a save read or made goes straight on, no second on its result;
+; none found is made, not asked about: the save is a file, so "no" only
+; turned saving off. Failures keep GH2's screens (mem_card.dta). The results
+; are its #defines' numbers, which it keeps to itself: 0 none, -101 no card,
+; -103 a different card, -105 corrupt, -106 no space, -120 a save there.
+{amend bootup_load
+   (memcard_result ($result $space_free)
+      {switch $result
+         (0 {set $mc_overwrite TRUE} {ui goto_screen cut_scene_screen})
+         (-101 {ui goto_screen bootup_nocard})
+         (-105 {set $mc_overwrite TRUE} {ui goto_screen bootup_corrupt_data})
+         {set $mc_overwrite FALSE}
+         {if_else {< {memcard space_available} {memcard space_needed}}
+            {ui goto_screen bootup_create_save_no_space}
+            {ui goto_screen bootup_create_save}
+         }
+      }
+   )
+}
+{amend bootup_create_save
+   (memcard_result ($result $space_free)
+      {set $mc_overwrite FALSE}
+      {switch $result
+         (0 {set $mc_overwrite TRUE} {campaign save_complete} {ui goto_screen cut_scene_screen})
+         (-101 {ui goto_screen bootup_save_nocard})
+         (-106 {ui goto_screen bootup_nospace})
+         (-120
+            {set $mc_replace_screen $this}
+            {set $mc_load_screen bootup_load}
+            {ui goto_screen bootup_replace_save_check}
+         )
+         (-103 {ui goto_screen bootup_different_card})
+         {set $mc_retry_screen $this}
+         {set $mc_continue_screen bootup_caution}
+         {set $mc_retry_continue_text save_error}
+         {ui goto_screen retry_continue}
+      }
+   )
+}
 {amend autosave
    (enter
       {dialog message mc_checking mc_title_saving}
@@ -87,7 +126,7 @@
    (enter
       {dialog message mc_checking mc_title_loading}
       {switch {memcard get_info}
-         (kMCNoCard {set $mc_load_text mc_nocard_error} {ui goto_screen memcard_load_error})
+         (-101 {set $mc_load_text mc_nocard_error} {ui goto_screen memcard_load_error})
          {script_task (delay 0) (units kTaskUISeconds)
             (script {dialog set_message load_loading} {memcard load_data $this})}
       }
