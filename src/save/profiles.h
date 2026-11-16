@@ -40,8 +40,16 @@ namespace gh2::save
     Profiles profiles();
     // Named, or renamed: its controllers play as it under the new name.
     void nameProfile(int profile, const std::string &name);
-    // Gone, its bests with it; its controllers play as guests.
+    // Gone, its bests and preferences with it; its controllers play as
+    // guests.
     void deleteProfile(int profile);
+
+    // What a profile plays with wherever it sits, in [profile 1 prefs]:
+    // lefty (0 or 1), speed (note speed in tenths, Clone Hero's, on every
+    // difficulty) and length (the highway's, horizon_y). None where it has
+    // set none, so it plays with the game's settings.
+    std::optional<int> profilePref(int profile, const std::string &key);
+    void keepProfilePref(int profile, const std::string &key, int value);
 
     // The profile seat `seat` plays as, none for a guest; and the one its
     // controller is to play as from now (a profile plays on one controller,

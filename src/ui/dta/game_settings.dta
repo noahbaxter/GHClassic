@@ -13,10 +13,11 @@
 ; The highway's length ({highway_length}, note_speed.cpp) is where a gem
 ; first shows, the track's horizon_y (track_graphics.dta): its camera sees
 ; that far, and its pools of gems and tails hold as many more as it is
-; longer. The board is made longer as each track is built.
-{func ghc_highway
+; longer. The board is made longer as each track is built. Each player's
+; track is built with theirs, $n, given here just before it is
+; (note_speed.cpp's onTrack): every track reads these as it is built.
+{func ghc_highway ($n)
    {do
-      ($n {highway_length})
       ($track {find $syscfg track_graphics})
       {set_elem {find $track horizon_y} 1 $n}
       {set_elem {find $track cam far_plane} 1 {if_else {> $n 110} {'+' $n 90} 200}}
@@ -24,7 +25,6 @@
       {set_elem {find $track init_tails} 1 {int {/ {'*' 16 {max $n 110}} 110}}}
    }
 }
-{ghc_highway}
 
 ; Audio Settings in GH1's scenes (gh1/menus.dta), out of a song and in one:
 ; GH1's sliders link to nothing, its own script moved between them, so they
@@ -2142,7 +2142,6 @@
          (gs_sfx.sld
             {if {!= $stop {$this length_stop}}
                {highway_length set {'+' 50 {'*' 5 $stop}}}
-               {ghc_highway}
                {$this retrack}
             }
          )

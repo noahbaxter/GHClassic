@@ -99,6 +99,25 @@ namespace gh2::save
         dropSections("profile " + std::to_string(profile + 1) + " ");
     }
 
+    std::optional<int> profilePref(int profile, const std::string &key)
+    {
+        // The profiles first: their first read can add sections, moving this.
+        if (!profiles().here(profile))
+            return std::nullopt;
+        const Section *section = keptSection("profile " + std::to_string(profile + 1) + " prefs");
+        const std::string *value = section ? section->get(key) : nullptr;
+        if (!value)
+            return std::nullopt;
+        return std::atoi(value->c_str());
+    }
+
+    void keepProfilePref(int profile, const std::string &key, int value)
+    {
+        if (profiles().here(profile))
+            keepSection("profile " + std::to_string(profile + 1) + " prefs",
+                        [&](Section &section) { section.set(key, std::to_string(value)); });
+    }
+
     namespace
     {
         // A seat's player moved to another device in it (host/input.h's

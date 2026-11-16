@@ -4,9 +4,11 @@
 #include "content/locale.h"
 #include "disc/ark.h"
 #include "dta.h"
+#include "highway/note_speed.h"
 #include "host/input.h"
 #include "render/texture_store.h"
 #include "save/profiles.h"
+#include "save/save.h"
 #include "script.h"
 #include "ui/seat_colors.h"
 
@@ -28,6 +30,13 @@ namespace gh2
         // Each seat's controller as `joined` last saw it.
         std::string s_seen[kPlayers];
         uint32_t s_seenStarts = 0; // startSeats() then
+
+        // Each seat's profile and lefty as `lefty` last saw them, once it
+        // has. A guest's lefty is kept apart, in state.ini's [guest], as
+        // Options' holds whoever played last.
+        std::optional<int> s_leftyFor[kPlayers];
+        bool s_leftyWas[kPlayers] = {};
+        bool s_leftySeen[kPlayers] = {};
 
         void see()
         {
@@ -172,6 +181,16 @@ namespace gh2
         //   since the last call, on Multiplayer's screen or, with <menu> 1,
         //   the main menu's, where whoever presses takes P1; -1 for none.
         // {ghc_profile seen}: who sits now is no join, as a menu opens.
+        // {ghc_profile pref <seat> speed|length}: what it plays with, its
+        //   profile's own else the game's (highway/note_speed.h).
+        // {ghc_profile set_pref <seat> lefty|speed|length <value>}: on its
+        //   profile; a guest's goes nowhere.
+        // {ghc_profile shown <value>}: a speed or length as Game Settings
+        //   shows it, in tenths: 60 "6.0".
+        // {ghc_profile lefty <seat> <now>}: whether the seat plays left
+        //   handed, now <now>: a profile sitting down brings its own, and one
+        //   sat there keeps whatever it is changed to; a guest has its own,
+        //   first Options', put back as a profile gets up.
         script::Node profile(const script::Call &call)
         {
             const std::string op = call.symbol(1);
@@ -262,6 +281,46 @@ namespace gh2
             {
                 dropSeat(n);
                 return {};
+            }
+            if (op == "pref")
+                return number(call.symbol(3) == "speed" ? seatSpeed(n) : seatLength(n));
+            if (op == "set_pref")
+            {
+                if (const auto profile = save::seatProfile(n))
+                    save::keepProfilePref(*profile, call.symbol(3), static_cast<int>(call.number(4)));
+                return {};
+            }
+            if (op == "shown")
+            {
+                const int tenths = n;
+                return word(std::to_string(tenths / 10) + "." + std::to_string(tenths % 10));
+            }
+            if (op == "lefty" && n >= 0 && n < kPlayers)
+            {
+                const bool now = call.number(3) != 0.0f;
+                const auto profile = save::seatProfile(n);
+                const std::string ownKey = "lefty p" + std::to_string(n + 1);
+                const auto keepOwn = [&](bool on) { save::keepState("guest", ownKey, on ? "1" : "0"); };
+                const std::string kept = save::state("guest", ownKey);
+                bool own = kept == "1", out = now;
+                if (!s_leftySeen[n] || profile != s_leftyFor[n])
+                {
+                    // Options' own, taken while a guest holds the seat.
+                    if (kept.empty() && (s_leftySeen[n] ? !s_leftyFor[n] : !profile))
+                        keepOwn(own = now);
+                    s_leftySeen[n] = true;
+                    s_leftyFor[n] = profile;
+                    out = profile ? save::profilePref(*profile, "lefty").value_or(own) != 0 : own;
+                }
+                else if (now != s_leftyWas[n])
+                {
+                    if (profile)
+                        save::keepProfilePref(*profile, "lefty", now ? 1 : 0);
+                    else
+                        keepOwn(now);
+                }
+                s_leftyWas[n] = out;
+                return number(out ? 1 : 0);
             }
             if (op == "seen")
             {
@@ -355,6 +414,9 @@ namespace gh2
         locale::add("ghc_guest", "guest");
         locale::add("ghc_profile_change", "CHANGE PROFILE");
         locale::add("ghc_profile_drop", "DROP OUT");
+        locale::add("ghc_profile_lefty", "LEFTY FLIP");
+        locale::add("ghc_profile_speed", "NOTE SPEED");
+        locale::add("ghc_profile_length", "HWY LENGTH");
         locale::add("ghc_rename", "RENAME");
         locale::add("ghc_delete", "DELETE");
         locale::add("ghc_delete_profile", "DELETE PROFILE");

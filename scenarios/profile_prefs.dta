@@ -1,0 +1,108 @@
+; A profile's own lefty, note speed and highway length (save/profiles.h),
+; set on its player's Start poster (ui/dta/profiles.dta): green tunes a
+; speed or length, strumming steps it, green keeps it and red puts it back;
+; green flips LEFTY FLIP, ticked in its box. Then a co-op song, each
+; player's highway built with their own (highway/note_speed.cpp): P1 lefty
+; at 8.0 and 13.0, P2 at 15.0 and 6.0.
+#include common/first_boot.dta
+(device guitar)
+(device guitar2)
+(press down guitar)
+(wait 0.5)
+{ghc_profile make 0 "Alpha"}
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+(wait 1)
+(press start guitar2)
+(wait_screen ghc_profile_screen 10)
+(wait 1)
+{ghc_profile make 1 "Beta"}
+{ui goto_screen main_screen}
+(wait_screen main_screen 10)
+(wait 1.5)
+(record on poster_prefs)
+(press start guitar)
+(wait 0.8)
+(shot p1)
+(press down guitar)
+(wait 0.4)
+(press down guitar)
+(wait 0.4)
+(expect {ghc_profile_panel get pick} 2)
+(press green guitar)
+(wait 0.4)
+(expect {ghc_profile_panel get tuning} speed)
+(press up guitar)
+(wait 0.3)
+(press up guitar)
+(wait 0.3)
+(press up guitar)
+(wait 0.3)
+(press up guitar)
+(wait 0.3)
+(shot p1_tuning)
+(press green guitar)
+(wait 0.4)
+(press down guitar)
+(wait 0.4)
+(press green guitar)
+(wait 0.3)
+(press up guitar)
+(wait 0.3)
+(press up guitar)
+(wait 0.3)
+(press red guitar)
+(wait 0.4)
+(expect {ghc_profile pref 0 length} 110)
+(press green guitar)
+(wait 0.3)
+(press up guitar)
+(wait 0.3)
+(press up guitar)
+(wait 0.3)
+(press up guitar)
+(wait 0.3)
+(press up guitar)
+(wait 0.3)
+(press green guitar)
+(wait 0.4)
+(press up guitar)
+(wait 0.4)
+(press up guitar)
+(wait 0.4)
+(expect {ghc_profile_panel get pick} 1)
+(press green guitar)
+(wait 0.6)
+(expect {options get_lefty 0} 1)
+(shot p1_set)
+(record off)
+(expect {ghc_profile pref 0 speed} 80)
+(expect {ghc_profile pref 0 length} 130)
+(press red guitar)
+(wait 0.5)
+(press start guitar2)
+(wait 0.8)
+(shot p2)
+(press red guitar2)
+(wait 0.5)
+{ghc_profile set_pref 1 speed 150}
+{ghc_profile set_pref 1 length 60}
+(expect {ghc_profile pref 1 speed} 150)
+{gamecfg set mode multi_coop}
+{game set_num_players 2}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 1} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{{game get_player_config 1} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 120)
+(wait_until {> {taskmgr seconds} 1} 60)
+{beatmatch jump 60000}
+(wait 3)
+(record on song_two_highways)
+(wait 6)
+(shot song)
+(record off)
+(quit)

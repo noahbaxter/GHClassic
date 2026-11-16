@@ -150,6 +150,14 @@
                {helpbar.view insert (objects 0) {$this find {elem $e 1}}}
                {helpbar.view insert (objects {helpbar.view size objects}) {$this find {elem $e 2}}}
             }
+            ; LEFTY FLIP's box on the poster: its line, the black in it and
+            ; the fill, each over the last.
+            {foreach $box ((prof_chk 1) (prof_chk_in 1.1) (prof_chk_on 1.2))
+               {ghc_box_make $this {elem $box 0} {help_box_mid.mesh get trans_parent} {elem $box 1}}
+               {foreach $part ("_left.mesh" "_mid.mesh" "_right.mesh")
+                  {helpbar.view insert (objects 0) {$this find {sprint {elem $box 0} $part}}}
+               }
+            }
             {foreach $t [texts]
                {new Text $t}
                {{$this find $t} copy help_bar.txt 0}
@@ -167,6 +175,7 @@
          {ghc_dim_panel show FALSE}
          {$this badge prof_title_tag.txt prof_title.txt prof_ring.mesh -1 0 0 1}
          {prof_name.txt set_showing FALSE}
+         {foreach $box (prof_chk prof_chk_in prof_chk_on) {ghc_box_show $this $box FALSE}}
       )
       ; What a free seat's badge says in its name's place, none for "".
       (free_text "")
@@ -337,6 +346,14 @@
       (held "")
       (holders {sprint {ghc_profile holder 0} "|" {ghc_profile holder 1}})
       (poll
+         ; Each seat's lefty kept with its profile: one sitting down brings
+         ; its own, wherever it was changed (here, Game Settings).
+         {foreach_int $s 0 2
+            {do
+               ($lefty {ghc_profile lefty $s {options get_lefty $s}})
+               {if {!= $lefty {options get_lefty $s}} {options set_lefty $s $lefty}}
+            }
+         }
          {if {< [seat] 0} {$this join}}
          ; A seat changing, a drop taking effect a poll on, draws them again.
          {do
@@ -363,9 +380,12 @@
       ; the screen with the dimmer behind, without the dialog's own wall,
       ; light and stickers, so the screen stays where it is. The profile's
       ; name barred across the face's eyes, the seat's ring on its emblem,
-      ; then its rows: CHANGE PROFILE, to the profile screen, and DROP OUT,
-      ; working only with another seated, freeing the seat, P2 moving up for
-      ; P1. This panel works them, from the seat's controller alone.
+      ; then its rows: CHANGE PROFILE, to the profile screen; the player's
+      ; LEFTY FLIP, ticked in its box; their NOTE SPEED and HWY LENGTH, each
+      ; tuned by strumming once picked, a profile's alone
+      ; (highway/note_speed.h); then DROP OUT, working only with another
+      ; seated, freeing the seat, P2 moving up for P1. This panel works
+      ; them, from the seat's controller alone.
       (poster FALSE)
       ; Not its light.mesh: the screen's own has that name, and is the one
       ; found.
@@ -374,15 +394,60 @@
       ; text group. The first's height under the title's and each next's,
       ; in the dialog's units, their size against the title's, and the
       ; picked one's scale.
-      (rows (ghc_profile_change ghc_profile_drop))
+      (rows (ghc_profile_change ghc_profile_lefty ghc_profile_speed ghc_profile_length ghc_profile_drop))
       (row_top -12)
       (row_pitch -28)
       (row_size 0.75)
       (row_focus 1.12)
-      ; The picked row, and whether DROP OUT works: not with P1 alone.
+      ; The picked row, and whether DROP OUT works: not with P1 alone. A
+      ; speed or length is a profile's alone.
       (pick 0)
       (can_drop FALSE)
-      (usable ($i) {|| [can_drop] {!= {elem [rows] $i} ghc_profile_drop}})
+      (usable
+         ($i)
+         {do
+            ($row {elem [rows] $i})
+            {cond
+               ({== $row ghc_profile_drop} [can_drop])
+               ({|| {== $row ghc_profile_speed} {== $row ghc_profile_length}} {>= {ghc_profile current [seat]} 0})
+               (TRUE TRUE)
+            }
+         }
+      )
+      ; Row $i's text: a speed or length with its setting after it, as Game
+      ; Settings shows it, between arrows while it is tuned.
+      (row_text
+         ($i)
+         {do
+            ($row {elem [rows] $i})
+            ($key {cond ({== $row ghc_profile_speed} speed) ({== $row ghc_profile_length} length) (TRUE "")})
+            ($value {if_else {== $key ""} "" {ghc_profile shown {ghc_profile pref [seat] $key}}})
+            {cond
+               ({== $key ""} {localize $row})
+               ({== $key [tuning]} {sprint {localize $row} "  < " $value " >"})
+               (TRUE {sprint {localize $row} "  " $value})
+            }
+         }
+      )
+      ; A speed or length being tuned: its key, and its setting as it was
+      ; picked, which red puts back. Strumming steps it [tune_step] tenths,
+      ; from [tune_min] to [tune_max] (Clone Hero's 5 to 20, and Game
+      ; Settings' length).
+      (tuning "")
+      (tune_was 0)
+      (tune_step 5)
+      (tune_min 50)
+      (tune_max 200)
+      ; LEFTY FLIP's box, on the help bar after its row's text: the gap to
+      ; it, its width and height and its line's, in the help bar's units;
+      ; the rows' middle (the title's height on the help bar) and the
+      ; dialog's units in the help bar's.
+      (check_gap 7)
+      (check_wide 12.6)
+      (check_tall 12.6)
+      (check_line 1.5)
+      (rows_z 54.6)
+      (dialog_scale 0.85)
       ; The text group the rows went into, so a dialog loaded again gets
       ; them.
       (rows_group 0)
@@ -422,13 +487,11 @@
             {{dialog find dl_button2.btn} set_showing FALSE}
          }
          {set [can_drop] {|| {!= $seat 0} {!= {ghc_profile holder 1} ""}}}
+         {set [tuning] ""}
          {$this build_rows}
          {$this pick_row 0}
          {$this header $seat}
-         {{ui current_screen} ghc_help_set
-            {if_else [can_drop]
-               ((fret1 help_select) (fret2 help_back) (strum help_updown))
-               ((fret1 help_select) (fret2 help_back))}}
+         {{ui current_screen} ghc_help_set ((fret1 help_select) (fret2 help_back) (strum help_updown))}
       )
       ; The name's bar, the name and the rows made, put in the dialog's text
       ; group in that order, each drawn over the one before; the rows
@@ -477,7 +540,7 @@
                {do
                   ($l {$this find {sprint "ghc_row" $k ".lbl"}})
                   {$l set trans_parent {$title get trans_parent}}
-                  {$l set_text {elem [rows] $k}}
+                  {$l set_localized_text {$this row_text $k}}
                   {$l set_local_pos
                      {elem [title_was] 0}
                      {elem [title_was] 1}
@@ -504,6 +567,43 @@
                   }
                }
                {$l set text_size {'*' [title_size_was] {'*' [row_size] $s}}}
+            }
+         }
+         {$this lefty_box}
+      )
+      ; LEFTY FLIP's box after its row's text, in the row's colour, filled
+      ; while the seat plays left handed: a box of the line's colour, a
+      ; black one inside it, and the fill (box.dta's, their ends flat). At
+      ; the poster's tilt, and as much higher as the row rises that far
+      ; along it.
+      (lefty_box
+         {do
+            ($k 1)
+            ($rx 0) ($ry 0) ($rz 0)
+            ($l {$this find {sprint "ghc_row" $k ".lbl"}})
+            ($c {$l get color})
+            ($wide
+               {'*' {text_fit label_width {text_fit upper {localize ghc_profile_lefty}} $l {$l get text_size}}
+                  [name_scale]})
+            ($x {'+' {/ $wide 2.0} [check_gap]})
+            ($z {'+' [rows_z] {'*' [dialog_scale] {'+' [row_top] {'*' $k [row_pitch]}}}})
+            ($line [check_line])
+            {{dialog find dl_title.lbl} get_world_rot $rx $ry $rz}
+            {foreach $box ((prof_chk 0 1) (prof_chk_in 1 0) (prof_chk_on 2 1))
+               {do
+                  ($name {elem $box 0})
+                  ($in {'*' {elem $box 1} $line})
+                  {ghc_box_show $this $name FALSE}
+                  {$this tilt {sprint $name "_mid.mesh"} dl_title.lbl}
+                  {ghc_box_put $this $name {'+' $x $in} 0 {'+' $z {'*' $x {'*' $ry 0.01745}}}
+                     {'-' [check_wide] {'*' 2 $in}} {'-' [check_tall] {'*' 2 $in}} 0 0}
+                  {if_else {elem $box 2}
+                     {ghc_box_color $this $name
+                        {/ {mod $c 256} 255.0} {/ {mod {int {/ $c 256}} 256} 255.0} {/ {int {/ $c 65536}} 255.0} 1}
+                     {ghc_box_color $this $name 0 0 0 1}}
+                  {{$this find {sprint $name "_mid.mesh"}} set_showing
+                     {|| {!= $name prof_chk_on} {options get_lefty [seat]}}}
+               }
             }
          }
       )
@@ -579,16 +679,37 @@
                {{$this find {sprint "ghc_row" $i ".lbl"}} set_showing FALSE}
             }
             {ghc_name.lbl set_showing FALSE}
-            {ghc_box_show $this prof_plate FALSE}
+            {foreach $box (prof_chk prof_chk_in prof_chk_on prof_plate) {ghc_box_show $this $box FALSE}}
          }
       )
-      ; A press on the poster from its seat.
+      ; A press on the poster from its seat: strumming a tuned setting steps
+      ; it, green keeps it and red puts it back.
       (poster_button
          ($button)
          {do
             ($row {elem [rows] [pick]})
             ($strum {|| {== $button kPad_DUp} {== $button kPad_DDown}})
             {cond
+               ({&& {!= [tuning] ""} $strum}
+                  {ghc_profile set_pref [seat] [tuning]
+                     {max [tune_min]
+                        {min [tune_max]
+                           {'+' {ghc_profile pref [seat] [tuning]}
+                              {'*' [tune_step] {if_else {== $button kPad_DUp} 1 -1}}}}}}
+                  {synth play_sequence button_toggle}
+                  {$this show_row [pick]}
+               )
+               ({&& {!= [tuning] ""} {|| {== $button kPad_X} {== $button kPad_Tri}}}
+                  {if_else {== $button kPad_X}
+                     {synth play_sequence button_select}
+                     {do
+                        {synth play_sequence button_back.cue}
+                        {ghc_profile set_pref [seat] [tuning] [tune_was]}
+                     }
+                  }
+                  {set [tuning] ""}
+                  {$this show_row [pick]}
+               )
                ($strum
                   {do
                      ($k {$this next_row {if_else {== $button kPad_DUp} -1 1}})
@@ -601,6 +722,17 @@
                ({== $button kPad_Tri}
                   {synth play_sequence button_back.cue}
                   {$this shut}
+               )
+               ({&& {== $button kPad_X} {== $row ghc_profile_lefty}}
+                  {synth play_sequence button_select}
+                  {options set_lefty [seat] {! {options get_lefty [seat]}}}
+                  {$this lefty_box}
+               )
+               ({&& {== $button kPad_X} {|| {== $row ghc_profile_speed} {== $row ghc_profile_length}}}
+                  {synth play_sequence button_select}
+                  {set [tuning] {if_else {== $row ghc_profile_speed} speed length}}
+                  {set [tune_was] {ghc_profile pref [seat] [tuning]}}
+                  {$this show_row [pick]}
                )
                ({== $button kPad_X}
                   {synth play_sequence button_select}
@@ -626,6 +758,11 @@
                )
             }
          }
+      )
+      ; Row $k's text as its setting now is.
+      (show_row
+         ($k)
+         {{$this find {sprint "ghc_row" $k ".lbl"}} set_localized_text {$this row_text $k}}
       )
       (shut
          {$this release}
