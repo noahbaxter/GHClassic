@@ -3,6 +3,8 @@
 ; changes; stepped down and let go, the menu is that game's. Holds with any
 ; set of discs (ghc.py scenarios --discs).
 #include common/first_boot.dta
+; Listed however few, until the taps below.
+{set $ghc_tap_flips 0}
 (wait 1)
 (shot gh2)
 ; Yellow and the strum are libpad's 0x1000 and 0x40.
@@ -31,4 +33,20 @@
 (expect {campaigns active} $want)
 (wait 2)
 (shot picked)
+; Tapped, with more of them than $ghc_tap_flips, nothing; with no more, the
+; next of them, round to the first.
+{set $ghc_tap_flips 2}
+(press yellow)
+(wait 1)
+(wait_until {&& {== {{ui current_screen} name} main_screen} {! {ui in_transition}}} 20)
+(wait 1)
+(expect {|| {<= {size {ghc_themes}} $ghc_tap_flips} {== {campaigns active} $want}} 1)
+{set $ghc_tap_flips 9}
+{set $at 0}
+{foreach_int $i 0 {size {ghc_themes}} {if {== {elem {ghc_themes} $i} {campaigns active}} {set $at $i}}}
+{set $next {elem {ghc_themes} {mod {'+' $at 1} {size {ghc_themes}}}}}
+(press yellow)
+(wait 1)
+(wait_until {&& {== {{ui current_screen} name} main_screen} {! {ui in_transition}}} 20)
+(expect {campaigns active} $next)
 (quit)

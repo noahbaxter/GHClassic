@@ -41,7 +41,8 @@
 (shot campaigns_gh1)
 ; Held, the engines' list (config/menus.toml's pick): a step round to GH2's and let
 ; go picks it; tapped again, GH1's. Yellow and the strum are libpad's 0x1000
-; and 0x40.
+; and 0x40. Listed however few, as two only flip otherwise.
+{set $ghc_tap_flips 0}
 (hold 4096)
 (wait 1)
 (expect {ghc_pick_panel get open} 1)
@@ -54,6 +55,7 @@
 (wait 1)
 (expect {ghc_pick_panel get open} 0)
 (expect {note_engine picked} gh2)
+{set $ghc_tap_flips 2}
 (press yellow)
 (wait 1)
 (expect {note_engine picked} gh1)

@@ -387,10 +387,14 @@
                {ui goto_screen chooseprof_screen}
                kDataUnhandled
             )
-            ; Held, the engines to pick from; tapped, the next.
+            ; Held, the engines to pick from; tapped, the next. With no more
+            ; of them than $ghc_tap_flips (main_menu.dta), a press is the next.
             ({&& {ghc_pressed $button pick} {> {note_engine choices} 1}}
-               {ghc_pick_panel open_held {ghc_engines} {note_engine picked} {ghc_held pick}
-                  ghc_engine_text ghc_engine_picked ghc_engine_next}
+               {if_else {<= {note_engine choices} $ghc_tap_flips}
+                  {$this ghc_engine_next}
+                  {ghc_pick_panel open_held {ghc_engines} {note_engine picked} {ghc_held pick}
+                     ghc_engine_text ghc_engine_picked ghc_engine_next}
+               }
                TRUE
             )
             (TRUE kDataUnhandled)

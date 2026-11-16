@@ -231,6 +231,9 @@
 ; The main screen, as the game's own but for fade_panel, which Quit fades
 ; through, and for yellow: held, it lists those games (picker.dta), and the
 ; one picked becomes the theme, its menus and music, back on this screen.
+; With no more of them than $ghc_tap_flips, a tap is the next instead: two
+; are no list to pick from.
+{set $ghc_tap_flips 2}
 {retype main_screen
    (
       (panels meta main_panel ghc_dim_panel dialog ghc_profile_panel helpbar ghc_pick_panel fade_panel)
@@ -278,10 +281,21 @@
             ({ghc_profile_panel button $player_num $button} TRUE)
             ({ghc_pick_button $button} TRUE)
             ({&& {ghc_pressed $button pick} {> {size {ghc_themes}} 1}}
-               {ghc_pick_panel open_with {ghc_themes} {campaigns active}}
+               {if_else {<= {size {ghc_themes}} $ghc_tap_flips}
+                  {$this ghc_theme_next}
+                  {ghc_pick_panel open_with {ghc_themes} {campaigns active}}
+               }
                TRUE
             )
             (TRUE kDataUnhandled)
+         }
+      )
+      (ghc_theme_next
+         {do
+            ($themes {ghc_themes})
+            ($at 0)
+            {find_elem $themes {campaigns active} $at}
+            {$this ghc_picked {elem $themes {mod {'+' $at 1} {size $themes}}}}
          }
       )
       (ghc_picked
