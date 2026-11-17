@@ -15,10 +15,11 @@
 (wait 1)
 (expect {setlist shown} gh2)
 ; Select opens the menu, on SPEED, and it stays open; green flips song
-; defaults' row; select shuts it.
+; defaults' row, under HIGH SCORES; select shuts it.
 (press star_power)
 (wait 0.5)
 (expect {ghc_pick_panel get open} 1)
+(press down)
 (press down)
 (shot menu)
 (expect {quickplay song_defaults} 0)

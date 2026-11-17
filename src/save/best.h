@@ -1,9 +1,9 @@
 #pragma once
 
-// A song's best on one note engine, part, difficulty and controller, as the
-// save's [best] section keeps every song's apart from the careers:
+// A song's best on one note engine, part, difficulty and controller, as each
+// profile (save/profiles.h) keeps every song's apart from the careers:
 //
-//   [best]
+//   [profile 1 best]
 //   version = 1
 //   gh2.shoutatthedevil.gh2.guitar.expert.guitar = 123456 5 98 412 0
 //   custom.3f9a12c4d5e6f708.gh1.bass.hard.gamepad = ...
@@ -12,7 +12,8 @@
 // difficulty and controller (guitar or gamepad, a keyboard a guitar), and
 // the speed where it is not 100% (".s150", save/results.h); then
 // the best run's score, stars, percent hit and longest streak, all one run's,
-// and whether any run was a full combo (1 or 0).
+// and whether any run was a full combo (1 or 0). Before profiles every best
+// was in [best].
 
 #include <cstdint>
 #include <optional>
@@ -37,4 +38,8 @@ namespace gh2::save
 
     std::string bestKey(const std::string &song, const std::string &engine, const std::string &part,
                         const std::string &difficulty, const std::string &controller);
+    // The section profile `profile` (from 0) keeps its bests in, [best] for
+    // none. A multiplayer mode's are apart, each player's own run in it:
+    // [profile 1 coop best], [coop best], [profile 2 pro_faceoff best].
+    std::string bestSection(std::optional<int> profile, const std::string &mode = "");
 }

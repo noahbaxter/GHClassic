@@ -1,0 +1,70 @@
+; A high score (highscore_panel.dta): a profile's goes on the board under
+; its name and keeps the run as its best; a guest types a name on the board
+; as GH2 has it, asked nothing, and P1 stays a guest. Each on its own table,
+; the last seconds of a disc song on another difficulty.
+#include common/first_boot.dta
+(device guitar)
+(press down guitar)
+(wait 0.5)
+{ghc_profile make 0 Alpha}
+(expect {ghc_profile name 0} Alpha)
+
+; Alpha's: on the board already, kept.
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+{game set_num_players 1}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 120)
+(wait_until {> {taskmgr seconds} 1} 60)
+{beatmatch jump 150000}
+{game set_paused TRUE}
+(wait 0.5)
+{game set_paused FALSE}
+(wait_screen endgame_screen 120)
+(wait 1)
+(expect {best score shoutatthedevil expert} {player0 score})
+(press green guitar)
+(wait_screen highscore_screen 30)
+(wait 1)
+(shot profile)
+(expect {highscore_panel get placed} 1)
+(expect {== {highscore_panel get_active_ten} NULL} 1)
+(press green guitar)
+(wait_screen complete_screen 30)
+
+; A guest's: typed on the board, nothing asked.
+{ghc_profile pick 0 -1}
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+{{game get_player_config 0} set_difficulty hard}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 120)
+(wait_until {> {taskmgr seconds} 1} 60)
+{beatmatch jump 150000}
+{game set_paused TRUE}
+(wait 0.5)
+{game set_paused FALSE}
+(wait_screen endgame_screen 120)
+(wait 1)
+(press green guitar)
+(wait_screen highscore_screen 30)
+(wait 1)
+(expect {highscore_panel get placed} 0)
+(expect {!= {highscore_panel get_active_ten} NULL} 1)
+(shot guest)
+{{highscore_panel get_active_ten} set_text "ZED"}
+(press start guitar)
+(wait 0.5)
+{set $n ""} {set $s 0} {set $found 0}
+{foreach_int $i 0 5
+   {highscores get_highscore $i $n $s}
+   {if {== $n ZED} {set $found 1}}
+}
+(expect $found 1)
+(expect {ghc_profile name 0} "")
+(quit)

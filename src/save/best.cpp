@@ -33,4 +33,10 @@ namespace gh2::save
     {
         return song + '.' + engine + '.' + part + '.' + difficulty + '.' + controller;
     }
+
+    std::string bestSection(std::optional<int> profile, const std::string &mode)
+    {
+        const std::string name = mode.empty() ? kBestSection : mode + ' ' + kBestSection;
+        return profile ? "profile " + std::to_string(*profile + 1) + ' ' + name : name;
+    }
 }

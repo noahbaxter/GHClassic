@@ -30,6 +30,7 @@
 #include "hook.h"
 #include "save/gh1_stream.h"
 #include "save/gh2_text.h"
+#include "save/profiles.h"
 #include "save/ps2_card.h"
 #include "save/results.h"
 #include "save/store.h"
@@ -304,22 +305,6 @@ namespace gh2::save
         {
             const auto it = s_songGames.find(song);
             return it == s_songGames.end() ? s_game : it->second;
-        }
-
-        // The [best] section as kept: the disk's, taken once where no save
-        // has been loaded yet, so a best kept before the load adds to it.
-        Section &bests()
-        {
-            static bool s_read = false;
-            if (!s_read && s_loaded == Loaded::kNothing && !s_store.find(kBestSection))
-            {
-                s_read = true;
-                Store disk;
-                if (readFile(path(), disk) == ReadResult::kOk)
-                    if (const Section *section = disk.find(kBestSection))
-                        s_store.sections.push_back(*section);
-            }
-            return s_store.section(kBestSection);
         }
 
         // A game's save folder as each game writes it: the marker file named
@@ -767,10 +752,7 @@ namespace gh2::save
             return false;
         const char *const name = kDifficulties[difficulty];
         if (isNamed(song))
-        {
-            const auto best = keptBest(playedKey(song, name));
-            return best && best->fullCombo;
-        }
+            return anyFullCombo(song, name);
         const std::string game = gameOf(song), key = "fc." + song;
         if (const Section *section = quickplaySection(game, noteEngine(), name); section && section->get(key))
             return true;
@@ -858,6 +840,13 @@ namespace gh2::save
         return k != s->second.end() ? k->second : "";
     }
 
+    std::map<std::string, std::string> stateSection(const std::string &section)
+    {
+        const State &state = readState();
+        const auto s = state.find(section);
+        return s == state.end() ? std::map<std::string, std::string>{} : s->second;
+    }
+
     void keepState(const std::string &section, const std::string &key, const std::string &value)
     {
         std::string &kept = readState()[section][key];
@@ -900,35 +889,77 @@ namespace gh2::save
         return gameOf(song);
     }
 
-    std::optional<Best> keptBest(const std::string &key)
+    // The disk's taken once where no save has been loaded yet, so a best
+    // kept before the load adds to it.
+    const Section *keptSection(const std::string &name)
     {
-        const std::string *kept = bests().get(key);
-        return kept ? parseBest(*kept) : std::nullopt;
+        static std::set<std::string> s_read;
+        if (s_read.insert(name).second && s_loaded == Loaded::kNothing && !s_store.find(name))
+        {
+            Store disk;
+            if (readFile(path(), disk) == ReadResult::kOk)
+                if (const Section *section = disk.find(name))
+                    s_store.sections.push_back(*section);
+        }
+        return s_store.find(name);
     }
 
-    void keepBest(const std::string &key, const Best &best)
+    void keepSection(const std::string &name, const std::function<void(Section &)> &change)
     {
+        keptSection(name);
+        change(s_store.section(name));
         // Into the save on disk as it is there, its careers as the game last
-        // saved them; where there is none yet the game's first save carries it.
+        // saved them.
         Store disk;
-        const bool onDisk = !s_inMemory && readFile(path(), disk) == ReadResult::kOk;
-        // The best of the disk's, this run's own (a write that failed may
-        // have left the disk's behind) and the new one.
-        Best now = best;
-        for (const std::string *was : {bests().get(key), onDisk ? disk.section(kBestSection).get(key) : nullptr})
-            if (const auto old = was ? parseBest(*was) : std::nullopt)
-                now = better(*old, now);
-        const auto keep = [&](Section &section)
-        {
-            section.set("version", std::to_string(kBestVersion));
-            section.set(key, bestText(now));
-        };
-        keep(bests());
-        if (!onDisk)
+        if (s_inMemory || readFile(path(), disk) != ReadResult::kOk)
             return;
-        keep(disk.section(kBestSection));
+        change(disk.section(name));
         if (!writeFile(path(), disk))
             std::cerr << "[save] could not write " << path() << std::endl;
+    }
+
+    void dropSections(const std::string &prefix)
+    {
+        const auto mine = [&](const std::string &name) { return name.starts_with(prefix); };
+        s_store.removeIf(mine);
+        Store disk;
+        if (s_inMemory || readFile(path(), disk) != ReadResult::kOk)
+            return;
+        disk.removeIf(mine);
+        if (!writeFile(path(), disk))
+            std::cerr << "[save] could not write " << path() << std::endl;
+    }
+
+    std::optional<Best> keptBest(const std::string &key, std::optional<int> profile, const std::string &mode)
+    {
+        const Section *section = profile ? keptSection(bestSection(profile, mode)) : nullptr;
+        const std::string *best = section ? section->get(key) : nullptr;
+        return best ? parseBest(*best) : std::nullopt;
+    }
+
+    bool anyFullCombo(const std::string &song, const std::string &difficulty)
+    {
+        for (const std::string &played : {playedKey(song, difficulty), playedKey(song, difficulty, "guitar", "gamepad")})
+            for (int profile = 0; profile < kProfiles; ++profile)
+                if (const auto best = keptBest(played, profile); best && best->fullCombo)
+                    return true;
+        return false;
+    }
+
+    void keepBest(const std::string &key, std::optional<int> profile, const Best &best, const std::string &mode)
+    {
+        if (!profile)
+            return;
+        // Each the better of its own and the new: the disk's may be behind
+        // this run's where a write failed.
+        keepSection(bestSection(profile, mode),
+                    [&](Section &section)
+                    {
+                        const std::string *was = section.get(key);
+                        const auto old = was ? parseBest(*was) : std::nullopt;
+                        section.set("version", std::to_string(kBestVersion));
+                        section.set(key, bestText(old ? better(*old, best) : best));
+                    });
     }
 
     std::string keptEngine()

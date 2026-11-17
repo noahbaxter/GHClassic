@@ -24,7 +24,9 @@ namespace gh2::textures
     // PS2 Tex the game draws itself may have been changed since (font bake,
     // its own scripts). Or with `file`, a PNG or JPG of the host's own, its
     // bytes from `file` when wanted (empty if it has gone), `path` its name
-    // for its id; at most kMostHostSide a side.
+    // for its id; at most kMostHostSide a side. A `variant` is the same
+    // picture again under an id of its own, for an edit of its own (a seat's
+    // poster, ui/players.cpp).
     struct Source
     {
         size_t disc = 0;
@@ -32,6 +34,7 @@ namespace gh2::textures
         std::string tex;
         bool paletted = false;
         std::function<std::string()> file;
+        std::string variant;
     };
     constexpr uint32_t kMostHostSide = 256u;
 

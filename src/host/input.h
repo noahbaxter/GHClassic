@@ -122,13 +122,42 @@ namespace gh2
     // What a player is shown for it: its guitar's layout ("Wii guitar
     // (raphnet)"), else its name; "" for none. Callable from any thread.
     std::string seatLabel(int seat);
+    // Who holds it, as input.ini's [seats] has it (DeviceId::text), while
+    // away too; the keyboard for P1 with no controller, else "". Callable
+    // from any thread.
+    std::string seatDevice(int seat);
+    // A seat's player moved to another device in it, as seatDevice names
+    // each: one controller taking a lone P1 from another, or from the
+    // keyboard standing in. Each once, oldest first. Callable from any
+    // thread.
+    struct Handover
+    {
+        std::string from, to;
+        bool fromKeyboard = false; // the keyboard standing in for P1
+    };
+    std::vector<Handover> takeHandovers();
+    // Whether it plays in pad mode, a gamepad's (as HostPad::joypad, but
+    // outside a song too). Callable from any thread.
+    bool seatPad(int seat);
 
     // Whether Multiplayer's screen is up, where a controller joins with
     // Start and yellow moves a player up a seat. Callable from any thread.
     void setPlayersStep(bool on);
+    // Whether the main menu is up, where Start on a controller with no seat
+    // joins the next free one (Seats::seat). Callable from any thread.
+    void setMenuJoins(bool on);
     // How many times P1 and P2 have traded places, by yellow there or by
     // P2 moving up when P1's controller is let go. Callable from any thread.
     uint32_t seatTrades();
+    // A player's profile menu is up (ui/players.h): no controller takes,
+    // leaves or trades a seat until it shuts. Callable from any thread.
+    void holdSeats(bool held);
+    // That seat's player dropped out, at the next poll. Callable from any
+    // thread.
+    void dropSeat(int seat);
+    // How many times a controller's Start has taken a seat, which the game
+    // never sees. Callable from any thread.
+    uint32_t startSeats();
 
     // The free camera's controls (ui/photo_mode.h): W A S D as how far it
     // is pushed right and forward, -1 to 1, the mouse's travel in pixels,

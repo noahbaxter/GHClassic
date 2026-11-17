@@ -1,13 +1,24 @@
 ; Multiplayer is always there; its screen is where P2 joins, with Start, and
 ; no mode starts until someone has. Yellow moves a player up a seat, lefty
-; going with them. Outside it, Start on another controller takes P1.
+; going with them. On the main menu Start joins too, picking a profile;
+; elsewhere Start on another controller takes P1.
 #include common/first_boot.dta
 (device pad)
 (device guitar)
 (press down pad)
 (expect {seat_has 0 pad} 1)
-; On the main menu the guitar's Start makes it P1: one player switching.
+; On the main menu the guitar's Start joins it as P2 on the profile list,
+; backing out leaving the seat free; a strum on it makes it P1, one player
+; switching.
 (press start guitar)
+(wait_screen ghc_profile_screen 10)
+(expect {seat_has 1 guitar} 1)
+(wait 1)
+(press red guitar)
+(wait_screen main_screen 10)
+(wait 0.5)
+(expect {seat_has 1 guitar} 0)
+(press down guitar)
 (wait 0.3)
 (expect {seat_has 0 guitar} 1)
 (expect {seat_has 1 pad} 0)
@@ -19,11 +30,19 @@
 (press green guitar)
 (wait 1)
 (expect {{ui current_screen} name} multi_screen)
+; Joining picks the pad's profile on the list (profiles.dta): GUEST, on
+; purpose, back to this screen.
 (press start pad)
+(wait_screen ghc_profile_screen 10)
+(expect {seat_has 1 pad} 1)
+(wait 1)
+(press up pad)
+(wait 0.3)
+(press green pad)
+(wait_screen multi_screen 10)
 (wait 0.5)
 (expect {seat_has 1 pad} 1)
 (expect {game is_missing_multi_controller} 0)
-(expect {{ui current_screen} name} multi_screen)
 (shot joined)
 ; The pad's player plays left handed, and moves up to P1.
 {options set_lefty 1 TRUE}

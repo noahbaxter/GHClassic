@@ -1,8 +1,9 @@
 #pragma once
 
-// Each song won alone, in quickplay or a career, kept as its best
-// (save/best.h) under the note engine played, by its game and name or as
-// another module names it.
+// Each song won, alone in quickplay or a career or in a multiplayer mode,
+// kept as each player's best (save/best.h) under the note engine played, by
+// its game and name or as another module names it, as the profile each seat
+// plays as (save/profiles.h).
 
 #include "addresses.h"
 
@@ -25,11 +26,13 @@ namespace gh2::save
     bool isNamed(const std::string &song);
 
     // [best]'s key for `song` played now on `difficulty` (easy .. expert),
-    // as `part` where no namer says otherwise, on `controller`. Every run is
-    // a guitar's until input tells a gamepad's apart. At another speed than
+    // as `part` where no namer says otherwise, on `controller`: gamepad for
+    // a seat in pad mode (seatController), else guitar. At another speed than
     // 100% the key ends in it, ".s150", each speed's runs kept apart.
     std::string playedKey(const std::string &song, const std::string &difficulty, const std::string &part = "guitar",
                           const std::string &controller = "guitar");
+    // The controller seat `seat` plays on, as playedKey takes it.
+    std::string seatController(int seat);
 
     void installResults(PS2Runtime &runtime, const Addresses &addresses);
 }

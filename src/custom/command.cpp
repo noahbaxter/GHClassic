@@ -7,6 +7,7 @@
 #include "custom/song_files.h"
 #include "custom/songs.h"
 #include "custom/text.h"
+#include "save/profiles.h"
 #include "save/results.h"
 #include "save/save.h"
 #include "script.h"
@@ -47,12 +48,12 @@ namespace gh2::custom
         // this a row shows its token.
         constexpr size_t kMostSections = 1000u;
 
-        // Its best on the hardest difficulty with one: score, stars, and percent
-        // or FC.
-        std::string bestLine(const std::string &id)
+        // Its best as `profile` plays it on `controller`, on the hardest
+        // difficulty with one: score, stars, and percent or FC.
+        std::string bestLine(const std::string &id, std::optional<int> profile, const std::string &controller)
         {
             for (const char *difficulty : {"expert", "hard", "medium", "easy"})
-                if (const auto best = save::keptBest(save::playedKey(id, difficulty)))
+                if (const auto best = save::keptBest(save::playedKey(id, difficulty, "guitar", controller), profile))
                     return std::to_string(best->score) + "  " + std::to_string(best->stars) + "*  " +
                            (best->fullCombo ? std::string("FC") : std::to_string(best->percent) + "%");
             return "NOT PLAYED";
@@ -143,7 +144,7 @@ namespace gh2::custom
             if (op == "length")
                 return call.word(lengthText(song ? song->length : 0.0));
             if (op == "best")
-                return call.word(bestLine(id));
+                return call.word(bestLine(id, save::seatProfile(0), save::seatController(0)));
             // The part it plays: quickplay's instrument's, or with a TRUE
             // after the rest its lead, as on guitar (Face-Off's).
             const auto part = [&](int lead)

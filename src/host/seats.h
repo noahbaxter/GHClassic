@@ -24,6 +24,7 @@ namespace gh2::input
     {
         kMenu,
         kPlayers,     // Multiplayer's screen, where players join and reorder
+        kJoin,        // the main menu, where Start joins the next free seat
         kControllers, // the Controllers screen, where devices only show
         // A song is up and holds the seats: on a screen of its own besides
         // these two (loading, results), played, or paused.
@@ -64,7 +65,8 @@ namespace gh2::input
         void restore(std::map<std::string, std::string> saved, uint64_t untilMs);
 
         // Who sits where; on the Controllers screen, nothing moves.
-        void seat(const std::vector<Read> &reads, Mode mode, uint64_t nowMs);
+        // `held`: a player's profile menu is up, and nothing moves.
+        void seat(const std::vector<Read> &reads, Mode mode, uint64_t nowMs, bool held = false);
         // A seat's device gone or back. `readingNone` in a window without
         // the controllers, which pauses for none.
         void follow(const std::vector<Read> &reads, bool readingNone);
@@ -89,6 +91,10 @@ namespace gh2::input
         bool away(int seat) const { return m_away[seat]; }
         // How many times P1 and P2 have traded places.
         uint32_t trades() const { return m_trades; }
+        // How many times a controller's Start has taken a seat.
+        uint32_t startSeats() const { return m_startSeats; }
+        // Its player dropped out: the seat is free, the seats behind move up.
+        void leave(int seat);
         // [seats] as they now are, once each time they change.
         std::optional<std::map<std::string, std::string>> takeSaved();
 
@@ -113,5 +119,6 @@ namespace gh2::input
         // The devices there as each seat's went, none of which is it.
         std::vector<DeviceId> m_thereWhenAway[kSeats];
         uint32_t m_trades = 0;
+        uint32_t m_startSeats = 0;
     };
 }

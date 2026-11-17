@@ -28,6 +28,7 @@
 #include "guest.h"
 #include "hook.h"
 #include "milo/layout.h"
+#include "save/profiles.h"
 #include "script.h"
 #include "settings/settings.h"
 
@@ -108,17 +109,52 @@ namespace gh2
             return number(stopOf(settings::get(key)));
         }
 
-        // Track::Track(int, Symbol, RndBitmap *, float speed), retail
-        // 0x14fa70: TrackPanel::CreateTracks (0x153a10) passes the mean of
-        // the players' difficulties' track_speed, so a speed between the two
-        // pairs' is two players on a difficulty of each, and takes as much of
-        // each setting.
-        void onTrack(uint8_t *, R5900Context *ctx, PS2Runtime *)
+        // The length the track being built takes (onTrack, onSetupFade).
+        int s_building = 110;
+
+        // Track::Track(int player, Symbol, RndBitmap *, float speed), retail
+        // 0x14fa70, once for each player's track (TrackPanel::CreateTracks,
+        // 0x153a10). A player with a profile's own speed plays at it on any
+        // difficulty. Otherwise the game passes the mean of the players'
+        // difficulties' track_speed, so a speed between the two pairs' is
+        // two players on a difficulty of each, and takes as much of each
+        // setting. Every track_graphics length the track reads, it reads in
+        // here, after this (Track+0xfc, its camera's far plane, its
+        // GemManager's and TrackObjects' horizon, its gem pools): so each
+        // player's is given theirs first (game_settings.dta's ghc_highway).
+        void onTrack(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
-            const float hard = std::clamp((ctx->f[12] - kEasySpeed) / (kHardSpeed - kEasySpeed), 0.0f, 1.0f);
-            ctx->f[12] = speed(settings::get(settings::kNoteSpeedEasy)) * (1.0f - hard) +
-                         speed(settings::get(settings::kNoteSpeedHard)) * hard;
+            const EntryArgs args(ctx);
+            const int player = static_cast<int>(args.a[1]);
+            const auto profile = save::seatProfile(player);
+            if (const auto own = profile ? save::profilePref(*profile, "speed") : std::nullopt)
+                ctx->f[12] = speed(*own);
+            else
+            {
+                const float hard = std::clamp((ctx->f[12] - kEasySpeed) / (kHardSpeed - kEasySpeed), 0.0f, 1.0f);
+                ctx->f[12] = speed(settings::get(settings::kNoteSpeedEasy)) * (1.0f - hard) +
+                             speed(settings::get(settings::kNoteSpeedHard)) * hard;
+            }
+            const float speedNow = ctx->f[12];
+            s_building = seatLength(player);
+            script::run(rdram, ctx, runtime, "{ghc_highway " + std::to_string(s_building) + "}");
+            args.restore(ctx);
+            ctx->f[12] = speedNow;
         }
+    }
+
+    int seatSpeed(int seat)
+    {
+        const auto profile = save::seatProfile(seat);
+        const auto own = profile ? save::profilePref(*profile, "speed") : std::nullopt;
+        return own.value_or(settings::get(settings::kNoteSpeedHard));
+    }
+
+    int seatLength(int seat)
+    {
+        const auto profile = save::seatProfile(seat);
+        const auto own = profile ? save::profilePref(*profile, "length") : std::nullopt;
+        return own.value_or(settings::get(settings::kHighwayLength));
     }
 
     namespace
@@ -161,7 +197,7 @@ namespace gh2
         void onSetupFade(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
             const uint32_t track = GPR_U32(ctx, 4);
-            const float by = static_cast<float>(settings::get(settings::kHighwayLength)) / kOwnLength;
+            const float by = static_cast<float>(s_building) / kOwnLength;
             const float rest = load<float>(rdram, load<uint32_t>(rdram, track + 0xa4u) + milo::transformable::kLocal + 0x34u);
             s_built[track] = {by, rest, rest, rest, rest};
             const uint32_t surface = load<uint32_t>(rdram, track + 0x58u);

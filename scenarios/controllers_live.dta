@@ -14,7 +14,7 @@
 (key Return)
 (wait 0.5)
 (expect {{ui current_screen} name} options_screen)
-(expect {{options_panel find op_data.btn} showing} 0)
+(expect {{options_panel find memory_card.btn} showing} 0)
 (expect {{options_panel find controllers.btn} showing} 1)
 (shot options_settings)
 (key Down)
@@ -115,7 +115,8 @@
 (wait 0.5)
 (expect {{ui current_screen} name} options_screen)
 (expect {options_screen focus_name} op_audio.btn)
-(expect {{options_panel find op_data.btn} showing} 1)
+(expect {{options_panel find memory_card.btn} showing} 1)
+(expect {{options_panel find op_data.btn} showing} 0)
 (expect {{options_panel find controllers.btn} showing} 0)
 (key Escape)
 (wait_screen main_screen)
@@ -123,7 +124,7 @@
 {ui goto_screen options_screen}
 (wait_screen options_screen)
 (wait 1)
-(expect {{options_panel find op_data.btn} showing} 1)
+(expect {{options_panel find memory_card.btn} showing} 1)
 (shot options_again)
 ; With no keyboard, red held three seconds is the way out.
 {ui goto_screen ghc_controllers_screen}

@@ -1,7 +1,41 @@
 ; The high score screen, as the game's own (endgame.dta) but for its wait: once
 ; a name is in, the game flushed and then held the screen for 7 seconds with
 ; an empty help bar. It now moves on when the flush animation ends, 1 second
-; in, and leaves the flush sound playing.
+; in, and leaves the flush sound playing. One player with a profile
+; (save/profiles.h) goes in under its name, already on the board, and
+; continuing flushes it; a guest types a name, a career's starting as its
+; band's.
+;
+; A board (ui/highscore.milo, in whichever panel loads it) shows the song's
+; table on player 0's difficulty: GH2's, or a custom song's of ours
+; (save/results.cpp), whose seeds are named by locale token.
+{func ghc_score_stats ($panel)
+   {{$panel find hs_stats.lbl} set_localized_text
+      {sprintf {localize highscore_score_fmt} {game get_song_text} {localize {game get_difficulty_sym 0}}}}
+}
+; Row $i from 1.
+{func ghc_score_row ($panel $i $name $score)
+   {{$panel find {sprintf "hs_name%d.lbl" $i}} set_localized_text $name}
+   {{$panel find {sprintf "hs_score%d.lbl" $i}} set_text {if_else {> $score 0} {sprintf "%d" $score} ""}}
+}
+; Row $i from the table's entry $slot, from 0.
+{func ghc_score_slot ($panel $i $slot)
+   {do
+      ($name "")
+      ($score 0)
+      ($song {game get_song})
+      ($diff {game get_difficulty_sym 0})
+      {if_else {custom ours $song}
+         {do
+            {set $score {ghc_scores score $song $diff $slot}}
+            {set $name {ghc_scores name $song $diff $slot}}
+            {if {ghc_scores seed $song $diff $slot} {set $name {localize $name}}}
+         }
+         {highscores get_highscore $slot $name $score}
+      }
+      {ghc_score_row $panel $i $name $score}
+   }
+}
 {retype highscore_panel
    (
       ; From the ARK root: a path resolves against the file its array came
@@ -9,28 +43,35 @@
       (file ui/highscore.milo)
       (active_ten 0)
       (auto_add TRUE)
+      (placed FALSE)
       (flushed FALSE)
+      ; Its place on the board, from 1, 0 for none.
+      (index 0)
+      ; Whether the song's table is ours (a custom song's) rather than GH2's.
+      (ours FALSE)
       (enter
-         {set [auto_add] {== career {gamecfg get mode}}}
+         {set [auto_add] {&& {== {game num_players} 1} {!= {ghc_profile name 0} ""}}}
+         {set [placed] FALSE}
          {set [flushed] FALSE}
-         {hs_stats.lbl set_localized_text
-            {sprintf
-               {localize highscore_score_fmt}
-               {game get_song_text}
-               {localize {game get_difficulty_sym 0}}
-            }
-         }
-         ; A custom song is in no table (its best is save.bin's), nor a run
-         ; at another speed (content/song_speed.h), so on.
-         {if_else {|| {custom ours {game get_song}} {!= {song_speed} 100}}
+         {set [ours] {custom ours {game get_song}}}
+         {ghc_score_stats $this}
+         ; A run at another speed is in no table (content/song_speed.h), so
+         ; on.
+         {if_else {!= {song_speed} 100}
             {ui goto_screen complete_screen}
             {do
                ($score {player0 score})
-               ($index {get_highscore_index $score})
+               ($index
+                  {if_else [ours]
+                     {ghc_scores place {game get_song} {game get_difficulty_sym 0} $score 0}
+                     {get_highscore_index $score}
+                  }
+               )
+               {set [index] $index}
                {$this fill_scores $index $score {$this get_default_name}}
                {if_else {!= $index 0}
                   {$this enter_score $index}
-                  {if_else [auto_add]
+                  {if_else {== career {gamecfg get mode}}
                      {ui goto_screen complete_screen}
                      {$this view_scores}
                   }
@@ -39,41 +80,37 @@
          }
          {highscore_screen update_help_bar}
       )
+      ; A player's score on the song's table.
+      (add_score
+         ($name $score)
+         {if_else [ours]
+            {ghc_scores add {game get_song} {game get_difficulty_sym 0} $name $score}
+            {highscores add $name $score}
+         }
+      )
       (fill_scores
          ($new_index $new_score $new_name)
          {do
             ($slot 0)
             {foreach_int $i 1 6
-               {do
-                  ($name 0)
-                  ($score 0)
-                  {if_else {== $i $new_index}
-                     {$this set_entry $i $new_name $new_score}
-                     {do
-                        {highscores get_highscore $slot $name $score}
-                        {$this set_entry $i $name $score}
-                        {'++' $slot}
-                     }
+               {if_else {== $i $new_index}
+                  {$this set_entry $i $new_name $new_score}
+                  {do
+                     {ghc_score_slot $this $i $slot}
+                     {'++' $slot}
                   }
                }
             }
          }
       )
       (get_default_name
-         {if_else [auto_add]
-            {campaign profile_name {campaign profile_slot}}
-            {highscores get_default_name}
+         {cond
+            ({!= {ghc_profile name 0} ""} {ghc_profile name 0})
+            ({== career {gamecfg get mode}} {campaign profile_name {campaign profile_slot}})
+            (TRUE {highscores get_default_name})
          }
       )
-      (set_entry
-         ($index $name $score)
-         {do
-            ($name_lbl {sprintf "hs_name%d.lbl" $index})
-            ($score_lbl {sprintf "hs_score%d.lbl" $index})
-            {$name_lbl set_localized_text $name}
-            {$score_lbl set_text {sprintf "%d" $score}}
-         }
-      )
+      (set_entry ($index $name $score) {ghc_score_row $this $index $name $score})
       (get_text_entry
          ($index)
          {sprintf "hs_entry%d.ten" $index}
@@ -91,9 +128,12 @@
             {if_else [auto_add]
                {do
                   {set [active_ten] 0}
+                  {set [placed] TRUE}
                   {$this set_text_entry -1}
                   {hs_start.lbl set_showing FALSE}
-                  {highscores add {$ten get_text} {player0 score}}
+                  ; The table keeps the name it is given, not a copy, so
+                  ; the profile's as a symbol, which lasts.
+                  {$this add_score {symbol {$this get_default_name}} {player0 score}}
                }
                {do
                   {set [active_ten] $ten}
@@ -130,15 +170,90 @@
                {{$this get_active_ten} is_done}
                {! [flushed]}
             }
-            {set [flushed] TRUE}
-            {hs_flush.tnm animate (range 0 17) (period 1) (units kTaskUISeconds)}
-            {play_sfx flush}
-            {highscore_screen update_help_bar}
-            {script_task
-               (delay 1) ; the game's 7
-               (units kTaskUISeconds)
-               (script {ui goto_screen complete_screen})
+            {$this flush}
+         }
+      )
+      (flush
+         {set [flushed] TRUE}
+         {hs_flush.tnm animate (range 0 17) (period 1) (units kTaskUISeconds)}
+         {play_sfx flush}
+         {highscore_screen update_help_bar}
+         {script_task
+            (delay 1) ; the game's 7
+            (units kTaskUISeconds)
+            (script {ui goto_screen complete_screen})
+         }
+      )
+   )
+}
+; The game's own (endgame.dta), but that continuing past a placed name
+; flushes it first, and a name typed goes on the song's table, ours for a
+; custom song.
+{retype highscore_screen
+   (
+      (panels GAME_PANELS highscore_panel helpbar)
+      (focus highscore_panel)
+      (in_game TRUE)
+      (allow_back FALSE)
+      (animate_transition FALSE)
+      (okay_to_add_score TRUE)
+      (enter {set [okay_to_add_score] TRUE})
+      (update_help_bar
+         {do
+            ($ten {highscore_panel get_active_ten})
+            {helpbar set_display
+               {if_else
+                  {&& {!= $ten NULL} {! {$ten is_done}}}
+                  ; Start takes the name, as the board's paper says.
+                  {do
+                     ($help {get_text_entry_help_text () $ten FALSE})
+                     ($array)
+                     {set $array ()}
+                     {resize $array 0}
+                     {foreach $h $help {push_back $array $h}}
+                     {push_back $array (start help_continue)}
+                     $array
+                  }
+                  {if_else {highscore_panel get flushed} () ((fret1 help_continue))}
+               }
             }
+         }
+      )
+      (SELECT_START_MSG {$this update_help_bar} kDataUnhandled)
+      (SCREEN_BACK_MSG {synth play_sequence button_back.cue} {$this update_help_bar} kDataUnhandled)
+      (TEXT_ENTRY_MSG
+         {do
+            ($ten {highscore_panel get_active_ten})
+            {if {!= $ten NULL}
+               {do
+                  ($text {$ten get_text})
+                  {if [okay_to_add_score]
+                     {set [okay_to_add_score] FALSE}
+                     {highscore_panel add_score $text {player0 score}}
+                     {highscores set_default_name $text}
+                  }
+               }
+            }
+            kDataUnhandled
+         }
+      )
+      (BUTTON_DOWN_MSG
+         {cond
+            ({== $button kPad_X}
+               {do
+                  ($ten {highscore_panel get_active_ten})
+                  {cond
+                     ({highscore_panel get flushed} 0)
+                     ({highscore_panel get placed} {synth play_sequence button_select} {highscore_panel flush})
+                     ({|| {== $ten NULL} {$ten is_done}}
+                        {synth play_sequence button_select}
+                        {ui goto_screen complete_screen}
+                     )
+                  }
+                  kDataUnhandled
+               }
+            )
+            (TRUE {if_else {highscore_panel get_active_ten} kDataUnhandled TRUE})
          }
       )
    )

@@ -1,0 +1,71 @@
+; Each player of a multiplayer song keeps their own best, as their own
+; profile, apart from solo's and each mode's from the others': co-op's and
+; Face-Off's scores are each player's, as GH2's endgame shows them. P1 on
+; easy and P2 on expert, so the two differ. The last seconds of a disc song,
+; both on autoplay.
+#include common/first_boot.dta
+(device guitar)
+(device guitar2)
+(press green guitar)
+(wait 0.5)
+{ghc_profile make 0 "Alpha"}
+{ui goto_screen multi_screen}
+(wait_screen multi_screen)
+(press start guitar2)
+(wait 0.5)
+(press red guitar2)
+(wait 0.5)
+{ghc_profile make 1 "Beta"}
+(expect {ghc_profile current 0} 0)
+(expect {ghc_profile current 1} 1)
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+
+{gamecfg set mode multi_coop}
+{game set_num_players 2}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty easy}
+{{game get_player_config 1} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{{game get_player_config 1} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 120)
+(wait_until {> {taskmgr seconds} 1} 60)
+{beatmatch jump 150000}
+{game set_paused TRUE}
+(wait 0.5)
+{game set_paused FALSE}
+(wait_screen multi_compete_coop_screen 120)
+(wait 1)
+(print coop {player0 score} {player1 score})
+(expect {!= {player0 score} {player1 score}} 1)
+(expect {== {best score shoutatthedevil easy 0 multi_coop} {player0 score}} 1)
+(expect {== {best score shoutatthedevil expert 1 multi_coop} {player1 score}} 1)
+(expect {best score shoutatthedevil easy 0 quickplay} 0)
+(expect {best score shoutatthedevil easy 0 multi_vs} 0)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+
+{gamecfg set mode multi_vs}
+{game set_num_players 2}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty easy}
+{{game get_player_config 1} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{{game get_player_config 1} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 120)
+(wait_until {> {taskmgr seconds} 1} 60)
+{beatmatch jump 150000}
+{game set_paused TRUE}
+(wait 0.5)
+{game set_paused FALSE}
+(wait_screen multi_compete_screen 120)
+(wait 1)
+(print faceoff {player0 score} {player1 score})
+(expect {== {best score shoutatthedevil easy 0 multi_vs} {player0 score}} 1)
+(expect {== {best score shoutatthedevil expert 1 multi_vs} {player1 score}} 1)
+(expect {< {best score shoutatthedevil easy 0 multi_coop} 1} 0)
+(quit)

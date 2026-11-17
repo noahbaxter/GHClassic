@@ -1,0 +1,18 @@
+; Profiles' screens (ui/dta/profiles.dta) under each game's menus: the main
+; menu's corner and Start menu, the profile list, its naming screen, a
+; naming error, deleting, and the band list with rename and delete.
+(needs gh1 gh80s)
+#include common/first_boot.dta
+(device guitar)
+(press down guitar)
+(wait 0.5)
+{ghc_profile make 0 "Alpha"}
+(expect {ghc_profile name 0} Alpha)
+{ui goto_screen options_screen}
+(wait_screen options_screen)
+{set $themes (gh2 gh80s gh1)}
+{set $theme 0}
+#include common/profiles_theme.dta
+#include common/profiles_theme.dta
+#include common/profiles_theme.dta
+(quit)

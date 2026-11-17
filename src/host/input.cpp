@@ -41,6 +41,7 @@
 #include <map>
 #include <mutex>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace gh2
@@ -62,6 +63,9 @@ namespace gh2
             return s_locked.load(std::memory_order_relaxed) || s_practicing.load(std::memory_order_relaxed);
         }
         std::atomic<bool> s_playersStep{false};
+        std::atomic<bool> s_menuJoins{false};
+        std::atomic<bool> s_seatsHeld{false};
+        std::atomic<int> s_dropSeat{-1};
         std::atomic<SongScreen> s_songScreen{SongScreen::kOther};
         // The seats as the last poll left them, for any thread.
         std::atomic<bool> s_away[kSeats] = {};   // a seated device not plugged in
@@ -71,11 +75,15 @@ namespace gh2
         // when GH2 sets the song up, so it never pauses for it.
         std::atomic<bool> s_goneBefore[kSeats] = {};
         std::atomic<uint32_t> s_trades{0};
+        std::atomic<uint32_t> s_startSeats{0};
 
         std::mutex s_mutex;
         HostPad s_pads[kSeats];
         std::string s_seatNames[kSeats]; // for seatHas
         std::string s_seatLabels[kSeats];
+        std::string s_seatDevices[kSeats]; // for seatDevice
+        std::vector<Handover> s_handovers; // for takeHandovers
+        bool s_seatPads[kSeats] = {};
         MenuControls s_menu;
         bool s_flying = false;
         HostFly s_fly, s_scriptedFly;
@@ -128,7 +136,9 @@ namespace gh2
                 default:
                     return Mode::kSong;
                 }
-            return s_playersStep.load(std::memory_order_relaxed) ? Mode::kPlayers : Mode::kMenu;
+            if (s_playersStep.load(std::memory_order_relaxed))
+                return Mode::kPlayers;
+            return s_menuJoins.load(std::memory_order_relaxed) ? Mode::kJoin : Mode::kMenu;
         }
 
         // Each action on a DualShock, as GH2's joypad layout takes it
@@ -250,7 +260,8 @@ namespace gh2
         const Mode mode = currentMode();
         if (mode == Mode::kControllers)
             screenPoll(reads, keys, s_modeWas != Mode::kControllers, s_seats);
-        s_seats.seat(reads, mode, SDL_GetTicks());
+        s_seats.leave(s_dropSeat.exchange(-1, std::memory_order_relaxed));
+        s_seats.seat(reads, mode, SDL_GetTicks(), s_seatsHeld.load(std::memory_order_relaxed));
         if (s_modeWas == Mode::kControllers && mode != Mode::kControllers)
             s_seats.letGoAll();
 
@@ -406,6 +417,7 @@ namespace gh2
             s_filled[seat].store(!s_seats[seat].none(), std::memory_order_relaxed);
         }
         s_trades.store(s_seats.trades(), std::memory_order_relaxed);
+        s_startSeats.store(s_seats.startSeats(), std::memory_order_relaxed);
 
         // Read every poll, so the travel from before a flight is not its
         // first step.
@@ -430,12 +442,24 @@ namespace gh2
                     menu.shown[static_cast<size_t>(a)] = shown(p1->gamepad, p1->profile[static_cast<size_t>(a)].front());
         std::lock_guard<std::mutex> lock(s_mutex);
         s_menu = menu;
+        const std::array<std::string, kSeats> devicesWas = std::to_array(s_seatDevices);
         for (int seat = 0; seat < kSeats; ++seat)
         {
             const bool keyboard = !seated[seat] && (s_standIn[seat].load(std::memory_order_relaxed) ||
                                                     (seat == 0 && s_seats[0].none()));
             s_seatNames[seat] = seated[seat] ? seated[seat]->name : keyboard ? "keyboard" : "";
             s_seatLabels[seat] = seated[seat] ? seated[seat]->label : keyboard ? "keyboard" : "";
+            s_seatDevices[seat] = !s_seats[seat].none() ? s_seats[seat].text()
+                                  : seat == 0         ? DeviceId::keyboard().text()
+                                                      : "";
+            s_seatPads[seat] = s_seats.pad(seat);
+            // Another device in a seat straight from one, not from another
+            // seat: the seat's player on another controller, who stays who
+            // they are (takeHandovers). A seat traded is its players moving.
+            const std::string &was = devicesWas[static_cast<size_t>(seat)], &now = s_seatDevices[seat];
+            if (!was.empty() && !now.empty() && was != now &&
+                std::find(devicesWas.begin(), devicesWas.end(), now) == devicesWas.end() && s_handovers.size() < 64)
+                s_handovers.push_back({was, now, was == DeviceId::keyboard().text()});
         }
         HostPad &pad = pads[0];
         pad.pressCount = s_pads[0].pressCount;
@@ -549,14 +573,52 @@ namespace gh2
         return seat >= 0 && seat < kSeats ? s_seatLabels[seat] : std::string();
     }
 
+    std::string seatDevice(int seat)
+    {
+        std::lock_guard<std::mutex> lock(s_mutex);
+        return seat >= 0 && seat < kSeats ? s_seatDevices[seat] : std::string();
+    }
+
+    std::vector<Handover> takeHandovers()
+    {
+        std::lock_guard<std::mutex> lock(s_mutex);
+        return std::exchange(s_handovers, {});
+    }
+
+    bool seatPad(int seat)
+    {
+        std::lock_guard<std::mutex> lock(s_mutex);
+        return seat >= 0 && seat < kSeats && s_seatPads[seat];
+    }
+
     void setPlayersStep(bool on)
     {
         s_playersStep.store(on, std::memory_order_relaxed);
     }
 
+    void setMenuJoins(bool on)
+    {
+        s_menuJoins.store(on, std::memory_order_relaxed);
+    }
+
     uint32_t seatTrades()
     {
         return s_trades.load(std::memory_order_relaxed);
+    }
+
+    void holdSeats(bool held)
+    {
+        s_seatsHeld.store(held, std::memory_order_relaxed);
+    }
+
+    void dropSeat(int seat)
+    {
+        s_dropSeat.store(seat, std::memory_order_relaxed);
+    }
+
+    uint32_t startSeats()
+    {
+        return s_startSeats.load(std::memory_order_relaxed);
     }
 
     void setFlying(bool flying)

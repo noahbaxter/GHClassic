@@ -66,14 +66,8 @@
 {set $was {{ui current_screen} focus_name}}
 (key Down)
 (expect {!= {{ui current_screen} focus_name} $was} 1)
-{set $was {{ui current_screen} focus_name}}
-(key Down)
-(expect {!= {{ui current_screen} focus_name} $was} 1)
 (expect {== {{ui current_screen} focus_name} $start} 1)
 {set $start {{ui current_screen} focus_name}}
-{set $was {{ui current_screen} focus_name}}
-(key Up)
-(expect {!= {{ui current_screen} focus_name} $was} 1)
 {set $was {{ui current_screen} focus_name}}
 (key Up)
 (expect {!= {{ui current_screen} focus_name} $was} 1)
