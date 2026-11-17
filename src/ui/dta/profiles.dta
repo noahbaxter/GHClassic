@@ -5,8 +5,10 @@
 ; deletes one once asked. On the main menu and Multiplayer's screen a
 ; seated player's Start dims the screen and puts up their menu on GH2's
 ; popup poster, their profile over it: CHANGE PROFILE goes to the profile
-; screen, DROP OUT, there only with another seated, frees the seat, P2
-; moving up for P1. A controller joining there by Start picks its profile
+; screen, DROP OUT signs them out and frees the seat, P2 moving up for P1,
+; the last one out going back to the splash. Nobody is signed in as the
+; game starts (save/profiles.h), and a seat not signed in picks its profile
+; by Start. A controller joining there by Start picks its profile
 ; on the profile screen, backing out of it leaving the seat free. Only the
 ; controller a screen or menu is for works it, and no seat changes while
 ; one is up. The main menu shows each seat in its top left corner, a free
@@ -384,9 +386,9 @@
       ; then its rows: CHANGE PROFILE, to the profile screen; the player's
       ; LEFTY FLIP, ticked in its box; their NOTE SPEED and HWY LENGTH, each
       ; tuned by strumming once picked, a profile's alone
-      ; (highway/note_speed.h); then DROP OUT, working only with another
-      ; seated, freeing the seat, P2 moving up for P1. This panel works
-      ; them, from the seat's controller alone.
+      ; (highway/note_speed.h); then DROP OUT, signing out and freeing the
+      ; seat, P2 moving up for P1, the last one out back to the splash. This
+      ; panel works them, from the seat's controller alone.
       (poster FALSE)
       ; Not its light.mesh: the screen's own has that name, and is the one
       ; found.
@@ -400,16 +402,13 @@
       (row_pitch -28)
       (row_size 0.75)
       (row_focus 1.12)
-      ; The picked row, and whether DROP OUT works: not with P1 alone. A
-      ; speed or length is a profile's alone.
+      ; The picked row. A speed or length is a profile's alone.
       (pick 0)
-      (can_drop FALSE)
       (usable
          ($i)
          {do
             ($row {elem [rows] $i})
             {cond
-               ({== $row ghc_profile_drop} [can_drop])
                ({|| {== $row ghc_profile_speed} {== $row ghc_profile_length}} {>= {ghc_profile current [seat]} 0})
                (TRUE TRUE)
             }
@@ -487,7 +486,6 @@
             {{dialog find dl_button1.btn} set_showing FALSE}
             {{dialog find dl_button2.btn} set_showing FALSE}
          }
-         {set [can_drop] {|| {!= $seat 0} {!= {ghc_profile holder 1} ""}}}
          {set [tuning] ""}
          {$this build_rows}
          {$this pick_row 0}
@@ -753,6 +751,8 @@
                                  {sprint prof_t $i ".txt"} {sprint prof_p $i ".txt"} {sprint prof_ring $i ".mesh"}
                                  -1 0 0 1}
                            }
+                           ; The last one out: back to the splash.
+                           {if {== [held] "|"} {ui goto_screen splash_screen}}
                         }
                      }
                   }

@@ -3,7 +3,7 @@
 ; on the top row, never GUEST, a seat's row showing its emblem, NEW PROFILE
 ; naming one on its band naming screen. Fast boot stops on the splash. On
 ; the main menu Start puts up P1's menu on GH2's popup poster: CHANGE
-; PROFILE back to the list, DROP OUT greyed alone. Joining Multiplayer's
+; PROFILE back to the list, DROP OUT usable alone too. Joining Multiplayer's
 ; screen picks P2's on the list, only P2's
 ; controller working it, and P2's DROP OUT frees the seat. The main menu's
 ; corner and Multiplayer's rows show who holds each seat, and a quickplay
@@ -55,14 +55,14 @@
 (shot corner)
 
 ; Start puts up P1's menu on the poster, CHANGE PROFILE picked and DROP OUT
-; greyed alone; CHANGE PROFILE goes to the list, on Alpha's row.
+; usable alone too; CHANGE PROFILE goes to the list, on Alpha's row.
 (press start guitar)
 (wait 0.5)
 (expect {ghc_profile_panel get seat} 0)
 (expect {ghc_profile_panel get poster} 1)
 (expect {ghc_profile_panel get pick} 0)
 (expect {{ghc_profile_panel find ghc_row4.lbl} showing} 1)
-(expect {ghc_profile_panel usable 4} 0)
+(expect {ghc_profile_panel usable 4} 1)
 (shot menu)
 (press green guitar)
 (wait_screen ghc_profile_screen 10)
@@ -261,8 +261,7 @@
 (expect {{ui current_screen} name} highscore_screen)
 (wait_screen complete_screen 30)
 
-; The splash's Start always picks on the list, on the profile the
-; controller last played as.
+; The splash's Start always picks on the list, on its top row.
 {ui goto_screen splash_screen}
 (wait_screen splash_screen)
 (wait 1)
