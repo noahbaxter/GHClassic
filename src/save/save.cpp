@@ -59,7 +59,12 @@ namespace gh2::save
 {
     namespace
     {
-        constexpr uint32_t kBufferSize = 0x21c00u;
+        // GH2's save file on a card, and the buffer the game saves into and
+        // loads from: room for every mounted game's songs, which its high
+        // scores hold (onHighScoreDb), where GH2's own 0x21c00 fits about
+        // 275 of them.
+        constexpr uint32_t kCardSize = 0x21c00u;
+        constexpr uint32_t kBufferSize = 0x100000u;
         constexpr uint32_t kStreamSize = 0x40u; // a BufStream; GHMCSaveData's stack holds one in 0x20
         constexpr uint32_t kIconSysSize = 964;  // sceMcIconSys
 
@@ -417,7 +422,7 @@ namespace gh2::save
             // Its own songs alone: the game would drop the rest on loading.
             gh2::Save own = save;
             std::erase_if(own.scores, [](const gh2::SongScores &s) { return gameOf(s.song) != s_game; });
-            std::vector<CardGame> folders = {{"gh2", guestString(rdram, s_addresses->mcBaseDir), false, kBufferSize,
+            std::vector<CardGame> folders = {{"gh2", guestString(rdram, s_addresses->mcBaseDir), false, kCardSize,
                                               {iconSys, iconSys + kIconSysSize}, guestString(rdram, s_addresses->mcIconFile),
                                               {iconData, iconData + load<uint32_t>(rdram, s_addresses->mcIconSize)}}};
             folders.insert(folders.end(), s_cardGames.begin(), s_cardGames.end());
@@ -1012,9 +1017,31 @@ namespace gh2::save
         s_scoreNames[game] = names;
     }
 
+    namespace
+    {
+        // The save's buffer and its BufStream at kBufferSize, not the
+        // game's 0x21c00.
+        struct VecNewTag;
+        void onVecNew(uint8_t *, R5900Context *ctx, PS2Runtime *)
+        {
+            const uint32_t from = GPR_U32(ctx, 31);
+            if (from == s_addresses->mcSaveAlloc || from == s_addresses->mcLoadAlloc)
+                SET_GPR_U32(ctx, 4, kBufferSize);
+        }
+        struct BufStreamTag;
+        void onBufStream(uint8_t *, R5900Context *ctx, PS2Runtime *)
+        {
+            const uint32_t from = GPR_U32(ctx, 31);
+            if (from == s_addresses->mcSaveStream || from == s_addresses->mcLoadStream)
+                SET_GPR_U32(ctx, 6, kBufferSize);
+        }
+    }
+
     void install(PS2Runtime &runtime, const Addresses &addresses)
     {
         s_addresses = &addresses;
+        EntryHook<VecNewTag>::install(runtime, addresses.builtinVecNew, onVecNew);
+        EntryHook<BufStreamTag>::install(runtime, addresses.bufStreamCtor, onBufStream);
         runtime.replaceFunction(addresses.saveData1, saveData1);
         runtime.replaceFunction(addresses.loadData1, loadData1);
         EntryHook<LoadData2Tag>::install(runtime, addresses.loadData2, onLoadData2);

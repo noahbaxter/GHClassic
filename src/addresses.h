@@ -378,6 +378,14 @@ namespace gh2
         uint32_t nullStr; // char*, the empty Symbol's text
         uint32_t scoreFormat; // "%i", a song list row's score (SongProvider::GetHighScore)
         uint32_t mcBuffer;    // the save's bytes between the two halves of a load or save
+        // That buffer, 0x21c00 bytes, made (__builtin_vec_new) by
+        // GHMCSaveData and GHMCLoadData, and the BufStream over it
+        // (bufStreamCtor) by GHMCSaveData and LoadData2: each call's return.
+        uint32_t builtinVecNew;
+        uint32_t mcSaveAlloc;
+        uint32_t mcSaveStream;
+        uint32_t mcLoadAlloc;
+        uint32_t mcLoadStream;
         uint32_t mcOverwrite; // GHMCSaveData's overwrite argument: replace a save already there
         uint32_t mcBaseDir;   // char*, the save's directory on the card
         uint32_t mcSaveFile;  // char*, the save's file in it
@@ -763,6 +771,11 @@ namespace gh2
         .nullStr = 0x3de688u,
         .scoreFormat = 0x3f8408u,
         .mcBuffer = 0x3da368u,
+        .builtinVecNew = 0x2cf180u,
+        .mcSaveAlloc = 0x14b350u,
+        .mcSaveStream = 0x14b36cu,
+        .mcLoadAlloc = 0x14b9d0u,
+        .mcLoadStream = 0x14bb28u,
         .mcOverwrite = 0x3da394u,
         .mcBaseDir = 0x3da374u,
         .mcSaveFile = 0x3da370u,
