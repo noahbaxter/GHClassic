@@ -504,7 +504,8 @@
          {if_else {ghc_full_combo} "FC" {sprintf {localize eg_percent_format} {player0 percent_hit}}}}
       {endgame_streak_data.lbl set_localized_text {sprintf {localize eg_streak_format} {player0 longest_streak}}}
       {endgame_review_data.lbl set_text {player0 star_rating}}
-      {percentbar_p1.mesh set_local_scale {/ {player0 percent_hit} 100.0} 1 1}
+      ; Full for a full combo, so the crown is on the bar's black.
+      {percentbar_p1.mesh set_local_scale {if_else {ghc_full_combo} 1 {/ {player0 percent_hit} 100.0}} 1 1}
       {$this set_headline endgame_headline.lbl}
       {if {! {{$this loaded_dir} exists ghc_fc.mesh}}
          {ghc_crown_make $this ghc_fc endgame_percent_data.lbl 100}
