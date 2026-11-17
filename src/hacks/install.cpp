@@ -8,6 +8,7 @@
 #include "content/campaigns.h"
 #include "content/games.h"
 #include "content/hidden_guitars.h"
+#include "content/locale.h"
 #include "content/setlists.h"
 #include "content/sources.h"
 #include "disc/ark.h"
@@ -178,6 +179,9 @@ namespace gh2
         for (const std::string &id : games::hacks())
         {
             const size_t disc = *games::disc(id);
+            // Named in the campaign picker and the setlists' by its file.
+            locale::add("campaign_" + id, games::name(id));
+            locale::add("setlist_" + id, games::name(id));
             // Before its config is read: its names by our ids.
             sources::addDisc(id, disc);
             const size_t layer = ark::addLayer(disc);

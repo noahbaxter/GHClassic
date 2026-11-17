@@ -38,7 +38,9 @@ namespace gh2::games
             size_t added;       // its addDisc, from 0
             std::string build;  // what its executable defines in _SHIP's place
             std::string header; // GEN/MAIN.HDR's SHA-1
+            std::string name;   // its image's file name, what the menus call it
             std::string id;     // named once its archive is indexed
+            bool career = false; // its own career screens (ui/career.dta)
         };
         std::vector<Hack> s_hacks;
 
@@ -113,9 +115,11 @@ namespace gh2::games
 
         script::Node hacksCommand(const script::Call &call)
         {
+            const bool careers = call.size() > 1 && call.symbol(1) == "career";
             std::string ids;
             for (const std::string &id : hacks())
-                ids += id + " ";
+                if (!careers || hasCareer(id))
+                    ids += id + " ";
             return {script::parse(call.rdram, call.ctx, call.runtime, ids), script::kArray};
         }
     }
@@ -160,7 +164,7 @@ namespace gh2::games
                 std::cerr << "[games] " << image.filename().string() << ": a hack of GH1, whose engine takes none yet"
                           << std::endl;
             else
-                hacks.push_back({image, {0u, buildOf(*volume), header, ""}});
+                hacks.push_back({image, {0u, buildOf(*volume), header, image.stem().string()}});
         }
         std::vector<std::string> order(std::begin(kOrder), std::end(kOrder));
         for (const auto &[game, image] : found)
@@ -193,7 +197,9 @@ namespace gh2::games
                 std::cerr << "[games] " << id << " is mounted twice; the second left out" << std::endl;
             else
                 hack.id = id;
-            std::cerr << "[games] hack " << hack.id << " (" << hack.build << ")" << std::endl;
+            hack.career = !ark::paths(*disc, "ui/gen/career.dtb").empty();
+            std::cerr << "[games] hack " << hack.id << " (" << hack.build << (hack.career ? ", career" : "") << "): "
+                      << hack.name << std::endl;
         }
     }
 
@@ -224,6 +230,20 @@ namespace gh2::games
     {
         return std::any_of(s_hacks.begin(), s_hacks.end(),
                            [disc](const Hack &hack) { return ark::discAdded(hack.added) == disc; });
+    }
+
+    bool hasCareer(const std::string &hack)
+    {
+        return std::any_of(s_hacks.begin(), s_hacks.end(),
+                           [&](const Hack &known) { return known.id == hack && known.career; });
+    }
+
+    std::string name(const std::string &hack)
+    {
+        for (const Hack &known : s_hacks)
+            if (hack == known.id)
+                return known.name;
+        return hack;
     }
 
     std::string build(const std::string &hack)

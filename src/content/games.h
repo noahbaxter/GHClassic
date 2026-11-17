@@ -12,7 +12,8 @@
 // which no other game's shares, else its header's ("h" and 8 hex digits).
 //
 //   {mounted <game>}  TRUE if that game's disc is mounted
-//   {hacks}           the hacks mounted, in the order added
+//   {hacks [career]}  the hacks mounted, in the order added; with career,
+//                     those with a career of their own
 
 #include "addresses.h"
 
@@ -45,6 +46,12 @@ namespace gh2::games
     std::vector<std::string> hacks();
     // Whether that indexed disc is a hack's.
     bool isHack(size_t disc);
+    // Whether that hack has a career of its own: its career screens
+    // (ui/career.dta). One with none (marfGH) is a setlist alone.
+    bool hasCareer(const std::string &hack);
+    // What the menus call it: its image's file name, which whoever added it
+    // chose.
+    std::string name(const std::string &hack);
     // What that hack's executable defines where GH2's defines _SHIP.
     std::string build(const std::string &hack);
     // Every name a Deluxe executable defines there: GH2DX's, the 80s',

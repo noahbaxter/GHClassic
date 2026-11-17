@@ -7,7 +7,9 @@
 ; buttons), in the skin of the game being played: in GH2's and the 80s',
 ; the Demo's amp poster and a case for each game, the picked one spinning
 ; over how far the band is through it, and the note engine's mark
-; (content/campaign_case.h). Picking another game
+; (content/campaign_case.h). Blue pages on to the hacks with a career of
+; their own, as many to a page as there are buttons, each named on its line
+; for want of a case. Picking another game
 ; goes through ghc_switch_screen, which has no panels: there the switch
 ; happens ({campaigns switch}, content/campaigns.h), with nothing loaded that
 ; it changes.
@@ -37,12 +39,34 @@
       (buttons (speed0.btn speed1.btn speed2.btn speed3.btn))
       (games ()) ; the games with a campaign, as the buttons list them
       (picked 0)
-      (enter
-         {title.lbl set_text ghc_select_campaign}
+      ; Blue pages through them: the games' own first, then the hacks with
+      ; a career of their own ({hacks career}, content/games.h), as many as
+      ; there are buttons to a page.
+      (page 0)
+      (pages {'+' 1 {int {/ {'+' {size {hacks career}} {'-' {size [buttons]} 1}} {size [buttons]}}}})
+      (next_page
+         {set [page] {mod {'+' [page] 1} {$this pages}}}
+         {$this lay}
+      )
+      (lay_games
          {resize [games] 0}
-         {foreach $g (gh1 gh2 gh2x gh80s)
-            {if {campaigns has $g} {push_back [games] $g}}
+         {set [picked] 0}
+         {if_else {== [page] 0}
+            {foreach $g (gh1 gh2 gh2x gh80s)
+               {if {campaigns has $g} {push_back [games] $g}}
+            }
+            {do
+               ($from {'*' {'-' [page] 1} {size [buttons]}})
+               {foreach_int $i $from {min {'+' $from {size [buttons]}} {size {hacks career}}}
+                  {push_back [games] {elem {hacks career} $i}}
+               }
+            }
          }
+      )
+      (enter {$this lay})
+      (lay
+         {title.lbl set_text ghc_select_campaign}
+         {$this lay_games}
          {do
             ($count {size [games]})
             ($band {campaign profile_slot})
@@ -192,6 +216,14 @@
       ; The scene has a case for each game listed and no other
       ; (content/campaign_case.cpp), where the pack has its art.
       (lay_cases
+         {foreach $g (gh1 gh2 gh2x gh80s)
+            {foreach $part (_cover.mesh _sleeve.mesh _shell.mesh)
+               {do
+                  ($name {if_else {== $part _cover.mesh} {sprint "ghc_cover_" $g ".mesh"} {sprint "ghc_case_" $g $part}})
+                  {if {exists {symbol $name}} {{$this find {symbol $name}} set_showing FALSE}}
+               }
+            }
+         }
          {foreach_int $i 0 {size [games]}
             {if {exists {symbol {sprint "ghc_cover_" {elem [games] $i} ".mesh"}}}
                {$this lay_case {elem [games] $i} $i}
@@ -207,6 +239,7 @@
             ($count {size [games]})
             ($picked {== $i [picked]})
             ($cover {$this find {symbol {sprint "ghc_cover_" $g ".mesh"}}})
+            {$cover set_showing TRUE}
             {$cover set_local_pos
                {'*' [cover_gap] {'-' $i {/ {'-' $count 1} 2.0}}}
                {if_else $picked [cover_picked_y] [cover_y]}
@@ -280,13 +313,21 @@
                }
             )
             ; Its size first: setting it reads the button's own text again.
+            ; A game with no case (a hack's) is named on its line, at the
+            ; button's own size, fitted to its width.
             {if [cased]
                {if {== [own_size] none} {set [own_size] {$btn get text_size}}}
-               {$btn set fit_text 0}
-               {$btn set text_size {'*' [line_size] [own_size]}}
+               {do
+                  ($named {! {exists {symbol {sprint "ghc_cover_" $game ".mesh"}}}})
+                  {$btn set fit_text $named}
+                  {$btn set text_size {if_else $named [own_size] {'*' [line_size] [own_size]}}}
+               }
             }
             {$btn set_localized_text
-               {if_else [cased] $shown {sprint {localize {sprint "campaign_" $game}} "  " $shown}}
+               {if_else {&& [cased] {exists {symbol {sprint "ghc_cover_" $game ".mesh"}}}}
+                  $shown
+                  {sprint {localize {sprint "campaign_" $game}} "  " $shown}
+               }
             }
          }
       )
@@ -339,7 +380,7 @@
    )
 }
 ; The campaigns' help bar: yellow changes the engine, whose mark is on the
-; poster.
+; poster, and blue pages to the hacks' campaigns.
 {func ghc_campaign_helpbar
    {do
       ($array)
@@ -349,6 +390,9 @@
       {push_back $array (fret2 help_back)}
       {if {> {note_engine choices} 1}
          {push_back $array (fret3 ghc_engine)}
+      }
+      {if {> {size {hacks career}} 0}
+         {push_back $array (fret4 ghc_bonus)}
       }
       {push_back $array (strum help_updown)}
       {helpbar set_display $array}
@@ -390,6 +434,13 @@
                   {synth play_sequence button_play}
                }
                {ghc_campaign_helpbar}
+               TRUE
+            )
+            ; The next page of campaigns, the hacks' after the games' own
+            ; (blue and orange both come as kPad_Square).
+            ({&& {== $button kPad_Square} {> {size {hacks career}} 0} {! {ui in_transition}}}
+               {ghc_campaign_panel next_page}
+               {synth play_sequence button_toggle}
                TRUE
             )
             (TRUE kDataUnhandled)

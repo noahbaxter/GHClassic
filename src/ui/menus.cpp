@@ -67,5 +67,7 @@ namespace gh2
         locale::add("ghc_engine_gh2", "ENGINE GH2");
         // The campaign picker's, whose poster shows which (campaigns.dta).
         locale::add("ghc_engine", "ENGINE");
+        // And its page of the hacks' campaigns.
+        locale::add("ghc_bonus", "BONUS");
     }
 }
