@@ -16,6 +16,9 @@ namespace gh2::guest
 
         float ms() const { return get<float>(0x00u); }
         int32_t tick() const { return get<int32_t>(0x04u); }
+        // Its length in whole ms, as its ctor (0x2363e8) keeps
+        // MultiGemInfo's.
+        uint16_t lengthMs() const { return get<uint16_t>(0x08u); }
         uint8_t slots() const { return get<uint8_t>(0x0cu); } // its frets, a bit each
         void setSlots(uint8_t slots) const { set<uint8_t>(0x0cu, slots); }
         bool hopo() const { return (get<uint8_t>(0x0du) & 1u) != 0u; } // WillBeNoStrum's
