@@ -382,6 +382,7 @@ set(GHC_GAME_SOURCES
     src/highway/extended/guitar/sustain_flames.cpp
     src/highway/extended/guitar/sustain_tails.cpp
     src/highway/extended/guitar/tap_gems.cpp
+    src/highway/extended/guitar/tap_line.cpp
     src/highway/extended/guitar/tap_pieces.cpp
     src/highway/gem_looks.cpp
     src/highway/note_speed.cpp
