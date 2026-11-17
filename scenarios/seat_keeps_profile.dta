@@ -2,8 +2,8 @@
 ; followHandovers): P2 drops out, and a strum on P2's controller takes the
 ; lone P1 seat, as one player picking up another controller does, but P1
 ; stays Alpha. Lefty is a profile's own, a guest's its own (ui/players.cpp):
-; Alpha's left handed, and P1 a guest puts the guest's back. A controller
-; coming to P1 from the keyboard standing in keeps its own profile.
+; Alpha's left handed, and P1 a guest puts the guest's back. P1 dropping out
+; signs out: a controller coming back to P1 is no one till it picks.
 #include common/first_boot.dta
 (device guitar)
 (device guitar2)
@@ -64,13 +64,14 @@
 (wait 0.5)
 (expect {options get_lefty 0} 1)
 
-; P1 drops out: the keyboard stands in, no one. The guitar pressing back
-; into P1 is Alpha still, not the keyboard's guest.
+; P1 drops out, signing out: the keyboard stands in, no one. The guitar
+; pressing back into P1 is no one either till it picks again.
 {ghc_profile drop 0}
 (wait 1)
 (expect {seat_has 0 guitar} 0)
+(expect {ghc_profile holder 0} "")
 (press down guitar)
 (wait 0.5)
 (expect {seat_has 0 guitar} 1)
-(expect {ghc_profile name 0} Alpha)
+(expect {ghc_profile holder 0} "")
 (quit)

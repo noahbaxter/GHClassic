@@ -804,8 +804,14 @@
                }
                TRUE
             )
+            ; A seat not signed in picks its profile, as one joining.
             ({ghc_pressed $button profile}
-               {if {! {$this join}} {$this open $player}}
+               {if {! {$this join}}
+                  {if_else {== {ghc_profile holder $player} ""}
+                     {ghc_profile_screen join $player {ui current_screen} {ui current_screen}}
+                     {$this open $player}
+                  }
+               }
                TRUE
             )
             (TRUE FALSE)

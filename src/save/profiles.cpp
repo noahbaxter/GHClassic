@@ -5,6 +5,7 @@
 #include "save/save.h"
 
 #include <cstdlib>
+#include <map>
 
 namespace gh2::save
 {
@@ -12,6 +13,16 @@ namespace gh2::save
     {
         constexpr const char *kSection = "profiles";
         constexpr const char *kGuest = "guest";
+
+        // Each signed-in device's profile, as profileText has it, or kGuest:
+        // this run's alone.
+        std::map<std::string, std::string> s_signedIn;
+
+        std::string signedInAs(const std::string &device)
+        {
+            const auto it = s_signedIn.find(device);
+            return it != s_signedIn.end() ? it->second : std::string();
+        }
 
         // A save from before profiles: one for each band, as many as there
         // is room for, the first taking every best kept then. Once: a band
@@ -38,7 +49,7 @@ namespace gh2::save
         // What `device` last played as: a profile or a guest (none).
         std::optional<int> deviceProfile(const Profiles &profiles, const std::string &device)
         {
-            const std::string kept = device.empty() ? std::string() : state(kSection, device);
+            const std::string kept = signedInAs(device);
             const int profile = std::atoi(kept.c_str()) - 1;
             if (!profiles.here(profile) || kept != profileText(profiles, profile))
                 return std::nullopt;
@@ -48,9 +59,9 @@ namespace gh2::save
         // Each controller that played as `was` plays as `now`.
         void remap(const std::string &was, const std::string &now)
         {
-            for (const auto &[device, kept] : stateSection(kSection))
+            for (auto &[device, kept] : s_signedIn)
                 if (kept == was)
-                    keepState(kSection, device, now);
+                    kept = now;
         }
     }
 
@@ -122,24 +133,17 @@ namespace gh2::save
     {
         // A seat's player moved to another device in it (host/input.h's
         // takeHandovers) is still who they were: the device takes their
-        // profile, or guest, and the one left lets it go. Only picking one
-        // changes who a seat is. The keyboard standing in for a P1 with no
-        // controller is no one till it plays as a profile: a controller
-        // coming to P1 from it keeps its own.
+        // sign-in, profile or guest, and the one left lets it go. One not
+        // signed in moves none. Only picking one changes who a seat is.
         void followHandovers()
         {
-            const std::vector<Handover> moved = takeHandovers();
-            if (moved.empty())
-                return;
-            const Profiles now = profiles();
-            for (const Handover &h : moved)
+            for (const Handover &h : takeHandovers())
             {
-                const auto profile = deviceProfile(now, h.from);
-                if (!profile && h.fromKeyboard)
+                const auto from = s_signedIn.find(h.from);
+                if (from == s_signedIn.end())
                     continue;
-                keepState(kSection, h.to, profile ? profileText(now, *profile) : kGuest);
-                if (profile)
-                    keepState(kSection, h.from, "");
+                s_signedIn[h.to] = from->second;
+                s_signedIn.erase(h.from);
             }
         }
     }
@@ -166,9 +170,19 @@ namespace gh2::save
             return;
         const std::string text = profile ? profileText(now, *profile) : kGuest;
         if (profile)
-            for (const auto &[other, kept] : stateSection(kSection))
-                if (other != device && kept == text)
-                    keepState(kSection, other, "");
-        keepState(kSection, device, text);
+            remap(text, kGuest);
+        s_signedIn[device] = text;
+    }
+
+    bool seatSignedIn(int seat)
+    {
+        followHandovers();
+        return !signedInAs(seatDevice(seat)).empty();
+    }
+
+    void signOut(int seat)
+    {
+        followHandovers();
+        s_signedIn.erase(seatDevice(seat));
     }
 }

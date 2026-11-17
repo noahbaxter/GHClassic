@@ -459,7 +459,7 @@ namespace gh2
             const std::string &was = devicesWas[static_cast<size_t>(seat)], &now = s_seatDevices[seat];
             if (!was.empty() && !now.empty() && was != now &&
                 std::find(devicesWas.begin(), devicesWas.end(), now) == devicesWas.end() && s_handovers.size() < 64)
-                s_handovers.push_back({was, now, was == DeviceId::keyboard().text()});
+                s_handovers.push_back({was, now});
         }
         HostPad &pad = pads[0];
         pad.pressCount = s_pads[0].pressCount;

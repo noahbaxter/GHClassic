@@ -133,7 +133,6 @@ namespace gh2
     struct Handover
     {
         std::string from, to;
-        bool fromKeyboard = false; // the keyboard standing in for P1
     };
     std::vector<Handover> takeHandovers();
     // Whether it plays in pad mode, a gamepad's (as HostPad::joypad, but

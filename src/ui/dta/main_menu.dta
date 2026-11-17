@@ -351,9 +351,9 @@
          {game_screen set attract_mode TRUE}
          {ui goto_screen loading_screen}
       )
-      ; Start only, which picks P1's profile on the notebook, on the one its
-      ; controller last played as, then the main menu. Joining: backing out
-      ; to here frees P1, for whichever controller presses Start next.
+      ; Start only, which signs P1 in on the notebook, then the main menu.
+      ; Joining: backing out to here frees P1, for whichever controller
+      ; presses Start next.
       (BUTTON_DOWN_MSG
          {if {ghc_pressed $button profile}
             {ghc_select}

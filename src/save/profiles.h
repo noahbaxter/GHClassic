@@ -8,12 +8,12 @@
 //   1 = Noah
 //   3 = Sam
 //
-// Its bests go in [profile 1 best] (save/best.h). Each seat plays as the
-// profile its controller last played as, kept in state.ini's [profiles] by
-// the device, as [seats] names it, as "<number> <name>" so a profile made
-// later under a gone one's number is not taken for it, or as a guest. A
-// controller with neither is a guest, as is one whose profile a seat before
-// it plays as. A save with bands and no profiles yet gets one of each
+// Its bests go in [profile 1 best] (save/best.h). A seat is signed in once
+// its player picks a profile or guest, and plays as that till they drop
+// out: kept for this run only, by the device, as [seats] names it, so every
+// start begins with nobody signed in. A seat not signed in plays as a
+// guest, as does one whose profile a seat before it plays as. A save with
+// bands and no profiles yet gets one of each
 // band's name, the first taking the bests kept before profiles. Not one
 // goes on a PCSX2 card: a card's saves are its bands'.
 
@@ -56,4 +56,8 @@ namespace gh2::save
     // so whichever had it last forgets it).
     std::optional<int> seatProfile(int seat);
     void keepSeatProfile(int seat, std::optional<int> profile);
+    // Whether seat `seat` has picked a profile or guest this run; and its
+    // player signing out, dropping out.
+    bool seatSignedIn(int seat);
+    void signOut(int seat);
 }

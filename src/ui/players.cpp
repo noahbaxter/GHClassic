@@ -146,11 +146,11 @@ namespace gh2
             ark::addFile("ui/image/gen/ghc_poster_black.png_ps2", textures::standIn(id, 128u, 32u));
         }
 
-        // Who holds a seat: the profile it plays as, else GUEST; "" for no
-        // controller.
+        // Who holds a seat: the profile it plays as, else GUEST; "" for one
+        // not signed in.
         std::string holder(int seat)
         {
-            if (seatDevice(seat).empty())
+            if (!save::seatSignedIn(seat))
                 return "";
             const auto profile = save::seatProfile(seat);
             return profile ? save::profiles().names[static_cast<size_t>(*profile)] : "GUEST";
@@ -162,7 +162,8 @@ namespace gh2
         // {ghc_profile name_of <row>}: that profile's name.
         // {ghc_profile name <seat>}: the seat's profile's name, "" for a guest.
         // {ghc_profile current <seat>}: the seat's profile, -1 for a guest.
-        // {ghc_profile holder <seat>}: "Noah", "GUEST", "" for none.
+        // {ghc_profile holder <seat>}: "Noah", "GUEST", "" for none signed
+        //   in.
         // {ghc_profile badge <seat>}: "P1  Noah", "P1  GUEST", "" for none.
         // {ghc_profile ink <seat> <game> <colour>}: a packed red (pack_color)
         //   in the seat's colour from that game's menus, as its poster's.
@@ -176,7 +177,7 @@ namespace gh2
         // {ghc_profile hold <0|1>}: a menu is up, so no controller takes,
         //   leaves or trades a seat (host/input.h).
         // {ghc_profile joins <0|1>}: the main menu is up, where Start joins.
-        // {ghc_profile drop <seat>}: its player drops out.
+        // {ghc_profile drop <seat>}: its player signs out and drops out.
         // {ghc_profile joined <menu>}: a seat taken by another controller
         //   since the last call, on Multiplayer's screen or, with <menu> 1,
         //   the main menu's, where whoever presses takes P1; -1 for none.
@@ -279,6 +280,7 @@ namespace gh2
             }
             if (op == "drop")
             {
+                save::signOut(n);
                 dropSeat(n);
                 return {};
             }
