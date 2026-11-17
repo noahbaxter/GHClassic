@@ -6,6 +6,7 @@
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
 #include "runtime/ee_scheduler.h"
+#include "script.h"
 
 #include <algorithm>
 #include <cstring>
@@ -93,6 +94,34 @@ namespace gh2::screen_loads
                 runtime.replaceFunction(address, &run);
             }
         };
+        // {ghc_preload <screen>}: its panels loading now, while another
+        // screen is still up, held until {ghc_unpreload <screen>}, once it
+        // has taken them itself. {ghc_preloaded <screen>}: whether they all
+        // have. A change into it then waits on nothing, where it would
+        // otherwise load behind the last screen gone.
+        script::Node panels(const script::Call &call, uint32_t function)
+        {
+            const uint32_t screen = call.object(1);
+            if (screen == 0u)
+                return {};
+            return {static_cast<uint32_t>(call.runtime->callGuestFunction(call.rdram, call.ctx, function, {screen})),
+                    script::kInt};
+        }
+        script::Node preload(const script::Call &call)
+        {
+            panels(call, s_addresses->uiScreenLoadPanels);
+            return {};
+        }
+        script::Node preloaded(const script::Call &call)
+        {
+            return panels(call, s_addresses->uiScreenArePanelsLoaded);
+        }
+        script::Node unpreload(const script::Call &call)
+        {
+            panels(call, s_addresses->uiScreenUnloadPanels);
+            return {};
+        }
+
         struct LoadMgrPollTag;
         struct ScreenEnterTag;
         struct ScreenExitTag;
@@ -104,6 +133,9 @@ namespace gh2::screen_loads
         s_checkUnload = runtime.lookupFunction(addresses.uiPanelCheckUnload);
         EntryHook<LoadTag>::install(runtime, addresses.uiPanelCheckLoad, onCheckLoad);
         Override<UnloadTag>::install(runtime, addresses.uiPanelCheckUnload, onCheckUnload);
+        script::addCommand("ghc_preload", preload);
+        script::addCommand("ghc_preloaded", preloaded);
+        script::addCommand("ghc_unpreload", unpreload);
         Unpaced<LoadMgrPollTag>::install(runtime, addresses.loadMgrPoll);
         Unpaced<ScreenEnterTag>::install(runtime, addresses.ghScreenEnter);
         Unpaced<ScreenExitTag>::install(runtime, addresses.ghScreenExit);

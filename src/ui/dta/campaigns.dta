@@ -17,15 +17,127 @@
 ; unlock-all cheat turns saving off with it. Game Settings' unlock all puts
 ; all access on too, saving left on ({campaigns cheat_access}). GH1's has no
 ; all access, and is this one otherwise.
+;
+; No autosave screen (mem_card.dta's, two 1 s waits around a save that takes
+; under a millisecond): the save is started here and the next screen comes at
+; once, the theme's card icon in the corner while it is made
+; (ui/background_save.h). One that fails puts the autosave screen up over
+; wherever the player is, to retry it or go on. A save asked for while one is
+; being made is made after it.
 {func autosave_goto ($next_screen)
-   {if_else {&& {campaign needs_save} {! {campaigns cheat_access}} $autosave {! $disable_save}}
+   {if {&& {campaign needs_save} {! {campaigns cheat_access}} $autosave {! $disable_save}}
+      {ghc_save}
+   }
+   {ui goto_screen $next_screen}
+}
+{set $ghc_saving FALSE}
+{set $ghc_save_again FALSE}
+{func ghc_save
+   {if_else $ghc_saving
+      {set $ghc_save_again TRUE}
       {do
-         {set $mc_save_success_screen $next_screen}
-         {set $mc_save_failed_screen $next_screen}
+         {set $ghc_saving TRUE}
+         {ghc_save_start {campaigns active}}
+         {memcard save_data {ui current_screen} $mc_overwrite}
+      }
+   }
+}
+; As the autosave screen takes its result (mem_card.dta); the next save
+; asked for starts once the card code has let this one go.
+{func ghc_saved ($result)
+   {set $ghc_saving FALSE}
+   {if_else {== $result 0}
+      {do
+         {campaign save_complete}
+         {set $mc_overwrite TRUE}
+         {if $ghc_save_again
+            {set $ghc_save_again FALSE}
+            {script_task (delay 0.1) (units kTaskUISeconds)
+               (script {if {campaign needs_save} {ghc_save}})
+            }
+         }
+      }
+      {do
+         {set $ghc_save_again FALSE}
+         {set $mc_save_success_screen {ui current_screen}}
+         {set $mc_save_failed_screen {ui current_screen}}
          {ui goto_screen autosave}
       }
-      {ui goto_screen $next_screen}
    }
+}
+; GH2's card screens (mem_card.dta) waited a second on "Checking status"
+; before reading or writing, as the PS2's card had to; ours is a file, so
+; at once, still a task as theirs. The second after, the result shown,
+; stays. bootup_load's comes up before these scripts and keeps its own.
+{amend bootup_create_save
+   (enter
+      {dialog message mc_checking mc_title_saving}
+      {script_task (delay 0) (units kTaskUISeconds)
+         (script {dialog set_message bootup_create_save} {memcard save_data $this $mc_overwrite})}
+   )
+}
+; Booting, a save read or made goes straight on, no second on its result;
+; none found is made, not asked about: the save is a file, so "no" only
+; turned saving off. Failures keep GH2's screens (mem_card.dta). The results
+; are its #defines' numbers, which it keeps to itself: 0 none, -101 no card,
+; -103 a different card, -105 corrupt, -106 no space, -120 a save there.
+{amend bootup_load
+   (memcard_result ($result $space_free)
+      {switch $result
+         (0 {set $mc_overwrite TRUE} {ui goto_screen cut_scene_screen})
+         (-101 {ui goto_screen bootup_nocard})
+         (-105 {set $mc_overwrite TRUE} {ui goto_screen bootup_corrupt_data})
+         {set $mc_overwrite FALSE}
+         {if_else {< {memcard space_available} {memcard space_needed}}
+            {ui goto_screen bootup_create_save_no_space}
+            {ui goto_screen bootup_create_save}
+         }
+      }
+   )
+}
+{amend bootup_create_save
+   (memcard_result ($result $space_free)
+      {set $mc_overwrite FALSE}
+      {switch $result
+         (0 {set $mc_overwrite TRUE} {campaign save_complete} {ui goto_screen cut_scene_screen})
+         (-101 {ui goto_screen bootup_save_nocard})
+         (-106 {ui goto_screen bootup_nospace})
+         (-120
+            {set $mc_replace_screen $this}
+            {set $mc_load_screen bootup_load}
+            {ui goto_screen bootup_replace_save_check}
+         )
+         (-103 {ui goto_screen bootup_different_card})
+         {set $mc_retry_screen $this}
+         {set $mc_continue_screen bootup_caution}
+         {set $mc_retry_continue_text save_error}
+         {ui goto_screen retry_continue}
+      }
+   )
+}
+{amend autosave
+   (enter
+      {dialog message mc_checking mc_title_saving}
+      {script_task (delay 0) (units kTaskUISeconds)
+         (script {dialog set_message save_saving} {memcard save_data $this $mc_overwrite})}
+   )
+}
+{amend memcard_load
+   (enter
+      {dialog message mc_checking mc_title_loading}
+      {switch {memcard get_info}
+         (-101 {set $mc_load_text mc_nocard_error} {ui goto_screen memcard_load_error})
+         {script_task (delay 0) (units kTaskUISeconds)
+            (script {dialog set_message load_loading} {memcard load_data $this})}
+      }
+   )
+}
+{amend mc_format
+   (enter
+      {dialog message mc_checking mc_title_caution}
+      {script_task (delay 0) (units kTaskUISeconds)
+         (script {dialog set_message format_card} {memcard format $this})}
+   )
 }
 {if {! {exists ghc_campaign_panel}} {new GHPanel ghc_campaign_panel}}
 {retype ghc_campaign_panel

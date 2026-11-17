@@ -2,6 +2,7 @@
 
 #include "dev/cheats.h"
 #include "host/audio.h"
+#include "host/boot_picture.h"
 #include "dev/draw_dump.h"
 #include "dev/timing.h"
 #include "host/input.h"
@@ -32,6 +33,7 @@
 #include <fstream>
 #include <iostream>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -138,6 +140,10 @@ namespace gh2
         std::chrono::steady_clock::time_point nextHiddenFrame{};
         Frame shown;                                 // the game frame last drawn
         movie::Picture moviePicture;                 // the movie's, while one plays
+        // The last boot's first picture, shown until the game draws one of
+        // its own (host/boot_picture.h); and whether this boot's is kept.
+        std::optional<boot_picture::Picture> bootPicture;
+        bool bootDrawn = false;
         std::chrono::microseconds frameWait{8333};   // half a display period
         std::chrono::nanoseconds gamePeriod{16667000};
 
@@ -434,14 +440,14 @@ namespace gh2
             readback = VK_NULL_HANDLE;
         }
 
-        // The movie picture into the target, which is its size, left as the
-        // scene leaves it.
-        bool recordMovie(VkCommandBuffer cmd, Slot &into)
+        // A picture into the target, which is its size, left as the scene
+        // leaves it: a movie's, or the boot's kept one.
+        bool recordPicture(VkCommandBuffer cmd, Slot &into, const std::vector<uint8_t> &rgba)
         {
-            const VkDeviceSize size = moviePicture.rgba.size();
+            const VkDeviceSize size = rgba.size();
             if (!roomToUpload(into, size))
                 return false;
-            std::memcpy(into.uploadMapped, moviePicture.rgba.data(), size);
+            std::memcpy(into.uploadMapped, rgba.data(), size);
             vmaFlushAllocation(allocator, into.uploadMemory, 0, size);
 
             imageBarrier(cmd, target, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0,
@@ -552,6 +558,65 @@ namespace gh2
                 std::fclose(file);
             }
             vmaUnmapMemory(allocator, readbackMemory);
+        }
+
+        // The target as read back, for the next boot (host/boot_picture.h).
+        void keepBootPicture(float aspect)
+        {
+            void *mapped = nullptr;
+            if (vmaMapMemory(allocator, readbackMemory, &mapped) != VK_SUCCESS)
+                return;
+            vmaInvalidateAllocation(allocator, readbackMemory, 0, VK_WHOLE_SIZE);
+            const uint8_t *pixels = static_cast<const uint8_t *>(mapped);
+            boot_picture::keep({targetWidth, targetHeight, aspect, std::vector<uint8_t>(pixels, pixels + readbackSize)});
+            vmaUnmapMemory(allocator, readbackMemory);
+        }
+
+        // The kept picture in the window at once, before the host's installs
+        // and the game's boot, which present nothing for seconds.
+        bool presentBootPicture()
+        {
+            if (!bootPicture)
+                return true;
+            Slot &into = slots[slot];
+            vkWaitForFences(device.device, 1, &into.done, VK_TRUE, UINT64_MAX);
+            if (!ensureTarget(bootPicture->width, bootPicture->height))
+                return false;
+            uint32_t imageIndex = 0;
+            const VkResult acquired = vkAcquireNextImageKHR(device.device, swapchain.swapchain, UINT64_MAX,
+                                                            into.imageAvailable, VK_NULL_HANDLE, &imageIndex);
+            if (acquired != VK_SUCCESS && acquired != VK_SUBOPTIMAL_KHR)
+                return true;
+            vkResetFences(device.device, 1, &into.done);
+            VkCommandBuffer cmd = into.cmd;
+            vkResetCommandBuffer(cmd, 0);
+            VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+            begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+            vkBeginCommandBuffer(cmd, &begin);
+            if (!recordPicture(cmd, into, bootPicture->rgba) ||
+                !blitToSwapchain(cmd, into, swapchainImages[imageIndex], bootPicture->aspect, false))
+                return false;
+            vkEndCommandBuffer(cmd);
+            const VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
+            submit.commandBufferCount = 1;
+            submit.pCommandBuffers = &cmd;
+            submit.waitSemaphoreCount = 1;
+            submit.pWaitSemaphores = &into.imageAvailable;
+            submit.pWaitDstStageMask = &waitStage;
+            submit.signalSemaphoreCount = 1;
+            submit.pSignalSemaphores = &renderFinished[imageIndex];
+            if (!check(vkQueueSubmit(queue, 1, &submit, into.done), "submit"))
+                return false;
+            VkPresentInfoKHR info{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
+            info.waitSemaphoreCount = 1;
+            info.pWaitSemaphores = &renderFinished[imageIndex];
+            info.swapchainCount = 1;
+            info.pSwapchains = &swapchain.swapchain;
+            info.pImageIndices = &imageIndex;
+            vkQueuePresentKHR(queue, &info);
+            slot = (slot + 1u) % kFramesInFlight;
+            return true;
         }
 
         // --record's frame (host/record.h), shown at that aspect and drawn at
@@ -771,6 +836,10 @@ namespace gh2
             return false;
         if (!s.hidden && !s.createSwapchain())
             return false;
+        if (!s.hidden)
+            s.bootPicture = boot_picture::kept();
+        if (!s.presentBootPicture())
+            return false;
         // A hidden run is scripted; the player's controller stays out of it.
         if (!s.hidden)
             openInput();
@@ -885,7 +954,17 @@ namespace gh2
                                                            s.gamePeriod * 2))
                             : frames().next(s.shown, s.frameWait);
         const Frame &frame = s.shown;
-        const float displayAspect = moviePlaying ? 4.0f / 3.0f : frame.displayAspect;
+        // The boot's first frame that draws anything ends the kept picture,
+        // and is kept for the next boot: a window's, not a hidden test run's.
+        bool keepThis = false;
+        if (!s.bootDrawn && !moviePlaying && isNew && !frame.draws.empty())
+        {
+            s.bootDrawn = true;
+            s.bootPicture.reset();
+            keepThis = !s.hidden;
+        }
+        const bool kept = !moviePlaying && s.bootPicture.has_value();
+        const float displayAspect = moviePlaying ? 4.0f / 3.0f : kept ? s.bootPicture->aspect : frame.displayAspect;
         const uint64_t tTaken = timed ? timing::now() : 0u;
         const LogClock::time_point waitEnd = LogClock::now();
         if (timed)
@@ -909,6 +988,11 @@ namespace gh2
         {
             width = s.moviePicture.width;
             height = s.moviePicture.height;
+        }
+        else if (kept)
+        {
+            width = s.bootPicture->width;
+            height = s.bootPicture->height;
         }
         else if (m_renderSize.mode == RenderSize::kHeight)
         {
@@ -945,7 +1029,8 @@ namespace gh2
         vkBeginCommandBuffer(cmd, &begin);
 
         const LogClock::time_point recordStart = LogClock::now();
-        if (moviePlaying ? !s.recordMovie(cmd, slot)
+        if (moviePlaying ? !s.recordPicture(cmd, slot, s.moviePicture.rgba)
+            : kept       ? !s.recordPicture(cmd, slot, s.bootPicture->rgba)
                          : !s.scene.record(cmd, frame, s.target, s.targetWidth, s.targetHeight, s.presented))
             return false;
         const LogClock::time_point recordEnd = LogClock::now();
@@ -957,7 +1042,7 @@ namespace gh2
         // A hidden frame's own slot on the game's clock, which a late wake
         // does not move; a shown one's, when it is drawn.
         const auto drawnAt = present ? ps2x::host_clock::now() : s.nextHiddenFrame;
-        if (shot || recording)
+        if (shot || recording || keepThis)
         {
             VkBufferImageCopy copy{};
             copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
@@ -1050,8 +1135,10 @@ namespace gh2
             }
         }
 
-        if (shot || recording)
+        if (shot || recording || keepThis)
             vkWaitForFences(s.device.device, 1, &slot.done, VK_TRUE, UINT64_MAX);
+        if (keepThis)
+            s.keepBootPicture(displayAspect);
         if (shot)
             s.writeShot(requested);
         if (recording)

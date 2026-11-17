@@ -12,6 +12,8 @@
 #include "hook.h"
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
+#include "render/frame.h"
+#include "runtime/ee_scheduler.h"
 
 #include <algorithm>
 #include <cstring>
@@ -192,6 +194,17 @@ namespace gh2::script
             readyUi(rdram, ctx, runtime);
         }
 
+        // The first UI poll once the boot has drawn a picture, the save's
+        // check (or a logo without fast_boot): the scripts hold that up a
+        // moment, where in the first screen change they held its music too
+        // and the black before it.
+        struct UiPollTag;
+        void onUiPoll(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            if (!s_uiRan && !building().draws.empty())
+                readyUi(rdram, ctx, runtime);
+        }
+
         // Virtual, as Hmx::Object::SetType calls it, so a class's own
         // override (UIPanel's reads file and focus) runs.
         void setTypeDef(const Call &call, uint32_t object, uint32_t def)
@@ -343,6 +356,9 @@ namespace gh2::script
             return true;
         s_uiRan = true;
         const R5900Context saved = *ctx;
+        // Some three seconds of the game's cycles: unpaced, the scheduler
+        // does not then hold the game as long again, catching its vblanks up.
+        const EeScheduler::UnpacedScope unpaced(runtime->eeScheduler());
         for (UiScript &script : s_uiScripts)
             runUi(rdram, ctx, runtime, script);
         *ctx = saved;
@@ -528,6 +544,7 @@ namespace gh2::script
         addCommand("amend", amend);
         EntryHook<InitTag>::install(runtime, addresses.ghUtlInit, onDataReady);
         EntryHook<GotoScreenTag>::install(runtime, addresses.uiGotoScreen, onGotoScreen);
+        EntryHook<UiPollTag>::install(runtime, addresses.uiManagerPoll, onUiPoll);
         EntryHook<DebugModalTag>::install(runtime, addresses.debugModal, onDebugModal);
         EntryHook<AbortTag>::install(runtime, addresses.abort, onAbort);
         EntryHook<DelayThreadTag>::install(runtime, addresses.delayThread, onDelayThread);

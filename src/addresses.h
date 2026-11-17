@@ -232,6 +232,9 @@ namespace gh2
         // A panel loaded for a screen and let go (ui/screen_loads.h).
         uint32_t uiPanelCheckLoad;   // UIPanel::CheckLoad
         uint32_t uiPanelCheckUnload; // UIPanel::CheckUnload
+        uint32_t uiScreenLoadPanels;      // UIScreen::LoadPanels, CheckLoad on each
+        uint32_t uiScreenUnloadPanels;    // UIScreen::UnloadPanels, CheckUnload on each
+        uint32_t uiScreenArePanelsLoaded; // UIScreen::ArePanelsLoaded
         uint32_t uiManagerPoll;
         uint32_t debugModal; // DebugModal(bool &, char *)
         uint32_t abort;
@@ -275,6 +278,7 @@ namespace gh2
         uint32_t freeCameraPoll; // FreeCamera::Poll
         uint32_t rndFlareDrawFlare;
         uint32_t saveData1;     // the card write, on GHMCSaveData's worker thread
+        uint32_t saveData2;     // (int result) back on the main thread: the result to the UI's screen
         uint32_t loadData1;     // the card read, on GHMCLoadData's
         uint32_t loadData2;     // back on the main thread, where Campaign::Load runs
         uint32_t sceMcInit;
@@ -633,6 +637,9 @@ namespace gh2
         .bandButtonGetStateColor = 0x28bb80u,
         .uiPanelCheckLoad = 0x20e040u,
         .uiPanelCheckUnload = 0x20e0d0u,
+        .uiScreenLoadPanels = 0x2134a0u,
+        .uiScreenUnloadPanels = 0x213508u,
+        .uiScreenArePanelsLoaded = 0x213590u,
         .uiManagerPoll = 0x214510u,
         .debugModal = 0x105a88u,
         .abort = 0x307b80u,
@@ -676,6 +683,7 @@ namespace gh2
         .freeCameraPoll = 0x1b9370u,
         .rndFlareDrawFlare = 0x1f9330u,
         .saveData1 = 0x14b3e0u,
+        .saveData2 = 0x14b5b8u,
         .loadData1 = 0x14ba00u,
         .loadData2 = 0x14bae0u,
         .sceMcInit = 0x2f3860u,

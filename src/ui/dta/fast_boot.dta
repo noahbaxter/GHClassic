@@ -1,13 +1,24 @@
 ; --fast-boot: the save loaded, straight to the press-start splash, past the
 ; intro movie: its Start picks P1's profile (main_menu.dta). A card with no
 ; profiles still gets the guitar help first, which leads there too.
+;
+; The save's dialog stays up, as the screen before shares its panels, while
+; the next screen's load behind it (ui/screen_loads.h): a screen with none
+; let meta and all with it go, and the next loaded them again behind black.
 {retype cut_scene_screen
    (
+      (panels meta dialog helpbar)
       (allow_back FALSE)
-      (TRANSITION_COMPLETE_MSG
-         {if_else {> {campaign num_profiles} 0}
-            {ui goto_screen splash_screen}
-            {ui goto_screen guitar_help_screen}
+      (animate_transition FALSE)
+      (next splash_screen)
+      (enter
+         {set [next] {if_else {> {campaign num_profiles} 0} splash_screen guitar_help_screen}}
+         {ghc_preload [next]}
+      )
+      (poll
+         {if {&& {! {ui in_transition}} {== {ui current_screen} $this} {ghc_preloaded [next]}}
+            {ui goto_screen [next]}
+            {ghc_unpreload [next]}
          }
       )
    )
