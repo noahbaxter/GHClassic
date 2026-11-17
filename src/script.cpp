@@ -482,6 +482,26 @@ namespace gh2::script
         release(rdram, ctx, runtime, root);
     }
 
+    void runKept(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &text)
+    {
+        static std::map<std::string, uint32_t> kept;
+        uint32_t &root = kept[text];
+        if (root == 0u)
+        {
+            const uint32_t parsed = parse(rdram, ctx, runtime, text);
+            if (parsed == 0u)
+            {
+                kept.erase(text);
+                return;
+            }
+            root = park(rdram, runtime, parsed);
+            release(rdram, ctx, runtime, parsed);
+        }
+        const uint32_t copy = clone(rdram, ctx, runtime, root);
+        evaluate(rdram, ctx, runtime, copy);
+        release(rdram, ctx, runtime, copy);
+    }
+
     uint32_t symbol(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &text)
     {
         const Call call{rdram, ctx, runtime, 0u};

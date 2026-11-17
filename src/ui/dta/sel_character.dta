@@ -209,7 +209,7 @@
                }
             }
          }
-         {if {== {gamecfg get mode} quickplay} {ghc_qp_view_poll $this}}
+         {if {== {gamecfg get mode} quickplay} {ghc_qp_view_poll $this} {ghc_preshow_follow_poll}}
       )
       (exit {set [skin_select] FALSE} {set [hub] FALSE})
       (add_outfit_buttons
@@ -330,6 +330,7 @@
                   {sc_char_nm.lbl set_text [char_focus]}
                   {sc_char_blurb.lbl set_localized_text {localize {sprint [char_focus] "_blurb"}}}
                   {char_single show_char 0 [char_outfit]}
+                  {ghc_preshow_follow [char_outfit]}
                   {char_single char_event 0 animate}
                   {$this set old_scroll_pos $new_scroll_pos}
                   {char_highlight.tnm set_frame $new_scroll_pos}
@@ -369,6 +370,7 @@
                         {'+' $z {'+' [outfit_lift] {'*' $idx [outfit_space]}}}}
                   }
                   {set $old_char {char_single get_char 0}}
+                  {ghc_preshow_follow [char_outfit]}
                   {if {char_single show_char 0 [char_outfit]}
                      {do
                         ($new_char {char_single get_char 0})

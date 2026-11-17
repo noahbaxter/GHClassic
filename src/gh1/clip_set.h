@@ -50,15 +50,12 @@ namespace gh2
             // A channel's bytes in a sample, or none.
             std::optional<Bytes> value(const std::string &channel, uint32_t sample) const
             {
-                size_t o = stride() * sample;
-                for (const std::string &c : channels)
-                {
-                    if (c == channel)
-                        return Bytes(data.begin() + static_cast<std::ptrdiff_t>(o),
-                                     data.begin() + static_cast<std::ptrdiff_t>(o + width(c)));
-                    o += width(c);
-                }
-                return std::nullopt;
+                const auto at = place(channel);
+                if (!at)
+                    return std::nullopt;
+                const size_t o = m_layout.stride * sample + at->first;
+                return Bytes(data.begin() + static_cast<std::ptrdiff_t>(o),
+                             data.begin() + static_cast<std::ptrdiff_t>(o + at->second));
             }
 
             // A channel holding `value` in every sample, where its type and
@@ -100,6 +97,37 @@ namespace gh2
                 }
                 channels.push_back(channel);
                 data = std::move(out);
+            }
+
+        private:
+            // Each channel's offset and width in a sample, and the stride,
+            // kept for value(): the walk-ons' fitting reads a few channels of
+            // every sample many times over (hub/menu_guitarist.cpp reach).
+            // Made again when the channels or compression change: channels
+            // are only ever added (hold, appendRotation, the readers), so
+            // their count tells.
+            struct Layout
+            {
+                size_t channels = 0u;
+                uint32_t compressed = 0u;
+                std::map<std::string, std::pair<size_t, size_t>> at;
+                size_t stride = 0u;
+            };
+            mutable Layout m_layout;
+
+            std::optional<std::pair<size_t, size_t>> place(const std::string &channel) const
+            {
+                if (m_layout.compressed != compressed || m_layout.channels != channels.size() || m_layout.at.empty())
+                {
+                    m_layout = {channels.size(), compressed, {}, 0u};
+                    for (const std::string &c : channels)
+                    {
+                        m_layout.at.emplace(c, std::pair(m_layout.stride, width(c)));
+                        m_layout.stride += width(c);
+                    }
+                }
+                const auto it = m_layout.at.find(channel);
+                return it != m_layout.at.end() ? std::optional(it->second) : std::nullopt;
             }
         };
 

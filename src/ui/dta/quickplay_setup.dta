@@ -604,13 +604,13 @@
          ; select, the same room.
          {if {! $ghc_qp_same_scene}
             {fade_panel start_fade $ghc_qp_fade_in (color 0 0 0) (fade_synth FALSE) (fade_out FALSE)}}
-         {set $ghc_qp_posed TRUE} {ghc_qp_recall} {sel_character_panel pick})
-      (TRANSITION_COMPLETE_MSG
-         {set $ghc_qp_same_scene FALSE}
-         ; The panel enters before the screen recalls the picks.
+         {set $ghc_qp_posed TRUE} {ghc_qp_recall} {sel_character_panel pick}
+         ; The panel enters before the screen recalls the picks. Shown as
+         ; the screen comes in: the guitarist loaded ahead
+         ; (ghc_preshow_preload, ghc_preshow_follow) stands as it arrives.
          {ghc_qp_show_venue sel_character_panel}
-         {ghc_qp_show_guitarist sel_character_panel}
-      )
+         {ghc_qp_show_guitarist sel_character_panel})
+      (TRANSITION_COMPLETE_MSG {set $ghc_qp_same_scene FALSE})
       (exit
          {ghc_qp_unpark sel_character_panel}
          {ghc_preshow_char set_placer 0}
@@ -621,6 +621,8 @@
             (ghc_play.btn {ui goto_screen qp_selsong_screen})
             (ghc_character.btn
                {set $ghc_qp_same_scene TRUE}
+               ; Held through character select (ghc_preshow_follow).
+               {ghc_preshow_char load}
                {ui goto_screen ghc_qp_character_screen}
             )
             (ghc_guitar.btn {ui goto_screen ghc_qp_guitar_screen})

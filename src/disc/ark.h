@@ -76,6 +76,9 @@ namespace gh2::ark
 
     // A file's bytes from that disc's archive alone.
     std::optional<std::vector<uint8_t>> readFile(size_t disc, const std::string &path);
+    // Its bytes as that disc has them, no fix applied: for another thread
+    // than the game's, once install has run.
+    std::optional<std::vector<uint8_t>> readOwn(size_t disc, const std::string &path);
 
     // A PAL release keeps a folder for each language where the USA one has
     // one file, and its videos in videos_pal: that disc's English files and
