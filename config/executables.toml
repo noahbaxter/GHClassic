@@ -14,6 +14,14 @@
 # The three USA retail discs match Redump's published values; the rest are
 # from Redump's PS2 DAT (2026-06-15).
 #
+# header_sha1 is its archive header's, GEN/MAIN.HDR, which differs with any
+# file added, dropped or resized. A PS2 disc of no release's serial, or of
+# one whose header_sha1 it does not match, is a romhack: mounted as a
+# campaign and a setlist of its own (hacks/install.h); one on GH1's
+# engine, not yet. Only
+# a disc's header is read, so this is how a slot swap, which keeps its
+# retail serial and executable, is told from the retail disc.
+#
 # executable: sha1 is the boot ELF, which is what the recompile depends on.
 # The debug builds are from Project Deluge (2021), on no retail disc.
 
@@ -28,6 +36,7 @@ name = "Guitar Hero (USA)"
 version = "1.00"
 role = "content"
 data_sha1 = "4caacaea582c79605f8c3582dd4b90abdec699f5"
+header_sha1 = "3cb9c0803cb8cc4bbaf25e20f2c0ae7e789fa1fe"
 redump = "http://redump.org/disc/699/"
 
 [[release]]
@@ -74,6 +83,7 @@ name = "Guitar Hero II (USA)"
 version = "1.00"
 role = "engine"
 data_sha1 = "e1a3a81827aa4264984b4f3678de58ca3d881528"
+header_sha1 = "a99b4ad7896631073899b384d164674e3b968612"
 redump = "http://redump.org/disc/627/"
 
 [[release]]
@@ -118,6 +128,7 @@ name = "Guitar Hero Encore: Rocks the 80s (USA)"
 version = "1.00"
 role = "content"
 data_sha1 = "184f2dc9993d9b1e6edf0125f68e1ce07742567a"
+header_sha1 = "bd6ef5bc3c20ebc06910ad641f0ed681907ccd24"
 redump = "http://forum.redump.org/post/131232/"
 
 [[release]]

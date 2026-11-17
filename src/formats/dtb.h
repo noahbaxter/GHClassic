@@ -9,6 +9,7 @@
 #include <functional>
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -70,6 +71,12 @@ namespace gh2::dtb
     // A built file's root as it is written, directives and all: for one
     // changed in part and written back.
     std::optional<Node> raw(const milo::Bytes &file);
+
+    // A raw root's conditionals on `names` settled as an executable that
+    // defines `defined` of them would: those directives gone, and the
+    // branches not taken with them. Every other directive stays. False if
+    // it has none of them.
+    bool resolve(Node &root, const std::set<std::string> &names, const std::set<std::string> &defined);
 
     // The array in `array` whose first node is `key`, as
     // DataArray::FindArray.

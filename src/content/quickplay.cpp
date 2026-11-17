@@ -91,7 +91,7 @@ namespace gh2::quickplay
             if (const sources::Row *row = sources::find(item, sources::Kind::Outfit))
                 return campaigns::unlockedIn(row->source, item);
             for (const std::string &game : campaigns::games())
-                if (campaigns::unlockedIn(game, item))
+                if (campaigns::lends(game, item) && campaigns::unlockedIn(game, item))
                     return true;
             return false;
         }

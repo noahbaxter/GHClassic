@@ -231,6 +231,58 @@ namespace gh2::dtb
         return std::nullopt;
     }
 
+    bool resolve(Node &root, const std::set<std::string> &names, const std::set<std::string> &defined)
+    {
+        // One stack across arrays, as the game's: settled ones take their
+        // branch or not, the rest stay for the game.
+        struct Open
+        {
+            bool settled, taken;
+        };
+        std::vector<Open> open;
+        bool any = false;
+        const auto active = [&] {
+            for (const Open &o : open)
+                if (o.settled && !o.taken)
+                    return false;
+            return true;
+        };
+        const std::function<void(std::vector<Node> &)> walk = [&](std::vector<Node> &nodes) {
+            std::vector<Node> out;
+            for (Node &n : nodes)
+            {
+                if (n.type == kIfdef || n.type == kIfndef)
+                {
+                    const bool settled = names.count(n.text) != 0u;
+                    open.push_back({settled, (defined.count(n.text) != 0u) == (n.type == kIfdef)});
+                    any = any || settled;
+                    if (settled)
+                        continue;
+                }
+                else if (n.type == kElse && !open.empty() && open.back().settled)
+                {
+                    open.back().taken = !open.back().taken;
+                    continue;
+                }
+                else if (n.type == kEndif && !open.empty())
+                {
+                    const bool settled = open.back().settled;
+                    open.pop_back();
+                    if (settled)
+                        continue;
+                }
+                if (!active())
+                    continue;
+                if (n.type == kArray || n.type == kCommand || n.type == kProperty)
+                    walk(n.nodes);
+                out.push_back(std::move(n));
+            }
+            nodes = std::move(out);
+        };
+        walk(root.nodes);
+        return any;
+    }
+
     std::optional<Node> read(const std::string &script, Macros &macros, const Files &files)
     {
         Load load{macros, files, {}};

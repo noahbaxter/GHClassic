@@ -653,6 +653,14 @@ namespace gh2::ark
         return std::nullopt;
     }
 
+    std::optional<size_t> discAdded(size_t added)
+    {
+        for (size_t i = 0u; added < s_added.size() && i < s_discs.size(); ++i)
+            if (s_discs[i].volume == s_added[added].get())
+                return i;
+        return std::nullopt;
+    }
+
     const std::string &serial(size_t disc) { return s_discs[disc].serial; }
 
     void front(std::optional<size_t> layer) { s_front = layer; }

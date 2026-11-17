@@ -45,6 +45,12 @@ namespace gh2
     // nothing changed, if the two are not that game's config.
     bool offerHiddenGuitars(dtb::Node &guitars, dtb::Node &store, const std::string &source, bool gh1);
 
+    // A GH2-form disc's guitars, store, campaign and career script on
+    // `layer`, its own in front of it: what it holds unoffered on sale, as
+    // GH2's is, and its career paying for it (content/payouts.h). Else an
+    // item no store sells is owned outside its career (content/campaigns.h).
+    void stockStore(const std::string &source, size_t disc, size_t layer);
+
     // guitar_copy.dta's text. Before any game adds its own for the same
     // tokens (GH1 names the finishes it shares by the whole guitar): the
     // first added is the one read.

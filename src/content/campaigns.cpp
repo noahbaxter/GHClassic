@@ -48,7 +48,7 @@ namespace gh2::campaigns
         // script, found by its name when the world loads.
         const std::vector<std::vector<const char *>> kConfig = {
             {"campaign"}, {"store"}, {"guitars"}, {"tips"}, {"venues"}, {"characters"}, {"synth", "metamusic"},
-            {"objects", "WorldDir", "types"},
+            {"objects", "WorldDir", "types"}, {"scoring"},
         };
         constexpr size_t kMetaMusic = 6u;  // kConfig's synth metamusic: the menus' music
         constexpr size_t kWorldTypes = 7u; // kConfig's objects WorldDir types: each venue's script
@@ -1380,6 +1380,15 @@ namespace gh2::campaigns
         return true;
     }
 
+    bool lends(const std::string &game, const std::string &item)
+    {
+        const std::vector<std::string> hacks = games::hacks();
+        if (std::find(hacks.begin(), hacks.end(), game) == hacks.end())
+            return true;
+        const sources::Row *row = sources::find(item);
+        return row && row->source == game;
+    }
+
     std::optional<bool> guitarUnlocked(const std::string &item)
     {
         bool known = false;
@@ -1391,7 +1400,7 @@ namespace gh2::campaigns
                 if (!finish && guitar.liveKey() != item)
                     continue;
                 known = true;
-                if (unlockedIn(campaign.game, finish ? item : guitar.key))
+                if (lends(campaign.game, item) && unlockedIn(campaign.game, finish ? item : guitar.key))
                     return true;
             }
         return known ? std::optional<bool>(false) : std::nullopt;
@@ -1420,14 +1429,17 @@ namespace gh2::campaigns
             for (const Guitar &guitar : i == s_active ? std::vector<Guitar>() : usable(s_campaigns[i]).guitars)
             {
                 const std::string body = guitar.liveKey();
+                const std::string &game = s_campaigns[i].game;
                 // A guitar the live config has none of comes whole. No band
                 // has an item for it (ProfileState::InitGuitars ran on the
                 // config before this), so no career's picker lists it.
-                if (guitar.type == "guitar")
+                if (guitar.type == "guitar" && lends(game, body))
                     text += "{if {! {find_exists $syscfg guitars " + body + "}} {push_back {find $syscfg guitars} (" + body +
                             " (type guitar) (skins))}}\n";
                 for (const auto &skin : guitar.skins)
                 {
+                    if (!lends(game, skin[0]))
+                        continue;
                     const std::string skins = "$syscfg guitars " + body + " skins";
                     text += "{if {&& {find_exists " + skins + "} {! {find_exists " + skins + " " + skin[0] + "}}} {push_back {find " +
                             skins + "} (" + skin[0] + " (outfit " + skin[1] + ") (mat " + skin[2] + "))}}\n";
@@ -1450,7 +1462,7 @@ namespace gh2::campaigns
         for (size_t i = 0; i < s_campaigns.size(); ++i)
             for (const Guitar &guitar : usable(s_campaigns[i]).guitars)
                 for (const auto &skin : guitar.skins)
-                    if (names.count(skin[0]) != 0u)
+                    if (names.count(skin[0]) != 0u && (i == s_active || lends(s_campaigns[i].game, skin[0])))
                     {
                         auto &finish = finishes[{guitar.liveKey(), skin[0]}];
                         finish.first = "(" + skin[0] + " (outfit " + skin[1] + ") (mat " + skin[2] + "))";

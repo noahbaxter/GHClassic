@@ -126,6 +126,11 @@ namespace gh2::campaigns
     // finish with its guitar, the Battle Axe by winning, the Grim Ripper's
     // guitar with him). False for a game with no campaign.
     bool unlockedIn(const std::string &game, const std::string &item);
+    // Whether `game`'s career is to lend `item` outside it: any game's, but
+    // a hack's (content/games.h) only its own, an item no retail disc has.
+    // One of the same name is that disc's (content/sources.h), and a hack's
+    // career having it opens nothing anywhere else.
+    bool lends(const std::string &game, const std::string &item);
     // Whether any game's career has that guitar or finish to use, a guitar
     // under either name where a game has its own for it. None if it is no
     // game's guitar or finish.

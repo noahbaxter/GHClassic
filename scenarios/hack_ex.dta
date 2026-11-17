@@ -1,0 +1,83 @@
+; skylerinman's GH2 EX Beta 1 hotfix, a hack of GH2's form (hacks/install.h):
+; GH2's career with other songs in its slots, no fail, a slower track and
+; 25 more songs in the store. Its songs are its own beside GH2's of the
+; same name, as its setlist and its campaign, which a band plays as itself.
+; Its career's first song won, it has the score, GH2's career none.
+(needs slus42000)
+#include common/first_boot.dta
+(expect {mounted slus42000} 1)
+(expect {elem {find $syscfg songs slus42000_custom1 name} 1} "Soulless 4")
+(expect {elem {find $syscfg songs slus42000_shoutatthedevil name} 1} "Yngwie Malmsteen Solo Medley 2")
+(expect {elem {find $syscfg songs gh2_shoutatthedevil name} 1} "Shout At The Devil")
+(expect {setlist has slus42000} 1)
+
+{gamecfg set mode career}
+{campaign set_profile_name "The Testers" 0}
+{ui goto_screen chooseprof_screen}
+(wait_screen chooseprof_screen)
+(press green)
+(wait_screen ghc_campaign_screen)
+(wait 1)
+; Into its career as the picker's green goes: which button shows it is to
+; be settled.
+{set $ghc_switch slus42000}
+{set $ghc_switch_next sel_difficulty_screen}
+{set $ghc_switch_as career}
+{ui goto_screen ghc_switch_screen}
+(wait_screen sel_difficulty_screen 40)
+(expect {campaigns active} slus42000)
+(wait 1)
+(shot difficulty)
+(press down)
+(press green)
+(wait_screen sel_character_new_screen)
+(wait_until {char_single are_chars_loaded})
+(wait 2)
+(shot character)
+(press green)
+(wait_screen sel_guitar_new_screen)
+(wait 3)
+(press green)
+(wait_screen tour_start_screen)
+(wait 1)
+(press green)
+(wait_screen career_screen 40)
+(wait 1)
+(expect {game get_character_outfit} slus42000_punk1)
+; Its own scoring: no fail.
+(expect {elem {find $syscfg scoring default_config crowd kDifficultyMedium lose_level} 1} 0.0)
+(press green)
+(wait_screen sel_venue_screen 40)
+(wait 1)
+(shot venue)
+(press green)
+(wait_screen sel_song_screen)
+(wait 2)
+(shot songs)
+(press green)
+(wait_screen game_screen 60)
+(expect {gamecfg get_song} slus42000_shoutatthedevil)
+(expect {game get_venue} slus42000_battle)
+(wait 5)
+(shot song)
+; Every note missed, and no fail.
+(wait 40)
+(expect {== {ui current_screen} game_screen} 1)
+{{game get_player_config 0} set autoplay TRUE}
+{player0 win 5}
+(wait_screen endgame_screen 400)
+(wait 4)
+(shot results)
+(press green)
+(wait_screen cashaward_screen)
+(press green)
+(wait_screen complete_screen)
+(press green)
+(wait_screen sel_song_screen 40)
+(expect {> {campaign high_score slus42000_shoutatthedevil} 0} 1)
+; As the save holds it.
+{ui goto_screen bootup_load}
+(wait_screen main_screen 40)
+(expect {campaigns progress slus42000 0} 1)
+(expect {campaigns progress gh2 0} 0)
+(quit)

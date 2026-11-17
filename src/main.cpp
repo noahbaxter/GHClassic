@@ -128,7 +128,7 @@ int main(int argc, char *argv[])
         return gh2::runBind(argc, argv);
 
     std::filesystem::path discPath;
-    bool contentGiven = false;
+    std::vector<std::filesystem::path> content;
     PS2Runtime::HostOptions hostOptions;
     gh2::RenderSize renderSize;
     double speed = 1.0;
@@ -169,9 +169,7 @@ int main(int argc, char *argv[])
         }
         else if (arg == "--content" && hasValue)
         {
-            if (!gh2::ark::addDisc(argv[++i]))
-                return 1;
-            contentGiven = true;
+            content.emplace_back(argv[++i]);
         }
         else if (arg == "--mods" && hasValue)
         {
@@ -275,9 +273,11 @@ int main(int argc, char *argv[])
                                          folder.string() + "\nthen start GH Classic again.\n\n" + why);
         }
         // The other games' discs from beside it, unless the run named its own.
-        if (!contentGiven)
+        if (content.empty())
             gh2::games::mount(gh2::disc::images());
     }
+    if (!content.empty())
+        gh2::games::mount(content);
     const std::vector<uint8_t> elf = gh2::disc::bootElf(discPath, why);
     if (elf.empty())
         return fail(hostOptions, discPath.string() + ": " + why);

@@ -409,6 +409,7 @@ set(GHC_GAME_SOURCES
     src/gh2x/textures.cpp
     src/gh2x/track.cpp
     src/gh80s/install.cpp
+    src/hacks/install.cpp
     src/hub/hub_scene.cpp
     src/hub/menu_guitarist.cpp
     src/hub/picture.cpp
@@ -664,8 +665,9 @@ set_source_files_properties(src/build_info.cpp PROPERTIES
     COMPILE_DEFINITIONS "GHC_VERSION=\"${GHC_VERSION}\";GHC_BUILT=\"${GHC_BUILT}\";GHC_EXPERIMENTAL=${GHC_EXPERIMENTAL_VALUE}")
 
 # Every supported release in config/executables.toml (role engine or
-# content) as {game, serial} for content/games.cpp, a PS2 serial as
-# SYSTEM.CNF boots it (SLUS-21224 is SLUS_212.24); editing it reconfigures.
+# content) as {game, serial, header_sha1} for content/games.cpp, a PS2
+# serial as SYSTEM.CNF boots it (SLUS-21224 is SLUS_212.24); editing it
+# reconfigures.
 file(STRINGS config/executables.toml GHC_TOML_LINES)
 set(GHC_RELEASES "")
 set(GHC_RELEASE_KIND "")
@@ -675,21 +677,16 @@ foreach(LINE IN LISTS GHC_TOML_LINES ITEMS "[[end]]")
         if(GHC_RELEASE_KIND STREQUAL "release" AND GHC_RELEASE_ROLE MATCHES "^(engine|content)$")
             string(REGEX REPLACE "^([A-Z]+)-([0-9][0-9][0-9])([0-9][0-9])$" "\\1_\\2.\\3"
                 GHC_RELEASE_SERIAL "${GHC_RELEASE_SERIAL}")
-            string(APPEND GHC_RELEASES "    {\"${GHC_RELEASE_GAME}\", \"${GHC_RELEASE_SERIAL}\"},\n")
+            string(APPEND GHC_RELEASES
+                "    {\"${GHC_RELEASE_GAME}\", \"${GHC_RELEASE_SERIAL}\", \"${GHC_RELEASE_HEADER_SHA1}\"},\n")
         endif()
         set(GHC_RELEASE_KIND "${GHC_NEXT_KIND}")
-        set(GHC_RELEASE_GAME "")
-        set(GHC_RELEASE_SERIAL "")
-        set(GHC_RELEASE_ROLE "")
-    elseif(LINE MATCHES "^(game|serial|role) = \"(.*)\"$")
+        foreach(GHC_FIELD GAME SERIAL ROLE HEADER_SHA1)
+            set(GHC_RELEASE_${GHC_FIELD} "")
+        endforeach()
+    elseif(LINE MATCHES "^(game|serial|role|header_sha1) = \"(.*)\"$")
         string(TOUPPER "${CMAKE_MATCH_1}" GHC_FIELD)
-        if(GHC_FIELD STREQUAL "GAME")
-            set(GHC_RELEASE_GAME "${CMAKE_MATCH_2}")
-        elseif(GHC_FIELD STREQUAL "SERIAL")
-            set(GHC_RELEASE_SERIAL "${CMAKE_MATCH_2}")
-        else()
-            set(GHC_RELEASE_ROLE "${CMAKE_MATCH_2}")
-        endif()
+        set(GHC_RELEASE_${GHC_FIELD} "${CMAKE_MATCH_2}")
     endif()
 endforeach()
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS config/executables.toml)

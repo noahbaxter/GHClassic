@@ -76,8 +76,9 @@ def releases(env):
 
 def content(env, games=None, release=None):
     """GHClassic's --content for each content game's disc in game/, any of
-    its releases (or only those of `games`), and --mods for mods/ when it
-    exists. release, a (game, image) of releases(), is that game's disc."""
+    its releases (or only those of `games`), each hack in game/ unless only
+    `games` are asked for, and --mods for mods/ when it exists. release, a
+    (game, image) of releases(), is that game's disc."""
     images = sorted(str(p) for p in discs_dir().glob("*"))
     args = []
     for game in content_games():
@@ -90,6 +91,12 @@ def content(env, games=None, release=None):
                                 env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
         if not result.returncode:
             args += ["--content", result.stdout.strip()]
+    if games is None:
+        result = subprocess.run([sys.executable, ROOT / "tools" / "disc.py", "hacks", *images],
+                                env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        for image in result.stdout.split("\n"):
+            if image:
+                args += ["--content", image]
     # The same as game/: this tree's own, else the main checkout's.
     mods = ROOT / "mods" if (ROOT / "mods").is_dir() else main_checkout() / "mods"
     if mods.is_dir():

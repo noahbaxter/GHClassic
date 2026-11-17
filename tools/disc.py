@@ -6,6 +6,10 @@
     tools/disc.py find <serial|game> <path>...  print the first image of that
                                              release, or of any of a game's
                                              content releases (gh1)
+    tools/disc.py hacks <path>...           print each image that is a hack:
+                                             a GH2-form disc of no release's,
+                                             or a release's with its files
+                                             changed (content/games.h)
     tools/disc.py boot-elf <image-or-elf> <out>  extract the boot executable (or take
                                              one already extracted, named as on the
                                              disc), refusing anything but a known
@@ -294,6 +298,29 @@ def release(boot_name):
     return next((r for r in known("release") if r["serial"] == serial), None)
 
 
+def header_sha1(img):
+    """The archive header's SHA-1, GEN/MAIN.HDR's, else None."""
+    try:
+        return hashlib.sha1(img.read("GEN/MAIN.HDR")).hexdigest()
+    except OSError:
+        return None
+
+
+def changed(rel, img):
+    """Whether a release's image has its files changed: a slot swap."""
+    return bool(rel and rel.get("header_sha1")) and header_sha1(img) != rel["header_sha1"]
+
+
+def is_hack(img):
+    """As content/games.cpp mounts one: a disc with an archive whose serial
+    is no supported release's, or whose header is not its release's, and
+    not on GH1's engine."""
+    rel = release(img.boot_name())
+    if rel and rel.get("role") in ("engine", "content") and not changed(rel, img):
+        return False
+    return header_sha1(img) is not None and not (rel and rel.get("game") == "gh1")
+
+
 def is_image(path):
     return Path(path).suffix.lower() in IMAGE_SUFFIXES
 
@@ -368,13 +395,22 @@ def main():
             try:
                 with Image(path) as img:
                     rel = release(img.boot_name())
+                    swapped = changed(rel, img)
             except (OSError, ValueError) as error:
                 print(f"skipping {error}", file=sys.stderr)
                 continue
-            if rel and rel["serial"] in serials:
+            if rel and rel["serial"] in serials and not swapped:
                 print(path)
                 return
         sys.exit(f"no {args[1]} image among the given paths")
+    elif args[:1] == ["hacks"]:
+        for path in (p for p in args[1:] if is_image(p) and not xbox_title_id(p)):
+            try:
+                with Image(path) as img:
+                    if is_hack(img):
+                        print(path)
+            except (OSError, ValueError) as error:
+                print(f"skipping {error}", file=sys.stderr)
     elif args[:1] == ["boot-elf"] and len(args) == 3:
         boot_elf(args[1], args[2])
     else:

@@ -43,6 +43,7 @@
 #include "highway/gem_looks.h"
 #include "gh1/install.h"
 #include "gh80s/install.h"
+#include "hacks/install.h"
 #include "gh2x/install.h"
 #include "ui/help_bar.h"
 #include "ui/controllers.h"
@@ -113,6 +114,7 @@ namespace
         gh2::installZebraWall();
         gh2::installEighties();
         gh2::installGh1();
+        gh2::installHacks();
         gh2::installClassicLogo();
         gh2::installGh2x();
         gh2::installCustomSongs();

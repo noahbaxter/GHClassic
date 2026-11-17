@@ -1,5 +1,5 @@
 ; Quickplay's setlists follow the discs: each game's list can be shown
-; exactly when its disc is mounted. Yellow held lists them, the strum steps
+; exactly when its disc is mounted, and each hack's. Yellow held lists them, the strum steps
 ; down the list without moving the songs, and letting go shows the one
 ; picked. Holds with any set of discs (ghc.py scenarios --discs).
 #include common/first_boot.dta
@@ -9,7 +9,7 @@
 (wait 2)
 (shot list)
 (expect {setlist shown} gh2)
-(expect {size {ghc_setlists}} {'+' {'+' 1 {mounted gh1}} {'+' {mounted gh2x} {mounted gh80s}}})
+(expect {size {ghc_setlists}} {'+' {'+' {'+' 1 {mounted gh1}} {'+' {mounted gh2x} {mounted gh80s}}} {size {hacks}}})
 (expect {setlist select gh1} {mounted gh1})
 {setlist select gh2}
 (expect {setlist select gh80s} {mounted gh80s})

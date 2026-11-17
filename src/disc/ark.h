@@ -86,6 +86,9 @@ namespace gh2::ark
     // Which indexed disc boots that executable ("SLUS_215.86", or a 360
     // title ID, "415607E7"), once install has run.
     std::optional<size_t> discWithSerial(const std::string &serial);
+    // The indexed disc of the `added`th addDisc (from 0), once install has
+    // run: where hacks sharing a serial are told apart.
+    std::optional<size_t> discAdded(size_t added);
 
     // Paths starting `as` are found as `source` plus the rest, on that disc
     // alone: "char/gh80s_punk1/" -> 80s "char/punk1/".

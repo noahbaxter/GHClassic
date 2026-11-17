@@ -310,6 +310,24 @@ namespace gh2
         return true;
     }
 
+    void stockStore(const std::string &source, size_t disc, size_t layer)
+    {
+        const dtb::Files theirs = [disc](const std::string &path) { return ark::readFile(disc, path); };
+        dtb::Macros none;
+        auto guitars = dtb::read("config/guitars.dta", none, theirs);
+        auto store = dtb::read("config/store.dta", none, theirs);
+        auto campaign = dtb::read("config/campaign.dta", none, theirs);
+        if (!guitars || !store || !offerHiddenGuitars(*guitars, *store, source, false))
+            return;
+        ark::addFile(layer, "config/gen/guitars.dtb", dtb::write(*guitars));
+        ark::addFile(layer, "config/gen/store.dtb", dtb::write(*store));
+        if (campaign && scalePayouts(*campaign, *store))
+            ark::addFile(layer, "config/gen/campaign.dtb", dtb::write(*campaign));
+        if (const auto file = theirs(kCareerScript))
+            if (auto script = dtb::raw(*file); script && openEasyStore(*script))
+                ark::addFile(layer, kCareerScript, dtb::write(*script));
+    }
+
     void installGuitarCopy()
     {
         if (const auto copy = dtb::parse(kGuitarCopyDta))
