@@ -37,16 +37,9 @@
 ; It is there on one the 360 has its own of.
 {func ghc_qp_hd_helpbar ($what $has)
    {do
-      ($array)
-      {set $array ()}
-      {resize $array 0}
-      {push_back $array (fret1 help_continue)}
-      {push_back $array (fret2 help_back)}
-      {if $has
-         {push_back $array {if_else {== {quickplay $what} hd} (fret4 ghc_hd) (fret4 ghc_sd)}}
-      }
-      {push_back $array (strum help_updown)}
-      {helpbar set_display $array}
+      ($actions {array 0})
+      {ghc_act $actions $has view {if_else {== {quickplay $what} hd} ghc_hd ghc_sd}}
+      {ghc_helpbar help_continue help_back $actions help_updown}
    }
 }
 {func ghc_qp_character_has_hd
@@ -170,7 +163,7 @@
             {sg_text_skin.grp set_showing {$this is_skin_select 0}}
             {guitar_display_panel set_env 0 guitar.env}
             {guitar_display_panel show_guitar 0 $guitar $skin guitar.pxy guitar_single.filt}
-            {if $play_sfx {synth play_sequence button_toggle}}
+            {if $play_sfx {ghc_toggle}}
             {ghc_qp_guitar_helpbar}
          }
       )
@@ -190,21 +183,22 @@
       (back_screen ghc_qp_setup_screen)
       ; The setup's scene (quickplay_setup.dta), going either way with no
       ; transition. Its guitarist's preview panel is not up here: beside
-      ; another, a preview panel's figure stands in its bind pose.
+      ; another, a preview panel's figure stands in its bind pose. Held
+      ; loaded instead, it loads the outfit on show (ghc_preshow_follow).
       (panels meta sel_character_panel char_single helpbar)
-      (animate_transition {! $ghc_qp_same_scene})
+      ; As SEL_CHARACTER_COMMON's, then the hub's guitarist let go.
+      (exit {char_single set_placer 0} {char_single set_door 0} {ghc_preshow_char unload})
       ; As SEL_CHARACTER_COMMON's, the panel opened again first.
       (enter
          {sel_character_panel pick}
          {char_single set_door 0 {sel_character_panel find cs_door.mesh}}
       )
-      ; Blue, which the UI gets as orange too (host/pad.cpp), then red as
-      ; SEL_CHARACTER_COMMON has it.
+      ; The look, then red as SEL_CHARACTER_COMMON has it.
       (BUTTON_DOWN_MSG
          {cond
-            ({&& {== $button kPad_Square} {ghc_qp_character_has_hd} {! {ui in_transition}}}
+            ({&& {ghc_pressed $button view} {ghc_qp_character_has_hd}}
                {quickplay characters {if_else {== {quickplay characters} hd} sd hd}}
-               {synth play_sequence button_toggle}
+               {ghc_toggle}
                ; The one on show loads again, and moves once it has.
                {char_single char_event 0 animate}
                {ghc_qp_character_helpbar}
@@ -214,8 +208,7 @@
                {if_else {sel_character_panel get skin_select}
                   {sel_character_panel unchoose_skins}
                   {do
-                     {$this backwards_anim}
-                     {synth play_sequence button_back.cue}
+                     {ghc_back}
                      {set $ghc_qp_same_scene TRUE}
                      {ui goto_screen [back_screen]}
                   }
@@ -246,14 +239,13 @@
          {ui goto_screen ghc_qp_setup_screen}
       )
       (go_back
-         {$this backwards_anim}
-         {synth play_sequence button_back.cue}
+         {ghc_back}
          {ui goto_screen ghc_qp_setup_screen}
       )
-      ; Blue, then red as SEL_GUITAR_COMMON has it.
+      ; The look, then red as SEL_GUITAR_COMMON has it.
       (BUTTON_DOWN_MSG
          {cond
-            ({&& {== $button kPad_Square} {ghc_qp_guitar_has_hd} {! {ui in_transition}}}
+            ({&& {ghc_pressed $button view} {ghc_qp_guitar_has_hd}}
                {quickplay guitars {if_else {== {quickplay guitars} hd} sd hd}}
                {sel_guitar_panel update_display TRUE}
                TRUE
@@ -320,17 +312,10 @@
 }
 {func ghc_qp_venue_helpbar
    {do
-      ($array)
-      {set $array ()}
-      {resize $array 0}
-      {push_back $array (fret1 help_continue)}
-      {push_back $array (fret2 help_back)}
-      {if {> {size {ghc_venue_games}} 1} {push_back $array (fret3 ghc_map)}}
-      {if {ghc_qp_venue_has_hd}
-         {push_back $array {if_else {== {quickplay venues} hd} (fret4 ghc_hd) (fret4 ghc_sd)}}
-      }
-      {push_back $array (strum help_updown)}
-      {helpbar set_display $array}
+      ($actions {array 0})
+      {ghc_act $actions {> {size {ghc_venue_games}} 1} pick ghc_map}
+      {ghc_act $actions {ghc_qp_venue_has_hd} view {if_else {== {quickplay venues} hd} ghc_hd ghc_sd}}
+      {ghc_helpbar help_continue help_back $actions help_updown}
    }
 }
 ; A button focused: its venue, and the map scrolled to it.
@@ -368,18 +353,17 @@
    {cond
       ({ghc_pick_button $button} TRUE)
       ({== $button kPad_Tri}
-         {{ui current_screen} backwards_anim}
-         {synth play_sequence button_back.cue}
+         {ghc_back}
          {ui goto_screen {if_else {ghc_multi_mode} multi_sel_guitar_screen ghc_qp_setup_screen}}
          TRUE
       )
-      ({&& {== $button kPad_Circle} {> {size {ghc_venue_games}} 1} {! {ui in_transition}}}
+      ({&& {ghc_pressed $button pick} {> {size {ghc_venue_games}} 1}}
          {ghc_pick_panel open_with {ghc_venue_games} $ghc_qp_venues}
          TRUE
       )
-      ({&& {== $button kPad_Square} {ghc_qp_venue_has_hd} {! {ui in_transition}}}
+      ({&& {ghc_pressed $button view} {ghc_qp_venue_has_hd}}
          {quickplay venues {if_else {== {quickplay venues} hd} sd hd}}
-         {synth play_sequence button_toggle}
+         {ghc_toggle}
          {ghc_qp_venue_helpbar}
          TRUE
       )
@@ -395,11 +379,11 @@
       (focus ghc_qp_venue_panel)
       (allow_back FALSE)
       (enter {ghc_qp_venue_enter $this ghc_qp_venue_panel})
-      (FOCUS_MSG {if {! {ui in_transition}} {ghc_qp_venue_focus ghc_qp_venue_panel $new_focus}})
+      (FOCUS_MSG {if {! {ui in_transition}} {ghc_qp_venue_focus ghc_qp_venue_panel $new_focus}} kDataUnhandled)
       (SELECT_START_MSG {ghc_qp_venue_select} kDataUnhandled)
       (BUTTON_DOWN_MSG {ghc_qp_venue_button $button})
       (ghc_picked ($game)
-         {synth play_sequence button_select}
+         {ghc_select}
          {set $ghc_qp_venues $game}
          {campaigns text_venues $game}
          {ui goto_screen ghc_qp_venue_twin_screen}
@@ -413,11 +397,11 @@
       (focus ghc_qp_venue_twin_panel)
       (allow_back FALSE)
       (enter {ghc_qp_venue_enter $this ghc_qp_venue_twin_panel})
-      (FOCUS_MSG {if {! {ui in_transition}} {ghc_qp_venue_focus ghc_qp_venue_twin_panel $new_focus}})
+      (FOCUS_MSG {if {! {ui in_transition}} {ghc_qp_venue_focus ghc_qp_venue_twin_panel $new_focus}} kDataUnhandled)
       (SELECT_START_MSG {ghc_qp_venue_select} kDataUnhandled)
       (BUTTON_DOWN_MSG {ghc_qp_venue_button $button})
       (ghc_picked ($game)
-         {synth play_sequence button_select}
+         {ghc_select}
          {set $ghc_qp_venues $game}
          {campaigns text_venues $game}
          {ui goto_screen {if_else {ghc_multi_mode} {ghc_multi_screen venue} ghc_qp_venue_screen}}

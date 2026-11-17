@@ -631,6 +631,14 @@ namespace gh2::ark
         return read(ownOn(s_discs[disc], key(path.c_str())));
     }
 
+    std::optional<std::vector<uint8_t>> readOwn(size_t disc, const std::string &path)
+    {
+        if (disc >= s_discs.size())
+            return std::nullopt;
+        const auto own = s_discs[disc].files.find(key(path.c_str()));
+        return own != s_discs[disc].files.end() ? read(&own->second) : std::nullopt;
+    }
+
     void unlocalize(size_t disc)
     {
         if (disc >= s_discs.size())

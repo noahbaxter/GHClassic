@@ -120,6 +120,17 @@
 {ui goto_screen qp_selsong_twin_screen}
 (wait_screen qp_selsong_twin_screen)
 (wait 2)
+; It opens on the row last on in it (quickplay.dta), so up to its first:
+; the list stops at its ends.
+(press up)
+(press up)
+(press up)
+(press up)
+(press up)
+(press up)
+(press up)
+(press up)
+(expect {game get_song} {song_provider get_symbol 0})
 (shot quickplay)
 ; Four rows down is the encore now, and it can be picked. The second
 ; tier's, in a venue the career has only opened, is the list's last row

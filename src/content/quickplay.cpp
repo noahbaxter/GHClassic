@@ -11,6 +11,7 @@
 #include "gh2x/models.h"
 #include "guest.h"
 #include "hook.h"
+#include "save/save.h"
 #include "script.h"
 #include "settings/settings.h"
 
@@ -149,7 +150,7 @@ namespace gh2::quickplay
         {
             const uint32_t returnTo = GPR_U32(ctx, 31), provider = GPR_U32(ctx, 4), dir = GPR_U32(ctx, 5);
             const bool free = !campaigns::inCareer(rdram);
-            script::run(rdram, ctx, runtime, configGuitars(rdram, free));
+            script::runKept(rdram, ctx, runtime, configGuitars(rdram, free));
             const uint32_t character = load<uint32_t>(rdram, provider + kProviderCharacter);
             const bool grim = free && character != 0u &&
                               std::string(reinterpret_cast<const char *>(getMemPtr(rdram, character))) == "grim";
@@ -171,6 +172,7 @@ namespace gh2::quickplay
         // which one serves it has changed. The panels are made once, with
         // the UI.
         constexpr uint32_t kPanelModels = 0x5cu, kCacheModelBytes = 0x1cu;
+        constexpr uint32_t kSetTypeDefSlot = 0x58u; // Hmx::Object's vtable
         std::vector<uint32_t> s_charPanels;
         struct ShowCharTag;
         void onShowChar(uint8_t *, R5900Context *ctx, PS2Runtime *)
@@ -366,6 +368,27 @@ namespace gh2::quickplay
             script::run(call.rdram, call.ctx, call.runtime, text);
         }
 
+        // {preview_load <panel>}: a CharsysPanel's models loaded on as its
+        // poll loads them (PollCharLoading), for one held loaded on no
+        // screen, once a screen had it up. Not its whole poll (Poll,
+        // 0x142110): that also sets the clock all previews animate by
+        // (0x2c6798 on 0x51ee40) from its own, and held another's figure in
+        // its bind pose.
+        script::Node previewLoad(const script::Call &call)
+        {
+            const uint32_t object = call.object(1);
+            if (object == 0u)
+                return {};
+            // Script finds its Hmx::Object; the panel's own `this` is where
+            // its SetTypeDef (CharsysPanel's, 0x141bf8) is called on, by the
+            // offset in that virtual's slot (script.cpp's setTypeDef).
+            const uint32_t vtable = load<uint32_t>(call.rdram, object);
+            const int16_t delta = load<int16_t>(call.rdram, vtable + kSetTypeDefSlot);
+            const uint32_t panel = object + static_cast<uint32_t>(static_cast<int32_t>(delta));
+            call.runtime->callGuestFunction(call.rdram, call.ctx, s_addresses->charsysPanelPollCharLoading, {panel});
+            return {};
+        }
+
         script::Node quickplayCommand(const script::Call &call)
         {
             const std::string op = call.symbol(1);
@@ -455,10 +478,29 @@ namespace gh2::quickplay
                     return {(now ? 1u : 0u) | (now != was ? 2u : 0u), script::kInt};
                 }
             }
+            // The theme's own guitarist, the outfit its game boots with: the
+            // one quickplay plays with none picked (quickplay_setup.dta).
+            if (op == "boot_outfit")
+                return {script::symbol(call.rdram, call.ctx, call.runtime, bootOutfit(campaigns::active())),
+                        script::kSymbol};
+            // The outfit picked is kept from run to run (the rest this run's
+            // alone): the guitarist the hub stands and the main menu loads
+            // ahead (preshow_guitarist.dta).
+            static const bool s_seeded = []
+            {
+                if (const std::string outfit = save::state("quickplay", "outfit"); !outfit.empty())
+                    s_picked["outfit"] = outfit;
+                return true;
+            }();
+            (void)s_seeded;
             if (op == "pick" && call.size() > 2)
             {
                 if (call.size() > 3)
+                {
                     s_picked[call.symbol(2)] = call.symbol(3);
+                    if (call.symbol(2) == "outfit")
+                        save::keepState("quickplay", "outfit", call.symbol(3));
+                }
                 const auto it = s_picked.find(call.symbol(2));
                 return {script::symbol(call.rdram, call.ctx, call.runtime, it != s_picked.end() ? it->second : ""),
                         script::kSymbol};
@@ -478,7 +520,8 @@ namespace gh2::quickplay
             }
             std::cerr << "[quickplay] usage: {quickplay song_defaults [<0|1>]}, "
                          "{quickplay cast <song> <game> <outfit>}, {quickplay next_gen_song 0}, "
-                         "{quickplay pick|picked <what>}, {quickplay look <character> [<outfit>]}, "
+                         "{quickplay boot_outfit}, {quickplay pick|picked <what>}, "
+                         "{quickplay look <character> [<outfit>]}, "
                          "{quickplay in_song_ui [venue|gh1|gh2|gh80s]},"
                          "{quickplay menu_music [theme|gh1|gh2|gh80s|all]}, "
                          "{quickplay menu_music_order [playlist|loop|shuffle]}, "
@@ -494,6 +537,7 @@ namespace gh2::quickplay
     {
         s_addresses = &addresses;
         script::addCommand("quickplay", quickplayCommand);
+        script::addCommand("preview_load", previewLoad);
         s_isItemUnlocked = runtime.lookupFunction(addresses.campaignIsItemUnlocked);
         runtime.replaceFunction(addresses.campaignIsItemUnlocked, &isItemUnlocked<false>);
         s_isItemUnlockedOn = runtime.lookupFunction(addresses.campaignIsItemUnlockedOn);

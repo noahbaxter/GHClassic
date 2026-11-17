@@ -30,8 +30,9 @@
 (expect $name Reiko)
 {campaign mark_needs_save}
 {autosave_goto main_screen}
-(wait_screen autosave)
+; Saved in the background, no screen.
 (wait_screen main_screen)
+(wait_until {! {campaign needs_save}})
 ; Not saved: the load must drop it.
 {game set_song iwannabesedated}
 {{game get_player_config 0} set_difficulty expert}

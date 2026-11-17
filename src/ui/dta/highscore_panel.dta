@@ -220,7 +220,7 @@
          }
       )
       (SELECT_START_MSG {$this update_help_bar} kDataUnhandled)
-      (SCREEN_BACK_MSG {synth play_sequence button_back.cue} {$this update_help_bar} kDataUnhandled)
+      (SCREEN_BACK_MSG {ghc_back} {$this update_help_bar} kDataUnhandled)
       (TEXT_ENTRY_MSG
          {do
             ($ten {highscore_panel get_active_ten})
@@ -244,9 +244,9 @@
                   ($ten {highscore_panel get_active_ten})
                   {cond
                      ({highscore_panel get flushed} 0)
-                     ({highscore_panel get placed} {synth play_sequence button_select} {highscore_panel flush})
+                     ({highscore_panel get placed} {ghc_select} {highscore_panel flush})
                      ({|| {== $ten NULL} {$ten is_done}}
-                        {synth play_sequence button_select}
+                        {ghc_select}
                         {ui goto_screen complete_screen}
                      )
                   }

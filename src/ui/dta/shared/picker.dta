@@ -8,7 +8,7 @@
 ; A screen with this among its panels sends its presses here first
 ; ({ghc_pick_button}), opens it on yellow ({ghc_pick_panel open_with}), and
 ; is told the pick, where it is not the one the list opened on:
-; (ghc_picked ($option)).
+; (ghc_picked ($option)). Which fret is which is config/menus.toml's.
 ;
 ; Opened with open_held it is held on another fret instead, shows only once
 ; that has been held a moment, and names its rows, takes the pick and takes
@@ -45,7 +45,7 @@
       ; open_held's: the fret held, whether the screen names the rows, its
       ; messages for a row's text, the pick and a tap (none for none),
       ; whether it shows yet, and the polls it waits to.
-      (held yellow)
+      (held fret3)
       (labelled FALSE)
       (text_msg ghc_option_text)
       (picked_msg ghc_picked)
@@ -231,7 +231,7 @@
          {set [picked] {mod {'+' {'+' [picked] $by} {size [options]}} {size [options]}}}
          {if {< [picked] [top]} {set [top] [picked]}}
          {if {>= [picked] {'+' [top] {$this visible}}} {set [top] {'+' {'-' [picked] {$this visible}} 1}}}
-         {synth play_sequence button_focus}
+         {ghc_toggle}
          {if_else [shown] {do {$this fill} {$this paint}} {$this reveal}}
       )
       (shut
@@ -245,7 +245,7 @@
          {foreach $box [boxes] {ghc_box_show $this {elem $box 0} FALSE}}
          {set [open] FALSE}
          {set [sticky] FALSE}
-         {set [held] yellow}
+         {set [held] {ghc_held pick}}
          {set [labelled] FALSE}
          {set [text_msg] ghc_option_text}
          {set [picked_msg] ghc_picked}
@@ -311,17 +311,17 @@
             {cond
                ({|| {== $button kPad_DUp} {== $button kPad_DDown}}
                   {ghc_option_step $editing {if_else {== $button kPad_DUp} 1 -1}}
-                  {synth play_sequence button_toggle}
+                  {ghc_toggle}
                   {ghc_pick_panel relabel}
                )
                ({== $button kPad_X}
                   {ghc_option_end $editing TRUE}
-                  {synth play_sequence button_select}
+                  {ghc_select}
                   {ghc_pick_edit FALSE}
                )
                ({|| {== $button kPad_Tri} {== $button kPad_Select}}
                   {ghc_option_end $editing FALSE}
-                  {synth play_sequence button_back.cue}
+                  {ghc_back}
                   {ghc_pick_edit FALSE}
                )
             }
@@ -333,15 +333,15 @@
          {if {&& {ghc_pick_panel get sticky} {! $editing}}
             {cond
                ({&& {== $button kPad_X} {ghc_option_edits {elem {ghc_pick_panel get options} {ghc_pick_panel get picked}}}}
-                  {synth play_sequence button_select}
+                  {ghc_select}
                   {ghc_pick_edit {elem {ghc_pick_panel get options} {ghc_pick_panel get picked}}}
                )
                ({== $button kPad_X}
                   {{ui current_screen} ghc_chose
                      {elem {ghc_pick_panel get options} {ghc_pick_panel get picked}}}
                )
-               ({|| {== $button kPad_Select} {== $button kPad_Tri}}
-                  {synth play_sequence button_back.cue}
+               ({|| {ghc_pressed $button menu} {== $button kPad_Tri}}
+                  {ghc_back}
                   {ghc_pick_panel shut}
                )
             }

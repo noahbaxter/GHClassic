@@ -1,0 +1,40 @@
+; Menu sounds, keyed on the press: config/menus.toml's [sounds], read here
+; as $ghc_sound_*. The game's own (sfx.dta, on the UI) sound what the UI did,
+; so a focus moved by green, as onto the character screen's outfits, sounded
+; as a strum: it named the career's two screens to keep quiet, and every
+; screen added since sounded wrong. Here a focus or a scroll sounds only after
+; a strum; the rest is the game's, its exceptions kept. Every menu sound our
+; screens play is one of these, never the synth's, so a scenario hears them.
+{func ghc_select {synth play_sequence $ghc_sound_select}}
+{func ghc_back {synth play_sequence $ghc_sound_back}}
+{func ghc_toggle {synth play_sequence $ghc_sound_toggle}}
+{func ghc_start {synth play_sequence $ghc_sound_start}}
+{func ghc_in ($x $list)
+   {do
+      ($in FALSE)
+      {foreach $i $list {if {== $i $x} {set $in TRUE}}}
+      $in
+   }
+}
+; The last press, as the UI takes it before any screen.
+{set $ghc_press kPad_X}
+{func ghc_strummed {ghc_in $ghc_press $ghc_sound_strum}}
+{amend ui
+   (BUTTON_DOWN_MSG {set $ghc_press $button} kDataUnhandled)
+   (SELECT_START_MSG
+      {if_else
+         {|| {ghc_in {{ui current_screen} name} $ghc_sound_start_screens} {ghc_in $component $ghc_sound_start_buttons}}
+         {ghc_start}
+         {ghc_select}
+      }
+      kDataUnhandled
+   )
+   (SCROLL_MSG
+      {if {&& {ghc_strummed} {! {ghc_in {ui focus_panel} $ghc_sound_quiet_scroll}}}
+         {ghc_toggle}
+      }
+      kDataUnhandled
+   )
+   (FOCUS_MSG {if {&& {ghc_strummed} {! {ui in_transition}}} {ghc_toggle}} kDataUnhandled)
+   (SCREEN_BACK_MSG {if {meta is_up} {ghc_back}} kDataUnhandled)
+)

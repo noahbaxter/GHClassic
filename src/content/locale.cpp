@@ -188,6 +188,23 @@ namespace gh2::locale
         s_ownTokens[owner] = tokens;
     }
 
+    uint32_t textOf(uint8_t *rdram, const std::string &game, const std::string &token)
+    {
+        if (game == "gh2")
+        {
+            static std::unordered_map<std::string, uint32_t> s_ours;
+            if (s_ours.empty() && s_tables.count("gh2") != 0u)
+                s_ours = entries(rdram, s_tables["gh2"]);
+            const auto text = s_ours.find(token);
+            return text != s_ours.end() ? text->second : 0u;
+        }
+        const auto differs = s_differs.find(game);
+        if (differs == s_differs.end())
+            return 0u;
+        const auto text = differs->second.find(token);
+        return text != differs->second.end() ? text->second : 0u;
+    }
+
     uint32_t owned(const char *token)
     {
         if (s_game != "gh2" || token == nullptr)

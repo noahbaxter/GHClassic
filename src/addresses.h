@@ -217,6 +217,24 @@ namespace gh2
         uint32_t builtinDelete;
         uint32_t dataNodeGetObj;   // DataNode::GetObj
         uint32_t uiGotoScreen;     // UIManager::GotoScreen
+        // The menus' camera turn between screens (ui/transitions.h).
+        uint32_t ghScreenEnter;                  // GHScreen::Enter(UIScreen *from)
+        uint32_t ghScreenExit;                   // GHScreen::Exit(UIScreen *to)
+        uint32_t ghScreenCheckAnimateTransition; // GHScreen::CheckAnimateTransition
+        uint32_t ghScreenForwards;               // bool: the turn on, not back
+        // What holds a screen's input (ui/transitions.h).
+        uint32_t uiTriggerIsBlocking;   // UITrigger::IsBlocking
+        uint32_t uiComponentSendSelect; // UIComponent::SendSelect(JoypadButton, int)
+        uint32_t uiSelectFrames;        // int: UIComponent's select_frames
+        // A pressed button drawn at its focused size (ui/press_size.h).
+        uint32_t bandButtonDrawShowing;   // BandButton::DrawShowing
+        uint32_t bandButtonGetStateColor; // BandButton::GetStateColor(State, Color &)
+        // A panel loaded for a screen and let go (ui/screen_loads.h).
+        uint32_t uiPanelCheckLoad;   // UIPanel::CheckLoad
+        uint32_t uiPanelCheckUnload; // UIPanel::CheckUnload
+        uint32_t uiScreenLoadPanels;      // UIScreen::LoadPanels, CheckLoad on each
+        uint32_t uiScreenUnloadPanels;    // UIScreen::UnloadPanels, CheckUnload on each
+        uint32_t uiScreenArePanelsLoaded; // UIScreen::ArePanelsLoaded
         uint32_t uiManagerPoll;
         uint32_t debugModal; // DebugModal(bool &, char *)
         uint32_t abort;
@@ -225,6 +243,7 @@ namespace gh2
         uint32_t spuStartSend;
         uint32_t metaMusicPoll;
         uint32_t metaMusicStop;
+        uint32_t videoProviderGetVideoData; // VideoProvider::GetVideoData(Symbol) const
         uint32_t metaPanelPoll;
         uint32_t metaPanelPickLoopIndex; // (int size)
         uint32_t systemConfig3; // SystemConfig(Symbol, Symbol, Symbol)
@@ -248,6 +267,9 @@ namespace gh2
         uint32_t rndMatLoadMultiPass; // and from reading its multiPass
         uint32_t binStreamRead;     // (void *, int)
         uint32_t binStreamReadEndian; // (void *, int)
+        uint32_t charBonesSamplesLoadData; // CharBonesSamples::LoadData(BinStream &)
+        uint32_t rndMeshReadVert;          // operator>>(BinStream &, RndMesh::Vert &)
+        uint32_t rndMeshRev;               // int: the RndMesh revision being loaded
         uint32_t rndMorphCtor;
         uint32_t rndMorphDtor;
         uint32_t rndMorphSetFrame; // (frame, blend)
@@ -256,6 +278,7 @@ namespace gh2
         uint32_t freeCameraPoll; // FreeCamera::Poll
         uint32_t rndFlareDrawFlare;
         uint32_t saveData1;     // the card write, on GHMCSaveData's worker thread
+        uint32_t saveData2;     // (int result) back on the main thread: the result to the UI's screen
         uint32_t loadData1;     // the card read, on GHMCLoadData's
         uint32_t loadData2;     // back on the main thread, where Campaign::Load runs
         uint32_t sceMcInit;
@@ -603,6 +626,20 @@ namespace gh2
         .builtinDelete = 0x2cf160u,
         .dataNodeGetObj = 0x2b7f80u,
         .uiGotoScreen = 0x214d48u,
+        .ghScreenEnter = 0x145cf8u,
+        .ghScreenExit = 0x145f80u,
+        .ghScreenCheckAnimateTransition = 0x145dc8u,
+        .ghScreenForwards = 0x3da34cu,
+        .uiTriggerIsBlocking = 0x21b2a0u,
+        .uiComponentSendSelect = 0x20d748u,
+        .uiSelectFrames = 0x473228u,
+        .bandButtonDrawShowing = 0x28bcb8u,
+        .bandButtonGetStateColor = 0x28bb80u,
+        .uiPanelCheckLoad = 0x20e040u,
+        .uiPanelCheckUnload = 0x20e0d0u,
+        .uiScreenLoadPanels = 0x2134a0u,
+        .uiScreenUnloadPanels = 0x213508u,
+        .uiScreenArePanelsLoaded = 0x213590u,
         .uiManagerPoll = 0x214510u,
         .debugModal = 0x105a88u,
         .abort = 0x307b80u,
@@ -611,6 +648,7 @@ namespace gh2
         .spuStartSend = 0x231a78u,
         .metaMusicPoll = 0x21f180u,
         .metaMusicStop = 0x21f668u,
+        .videoProviderGetVideoData = 0x11b350u,
         .metaPanelPoll = 0x134850u,
         .metaPanelPickLoopIndex = 0x1349d8u,
         .systemConfig3 = 0x2a8700u,
@@ -634,6 +672,9 @@ namespace gh2
         .rndMatLoadMultiPass = 0x1c0270u,
         .binStreamRead = 0x2c8c50u,
         .binStreamReadEndian = 0x2c8e20u,
+        .charBonesSamplesLoadData = 0x194978u,
+        .rndMeshReadVert = 0x1c8328u,
+        .rndMeshRev = 0x471df8u,
         .rndMorphCtor = 0x200b98u,
         .rndMorphDtor = 0x374f90u,
         .rndMorphSetFrame = 0x201048u,
@@ -642,6 +683,7 @@ namespace gh2
         .freeCameraPoll = 0x1b9370u,
         .rndFlareDrawFlare = 0x1f9330u,
         .saveData1 = 0x14b3e0u,
+        .saveData2 = 0x14b5b8u,
         .loadData1 = 0x14ba00u,
         .loadData2 = 0x14bae0u,
         .sceMcInit = 0x2f3860u,

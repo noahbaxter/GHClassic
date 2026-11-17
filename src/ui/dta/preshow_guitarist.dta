@@ -29,6 +29,33 @@
       }
    }
 }
+; Loaded ahead, on no placer, by a screen with the panel up and no one
+; standing (main_screen): the outfit the hub will stand (ghc_qp_outfit,
+; quickplay_setup.dta), so that the hub has it at once. The panel keeps
+; what it has loaded while some screen holds it up.
+{func ghc_preshow_preload
+   {if {! {quickplay song_defaults}}
+      {do
+         {ghc_preshow_type_char}
+         {ghc_preshow_char show_char 0 {ghc_preshow_name {ghc_qp_outfit}}}
+      }
+   }
+}
+; Quickplay's character select: the outfit on show there loading for the
+; hub as well, so that the one picked stands at once. The panel is held
+; loaded from the hub (ghc_qp_setup_screen's ghc_character.btn) and loads
+; from character select's poll (ghc_preshow_follow_poll), never up there:
+; up beside another, that one's figure stood in its bind pose.
+{func ghc_preshow_follow ($outfit)
+   {if {== {{ui current_screen} name} ghc_qp_character_screen}
+      {ghc_preshow_char show_char 0 {ghc_preshow_name $outfit}}
+   }
+}
+{func ghc_preshow_follow_poll
+   {if {== {{ui current_screen} name} ghc_qp_character_screen}
+      {preview_load ghc_preshow_char}
+   }
+}
 ; A song stands its guitarist on a stage mark (Character::Teleport,
 ; 0x162b30), which its walks and turns are measured from; without one it
 ; walks off. This one is the size of the venues' start marks

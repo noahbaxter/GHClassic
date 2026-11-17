@@ -240,7 +240,7 @@
             (game_settings.btn {ui goto_screen game_settings_screen})
             (controllers.btn {ui goto_screen ghc_controllers_screen})
             (memory_card.btn {ui goto_screen mem_card_screen})
-            (op_bonus.btn {ui goto_screen bonus_material_screen})
+            (op_bonus.btn {ui goto_screen {ghc_bonus_screen {campaigns active}}})
             (op_credit.btn {ui goto_screen credits_screen})
          }
          kDataUnhandled
@@ -258,14 +258,14 @@
       (BUTTON_DOWN_MSG
          {cond
             ({&& $ghc_options_settings {== $button kPad_Tri}}
-               {synth play_sequence button_back.cue}
+               {ghc_back}
                {set $ghc_options_settings FALSE}
                {options_panel show_rows}
                {options_panel set_focus {options_panel find op_audio.btn}}
                TRUE
             )
             ({&& {! $ghc_options_settings} {== $button kPad_X} {== {options_panel focus_name} op_audio.btn}}
-               {synth play_sequence button_select}
+               {ghc_select}
                {set $ghc_options_settings TRUE}
                {options_panel show_rows}
                TRUE
@@ -273,6 +273,150 @@
             (TRUE kDataUnhandled)
          }
       )
+   )
+}
+; Bonus videos: each game's poster a screen of its own over the theme's room
+; (GH1's three videos, GH2's two; the 80s sells none), loading that game's
+; own scene (ghc/<game>/, disc/ark.h's alias), its rows' text, unlocks and
+; files that game's whatever the theme. Options opens the theme's game's,
+; GH2's for the 80s; the pick fret tapped, the other's, the camera still
+; between them (config/menus.toml's same_room).
+{func ghc_bonus_screen ($game) {if_else {== $game gh1} ghc_bonus_gh1_screen ghc_bonus_gh2_screen}}
+{func ghc_bonus_movie ($btn)
+   {switch $btn (bm_video1.btn video1) (bm_video2.btn video2) (bm_video3.btn video3) none}
+}
+; Bought in that game's career, or everything unlocked.
+{func ghc_bonus_unlocked ($game $movie)
+   {||
+      {campaigns unlock_all}
+      {if_else {== $game {campaigns live}} {campaign is_video_unlocked $movie} {campaigns owns $game $movie}}
+   }
+}
+; Where a video played goes back to.
+{set $ghc_bonus_back ghc_bonus_gh2_screen}
+; Both posters' scenes are up on either screen, each its wall and light
+; (bm_wall.mesh in GH1's, brick.mesh in GH2's) and its poster: the theme's
+; game's wall behind, the one shown's poster in front, the rest hidden.
+{func ghc_bonus_parts ($game $wall $poster)
+   {do
+      ($panel {if_else {== $game gh1} ghc_bonus_gh1_panel ghc_bonus_gh2_panel})
+      {foreach $o {if_else {== $game gh1} (bm_wall.mesh bm_light.mesh) (brick.mesh light.mesh)}
+         {{$panel find $o} set_showing $wall}
+      }
+      {foreach $o (bm_poster.mesh bm_maskingtape2.mesh bm_maskingtape3.mesh bm_title.lbl bm_buy.lbl bm_buttons.view bm_tape.view)
+         {{$panel find $o} set_showing $poster}
+      }
+   }
+}
+#define GHC_BONUS_SCREEN (
+   (allow_back FALSE)
+   (enter
+      {set $ghc_bonus_back $this}
+      {do
+         ($home {if_else {== {campaigns active} gh1} gh1 gh2})
+         {ghc_bonus_parts [other] {== [other] $home} FALSE}
+         {ghc_bonus_parts [game] {== [game] $home} TRUE}
+      }
+      {do
+         ($locked FALSE)
+         ($first none)
+         {foreach $row [rows]
+            {do
+               ($b {[panel] find $row})
+               ($movie {ghc_bonus_movie $row})
+               ($text {campaigns text [game] $movie})
+               {$b set_localized_text {if_else {== $text ""} {localize $movie} $text}}
+               {if_else {ghc_bonus_unlocked [game] $movie}
+                  {do
+                     {$this enable $b}
+                     {if {== $first none} {set $first $row}}
+                  }
+                  {do
+                     {$this disable $b kPad_DDown}
+                     {set $locked TRUE}
+                  }
+               }
+            }
+         }
+         {if_else {== $first none}
+            {do
+               {$this enable {[panel] find bm_hidden.btn}}
+               {[panel] set_focus {[panel] find bm_hidden.btn}}
+            }
+            {do
+               {$this disable {[panel] find bm_hidden.btn} kPad_DDown}
+               {[panel] set_focus {[panel] find $first}}
+            }
+         }
+         {{[panel] find bm_buy.lbl} set_showing $locked}
+      }
+   )
+   (BUTTON_DOWN_MSG
+      {cond
+         ({&& {ghc_pressed $button pick} {campaigns has gh1}}
+            {ghc_select}
+            {ui goto_screen {ghc_bonus_screen [other]}}
+            TRUE
+         )
+         ({== $button kPad_Tri}
+            {ghc_back}
+            {ui goto_screen options_screen}
+            TRUE
+         )
+         ; As the game's own: green does nothing on the locked row.
+         ({&& {== {$this focus_name} bm_hidden.btn} {== $button kPad_X}} TRUE)
+         (TRUE kDataUnhandled)
+      }
+   )
+   (SELECT_START_MSG
+      {play_bonus_video_screen set video {campaigns video_file [game] {ghc_bonus_movie $component}}}
+      {ui goto_screen play_bonus_video_screen}
+   )
+)
+{if {! {exists ghc_bonus_gh1_panel}} {new GHPanel ghc_bonus_gh1_panel}}
+{retype ghc_bonus_gh1_panel ((file ghc/gh1/ui/bonus_material.milo) (focus bm_video1.btn))}
+{if {! {exists ghc_bonus_gh2_panel}} {new GHPanel ghc_bonus_gh2_panel}}
+{retype ghc_bonus_gh2_panel ((file ghc/gh2/ui/bonus_material.milo) (focus bm_video3.btn))}
+{if {! {exists ghc_bonus_gh1_screen}} {new GHScreen ghc_bonus_gh1_screen}}
+{retype ghc_bonus_gh1_screen
+   (
+      ; The other's first: its wall drawn behind this one's poster.
+      (panels meta ghc_bonus_gh2_panel ghc_bonus_gh1_panel helpbar)
+      (focus ghc_bonus_gh1_panel)
+      (panel ghc_bonus_gh1_panel)
+      (game gh1)
+      (other gh2)
+      (rows (bm_video1.btn bm_video2.btn bm_video3.btn))
+      (helpbar
+         (default ((fret1 help_select) (fret2 help_back) (fret3 setlist_gh2) (strum help_updown)))
+         (bm_hidden.btn ((fret2 help_back) (fret3 setlist_gh2)))
+      )
+      GHC_BONUS_SCREEN
+   )
+}
+{if {! {exists ghc_bonus_gh2_screen}} {new GHScreen ghc_bonus_gh2_screen}}
+{retype ghc_bonus_gh2_screen
+   (
+      (panels meta ghc_bonus_gh1_panel ghc_bonus_gh2_panel helpbar)
+      (focus ghc_bonus_gh2_panel)
+      (panel ghc_bonus_gh2_panel)
+      (game gh2)
+      (other gh1)
+      (rows (bm_video3.btn bm_video2.btn)) ; as the poster has them, top first
+      (helpbar
+         (default ((fret1 help_select) (fret2 help_back) (fret3 setlist_gh1) (strum help_updown)))
+         (bm_hidden.btn ((fret2 help_back) (fret3 setlist_gh1)))
+      )
+      GHC_BONUS_SCREEN
+   )
+}
+; A video played goes back to the poster it was picked on.
+{amend play_bonus_video_screen
+   (TRANSITION_COMPLETE_MSG
+      {meta set_tool_movie TRUE}
+      {meta play_movie [video]}
+      {meta set_tool_movie FALSE}
+      {ui goto_screen $ghc_bonus_back}
    )
 }
 
@@ -923,7 +1067,7 @@
 {func ghc_practice_speed_by ($by $op)
    {song_speed $op {max 25 {min 200 {'+' {song_speed} {'*' 5 $by}}}}}
    {set $ghc_practice_pct {song_speed}}
-   {synth play_sequence button_toggle}
+   {ghc_toggle}
 }
 ; Green on the row: taken up, else kept.
 {func ghc_practice_speed_select ($panel)
@@ -941,7 +1085,7 @@
       ({== $button kPad_Tri}
          {song_speed set $ghc_speed_before}
          {set $ghc_practice_pct {song_speed}}
-         {synth play_sequence button_back.cue}
+         {ghc_back}
          {ghc_practice_speed_edit $panel FALSE}
          TRUE
       )
@@ -1171,7 +1315,7 @@
                   {title.lbl set_text select_end_section}
                   ; Handled: the list's own select would hold it still as
                   ; it plays its select, the end not pickable for a moment.
-                  {synth play_sequence button_select}
+                  {ghc_select}
                   TRUE
                )
                ({< $idx [start]} {handle (ui BAD_SELECT_START_MSG)})
@@ -1182,7 +1326,7 @@
       (BUTTON_DOWN_MSG
          {if_else {&& {== $button kPad_Tri} {! {ui in_transition}}}
             {do
-               {synth play_sequence button_back.cue}
+               {ghc_back}
                {if_else [section]
                   {$this unmark}
                   {do {pract_pause_panel set from_sections TRUE} {ui goto_screen pract_pause_screen}}
@@ -1273,7 +1417,7 @@
       (toggle ($option)
          {practice_option $option {! {practice_option $option}}}
          {if {== $option solo_stems} {set $ghc_practice_reload TRUE}}
-         {synth play_sequence button_toggle}
+         {ghc_toggle}
          {$this sync}
       )
    )
@@ -1289,7 +1433,7 @@
          {cond
             ({== $button kPad_Start} {ghc_practice_resume $this} TRUE)
             ({== $button kPad_Tri}
-               {synth play_sequence button_back.cue}
+               {ghc_back}
                {ui goto_screen ghc_practice_settings_screen}
                TRUE
             )
@@ -1396,7 +1540,7 @@
    (BUTTON_DOWN_MSG
       {if {== $button kPad_Start} {ghc_pause_resume $this}}
       {if {== $button kPad_Tri}
-         {synth play_sequence button_back.cue}
+         {ghc_back}
          {ui goto_screen {ghc_pause_screen pause_screen}}
       }
       kDataUnhandled
@@ -1410,13 +1554,12 @@
    (focus pause_audio_settings_panel)
    (in_game TRUE)
    (allow_back FALSE)
-   (animate_transition FALSE)
    ; Under Settings each is named for what it holds.
    (enter {{pause_audio_settings_panel find gs_title.lbl} set_localized "AUDIO"})
    (BUTTON_DOWN_MSG
       {if {&& {! {pause_audio_settings_panel slider_selected}} {== $button kPad_Tri}}
          {$this set_volumes}
-         {synth play_sequence button_back.cue}
+         {ghc_back}
          {ui goto_screen {ghc_pause_screen pause_settings_screen}}
       }
       kDataUnhandled
@@ -1428,10 +1571,9 @@
    (focus pause_video_settings_panel)
    (in_game TRUE)
    (allow_back FALSE)
-   (animate_transition FALSE)
    (BUTTON_DOWN_MSG
       {if {&& {== $button kPad_Tri} {== {pause_video_settings_panel get picking} none}}
-         {synth play_sequence button_back.cue}
+         {ghc_back}
          {ui goto_screen {ghc_pause_screen pause_settings_screen}}
       }
       kDataUnhandled
@@ -1452,8 +1594,7 @@
       ; Red on a picked row is the row's (VIDEO_ROW_HANDLERS).
       (BUTTON_DOWN_MSG
          {if {&& {== $button kPad_Tri} {== {video_settings_panel get picking} none}}
-            {$this backwards_anim}
-            {synth play_sequence button_back.cue}
+            {ghc_back}
             {autosave_goto options_screen}
          }
          kDataUnhandled
@@ -1609,12 +1750,10 @@
                {if_else {== [picking] {elem $row 2}} kFocused kNormal}}
          }
       }
-      {helpbar set_display
-         {cond
-            ({!= [picking] none} ((fret1 help_confirm) (fret2 help_cancel) (strum help_updown)))
-            ({$this lists [at]} ((fret1 help_select) (fret2 help_back) (strum help_updown)))
-            (TRUE ((fret1 help_onoff) (fret2 help_back) (strum help_updown)))
-         }
+      {cond
+         ({!= [picking] none} {ghc_helpbar help_confirm help_cancel {array 0} help_updown})
+         ({$this lists [at]} {ghc_helpbar help_select help_back {array 0} help_updown})
+         (TRUE {ghc_helpbar help_onoff help_back {array 0} help_updown})
       }
    )
    ; A row with a list of values for a box: green picks it, the strum goes
@@ -1715,16 +1854,16 @@
          {cond
             ({== $button kPad_DDown}
                {video [picking] next}
-               {synth play_sequence button_toggle}
+               {ghc_toggle}
                {$this sync_rows}
             )
             ({== $button kPad_DUp}
                {video [picking] prev}
-               {synth play_sequence button_toggle}
+               {ghc_toggle}
                {$this sync_rows}
             )
             ({== $button kPad_Tri}
-               {synth play_sequence button_back.cue}
+               {ghc_back}
                {video [picking] set [picked_at]}
                {set [picking] none}
                {$this sync_rows}
@@ -2084,16 +2223,14 @@
          {gm_unlock.btn set text_token {if_else {campaigns unlock_all} "UNLOCK ALL ON" "UNLOCK ALL OFF"}}
       }
       {$this sync_rows}
-      {helpbar set_display
-         {if_else {$this slider_selected}
-            ((fret1 help_confirm) (fret2 help_cancel) (fret3 help_reset) (strum help_updown))
-            {if_else {$this on_slider}
-               ((fret1 help_select) (fret2 help_back) (fret3 help_reset) (strum help_updown))
-               {if_else {|| {== [at] "gm_lag.btn"} {== [at] "gm_engine.btn"} {== [at] "gm_unlock.btn"}}
-                  ((fret1 help_select) (fret2 help_back) (strum help_updown))
-                  ((fret1 help_onoff) (fret2 help_back) (strum help_updown))
-               }
-            }
+      {do
+         ($actions {array 0})
+         {ghc_act $actions {|| {$this slider_selected} {$this on_slider}} reset help_reset}
+         {cond
+            ({$this slider_selected} {ghc_helpbar help_confirm help_cancel $actions help_updown})
+            ({|| {$this on_slider} {== [at] "gm_lag.btn"} {== [at] "gm_engine.btn"} {== [at] "gm_unlock.btn"}}
+               {ghc_helpbar help_select help_back $actions help_updown})
+            (TRUE {ghc_helpbar help_onoff help_back $actions help_updown})
          }
       }
    )
@@ -2272,13 +2409,13 @@
                ; career, from the next list shown (campaigns.cpp).
                (gm_unlock.btn {campaigns unlock_all {! {campaigns unlock_all}}})
             }
-            {synth play_sequence button_toggle}
+            {ghc_toggle}
             {$this sync_look}
          }
       }
    )
    (BUTTON_DOWN_MSG
-      {if_else {&& {== $button kPad_Circle} {$this on_slider}}
+      {if_else {&& {ghc_pressed $button reset} {$this on_slider}}
          {do
             ; The game's own: the length's is 110, its twelfth stop past 50.
             {cond
@@ -2286,7 +2423,7 @@
                ({== [at] "gs_guitar.sld"} {gs_guitar.sld set_current {note_speed reset hard}})
                (TRUE {gs_sfx.sld set_current 12} {$this keep gs_sfx.sld 12})
             }
-            {synth play_sequence button_toggle}
+            {ghc_toggle}
             {$this sync_look}
          }
          kDataUnhandled
@@ -2297,10 +2434,9 @@
    (focus pause_game_settings_panel)
    (in_game TRUE)
    (allow_back FALSE)
-   (animate_transition FALSE)
    (BUTTON_DOWN_MSG
       {if {&& {! {pause_game_settings_panel slider_selected}} {== $button kPad_Tri}}
-         {synth play_sequence button_back.cue}
+         {ghc_back}
          {ui goto_screen {ghc_pause_screen pause_settings_screen}}
       }
       kDataUnhandled
@@ -2342,8 +2478,7 @@
    (allow_back FALSE)
    (BUTTON_DOWN_MSG
       {if {&& {! {game_settings_panel slider_selected}} {== $button kPad_Tri}}
-         {$this backwards_anim}
-         {synth play_sequence button_back.cue}
+         {ghc_back}
          {ui goto_screen options_screen}
       }
       kDataUnhandled

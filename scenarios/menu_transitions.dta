@@ -1,0 +1,117 @@
+; The menus' screen changes, each a clip (tools/ghc.py record): into and back
+; out of quickplay's setup and each of its pickers, the song list, the
+; campaign picker and Options' Game Settings, by the presses a player makes,
+; to show which turn and which cut, and which way.
+#include common/first_boot.dta
+{campaign set_all_access 1}
+{campaign set_profile_name "The Testers" 0}
+{quickplay song_defaults 0}
+(wait 2)
+
+; Quickplay: the setup, its pickers each in and out, the song list.
+{main_panel set_focus {main_panel find main_quickspin.btn}}
+(wait 0.5)
+(record on qp_setup_in)
+(press green)
+(wait_screen ghc_qp_setup_screen)
+(wait 2)
+(record off)
+{sel_character_panel set_focus {sel_character_panel find ghc_character.btn}}
+(wait 0.5)
+(record on character_in_out)
+(press green)
+(wait_screen ghc_qp_character_screen)
+(wait_until {char_single are_chars_loaded})
+(wait 1.5)
+(press red)
+(wait_screen ghc_qp_setup_screen)
+(wait 2)
+(record off)
+{sel_character_panel set_focus {sel_character_panel find ghc_guitar.btn}}
+(wait 0.5)
+(record on guitar_in_out)
+(press green)
+(wait_screen ghc_qp_guitar_screen)
+(wait 2.5)
+(press red)
+(wait_screen ghc_qp_setup_screen)
+(wait 2)
+(record off)
+{sel_character_panel set_focus {sel_character_panel find ghc_venue.btn}}
+(wait 0.5)
+(record on venue_in_out)
+(press green)
+(wait_screen ghc_qp_venue_screen)
+(wait 2)
+(press red)
+(wait_screen ghc_qp_setup_screen)
+(wait 2)
+(record off)
+{sel_character_panel set_focus {sel_character_panel find ghc_modifiers.btn}}
+(wait 0.5)
+(record on modifiers_in_out)
+(press green)
+(wait_screen ghc_qp_extras_screen)
+(wait 1.5)
+(press red)
+(wait_screen ghc_qp_setup_screen)
+(wait 2)
+(record off)
+{sel_character_panel set_focus {sel_character_panel find ghc_play.btn}}
+(wait 0.5)
+(record on song_list_in_out)
+(press green)
+(wait_screen qp_selsong_screen)
+(wait 1.5)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1.5)
+(press red)
+(wait_screen qp_selsong_screen)
+(wait 1.5)
+(press red)
+(wait_screen ghc_qp_setup_screen)
+(wait 2)
+(record off)
+(record on qp_setup_out)
+(press red)
+(wait_screen main_screen)
+(wait 2)
+(record off)
+
+; Career: the band's screen, the campaign picker, back out.
+{main_panel set_focus {main_panel find main_career.btn}}
+(wait 0.5)
+(record on career_in_out)
+(press green)
+(wait_screen chooseprof_screen)
+(wait 1.5)
+(press green)
+(wait_screen ghc_campaign_screen)
+(wait 1.5)
+(press red)
+(wait_screen chooseprof_screen)
+(wait 1.5)
+(press red)
+(wait_screen main_screen)
+(wait 2)
+(record off)
+
+; Options and its Game Settings.
+{main_panel set_focus {main_panel find main_options.btn}}
+(wait 0.5)
+(record on options_in_out)
+(press green)
+(wait_screen options_screen)
+(wait 1.5)
+{ui goto_screen game_settings_screen}
+(wait_screen game_settings_screen)
+(wait 1.5)
+(press red)
+(wait_screen options_screen)
+(wait 1.5)
+(press red)
+(wait_screen main_screen)
+(wait 2)
+(record off)
+(quit)

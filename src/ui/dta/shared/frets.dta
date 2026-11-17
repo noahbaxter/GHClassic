@@ -1,0 +1,56 @@
+; The menus' frets past green (on), red (back) and the strum, as every
+; screen reads them: which fret each action is on is config/menus.toml's
+; [frets], read here as $ghc_frets, each row an action and its fret by place
+; (fret1 to fret5, select, start), as the help bar and {pad_held} both name
+; them. A screen's presses ({ghc_pressed}) and its help bar ({ghc_helpbar})
+; both go by it, so a fret and its name can't part.
+; A press as its fret. The UI gets the third fret as kPad_Circle, and the
+; fourth and fifth both as kPad_Square.
+{func ghc_fret ($button)
+   {cond
+      ({== $button kPad_Circle} fret3)
+      ({&& {== $button kPad_Square} {pad_held fret5}} fret5)
+      ({== $button kPad_Square} fret4)
+      ({== $button kPad_Select} select)
+      ({== $button kPad_Start} start)
+      (TRUE none)
+   }
+}
+; Whether the press is that action's, outside a transition.
+{func ghc_pressed ($button $action)
+   {&& {! {ui in_transition}} {== {ghc_fret $button} {elem {find $ghc_frets $action} 1}}}
+}
+; The fret an action is held on, for a list held open (picker.dta).
+{func ghc_held ($action) {elem {find $ghc_frets $action} 1}}
+{func ghc_pair ($a $b)
+   {do
+      ($pair {array 0})
+      {push_back $pair $a}
+      {push_back $pair $b}
+      $pair
+   }
+}
+; A screen's help bar: green's text, red's, each of $actions, (action text)
+; where the screen has it now, and the strum's; none for one it has not. The
+; bar lays them out in the order given, so its frets go left to right, then
+; the strum, then Start.
+{func ghc_helpbar ($green $red $actions $strum)
+   {do
+      ($bar {array 0})
+      {if {!= $green none} {push_back $bar {ghc_pair fret1 $green}}}
+      {if {!= $red none} {push_back $bar {ghc_pair fret2 $red}}}
+      {foreach $slot (fret3 fret4 fret5 select strum start)
+         {if {&& {== $slot strum} {!= $strum none}} {push_back $bar {ghc_pair strum $strum}}}
+         {foreach $act $actions
+            {if {== $slot {elem {find $ghc_frets {elem $act 0}} 1}}
+               {push_back $bar {ghc_pair $slot {elem $act 1}}}
+            }
+         }
+      }
+      {helpbar set_display $bar}
+   }
+}
+; Building $actions: (action text) added where $on.
+{func ghc_act ($actions $on $action $text)
+   {if $on {push_back $actions {ghc_pair $action $text}}}
+}

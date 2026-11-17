@@ -75,6 +75,10 @@ namespace gh2::script
     // evaluated, then let go: what a run defines holds its own arrays
     // (Hmx::Object::SetTypeDef, 0x2c1360). On the guest thread only.
     void run(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &text);
+    // As run, for a script that comes back word for word: parsed the first
+    // time and parked (park), and from then on cloned, so the game's parser
+    // reads it once. Each text is kept for good.
+    void runKept(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &text);
 
     // The game's Symbol for `text`, interned. On the guest thread only.
     uint32_t symbol(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &text);
@@ -83,8 +87,9 @@ namespace gh2::script
     // array set here must outlive the variable or be cleared after use.
     void setVariable(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const char *name, Node node);
 
-    // Run once the game's UI objects exist: at the first screen change after
-    // the commands are registered.
+    // Run once the game's UI objects exist: at the first UI poll once the
+    // boot has drawn a picture, or at the first screen change after the
+    // commands are registered if one comes first.
     void runWhenUiReady(std::string text);
     // Those scripts run now if the commands are registered and they have not
     // yet, for a hook on that screen change that runs before this one's.

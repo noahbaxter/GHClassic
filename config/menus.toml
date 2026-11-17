@@ -1,0 +1,62 @@
+# The menus' rules, each a list kept here once: what each fret does past
+# green, red and the strum, the sound each press makes, and which screen
+# changes turn the camera. Screens never
+# restate them. tools/menus.py checks this file and writes it out for the
+# game's scripts when the build configures (src/ui/dta/shared/ reads it).
+
+# The fret for each thing a screen adds, by where it is on the neck (fret1
+# to fret5, green's end first, or select or start), never its colour: the
+# help bar and the held checks both go by place. Two actions may share a
+# fret where no screen has both.
+[frets]
+pick = "fret3"    # held, a list to pick another from; tapped, the next
+view = "fret4"    # how it shows: PS2 or 360 models, custom songs' sort
+jump = "fret5"    # to a section
+reset = "fret3"   # a value back to its default
+hide = "fret5"    # photo mode's help bar and list put away
+menu = "select"   # the screen's menu, open until pressed again
+profile = "start" # a seated player's menu, or another controller joining
+rename = "fret3"  # a profile or band, on its list
+delete = "fret4"  # a profile or band, on its list
+
+# Menu sounds, keyed on the press: green selects, red backs out, a strum
+# toggles, and a focus or scroll sounds only after a strum. The rest is the
+# game's own (ui/sfx.dta on the disc), kept.
+[sounds]
+select = "button_select"
+back = "button_back.cue"
+toggle = "button_toggle"
+start = "button_play"
+# The presses that are a strum.
+strum = ["kPad_DUp", "kPad_DDown", "kPad_DLeft", "kPad_DRight"]
+# Green starts a song on these screens, and from these buttons, so sounds start.
+start_screens = ["sel_song_screen", "multi_seldiff_screen", "seldiff_screen"]
+start_buttons = ["pause_restart.btn", "pause_controller_resume.btn", "lose_restart.btn", "comp_restart.btn"]
+# Lists that scroll without a sound.
+quiet_scroll = ["credits_panel", "sel_character_panel"]
+
+# The camera's turn between screens (ui/metacam.milo's meta_cam_right_in and
+# _out). Which way needs no list: back into a screen still on the way that
+# led here (red, or a pick taking you home to quickplay's hub), on into any
+# other. A screen not named here turns as the game's own says (its
+# animate_transition).
+[transitions]
+# Screens it never turns for: each comes in its own way, a fade or a cut.
+still = [
+    "cut_scene_screen",              # --fast-boot's way past the intro
+    "ghc_switch_screen",             # a campaign switch, under its own fade
+    "ghc_qp_setup_screen",           # quickplay's hub: the turn fights its own view, in place as it fades in
+    "photo_screen",                  # in a song
+    "pause_game_settings_screen",    # in a song
+    "pause_audio_settings_screen",   # in a song
+    "pause_video_settings_screen",   # in a song
+    "ghc_practice_game_screen",      # in practice, the three above's twins
+    "ghc_practice_audio_screen",
+    "ghc_practice_video_screen",
+]
+# Screens in one room, between which the camera stays: it only moves.
+same_room = [
+    ["ghc_qp_setup_screen", "ghc_qp_character_screen"],
+    # the bonus videos' posters, GH1's and GH2's (game_settings.dta)
+    ["ghc_bonus_gh1_screen", "ghc_bonus_gh2_screen"],
+]

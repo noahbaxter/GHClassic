@@ -23,6 +23,7 @@
 #include "content/practice_sounds.h"
 #include "content/song_speed.h"
 #include "content/status_line.h"
+#include "ui/background_save.h"
 #include "ui/fast_boot.h"
 #include "frame_step.h"
 #include "game_overrides.h"
@@ -55,6 +56,10 @@
 #include "settings/latency.h"
 #include "settings/settings.h"
 #include "ui/list_scroll.h"
+#include "ui/transitions.h"
+#include "ui/press_size.h"
+#include "ui/screen_loads.h"
+#include "guest/bin_reads.h"
 #include "ui/text_fit.h"
 #include "ui/locale.h"
 #include "ui/menus.h"
@@ -198,16 +203,22 @@ namespace
         gh2::installLatency(runtime, gh2::kSlus21447);
         gh2::installPad(runtime, gh2::kSlus21447);
         gh2::list_scroll::install(runtime, gh2::kSlus21447);
+        gh2::transitions::install(runtime, gh2::kSlus21447);
+        gh2::press_size::install(runtime, gh2::kSlus21447);
+        gh2::screen_loads::install(runtime, gh2::kSlus21447);
+        gh2::bin_reads::install(runtime, gh2::kSlus21447);
         gh2::text_fit::install(gh2::kSlus21447);
         gh2::installFrameStep(runtime, gh2::kSlus21447);
         gh2::installMenus(runtime);
         gh2::installPhotoMode(runtime, gh2::kSlus21447);
+        gh2::background_save::install(runtime, gh2::kSlus21447);
         gh2::installHelpBar(runtime, gh2::kSlus21447);
         gh2::menu_guitarist::install(runtime, gh2::kSlus21447);
         gh2::installPlayers(runtime);
         gh2::installControllers(runtime);
         // After the help bar, which recolours its scene's own pixels.
         gh2::installGh2xAssets(runtime, gh2::kSlus21447);
+        gh2::prebakeFonts();
         // After the 360's scenes, the streak counter and the font bake: its
         // highway starts from theirs, and is served over the 360's.
         gh2::installGh1Highway();

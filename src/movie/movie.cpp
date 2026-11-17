@@ -360,14 +360,15 @@ namespace gh2
         // plays the PSS through libmpeg, the IPU and a libsdr channel until
         // sceMpegIsEnd or a skip and returns 1 (0x21bebc), or 0 when the file
         // will not open. Its one caller, MetaPanel::OnPlayMovie (0x134c08),
-        // passes "videos/<name>" and 0. Another game's own, the campaign in
-        // front's (content/campaigns.h), comes before the game disc's.
+        // passes "videos/<name>" and 0. Another game's own, as the game would
+        // get it (the campaign in front's, or one lent: the menus' game's
+        // bonus videos, content/campaigns.h), comes before the game disc's.
         void playMovie(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
             const std::string path = reinterpret_cast<const char *>(getMemPtr(rdram, GPR_U32(ctx, 4)));
             const float minSkipSeconds = ctx->f[12];
             uint32_t result = 0;
-            std::optional<ark::Made> file = ark::openFront(path);
+            std::optional<ark::Made> file = ark::open(path);
             DiscImage *disc = ps2ConfiguredDisc();
             DiscImage::Extent extent;
             if (!file && disc && disc->find(path, extent) && !extent.isDir)

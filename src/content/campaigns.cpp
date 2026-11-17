@@ -321,6 +321,31 @@ namespace gh2::campaigns
             return "";
         }
 
+        // The bonus videos a campaign's store sells, (video (video1 (file
+        // x.pss) ...) ...), as the movie player opens them: videos/x.pss.
+        // Only `only`'s, where one is named.
+        std::vector<std::string> videosOf(const Guest &guest, size_t index, const std::string &only = "")
+        {
+            constexpr size_t kStore = 1u; // kConfig's store
+            constexpr uint32_t kString = 0x12u;
+            std::vector<std::string> paths;
+            const uint32_t store = s_campaigns[index].config.size() > kStore ? s_campaigns[index].config[kStore] : 0u;
+            const uint32_t sold = store ? guest.find(store, "video") : 0u;
+            for (int i = 1; sold && i < guest.size(sold); ++i)
+            {
+                if (guest.type(sold, i) != script::kArray || (!only.empty() && guest.key(guest.value(sold, i)) != only))
+                    continue;
+                const uint32_t file = guest.find(guest.value(sold, i), "file");
+                if (file == 0u || guest.size(file) < 2 ||
+                    (guest.type(file, 1) != script::kSymbol && guest.type(file, 1) != kString))
+                    continue;
+                const uint32_t text = guest.type(file, 1) == script::kSymbol ? guest.value(file, 1)
+                                                                              : load<uint32_t>(guest.call.rdram, guest.value(file, 1));
+                paths.push_back(std::string("videos/") + reinterpret_cast<const char *>(getMemPtr(guest.call.rdram, text)));
+            }
+            return paths;
+        }
+
         // Each panel `init` makes takes its type definition from there, or
         // only those in `only`. `was` is where a scene came from before.
         using Origin = std::optional<std::pair<uint32_t, uint32_t>>;
@@ -567,6 +592,9 @@ namespace gh2::campaigns
                 for (const auto &[scene, origin] : was)
                     s_menusLent.push_back(scene);
                 s_menusLent.insert(s_menusLent.end(), kMenuFiles.begin(), kMenuFiles.end());
+                // Its bonus videos, which its bonus screen and store play.
+                for (std::string &video : videosOf(guest, index))
+                    s_menusLent.push_back(std::move(video));
                 for (const std::string &prefix : s_menusLent)
                     ark::lend(prefix, s_campaigns[index].front);
             }
@@ -1021,6 +1049,35 @@ namespace gh2::campaigns
                 locale::own(op == "text_venues" ? locale::kVenue : locale::kCharacter, s_campaigns[*index].game);
                 return {1u, script::kInt};
             }
+            // {campaigns text <game> <token>}: that game's own text for it,
+            // whatever the theme, or "" (locale::textOf).
+            if (op == "text")
+            {
+                const auto index = indexOf(call.symbol(2));
+                if (!index)
+                    return call.word("");
+                textBuilt(Guest{call}, *index);
+                const uint32_t text = locale::textOf(call.rdram, s_campaigns[*index].game, call.symbol(3));
+                return call.word(text != 0u ? reinterpret_cast<const char *>(getMemPtr(call.rdram, text)) : "");
+            }
+            // {campaigns video_file <game> <video>}: the file that game's
+            // store names for one of its bonus videos, lent from its disc
+            // with the menus' files until they change; "" for none.
+            if (op == "video_file")
+            {
+                const auto index = indexOf(call.symbol(2));
+                const Guest guest{call};
+                if (!index || !built(guest, *index))
+                    return call.word("");
+                const std::string video = call.symbol(3);
+                for (const std::string &path : videosOf(guest, *index, video))
+                {
+                    s_menusLent.push_back(path);
+                    ark::lend(path, s_campaigns[*index].front);
+                    return call.word(path.substr(std::strlen("videos/")));
+                }
+                return call.word("");
+            }
             if (op == "owns")
             {
                 // A game with no career here has nothing to earn it in.
@@ -1298,6 +1355,23 @@ namespace gh2::campaigns
             if (s_toSwitch)
                 store<float>(rdram, GPR_U32(ctx, 4) + 0x44u, 2.0f);
         }
+
+        // VideoProvider keeps the config's (store (video ...)) it found as it
+        // was made (0x11b0c8, at +0x3c), the boot's game's: a video looked up
+        // (GetVideoData, 0x11b350) in the menus' game's store, as kept
+        // (build), whose files menusFrom lends: GH1's bonus videos too.
+        struct VideoTag;
+        void onGetVideoData(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            constexpr size_t kStore = 1u; // kConfig's store
+            const script::Call call{rdram, ctx, runtime, 0u};
+            const Guest guest{call};
+            if (s_menus >= s_campaigns.size() || s_campaigns[s_menus].config.size() <= kStore)
+                return;
+            if (const uint32_t store = s_campaigns[s_menus].config[kStore])
+                if (const uint32_t video = guest.find(store, "video"))
+                    ::gh2::store<uint32_t>(rdram, GPR_U32(ctx, 4) + 0x3cu, video);
+        }
     }
 
     void add(const std::string &game, size_t front)
@@ -1547,5 +1621,6 @@ namespace gh2::campaigns
         EntryHook<FinishSongTag>::install(runtime, addresses.profileStateFinishSong, onFinishSong);
         EntryHook<GameOverTag>::install(runtime, addresses.hudPanelOnGameOver, onGameOver);
         EntryHook<MetaMusicStopTag>::install(runtime, addresses.metaMusicStop, onMetaMusicStop);
+        EntryHook<VideoTag>::install(runtime, addresses.videoProviderGetVideoData, onGetVideoData);
     }
 }
