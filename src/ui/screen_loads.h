@@ -8,7 +8,9 @@
 // a picker loaded it again, its models read as the screen faded out. Here a
 // menu panel no screen holds stays loaded while the menus are up (the meta
 // panel, which every menu screen has and no song's does), and all are let go
-// with meta, as a song loads.
+// with meta, as a song loads. One kept whose (file ...) names another scene
+// by the time a screen loads it again (the song list's, by setlist) is let go
+// first and loads that.
 //
 // And the game's own work in a change (GHScreen's Enter and Exit) and in
 // loading (LoadMgr::Poll) runs unpaced: its code runs some three times faster

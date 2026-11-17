@@ -10,6 +10,8 @@
 
 #include <algorithm>
 #include <cstring>
+#include <map>
+#include <string>
 #include <vector>
 
 namespace gh2::screen_loads
@@ -33,11 +35,48 @@ namespace gh2::screen_loads
             return name != 0u && std::strcmp(reinterpret_cast<const char *>(getMemPtr(rdram, name)), "meta") == 0;
         }
 
-        struct LoadTag;
-        void onCheckLoad(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
+        // The scene a panel's (file ...) names now, as UIPanel::Load
+        // (0x20e2a0) evaluates it: its type's (file ...), "" for none. Some
+        // are worked out each load: the song list's by setlist, the venue
+        // picker's by game, the character screen's by mode.
+        std::string fileOf(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t panel)
         {
-            if (s_meta == 0u && isMeta(rdram, GPR_U32(ctx, 4)))
-                s_meta = GPR_U32(ctx, 4);
+            const uint32_t object = load<uint32_t>(rdram, panel);
+            const uint32_t type = object != 0u ? load<uint32_t>(rdram, object + 4u) : 0u;
+            if (type == 0u)
+                return "";
+            static const uint32_t s_file = script::symbol(rdram, ctx, runtime, "file");
+            const auto file = static_cast<uint32_t>(
+                runtime->callGuestFunction(rdram, ctx, s_addresses->dataArrayFindArray, {type, s_file, 0u}));
+            if (file == 0u)
+                return "";
+            const auto text = static_cast<uint32_t>(runtime->callGuestFunction(
+                rdram, ctx, s_addresses->dataNodeStr, {load<uint32_t>(rdram, file) + 8u, file}));
+            return text != 0u ? reinterpret_cast<const char *>(getMemPtr(rdram, text)) : "";
+        }
+        std::map<uint32_t, std::string> s_files; // each panel's, as it last loaded
+
+        // A kept panel whose file names another scene now (a setlist picked
+        // since) is let go before it is loaded again, so it loads that.
+        struct LoadTag;
+        void onCheckLoad(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t panel = GPR_U32(ctx, 4);
+            if (s_meta == 0u && isMeta(rdram, panel))
+                s_meta = panel;
+            const int32_t loads = load<int32_t>(rdram, panel + kLoads);
+            const auto kept = std::find(s_kept.begin(), s_kept.end(), panel);
+            if (loads != 0 && (loads != 1 || kept == s_kept.end()))
+                return;
+            const EntryArgs args(ctx);
+            std::string file = fileOf(rdram, ctx, runtime, panel);
+            if (loads == 1 && file != s_files[panel])
+            {
+                s_kept.erase(kept);
+                runtime->callGuestFunction(rdram, ctx, s_addresses->uiPanelCheckUnload, {panel}, s_checkUnload);
+            }
+            s_files[panel] = std::move(file);
+            args.restore(ctx);
         }
 
         // The next screen has loaded its panels by the time the last lets go

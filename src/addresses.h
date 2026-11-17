@@ -232,6 +232,8 @@ namespace gh2
         // A panel loaded for a screen and let go (ui/screen_loads.h).
         uint32_t uiPanelCheckLoad;   // UIPanel::CheckLoad
         uint32_t uiPanelCheckUnload; // UIPanel::CheckUnload
+        uint32_t dataArrayFindArray; // DataArray::FindArray(Symbol, bool fail)
+        uint32_t dataNodeStr;        // DataNode::Str(const DataArray *), evaluated
         uint32_t uiScreenLoadPanels;      // UIScreen::LoadPanels, CheckLoad on each
         uint32_t uiScreenUnloadPanels;    // UIScreen::UnloadPanels, CheckUnload on each
         uint32_t uiScreenArePanelsLoaded; // UIScreen::ArePanelsLoaded
@@ -637,6 +639,8 @@ namespace gh2
         .bandButtonGetStateColor = 0x28bb80u,
         .uiPanelCheckLoad = 0x20e040u,
         .uiPanelCheckUnload = 0x20e0d0u,
+        .dataArrayFindArray = 0x2b0028u,
+        .dataNodeStr = 0x2b7eb0u,
         .uiScreenLoadPanels = 0x2134a0u,
         .uiScreenUnloadPanels = 0x213508u,
         .uiScreenArePanelsLoaded = 0x213590u,
