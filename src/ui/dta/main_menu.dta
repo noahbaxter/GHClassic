@@ -231,6 +231,9 @@
 ; The main screen, as the game's own but for fade_panel, which Quit fades
 ; through, and for yellow: held, it lists those games (picker.dta), and the
 ; one picked becomes the theme, its menus and music, back on this screen.
+; With no more of them than $ghc_tap_flips, a tap is the next instead: two
+; are no list to pick from.
+{set $ghc_tap_flips 2}
 {retype main_screen
    (
       (panels meta main_panel ghc_dim_panel dialog ghc_profile_panel helpbar ghc_pick_panel fade_panel)
@@ -265,32 +268,39 @@
       (ghc_help_set ($array) {helpbar set_display $array})
       (ghc_help
          {do
-            ($array)
-            {set $array ()}
-            {resize $array 0}
-            {push_back $array (fret1 help_continue)}
-            {if {> {size {ghc_themes}} 1} {push_back $array (fret3 ghc_theme)}}
-            {push_back $array (strum help_updown)}
+            ($actions {array 0})
+            {ghc_act $actions {> {size {ghc_themes}} 1} pick ghc_theme}
             ; Start puts up a seated player's menu, or joins another
             ; controller (profiles.dta).
-            {push_back $array (start ghc_profile_help)}
-            {helpbar set_display $array}
+            {ghc_act $actions TRUE profile ghc_profile_help}
+            {ghc_helpbar help_continue none $actions help_updown}
          }
       )
       (BUTTON_DOWN_MSG
          {cond
             ({ghc_profile_panel button $player_num $button} TRUE)
             ({ghc_pick_button $button} TRUE)
-            ({&& {== $button kPad_Circle} {> {size {ghc_themes}} 1} {! {ui in_transition}}}
-               {ghc_pick_panel open_with {ghc_themes} {campaigns active}}
+            ({&& {ghc_pressed $button pick} {> {size {ghc_themes}} 1}}
+               {if_else {<= {size {ghc_themes}} $ghc_tap_flips}
+                  {$this ghc_theme_next}
+                  {ghc_pick_panel open_with {ghc_themes} {campaigns active}}
+               }
                TRUE
             )
             (TRUE kDataUnhandled)
          }
       )
+      (ghc_theme_next
+         {do
+            ($themes {ghc_themes})
+            ($at 0)
+            {find_elem $themes {campaigns active} $at}
+            {$this ghc_picked {elem $themes {mod {'+' $at 1} {size $themes}}}}
+         }
+      )
       (ghc_picked
          ($game)
-         {synth play_sequence button_select}
+         {ghc_select}
          {set $ghc_switch $game}
          {set $ghc_switch_next main_screen}
          {set $ghc_switch_as menus}
@@ -339,8 +349,8 @@
       ; controller last played as, then the main menu. Joining: backing out
       ; to here frees P1, for whichever controller presses Start next.
       (BUTTON_DOWN_MSG
-         {if {== $button kPad_Start}
-            {synth play_sequence button_select}
+         {if {ghc_pressed $button profile}
+            {ghc_select}
             {ghc_profile_screen join 0 splash_screen main_screen}
          }
       )

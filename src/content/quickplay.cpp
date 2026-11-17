@@ -11,6 +11,7 @@
 #include "gh2x/models.h"
 #include "guest.h"
 #include "hook.h"
+#include "save/save.h"
 #include "script.h"
 #include "settings/settings.h"
 
@@ -455,10 +456,29 @@ namespace gh2::quickplay
                     return {(now ? 1u : 0u) | (now != was ? 2u : 0u), script::kInt};
                 }
             }
+            // The theme's own guitarist, the outfit its game boots with: the
+            // one quickplay plays with none picked (quickplay_setup.dta).
+            if (op == "boot_outfit")
+                return {script::symbol(call.rdram, call.ctx, call.runtime, bootOutfit(campaigns::active())),
+                        script::kSymbol};
+            // The outfit picked is kept from run to run (the rest this run's
+            // alone): the guitarist the hub stands and the main menu loads
+            // ahead (preshow_guitarist.dta).
+            static const bool s_seeded = []
+            {
+                if (const std::string outfit = save::state("quickplay", "outfit"); !outfit.empty())
+                    s_picked["outfit"] = outfit;
+                return true;
+            }();
+            (void)s_seeded;
             if (op == "pick" && call.size() > 2)
             {
                 if (call.size() > 3)
+                {
                     s_picked[call.symbol(2)] = call.symbol(3);
+                    if (call.symbol(2) == "outfit")
+                        save::keepState("quickplay", "outfit", call.symbol(3));
+                }
                 const auto it = s_picked.find(call.symbol(2));
                 return {script::symbol(call.rdram, call.ctx, call.runtime, it != s_picked.end() ? it->second : ""),
                         script::kSymbol};
@@ -478,7 +498,8 @@ namespace gh2::quickplay
             }
             std::cerr << "[quickplay] usage: {quickplay song_defaults [<0|1>]}, "
                          "{quickplay cast <song> <game> <outfit>}, {quickplay next_gen_song 0}, "
-                         "{quickplay pick|picked <what>}, {quickplay look <character> [<outfit>]}, "
+                         "{quickplay boot_outfit}, {quickplay pick|picked <what>}, "
+                         "{quickplay look <character> [<outfit>]}, "
                          "{quickplay in_song_ui [venue|gh1|gh2|gh80s]},"
                          "{quickplay menu_music [theme|gh1|gh2|gh80s|all]}, "
                          "{quickplay menu_music_order [playlist|loop|shuffle]}, "

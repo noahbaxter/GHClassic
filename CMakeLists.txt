@@ -460,6 +460,8 @@ set(GHC_GAME_SOURCES
     src/ui/controllers.cpp
     src/ui/classic_scene.cpp
     src/ui/list_scroll.cpp
+    src/ui/transitions.cpp
+    src/ui/press_size.cpp
     src/ui/text_fit.cpp
     src/ui/menus.cpp
     src/ui/meta_music.cpp
@@ -567,21 +569,39 @@ file(READ src/gh1/menus.dta GHC_GH1_MENUS_DTA)
 file(READ src/gh1/scripts.dta GHC_GH1_SCRIPTS_DTA)
 file(READ src/content/guitar_copy.dta GHC_GUITAR_COPY_DTA)
 file(READ src/hub/preshow_picks.dta GHC_PRESHOW_PICKS_DTA)
-file(READ src/ui/dta/picker.dta GHC_PICKER_DTA)
+# The menus' rules (config/menus.toml), checked and written out for the
+# shared scripts (src/ui/dta/shared/) that apply them.
+find_package(Python3 3.11 REQUIRED COMPONENTS Interpreter)
+file(MAKE_DIRECTORY "${GHC_DTA_DIR}")
+execute_process(
+    COMMAND "${Python3_EXECUTABLE}" tools/menus.py config/menus.toml "${GHC_DTA_DIR}/menu_rules.dta"
+            "${GHC_DTA_DIR}/menu_rules.inc"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    RESULT_VARIABLE GHC_MENUS_RESULT
+    ERROR_VARIABLE GHC_MENUS_ERROR)
+if(NOT GHC_MENUS_RESULT EQUAL 0)
+    message(FATAL_ERROR "${GHC_MENUS_ERROR}")
+endif()
+file(READ "${GHC_DTA_DIR}/menu_rules.dta" GHC_MENU_RULES_DTA)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS config/menus.toml tools/menus.py)
+file(READ src/ui/dta/shared/sfx.dta GHC_SFX_DTA)
+file(READ src/ui/dta/shared/frets.dta GHC_FRETS_DTA)
+file(READ src/ui/dta/shared/picker.dta GHC_PICKER_DTA)
 file(READ src/ui/dta/quickplay_pickers.dta GHC_QUICKPLAY_PICKERS_DTA)
 file(READ src/ui/dta/quickplay_setup.dta GHC_QUICKPLAY_SETUP_DTA)
 file(READ src/ui/dta/multiplayer.dta GHC_MULTIPLAYER_DTA)
 file(READ src/ui/dta/preshow_guitarist.dta GHC_PRESHOW_GUITARIST_DTA)
 file(READ src/ui/dta/in_song.dta GHC_IN_SONG_DTA)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    src/ui/dta/shared/sfx.dta src/ui/dta/shared/frets.dta src/ui/dta/shared/picker.dta src/ui/dta/shared/box.dta
     src/ui/dta/lag_panel.dta src/ui/dta/highscore_panel.dta src/ui/dta/main_menu.dta src/ui/dta/fast_boot.dta
     src/ui/dta/locale.dta src/ui/dta/crowd.dta src/ui/dta/sel_character.dta src/ui/dta/quickplay.dta
-    src/ui/dta/campaigns.dta src/gh1/menus.dta src/gh1/scripts.dta src/ui/dta/picker.dta src/ui/dta/quickplay_pickers.dta
+    src/ui/dta/campaigns.dta src/gh1/menus.dta src/gh1/scripts.dta src/ui/dta/quickplay_pickers.dta
     src/ui/dta/quickplay_setup.dta src/ui/dta/multiplayer.dta src/ui/dta/preshow_guitarist.dta src/ui/dta/in_song.dta
-    src/content/guitar_copy.dta src/hub/preshow_picks.dta src/ui/dta/game_settings.dta src/ui/dta/photo_mode.dta src/ui/dta/box.dta
+    src/content/guitar_copy.dta src/hub/preshow_picks.dta src/ui/dta/game_settings.dta src/ui/dta/photo_mode.dta
     src/ui/dta/note_streak.dta src/ui/dta/streak_counter.dta src/ui/dta/song_progress.dta src/ui/dta/players.dta
     src/ui/dta/controllers.dta src/ui/dta/profiles.dta)
-file(READ src/ui/dta/box.dta GHC_BOX_DTA)
+file(READ src/ui/dta/shared/box.dta GHC_BOX_DTA)
 file(READ src/ui/dta/note_streak.dta GHC_NOTE_STREAK_DTA)
 file(READ src/ui/dta/streak_counter.dta GHC_STREAK_COUNTER_DTA)
 file(READ src/ui/dta/song_progress.dta GHC_SONG_PROGRESS_DTA)

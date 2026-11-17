@@ -107,6 +107,11 @@ namespace gh2
             return input::kActions[name == "up" ? input::kStrumUp : input::kStrumDown].button;
         if (name == "left" || name == "right")
             return name == "left" ? pad::kLeft : pad::kRight;
+        // fret1 to fret5 by where they are on the neck, as the help bar names
+        // them, whatever colour each is.
+        constexpr input::Action kFrets[] = {input::kGreen, input::kRed, input::kYellow, input::kBlue, input::kOrange};
+        if (name.size() == 5 && name.compare(0, 4, "fret") == 0 && name[4] >= '1' && name[4] <= '5')
+            return input::kActions[kFrets[name[4] - '1']].button;
         for (const input::ActionInfo &action : input::kActions)
             if (name == action.name)
                 return action.button;
@@ -115,7 +120,7 @@ namespace gh2
 
     namespace
     {
-        // {pad_held up|down|left|right|<fret colour>}: 1 while that is held,
+        // {pad_held up|down|left|right|fret1..fret5|<fret colour>}: 1 while that is held,
         // for menus that repeat on a hold. The UI gets only presses, and
         // gets blue and orange both as kPad_Square.
         script::Node padHeld(const script::Call &call)

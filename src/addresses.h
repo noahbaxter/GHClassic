@@ -217,6 +217,18 @@ namespace gh2
         uint32_t builtinDelete;
         uint32_t dataNodeGetObj;   // DataNode::GetObj
         uint32_t uiGotoScreen;     // UIManager::GotoScreen
+        // The menus' camera turn between screens (ui/transitions.h).
+        uint32_t ghScreenEnter;                  // GHScreen::Enter(UIScreen *from)
+        uint32_t ghScreenExit;                   // GHScreen::Exit(UIScreen *to)
+        uint32_t ghScreenCheckAnimateTransition; // GHScreen::CheckAnimateTransition
+        uint32_t ghScreenForwards;               // bool: the turn on, not back
+        // What holds a screen's input (ui/transitions.h).
+        uint32_t uiTriggerIsBlocking;   // UITrigger::IsBlocking
+        uint32_t uiComponentSendSelect; // UIComponent::SendSelect(JoypadButton, int)
+        uint32_t uiSelectFrames;        // int: UIComponent's select_frames
+        // A pressed button drawn at its focused size (ui/press_size.h).
+        uint32_t bandButtonDrawShowing;   // BandButton::DrawShowing
+        uint32_t bandButtonGetStateColor; // BandButton::GetStateColor(State, Color &)
         uint32_t uiManagerPoll;
         uint32_t debugModal; // DebugModal(bool &, char *)
         uint32_t abort;
@@ -225,6 +237,7 @@ namespace gh2
         uint32_t spuStartSend;
         uint32_t metaMusicPoll;
         uint32_t metaMusicStop;
+        uint32_t videoProviderGetVideoData; // VideoProvider::GetVideoData(Symbol) const
         uint32_t metaPanelPoll;
         uint32_t metaPanelPickLoopIndex; // (int size)
         uint32_t systemConfig3; // SystemConfig(Symbol, Symbol, Symbol)
@@ -603,6 +616,15 @@ namespace gh2
         .builtinDelete = 0x2cf160u,
         .dataNodeGetObj = 0x2b7f80u,
         .uiGotoScreen = 0x214d48u,
+        .ghScreenEnter = 0x145cf8u,
+        .ghScreenExit = 0x145f80u,
+        .ghScreenCheckAnimateTransition = 0x145dc8u,
+        .ghScreenForwards = 0x3da34cu,
+        .uiTriggerIsBlocking = 0x21b2a0u,
+        .uiComponentSendSelect = 0x20d748u,
+        .uiSelectFrames = 0x473228u,
+        .bandButtonDrawShowing = 0x28bcb8u,
+        .bandButtonGetStateColor = 0x28bb80u,
         .uiManagerPoll = 0x214510u,
         .debugModal = 0x105a88u,
         .abort = 0x307b80u,
@@ -611,6 +633,7 @@ namespace gh2
         .spuStartSend = 0x231a78u,
         .metaMusicPoll = 0x21f180u,
         .metaMusicStop = 0x21f668u,
+        .videoProviderGetVideoData = 0x11b350u,
         .metaPanelPoll = 0x134850u,
         .metaPanelPickLoopIndex = 0x1349d8u,
         .systemConfig3 = 0x2a8700u,

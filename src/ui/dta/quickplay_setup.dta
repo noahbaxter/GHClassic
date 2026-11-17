@@ -8,17 +8,39 @@
 ; there, in character select's doorway, by a picture of the venue
 ; (hub/hub_scene.h).
 ;
+; Quickplay's guitarist: the outfit last picked (kept from run to run)
+; while the config has it, else the theme's own, the one its game boots
+; with, so the hub, the song and the main menu's load ahead
+; (ghc_preshow_preload) all agree.
+{func ghc_qp_has_outfit ($o)
+   {do
+      ($has FALSE)
+      {foreach_int $i 1 {size {find $syscfg characters}}
+         {do
+            ($c {elem {find $syscfg characters} $i})
+            {foreach_int $j 1 {size $c}
+               {if {== {elem {elem $c $j} 0} $o} {set $has TRUE}}
+            }
+         }
+      }
+      $has
+   }
+}
+{func ghc_qp_outfit
+   {if_else {&& {quickplay picked outfit} {ghc_qp_has_outfit {quickplay pick outfit}}}
+      {quickplay pick outfit}
+      {quickplay boot_outfit}
+   }
+}
 ; What a song plays with is what was last picked ({quickplay pick}), put
-; together again each time, so a picker backed out of leaves nothing. What
-; is not yet picked is the first recall's, the hub's song's casting
-; (GameConfig::SetQuickplay, 0x126828), kept as picked: else each song
-; would play its own, a custom song's own cast (custom/cast.h).
+; together again each time, so a picker backed out of leaves nothing. The
+; guitarist is always {ghc_qp_outfit}; the rest not yet picked is the first
+; recall's, the hub's song's casting (GameConfig::SetQuickplay, 0x126828),
+; kept as picked: else each song would play its own, a custom song's own
+; cast (custom/cast.h).
 {func ghc_qp_recall
    {game set_quickplay}
-   {if_else {quickplay picked outfit}
-      {game set_character {quickplay pick outfit} TRUE}
-      {quickplay pick outfit {game get_character_outfit}}
-   }
+   {game set_character {ghc_qp_outfit} TRUE}
    {if_else {quickplay picked guitar}
       {game set_guitar {quickplay pick guitar} {quickplay pick skin}}
       {do
@@ -111,7 +133,7 @@
 {set $ghc_qp_poster_scale 30}
 ; With song defaults, the question mark in the doorway: rows across and
 ; down from where the guitarist's name stood, and times its text.
-{set $ghc_qp_unknown_pos (9 3)}
+{set $ghc_qp_unknown_pos (6 3)}
 {set $ghc_qp_unknown_size 4}
 ; The door stays open, wider than the scene has it (cs_door.mesh at 90 0
 ; 125), clear of a walk-on's wide step. Character select hands it to the
@@ -169,6 +191,9 @@
 {set $ghc_qp_angle (28 -4 -160 -5 -20)}
 ; The words this much in from the view's own left, room for the arrow's head.
 {set $ghc_qp_rows_in 45}
+; And the words alone, not their arrows, this much further left: the
+; longest clear of the door frame.
+{set $ghc_qp_words_left 6}
 {set $ghc_qp_view_frames 36}
 ; Where the view is (0 character select's, 1 the hub's) and where it is
 ; going.
@@ -261,9 +286,10 @@
             ($btn {new {outfit1.btn class_name} {elem $row 0}})
             {$btn copy outfit1.btn 0}
             {$btn set trans_parent $group}
-            {$btn set_local_pos $x $y {'+' $top {'*' {'+' $ghc_qp_row_start $i} $step}}}
+            {$btn set_local_pos {'-' $x $ghc_qp_words_left} $y {'+' $top {'*' {'+' $ghc_qp_row_start $i} $step}}}
             {$btn set text_token {elem $row 1}}
             {$btn set text_size {outfit1.btn get text_size}}
+            {press_holds_size {elem $row 0}} ; pressed, not grown toward the door
             {$group insert (objects {$group size objects}) $btn}
          }
       }
@@ -291,7 +317,7 @@
       ($words {elem {find $ghc_qp_rows {symbol $btn}} 2}) ; a focus names it in a string
       ($bar {'+' $words $ghc_qp_arrow_past})
       {$btn get_local_pos $x $y $z}
-      {set $x {'+' $x $ghc_qp_arrow_x}}
+      {set $x {'+' $x {'+' $ghc_qp_arrow_x $ghc_qp_words_left}}}
       {set $y {'+' $y $ghc_qp_arrow_y}}
       {set $z {'+' $z $ghc_qp_arrow_z}}
       {ghc_arrow_head.mesh set_local_pos $x $y $z}
@@ -385,6 +411,7 @@
 ; its own: the question mark does instead.
 {func ghc_qp_show_guitarist ($panel)
    {ghc_qp_unpark $panel}
+   {set $ghc_qp_standing none}
    {set $ghc_qp_posed TRUE}
    {set $ghc_qp_posed_at 0}
    {{$panel find ghc_unknown.lbl} set_showing {quickplay song_defaults}}
@@ -408,6 +435,23 @@
             {set $ghc_qp_parked TRUE}
          }
          {ghc_preshow_char show_char 0 {ghc_preshow_name {game get_character_outfit}}}
+         {set $ghc_qp_standing {game get_character_outfit}}
+      }
+   }
+}
+; Song defaults turned off or on in the hub (ghc_defaults.btn): a guitarist
+; already shown there, in the outfit still to play, only shown or hidden,
+; never placed again behind an empty doorway.
+{set $ghc_qp_standing none}
+{func ghc_qp_toggle_guitarist ($panel)
+   {do
+      ($char {ghc_preshow_char get_char 0})
+      {if_else {&& $char $ghc_qp_posed {== $ghc_qp_posed_at 0} {== $ghc_qp_standing {game get_character_outfit}}}
+         {do
+            {{$panel find ghc_unknown.lbl} set_showing {quickplay song_defaults}}
+            {$char set_showing {! {quickplay song_defaults}}}
+         }
+         {ghc_qp_show_guitarist $panel}
       }
    }
 }
@@ -554,9 +598,6 @@
       (panels meta sel_character_panel helpbar ghc_preshow_char fade_panel)
       (focus sel_character_panel)
       (allow_back FALSE)
-      ; Never the scene's swoop: it fights the hub's own view (ghc_qp_view),
-      ; which is already in place as the screen fades in.
-      (animate_transition FALSE)
       (helpbar (default ((fret1 help_continue) (fret2 help_back) (strum help_updown))))
       (enter
          ; In from black, the room still: but not back from character
@@ -589,15 +630,14 @@
                {quickplay song_defaults {! {quickplay song_defaults}}}
                {ghc_qp_sync_rows sel_character_panel}
                {ghc_qp_show_venue sel_character_panel}
-               {ghc_qp_show_guitarist sel_character_panel}
+               {ghc_qp_toggle_guitarist sel_character_panel}
             )
          }
          kDataUnhandled
       )
       (BUTTON_DOWN_MSG
          {if {== $button kPad_Tri}
-            {$this backwards_anim}
-            {synth play_sequence button_back.cue}
+            {ghc_back}
             {ui goto_screen main_screen}
          }
          kDataUnhandled
@@ -718,8 +758,7 @@
       (helpbar (default ((fret1 help_onoff) (fret2 help_back) (strum help_updown))))
       (BUTTON_DOWN_MSG
          {if {== $button kPad_Tri}
-            {$this backwards_anim}
-            {synth play_sequence button_back.cue}
+            {ghc_back}
             {ui goto_screen ghc_qp_setup_screen}
          }
          kDataUnhandled

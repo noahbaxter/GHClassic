@@ -93,7 +93,7 @@
    (= enter {play_sfx beat_venue})
    (= BUTTON_DOWN_MSG
       {if {== $button kPad_X}
-         {synth play_sequence button_select}
+         {ghc_select}
          {goto_endgame_complete}}))
 
 ; GH1's screen for beating the game names the difficulty, and opens on the
@@ -135,7 +135,7 @@
                {{win_game_panel loaded_dir} exists win_screen2.view}
                {! {{win_game_panel find win_screen2.view} showing}}}
             {do
-               {synth play_sequence button_select}
+               {ghc_select}
                {campaign buy_item battleaxe 0}
                {helpbar set_display ()}
                {set [continue_time] {'+' {taskmgr ui_seconds} 6}}
@@ -148,7 +148,7 @@
                      {fade_panel start_fade 4 (color 1 1 1) (fade_synth FALSE) (fade_out FALSE)})}}
             {do
                {fade_panel start_fade 1 (color 0 0 0) (fade_synth FALSE) (fade_out TRUE)}
-               {synth play_sequence button_select}
+               {ghc_select}
                {script_task (delay 1) (units kTaskUISeconds)
                   (script
                      ; GH2's letter for Pro Face-Off has no place in GH1's.

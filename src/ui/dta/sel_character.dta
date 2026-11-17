@@ -315,14 +315,14 @@
          {text_character.grp set_showing TRUE}
          {sel_skin.tnm animate (units kTaskUISeconds) (period 0.4) (range 10 0)}
          {$this set_focus character.lst}
-         {synth play_sequence button_back.cue}
+         {ghc_back}
       )
       (open_door)
       (SCROLL_MSG
          {do
             ($new_scroll_pos {character.lst selected_pos})
             {if {&& {!= $new_scroll_pos [old_scroll_pos]} {character_provider is_active $new_scroll_pos}}
-               {synth play_sequence button_toggle}
+               {ghc_toggle}
                {set [char_focus] {character_provider get_symbol $new_scroll_pos}}
                {set [char_outfit] {$this hover_outfit [char_focus]}}
                {if [char_focus]
@@ -355,12 +355,6 @@
                   {if {== {sprint {$new_focus name}} {sprint {elem [outfit_buttons] $i}}} {set $idx $i}}
                }
                {if {>= $idx 0}
-                  ; The UI's own FOCUS_MSG (sfx.dta) sounds it on every
-                  ; screen but the career's two.
-                  {if {|| {== {{ui current_screen} name} sel_character_new_screen}
-                        {== {{ui current_screen} name} sel_character_edit_screen}}
-                     {synth play_sequence button_toggle}
-                  }
                   {set [char_outfit] {elem [outfits] $idx}}
                   {quickplay look [char_focus] [char_outfit]}
                   {$this show_portraits}

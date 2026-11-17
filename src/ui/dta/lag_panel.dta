@@ -86,32 +86,15 @@
       )
       (update_helpbar
          {do
-            ($array)
-            {set $array ()}
-            {resize $array 0}
+            ($actions {array 0})
+            ($browse {== [state] browse})
+            ; Help bar labels must be locale tokens; unknown ones draw blank.
+            {ghc_act $actions {! $browse} reset help_reset}
             {if_else {== [state] calibrating}
-               {push_back $array (strum help_hitonchange)}
-               {do
-                  ; Frets first, the strum last: the help bar lays them out
-                  ; left to right in that order, the strum on the far right.
-                  {if {== [state] browse}
-                     {push_back $array (fret1 help_select)}
-                  }
-                  {push_back $array (fret2 help_back)}
-                  {if {!= [state] browse}
-                     {push_back $array (fret3 help_reset)}
-                  }
-                  ; Help bar labels must be locale tokens; unknown ones draw
-                  ; blank.
-                  {push_back $array
-                     {if_else {== [state] browse}
-                        (strum help_updown)
-                        (strum help_adjsync)
-                     }
-                  }
-               }
+               {ghc_helpbar none none {array 0} help_hitonchange}
+               {ghc_helpbar {if_else $browse help_select none} help_back $actions
+                  {if_else $browse help_updown help_adjsync}}
             }
-            {helpbar set_display $array}
          }
       )
       (set_state
@@ -165,12 +148,12 @@
       (nudge
          ($d)
          {latency set [state] {+ {latency get [state]} $d}}
-         {synth play_sequence button_toggle}
+         {ghc_toggle}
          {$this update_text}
       )
       (reset_value
          {latency set [state] 0}
-         {synth play_sequence button_toggle}
+         {ghc_toggle}
          {$this update_text}
       )
       ; One step now, then more while the strum stays held.
@@ -231,7 +214,7 @@
             ({== [state] browse}
                {if_else {== $button kPad_Tri}
                   {do
-                     {synth play_sequence button_back.cue}
+                     {ghc_back}
                      {if_else {== [from_panel] game_settings_panel}
                         {ui goto_screen game_settings_screen}
                         {ui goto_screen {ghc_pause_screen pause_game_settings_screen}}
@@ -242,8 +225,8 @@
             )
             ({== $button kPad_DUp} {$this strum_step up 5})
             ({== $button kPad_DDown} {$this strum_step down -5})
-            ({== $button kPad_Circle} {$this reset_value})
-            ({== $button kPad_Tri} {synth play_sequence button_back.cue} {$this set_state browse})
+            ({ghc_pressed $button reset} {$this reset_value})
+            ({== $button kPad_Tri} {ghc_back} {$this set_state browse})
             (TRUE kDataUnhandled)
          }
       )

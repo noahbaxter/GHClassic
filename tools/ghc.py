@@ -352,7 +352,8 @@ def build(disc=None, recomp=True, lto=False):
     tag = tree_version()
     configure = ["cmake", "-S", ROOT, "-B", GAME, "-DCMAKE_BUILD_TYPE=Release",
                  f"-DGHC_GENERATED_DIR={RECOMP / 'output'}", f"-DGHC_ENABLE_LTO={'ON' if lto else 'OFF'}",
-                 f"-DGHC_VERSION={tag}", f"-DGHC_EXPERIMENTAL={'ON' if experimental(tag) else 'OFF'}", *DEP_CACHE]
+                 f"-DGHC_VERSION={tag}", f"-DGHC_EXPERIMENTAL={'ON' if experimental(tag) else 'OFF'}",
+                 f"-DPython3_EXECUTABLE={sys.executable}", *DEP_CACHE]
     build_step("configuring game", configure, env, "game-configure.log")
     build_step("building game", ["cmake", "--build", GAME, "--target", "GHClassic", "-j", jobs], env, "game.log")
 
@@ -803,8 +804,8 @@ def cmd_ci(argv):
     jobs = str(os.cpu_count() or 4)
     build_tools(env, jobs)
     ci = BUILD / "ci"
-    run(["cmake", "-S", ROOT, "-B", ci, "-DCMAKE_BUILD_TYPE=Release", f"-DGHC_GENERATED_DIR={ci / 'none'}"],
-        env, quiet=True)
+    run(["cmake", "-S", ROOT, "-B", ci, "-DCMAKE_BUILD_TYPE=Release", f"-DGHC_GENERATED_DIR={ci / 'none'}",
+         f"-DPython3_EXECUTABLE={sys.executable}"], env, quiet=True)
     run(["cmake", "--build", ci, "-j", jobs, "--target", "ps2_runtime", "chdr-static", "SDL3-static", "volk",
          "vk-bootstrap", "glslang-standalone", "mpeg2", "save_test", "releases_test", "input_test", "seats_test"], env)
     run([ci / f"save_test{EXE}"], env)

@@ -276,8 +276,12 @@ namespace gh2::script
         return load<int16_t>(rdram, args + 8u);
     }
 
+    // Past a command's last node is whatever its block held before, an
+    // old node a script freed, so nothing is read there: 0.
     Node Call::arg(int i) const
     {
+        if (i >= size())
+            return {0u, kInt};
         const uint32_t node = load<uint32_t>(rdram, args) + 8u * static_cast<uint32_t>(i);
         const uint32_t evaluated =
             static_cast<uint32_t>(runtime->callGuestFunction(rdram, ctx, s_addresses->dataNodeEvaluate, {node}));
@@ -316,6 +320,8 @@ namespace gh2::script
 
     uint32_t Call::object(int i) const
     {
+        if (i >= size())
+            return 0u;
         const uint32_t node = load<uint32_t>(rdram, args) + 8u * static_cast<uint32_t>(i);
         return static_cast<uint32_t>(runtime->callGuestFunction(rdram, ctx, s_addresses->dataNodeGetObj, {node, args}));
     }
