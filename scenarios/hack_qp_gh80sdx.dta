@@ -1,0 +1,8 @@
+; Rocks the 80s Deluxe 2.0's setlist in quickplay, its first song played.
+(needs ghce00080)
+#include common/first_boot.dta
+{set $hack ghce00080}
+(record on gh80sdx_setlist)
+#include common/hack_setlist.dta
+(record off)
+(quit)

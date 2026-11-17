@@ -1,0 +1,28 @@
+; Hack $hack's setlist in quickplay, by the buttons a player presses: the
+; setup's PLAY SHOW, its list picked from yellow's, its first song played
+; with song defaults on, its own cast and venue. Shots of each.
+{quickplay song_defaults 1}
+{setlist select gh2}
+{gamecfg set mode quickplay}
+{ui goto_screen ghc_qp_setup_screen}
+(wait_screen ghc_qp_setup_screen)
+(wait 1)
+(press green)
+(wait_screen qp_selsong_screen)
+(wait 1)
+{qp_selsong_screen ghc_picked $hack}
+(wait_screen qp_selsong_twin_screen)
+(wait 2)
+(expect {setlist shown} $hack)
+(shot setlist)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+{{game get_player_config 0} set autoplay TRUE}
+(press green)
+(wait_screen game_screen 60)
+(expect {campaigns venue_game} $hack)
+(wait 8)
+(shot song)
+(wait 20)
+(shot highway)

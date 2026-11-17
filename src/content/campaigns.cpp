@@ -1,5 +1,6 @@
 #include "content/campaigns.h"
 
+#include "content/games.h"
 #include "content/locale.h"
 #include "content/outfits.h"
 #include "content/setlists.h"
@@ -366,8 +367,13 @@ namespace gh2::campaigns
                 if (only && only->count(reinterpret_cast<const char *>(getMemPtr(guest.call.rdram, guest.value(command, 2)))) == 0u)
                     continue;
                 const uint32_t object = guest.run(s_addresses->dataNodeGetObj, {guest.node(command, 2), command});
+                // One of its own that GH2's UI has none of (a hack's
+                // screens): made as its scripts make it.
                 if (object == 0u)
+                {
+                    guest.run(s_addresses->dataNodeEvaluate, {guest.node(init, i)});
                     continue;
+                }
                 const uint32_t vtable = load<uint32_t>(guest.call.rdram, object);
                 const int16_t delta = load<int16_t>(guest.call.rdram, vtable + kSetTypeDefSlot);
                 guest.run(load<uint32_t>(guest.call.rdram, vtable + kSetTypeDefSlot + 4u),
@@ -552,13 +558,19 @@ namespace gh2::campaigns
             syncConfig(guest, s_campaigns[from], kMetaMusic);
             if (s_career || pick != settings::kMusicAll)
                 return;
-            // The 360's are GH2's, each loop once.
+            // The 360's are GH2's, each loop once. A hack's are its career's
+            // alone: it is no theme (hacks/install.h).
             std::set<std::string> listed(musicOf(from).begin(), musicOf(from).end());
+            const std::vector<std::string> hacks = games::hacks();
             std::string text = "{do ($m {find $syscfg synth metamusic})";
             for (size_t i = 0; i < s_campaigns.size(); ++i)
+            {
+                if (std::find(hacks.begin(), hacks.end(), s_campaigns[i].game) != hacks.end())
+                    continue;
                 for (const std::string &loop : musicOf(i))
                     if (listed.insert(loop).second)
                         text += " {push_back {find $m music} " + loop + "}";
+            }
             text += " {set_elem {find $m play_from_memory} 1 0}}";
             script::run(call.rdram, call.ctx, call.runtime, text);
         }

@@ -1,0 +1,8 @@
+; GH2 Deluxe 2.0's setlist in quickplay, its first song played.
+(needs ghce00020)
+#include common/first_boot.dta
+{set $hack ghce00020}
+(record on gh2dx_setlist)
+#include common/hack_setlist.dta
+(record off)
+(quit)

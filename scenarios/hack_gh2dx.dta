@@ -1,0 +1,9 @@
+; GH2 Deluxe 2.0 (BAGHCE-00020), GH2's executable patched (_SHIP): its own
+; career, screens and text, its first song played.
+(needs ghce00020)
+#include common/first_boot.dta
+{set $hack ghce00020}
+(record on gh2dx_career)
+#include common/hack_career.dta
+(record off)
+(quit)

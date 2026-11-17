@@ -1,0 +1,8 @@
+; GH2 Deluxe Custom Edition's setlist in quickplay, its one song played.
+(needs ghce68878)
+#include common/first_boot.dta
+{set $hack ghce68878}
+(record on ce_setlist)
+#include common/hack_setlist.dta
+(record off)
+(quit)

@@ -235,9 +235,12 @@ namespace gh2
 
             const uint32_t list = call(s_addresses->systemConfig3, {symbol("synth"), symbol("metamusic"), symbol("music")});
             const uint32_t size = static_cast<uint32_t>(load<int16_t>(rdram, list + 8u));
+            // Each a name, or a script that makes one (Deluxe's, by its
+            // easter eggs), evaluated as the game's own reads are.
             const auto pathOf = [&](uint32_t i)
             {
-                const uint32_t name = load<uint32_t>(rdram, load<uint32_t>(rdram, list) + 8u * i);
+                const uint32_t node = call(s_addresses->dataNodeEvaluate, {load<uint32_t>(rdram, list) + 8u * i});
+                const uint32_t name = load<uint32_t>(rdram, node);
                 return "sfx/streams/" + std::string(reinterpret_cast<const char *>(getMemPtr(rdram, name)));
             };
             const uint32_t playing = s_dealt != 0u && s_dealt < size ? rateOf(pathOf(s_dealt)) : 0u;

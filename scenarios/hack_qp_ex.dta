@@ -1,0 +1,8 @@
+; skylerinman's GH2 EX's setlist in quickplay, its first song played.
+(needs slus42000)
+#include common/first_boot.dta
+{set $hack slus42000}
+(record on ex_setlist)
+#include common/hack_setlist.dta
+(record off)
+(quit)

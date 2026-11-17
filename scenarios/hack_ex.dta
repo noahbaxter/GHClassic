@@ -25,6 +25,7 @@
 {set $ghc_switch_as career}
 {ui goto_screen ghc_switch_screen}
 (wait_screen sel_difficulty_screen 40)
+(record on ex_career)
 (expect {campaigns active} slus42000)
 (wait 1)
 (shot difficulty)
@@ -60,6 +61,7 @@
 (expect {game get_venue} slus42000_battle)
 (wait 5)
 (shot song)
+(record off)
 ; Every note missed, and no fail.
 (wait 40)
 (expect {== {ui current_screen} game_screen} 1)

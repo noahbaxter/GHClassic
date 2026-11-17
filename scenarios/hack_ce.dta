@@ -1,0 +1,19 @@
+; GH2 Deluxe Custom Edition (BAGHCE-68878), MiloHax's template for custom
+; songs: Deluxe's scripts for every build, read as its own executable picks
+; among them (_ONYX, games.h), so its fourteen venues and its one song, not
+; GH2DX's setlist. Its career, all its own screens to its song: that song
+; is its only tier's last, an encore, so its setlist shows it blank until
+; earned, as GH2's would.
+(needs ghce68878)
+#include common/first_boot.dta
+(expect {size {campaigns venues ghce68878}} 14)
+(expect {elem {campaigns venues ghce68878} 1} ghce68878_battle2)
+(expect {elem {find $syscfg songs ghce68878_speedtest artist} 1} "ExileLord")
+(expect {setlist has ghce68878} 1)
+{set $hack ghce68878}
+(record on ce_career)
+#include common/hack_career.dta
+(record off)
+; Deluxe's text is in its own files, which its root config lists.
+(expect {localize sponsor_title} "YOU GOT SPONSORED!")
+(quit)

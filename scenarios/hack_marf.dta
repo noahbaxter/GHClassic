@@ -1,0 +1,10 @@
+; marfGH Volume 1 (BAMARF-00005), on a lightened GH2 Deluxe with no career
+; of its own (its career button is quickplay): its songs as a quickplay
+; setlist, its first played in its own venue.
+(needs marf00005)
+#include common/first_boot.dta
+{set $hack marf00005}
+(record on marf_setlist)
+#include common/hack_setlist.dta
+(record off)
+(quit)

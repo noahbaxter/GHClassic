@@ -1,0 +1,9 @@
+; GH1 Redux (BAGHCE-11111): GH1's setlist on Deluxe's 80s base, its scripts
+; as its own build reads them (GH1RX), its own career and first song.
+(needs ghce11111)
+#include common/first_boot.dta
+{set $hack ghce11111}
+(record on gh1redux_career)
+#include common/hack_career.dta
+(record off)
+(quit)

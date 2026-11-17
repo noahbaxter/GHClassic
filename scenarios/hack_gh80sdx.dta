@@ -1,0 +1,9 @@
+; Rocks the 80s Deluxe 2.0 (BAGHCE-00080): Deluxe's scripts as its 80s
+; build reads them (_ENCO), its own career and first song.
+(needs ghce00080)
+#include common/first_boot.dta
+{set $hack ghce00080}
+(record on gh80sdx_career)
+#include common/hack_career.dta
+(record off)
+(quit)

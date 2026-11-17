@@ -106,6 +106,7 @@ namespace
         gh2::ark::install(runtime, gh2::kSlus21447);
         // Before anything reads GH2's config: its songs by our names.
         gh2::sources::addDisc("gh2", 0u);
+        gh2::readHacks();
         gh2::installHeaps();
         gh2::installGuitarCopy();
         // Before GH1's lists, built from GH2's song list and its type.

@@ -1,5 +1,6 @@
 #include "render/font_bake.h"
 
+#include "content/games.h"
 #include "disc/ark.h"
 #include "formats/bitmap.h"
 #include "milo/layout.h"
@@ -583,12 +584,17 @@ namespace gh2
         std::set<std::string> traced;
         for (const std::string &name : vector_fonts::names())
             traced.insert(name + ".font");
-        // Every disc's: a career's song has its own game's HUD.
+        // Every disc's: a career's song has its own game's HUD. A hack's
+        // fonts are its own (content/games.h).
         for (size_t disc = 0u; disc < ark::discs(); ++disc)
+        {
+            if (games::isHack(disc))
+                continue;
             for (const char *folder : kFolders)
                 for (const std::string &path : ark::paths(disc, folder))
                     if (path.ends_with(".milo_ps2"))
                         ark::addFix(disc, path, [disc, path, traced](std::vector<uint8_t> &file)
                                     { fixFonts(disc, path, traced, file); });
+        }
     }
 }
