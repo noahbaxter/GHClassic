@@ -426,6 +426,18 @@ namespace
         CHECK(chart && chart->kicks == std::vector<uint32_t>({0u, 384u}) && chart->drums.size() == 3u &&
               chart->snares.empty());
         CHECK(chart && chart->vocals.size() == 1u && chart->vocals[0].tick == 0u && chart->vocals[0].length == 384u);
+        // A phrase_start needs no phrase_end before it: the one open ends a
+        // beat past its last lyric, or at the next phrase if sooner; the last
+        // one open the same, and a phrase with no lyric is none.
+        const auto unended = parseChart(kOneGemChart + "[Events]\n{\n  0 = E \"phrase_start\"\n  96 = E \"lyric la\"\n"
+                                                       "  1000 = E \"phrase_start\"\n  1100 = E \"lyric la\"\n"
+                                                       "  1200 = E \"lyric la\"\n  1250 = E \"phrase_start\"\n"
+                                                       "  1300 = E \"lyric la\"\n  2000 = E \"phrase_start\"\n}\n",
+                                        {}, why);
+        CHECK(unended && unended->vocals.size() == 3u);
+        CHECK(unended && unended->vocals[0].tick == 0u && unended->vocals[0].length == 288u);
+        CHECK(unended && unended->vocals[1].tick == 1000u && unended->vocals[1].length == 250u);
+        CHECK(unended && unended->vocals[2].tick == 1250u && unended->vocals[2].length == 242u);
         CHECK(chart && chart->keys.empty() && chart->stage.at("EVENTS").cues.size() == 3u &&
               chart->stage.at("EVENTS").cues[1].text == "lyric la");
         const auto keyed = parseChart(text + "[ExpertKeyboard]\n{\n  0 = N 1 0\n  0 = N 3 0\n  192 = N 7 0\n}\n", {}, why);
