@@ -235,12 +235,17 @@ int main()
         CHECK(c.feed(now) && formatSource(*c.found()) == "hat 0 down");
     }
     {
-        // Whammy: a button pressed first is passed over, and the axis keeps
-        // the furthest point it reached on the way.
-        Capture c(rest, Capture::kAxisOnly);
+        // Whammy: a button alone is caught, for a guitar whose adapter drops
+        // its bar.
+        Capture b(rest, Capture::kWhammy);
         now.buttons[0] = true;
-        CHECK(!c.feed(now) && !c.found());
+        CHECK(!b.feed(now));
         now.buttons[0] = false;
+        CHECK(b.feed(now) && b.found() && b.found()->kind == Source::kButton && b.found()->index == 0);
+    }
+    {
+        // Whammy: the axis keeps the furthest point it reached on the way.
+        Capture c(rest, Capture::kWhammy);
         for (float v : {-0.4f, 0.2f, 0.8f, 0.3f})
         {
             now.axes[1] = v;
@@ -285,7 +290,7 @@ int main()
         // Whammy on a pad whose touch sensor flickers and gyro drifts: the
         // stick back at rest is enough.
         const Snapshot pad{{false, false}, {SDL_HAT_CENTERED}, {0.0f, 0.0f, 0.0f}};
-        Capture c(pad, Capture::kAxisOnly);
+        Capture c(pad, Capture::kWhammy);
         Snapshot now = pad;
         now.axes[1] = 1.0f;
         now.axes[2] = 0.6f;
