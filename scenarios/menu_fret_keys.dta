@@ -1,0 +1,66 @@
+; A menu's yellow and blue (the campaign picker's engine, a custom setlist's
+; sort) are on a gamepad's Y and X and the keyboard's 3 and 4, which
+; nothing else in a menu takes. Yellow flips the note engine, two flips of
+; it putting it back.
+(needs gh1)
+#include common/first_boot.dta
+(controller pad "045e:028e" pad)
+(wait 0.5)
+(press dpdown pad)
+(expect {seat_has 0 pad} 1)
+(expect {note_engine picked} gh2)
+
+; Yellow on the campaign picker.
+{gamecfg set mode career}
+{campaign set_profile_name "The Testers" 0}
+{ui goto_screen chooseprof_screen}
+(wait_screen chooseprof_screen)
+(press a pad)
+(wait_screen ghc_campaign_screen)
+(wait 1.5)
+(shot campaigns_pad)
+(press y pad)
+(wait 1)
+(expect {note_engine picked} gh1)
+(keys 3)
+(wait 0.3)
+(keys)
+(wait 1)
+(expect {note_engine picked} gh2)
+
+; Blue, on quickplay's song list, which takes it only on a custom setlist:
+; the press as the UI got it (shared/sfx.dta), the fourth fret.
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 2)
+(press x pad)
+(wait 1)
+(expect {ghc_fret $ghc_press} fret4)
+{set $ghc_press kPad_X}
+(keys 4)
+(wait 0.3)
+(keys)
+(wait 1)
+(expect {ghc_fret $ghc_press} fret4)
+
+; Select, on the song list, opens and shuts the song defaults list: a pad's
+; Back, then the keyboard's Shift.
+(expect {ghc_pick_panel get open} 0)
+(press back pad)
+(wait 1)
+(expect {ghc_pick_panel get open} 1)
+(press back pad)
+(wait 1)
+(expect {ghc_pick_panel get open} 0)
+(keys "Right Shift")
+(wait 0.3)
+(keys)
+(wait 1)
+(expect {ghc_pick_panel get open} 1)
+(keys "Left Shift")
+(wait 0.3)
+(keys)
+(wait 1)
+(expect {ghc_pick_panel get open} 0)
+(quit)

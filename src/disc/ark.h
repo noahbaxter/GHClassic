@@ -35,6 +35,10 @@ namespace gh2::ark
     void addMade(const std::string &path, std::function<std::optional<Made>()> make);
     // One that is those bytes, kept for as long as it is read.
     Made held(std::vector<uint8_t> bytes);
+    // Each file under `prefix` the same way, `make` given its path, for
+    // files too many to add one by one: none where it has nothing there,
+    // looked for again the next time.
+    void addMaker(const std::string &prefix, std::function<std::optional<Made>(const std::string &path)> make);
 
     // A file served in place of that disc's own copy of `path`, wherever its
     // copy would be (as a rename's source, under a layer over it, or in the
@@ -72,6 +76,9 @@ namespace gh2::ark
 
     // A file's bytes from that disc's archive alone.
     std::optional<std::vector<uint8_t>> readFile(size_t disc, const std::string &path);
+    // Its bytes as that disc has them, no fix applied: for another thread
+    // than the game's, once install has run.
+    std::optional<std::vector<uint8_t>> readOwn(size_t disc, const std::string &path);
 
     // A PAL release keeps a folder for each language where the USA one has
     // one file, and its videos in videos_pal: that disc's English files and
@@ -122,6 +129,8 @@ namespace gh2::ark
     // The layer in front's own file at `path`, or its disc's, read in place
     // as it is asked for. None with no layer in front, or none there.
     std::optional<Made> openFront(const std::string &path);
+    // A file as the game would get it, read in place as it is asked for.
+    std::optional<Made> open(const std::string &path);
 
     // Where a file's bytes live, its part and offset there, as it is found
     // now: one disc's copy differs from another's.

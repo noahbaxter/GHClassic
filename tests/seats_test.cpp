@@ -113,6 +113,20 @@ int main()
         CHECK(kPlayers > 2 || seats.seatOf(c) < 0);
     }
 
+    // On the main menu Start joins the next free seat too, but a fret on
+    // another controller still takes P1 from one player alone, and nothing
+    // trades seats there.
+    {
+        Seats seats;
+        press(seats, {device(a, pad::kR2), device(b), device(c)}, Mode::kJoin);
+        press(seats, {device(a), device(b, pad::kR2), device(c)}, Mode::kJoin);
+        CHECK(seats[0] == b && seats[1].none());
+        press(seats, {device(a, pad::kStart), device(b), device(c)}, Mode::kJoin);
+        CHECK(seats[0] == b && seats[1] == a);
+        press(seats, {device(a, pad::kTriangle), device(b), device(c)}, Mode::kJoin);
+        CHECK(seats[0] == b && seats[1] == a);
+    }
+
     // Yellow there moves a player up a seat, the first round to the last.
     {
         Seats seats;

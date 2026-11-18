@@ -1,0 +1,22 @@
+; input.ini's [menu gamepad] rebinds every gamepad's menu controls: with
+; green on Y and red on X, Y picks and X backs out, and A and B do neither.
+#include common/first_boot.dta
+(menu_bind gamepad green "pad y")
+(menu_bind gamepad red "pad x")
+(controller pad "045e:028e" pad)
+(wait 0.5)
+(press dpdown pad)
+(expect {seat_has 0 pad} 1)
+(wait 1)
+(expect {main_screen focus_name} main_options.btn)
+(press a pad)
+(wait 0.5)
+(expect {{ui current_screen} name} main_screen)
+(press y pad)
+(wait_screen options_screen 10)
+(press b pad)
+(wait 0.5)
+(expect {{ui current_screen} name} options_screen)
+(press x pad)
+(wait_screen main_screen 10)
+(quit)

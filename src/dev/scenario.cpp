@@ -4,6 +4,7 @@
 #include "dev/transplant.h"
 #include "frame_step.h"
 #include "dev/draw_dump.h"
+#include "dev/timing.h"
 #include "ps2_runtime_macros.h"
 #include "guest.h"
 #include "hook.h"
@@ -254,12 +255,15 @@ namespace gh2::scenario
                 }
                 if (verb == "key")
                 {
-                    // A key by SDL's name (Tab, Return, Escape, Up), held
-                    // as a press is.
-                    s_pressKey = SDL_GetScancodeFromName(array.symbol(1).c_str());
+                    // A key by SDL's name (Tab, Return, Escape, Up, a digit),
+                    // held as a press is.
+                    const std::string name = array.symbol(1).empty()
+                                                 ? std::to_string(static_cast<int>(array.number(1)))
+                                                 : array.symbol(1);
+                    s_pressKey = SDL_GetScancodeFromName(name.c_str());
                     if (s_pressKey == SDL_SCANCODE_UNKNOWN)
                     {
-                        std::cerr << "[scenario] FAIL: no key " << array.symbol(1) << std::endl;
+                        std::cerr << "[scenario] FAIL: no key " << name << std::endl;
                         quit();
                         return;
                     }
@@ -278,10 +282,17 @@ namespace gh2::scenario
                     s_heldKeys.clear();
                     for (int k = 1; k < array.size(); ++k)
                     {
-                        // A digit's key reads as its number.
-                        const std::string name = array.symbol(k).empty()
-                                                     ? std::to_string(static_cast<int>(array.number(k)))
-                                                     : array.symbol(k);
+                        // A digit's key reads as its number, and a name with a
+                        // space ("Right Shift") as a string.
+                        std::string name = array.symbol(k);
+                        if (name.empty())
+                        {
+                            name = text(rdram, array.arg(k));
+                            char *end = nullptr;
+                            const double number = std::strtod(name.c_str(), &end);
+                            if (end != name.c_str() && *end == '\0')
+                                name = std::to_string(static_cast<int>(number));
+                        }
                         const int key = SDL_GetScancodeFromName(name.c_str());
                         if (key == SDL_SCANCODE_UNKNOWN)
                         {
@@ -374,6 +385,9 @@ namespace gh2::scenario
                 else if (verb == "hold")
                     // Pad buttons held until the next (hold), libpad bits: (hold 0) lets go.
                     setScriptedPad(static_cast<uint16_t>(array.number(1)));
+                else if (verb == "whammy")
+                    // The whammy held this far down, 0 to 1, until the next (whammy).
+                    setScriptedWhammy(array.number(1));
                 else if (verb == "fly")
                     // The free camera's keys held until the next (fly), right and forward
                     // from -1 to 1, and the mouse moved once, pixels right and down. Then,
@@ -419,6 +433,11 @@ namespace gh2::scenario
                     // A controller that is not there, by name; its presses go
                     // through the seat rules. Read from the file at boot too.
                     addScriptedDevice(array.symbol(1));
+                else if (verb == "menu_bind")
+                    // (menu_bind keyboard|gamepad <action> "<controls>"): a
+                    // line of input.ini's [menu keyboard] or [menu gamepad],
+                    // for this run alone.
+                    bindScriptedMenu(array.symbol(1) == "keyboard", array.symbol(2), text(rdram, array.arg(3)));
                 else if (verb == "controller")
                 {
                     // One plugged into SDL as a real one is: "vendor:product"
@@ -514,6 +533,10 @@ namespace gh2::scenario
                     requestDrawDump(array.symbol(1), building().serial + 1u);
                     s_shooting = true;
                     return;
+                }
+                else if (verb == "songs")
+                {
+                    // Read by ghc.py before the run, as the folders setting.
                 }
                 else if (verb == "needs")
                 {
@@ -637,6 +660,7 @@ namespace gh2::scenario
         struct SecondsBeatTag;
         void onSetSecondsBeat(uint8_t *, R5900Context *ctx, PS2Runtime *)
         {
+            timing::songSeconds(ctx->f[12]);
             if (!s_frozen)
                 return;
             ctx->f[12] = s_seconds;

@@ -20,11 +20,30 @@
 #include "content/campaigns.h"
 #include "content/setlists.h"
 #include "content/songs.h"
+#include "content/practice_sounds.h"
+#include "content/song_speed.h"
 #include "content/status_line.h"
+#include "ui/background_save.h"
 #include "ui/fast_boot.h"
 #include "frame_step.h"
 #include "game_overrides.h"
 #include "gh1/face.h"
+#include "custom/install.h"
+#include "highway/cyan_stars.h"
+#include "gameplay/extended/guitar/gem_kinds.h"
+#include "gameplay/extended/guitar/hammer_ons.h"
+#include "gameplay/extended/guitar/lane_hits.h"
+#include "highway/extended/guitar/lane_bands.h"
+#include "gameplay/extended/guitar/open_chord_hits.h"
+#include "highway/extended/guitar/open_gems.h"
+#include "highway/extended/guitar/open_bursts.h"
+#include "highway/extended/guitar/open_tails.h"
+#include "highway/extended/guitar/sustain_tails.h"
+#include "highway/extended/guitar/sustain_flames.h"
+#include "gameplay/extended/guitar/sustain_hold.h"
+#include "highway/extended/guitar/tap_gems.h"
+#include "highway/extended/guitar/tap_line.h"
+#include "highway/gem_looks.h"
 #include "gh1/install.h"
 #include "gh80s/install.h"
 #include "gh2x/install.h"
@@ -36,6 +55,12 @@
 #include "ui/zebra_wall.h"
 #include "settings/latency.h"
 #include "settings/settings.h"
+#include "ui/list_scroll.h"
+#include "ui/transitions.h"
+#include "ui/press_size.h"
+#include "ui/screen_loads.h"
+#include "guest/bin_reads.h"
+#include "ui/text_fit.h"
 #include "ui/locale.h"
 #include "ui/menus.h"
 #include "ui/meta_music.h"
@@ -44,11 +69,11 @@
 #include "ui/slider_scale.h"
 #include "movie/movie.h"
 #include "dev/cheats.h"
-#include "gameplay/hopo_lock.h"
+#include "gameplay/engine/hopo_lock.h"
 #include "lefty_guitarist.h"
-#include "gameplay/note_speed.h"
-#include "gameplay/note_engine/note_engine.h"
-#include "gameplay/retrack.h"
+#include "highway/note_speed.h"
+#include "gameplay/engine/note_engine.h"
+#include "highway/retrack.h"
 #include "streak/counter.h"
 #include "streak/note_streak.h"
 #include "dev/null_rnd.h"
@@ -74,10 +99,11 @@
 #include "dev/transplant.h"
 #include "synth/synth.h"
 #include "settings/video_options.h"
-#include "gameplay/strum_limit.h"
-#include "gameplay/sustain_release.h"
-#include "gameplay/track_start.h"
-#include "gameplay/whammy_hold.h"
+#include "gameplay/engine/star_power_overlap.h"
+#include "gameplay/engine/strum_limit.h"
+#include "gameplay/engine/sustain_release.h"
+#include "gameplay/engine/track_start.h"
+#include "gameplay/engine/whammy_hold.h"
 
 namespace
 {
@@ -94,6 +120,9 @@ namespace
         gh2::installGh1();
         gh2::installClassicLogo();
         gh2::installGh2x();
+        gh2::installCustomSongs();
+        gh2::song_speed::install(runtime, gh2::kSlus21447);
+        gh2::practice_sounds::install(runtime, gh2::kSlus21447);
         gh2::installHiddenGuitars();
         gh2::installGh1Face(runtime, gh2::kSlus21447);
         gh2::outfits::install(runtime, gh2::kSlus21447);
@@ -121,7 +150,17 @@ namespace
         gh2::installMetaMusic(runtime, gh2::kSlus21447);
         gh2::installTrackStart(runtime, gh2::kSlus21447);
         gh2::installSustainRelease(runtime, gh2::kSlus21447);
+        gh2::installGemLooks(runtime, gh2::kSlus21447);
+        gh2::guitar::installSustainTails(runtime, gh2::kSlus21447);
+        gh2::guitar::installOpenGems(runtime, gh2::kSlus21447);
+        gh2::guitar::installOpenTails(runtime, gh2::kSlus21447);
+        gh2::guitar::installOpenBursts(runtime, gh2::kSlus21447);
         gh2::installWhammyHold(runtime, gh2::kSlus21447);
+        gh2::installStarPowerOverlap(runtime, gh2::kSlus21447);
+        gh2::guitar::installCyanStars(runtime, gh2::kSlus21447);
+        // After the cyan stars, which it copies.
+        gh2::guitar::installTapGems(runtime, gh2::kSlus21447);
+        gh2::guitar::installTapLine(runtime, gh2::kSlus21447);
         gh2::installHopoLock(runtime, gh2::kSlus21447);
         // Off, neither is installed: the score and rock meters stay where
         // retail has them.
@@ -134,6 +173,20 @@ namespace
             gh2::installSongProgress(runtime, gh2::kSlus21447);
         gh2::installFontBake();
         gh2::installNoteEngine(runtime, gh2::kSlus21447);
+        // Over the note engine's: a custom chart's kinds answer before GH1's
+        // marking, its taps and opens before GH1's hammer-on rules, and the
+        // frets held for its sustains are left out of what either engine sees.
+        gh2::guitar::installGemKinds(runtime, gh2::kSlus21447);
+        gh2::guitar::installHammerOns(runtime, gh2::kSlus21447);
+        // Over hammer_ons' CanHopo.
+        gh2::guitar::installOpenChordHits(runtime, gh2::kSlus21447);
+        // Over hammer_ons' FretButtonUp.
+        gh2::guitar::installSustainHold(runtime, gh2::kSlus21447);
+        gh2::guitar::installSustainFlames(runtime, gh2::kSlus21447);
+        // Its strums seen before either engine's Swing, its misses and
+        // passes answered before theirs.
+        gh2::guitar::installLaneHits(runtime, gh2::kSlus21447);
+        gh2::guitar::installLaneBands(runtime, gh2::kSlus21447);
         // After the note engine, whose hook on BeatMatcher::Swing it wraps:
         // a strum it drops never reaches the engine.
         gh2::installStrumLimit(runtime, gh2::kSlus21447);
@@ -149,15 +202,23 @@ namespace
         gh2::installLocale(runtime, gh2::kSlus21447);
         gh2::installLatency(runtime, gh2::kSlus21447);
         gh2::installPad(runtime, gh2::kSlus21447);
+        gh2::list_scroll::install(runtime, gh2::kSlus21447);
+        gh2::transitions::install(runtime, gh2::kSlus21447);
+        gh2::press_size::install(runtime, gh2::kSlus21447);
+        gh2::screen_loads::install(runtime, gh2::kSlus21447);
+        gh2::bin_reads::install(runtime, gh2::kSlus21447);
+        gh2::text_fit::install(gh2::kSlus21447);
         gh2::installFrameStep(runtime, gh2::kSlus21447);
         gh2::installMenus(runtime);
         gh2::installPhotoMode(runtime, gh2::kSlus21447);
+        gh2::background_save::install(runtime, gh2::kSlus21447);
         gh2::installHelpBar(runtime, gh2::kSlus21447);
         gh2::menu_guitarist::install(runtime, gh2::kSlus21447);
         gh2::installPlayers(runtime);
         gh2::installControllers(runtime);
         // After the help bar, which recolours its scene's own pixels.
         gh2::installGh2xAssets(runtime, gh2::kSlus21447);
+        gh2::prebakeFonts();
         // After the 360's scenes, the streak counter and the font bake: its
         // highway starts from theirs, and is served over the 360's.
         gh2::installGh1Highway();

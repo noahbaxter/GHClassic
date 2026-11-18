@@ -1,0 +1,58 @@
+; A custom song at 120%: the results paper names it "Test Song (120%)", as
+; its intro's caption and every screen naming the song in play do, and
+; the song list's printout shows its title and best at the speed picked,
+; changed as Select's speed row steps and put back by red.
+(songs songs)
+#include common/first_boot.dta
+; A profile's, as a guest keeps no best.
+(device guitar)
+(press down guitar)
+(wait 0.5)
+{ghc_profile make 0 "Tester"}
+{gamecfg set mode quickplay}
+{setlist select custom}
+{song_speed set 120}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+{{game get_player_config 0} set autoplay TRUE}
+(press down)
+(press green)
+(wait_screen game_screen 60)
+(wait 2)
+(shot intro_caption)
+(wait_screen endgame_screen 120)
+(wait 2)
+; Every screen's name of the song in play has its speed after it.
+(expect {game get_song_text} "Test Song (120%)")
+(shot results_120)
+(press green)
+(wait_screen complete_screen 30)
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(expect {!= {custom best {game get_song}} "NOT PLAYED"} 1)
+(shot printout_120)
+; The custom list's menu opens on RANDOM SONG; speed is under it.
+(press star_power)
+(wait 1)
+(press down)
+(press green)
+(expect {ghc_pick_panel get editing} speed)
+(press down)
+(press down)
+(press down)
+(press down)
+(wait 1)
+(expect {song_speed} 100)
+(expect {custom best {game get_song}} "NOT PLAYED")
+(shot printout_100)
+(press red)
+(wait 1)
+(expect {song_speed} 120)
+(shot printout_120_back)
+(quit)

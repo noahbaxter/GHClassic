@@ -36,9 +36,19 @@ namespace gh2::poster_meshes
                                         const std::array<float, 3> *light = nullptr,
                                         const std::array<float, 3> &tint = {1.0f, 1.0f, 1.0f});
 
+    // A meshBody drawn with `mat` put out of sight: its Draw's showing off,
+    // the Draw just before the Mat's name (its revision 3, showing, no
+    // children, its sphere). False for a body not laid out so.
+    bool hide(milo::Bytes &body, const std::string &mat);
+
     // A flat picture 2 half-wide by 2 half-high, facing -y, z up, its uvs
     // across from u0 to u1.
     Mesh quad(float halfWide, float halfHigh, float u0 = 0.0f, float u1 = 1.0f);
+
+    // A flat ring 1 across its outside, `inside` of that within, facing -y:
+    // the note engine's mark (content/campaign_case.h) and a seat's
+    // (ui/help_bar.cpp); a disc at 0.
+    Mesh ring(float inside = 0.84f);
 
     // A Tex like `like` whose bitmap is a small stand-in for that picture,
     // which the host draws at its own size (render/texture_store.h).

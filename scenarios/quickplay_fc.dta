@@ -38,8 +38,9 @@
 (wait_screen main_screen)
 {campaign mark_needs_save}
 {autosave_goto main_screen}
-(wait_screen autosave)
+; Saved in the background, no screen.
 (wait_screen main_screen)
+(wait_until {! {campaign needs_save}})
 {ui goto_screen bootup_load}
 (wait_screen guitar_help_screen)
 (expect {campaigns full_combo shoutatthedevil 3} 1)

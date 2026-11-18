@@ -4,8 +4,9 @@
 ; takes at load, so a switch goes to the twin screen, whose own panel loads
 ; the new one. Both leave for the main menu, never for each other.
 ;
-; The setlists there are to show: GH2's, and each other game's whose disc is
-; mounted ({mounted}, content/games.h).
+; The setlists there are to show: GH2's, each other game's whose disc is
+; mounted ({mounted}, content/games.h), and the player's own songs where
+; there are any (custom/install.h).
 {func ghc_setlists
    {do
       ($lists)
@@ -14,25 +15,435 @@
       {foreach $game (gh1 gh2 gh2x gh80s)
          {if {|| {== $game gh2} {mounted $game}} {push_back $lists $game}}
       }
+      {if {setlist has custom} {push_back $lists custom}}
       $lists
    }
 }
-; The yellow fret shows only where there is another setlist; blue names the
-; note engine quickplay judges by, and changes it. Set from the screen's
-; enter, after the help bar's own has put up the screen's default.
+; The song list scene's paper, each piece put on again past where the scene
+; ends it (content/setlist_paper.cpp).
+{set $ghc_paper
+   (ss_songlist.view setlist1.mesh setlist2.mesh setlist3.mesh setlist4.mesh setlist5.mesh ss_bigwall.mesh
+      doodle1.mesh doodle2.mesh doodle3.mesh doodle4.mesh doodle5.mesh doodle6.mesh
+      doodle7.mesh doodle8.mesh doodle9.mesh doodle10.mesh doodle11.mesh doodle12.mesh)
+}
+; A custom song's details printed on the multiplayer stats' green-bar paper
+; (ghc_printout.mesh, content/setlist_printout.cpp), in its receipt type, hung down
+; the custom list's right side with the song's album art on the store's
+; sticker at its head. It slides in from the right once the screen is up.
+; It hangs from ss_info.view, which GH2's scene leaves empty and nothing
+; moves, so it stays put while the list scrolls under it; everything else
+; hangs from the paper. Made on a poll once the screen is up, as the
+; classic logo is (main_menu.dta). The game's own setlists have no art and
+; never show it.
+;
+; In the sheet's units, 600 a sheet wide, a unit 2.26 pixels at 1080p, the
+; screen's middle 0, z up. The paper's middle where it rests (its right
+; edge inside 4:3's, 318) and where it slides in from (past a 21:9
+; screen's edge, 557, so none of it shows before), and how long that
+; takes in seconds; its margin.
+{set $ghc_info_rest 202}
+{set $ghc_info_from 700}
+{set $ghc_info_slide 0.15}
+{set $ghc_info_margin 26}
+; The paper's width (content/setlist_printout.cpp's kPrintout), and the room its
+; margins leave a line.
+{set $ghc_info_width 230}
+{set $ghc_info_room {'-' $ghc_info_width {'*' 2 $ghc_info_margin}}}
+; Each piece on the paper: where its middle is, how far it is turned, and
+; its draw order. The sticker 159 up; the cover off its middle by as much
+; as the store's own covers on it are (us_logo_jordan_keep,
+; us_logo_rawdog_keep: 2 of its 256 right and up); the tape over the
+; cover's top edge, a third of its 20 on the cover (59.3 + 3.4 up), turned
+; a little.
+{set $ghc_info_pieces
+   (
+      (ghc_sticker 1 159 0 10.5)
+      (ghc_art 2.08 160.08 0 10.6)
+      (ghc_tape 2.08 222.8 2 10.7)
+   )
+}
+; The values' ink, and the keys' grey, lighter than the values'.
+{set $ghc_info_value_ink 0.24}
+{set $ghc_info_key_color 0.55}
+{set $ghc_info_artist_ink 0.12}
+; The paper's lines, laid out afresh for each song from the top down: as
+; many labels as the longest layout takes.
+{set $ghc_info_pool 24}
+; Over the paper's middle: the top of what goes under the sticker, the top
+; of the second rule's line, and the best's foot under it, above the help
+; bar. The title and artist, the first rule and the details go between,
+; what room they leave shared out evenly between them; a rule's line is
+; this tall.
+{set $ghc_info_top 88}
+{set $ghc_info_rule2 -138}
+{set $ghc_info_best -168}
+{set $ghc_info_rule 12}
+; Each part's size, the height of its lines, and the most it wraps to.
+{set $ghc_info_title (10 15 3)}
+{set $ghc_info_artist (8 11 2)}
+{set $ghc_info_detail (7.5 15 2)}
+; What a key's column takes from a value on its row.
+{set $ghc_info_keys 60}
+; When the paper started in: -2 from the screen's enter until it is up,
+; -1 once at rest.
+{set $ghc_info_since -1}
+{func ghc_info_make ($i_dir)
+   {if {&& {== {setlist shown} custom} {$i_dir find ghc_printout.mesh FALSE}
+         {! {$i_dir find ghc_info_0.lbl FALSE}} {! {ui in_transition}}}
+      {do
+         ($paper {$i_dir find ghc_printout.mesh})
+         {{$i_dir find printerpaper1.mat} set z_mode 3}
+         {$paper set_mat {$i_dir find printerpaper1.mat}}
+         {$paper set trans_parent {$i_dir find ss_info.view}}
+         {$paper set_local_rot 0 0 0}
+         {$paper set_local_pos $ghc_info_from 0 0}
+         {$paper set draw_order 10}
+         {foreach $piece $ghc_info_pieces
+            {do
+               ($mesh {$i_dir find {sprint {elem $piece 0} ".mesh"}})
+               ($mat {$i_dir find {sprint {elem $piece 0} ".mat"}})
+               {$mat set z_mode 3}
+               {$mesh set_mat $mat}
+               {$mesh set trans_parent $paper}
+               {$mesh set_local_rot 0 {elem $piece 3} 0}
+               {$mesh set_local_pos {elem $piece 1} -0.5 {elem $piece 2}}
+               {$mesh set draw_order {elem $piece 4}}
+            }
+         }
+         ; The instruments' icons, put in place by ghc_info_parts.
+         {foreach $part $ghc_info_parts
+            {do
+               ($mesh {$i_dir find {sprint "ghc_icon_" $part ".mesh"}})
+               ($mat {$i_dir find {sprint "ghc_icon_" $part ".mat"}})
+               {$mat set z_mode 3}
+               {$mesh set_mat $mat}
+               {$mesh set trans_parent $paper}
+               {$mesh set_local_rot 0 0 0}
+               ; under the labels, so rhythm's R prints over its guitar
+               {$mesh set draw_order 10.8}
+            }
+         }
+         {foreach_int $n 0 $ghc_info_pool
+            {do
+               ($l {new BandLabel {sprint "ghc_info_" $n ".lbl"}})
+               {$l set_type receipt}
+               {$l set trans_parent $paper}
+               {$l set width $ghc_info_room}
+               {$l set color {pack_color $ghc_info_value_ink $ghc_info_value_ink {'+' $ghc_info_value_ink 0.03}}}
+               {$l set draw_order 11}
+            }
+         }
+         {do
+            ($l {new BandLabel ghc_scan.lbl})
+            {$l set_type receipt}
+            {$l set trans_parent $paper}
+            {$l set width $ghc_info_room}
+            {$l set color {pack_color $ghc_info_key_color $ghc_info_key_color {'+' $ghc_info_key_color 0.03}}}
+            {$l set alignment 65}
+            {$l set text_size $ghc_scan_size}
+            {$l set_local_pos {'-' $ghc_info_margin {/ $ghc_info_width 2}} -1 $ghc_scan_z}
+            {$l set draw_order 11}
+            {$l set_showing FALSE}
+         }
+         {{$i_dir loaded_dir} sync_objects}
+         {ghc_info_show $i_dir}
+      }
+   }
+   {if {&& {== $ghc_info_since -2} {! {ui in_transition}}} {set $ghc_info_since {taskmgr ui_seconds}}}
+   {ghc_info_slide $i_dir}
+}
+; While the song folders are scanned, how far it is, in the keys' grey at
+; the paper's foot (custom/scan_status.h). Set on a poll, only when it
+; changes.
+{set $ghc_scan_size 7.5}
+{set $ghc_scan_z 76}
+{set $ghc_scan_text ''}
+{func ghc_scan_update ($s_dir)
+   {if {$s_dir find ghc_scan.lbl FALSE}
+      {do
+         ($l {$s_dir find ghc_scan.lbl})
+         ($text {custom scan})
+         ($shown {&& {== {setlist shown} custom} {custom ours {game get_song}} {!= $text ''}})
+         {if {!= $text $ghc_scan_text}
+            {set $ghc_scan_text $text}
+            {if {!= $text ''} {$l set_localized_text $text}}
+         }
+         {$l set_showing $shown}
+      }
+   }
+}
+; In from the right, slowing as it comes to rest.
+{func ghc_info_slide ($i_dir)
+   {if {&& {>= $ghc_info_since 0} {$i_dir find ghc_info_0.lbl FALSE}}
+      {do
+         ($t {min 1 {/ {'-' {taskmgr ui_seconds} $ghc_info_since} $ghc_info_slide}})
+         ($left {'-' 1 $t})
+         {{$i_dir find ghc_printout.mesh} set_local_pos
+            {'+' $ghc_info_rest {'*' {'*' {'*' {'-' $ghc_info_from $ghc_info_rest} $left} $left} $left}} 0 0}
+         {if {>= $t 1} {set $ghc_info_since -1}}
+      }
+   }
+}
+; The song the list is on previewed. A custom song's waits, silent, for its
+; audio to be read off its disk ({custom ready}), so scrolling never does;
+; this song's preview is the one playing once it starts. None starts until
+; the list has rested on a song a few frames, so a held strum going by
+; plays none. The list goes on being polled once it is left, so none starts
+; then either.
+{set $ghc_preview_live FALSE}
+{set $ghc_preview_on ''}
+{set $ghc_preview_rest 0}
+{set $ghc_preview_frames 9}
+; Up or down held long enough to speed up, and the paper waiting for it.
+{set $ghc_scroll_rushing FALSE}
+{set $ghc_info_due FALSE}
+{func ghc_preview ($p_song)
+   {set $ghc_preview_rest 0}
+   {if_else {custom ours $p_song}
+      {do
+         ; Its art and its neighbours' read on ahead from each song gone
+         ; by, the paper or not.
+         {custom art $p_song}
+         {if {!= $p_song $ghc_preview_on}
+            {song_preview ''}
+            {set $ghc_preview_on ''}
+         }
+      }
+      {song_preview $p_song}
+   }
+}
+{func ghc_preview_poll
+   {do
+      ($song {game get_song})
+      {set $ghc_preview_rest {'+' $ghc_preview_rest 1}}
+      {if {&& $ghc_preview_live {>= $ghc_preview_rest $ghc_preview_frames} {custom ours $song} {!= $song $ghc_preview_on}
+            {custom ready $song}}
+         {song_preview $song}
+         {set $ghc_preview_on $song}
+      }
+   }
+}
+; The paper's lines for the song the list is on; hidden on another setlist.
+{func ghc_info_show ($s_dir)
+   {if {$s_dir find ghc_info_0.lbl FALSE}
+      {do
+         ($song {game get_song})
+         ($shown {&& {== {setlist shown} custom} {custom ours $song}})
+         {{$s_dir find ghc_printout.mesh} set_showing $shown}
+         {{$s_dir find ghc_sticker.mesh} set_showing $shown}
+         {{$s_dir find ghc_tape.mesh} set_showing $shown}
+         {foreach_int $n 0 $ghc_info_pool {{$s_dir find {sprint "ghc_info_" $n ".lbl"}} set_showing FALSE}}
+         {foreach $part $ghc_info_parts {{$s_dir find {sprint "ghc_icon_" $part ".mesh"}} set_showing FALSE}}
+         {ghc_info_art $s_dir}
+         {if $shown
+            {set $ghc_info_n 0}
+            {do
+               ($title {text_fit upper {ghc_speed_title {custom tag $song name}}})
+               ($artist {text_fit upper {custom tag $song artist}})
+               ($tn {ghc_info_count $s_dir $title $ghc_info_title $ghc_info_room})
+               ($an {ghc_info_count $s_dir $artist $ghc_info_artist $ghc_info_room})
+               ; The title over the artist, 4 between.
+               ($names {'+' {'*' $tn {elem $ghc_info_title 1}} {'+' 4 {'*' $an {elem $ghc_info_artist 1}}}})
+               ($details {'*' {ghc_info_details $s_dir $song 0 FALSE} {elem $ghc_info_detail 1}})
+               ; Under the scan's line while it shows, never up over it.
+               ($scan {!= {custom scan} ''})
+               ($top {if_else $scan {'-' $ghc_scan_z 4} $ghc_info_top})
+               ; Four gaps: over the title, either side of the first rule
+               ; and over the parts' row, which stays put over the second.
+               ($gap {/ {'-' {'-' {'-' $top {ghc_info_parts_top}} $ghc_info_rule} {'+' $names $details}} 4})
+               ($at {'-' $top {if_else $scan {max 0 $gap} $gap}})
+               {ghc_info_lines $s_dir $title $ghc_info_title $ghc_info_room
+                  {'+' {'-' $at {elem $ghc_info_title 1}} 2} FALSE}
+               ; The artist's thin small type darker, to read as dark as
+               ; the title's.
+               {set $ghc_info_ink $ghc_info_artist_ink}
+               {ghc_info_lines $s_dir $artist $ghc_info_artist $ghc_info_room
+                  {'+' {'-' $at {'+' {'*' $tn {elem $ghc_info_title 1}} {'+' 4 {elem $ghc_info_artist 1}}}} 2} FALSE}
+               {set $ghc_info_ink $ghc_info_value_ink}
+               {set $at {'-' $at {'+' $names $gap}}}
+               {ghc_info_dashes $s_dir $at}
+               {set $at {'-' $at {'+' $ghc_info_rule $gap}}}
+               {ghc_info_details $s_dir $song {'+' {'-' $at {elem $ghc_info_detail 1}} 3} TRUE}
+               {ghc_info_parts $s_dir $song}
+               {ghc_info_dashes $s_dir $ghc_info_rule2}
+               {ghc_info_key $s_dir {text_fit upper best} 8 $ghc_info_best}
+               {ghc_info_line $s_dir {custom best $song} 8 $ghc_info_best TRUE}
+            }
+         }
+      }
+   }
+}
+; The song's album art on the sticker once it is read off its disk ({custom
+; art}, which reads it and its neighbours' ahead), so the list never waits
+; on it: a scan busy on a network drive can hold a read up a second. Put on
+; once a song.
+{set $ghc_art_on ''}
+{func ghc_info_art ($a_dir)
+   {do
+      ($song {game get_song})
+      ($art {&& {== {setlist shown} custom} {custom art $song}})
+      {if {&& $art {!= $song $ghc_art_on}}
+         {{$a_dir find ghc_art.tex} set_bitmap {sprint "ui/image/ghc_art_" $song ".png"}}
+         {set $ghc_art_on $song}
+      }
+      {{$a_dir find ghc_art.mesh} set_showing $art}
+   }
+}
+; The details a song has, a key on the left and its value on the right of
+; its row, or on its own rows under the key where it runs too wide for
+; that; their rows' feet from z down if placed. How many rows they take.
+{func ghc_info_details ($d_dir $d_song $d_z $d_place)
+   {set $ghc_info_rows 0}
+   {foreach $key (album year genre length charter)
+      {do
+         ($v {text_fit upper
+            {if_else {== $key length} {custom length $d_song} {custom tag $d_song $key}}
+         })
+         ($pitch {elem $ghc_info_detail 1})
+         ($z {'-' $d_z {'*' $ghc_info_rows $pitch}})
+         {if {> {ghc_info_count $d_dir $v $ghc_info_detail $ghc_info_room} 0}
+            {do
+               ($beside {== 1 {ghc_info_count $d_dir $v $ghc_info_detail {'-' $ghc_info_room $ghc_info_keys}}})
+               {if $d_place
+                  {ghc_info_key $d_dir {text_fit upper $key} {elem $ghc_info_detail 0} $z}
+                  {ghc_info_lines $d_dir $v $ghc_info_detail
+                     {if_else $beside {'-' $ghc_info_room $ghc_info_keys} $ghc_info_room}
+                     {if_else $beside $z {'-' $z $pitch}} TRUE}
+               }
+               {set $ghc_info_rows
+                  {'+' $ghc_info_rows
+                     {'+' 1 {if_else $beside 0 {ghc_info_count $d_dir $v $ghc_info_detail $ghc_info_room}}}}}
+            }
+         }
+      }
+   }
+   $ghc_info_rows
+}
+; The parts the chart has, as Warriors of Rock's setlist draws them: a row
+; of icons (ghc_icon_<part>.mesh, content/setlist_printout.cpp) across the
+; paper's middle, centred, each song.ini difficulty under its icon, or a
+; dash where it gives none (GH1 to GH3 rips give none). The guitar, or
+; lead's and rhythm's with an L and an R where the chart has both, then
+; bass, drums and vocals; drums and vocals faded, not played yet. The row
+; stays put whatever is over it, as the best does, its numbers' feet just
+; over the second rule. An icon's side, their middles apart, the gap under
+; them, the numbers' size, the gap under them, a faded icon's alpha and
+; the letters' size.
+{set $ghc_info_parts (guitar rhythm bass drums vocals)}
+{set $ghc_info_icon 34}
+{set $ghc_info_step 36}
+{set $ghc_info_icon_gap 2}
+{set $ghc_info_level 9}
+{set $ghc_info_level_gap 5}
+{set $ghc_info_faded 0.3}
+{set $ghc_info_r 12}
+; The icons' top.
+{func ghc_info_parts_top
+   {'+' $ghc_info_rule2 {'+' $ghc_info_level_gap {'+' $ghc_info_level {'+' $ghc_info_icon_gap $ghc_info_icon}}}}
+}
+{func ghc_info_parts ($p_dir $p_song)
+   {do
+      ($slots)
+      {set $slots ()}
+      {resize $slots 0}
+      {if_else {&& {custom track $p_song lead} {custom track $p_song rhythm}}
+         {do {push_back $slots lead} {push_back $slots rhythm}}
+         {if {custom track $p_song guitar} {push_back $slots guitar}}
+      }
+      {foreach $part (bass drums vocals)
+         {if {custom track $p_song $part} {push_back $slots $part}}
+      }
+      {foreach_int $k 0 {size $slots}
+         {ghc_info_part $p_dir $p_song {elem $slots $k} {'*' $ghc_info_step {'-' $k {/ {'-' {size $slots} 1} 2}}}}
+      }
+   }
+}
+; One part's icon at x on the row, and its difficulty or a dash under it.
+; Lead and rhythm are the guitar with an L or an R over it.
+{func ghc_info_part ($q_dir $q_song $q_slot $q_x)
+   {do
+      ($mid {'-' {ghc_info_parts_top} {/ $ghc_info_icon 2}})
+      ($mesh {if_else {== $q_slot lead} guitar $q_slot})
+      ($level {custom level $q_song {if_else {== $q_slot lead} guitar $q_slot}})
+      ($dim {|| {== $q_slot drums} {== $q_slot vocals}})
+      {{$q_dir find {sprint "ghc_icon_" $mesh ".mat"}} set alpha {if_else $dim $ghc_info_faded 1}}
+      {{$q_dir find {sprint "ghc_icon_" $mesh ".mesh"}} set_local_pos $q_x -0.5 $mid}
+      {{$q_dir find {sprint "ghc_icon_" $mesh ".mesh"}} set_showing TRUE}
+      ; The number centred under it (RndText's kBottomCenter, 0x42), in the
+      ; keys' lighter grey when faded.
+      {set $ghc_info_ink {if_else $dim $ghc_info_key_color $ghc_info_value_ink}}
+      {ghc_info_put $q_dir {if_else {== $level ''} "-" $level} $ghc_info_level $q_x
+         {'+' $ghc_info_rule2 $ghc_info_level_gap} 66}
+      ; The L or R in the paper's white, centred on the guitar
+      ; (kMiddleCenter, 0x22).
+      {if {|| {== $q_slot lead} {== $q_slot rhythm}}
+         {set $ghc_info_ink 0.96}
+         {ghc_info_put $q_dir {if_else {== $q_slot lead} L R} $ghc_info_r $q_x $mid 34}
+      }
+      {set $ghc_info_ink $ghc_info_value_ink}
+   }
+}
+; How many lines text takes at a part's size in that room, broken between
+; words (ui/text_fit.h's wrap).
+{func ghc_info_count ($c_dir $c_text $c_part $c_room)
+   {text_fit wrap $c_text {$c_dir find ghc_info_0.lbl} {elem $c_part 0} $c_room {elem $c_part 2} -1}
+}
+; Those lines, from a foot at z down, on the left or the right.
+{func ghc_info_lines ($b_dir $b_text $b_part $b_room $b_z $b_right)
+   {foreach_int $k 0 {ghc_info_count $b_dir $b_text $b_part $b_room}
+      {ghc_info_line $b_dir
+         {text_fit wrap $b_text {$b_dir find ghc_info_0.lbl} {elem $b_part 0} $b_room {elem $b_part 2} $k}
+         {elem $b_part 0} {'-' $b_z {'*' $k {elem $b_part 1}}} $b_right}
+   }
+}
+; A key's line, in the keys' lighter grey.
+{func ghc_info_key ($k_dir $k_text $k_size $k_z)
+   {set $ghc_info_ink $ghc_info_key_color}
+   {ghc_info_line $k_dir $k_text $k_size $k_z FALSE}
+   {set $ghc_info_ink $ghc_info_value_ink}
+}
+; As many of the receipt's dashes as span the room, in the middle of a
+; rule's line from its top.
+{func ghc_info_dashes ($r_dir $r_top)
+   {ghc_info_line $r_dir "---------------------------" 6.5 {'-' $r_top 9} FALSE}
+}
+; The pool's next label: text at that size, its foot at z, on the left
+; (RndText's kBottomLeft, 0x41) or the right (kBottomRight, 0x44), in the
+; ink $ghc_info_ink says.
+{set $ghc_info_ink $ghc_info_value_ink}
+{func ghc_info_line ($l_dir $l_text $l_size $l_z $l_right)
+   {ghc_info_put $l_dir $l_text $l_size
+      {if_else $l_right
+         {'-' {/ $ghc_info_width 2} $ghc_info_margin}
+         {'-' $ghc_info_margin {/ $ghc_info_width 2}}
+      }
+      $l_z {if_else $l_right 68 65}}
+}
+; Or with its foot at x and z, by that alignment.
+{func ghc_info_put ($t_dir $t_text $t_size $t_x $t_z $t_align)
+   {if {< $ghc_info_n $ghc_info_pool}
+      {do
+         ($l {$t_dir find {sprint "ghc_info_" $ghc_info_n ".lbl"}})
+         {$l set color {pack_color $ghc_info_ink $ghc_info_ink {'+' $ghc_info_ink 0.03}}}
+         {$l set alignment $t_align}
+         {$l set text_size $t_size}
+         {$l set_local_pos $t_x -1 $t_z}
+         {$l set_localized_text $t_text}
+         {$l set_showing TRUE}
+         {set $ghc_info_n {'+' $ghc_info_n 1}}
+      }
+   }
+}
+; The setlist where there is another, and custom songs' sort and sections.
+; Set from the screen's enter, after the help bar's own has put up the
+; screen's default.
 {func ghc_qp_helpbar
    {do
-      ($array)
-      {set $array ()}
-      {resize $array 0}
-      {push_back $array (fret1 help_continue)}
-      {push_back $array (fret2 help_back)}
-      {if {> {size {ghc_setlists}} 1} {push_back $array (fret3 ghc_setlist)}}
-      {if {> {note_engine choices} 1}
-         {push_back $array {if_else {== gh1 {note_engine}} (fret4 ghc_engine_gh1) (fret4 ghc_engine_gh2)}}
-      }
-      {push_back $array (strum help_updown)}
-      {helpbar set_display $array}
+      ($actions {array 0})
+      {ghc_act $actions {> {size {ghc_setlists}} 1} pick ghc_setlist}
+      {ghc_act $actions {== {setlist shown} custom} view ghc_sort}
+      {ghc_act $actions {&& {== {setlist shown} custom} {> {setlist tiers} 1}} jump ghc_section}
+      {ghc_helpbar help_continue help_back $actions help_updown}
    }
 }
 {set $ghc_sel_song_panel
@@ -42,7 +453,7 @@
       (file
          {switch {gamecfg get mode}
             ((career multi_coop) ui/sel_song.milo)
-            ((quickplay multi_vs multi_fo) {setlist look})
+            ((quickplay multi_vs multi_fo practice) {setlist look})
             ui/sel_song_quickplay.milo
          }
       )
@@ -50,11 +461,53 @@
       (focus ss_song.lst)
       (joypad (hold_ms 500) (repeat_ms 80))
       (enter
+         ; A setlist picked on the paper turned away, on its first song.
+         {if {setlist take} {game set_song_index 0}}
+         {set $ghc_preview_live TRUE}
+         ; The preview at the song speed, as it changes (content/song_speed.h);
+         ; a career's is at 100%.
+         {song_speed preview {! {{ui current_screen} sel_song_career}}}
          {{ui current_screen} turn_off_ambient}
          {if {! {{ui current_screen} sel_song_career}} {song_provider set_quickplay TRUE}}
          {ss_song.lst set_provider song_provider}
+         ; Back on the song last on in this setlist, from wherever: the main
+         ; menu puts the game's own on the first ({setlist song}).
+         {if {>= {setlist song} 0} {game set_song_index {setlist song}}}
          {if {== {game get_song_index} -1} {game set_song_index 0}}
+         ; The printout out to the right again, to slide in once the screen
+         ; is up. Its pieces are hidden until then: the scene has them where
+         ; the sheet they were cut from is, in its paper (content/setlist_printout.cpp).
+         {set $ghc_info_since -2}
+         {set $ghc_art_on ''}
+         {foreach $piece
+               (ghc_printout.mesh ghc_sticker.mesh ghc_art.mesh ghc_tape.mesh ghc_icon_guitar.mesh
+                  ghc_icon_rhythm.mesh ghc_icon_bass.mesh ghc_icon_drums.mesh ghc_icon_vocals.mesh)
+            {if {$this find $piece FALSE} {{$this find $piece} set_showing FALSE}}
+         }
+         {if {$this find ghc_info_0.lbl FALSE}
+            {{$this find ghc_printout.mesh} set_local_pos $ghc_info_from 0 0}
+         }
+         ; Where the scene put each piece of its paper, for the paper to
+         ; go on past them (content/setlist_paper.cpp).
+         {foreach $piece $ghc_paper
+            {if {$this find $piece FALSE}
+               {do
+                  ($x 0)
+                  ($y 0)
+                  ($z 0)
+                  {{$this find $piece} get_local_pos $x $y $z}
+                  {setlist paper_base $piece $x $z}
+               }
+            }
+         }
          {$this update_song_info}
+         ; Back from practice on a career song: on that song, not the one the
+         ; career wants next (Game::SetCareerSong, update_song_info).
+         {if {>= $ghc_practice_row 0}
+            {ss_song.lst set_selected $ghc_practice_row}
+            {$this update_pos}
+            {set $ghc_practice_row -1}
+         }
       )
       (update_song_info
          {if {== 0 {song_provider get_quickplay}} {game set_career_song}}
@@ -63,12 +516,71 @@
          {$this update_pos}
       )
       (exit
+         {set $ghc_preview_live FALSE}
          {song_preview ''}
-         {if [metamusic_on_exit] {meta_music start}}
+         {song_speed preview FALSE}
+         {set $ghc_preview_on ''}
+         {if [metamusic_on_exit]
+            {meta_music start}
+            ; Not on the turn to the twin (ghc_qp_picked): this paper still
+            ; shows its list as it turns away, which would show the career's.
+            {song_provider set_quickplay FALSE}
+         }
          {set [metamusic_on_exit] TRUE}
-         {song_provider set_quickplay FALSE}
       )
       (SCROLL_MSG {$this update_pos})
+      (poll
+         {ghc_info_make $this}
+         {ghc_scan_update $this}
+         ; Up or down held speeds up (ui/list_scroll.h).
+         {set $ghc_scroll_rushing {list_scroll_fast}}
+         {ghc_preview_poll}
+         {if {&& $ghc_info_due {! $ghc_scroll_rushing}}
+            {set $ghc_info_due FALSE}
+            {ghc_info_show $this}
+         }
+         {if {&& {! $ghc_info_due} {$this find ghc_info_0.lbl FALSE}} {ghc_info_art $this}}
+         ; Songs a scan finds or loses since the list filled, put in while
+         ; it rests (content/setlists.h); a new sort turning away, never.
+         {if {&& {! $ghc_scroll_rushing} {! {ui in_transition}} {setlist stale}} {$this ghc_renew}}
+      )
+      ; The list filled again with the same song on, where it was on the
+      ; screen; one gone leaves the highlight on the row there.
+      (ghc_renew
+         {do
+            ($pos {ss_song.lst selected_pos})
+            ($song {game get_song})
+            {ss_song.lst set_provider song_provider}
+            {do
+               ($row {setlist song})
+               {if_else {&& {>= $row 0} {== {song_provider get_symbol $row} $song}}
+                  {do
+                     {ss_song.lst set_selected $row}
+                     {game set_song_index $row}
+                     {$this ghc_frame $row}
+                  }
+                  {do
+                     {ss_song.lst set_selected $pos}
+                     {$this update_pos}
+                  }
+               }
+            }
+         }
+      )
+      ; To a tier's first song (orange, custom songs' sections), or to a
+      ; song at random (Select's menu).
+      ; A jump toggles; random, picked with green, selects.
+      (ghc_jump ($tier) {$this ghc_go {setlist jump $tier} FALSE})
+      (ghc_random {$this ghc_go {setlist random} TRUE})
+      (ghc_go
+         ($row $picked)
+         {if {>= $row 0}
+            {if_else $picked {ghc_select} {ghc_toggle}}
+            {ss_song.lst set_provider song_provider}
+            {ss_song.lst set_selected $row}
+            {$this update_pos}
+         }
+      )
       ; The songs ride the View, a frame a row, and a header takes a row of
       ; its own. GH1 frames its paper from its list's first header by two
       ; (gElementSpacing, debug 0x3132b0, SpacedSelectedPos 0x127240), so
@@ -86,7 +598,28 @@
                {set $pos $moved}
             }
             {game set_song_index $pos}
-            {song_preview {game get_song}}
+            {setlist song $pos}
+            {ghc_preview {game get_song}}
+            ; Laying out the paper takes longer than a frame: while the list
+            ; rushes by, only once it slows (poll).
+            {if_else $ghc_scroll_rushing {set $ghc_info_due TRUE} {ghc_info_show $this}}
+            {$this ghc_frame $pos}
+         }
+      )
+      ; Paper made endless (content/setlist_paper.cpp) is framed from the
+      ; setlist's top, its sheets and doodles put on ahead.
+      (ghc_frame
+         ($pos)
+         {if_else {> {sel_song.view end_frame} 100}
+            {do
+               {sel_song.view set_frame {setlist frame $pos}}
+               {foreach $piece $ghc_paper
+                  {if {$this find $piece FALSE}
+                     {setlist paper_pose $piece {$this find $piece}}
+                     {{$this find $piece} set_local_pos {setlist paper $piece x} 0 {setlist paper $piece z}}
+                  }
+               }
+            }
             {sel_song.view set_frame
                {+ $pos {song_provider num_headers $pos} {switch {setlist shown} (gh1 1) 0}}
             }
@@ -123,86 +656,295 @@
 {retype sel_song_panel $ghc_sel_song_panel}
 {if {! {exists sel_song_twin_panel}} {new GHPanel sel_song_twin_panel}}
 {retype sel_song_twin_panel $ghc_sel_song_panel}
-; The UI gets yellow as kPad_Circle and red as kPad_Tri.
+; The UI gets red as kPad_Tri; the other frets are config/menus.toml's.
 {func ghc_qp_button ($button)
    {cond
+      ; Only where its screen has it: one not loaded says it is showing.
+      ({&& {ghc_scores_panel loaded_dir} {ghc_scores_panel showing}} {ghc_scores_panel button $button})
       ({ghc_pick_button $button} TRUE)
-      ; Back to the show's setup (quickplay_setup.dta).
+      ; Back to the show's setup (quickplay_setup.dta), or practice's
+      ; Training.
       ({== $button kPad_Tri}
-         {synth play_sequence button_back.cue}
-         {ui goto_screen ghc_qp_setup_screen}
+         {ghc_back}
+         {ui goto_screen {if_else {== {gamecfg get mode} practice} training_screen ghc_qp_setup_screen}}
          TRUE
       )
-      ({&& {== $button kPad_Circle} {> {size {ghc_setlists}} 1} {! {ui in_transition}}}
+      ({&& {ghc_pressed $button pick} {> {size {ghc_setlists}} 1}}
          {ghc_pick_panel open_with {ghc_setlists} {setlist shown}}
          TRUE
       )
-      ({&& {== $button kPad_Square} {> {note_engine choices} 1} {! {ui in_transition}}}
-         {synth play_sequence button_toggle}
-         {note_engine set {note_engine next {note_engine}}}
-         {ghc_qp_helpbar}
+      ; Held, custom songs' sorts (custom/catalog.h).
+      ({&& {ghc_pressed $button view} {== {setlist shown} custom}}
+         {ghc_pick_panel open_held
+            (sort_folder sort_artist sort_title sort_charter sort_genre sort_length sort_difficulty) {custom sort}
+            {ghc_held view}
+            ghc_option_text ghc_picked none}
          TRUE
       )
-      ({&& {== $button kPad_Select} {! {ui in_transition}}}
-         {synth play_sequence button_select}
-         {ghc_pick_panel open_sticky (song_defaults) song_defaults}
+      ; Held, every tier to jump to; tapped, the next one.
+      ({&& {ghc_pressed $button jump} {== {setlist shown} custom} {> {setlist tiers} 1}}
+         {do
+            ($tiers ())
+            ; Sized once: a push_back each, of thousands, copies the
+            ; whole array each time.
+            {resize $tiers {setlist tiers}}
+            {foreach_int $t 0 {setlist tiers} {set_elem $tiers $t $t}}
+            {ghc_pick_panel open_held $tiers {setlist tier_at} {ghc_held jump} ghc_section_text ghc_section_picked
+               ghc_section_next}
+         }
+         TRUE
+      )
+      ({ghc_pressed $button menu}
+         {ghc_select}
+         {ghc_pick_panel open_sticky {ghc_qp_options} {elem {ghc_qp_options} 0}}
          TRUE
       )
       (TRUE kDataUnhandled)
    }
 }
-; Select's menu (picker.dta): each row a setting, green flips it.
+; Select's menu's rows: a custom setlist's opens on RANDOM SONG, green
+; straight away jumping to one; another's has the note engine quickplay
+; judges by, where there is more than one. Practice's speed is its pause
+; menu's, and it has no song defaults or high scores.
+{func ghc_qp_options
+   {do
+      ($options {array 0})
+      {if {== {setlist shown} custom} {push_back $options random}}
+      {if {!= {gamecfg get mode} practice}
+         {push_back $options speed}
+         {push_back $options scores}
+         {push_back $options song_defaults}
+      }
+      {if {&& {!= {setlist shown} custom} {> {note_engine choices} 1}} {push_back $options engine}}
+      {push_back $options instrument}
+      $options
+   }
+}
+; Select's menu (picker.dta): each row a setting, green flips it, or a
+; thing to do.
 {func ghc_qp_option_text ($option)
    {switch $option
+      (random "RANDOM SONG")
+      (scores "HIGH SCORES")
+      ; Changed as practice's is (ghc_pick_edit, content/song_speed.h).
+      (speed {sprint "SPEED: " {song_speed} "%"})
       (song_defaults
          {sprint "SONG DEFAULTS: " {if_else {quickplay song_defaults} "ON" "OFF"}})
+      ; The part a custom song plays (custom/songs.h); one without it
+      ; plays the part it has.
+      (instrument
+         {sprint "INSTRUMENT: " {if_else {== {custom instrument} bass} "BASS" "GUITAR"}})
+      (engine {localize {sprint "ghc_engine_" {note_engine}}})
+      (sort_folder "FOLDER")
+      (sort_artist "ARTIST")
+      (sort_title "TITLE")
+      (sort_charter "CHARTER")
+      (sort_genre "GENRE")
+      (sort_length "LENGTH")
+      (sort_difficulty "DIFFICULTY")
       $option
    }
 }
-{func ghc_qp_chose ($option)
-   {switch $option
-      (song_defaults {quickplay song_defaults {! {quickplay song_defaults}}})
+{func ghc_qp_chose ($c_panel $option)
+   {cond
+      ({== $option random}
+         {ghc_pick_panel shut}
+         {$c_panel ghc_random}
+      )
+      ({== $option scores}
+         {ghc_pick_panel shut}
+         {ghc_select}
+         {ghc_scores_panel open}
+      )
+      (TRUE
+         {switch $option
+            (song_defaults {quickplay song_defaults {! {quickplay song_defaults}}})
+            (instrument {custom instrument {if_else {== {custom instrument} bass} guitar bass}})
+            (engine {note_engine set {note_engine next {note_engine}}})
+         }
+         {ghc_select}
+         {ghc_pick_panel relabel}
+      )
    }
-   {synth play_sequence button_toggle}
-   {ghc_pick_panel relabel}
 }
-; The setlist picked, shown by that screen.
-{func ghc_qp_picked ($panel $twin $game)
-   {if {setlist select $game}
-      {synth play_sequence button_select}
-      {$panel set metamusic_on_exit FALSE}
-      {game set_song_index 0}
-      {ui goto_screen $twin}
+; Select's menu's rows that are values (picker.dta's ghc_pick_edit): the
+; speed, its value before it was taken up kept to put back.
+{set $ghc_option_was 100}
+{func ghc_option_edits ($option)
+   {if {== $option speed} {set $ghc_option_was {song_speed}}}
+   {== $option speed}
+}
+{func ghc_option_step ($option $dir)
+   {if {== $option speed}
+      {ghc_speed_step $dir}
+      ; The paper's title and best, at that speed.
+      {set $ghc_info_due TRUE}
    }
+}
+{func ghc_option_end ($option $keep)
+   {if {&& {== $option speed} {! $keep}}
+      {song_speed set $ghc_option_was}
+      {set $ghc_info_due TRUE}
+   }
+}
+; A song's title with its speed after it, off 100%: "FINISH IT (120%)".
+{func ghc_speed_title ($title)
+   {if_else {== {song_speed} 100} $title {sprint $title " (" {song_speed} "%)"}}
+}
+; The song speed a step faster ($dir 1) or slower (-1): 10% steps up to
+; 50%, 5% to 150%, 25% to 500%.
+{func ghc_speed_step ($dir)
+   {do
+      ($s {song_speed})
+      {song_speed set
+         {if_else {> $dir 0}
+            {cond ({< $s 50} {'+' $s 10}) ({< $s 150} {'+' $s 5}) (TRUE {'+' $s 25})}
+            {cond ({<= $s 50} {'-' $s 10}) ({<= $s 150} {'-' $s 5}) (TRUE {'-' $s 25})}
+         }
+      }
+   }
+}
+; Orange tapped, the next tier's first song.
+{func ghc_qp_section_next ($n_panel)
+   {$n_panel ghc_jump {mod {'+' {setlist tier_at} 1} {setlist tiers}}}
+}
+; The setlist or sort picked, shown by that screen: a new sort keeps the
+; song the list is on (content/setlists.cpp). The paper turning away keeps
+; the setlist it shows; the twin loads the next one's scene.
+{func ghc_qp_picked ($panel $twin $game)
+   {cond
+      ; A sort in place at once, on the same song: the paper is the same.
+      ({custom sort $game}
+         {ghc_select}
+         {$panel ghc_renew}
+      )
+      ; A setlist turns to the twin, whose paper is its own.
+      ({setlist next $game}
+         {ghc_select}
+         {$panel set metamusic_on_exit FALSE}
+         {ui goto_screen $twin}
+      )
+   }
+}
+; Select's HIGH SCORES: the song's board on player 0's difficulty, as the
+; high score screen shows it (highscore_panel.dta), its wall and all, in
+; place of the list and its backdrop; the screen stays, its preview
+; playing. Red, green or select puts it away.
+{if {! {exists ghc_scores_panel}} {new GHPanel ghc_scores_panel}}
+{retype ghc_scores_panel
+   (
+      (file ui/highscore.milo)
+      ; The screen's own, out of sight while it is up.
+      (under (meta sel_song_panel sel_song_twin_panel))
+      (enter {$this set_showing FALSE})
+      (open
+         {foreach $p [under] {$p set_showing FALSE}}
+         {ghc_score_stats $this}
+         {foreach_int $i 1 6
+            {{$this find {sprintf "hs_entry%d.ten" $i}} set_showing FALSE}
+            {{$this find {sprintf "hs_name%d.lbl" $i}} set_showing TRUE}
+            {ghc_score_slot $this $i {'-' $i 1}}
+         }
+         {{$this find hs_start.lbl} set_showing FALSE}
+         {{$this find hs_flush.tnm} set_frame 0}
+         {$this set_showing TRUE}
+         {helpbar set_display ((fret2 help_back))}
+      )
+      (shut
+         {$this set_showing FALSE}
+         {foreach $p [under] {$p set_showing TRUE}}
+         {ghc_back}
+         {ghc_qp_helpbar}
+      )
+      ; Every press while it is up.
+      (button
+         ($button)
+         {if {|| {== $button kPad_Tri} {== $button kPad_X} {ghc_pressed $button menu}} {$this shut}}
+         TRUE
+      )
+   )
 }
 {retype qp_selsong_screen
    (
-      (panels meta sel_song_panel helpbar ghc_pick_panel)
+      (panels meta sel_song_panel ghc_scores_panel helpbar ghc_pick_panel)
       (focus sel_song_panel)
       (sel_song_career FALSE)
       ; Back from a song in another game's venue (quickplay_pickers.dta), the
-      ; next is GH2's again.
-      (enter {campaigns venues_from {campaigns live}} {ghc_qp_helpbar})
+      ; next is GH2's again, and the 360's looks of a 360 song are let go.
+      (enter {campaigns venues_from {campaigns live}} {quickplay next_gen_song 0} {ghc_qp_helpbar})
       (SELECT_START_MSG {ui goto_screen qp_diff_screen} kDataUnhandled)
       (BUTTON_DOWN_MSG {ghc_qp_button $button})
       (ghc_picked ($game) {ghc_qp_picked sel_song_panel qp_selsong_twin_screen $game})
       (ghc_option_text ($option) {ghc_qp_option_text $option})
-      (ghc_chose ($option) {ghc_qp_chose $option})
+      (ghc_chose ($option) {ghc_qp_chose sel_song_panel $option})
+      (ghc_section_text ($tier) {setlist tier_name $tier})
+      (ghc_section_picked ($tier) {sel_song_panel ghc_jump $tier})
+      (ghc_section_next {ghc_qp_section_next sel_song_panel})
    )
 }
 {if {! {exists qp_selsong_twin_screen}} {new GHScreen qp_selsong_twin_screen}}
 {retype qp_selsong_twin_screen
    (
-      (panels meta sel_song_twin_panel helpbar ghc_pick_panel)
+      (panels meta sel_song_twin_panel ghc_scores_panel helpbar ghc_pick_panel)
       (focus sel_song_twin_panel)
       (sel_song_career FALSE)
       ; Back from a song in another game's venue (quickplay_pickers.dta), the
-      ; next is GH2's again.
-      (enter {campaigns venues_from {campaigns live}} {ghc_qp_helpbar})
+      ; next is GH2's again, and the 360's looks of a 360 song are let go.
+      (enter {campaigns venues_from {campaigns live}} {quickplay next_gen_song 0} {ghc_qp_helpbar})
       (SELECT_START_MSG {ui goto_screen qp_diff_screen} kDataUnhandled)
       (BUTTON_DOWN_MSG {ghc_qp_button $button})
       (ghc_picked ($game) {ghc_qp_picked sel_song_twin_panel qp_selsong_screen $game})
       (ghc_option_text ($option) {ghc_qp_option_text $option})
-      (ghc_chose ($option) {ghc_qp_chose $option})
+      (ghc_chose ($option) {ghc_qp_chose sel_song_twin_panel $option})
+      (ghc_section_text ($tier) {setlist tier_name $tier})
+      (ghc_section_picked ($tier) {sel_song_twin_panel ghc_jump $tier})
+      (ghc_section_next {ghc_qp_section_next sel_song_twin_panel})
+   )
+}
+; Practice's song list is quickplay's, every setlist and custom songs. A
+; custom song plays the part Select's menu set, as in quickplay. A song
+; picked here is practice's own: Return comes back to this list.
+{func ghc_practice_part
+   {set $ghc_practice_from FALSE}
+   {practice_sel_section_screen set career_mode FALSE}
+   {if_else {custom ours {game get_song}}
+      {do {gamecfg set_track 0 0} {ghc_custom_start FALSE} {ui goto_screen practice_diff_screen}}
+      {ui goto_screen practice_selpart_screen}
+   }
+}
+; Practice's speed, set in its pause menu (game_settings.dta), for every
+; practice after.
+{set $ghc_practice_pct 100}
+{retype practice_selsong_screen
+   (
+      (panels meta sel_song_panel helpbar ghc_pick_panel)
+      (focus sel_song_panel)
+      (sel_song_career FALSE)
+      (enter {song_speed set $ghc_practice_pct} {ghc_qp_helpbar})
+      (SELECT_START_MSG {ghc_practice_part} kDataUnhandled)
+      (BUTTON_DOWN_MSG {ghc_qp_button $button})
+      (ghc_picked ($game) {ghc_qp_picked sel_song_panel ghc_practice_selsong_twin_screen $game})
+      (ghc_option_text ($option) {ghc_qp_option_text $option})
+      (ghc_chose ($option) {ghc_qp_chose sel_song_panel $option})
+      (ghc_section_text ($tier) {setlist tier_name $tier})
+      (ghc_section_picked ($tier) {sel_song_panel ghc_jump $tier})
+      (ghc_section_next {ghc_qp_section_next sel_song_panel})
+   )
+}
+{if {! {exists ghc_practice_selsong_twin_screen}} {new GHScreen ghc_practice_selsong_twin_screen}}
+{retype ghc_practice_selsong_twin_screen
+   (
+      (panels meta sel_song_twin_panel helpbar ghc_pick_panel)
+      (focus sel_song_twin_panel)
+      (sel_song_career FALSE)
+      (enter {song_speed set $ghc_practice_pct} {ghc_qp_helpbar})
+      (SELECT_START_MSG {ghc_practice_part} kDataUnhandled)
+      (BUTTON_DOWN_MSG {ghc_qp_button $button})
+      (ghc_picked ($game) {ghc_qp_picked sel_song_twin_panel practice_selsong_screen $game})
+      (ghc_option_text ($option) {ghc_qp_option_text $option})
+      (ghc_chose ($option) {ghc_qp_chose sel_song_twin_panel $option})
+      (ghc_section_text ($tier) {setlist tier_name $tier})
+      (ghc_section_picked ($tier) {sel_song_twin_panel ghc_jump $tier})
+      (ghc_section_next {ghc_qp_section_next sel_song_twin_panel})
    )
 }

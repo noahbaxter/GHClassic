@@ -19,6 +19,12 @@
 (expect {seat_has 1 keyboard} 0)
 (expect {seat_has 0 guitar} 1)
 (expect {{ui current_screen} name} multi_screen)
+; Tab is P1's Start, which opens P1's menu (profiles.dta), and Escape
+; shuts it.
+(expect {ghc_profile_panel get seat} 0)
+(key Escape)
+(wait 0.3)
+(expect {ghc_profile_panel get seat} -1)
 ; Its Escape backs out, as P1's.
 (key Escape)
 (wait_screen main_screen 10)

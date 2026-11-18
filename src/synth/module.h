@@ -10,6 +10,7 @@
 // voices it reads positions from have played exactly that long.
 
 #include "synth/spu.h"
+#include "synth/timeline.h"
 
 #include "runtime/host_clock.h"
 
@@ -52,6 +53,22 @@ namespace gh2::synth
 
         // Audio thread: `frames` of interleaved stereo at 48 kHz added to `out`.
         void render(float *out, size_t frames);
+
+        // Sounds at the song's time, mixed with the rest (synth/timeline.h).
+        Timeline &timeline() { return m_timeline; }
+
+        // The song's stream (the timeline's clock) holds audio made at
+        // `speed` (thousandths) with its pitch kept; played at any other,
+        // its pitch is put back in the mix, as each sample is heard. 0: its
+        // audio plays as it is.
+        void keepPitch(int32_t speed);
+        // How far behind its voice `stream` is heard, in the stream's
+        // samples: the pitch shifter's latency, at the speeds it was played.
+        double heardBehind(uint32_t stream);
+        // Every stream played at `speed` (thousandths) times its own, as a
+        // tape: a song list's preview at the song speed picked, its pitch
+        // kept by keepPitch(kSpeedOne). Taken up at once.
+        void playStreamsAt(int32_t speed);
 
     private:
         struct Channel;
@@ -96,6 +113,8 @@ namespace gh2::synth
         void setChannelSpeed(Channel &ch, int32_t speed);
         void slipJump(Stream &s, Channel &ch, int32_t offset);
         uint32_t position(const Channel &ch) const;
+        uint16_t channelPitch(const Channel &ch, int32_t speed) const;
+        int32_t m_streamSpeed = 1000; // playStreamsAt's
 
         void startSample(Sample &s);
         void stopSample(Sample &s);
@@ -126,5 +145,31 @@ namespace gh2::synth
         std::vector<Reply> m_tickReplies;
         std::vector<Reply> m_sent;
         uint32_t m_framesToTick = 0;
+
+        // Where the timeline's stream is: taken each tick from its voice,
+        // samples into its data and the voice's pitch (0: not playing), and
+        // moved on by the frames mixed since.
+        struct Mark
+        {
+            double samples = 0.0;
+            uint16_t pitch = 0;
+            double shift = 0.0; // the pitch put back by, 0: kept as it was
+            bool real = false;  // false: before the stream played
+        };
+        void markSong();
+        Timeline m_timeline;
+        std::optional<Timeline::Clock> m_songClock;
+        size_t m_songFrames = 0;
+
+        // The song's stream's voices put through the shifter while it
+        // keeps pitch: the marks of the ticks it holds, oldest first, the
+        // last this tick's.
+        struct Shifter;
+        std::unique_ptr<Shifter> m_shifter;
+        int32_t m_keptAt = 0;
+        bool m_shifting = false; // running: pitch is kept
+        uint32_t m_shifted = 0;  // the stream going through it, 0: none
+        uint64_t m_diverted = 0; // its voices, a bit each
+        std::deque<Mark> m_marks;
     };
 }

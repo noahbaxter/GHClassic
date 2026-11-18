@@ -6,8 +6,10 @@
    (intro_start_msg
       ($fast $encore)
       {track_panel intro_start_msg}
-      ; GH1's in-song screens may have none.
-      {if {exists mtv_overlay_panel}
+      ; GH1's in-song screens may have none. Practice's section going round
+      ; again shows none: GH2's own shows it once, as the song starts
+      ; (practice.dta's intro_skip).
+      {if {&& {exists mtv_overlay_panel} {!= {gamecfg get mode} practice}}
          {mtv_overlay_panel show_overlay FALSE}
          {script_task (delay 1) (units kTaskSeconds) (script {mtv_overlay_panel show_overlay TRUE})}
          {script_task (delay 6) (units kTaskSeconds) (script {mtv_overlay_panel show_overlay FALSE})}

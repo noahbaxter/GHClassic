@@ -14,8 +14,8 @@
 (shot character)
 ; The song's own casting is where each pick starts: its venue, arena, is
 ; locked on a new save, so its tier's stands in (GameConfig::SetQuickplay,
-; 0x126828).
-(expect {game get_character_outfit} glam1)
+; 0x126828). The guitarist is the theme's own, nothing picked yet.
+(expect {== {game get_character_outfit} {quickplay boot_outfit}} 1)
 (expect {game get_guitar} flying_v)
 (expect {game get_venue} battle)
 {game set_character punk1 TRUE}

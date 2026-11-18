@@ -1,0 +1,27 @@
+; A save from before profiles gets one of each band's name, once: a band
+; named after that makes none. The bands are made and saved before the main
+; menu first asks who plays.
+(wait_screen guitar_help_screen)
+{campaign set_profile_name "Old Band" 0}
+{campaign set_profile_name "Other Band" 2}
+{campaign mark_needs_save}
+{autosave_goto main_screen}
+(wait_screen main_screen)
+(wait_until {! $ghc_saving} 10)
+(wait 1)
+(expect {ghc_profile name_of 0} "Old Band")
+(expect {ghc_profile name_of 1} "Other Band")
+(expect {ghc_profile named 2} 0)
+{campaign set_profile_name "New Band" 3}
+{campaign mark_needs_save}
+{autosave_goto main_screen}
+(wait_until {! $ghc_saving} 10)
+(wait 1)
+(expect {ghc_profile named 2} 0)
+; And so it loads, on to the splash, which waits for Start.
+{ui goto_screen bootup_load}
+(wait 2)
+(wait_screen splash_screen 30)
+(expect {ghc_profile name_of 1} "Other Band")
+(expect {ghc_profile named 2} 0)
+(quit)

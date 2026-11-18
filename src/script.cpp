@@ -12,7 +12,10 @@
 #include "hook.h"
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
+#include "render/frame.h"
+#include "runtime/ee_scheduler.h"
 
+#include <algorithm>
 #include <cstring>
 #include <iostream>
 #include <map>
@@ -191,6 +194,17 @@ namespace gh2::script
             readyUi(rdram, ctx, runtime);
         }
 
+        // The first UI poll once the boot has drawn a picture, the save's
+        // check (or a logo without fast_boot): the scripts hold that up a
+        // moment, where in the first screen change they held its music too
+        // and the black before it.
+        struct UiPollTag;
+        void onUiPoll(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            if (!s_uiRan && !building().draws.empty())
+                readyUi(rdram, ctx, runtime);
+        }
+
         // Virtual, as Hmx::Object::SetType calls it, so a class's own
         // override (UIPanel's reads file and focus) runs.
         void setTypeDef(const Call &call, uint32_t object, uint32_t def)
@@ -275,8 +289,12 @@ namespace gh2::script
         return load<int16_t>(rdram, args + 8u);
     }
 
+    // Past a command's last node is whatever its block held before, an
+    // old node a script freed, so nothing is read there: 0.
     Node Call::arg(int i) const
     {
+        if (i >= size())
+            return {0u, kInt};
         const uint32_t node = load<uint32_t>(rdram, args) + 8u * static_cast<uint32_t>(i);
         const uint32_t evaluated =
             static_cast<uint32_t>(runtime->callGuestFunction(rdram, ctx, s_addresses->dataNodeEvaluate, {node}));
@@ -291,6 +309,15 @@ namespace gh2::script
         return reinterpret_cast<const char *>(getMemPtr(rdram, node.value));
     }
 
+    // A string node's value holds its char* first (locale.cpp read).
+    std::string Call::text(int i) const
+    {
+        const Node node = arg(i);
+        if (node.type == kString && node.value != 0u)
+            return reinterpret_cast<const char *>(getMemPtr(rdram, load<uint32_t>(rdram, node.value)));
+        return symbol(i);
+    }
+
     float Call::number(int i) const
     {
         const Node node = arg(i);
@@ -302,11 +329,17 @@ namespace gh2::script
         return value;
     }
 
+    size_t Call::index(int i) const { return static_cast<size_t>(std::max(0, static_cast<int>(number(i)))); }
+
     uint32_t Call::object(int i) const
     {
+        if (i >= size())
+            return 0u;
         const uint32_t node = load<uint32_t>(rdram, args) + 8u * static_cast<uint32_t>(i);
         return static_cast<uint32_t>(runtime->callGuestFunction(rdram, ctx, s_addresses->dataNodeGetObj, {node, args}));
     }
+
+    Node Call::word(const std::string &text) const { return {script::symbol(rdram, ctx, runtime, text), kSymbol}; }
 
     void runWhenUiReady(std::string text)
     {
@@ -323,6 +356,9 @@ namespace gh2::script
             return true;
         s_uiRan = true;
         const R5900Context saved = *ctx;
+        // Some three seconds of the game's cycles: unpaced, the scheduler
+        // does not then hold the game as long again, catching its vblanks up.
+        const EeScheduler::UnpacedScope unpaced(runtime->eeScheduler());
         for (UiScript &script : s_uiScripts)
             runUi(rdram, ctx, runtime, script);
         *ctx = saved;
@@ -462,6 +498,26 @@ namespace gh2::script
         release(rdram, ctx, runtime, root);
     }
 
+    void runKept(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &text)
+    {
+        static std::map<std::string, uint32_t> kept;
+        uint32_t &root = kept[text];
+        if (root == 0u)
+        {
+            const uint32_t parsed = parse(rdram, ctx, runtime, text);
+            if (parsed == 0u)
+            {
+                kept.erase(text);
+                return;
+            }
+            root = park(rdram, runtime, parsed);
+            release(rdram, ctx, runtime, parsed);
+        }
+        const uint32_t copy = clone(rdram, ctx, runtime, root);
+        evaluate(rdram, ctx, runtime, copy);
+        release(rdram, ctx, runtime, copy);
+    }
+
     uint32_t symbol(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &text)
     {
         const Call call{rdram, ctx, runtime, 0u};
@@ -488,6 +544,7 @@ namespace gh2::script
         addCommand("amend", amend);
         EntryHook<InitTag>::install(runtime, addresses.ghUtlInit, onDataReady);
         EntryHook<GotoScreenTag>::install(runtime, addresses.uiGotoScreen, onGotoScreen);
+        EntryHook<UiPollTag>::install(runtime, addresses.uiManagerPoll, onUiPoll);
         EntryHook<DebugModalTag>::install(runtime, addresses.debugModal, onDebugModal);
         EntryHook<AbortTag>::install(runtime, addresses.abort, onAbort);
         EntryHook<DelayThreadTag>::install(runtime, addresses.delayThread, onDelayThread);

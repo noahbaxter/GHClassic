@@ -1,0 +1,32 @@
+; A custom song with no bass part: the bassist plays with the guitar's notes
+; (beats 8 to 20, 26 to 33), a two-beat rest (16) played through, a six-beat
+; one (21 to 25) idled. Its mode 4 playing (kBandActive), 64 idle
+; (kBandIdle), each a beat early as GH2's band parsers send them.
+(songs bass_follows_lead)
+#include common/first_boot.dta
+{gamecfg set mode quickplay}
+{setlist select custom}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+{{game get_player_config 0} set autoplay TRUE}
+(press green)
+(wait_screen game_screen 60)
+(wait_until {> {taskmgr beat} 5} 60)
+(expect {{find_obj world bassist} get mode} 64)
+(record on bass_follows_lead)
+(wait_until {> {taskmgr beat} 12} 30)
+(expect {{find_obj world bassist} get mode} 4)
+(wait_until {> {taskmgr beat} 16.5} 30)
+(expect {{find_obj world bassist} get mode} 4)
+(wait_until {> {taskmgr beat} 23} 30)
+(expect {{find_obj world bassist} get mode} 64)
+(wait_until {> {taskmgr beat} 29} 30)
+(expect {{find_obj world bassist} get mode} 4)
+(wait_until {> {taskmgr beat} 36} 30)
+(expect {{find_obj world bassist} get mode} 64)
+(record off)
+(quit)

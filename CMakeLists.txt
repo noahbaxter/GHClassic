@@ -154,6 +154,7 @@ FetchContent_MakeAvailable(stb)
 # The save code's round trips, which need no disc and no game.
 add_executable(save_test EXCLUDE_FROM_ALL
     tests/save_test.cpp
+    src/save/best.cpp
     src/save/gh2_stream.cpp
     src/save/gh2_text.cpp
     src/save/ps2_card.cpp
@@ -162,13 +163,38 @@ add_executable(save_test EXCLUDE_FROM_ALL
 target_include_directories(save_test PRIVATE src)
 target_link_libraries(save_test PRIVATE miniz)
 
+# Custom songs' charts, and a tally of a folder of them.
+add_executable(custom_chart_test EXCLUDE_FROM_ALL
+    tests/custom_chart_test.cpp
+    src/custom/cast.cpp
+    src/custom/catalog.cpp
+    src/custom/chart.cpp
+    src/custom/chart_rules.cpp
+    src/custom/gh2_chart.cpp
+    src/custom/index.cpp
+    src/custom/library.cpp
+    src/custom/lipsync.cpp
+    src/custom/notes_chart.cpp
+    src/custom/notes_mid.cpp
+    src/custom/song_facts.cpp
+    src/custom/song_ini.cpp
+    src/custom/stage/band.cpp
+    src/custom/stage/stage.cpp
+    src/custom/stage/venue.cpp
+    src/custom/text.cpp
+    src/formats/md5.cpp
+    src/formats/midi.cpp
+    src/formats/sng.cpp
+)
+target_include_directories(custom_chart_test PRIVATE src "${CMAKE_CURRENT_BINARY_DIR}/dta")
+
 # Which release the game offers as an update.
 add_executable(releases_test EXCLUDE_FROM_ALL tests/releases_test.cpp src/host/releases.cpp)
 target_include_directories(releases_test PRIVATE src)
 
 # Which layout each controller gets, and input.ini's sections.
 add_executable(input_test EXCLUDE_FROM_ALL tests/input_test.cpp src/host/bindings.cpp src/host/capture.cpp
-                                          src/host/profiles.cpp)
+                                          src/host/layouts.cpp src/host/profiles.cpp)
 target_include_directories(input_test PRIVATE src)
 target_link_libraries(input_test PRIVATE SDL3::SDL3)
 
@@ -207,6 +233,39 @@ target_include_directories(vorbisfile SYSTEM PUBLIC
 target_include_directories(vorbisfile PRIVATE "${vorbis_SOURCE_DIR}/lib")
 set_target_properties(vorbisfile PROPERTIES C_STANDARD 99)
 
+# The rest of the audio custom songs come in. Opus: libopus and opusfile
+# (BSD-3-Clause), opusfile's sources built here on the Ogg above, as its own
+# CMake wants an installed Ogg and Opus. MP3 and WAV: dr_mp3 and dr_wav
+# (public domain or MIT-0), as the runtime's raylib already builds them into
+# raudio: its copies' headers, so the two agree.
+FetchContent_Declare(opus
+    GIT_REPOSITORY https://github.com/xiph/opus.git
+    GIT_TAG 5ec2f3c915d0529b94a3a302969c673531654824) # v1.5.2
+FetchContent_Declare(opusfile
+    GIT_REPOSITORY https://github.com/xiph/opusfile.git
+    GIT_TAG a55c164e9891a9326188b7d4d216ec9a88373739 # v0.12
+    SOURCE_SUBDIR none)
+set(OPUS_INSTALL_PKG_CONFIG_MODULE OFF CACHE BOOL "" FORCE)
+set(OPUS_INSTALL_CMAKE_CONFIG_MODULE OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(opus opusfile)
+add_library(opusfile STATIC)
+foreach(OPUSFILE_SOURCE info internal opusfile stream)
+    target_sources(opusfile PRIVATE "${opusfile_SOURCE_DIR}/src/${OPUSFILE_SOURCE}.c")
+endforeach()
+target_include_directories(opusfile SYSTEM PUBLIC "${opusfile_SOURCE_DIR}/include")
+target_link_libraries(opusfile PUBLIC opus vorbisfile)
+set_target_properties(opusfile PROPERTIES C_STANDARD 99)
+
+# Songs slowed and sped up with their pitch kept: Signalsmith Stretch and
+# its Linear (MIT), header-only.
+FetchContent_Declare(signalsmith-linear
+    GIT_REPOSITORY https://github.com/Signalsmith-Audio/linear.git
+    GIT_TAG 7bb1c8f36794d6980080ce817c91f8da8fe56a66) # 0.6.6
+FetchContent_Declare(signalsmith-stretch
+    GIT_REPOSITORY https://github.com/Signalsmith-Audio/signalsmith-stretch.git
+    GIT_TAG 88061fd4eda56a2353c5d65c74aa3f4ccf76f9da) # 1.4.0, on Linear 0.6.6
+FetchContent_MakeAvailable(signalsmith-linear signalsmith-stretch)
+
 # Without a disc's generated code, everything above still builds: what CI
 # checks (tools/ghc.py ci).
 file(GLOB GHC_GENERATED_SOURCES CONFIGURE_DEPENDS
@@ -243,10 +302,40 @@ set(GHC_GAME_SOURCES
     src/content/hidden_guitars.cpp
     src/content/outfits.cpp
     src/content/payouts.cpp
+    src/content/setlist_look.cpp
+    src/content/setlist_paper.cpp
+    src/content/setlist_printout.cpp
+    src/content/setlist_window.cpp
     src/content/setlists.cpp
     src/content/songs.cpp
+    src/content/song_speed.cpp
+    src/content/practice_sounds.cpp
     src/content/status_line.cpp
     src/content/tour_or_higher.cpp
+    src/content/vgs.cpp
+    src/content/vorbis.cpp
+    src/content/audio_file.cpp
+    src/custom/audio.cpp
+    src/custom/cast.cpp
+    src/custom/catalog.cpp
+    src/custom/chart.cpp
+    src/custom/chart_rules.cpp
+    src/custom/command.cpp
+    src/custom/gh2_chart.cpp
+    src/custom/index.cpp
+    src/custom/install.cpp
+    src/custom/library.cpp
+    src/custom/lipsync.cpp
+    src/custom/notes_chart.cpp
+    src/custom/notes_mid.cpp
+    src/custom/song_facts.cpp
+    src/custom/song_files.cpp
+    src/custom/song_ini.cpp
+    src/custom/songs.cpp
+    src/custom/stage/band.cpp
+    src/custom/stage/stage.cpp
+    src/custom/stage/venue.cpp
+    src/custom/text.cpp
     src/dev/cheats.cpp
     src/dev/draw_dump.cpp
     src/dev/mesh_packet.cpp
@@ -264,20 +353,41 @@ set(GHC_GAME_SOURCES
     src/disc/volume.cpp
     src/formats/bitmap.cpp
     src/formats/dtb.cpp
+    src/formats/ps2_icon.cpp
     src/formats/dtb_text.cpp
     src/formats/dxt.cpp
+    src/formats/md5.cpp
     src/formats/midi.cpp
-    src/gameplay/hopo_lock.cpp
-    src/gameplay/note_engine/gh1_scoring.cpp
-    src/gameplay/note_engine/gh1_star_power.cpp
-    src/gameplay/note_engine/gh1_watcher.cpp
-    src/gameplay/note_engine/note_engine.cpp
-    src/gameplay/note_speed.cpp
-    src/gameplay/retrack.cpp
-    src/gameplay/strum_limit.cpp
-    src/gameplay/sustain_release.cpp
-    src/gameplay/track_start.cpp
-    src/gameplay/whammy_hold.cpp
+    src/formats/sng.cpp
+    src/gameplay/engine/gh1/scoring.cpp
+    src/gameplay/engine/gh1/star_power.cpp
+    src/gameplay/engine/gh1/watcher.cpp
+    src/gameplay/engine/hopo_lock.cpp
+    src/gameplay/engine/note_engine.cpp
+    src/gameplay/engine/star_power_overlap.cpp
+    src/gameplay/engine/strum_limit.cpp
+    src/gameplay/engine/sustain_release.cpp
+    src/gameplay/engine/track_start.cpp
+    src/gameplay/engine/whammy_hold.cpp
+    src/gameplay/extended/guitar/gem_kinds.cpp
+    src/gameplay/extended/guitar/hammer_ons.cpp
+    src/gameplay/extended/guitar/lane_hits.cpp
+    src/gameplay/extended/guitar/open_chord_hits.cpp
+    src/gameplay/extended/guitar/sustain_hold.cpp
+    src/highway/cyan_stars.cpp
+    src/highway/extended/guitar/lane_bands.cpp
+    src/highway/extended/guitar/open_bursts.cpp
+    src/highway/extended/guitar/open_gems.cpp
+    src/highway/extended/guitar/open_pieces.cpp
+    src/highway/extended/guitar/open_tails.cpp
+    src/highway/extended/guitar/sustain_flames.cpp
+    src/highway/extended/guitar/sustain_tails.cpp
+    src/highway/extended/guitar/tap_gems.cpp
+    src/highway/extended/guitar/tap_line.cpp
+    src/highway/extended/guitar/tap_pieces.cpp
+    src/highway/gem_looks.cpp
+    src/highway/note_speed.cpp
+    src/highway/retrack.cpp
     src/gh1/band.cpp
     src/gh1/cameras.cpp
     src/gh1/career.cpp
@@ -322,11 +432,14 @@ set(GHC_GAME_SOURCES
     src/movie/movie.cpp
     src/movie/pss.cpp
     src/movie/screen.cpp
+    src/save/profiles.cpp
+    src/save/best.cpp
     src/save/card.cpp
     src/save/gh1_stream.cpp
     src/save/gh2_stream.cpp
     src/save/gh2_text.cpp
     src/save/ps2_card.cpp
+    src/save/results.cpp
     src/save/save.cpp
     src/save/store.cpp
     src/settings/latency.cpp
@@ -340,12 +453,20 @@ set(GHC_GAME_SOURCES
     src/synth/reverb.cpp
     src/synth/spu.cpp
     src/synth/synth.cpp
+    src/synth/timeline.cpp
+    src/ui/background_save.cpp
     src/ui/fast_boot.cpp
     src/ui/locale.cpp
     src/ui/help_bar.cpp
     src/ui/players.cpp
     src/ui/controllers.cpp
     src/ui/classic_scene.cpp
+    src/ui/list_scroll.cpp
+    src/ui/transitions.cpp
+    src/ui/press_size.cpp
+    src/ui/screen_loads.cpp
+    src/guest/bin_reads.cpp
+    src/ui/text_fit.cpp
     src/ui/menus.cpp
     src/ui/meta_music.cpp
     src/ui/photo_mode.cpp
@@ -361,6 +482,7 @@ set(GHC_GAME_SOURCES
     src/host/device_screen.cpp
     src/host/input.cpp
     src/host/layouts.cpp
+    src/host/menu_layer.cpp
     src/host/owner.cpp
     src/host/pad.cpp
     src/host/perf.cpp
@@ -371,6 +493,7 @@ set(GHC_GAME_SOURCES
     src/host/sdl_devices.cpp
     src/host/seats.cpp
     src/host/update.cpp
+    src/host/boot_picture.cpp
     src/host/vulkan_frontend.cpp
     src/host/vma.cpp
     src/host/scene_renderer.cpp
@@ -378,6 +501,7 @@ set(GHC_GAME_SOURCES
     src/render/frame.cpp
     src/render/look.cpp
     src/render/char_lod.cpp
+    src/render/draw_hue.cpp
     src/render/font_bake.cpp
     src/render/mesh_capture.cpp
     src/render/native_cull.cpp
@@ -450,32 +574,55 @@ file(READ src/gh1/menus.dta GHC_GH1_MENUS_DTA)
 file(READ src/gh1/scripts.dta GHC_GH1_SCRIPTS_DTA)
 file(READ src/content/guitar_copy.dta GHC_GUITAR_COPY_DTA)
 file(READ src/hub/preshow_picks.dta GHC_PRESHOW_PICKS_DTA)
-file(READ src/ui/dta/picker.dta GHC_PICKER_DTA)
+# The menus' rules (config/menus.toml), checked and written out for the
+# shared scripts (src/ui/dta/shared/) that apply them.
+find_package(Python3 3.11 REQUIRED COMPONENTS Interpreter)
+file(MAKE_DIRECTORY "${GHC_DTA_DIR}")
+execute_process(
+    COMMAND "${Python3_EXECUTABLE}" tools/menus.py config/menus.toml "${GHC_DTA_DIR}/menu_rules.dta"
+            "${GHC_DTA_DIR}/menu_rules.inc"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    RESULT_VARIABLE GHC_MENUS_RESULT
+    ERROR_VARIABLE GHC_MENUS_ERROR)
+if(NOT GHC_MENUS_RESULT EQUAL 0)
+    message(FATAL_ERROR "${GHC_MENUS_ERROR}")
+endif()
+file(READ "${GHC_DTA_DIR}/menu_rules.dta" GHC_MENU_RULES_DTA)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS config/menus.toml tools/menus.py)
+file(READ src/ui/dta/shared/sfx.dta GHC_SFX_DTA)
+file(READ src/ui/dta/shared/frets.dta GHC_FRETS_DTA)
+file(READ src/ui/dta/shared/picker.dta GHC_PICKER_DTA)
 file(READ src/ui/dta/quickplay_pickers.dta GHC_QUICKPLAY_PICKERS_DTA)
 file(READ src/ui/dta/quickplay_setup.dta GHC_QUICKPLAY_SETUP_DTA)
 file(READ src/ui/dta/multiplayer.dta GHC_MULTIPLAYER_DTA)
 file(READ src/ui/dta/preshow_guitarist.dta GHC_PRESHOW_GUITARIST_DTA)
 file(READ src/ui/dta/in_song.dta GHC_IN_SONG_DTA)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    src/ui/dta/shared/sfx.dta src/ui/dta/shared/frets.dta src/ui/dta/shared/picker.dta src/ui/dta/shared/box.dta
     src/ui/dta/lag_panel.dta src/ui/dta/highscore_panel.dta src/ui/dta/main_menu.dta src/ui/dta/fast_boot.dta
     src/ui/dta/locale.dta src/ui/dta/crowd.dta src/ui/dta/sel_character.dta src/ui/dta/quickplay.dta
-    src/ui/dta/campaigns.dta src/gh1/menus.dta src/gh1/scripts.dta src/ui/dta/picker.dta src/ui/dta/quickplay_pickers.dta
+    src/ui/dta/campaigns.dta src/gh1/menus.dta src/gh1/scripts.dta src/ui/dta/quickplay_pickers.dta
     src/ui/dta/quickplay_setup.dta src/ui/dta/multiplayer.dta src/ui/dta/preshow_guitarist.dta src/ui/dta/in_song.dta
-    src/content/guitar_copy.dta src/hub/preshow_picks.dta src/ui/dta/game_settings.dta src/ui/dta/photo_mode.dta src/ui/dta/box.dta
+    src/content/guitar_copy.dta src/hub/preshow_picks.dta src/ui/dta/game_settings.dta src/ui/dta/photo_mode.dta
     src/ui/dta/note_streak.dta src/ui/dta/streak_counter.dta src/ui/dta/song_progress.dta src/ui/dta/players.dta
-    src/ui/dta/controllers.dta)
-file(READ src/ui/dta/box.dta GHC_BOX_DTA)
+    src/ui/dta/controllers.dta src/ui/dta/profiles.dta)
+file(READ src/ui/dta/shared/box.dta GHC_BOX_DTA)
 file(READ src/ui/dta/note_streak.dta GHC_NOTE_STREAK_DTA)
 file(READ src/ui/dta/streak_counter.dta GHC_STREAK_COUNTER_DTA)
 file(READ src/ui/dta/song_progress.dta GHC_SONG_PROGRESS_DTA)
 file(READ src/ui/dta/game_settings.dta GHC_GAME_SETTINGS_DTA)
 file(READ src/ui/dta/photo_mode.dta GHC_PHOTO_MODE_DTA)
 file(READ src/ui/dta/players.dta GHC_PLAYERS_DTA)
+file(READ src/ui/dta/profiles.dta GHC_PROFILES_DTA)
 file(READ src/ui/dta/controllers.dta GHC_CONTROLLERS_DTA)
 configure_file(src/ui/dta/dta.h.in "${GHC_DTA_DIR}/dta.h" @ONLY)
 file(READ config/settings.template.ini GHC_SETTINGS_TEMPLATE)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS config/settings.template.ini)
 configure_file(src/settings/settings_template.h.in "${GHC_DTA_DIR}/settings_template.h" @ONLY)
+# Official songs' bands (custom/song_facts.h), tools/song_facts.py's table.
+file(READ assets/song_facts.tsv GHC_SONG_FACTS)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/song_facts.tsv)
+configure_file(src/custom/song_facts_table.h.in "${GHC_DTA_DIR}/song_facts_table.h" @ONLY)
 # The old Flying V layout's texel table (gh1/guitars.h), as a byte array.
 file(READ src/gh1/flyingv_old_layout.bin GHC_FLYINGV_OLD_LAYOUT HEX)
 string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_FLYINGV_OLD_LAYOUT "${GHC_FLYINGV_OLD_LAYOUT}")
@@ -525,6 +672,19 @@ file(READ assets/crown/crown.bin GHC_CROWN HEX)
 string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_CROWN "${GHC_CROWN}")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/crown/crown.bin)
 configure_file(src/ui/crown_bitmap.h.in "${GHC_DTA_DIR}/crown_bitmap.h" @ONLY)
+# The custom list printout's instrument icons (content/setlist_printout.cpp), tools/procedural/instrument_icons.py's bitmaps.
+foreach(GHC_PART guitar bass drums vocals)
+    string(TOUPPER "${GHC_PART}" GHC_PART_UPPER)
+    file(READ assets/instruments/${GHC_PART}.bin GHC_ICON_${GHC_PART_UPPER} HEX)
+    string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_ICON_${GHC_PART_UPPER} "${GHC_ICON_${GHC_PART_UPPER}}")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/instruments/${GHC_PART}.bin)
+endforeach()
+configure_file(src/content/instrument_icons.h.in "${GHC_DTA_DIR}/instrument_icons.h" @ONLY)
+# Practice's metronome and note click (content/practice_sounds.cpp), tools/procedural/practice_sounds.py's.
+file(READ assets/practice_sounds/practice_sounds.bin GHC_PRACTICE_SOUNDS HEX)
+string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_PRACTICE_SOUNDS "${GHC_PRACTICE_SOUNDS}")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS assets/practice_sounds/practice_sounds.bin)
+configure_file(src/content/practice_sounds_bin.h.in "${GHC_DTA_DIR}/practice_sounds_bin.h" @ONLY)
 # The help bar's glyphs (ui/help_bar.cpp), tools/procedural/helpbar_glyphs.py's sheet.
 file(READ assets/helpbar/glyphs.bin GHC_HELPBAR_GLYPHS HEX)
 string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_HELPBAR_GLYPHS "${GHC_HELPBAR_GLYPHS}")
@@ -605,6 +765,8 @@ set_source_files_properties(${GHC_GAME_SOURCES} PROPERTIES SKIP_UNITY_BUILD_INCL
 # miniz comes with libchdr; its target leaves out its own include path.
 target_include_directories(GHClassic PRIVATE "${GHC_GENERATED_DIR}" src lib/libchdr/deps/miniz-3.1.2)
 target_include_directories(GHClassic SYSTEM PRIVATE "${stb_SOURCE_DIR}")
+FetchContent_GetProperties(raylib)
+target_include_directories(GHClassic SYSTEM PRIVATE "${raylib_SOURCE_DIR}/src/external")
 target_link_libraries(GHClassic PRIVATE
     miniz
     ps2_runtime
@@ -614,6 +776,8 @@ target_link_libraries(GHClassic PRIVATE
     GPUOpen::VulkanMemoryAllocator
     mpeg2
     vorbisfile
+    opusfile
+    signalsmith-stretch
     miniz # libchdr's, for save.bin
 )
 # Calls go through volk's pointers, never a linked loader.

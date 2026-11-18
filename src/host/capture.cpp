@@ -142,14 +142,15 @@ namespace gh2::input
     {
         if (m_mode == kTilt)
             return feedTilt(now);
-        if (!m_found && m_mode == kAxisOnly)
+        if (m_mode == kWhammy && (!m_found || m_found->kind != Source::kAxis))
         {
-            // Its axes alone: a button pressed with it (a stick's click, a
-            // pad's touch sensor) would be found first every time.
             Snapshot axes = now;
             axes.buttons = m_rest.buttons;
             axes.hats = m_rest.hats;
-            m_found = moved(m_rest, axes);
+            if (const auto axis = moved(m_rest, axes))
+                m_found = axis;
+            else if (!m_found)
+                m_found = moved(m_rest, now);
         }
         else if (!m_found)
             m_found = moved(m_rest, now);

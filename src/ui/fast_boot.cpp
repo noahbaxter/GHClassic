@@ -1,12 +1,11 @@
-// Boot straight to the main menu. App::App (retail 0x100240) shows each
+// Boot straight to the press-start splash. App::App (retail 0x100240) shows each
 // boot logo, runs a batch of inits, then spins on a Timer read off Count
 // until three seconds have passed since the logo (0x1006d0, 0x100858,
 // 0x100a28). Each spin follows one call, made from nowhere else: MetaInit,
 // GHUtl::Init and ProgressiveScanCheck. Moving Count three seconds on at
 // their entry ends the spin after it on its first check; the inits before
 // it have all returned. The logos themselves are never loaded or drawn.
-// Past the save's load, fast_boot.dta skips the intro movie and the
-// press-start splash.
+// Past the save's load, fast_boot.dta skips the intro movie.
 
 #include "ui/fast_boot.h"
 

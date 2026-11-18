@@ -1,0 +1,27 @@
+; Taps and HOPOs under a sustain (tap_under_sustain.dta) leave GH2's rule
+; for a fret held with no sustain: an orange with none strummed and held, a
+; red HOPO pressed under it with orange still held is no hammer-on, passed
+; by; then a yellow strummed.
+(songs hopo_under_held_fret)
+#include common/first_boot.dta
+{gamecfg set mode quickplay}
+{setlist select custom}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+(press green)
+(wait_screen game_screen 60)
+(wait_until {> {ghc_play gems} 0} 30)
+(expect {ghc_play gems} 3)
+(expect {ghc_play gem 1 hopo} 1)
+{ghc_play strum 0 0}
+{ghc_play press 1 0}
+{ghc_play strum 2 0}
+(wait_until {ghc_play idle} 30)
+(wait 2)
+(expect {player0 gems_hit} 2)
+(expect {player0 gems_passed} 1)
+(quit)

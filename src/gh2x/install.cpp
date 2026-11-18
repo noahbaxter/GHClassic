@@ -19,6 +19,7 @@
 #include "content/locale.h"
 #include "content/mogg.h"
 #include "content/payouts.h"
+#include "content/quickplay.h"
 #include "content/setlists.h"
 #include "content/songs.h"
 #include "disc/ark.h"
@@ -346,6 +347,7 @@ namespace gh2
                 playing.nextGen = campaigns::active() == "gh2x";
                 playing.gh2Venue = campaigns::venueGame() == "gh2";
                 playing.inVenue = look::inVenue();
+                playing.nextGenSong = quickplay::nextGenSong();
                 return playing;
             });
         installGh2xTextures();

@@ -1,0 +1,91 @@
+; Practice begun from its menus plays the whole song at once, no section
+; screen. Its pause menu's Change Section shows GH2's section poster over
+; the paused song: red goes back to the pause menu, green marks a start,
+; red takes the mark off, and green on a start then an end plays them at
+; once, the song's clock at the start's bar ahead with nothing loaded.
+; Their end goes round to their start.
+#include common/first_boot.dta
+{gamecfg set mode practice}
+{game set_song shoutatthedevil}
+{gamecfg set_track 0 0}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{ui goto_screen practice_diff_screen}
+(wait_screen practice_diff_screen 60)
+(wait 1)
+(press green)
+(wait_screen practice_game_screen 60)
+(expect {gamecfg get (practice_sections 0)} -1)
+(expect {gamecfg get (practice_sections 1)} -1)
+; From the bar ahead of its first note's, 2.56 s in, not a count-in
+; before its intro.
+(expect {&& {> {taskmgr seconds} 2} {< {taskmgr seconds} 3}} 1)
+(wait 4)
+; The whole song's map: a tick at each of its sections but the first.
+(expect {practice_panel get map_ticks} {'-' {practice_section_count} 1})
+(shot full_song_map)
+(press start)
+(wait_screen pract_pause_screen 20)
+(wait 1)
+{set $ghc_paused {taskmgr seconds}}
+(press down)
+(press down)
+(press down)
+(expect {pract_pause_panel focus_name} section.btn)
+(press green)
+(wait_screen ghc_practice_section_screen 10)
+(wait 0.5)
+(press red)
+(wait_screen pract_pause_screen 10)
+(wait 0.3)
+(expect {pract_pause_panel focus_name} section.btn)
+(expect {taskmgr seconds} $ghc_paused 0.01)
+(press green)
+(wait_screen ghc_practice_section_screen 10)
+(wait 0.5)
+(press down)
+(press down)
+(press down)
+(press green)
+(wait 0.3)
+(expect {practice_sel_section_panel get section} 1)
+(press red)
+(wait 0.3)
+(expect {practice_sel_section_panel get section} 0)
+(expect {{ui current_screen} name} ghc_practice_section_screen)
+(record on section_jump)
+(press down)
+(wait 0.5)
+(press green)
+(wait 0.5)
+(press down)
+(wait 0.5)
+(shot marked)
+(expect {taskmgr seconds} $ghc_paused 0.01)
+(press green)
+{set $ghc_t0 {taskmgr ui_seconds}}
+(wait 0.3)
+(expect {{ui current_screen} name} practice_game_screen)
+(expect {< {'-' {taskmgr ui_seconds} $ghc_t0} 1} 1)
+(expect {gamecfg get (practice_sections 0)} 3)
+(expect {gamecfg get (practice_sections 1)} 4)
+{do ($a 0) ($b 0) {gamecfg get_section_bounds 3 $a $b} {set $ghc_from {/ $a 1000}}}
+{do ($a 0) ($b 0) {gamecfg get_section_bounds 4 $a $b} {set $ghc_to {/ $b 1000}}}
+(print {taskmgr seconds} " " $ghc_from " " $ghc_to)
+(expect {&& {< {taskmgr seconds} $ghc_from} {> {taskmgr seconds} {'-' $ghc_from 5}}} 1)
+; The map under the stats empty in the bar ahead, filling through the
+; two sections, a tick where the second starts.
+(expect {practice_panel get map_fill} 0 0.01)
+(expect {{practice_panel find ghc_map_tick0_mid.mesh} showing} 1)
+(wait 4)
+(record off)
+(shot jumped)
+(wait_until {> {practice_panel get map_fill} 0.5} 60)
+(shot map_half)
+(wait_until {> {practice_panel get map_fill} 0.95} 60)
+(wait_until {> $ghc_practice_best 0} 120)
+(wait 1)
+(expect {< {taskmgr seconds} $ghc_from} 1)
+(expect $ghc_practice_best 100)
+(expect {practice_panel get map_fill} 0 0.01)
+(quit)

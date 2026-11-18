@@ -1,0 +1,46 @@
+; profiles_themes.dta's screens under the theme $theme of $themes picks,
+; each shot named for it; on to the next.
+{set $look {elem $themes $theme}}
+{set $theme {'+' $theme 1}}
+{campaigns switch $look}
+(wait 2)
+(expect {campaigns active} $look)
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+(wait 1.5)
+{set $shot {symbol {sprint corner_ $look}}}
+(shot $shot)
+(press start guitar)
+(wait 0.5)
+{set $shot {symbol {sprint menu_ $look}}}
+(shot $shot)
+(press green guitar)
+(wait_screen ghc_profile_screen 10)
+(wait 1.5)
+{set $shot {symbol {sprint list_ $look}}}
+(shot $shot)
+{ghc_nameprofile_screen set row -1}
+{ui goto_screen ghc_nameprofile_screen}
+(wait_screen ghc_nameprofile_screen 10)
+(wait 1.5)
+{set $shot {symbol {sprint name_ $look}}}
+(shot $shot)
+{ghc_profile_error_screen show ghc_duplicate_profile}
+(wait 1)
+{set $shot {symbol {sprint error_ $look}}}
+(shot $shot)
+{ui pop_screen}
+(wait 0.5)
+{ghc_delete_screen ask profile 0 Alpha main_screen}
+(wait_screen ghc_delete_screen 10)
+(wait 1.5)
+{set $shot {symbol {sprint delete_ $look}}}
+(shot $shot)
+(press red guitar)
+(wait_screen main_screen 10)
+{campaign set_profile_name "The Testers" 0}
+{ui goto_screen chooseprof_screen}
+(wait_screen chooseprof_screen 10)
+(wait 1.5)
+{set $shot {symbol {sprint bands_ $look}}}
+(shot $shot)

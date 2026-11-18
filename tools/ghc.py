@@ -12,7 +12,7 @@
     tools/ghc.py release [--skip-build] [disc]  this platform's player package, into build/release
     tools/ghc.py ci                          what builds without a disc, into build/ci
     tools/ghc.py procedural [name ...]       draw tools/procedural's pictures again
-    tools/ghc.py review [archive <folder> ... | archive --landed]  what review/ holds; put it away
+    tools/ghc.py review [backlog <folder> ... | archive <folder> ... | archive --landed]  what review/ holds; park or put it away
     tools/ghc.py sandbox [--4x3] [--no-build]  the hub's guitarist, playing what sandbox.dta says, live
 
 play builds everything from the disc on its first run, then brings the C++
@@ -69,10 +69,12 @@ game/, into build/procedural, never kept in the repo.
 review/ has a folder per branch, named for it with / as - (feature-dancer),
 holding what that branch's trees made; a detached tree's is
 detached-<commit>. review lists them with each branch's last commit and how
-it stands: checked out in a tree, landed in dev, or gone. archive moves
-folders into review/archive/, each video made small (540 lines, crf 30) and
-every still kept; --landed archives every folder whose branch landed or is
-gone.
+it stands: checked out in a tree, landed in dev, or gone. Only branches
+being worked on keep theirs at the top: backlog parks a folder in
+review/_backlog/ as it is, and a branch's next record or shot brings it back
+out. archive moves folders into review/_archive/, each video made small (540
+lines, crf 30) and every still kept; --landed archives every folder, parked
+or not, whose branch landed or is gone.
 """
 import argparse
 import hashlib
@@ -350,7 +352,8 @@ def build(disc=None, recomp=True, lto=False):
     tag = tree_version()
     configure = ["cmake", "-S", ROOT, "-B", GAME, "-DCMAKE_BUILD_TYPE=Release",
                  f"-DGHC_GENERATED_DIR={RECOMP / 'output'}", f"-DGHC_ENABLE_LTO={'ON' if lto else 'OFF'}",
-                 f"-DGHC_VERSION={tag}", f"-DGHC_EXPERIMENTAL={'ON' if experimental(tag) else 'OFF'}", *DEP_CACHE]
+                 f"-DGHC_VERSION={tag}", f"-DGHC_EXPERIMENTAL={'ON' if experimental(tag) else 'OFF'}",
+                 f"-DPython3_EXECUTABLE={sys.executable}", *DEP_CACHE]
     build_step("configuring game", configure, env, "game-configure.log")
     build_step("building game", ["cmake", "--build", GAME, "--target", "GHClassic", "-j", jobs], env, "game.log")
 
@@ -462,6 +465,7 @@ def cmd_sandbox(argv):
 
 
 REVIEW = main_checkout() / "review"
+BACKLOG, ARCHIVE = "_backlog", "_archive"  # in review/: parked branches' folders, landed or dropped ones'
 # A recorded clip's picture as it goes into review: full size, but compressed.
 RECORD_VIDEO = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p", "-movflags", "+faststart"]
 # An archived video's size: small enough to keep, big enough to tell what it showed.
@@ -507,6 +511,9 @@ def review_set(name):
     # branch.<chunk>.review <bigger branch>.
     branch = (branch and git_out("config", f"branch.{branch}.review")) or branch
     folder = branch_folder(branch) if branch else f"detached-{git_out('rev-parse', '--short', 'HEAD') or 'tree'}"
+    # A branch worked on again brings its folder back out of _backlog.
+    if (REVIEW / BACKLOG / folder).is_dir() and not (REVIEW / folder).exists():
+        shutil.move(REVIEW / BACKLOG / folder, REVIEW / folder)
     if SERIES:
         found = sorted((REVIEW / folder).glob(f"*_{SERIES}")) if (REVIEW / folder).is_dir() else []
         if found:
@@ -538,6 +545,12 @@ def arm(out, scenario=None, speed=None, secs=30, disc=None, shot_every=60, env=N
     out = Path(out)
     shutil.rmtree(out, ignore_errors=True)
     (out / "frames").mkdir(parents=True)
+    # A scenario's (songs <folder>) steps, beside it: custom songs are
+    # scanned at boot, before any step runs. --set's folders still wins.
+    if scenario:
+        if songs := re.findall(r"^\(songs ([^)]*)\)", Path(scenario).read_text(), re.M):
+            here = Path(scenario).resolve().parent
+            settings = ["folders=" + ";".join(str(here / s.strip()) for s in songs), *settings]
     # --set's lines, over the defaults.
     if settings:
         (out / "settings.ini").write_text("".join(f"{s.replace('=', ' = ', 1)}\n" for s in settings))
@@ -791,8 +804,8 @@ def cmd_ci(argv):
     jobs = str(os.cpu_count() or 4)
     build_tools(env, jobs)
     ci = BUILD / "ci"
-    run(["cmake", "-S", ROOT, "-B", ci, "-DCMAKE_BUILD_TYPE=Release", f"-DGHC_GENERATED_DIR={ci / 'none'}"],
-        env, quiet=True)
+    run(["cmake", "-S", ROOT, "-B", ci, "-DCMAKE_BUILD_TYPE=Release", f"-DGHC_GENERATED_DIR={ci / 'none'}",
+         f"-DPython3_EXECUTABLE={sys.executable}"], env, quiet=True)
     run(["cmake", "--build", ci, "-j", jobs, "--target", "ps2_runtime", "chdr-static", "SDL3-static", "volk",
          "vk-bootstrap", "glslang-standalone", "mpeg2", "save_test", "releases_test", "input_test", "seats_test"], env)
     run([ci / f"save_test{EXE}"], env)
@@ -834,6 +847,8 @@ def notices():
         ("libmpeg2", src("libmpeg2") / "COPYING"),
         ("libogg", src("ogg") / "COPYING"),
         ("libvorbis", src("vorbis") / "COPYING"),
+        ("libopus", src("opus") / "COPYING"),
+        ("opusfile", src("opusfile") / "COPYING"),
         ("zstd", ROOT / "config" / "licenses" / "zstd.txt"),
         ("PS2Recomp", ROOT / "lib" / "PS2Recomp" / "LICENSE"),
     ]
@@ -982,9 +997,9 @@ def review_branches():
 
 
 def archive_folder(folder):
-    """A review/ folder into review/archive/, each video made small and every
+    """A review/ folder into review/_archive/, each video made small and every
     still kept as it is."""
-    target = REVIEW / "archive" / folder.name
+    target = REVIEW / ARCHIVE / folder.name
     # A folder archived again goes beside the first.
     stem, again = target.name, 2
     while target.exists():
@@ -1004,25 +1019,38 @@ def archive_folder(folder):
 
 
 def cmd_review(argv):
-    """review/'s folders and what each is for; archive puts them away."""
+    """review/'s folders and what each is for; backlog parks them, archive
+    puts them away."""
     parser = argparse.ArgumentParser(prog="ghc.py review")
-    parser.add_argument("action", nargs="?", choices=["archive"])
-    parser.add_argument("folders", nargs="*", help="review/ folders to archive")
+    parser.add_argument("action", nargs="?", choices=["archive", "backlog"])
+    parser.add_argument("folders", nargs="*", help="review/ folders to archive or park")
     parser.add_argument("--landed", action="store_true",
-                        help="with archive, every folder whose branch landed in dev or is gone")
+                        help="with archive, every folder whose branch landed in dev or is gone, parked ones too")
     args = parser.parse_args(argv)
     REVIEW.mkdir(exist_ok=True)
     branches = review_branches()
-    folders = sorted(p for p in REVIEW.iterdir() if p.is_dir() and p.name != "archive")
+    folders = sorted(p for p in REVIEW.iterdir() if p.is_dir() and not p.name.startswith("_"))
+    parked = sorted(p for p in (REVIEW / BACKLOG).iterdir() if p.is_dir()) if (REVIEW / BACKLOG).is_dir() else []
 
     def state(folder):
         if folder.name.startswith("detached-"):
             return "detached tree", ""
         return branches.get(folder.name, ("no branch", ""))
 
+    if args.action == "backlog":
+        if not args.folders:
+            sys.exit("nothing to park: name folders")
+        (REVIEW / BACKLOG).mkdir(exist_ok=True)
+        for name in args.folders:
+            if not (REVIEW / name).is_dir():
+                sys.exit(f"no folder {REVIEW / name}")
+            shutil.move(REVIEW / name, REVIEW / BACKLOG / name)
+            print(f"parked {name}")
+        return
+
     if args.action == "archive":
         if args.landed:
-            picked = [f for f in folders if state(f)[0] in ("landed", "no branch")]
+            picked = [f for f in folders + parked if state(f)[0] in ("landed", "no branch")]
         else:
             picked = [REVIEW / name for name in args.folders]
         if not picked:
@@ -1045,11 +1073,12 @@ def cmd_review(argv):
     if loose:
         size = human(sum(f.stat().st_size for f in loose))
         print(f"{'(loose)':44} {len(loose):6} {size:>6}  in no branch's folder: move each into one")
-    archived = REVIEW / "archive"
-    if archived.is_dir():
-        files = files_in(archived)
-        size = human(sum(f.stat().st_size for f in files))
-        print(f"{'archive/':44} {len(files):6} {size:>6}  {sum(1 for p in archived.iterdir() if p.is_dir())} folders")
+    for kept, what in ((BACKLOG, "parked"), (ARCHIVE, "archived")):
+        if (REVIEW / kept).is_dir():
+            files = files_in(REVIEW / kept)
+            size = human(sum(f.stat().st_size for f in files))
+            count = sum(1 for p in (REVIEW / kept).iterdir() if p.is_dir())
+            print(f"{kept + '/':44} {len(files):6} {size:>6}  {count} folders {what}")
 
 
 COMMANDS = {"play": cmd_play, "build": cmd_build, "bind": cmd_bind, "arm": cmd_arm, "record": cmd_record,

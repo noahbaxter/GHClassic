@@ -168,6 +168,7 @@ namespace gh2
         constexpr uint32_t kTimerBase = 0x30u, kTimerRate = 0x34u;
         constexpr float kSnapMs = 50.0f;
         constexpr float kSlew = 0.03f;    // of time passed
+        constexpr float kSlewBack = 0.15f; // the clock that far ahead, slowed by
         constexpr float kSettleS = 0.5f;  // the time an error takes to be pulled in, under the slew
         constexpr float kStaleMs = 50.0f; // a position older (one from before a hitch) is dropped
         constexpr float kStepMs = 20.0f;  // the clock and host time apart by more since the last report: the EE caught up
@@ -186,9 +187,12 @@ namespace gh2
         void lockClock(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
             const uint32_t self = GPR_U32(ctx, 4);
+            const uint32_t id = load<uint32_t>(rdram, self + kStreamId);
             if (load<uint32_t>(rdram, self + kStreamState) != kStreamPlaying)
             {
                 s_locks.erase(self);
+                if (const auto clock = s_module.timeline().clock(); clock && clock->stream == id)
+                    s_module.timeline().setClock(std::nullopt);
                 return;
             }
             const int32_t played = load<int32_t>(rdram, self + kPlayed);
@@ -205,12 +209,16 @@ namespace gh2
             SET_GPR_U32(ctx, 4, self);
             if (rate == 0u)
                 return;
+            // The song's stream, the one its clock is held to, times the
+            // timeline's sounds (GH2 plays one stream through a song).
+            s_module.timeline().setClock(synth::Timeline::Clock{id, rate, load<float>(rdram, self + kStartMs)});
 
             const auto now = ps2x::host_clock::now();
             const float timerRate = load<float>(rdram, self + kTimer + kTimerRate);
             const float ageMs = std::chrono::duration<float, std::milli>(now - at->second).count() * timerRate;
-            const float audioMs = static_cast<float>(played) * synth::kAdpcmBlockSamples * 1000.0f / static_cast<float>(rate) +
-                                  load<float>(rdram, self + kStartMs) + ageMs;
+            // Where it is heard: its pitch kept in the mix, that far behind.
+            const double samples = double(played) * synth::kAdpcmBlockSamples - s_module.heardBehind(id);
+            const float audioMs = static_cast<float>(samples * 1000.0 / rate) + load<float>(rdram, self + kStartMs) + ageMs;
             const float error = clockMs - audioMs;
             store<int32_t>(rdram, self + kPlayed, -1);
 
@@ -229,6 +237,12 @@ namespace gh2
                     const float limit = kSlew * dtMs;
                     pull = std::clamp(error * std::min(1.0f, dtMs / (kSettleS * 1000.0f)), -limit, limit);
                 }
+                // Ahead, it is slowed and never snapped back: the song's
+                // clock never goes back (GamePanel::Poll), so it would stand
+                // still that long. Practice's shifter puts its stream that
+                // far behind once it starts.
+                else if (error > kSnapMs && !first)
+                    pull = std::min(error, kSlewBack * dtMs);
             }
             if (!first)
             {
@@ -257,5 +271,20 @@ namespace gh2
     void synth::render(float *out, size_t frames)
     {
         s_module.render(out, frames);
+    }
+
+    synth::Timeline &synth::timeline()
+    {
+        return s_module.timeline();
+    }
+
+    void synth::keepPitch(int percent)
+    {
+        s_module.keepPitch(percent * 10);
+    }
+
+    void synth::playStreamsAt(int percent)
+    {
+        s_module.playStreamsAt(percent * 10);
     }
 }

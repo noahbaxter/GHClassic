@@ -1,0 +1,30 @@
+; P2's Start menu up on the poster when P2's controller goes away: red from
+; another controller shuts it (ui/dta/profiles.dta), so the main menu is no
+; dead end.
+#include common/first_boot.dta
+(device guitar)
+(device pad)
+(press down guitar)
+(wait 0.5)
+{ghc_profile make 0 "Alpha"}
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+(wait 1)
+(press start pad)
+(wait_screen ghc_profile_screen 10)
+(wait 1)
+{ghc_profile make 1 "Bravo"}
+{ui goto_screen main_screen}
+(wait_screen main_screen 10)
+(wait 1)
+(press start pad)
+(wait 0.6)
+(expect {ghc_profile_panel get seat} 1)
+(unplug pad)
+(wait 1.5)
+(expect {ghc_profile_panel get seat} 1)
+(press red guitar)
+(wait 0.6)
+(expect {ghc_profile_panel get seat} -1)
+(expect {{ui current_screen} name} main_screen)
+(quit)

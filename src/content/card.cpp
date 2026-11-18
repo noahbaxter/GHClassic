@@ -35,6 +35,17 @@ namespace gh2::content
         }
     }
 
+    std::optional<std::vector<uint8_t>> cardIcon(size_t disc)
+    {
+        const dtb::Files files = [disc](const std::string &path) { return ark::readFile(disc, path); };
+        dtb::Macros macros;
+        const auto mc = dtb::read("config/mc.dta", macros, files);
+        const dtb::Node *icon = mc ? dtb::find(*mc, "ps2_icon") : nullptr;
+        const dtb::Node *file = icon ? value(*icon, "file") : nullptr;
+        const auto bytes = file ? ark::readFile(disc, "mc/" + file->text) : std::nullopt;
+        return bytes ? std::optional(std::vector<uint8_t>(bytes->begin(), bytes->end())) : std::nullopt;
+    }
+
     void addCardGame(size_t disc, const std::string &game, bool gh1Layout, uint32_t dataSize, const std::string &title,
                      int lineBreak)
     {

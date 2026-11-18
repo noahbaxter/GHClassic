@@ -1,0 +1,72 @@
+; A guest's song keeps no best; a profile's keeps its own, on each
+; controller apart. A custom song, for its short chart (as custom_song.dta).
+(songs songs)
+#include common/first_boot.dta
+{gamecfg set mode quickplay}
+{setlist select custom}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(expect {ghc_profile current 0} -1)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+{{game get_player_config 0} set autoplay TRUE}
+(press down)
+(press green)
+(wait_screen game_screen 60)
+(wait_screen endgame_screen 120)
+(wait 1)
+(expect {best score {game get_song} expert} 0)
+; Past its high score table, where a guest types a name, to the screen
+; after it.
+{ui goto_screen complete_screen}
+(wait_screen complete_screen 30)
+
+{ghc_profile make 0 "The Testers"}
+(expect {best score {game get_song} expert} 0)
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+{{game get_player_config 0} set autoplay TRUE}
+; The screen opens on the difficulty last picked: Expert.
+(press green)
+(wait_screen game_screen 60)
+(wait_screen endgame_screen 120)
+(wait 1)
+(expect {game get_difficulty_sym 0} expert)
+(expect {== {best score {game get_song} expert} {player0 score}} 1)
+; Its high score table: the profile's run goes in, green past it.
+(press green)
+(wait_screen highscore_screen 30)
+(wait 1)
+(press green)
+(wait_screen complete_screen 30)
+
+; In pad mode it is kept apart: a gamepad taking P1 plays as it once
+; picked, its own best none yet.
+(device pad)
+(press start pad)
+(wait 0.5)
+(expect {seat_has 0 pad} 1)
+{ghc_profile pick 0 0}
+(expect {ghc_profile current 0} 0)
+(expect {best score {game get_song} expert} 0)
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+{{game get_player_config 0} set autoplay TRUE}
+(press green)
+(wait_screen game_screen 60)
+(wait_screen endgame_screen 120)
+(wait 1)
+(expect {== {best score {game get_song} expert} {player0 score}} 1)
+(quit)

@@ -8,6 +8,10 @@
 #include "milo/objects.h"
 #include "worker.h"
 
+// Built in raylib's rtextures, which the runtime links.
+#include <stb_image.h>
+#include <stb_image_resize2.h>
+
 #include <algorithm>
 #include <atomic>
 #include <cctype>
@@ -92,7 +96,8 @@ namespace gh2::textures
 
         bool same(const Source &a, const Source &b)
         {
-            return a.disc == b.disc && a.path == b.path && a.tex == b.tex;
+            return a.disc == b.disc && a.path == b.path && a.tex == b.tex && bool(a.file) == bool(b.file) &&
+                   a.variant == b.variant;
         }
 
         uint32_t hash(const Source &source)
@@ -109,6 +114,10 @@ namespace gh2::textures
             // Only then, so every other source's id stays as it was.
             if (source.paletted)
                 mix(1u);
+            if (source.file)
+                mix(2u);
+            for (const char c : source.variant)
+                mix(static_cast<uint8_t>(c));
             return hash;
         }
 
@@ -288,9 +297,33 @@ namespace gh2::textures
             return apart < uint64_t(own.width) * own.height * 4u * kSamePictureLevels;
         }
 
+        // A host's PNG or JPG, made no larger than kMostHostSide a side.
+        std::shared_ptr<TextureData> decodeHost(const std::string &file)
+        {
+            int width = 0, height = 0, channels = 0;
+            stbi_uc *pixels = stbi_load_from_memory(reinterpret_cast<const stbi_uc *>(file.data()),
+                                                    static_cast<int>(file.size()), &width, &height, &channels, 4);
+            if (!pixels)
+                return nullptr;
+            const float scale = std::min(1.0f, float(kMostHostSide) / float(std::max(width, height)));
+            auto out = std::make_shared<TextureData>();
+            out->width = std::max(1u, static_cast<uint32_t>(width * scale));
+            out->height = std::max(1u, static_cast<uint32_t>(height * scale));
+            out->rgba.resize(size_t(out->width) * out->height * 4u);
+            if (scale < 1.0f)
+                stbir_resize_uint8_srgb(pixels, width, height, 0, out->rgba.data(), int(out->width), int(out->height), 0,
+                                        STBIR_RGBA);
+            else
+                std::memcpy(out->rgba.data(), pixels, out->rgba.size());
+            stbi_image_free(pixels);
+            return out;
+        }
+
         // `open` is the reading thread's own.
         std::shared_ptr<TextureData> read(const Source &source, std::optional<Open> &open)
         {
+            if (source.file)
+                return decodeHost(source.file());
             if (source.disc == kBundled)
             {
                 std::pair<const uint8_t *, size_t> picture{nullptr, 0u};

@@ -1,0 +1,34 @@
+; Select's HIGH SCORES on quickplay's song list: the song's board in place
+; of the list, which stays its screen's; red puts it away.
+#include common/first_boot.dta
+{gamecfg set mode quickplay}
+{{game get_player_config 0} set_difficulty expert}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 2)
+(expect {ghc_scores_panel showing} 0)
+(press star_power)
+(wait 0.5)
+(expect {ghc_pick_panel get options} (speed scores song_defaults instrument))
+(press down)
+(wait 0.3)
+(press green)
+(wait 1)
+(expect {ghc_scores_panel showing} 1)
+(expect {ghc_pick_panel get open} 0)
+(expect {{ui current_screen} name} qp_selsong_screen)
+(shot board)
+; The list takes no strum while it is up.
+(expect {game get_song_index} 0)
+(press down)
+(wait 0.3)
+(expect {game get_song_index} 0)
+(press red)
+(wait 0.5)
+(expect {ghc_scores_panel showing} 0)
+(expect {{ui current_screen} name} qp_selsong_screen)
+(press down)
+(wait 0.5)
+(expect {game get_song_index} 1)
+(shot list_after)
+(quit)

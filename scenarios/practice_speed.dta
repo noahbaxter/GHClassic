@@ -1,0 +1,102 @@
+; Practice's speed changed in its pause menu: the speed row, taken up with
+; green, steps by strum, red putting it back and green keeping it, and
+; resume takes up where it paused at the new speed. A Select tap restarts
+; the section.
+#include common/first_boot.dta
+{gamecfg set mode practice}
+{game set_song shoutatthedevil}
+{gamecfg set_track 0 0}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{set $ghc_practice_pct 85}
+{song_speed set $ghc_practice_pct}
+{ghc_practice_whole}
+{ui goto_screen practice_loading_screen}
+(wait_screen practice_game_screen 60)
+(wait 1)
+{ghc_practice_jump 1 6}
+(expect {song_speed} 85)
+(wait 4)
+{set $ghc_t0 {taskmgr ui_seconds}}
+{set $ghc_s0 {taskmgr seconds}}
+(wait 2)
+(expect {'/' {'-' {taskmgr seconds} $ghc_s0} {'-' {taskmgr ui_seconds} $ghc_t0}} 0.85 0.03)
+(shot playing)
+(press start)
+(wait_screen pract_pause_screen 10)
+(wait 0.5)
+{set $ghc_paused {taskmgr seconds}}
+(press down)
+(press down)
+(expect {pract_pause_panel focus_name} change_speed.btn)
+; Green takes it up, in green, strum steps it and the focus stays; red
+; puts it back, green keeps it.
+(shot pause_row_idle)
+(press green)
+(wait 0.2)
+(expect $ghc_speed_before 85)
+(press down)
+(wait 0.2)
+(expect {song_speed} 80)
+(expect {pract_pause_panel focus_name} change_speed.btn)
+(press red)
+(wait 0.2)
+(expect {song_speed} 85)
+(expect $ghc_speed_before FALSE)
+(expect {{ui current_screen} name} pract_pause_screen)
+(press green)
+(wait 0.2)
+(press up)
+(wait 0.2)
+(press up)
+(wait 0.2)
+(expect {song_speed} 95)
+(press down)
+(wait 0.2)
+(expect {song_speed} 90)
+(shot pause_row_editing)
+(press green)
+(wait 0.2)
+(expect {song_speed} 90)
+(expect $ghc_speed_before FALSE)
+(shot pause_row_kept)
+(press up)
+(press up)
+; Resumed from where it paused, at once, at 90%.
+{set $ghc_t0 {taskmgr ui_seconds}}
+(press green)
+(wait 0.5)
+(expect {{ui current_screen} name} practice_game_screen)
+(expect {taskmgr seconds} {'+' $ghc_paused {'*' 0.9 {'-' {taskmgr ui_seconds} $ghc_t0}}} 0.1)
+{set $ghc_t0 {taskmgr ui_seconds}}
+{set $ghc_s0 {taskmgr seconds}}
+(wait 2)
+(expect {'/' {'-' {taskmgr seconds} $ghc_s0} {'-' {taskmgr ui_seconds} $ghc_t0}} 0.9 0.03)
+; A tap restarts the section, a bar ahead of it, its hits from none.
+(hold 1)
+(wait 0.15)
+(hold 0)
+(wait 0.3)
+(expect {player0 gems_hit} 0)
+(expect {< {taskmgr seconds} $ghc_paused} 1)
+(expect $ghc_practice_pct 90)
+; The pause menu's Restart is the same: no loading, playing at once.
+(wait 3)
+(press start)
+(wait_screen pract_pause_screen 10)
+(wait 0.5)
+{set $ghc_paused {taskmgr seconds}}
+(press down)
+(expect {pract_pause_panel focus_name} restart.btn)
+(press green)
+(wait 0.3)
+(expect {!= {{ui current_screen} name} practice_loading_screen} 1)
+(wait_screen practice_game_screen 5)
+(wait 0.5)
+(expect {player0 gems_hit} 0)
+(expect {< {taskmgr seconds} $ghc_paused} 1)
+; Playing, not paused.
+{set $ghc_s0 {taskmgr seconds}}
+(wait 0.5)
+(expect {> {taskmgr seconds} $ghc_s0} 1)
+(quit)

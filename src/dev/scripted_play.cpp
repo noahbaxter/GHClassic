@@ -27,7 +27,10 @@ namespace gh2::scripted_play
             kStrum,   // every fret let go, `slots` pressed, a strum
             kPress,   // `slots` pressed
             kRelease, // every fret let go
+            kLift,    // `slots` let go
             kHammer,  // `slots` hammered on, or pulled off to from the frets above
+            kPadTap,  // `slots` pressed on a DualShock, each a swing
+            kPadLift, // `slots` let go on a DualShock
             kMark,    // $var set to player 0's score or streak
         };
 
@@ -102,10 +105,10 @@ namespace gh2::scripted_play
                         down(slot);
             }
 
-            void release() const
+            void release(uint32_t slots = 0x1fu) const
             {
                 for (int slot = 0; slot < 5; ++slot)
-                    if ((s_held >> slot) & 1u)
+                    if ((slots & s_held) >> slot & 1u)
                         up(slot);
             }
 
@@ -124,6 +127,28 @@ namespace gh2::scripted_play
             }
 
             void strum() const { call(s_addresses->beatMatcherSwing, highest(s_held), 1u); }
+
+            // JoypadController::OnMsg (retail 0x237030, 0x237120): a press
+            // a Swing on its fret, no strum; a letting go a FretButtonUp.
+            void tap(uint32_t slots) const
+            {
+                for (int slot = 0; slot < 5; ++slot)
+                    if ((slots >> slot) & 1u && !((s_held >> slot) & 1u))
+                    {
+                        call(s_addresses->beatMatcherSwing, slot, 0u);
+                        s_held |= 1u << slot;
+                    }
+            }
+
+            void lift(uint32_t slots) const
+            {
+                for (int slot = 0; slot < 5; ++slot)
+                    if ((slots >> slot) & 1u && (s_held >> slot) & 1u)
+                    {
+                        call(s_addresses->beatMatcherFretButtonUp, slot);
+                        s_held &= ~(1u << slot);
+                    }
+            }
         };
 
         void fire(const Pad &pad, const Action &action, float now)
@@ -145,9 +170,21 @@ namespace gh2::scripted_play
                 what = "release";
                 pad.release();
                 break;
+            case Kind::kLift:
+                what = "lift";
+                pad.release(action.slots);
+                break;
             case Kind::kHammer:
                 what = "hammer";
                 pad.hammer(action.slots);
+                break;
+            case Kind::kPadTap:
+                what = "pad tap";
+                pad.tap(action.slots);
+                break;
+            case Kind::kPadLift:
+                what = "pad lift";
+                pad.lift(action.slots);
                 break;
             case Kind::kMark:
                 what = "mark";
@@ -155,7 +192,7 @@ namespace gh2::scripted_play
                             "{set $" + action.var + " {player0 " + (action.streak ? "current_streak" : "score") + "}}");
                 break;
             }
-            if (action.kind != Kind::kRelease && action.kind != Kind::kMark)
+            if (action.kind != Kind::kRelease && action.kind != Kind::kPadLift && action.kind != Kind::kMark)
                 s_worst = std::max(s_worst, std::abs(now - action.at));
             std::cerr << "[play] " << what << " at " << now << " ms, " << now - action.at << " from " << action.at
                       << std::endl;
@@ -220,6 +257,10 @@ namespace gh2::scripted_play
                 if (kind == "hammer" && one && i > 0 && gems[i].hopo() && std::popcount(gems[i - 1].slots()) == 1 &&
                     clear(i, i - 1, 150.0f) && clear(i, i + 1, 150.0f) && gems[i - 1].ms() >= from)
                     return i;
+                if (kind == "repeat" && std::popcount(gems[i].slots()) == 2 && i + 1 < count &&
+                    gems[i + 1].slots() == gems[i].slots() && clear(i, i - 1, 300.0f) && clear(i, i + 1, 200.0f) &&
+                    clear(i + 1, i + 2, 300.0f))
+                    return i;
                 if (kind == "run" && clear(i, i - 1, 170.0f) && i + 10 <= count)
                 {
                     int k = i + 1;
@@ -282,6 +323,11 @@ namespace gh2::scripted_play
                 queue({call.number(2), Kind::kRelease});
                 return integer(1);
             }
+            if (op == "pad_lift")
+            {
+                queue({call.number(2), Kind::kPadLift, static_cast<uint32_t>(call.number(3))});
+                return integer(1);
+            }
             if (op == "mark")
             {
                 queue({call.number(2), Kind::kMark, 0u, call.symbol(3), call.symbol(4) == "streak"});
@@ -295,15 +341,30 @@ namespace gh2::scripted_play
                     return script::floatNode(gems[i].ms());
                 if (field == "frets")
                     return integer(std::popcount(gems[i].slots()));
+                if (field == "low" || field == "high")
+                {
+                    const uint32_t slots = gems[i].slots();
+                    return integer(static_cast<int>(field == "low" ? slots & (0u - slots)
+                                                                   : 1u << (31 - std::countl_zero(slots))));
+                }
                 if (field == "hopo")
                     return integer(gems[i].hopo() ? 1 : 0);
                 if (field == "played")
                     return integer(track.played(i) ? 1 : 0);
             }
-            if ((op == "strum" || op == "press" || op == "hammer") && gemAt(i))
+            if ((op == "strum" || op == "press" || op == "lift" || op == "hammer") && gemAt(i))
             {
-                const Kind kind = op == "strum" ? Kind::kStrum : op == "press" ? Kind::kPress : Kind::kHammer;
+                const Kind kind = op == "strum"   ? Kind::kStrum
+                                  : op == "press" ? Kind::kPress
+                                  : op == "lift"  ? Kind::kLift
+                                                  : Kind::kHammer;
                 queue({gems[i].ms() + call.number(3), kind, gems[i].slots()});
+                return integer(1);
+            }
+            if (op == "pad_tap" && gemAt(i))
+            {
+                const uint32_t slots = call.size() > 4 ? static_cast<uint32_t>(call.number(4)) : gems[i].slots();
+                queue({gems[i].ms() + call.number(3), Kind::kPadTap, slots});
                 return integer(1);
             }
             if (op == "play" && gemAt(i))

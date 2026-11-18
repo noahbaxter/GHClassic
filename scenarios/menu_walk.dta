@@ -1,0 +1,70 @@
+; Every menu screen reachable from the main menu, left by the keyboard's
+; Escape and a gamepad's B: back works the same on all of them. Shots of each
+; show the help bar's controls.
+#include common/first_boot.dta
+(controller pad "045e:028e" pad)
+(wait 0.5)
+(press dpdown pad)
+(expect {seat_has 0 pad} 1)
+(wait 1)
+
+{set $walk options_screen}
+#include common/walk_menu.dta
+{set $walk game_settings_screen}
+#include common/walk_menu.dta
+{set $walk video_settings_screen}
+#include common/walk_menu.dta
+{set $walk audio_settings_screen}
+#include common/walk_menu.dta
+; The Controllers screen reads the keyboard only (a pad's presses there are
+; what it shows and rebinds), so its Escape alone.
+{ui goto_screen ghc_controllers_screen}
+(wait_until {== {{ui current_screen} name} ghc_controllers_screen} 15)
+(wait 1.5)
+(shot ghc_controllers_screen)
+(key Escape)
+(wait 1.5)
+(expect {!= {{ui current_screen} name} ghc_controllers_screen} 1)
+{set $walk multi_screen}
+#include common/walk_menu.dta
+{set $walk chooseprof_screen}
+#include common/walk_menu.dta
+{set $walk options_chooseprof_screen}
+#include common/walk_menu.dta
+{set $walk ghc_campaign_screen}
+#include common/walk_menu.dta
+; Training is reached from the main menu's button, as its back target is set
+; there: jumped into, it does not back out.
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+(wait 1.5)
+; The focus is wherever the walk came back to, so put on Training.
+{main_panel set_focus {main_panel find main_tutorial.btn}}
+(wait 0.3)
+(expect {main_screen focus_name} main_tutorial.btn)
+(key Return)
+(wait_screen training_screen 10)
+(wait 1.5)
+(shot training_screen)
+(key Escape)
+(wait_screen main_screen 10)
+(key Return)
+(wait_screen training_screen 10)
+(wait 1.5)
+(press b pad)
+(wait_screen main_screen 10)
+{set $walk credits_screen}
+#include common/walk_menu.dta
+{set $walk lag_screen}
+#include common/walk_menu.dta
+; Quickplay's screens last: jumping into them leaves its mode set, under which
+; the Training screen does not back out.
+{set $walk ghc_qp_setup_screen}
+#include common/walk_menu.dta
+{set $walk ghc_qp_character_screen}
+#include common/walk_menu.dta
+{set $walk ghc_qp_guitar_screen}
+#include common/walk_menu.dta
+{set $walk qp_selsong_screen}
+#include common/walk_menu.dta
+(quit)

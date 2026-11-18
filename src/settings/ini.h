@@ -19,6 +19,12 @@ namespace gh2::ini
         return s.substr(begin, s.find_last_not_of(" \t\r") - begin + 1);
     }
 
+    // Text without UTF-8's byte order mark, which some editors put first.
+    inline std::string withoutBom(const std::string &text)
+    {
+        return text.rfind("\xef\xbb\xbf", 0u) == 0u ? text.substr(3u) : text;
+    }
+
     // Blank, or a comment: ';' and '#' only start one at the line's start.
     inline bool skipped(const std::string &trimmed)
     {

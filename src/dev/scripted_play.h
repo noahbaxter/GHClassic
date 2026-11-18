@@ -14,21 +14,32 @@
 //   {ghc_play now}                    the time now
 //   {ghc_play gems}                   how many gems the track has
 //   {ghc_play hopos}                  how many of them are HOPOs
-//   {ghc_play gem <i> ms|frets|hopo|played}
-//   {ghc_play find lone|hammer|run <ms>}  the first such gem from then on, or
-//                                     -1. lone: one fret, no HOPO, 400 ms from
-//                                     any other gem. hammer: a one-fret HOPO,
-//                                     with 150 ms clear each side, after a
+//   {ghc_play gem <i> ms|frets|hopo|played|low|high}  low and high: its lowest
+//                                     and highest fret, as a bit mask
+//   {ghc_play find lone|hammer|run|repeat <ms>}  the first such gem from then
+//                                     on, or -1. lone: one fret, no HOPO, 400 ms
+//                                     from any other gem. hammer: a one-fret
+//                                     HOPO, with 150 ms clear each side, after a
 //                                     one-fret gem. run: the first of ten gems
 //                                     100 ms or more apart, 170 ms after the
-//                                     gem before, which has passed by then
+//                                     gem before, which has passed by then.
+//                                     repeat: a two-fret chord the next gem
+//                                     repeats 200 ms or more on, 300 ms clear
+//                                     of the gems around them
 //   {ghc_play strum <i> <offset>}     at the gem's ms plus offset: every fret let
 //                                     go, the gem's pressed, then a strum; its
 //                                     frets stay held
 //   {ghc_play press <i> <offset>}     the gem's frets pressed then
+//   {ghc_play lift <i> <offset>}      the gem's frets let go then, those above
+//                                     every other held a pull-off
 //   {ghc_play hammer <i> <offset>}    its fret hammered on then, or pulled off to
 //                                     where it is below the frets held
 //   {ghc_play release <ms>}           every fret let go then
+//   {ghc_play pad_tap <i> <offset> [<frets>]}  a DualShock's press, as
+//                                     JoypadController::OnMsg (0x237030) sends
+//                                     it: each fret not held a Swing, no strum.
+//                                     The gem's frets unless a bit mask is given
+//   {ghc_play pad_lift <ms> <frets>}  a DualShock letting go of those frets
 //   {ghc_play play <i> <count>}       that many gems from it strummed on time,
 //                                     each with only its own frets held
 //   {ghc_play mark <ms> <var> score|streak}  $var set to player 0's then, in

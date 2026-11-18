@@ -3,6 +3,9 @@
 // The port's scripts, from src/ui/dta/ and src/gh1/, compiled in by CMake.
 
 inline constexpr const char kLagPanelDta[] = R"dta(@GHC_LAG_PANEL_DTA@)dta";
+inline constexpr const char kMenuRulesDta[] = R"dta(@GHC_MENU_RULES_DTA@)dta";
+inline constexpr const char kSfxDta[] = R"dta(@GHC_SFX_DTA@)dta";
+inline constexpr const char kFretsDta[] = R"dta(@GHC_FRETS_DTA@)dta";
 inline constexpr const char kPickerDta[] = R"dta(@GHC_PICKER_DTA@)dta";
 inline constexpr const char kMainMenuDta[] = R"dta(@GHC_MAIN_MENU_DTA@)dta";
 inline constexpr const char kHighscorePanelDta[] = R"dta(@GHC_HIGHSCORE_PANEL_DTA@)dta";
@@ -25,6 +28,7 @@ inline constexpr const char kGameSettingsDta[] = R"dta(@GHC_GAME_SETTINGS_DTA@)d
 inline constexpr const char kBoxDta[] = R"dta(@GHC_BOX_DTA@)dta";
 inline constexpr const char kPhotoModeDta[] = R"dta(@GHC_PHOTO_MODE_DTA@)dta";
 inline constexpr const char kPlayersDta[] = R"dta(@GHC_PLAYERS_DTA@)dta";
+inline constexpr const char kProfilesDta[] = R"dta(@GHC_PROFILES_DTA@)dta";
 inline constexpr const char kControllersDta[] = R"dta(@GHC_CONTROLLERS_DTA@)dta";
 inline constexpr const char kNoteStreakDta[] = R"dta(@GHC_NOTE_STREAK_DTA@)dta";
 inline constexpr const char kStreakCounterDta[] = R"dta(@GHC_STREAK_COUNTER_DTA@)dta";

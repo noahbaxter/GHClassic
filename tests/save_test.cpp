@@ -2,6 +2,7 @@
 // text and file, GH2's stream and its store sections, and a PCSX2 card.
 // tools/ghc.py ci builds and runs it; it exits 1 on any failed check.
 
+#include "save/best.h"
 #include "save/gh2_stream.h"
 #include "save/gh2_text.h"
 #include "save/ps2_card.h"
@@ -17,6 +18,13 @@
 
 namespace
 {
+    using gh2::save::Best;
+    using gh2::save::bestKey;
+    using gh2::save::bestSection;
+    using gh2::save::bestText;
+    using gh2::save::better;
+    using gh2::save::kBestSection;
+    using gh2::save::parseBest;
     using gh2::save::Ps2Card;
     using gh2::save::readFile;
     using gh2::save::ReadResult;
@@ -68,6 +76,29 @@ namespace
         CHECK(back.text() == store.text());
         CHECK(back.find("mod colours") && *back.find("mod colours")->get("highway") == "ff00ff");
         CHECK(!back.find("band 2"));
+        // A key twice, or a section met again, as one, the last value kept.
+        const Store twice = Store::parse("[a]\nk = 1\n[b]\nj = 2\n[a]\nk = 3\nl = 4\n");
+        CHECK(twice.text() == "[a]\nk = 3\nl = 4\n\n[b]\nj = 2\n");
+    }
+
+    // [best]'s lines: read back as written, the higher scoring run kept
+    // whole with a full combo from either, and a line too short none.
+    void bests()
+    {
+        const Best run{123456u, 5u, 98u, 412u, false}, other{99000u, 4u, 100u, 500u, true};
+        const auto back = parseBest(bestText(run));
+        CHECK(back && back->score == 123456u && back->stars == 5u && back->percent == 98u && back->streak == 412u &&
+              !back->fullCombo);
+        for (const Best &best : {better(run, other), better(other, run)})
+            CHECK(best.score == 123456u && best.stars == 5u && best.percent == 98u && best.streak == 412u &&
+                  best.fullCombo);
+        CHECK(!parseBest("123 4"));
+        CHECK(bestKey("gh2.freebird", "gh1", "guitar", "expert", "gamepad") == "gh2.freebird.gh1.guitar.expert.gamepad");
+        // A save with them keeps them as any section: one build's [best] goes
+        // through another's untouched.
+        Store store;
+        store.section(kBestSection).set("gh2.freebird.gh2.guitar.expert.guitar", bestText(run));
+        CHECK(Store::parse(store.text()).text() == store.text());
     }
 
     void storeFile(const fs::path &dir)
@@ -142,6 +173,21 @@ namespace
         save.careerBeaten = 1;
         save.coop[1] = {0x4, 99000, 4, 0};
         return save;
+    }
+
+    // Profiles' bests are no band's: a band gone takes none with it.
+    void profileBests()
+    {
+        CHECK(bestSection(std::nullopt) == "best" && bestSection(2) == "profile 3 best");
+        CHECK(bestSection(std::nullopt, "coop") == "coop best" && bestSection(0, "faceoff") == "profile 1 faceoff best");
+        const codec::Save fresh = freshCampaign();
+        codec::Save save = playedCampaign();
+        Store store;
+        for (const char *mode : {"", "coop"})
+            store.section(bestSection(2, mode)).set("gh2.freebird.gh2.guitar.expert", "1 1 1 1 0");
+        save.profiles[2].empty = 1;
+        codec::toStore(save, fresh, store);
+        CHECK(store.find("profile 3 best") && store.find("profile 3 coop best"));
     }
 
     void gh2Stream()
@@ -253,6 +299,8 @@ int main()
     const fs::path dir = fs::temp_directory_path() / ("ghc-save-test-" + std::to_string(std::random_device()()));
     fs::create_directories(dir);
     storeText();
+    bests();
+    profileBests();
     storeFile(dir);
     gh2Stream();
     gh2Sections();

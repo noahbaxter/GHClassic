@@ -3,9 +3,10 @@
 #include "content/locale.h"
 #include "content/outfits.h"
 #include "content/setlists.h"
+#include "content/song_speed.h"
 #include "disc/ark.h"
 #include "formats/dtb.h"
-#include "gameplay/note_engine/note_engine.h"
+#include "gameplay/engine/note_engine.h"
 #include "guest.h"
 #include "hook.h"
 #include "save/save.h"
@@ -320,6 +321,31 @@ namespace gh2::campaigns
             return "";
         }
 
+        // The bonus videos a campaign's store sells, (video (video1 (file
+        // x.pss) ...) ...), as the movie player opens them: videos/x.pss.
+        // Only `only`'s, where one is named.
+        std::vector<std::string> videosOf(const Guest &guest, size_t index, const std::string &only = "")
+        {
+            constexpr size_t kStore = 1u; // kConfig's store
+            constexpr uint32_t kString = 0x12u;
+            std::vector<std::string> paths;
+            const uint32_t store = s_campaigns[index].config.size() > kStore ? s_campaigns[index].config[kStore] : 0u;
+            const uint32_t sold = store ? guest.find(store, "video") : 0u;
+            for (int i = 1; sold && i < guest.size(sold); ++i)
+            {
+                if (guest.type(sold, i) != script::kArray || (!only.empty() && guest.key(guest.value(sold, i)) != only))
+                    continue;
+                const uint32_t file = guest.find(guest.value(sold, i), "file");
+                if (file == 0u || guest.size(file) < 2 ||
+                    (guest.type(file, 1) != script::kSymbol && guest.type(file, 1) != kString))
+                    continue;
+                const uint32_t text = guest.type(file, 1) == script::kSymbol ? guest.value(file, 1)
+                                                                              : load<uint32_t>(guest.call.rdram, guest.value(file, 1));
+                paths.push_back(std::string("videos/") + reinterpret_cast<const char *>(getMemPtr(guest.call.rdram, text)));
+            }
+            return paths;
+        }
+
         // Each panel `init` makes takes its type definition from there, or
         // only those in `only`. `was` is where a scene came from before.
         using Origin = std::optional<std::pair<uint32_t, uint32_t>>;
@@ -566,6 +592,9 @@ namespace gh2::campaigns
                 for (const auto &[scene, origin] : was)
                     s_menusLent.push_back(scene);
                 s_menusLent.insert(s_menusLent.end(), kMenuFiles.begin(), kMenuFiles.end());
+                // Its bonus videos, which its bonus screen and store play.
+                for (std::string &video : videosOf(guest, index))
+                    s_menusLent.push_back(std::move(video));
                 for (const std::string &prefix : s_menusLent)
                     ark::lend(prefix, s_campaigns[index].front);
             }
@@ -775,26 +804,37 @@ namespace gh2::campaigns
             return all == 0u ? 0 : static_cast<int>(count * 100u / all);
         }
 
-        // Whether `game`'s store sells `item`: named in any of store.dta's
-        // lists, read off its disc.
-        bool sells(const Campaign &campaign, const std::string &item)
+        // What `game`'s store sells, each by its price (0 where it names
+        // none): named in any of store.dta's lists, read off its disc.
+        const std::map<std::string, int> &sold(const Campaign &campaign)
         {
-            static std::map<std::string, std::set<std::string>> s_sold;
+            static std::map<std::string, std::map<std::string, int>> s_sold;
             auto found = s_sold.find(campaign.game);
             if (found == s_sold.end())
             {
-                found = s_sold.emplace(campaign.game, std::set<std::string>()).first;
+                found = s_sold.emplace(campaign.game, std::map<std::string, int>()).first;
                 const auto front = campaign.front;
                 dtb::Macros macros;
                 const auto store =
                     dtb::read("config/store.dta", macros, [front](const std::string &path) { return ark::readFront(front, path); });
                 for (const dtb::Node &list : store ? store->nodes : std::vector<dtb::Node>())
                     for (size_t i = 1u; i < list.nodes.size(); ++i)
-                        found->second.insert(list.nodes[i].type == dtb::kArray && !list.nodes[i].nodes.empty()
-                                                 ? list.nodes[i].nodes[0].text
-                                                 : list.nodes[i].text);
+                    {
+                        const dtb::Node &item = list.nodes[i];
+                        const bool named = item.type == dtb::kArray && !item.nodes.empty();
+                        const dtb::Node *price = named ? dtb::find(item, "price") : nullptr;
+                        const auto value = price && price->nodes.size() > 1u ? dtb::number(price->nodes[1]) : std::nullopt;
+                        found->second[named ? item.nodes[0].text : item.text] = value ? static_cast<int>(*value) : 0;
+                    }
             }
-            return found->second.count(item) != 0u;
+            return found->second;
+        }
+        bool sells(const Campaign &campaign, const std::string &item) { return sold(campaign).count(item) != 0u; }
+        int priceOf(const Campaign &campaign, const std::string &item)
+        {
+            const auto &prices = sold(campaign);
+            const auto it = prices.find(item);
+            return it != prices.end() ? it->second : 0;
         }
 
         // What `game`'s config has to use, read off its disc: its characters
@@ -805,12 +845,14 @@ namespace gh2::campaigns
             // of, where the two are named apart (gh1/career.cpp).
             std::string key, type, as;
             std::vector<std::array<std::string, 3>> skins; // key, outfit, mat
+
+            const std::string &liveKey() const { return as.empty() ? key : as; }
         };
         struct Usable
         {
             std::set<std::string> items;
             std::vector<std::string> outfits; // in config's order
-            std::vector<std::string> characters;
+            std::vector<std::pair<std::string, std::vector<std::string>>> characters; // each with its outfits
             std::vector<Guitar> guitars;
         };
         const Usable &usable(const Campaign &campaign)
@@ -838,8 +880,8 @@ namespace gh2::campaigns
                     if (character.type != dtb::kArray || character.nodes.empty())
                         continue;
                     found.items.insert(character.nodes[0].text);
-                    found.characters.push_back(character.nodes[0].text);
-                    for (const std::string &outfit : keys(character))
+                    found.characters.emplace_back(character.nodes[0].text, keys(character));
+                    for (const std::string &outfit : found.characters.back().second)
                     {
                         found.items.insert(outfit);
                         found.outfits.push_back(outfit);
@@ -913,6 +955,9 @@ namespace gh2::campaigns
                 return {script::symbol(call.rdram, call.ctx, call.runtime, s_campaigns[s_menus].game), script::kSymbol};
             if (op == "live")
                 return {script::symbol(call.rdram, call.ctx, call.runtime, active()), script::kSymbol};
+            // The game whose screens are around the song in play (lookFor).
+            if (op == "look")
+                return {script::symbol(call.rdram, call.ctx, call.runtime, s_campaigns[s_lookFrom].game), script::kSymbol};
             if (op == "has")
                 return {indexOf(call.symbol(2)) ? 1u : 0u, script::kInt};
             if (op == "first_character" || op == "second_character")
@@ -945,10 +990,11 @@ namespace gh2::campaigns
                 return {};
             }
             // From onGameOver, a quickplay song alone: difficulty, song, then
-            // as finished's. A song lost has gems passed.
+            // as finished's. A song lost has gems passed. One at another
+            // speed is only its [best] (save/results.h).
             if (op == "finished_quickplay")
             {
-                if (fullCombo(call, 4) && !save::hasFullCombo(call.symbol(3), static_cast<int>(call.number(2))))
+                if (fullCombo(call, 4) && song_speed::percent() == 100 && !save::hasFullCombo(call.symbol(3), static_cast<int>(call.number(2))))
                 {
                     save::keepQuickplayFullCombo(static_cast<int>(call.number(2)), call.symbol(3));
                     // Quickplay saves only when something asks it to.
@@ -1002,6 +1048,35 @@ namespace gh2::campaigns
                 textBuilt(Guest{call}, *index);
                 locale::own(op == "text_venues" ? locale::kVenue : locale::kCharacter, s_campaigns[*index].game);
                 return {1u, script::kInt};
+            }
+            // {campaigns text <game> <token>}: that game's own text for it,
+            // whatever the theme, or "" (locale::textOf).
+            if (op == "text")
+            {
+                const auto index = indexOf(call.symbol(2));
+                if (!index)
+                    return call.word("");
+                textBuilt(Guest{call}, *index);
+                const uint32_t text = locale::textOf(call.rdram, s_campaigns[*index].game, call.symbol(3));
+                return call.word(text != 0u ? reinterpret_cast<const char *>(getMemPtr(call.rdram, text)) : "");
+            }
+            // {campaigns video_file <game> <video>}: the file that game's
+            // store names for one of its bonus videos, lent from its disc
+            // with the menus' files until they change; "" for none.
+            if (op == "video_file")
+            {
+                const auto index = indexOf(call.symbol(2));
+                const Guest guest{call};
+                if (!index || !built(guest, *index))
+                    return call.word("");
+                const std::string video = call.symbol(3);
+                for (const std::string &path : videosOf(guest, *index, video))
+                {
+                    s_menusLent.push_back(path);
+                    ark::lend(path, s_campaigns[*index].front);
+                    return call.word(path.substr(std::strlen("videos/")));
+                }
+                return call.word("");
             }
             if (op == "owns")
             {
@@ -1170,9 +1245,9 @@ namespace gh2::campaigns
                 for (size_t i = 0; i < s_campaigns.size(); ++i)
                     for (const std::string &venue : venuesOf(i))
                         venues.insert(venue);
-                for (const std::string &character : usable(s_campaigns[0]).characters)
+                for (const auto &character : usable(s_campaigns[0]).characters)
                     for (const char *suffix : {"", "_blurb", "_outfit_blurb"})
-                        characters.insert(character + suffix);
+                        characters.insert(character.first + suffix);
                 locale::ownTokens(locale::kVenue, venues);
                 locale::ownTokens(locale::kCharacter, characters);
                 *ctx = saved;
@@ -1280,6 +1355,23 @@ namespace gh2::campaigns
             if (s_toSwitch)
                 store<float>(rdram, GPR_U32(ctx, 4) + 0x44u, 2.0f);
         }
+
+        // VideoProvider keeps the config's (store (video ...)) it found as it
+        // was made (0x11b0c8, at +0x3c), the boot's game's: a video looked up
+        // (GetVideoData, 0x11b350) in the menus' game's store, as kept
+        // (build), whose files menusFrom lends: GH1's bonus videos too.
+        struct VideoTag;
+        void onGetVideoData(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            constexpr size_t kStore = 1u; // kConfig's store
+            const script::Call call{rdram, ctx, runtime, 0u};
+            const Guest guest{call};
+            if (s_menus >= s_campaigns.size() || s_campaigns[s_menus].config.size() <= kStore)
+                return;
+            if (const uint32_t store = s_campaigns[s_menus].config[kStore])
+                if (const uint32_t video = guest.find(store, "video"))
+                    ::gh2::store<uint32_t>(rdram, GPR_U32(ctx, 4) + 0x3cu, video);
+        }
     }
 
     void add(const std::string &game, size_t front)
@@ -1356,7 +1448,7 @@ namespace gh2::campaigns
             {
                 const bool finish = std::any_of(guitar.skins.begin(), guitar.skins.end(),
                                                 [&](const auto &skin) { return skin[0] == item; });
-                if (!finish && (guitar.as.empty() ? guitar.key : guitar.as) != item)
+                if (!finish && guitar.liveKey() != item)
                     continue;
                 known = true;
                 if (unlockedIn(campaign.game, finish ? item : guitar.key))
@@ -1387,7 +1479,7 @@ namespace gh2::campaigns
         for (size_t i = 0; i < s_campaigns.size(); ++i)
             for (const Guitar &guitar : i == s_active ? std::vector<Guitar>() : usable(s_campaigns[i]).guitars)
             {
-                const std::string body = guitar.as.empty() ? guitar.key : guitar.as;
+                const std::string body = guitar.liveKey();
                 // A guitar the live config has none of comes whole. No band
                 // has an item for it (ProfileState::InitGuitars ran on the
                 // config before this), so no career's picker lists it.
@@ -1409,7 +1501,7 @@ namespace gh2::campaigns
         std::set<std::string> names;
         for (const Campaign &campaign : s_campaigns)
             for (const Guitar &guitar : usable(campaign).guitars)
-                names.insert(guitar.as.empty() ? guitar.key : guitar.as);
+                names.insert(guitar.liveKey());
         const uint32_t held = load<uint32_t>(rdram, s_addresses->theCampaign);
         const bool career = inCareer(rdram), all = held != 0u && load<uint32_t>(rdram, held + kAllAccess) != 0u;
         // Each such finish by its guitar and key: what it is, and whether
@@ -1420,7 +1512,7 @@ namespace gh2::campaigns
                 for (const auto &skin : guitar.skins)
                     if (names.count(skin[0]) != 0u)
                     {
-                        auto &finish = finishes[{guitar.as.empty() ? guitar.key : guitar.as, skin[0]}];
+                        auto &finish = finishes[{guitar.liveKey(), skin[0]}];
                         finish.first = "(" + skin[0] + " (outfit " + skin[1] + ") (mat " + skin[2] + "))";
                         finish.second = finish.second ||
                                         (career ? i == s_active : all || unlockedIn(s_campaigns[i].game, guitar.key));
@@ -1441,6 +1533,56 @@ namespace gh2::campaigns
     {
         const auto index = indexOf(game);
         return index ? usable(s_campaigns[*index]).outfits : std::vector<std::string>();
+    }
+
+    std::vector<std::pair<std::string, std::vector<std::string>>> characters(const std::string &game)
+    {
+        const auto index = indexOf(game);
+        return index ? usable(s_campaigns[*index]).characters : std::vector<std::pair<std::string, std::vector<std::string>>>();
+    }
+
+    std::vector<Finish> finishes()
+    {
+        std::vector<Finish> out;
+        for (const Campaign &campaign : s_campaigns)
+            for (const Guitar &guitar : usable(campaign).guitars)
+                if (guitar.type == "guitar")
+                    for (const auto &skin : guitar.skins)
+                    {
+                        const Finish finish{guitar.liveKey(), skin[0], skin[1]};
+                        if (std::none_of(out.begin(), out.end(), [&](const Finish &f)
+                                         { return f.guitar == finish.guitar && f.finish == finish.finish; }))
+                            out.push_back(finish);
+                    }
+        return out;
+    }
+
+    std::vector<Finish> finishesOf(const std::string &game)
+    {
+        std::vector<Finish> out;
+        if (const auto index = indexOf(game))
+            for (const Guitar &guitar : usable(s_campaigns[*index]).guitars)
+                if (guitar.type == "guitar")
+                    for (const auto &skin : guitar.skins)
+                        out.push_back({guitar.liveKey(), skin[0], skin[1],
+                                       priceOf(s_campaigns[*index], guitar.key) + priceOf(s_campaigns[*index], skin[0])});
+        std::stable_sort(out.begin(), out.end(), [](const Finish &a, const Finish &b) { return a.price < b.price; });
+        return out;
+    }
+
+    std::string scytheOf(const std::string &game)
+    {
+        if (const auto index = indexOf(game))
+            for (const Guitar &guitar : usable(s_campaigns[*index]).guitars)
+                if (guitar.liveKey() == "scythe" && !guitar.skins.empty())
+                    return guitar.skins.front()[0];
+        return "scythe";
+    }
+
+    bool venueOpen(const std::string &game, const std::string &venue)
+    {
+        const auto index = indexOf(game);
+        return index && venueOpen(*index, venue);
     }
 
     bool gh1Highway()
@@ -1479,5 +1621,6 @@ namespace gh2::campaigns
         EntryHook<FinishSongTag>::install(runtime, addresses.profileStateFinishSong, onFinishSong);
         EntryHook<GameOverTag>::install(runtime, addresses.hudPanelOnGameOver, onGameOver);
         EntryHook<MetaMusicStopTag>::install(runtime, addresses.metaMusicStop, onMetaMusicStop);
+        EntryHook<VideoTag>::install(runtime, addresses.videoProviderGetVideoData, onGetVideoData);
     }
 }

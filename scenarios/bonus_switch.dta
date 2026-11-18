@@ -1,0 +1,48 @@
+; Bonus videos: Options opens the theme's game's poster, and yellow tapped
+; the other game's, over the same room, the theme unchanged; each its own
+; videos (GH1's three, GH2's two), found on its own disc.
+#include common/first_boot.dta
+(needs gh1)
+{campaigns unlock_all TRUE}
+{ui goto_screen options_screen}
+(wait_screen options_screen)
+(wait 1)
+{options_panel set_focus {options_panel find op_bonus.btn}}
+(wait 0.3)
+(press green)
+(wait_screen ghc_bonus_gh2_screen 10)
+(wait 1)
+(expect {campaigns active} gh2)
+(expect {ghc_bonus_gh2_screen focus_name} bm_video3.btn)
+(shot gh2_poster)
+(press yellow)
+(wait_screen ghc_bonus_gh1_screen 10)
+(wait 1)
+(expect {campaigns active} gh2)
+(expect {ghc_bonus_gh1_screen focus_name} bm_video1.btn)
+(expect {campaigns video_file gh1 video1} wavegroup.pss)
+(shot gh1_poster)
+(press yellow)
+(wait_screen ghc_bonus_gh2_screen 10)
+(wait 1)
+(expect {campaigns video_file gh2 video3} hmx.pss)
+(press red)
+(wait_screen options_screen 10)
+; Under GH1's theme, its own poster first, GH2's over its room.
+{main_screen ghc_picked gh1}
+(wait_until {&& {== {{ui current_screen} name} main_screen} {! {ui in_transition}}} 20)
+{ui goto_screen options_screen}
+(wait_screen options_screen)
+(wait 1)
+{options_panel set_focus {options_panel find op_bonus.btn}}
+(wait 0.3)
+(press green)
+(wait_screen ghc_bonus_gh1_screen 10)
+(wait 1)
+(shot gh1_theme_gh1_poster)
+(press yellow)
+(wait_screen ghc_bonus_gh2_screen 10)
+(wait 1)
+(expect {campaigns active} gh1)
+(shot gh1_theme_gh2_poster)
+(quit)

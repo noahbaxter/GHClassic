@@ -14,10 +14,14 @@
 #include "gh1/songs.h"
 
 #include "disc/ark.h"
+#include "content/campaigns.h"
 #include "content/encores.h"
 #include "content/locale.h"
 #include "content/setlists.h"
 #include "content/songs.h"
+#include "custom/gh2_chart.h"
+#include "custom/lipsync.h"
+#include "custom/stage/stage.h"
 #include "formats/dtb.h"
 #include "gh1/face.h"
 #include "gh1/guitarist.h"
@@ -36,11 +40,6 @@ namespace gh2::gh1
 {
     namespace
     {
-        // A chart's track of the drums' cues a beat ahead, note 60 drum_on
-        // and 61 drum_off, which a parser of its own sends the world as
-        // GH1 sends its venue (addSetlist).
-        constexpr const char *kUpcoming = "GH1 UPCOMING";
-
         // GH2's venues standing in for GH1's, by tier: each the one that
         // plays GH1's crowd for it (crowd_v1 to v6, world/<venue>/streams).
         const std::map<std::string, std::string> kVenues = {
@@ -110,7 +109,7 @@ namespace gh2::gh1
             uint32_t at = 0u, from = 0u, length = in.division * 4u;
             for (const midi::Event &e : in.tracks[0].events)
             {
-                if (e.status != 0xffu || e.meta != 0x58u || e.data.size() < 2u)
+                if (e.status != midi::kMeta || e.meta != midi::kSignature || e.data.size() < 2u)
                     continue;
                 const uint32_t next = e.data[1] < 32u ? in.division * 4u * e.data[0] >> e.data[1] : 0u;
                 if (next == 0u)
@@ -193,7 +192,7 @@ namespace gh2::gh1
                 return std::nullopt;
             const auto textOf = [](const midi::Event &e) -> std::optional<std::string>
             {
-                if (e.status != 0xffu || e.meta != 0x01u)
+                if (e.status != midi::kMeta || e.meta != midi::kText)
                     return std::nullopt;
                 std::string s(e.data.begin(), e.data.end());
                 s.erase(s.find_last_not_of(' ') + 1u);
@@ -201,7 +200,7 @@ namespace gh2::gh1
             };
 
             const char *const order[] = {"PART GUITAR", "EVENTS",     "BAND BASS", "BAND DRUMS",
-                                         "BAND SINGER", "BAND KEYS", kUpcoming};
+                                         "BAND SINGER", "BAND KEYS", custom::kUpcomingTrack};
             std::map<std::string, midi::Track> made;
             made["PART GUITAR"].events = gems->events;
             made["EVENTS"];
@@ -215,7 +214,7 @@ namespace gh2::gh1
                     }
                     // The fret hand's places, 40 to 59. getready2rokk's four
                     // 60s (GH1's finger_powerchord_1) would be easy gems.
-                    else if (e.status != 0xffu && !e.data.empty() && e.data[0] >= 40u && e.data[0] <= 59u)
+                    else if (e.status != midi::kMeta && !e.data.empty() && e.data[0] >= 40u && e.data[0] <= 59u)
                         made["PART GUITAR"].events.push_back(e);
                 }
             std::vector<std::pair<uint32_t, std::string>> marks;
@@ -229,19 +228,17 @@ namespace gh2::gh1
                     // GH1 sends the venue each text a beat ahead as
                     // upcoming_<text> (BeatMaster::CheckUpcomingTextEvents,
                     // GH1 0x274460); its venues' drum kit cymbals stop and
-                    // start by the drums' (kUpcoming, addSetlist).
+                    // start by the drums' (custom::kUpcomingTrack, addSetlist).
                     if (*s == "drum_on" || *s == "drum_off")
                     {
-                        const uint32_t at = e.tick > in->division ? e.tick - in->division : 0u;
-                        const uint8_t note = *s == "drum_on" ? 60u : 61u;
-                        made[kUpcoming].events.push_back({at, 0x90u, 0u, {note, 100u}});
-                        made[kUpcoming].events.push_back({at + 1u, 0x80u, 0u, {note, 0u}});
+                        const uint32_t cueTick = e.tick > in->division ? e.tick - in->division : 0u;
+                        custom::addNote(made[custom::kUpcomingTrack], cueTick, cueTick, *s == "drum_on" ? 60u : 61u);
                     }
                 }
             // GH1's gems are notes 60 to 100 of T1 GEMS, easy's to expert's.
             uint32_t firstGem = UINT32_MAX;
             for (const midi::Event &e : gems->events)
-                if ((e.status & 0xf0u) == 0x90u && e.data.size() > 1u && e.data[1] != 0u && e.data[0] >= 60u &&
+                if (midi::kind(e) == midi::kNoteOn && e.data.size() > 1u && e.data[1] != 0u && e.data[0] >= 60u &&
                     e.data[0] <= 100u)
                     firstGem = std::min(firstGem, e.tick);
             for (const auto &[tick, name] : sections(*in, marks, firstGem))
@@ -262,7 +259,7 @@ namespace gh2::gh1
             const midi::TempoMap tempos(*in);
             if (triggers)
                 for (midi::Event e : triggers->events)
-                    if (e.status != 0xffu && (e.status & 0xe0u) == 0x80u && !e.data.empty() &&
+                    if ((midi::kind(e) == midi::kNoteOn || midi::kind(e) == midi::kNoteOff) && !e.data.empty() &&
                         (e.data[0] == 60u || e.data[0] == 61u))
                     {
                         const bool kick = e.data[0] == 60u;
@@ -301,12 +298,12 @@ namespace gh2::gh1
                 std::optional<uint32_t> on;
                 for (const midi::Event &e : track.events)
                 {
-                    if (e.status == 0xffu || e.data.size() < 2u || e.data[0] != 108u)
+                    if (e.status == midi::kMeta || e.data.size() < 2u || e.data[0] != 108u)
                         continue;
-                    const bool down = (e.status & 0xf0u) == 0x90u && e.data[1] != 0u;
+                    const bool down = midi::kind(e) == midi::kNoteOn && e.data[1] != 0u;
                     if (down && !on)
                         on = e.tick;
-                    else if (!down && on && ((e.status & 0xf0u) == 0x80u || (e.status & 0xf0u) == 0x90u))
+                    else if (!down && on && (midi::kind(e) == midi::kNoteOff || midi::kind(e) == midi::kNoteOn))
                     {
                         out.emplace_back(seconds(*on), seconds(e.tick));
                         on.reset();
@@ -314,6 +311,23 @@ namespace gh2::gh1
                 }
             }
             return out;
+        }
+
+        // Another game's chart with GH1's venues' drum cue added from its
+        // BAND DRUMS (custom::upcomingDrums); none where it has no BAND
+        // DRUMS.
+        std::optional<ark::Made> withUpcomingDrums(size_t disc, const std::string &path)
+        {
+            const auto bytes = ark::readFile(disc, path);
+            auto file = bytes ? midi::parse(*bytes) : std::nullopt;
+            if (!file)
+                return std::nullopt;
+            const auto drums = std::find_if(file->tracks.begin(), file->tracks.end(),
+                                            [](const midi::Track &t) { return t.name == "BAND DRUMS"; });
+            if (drums == file->tracks.end())
+                return std::nullopt;
+            file->tracks.push_back(custom::upcomingDrums(*drums, file->division));
+            return ark::held(midi::write(*file));
         }
 
         using dtb::array;
@@ -342,7 +356,7 @@ namespace gh2::gh1
             dtb::Node vols = array({symbol("vols"), array({})});
             for (const dtb::Node &gain : gains->nodes)
                 if (const auto g = dtb::number(gain))
-                    vols.nodes[1].nodes.push_back({dtb::kFloat, 0, *g > 0.0f ? 20.0f * std::log10(*g) : -96.0f});
+                    vols.nodes[1].nodes.push_back(dtb::real(*g > 0.0f ? 20.0f * std::log10(*g) : -96.0f));
             dtb::Node song = array({
                 symbol("song"),
                 array({symbol("name"), *path}),
@@ -455,7 +469,7 @@ namespace gh2::gh1
             if (store)
                 for (dtb::Node &list : store->nodes)
                     if (list.type == dtb::kArray && !list.nodes.empty() && list.nodes[0].text == "song")
-                        list.nodes.push_back(array({entry.nodes[0], array({symbol("price"), {dtb::kInt, 250, 0.0f, {}, {}}})}));
+                        list.nodes.push_back(array({entry.nodes[0], array({symbol("price"), dtb::integer(250)})}));
         }
     }
 
@@ -478,18 +492,27 @@ namespace gh2::gh1
 
         // The drums' cues a beat ahead to the world, as upcoming_drum_on and
         // upcoming_drum_off, which GH1's venue scripts take (gh1/scripts.cpp).
-        // GH2's songs have no such track, so nothing of theirs reaches it.
-        constexpr const char *kParsers = "config/gen/midi_parsers.dtb";
-        const auto parsers = ark::readFile(0u, kParsers);
-        auto parserRoot = parsers ? dtb::raw(*parsers) : std::nullopt;
-        const auto upcoming = dtb::parse(std::string("(gh1_upcoming (type midi) (eval 1) (track_name '") + kUpcoming +
-                                         "') (mappings (default (events (60 ({handle (world upcoming_drum_on)})) "
-                                         "(61 ({handle (world upcoming_drum_off)}))))))");
-        if (parserRoot && upcoming)
-        {
-            parserRoot->nodes.insert(parserRoot->nodes.end(), upcoming->nodes.begin(), upcoming->nodes.end());
-            ark::addFile(kParsers, dtb::write(*parserRoot));
-        }
+        ark::addFix(0u, "config/gen/midi_parsers.dtb", [](std::vector<uint8_t> &file)
+                    {
+                        auto root = dtb::raw(file);
+                        const auto upcoming = dtb::parse(
+                            std::string("(gh1_upcoming (type midi) (eval 1) (track_name '") + custom::kUpcomingTrack +
+                            "') (mappings (default (events (60 ({handle (world upcoming_drum_on)})) "
+                            "(61 ({handle (world upcoming_drum_off)}))))))");
+                        if (!root || !upcoming)
+                            return;
+                        root->nodes.insert(root->nodes.end(), upcoming->nodes.begin(), upcoming->nodes.end());
+                        file = dtb::write(*root);
+                    });
+        // Other games' songs (GH2's, the 80s') get that cue track too while
+        // they play in GH1's venues; in their own venues they keep the
+        // disc's chart.
+        for (size_t other = 0u; other < ark::discs(); ++other)
+            if (other != disc)
+                for (const std::string &path : ark::paths(other, "songs/"))
+                    if (path.ends_with(".mid"))
+                        ark::addMade(other, path, [other, path] { return withUpcomingDrums(other, path); },
+                                     [] { return campaigns::venueGame() == "gh1"; });
 
         // The basement's results headlines, by stars (gh1/menus.dta).
         for (int stars = 3; stars <= 5; ++stars)
@@ -505,6 +528,7 @@ namespace gh2::gh1
 
         std::vector<setlists::Tier> tiers;
         size_t count = 0u;
+        const auto blink = ark::readFile(gh2Disc, "songs/_blinktrack/_blinktrack.voc");
         for (const auto &[group, list] : groups)
         {
             setlists::Tier tier{group == "store" ? venue(groups.front().first) : venue(group), "gh1_" + group, {},
@@ -527,10 +551,19 @@ namespace gh2::gh1
                 }
                 songs::add(*text);
                 ark::addFile(mid, *converted);
-                addSinging(name, sung(*file));
+                const auto open = sung(*file);
+                addSinging(name, open);
                 // GH2's singer lip-syncs to <song>.voc; GH1's sang to chart
-                // events, so GH2's neutral track stands in.
-                ark::rename("songs/" + name + "/" + name + ".voc", gh2Disc, "songs/_blinktrack/_blinktrack.voc");
+                // events, so GH2's neutral track (its blinks) with a vowel
+                // each time GH1's opens its mouth (custom/lipsync.h).
+                if (blink)
+                {
+                    static const char *const kVowels[] = {"ah", "oh", "eh", "ee", "oo"};
+                    std::vector<custom::Sung> mouth;
+                    for (const auto &[from, to] : open)
+                        mouth.push_back({from, to, kVowels[mouth.size() % std::size(kVowels)]});
+                    ark::addFile("songs/" + name + "/" + name + ".voc", custom::withMouth(*blink, custom::mouthShapes(mouth)));
+                }
                 ark::rename("songs/" + name + "/", disc, "songs/" + name + "/");
                 tier.songs.push_back(name);
                 ++count;

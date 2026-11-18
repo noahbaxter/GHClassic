@@ -16,6 +16,9 @@ namespace gh2
     // in it (input.h).
     void setScriptedPad(uint16_t pressed);
 
+    // How far down a scripted run holds the whammy, 0 to 1 (0 lets go).
+    void setScriptedWhammy(float down);
+
     // The bit for an action by its name (host/bindings.h), or for up, down,
     // left or right; 0 for anything else.
     uint16_t padButton(const std::string &name);

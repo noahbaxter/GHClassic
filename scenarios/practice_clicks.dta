@@ -1,0 +1,41 @@
+; Practice's note click, then its metronome, each alone: a custom song at
+; 120 bpm in 4/4 with a note on each beat, the whole song played (its own
+; audio near silent), so each click stands out. The note click on each note
+; as the music reaches it, the metronome on each beat, each bar's first its
+; own sound, each played by the mix (content/practice_sounds.h). Recorded
+; to be heard.
+(songs songs_stems)
+#include common/first_boot.dta
+{practice_option solo_stems 0}
+{practice_option metronome 0}
+{practice_option note_click 1}
+{gamecfg set mode practice}
+{setlist select custom}
+{ui goto_screen practice_selsong_screen}
+(wait_screen practice_selsong_screen)
+(wait 3)
+(press green)
+(wait_screen practice_diff_screen)
+(wait 1)
+{{game get_player_config 0} set autoplay TRUE}
+(press green)
+(wait_screen practice_game_screen 60)
+(expect $ghc_practice_solo 0)
+; The whole song, from a bar ahead of it: its first note two bars in.
+(wait 2.5)
+{set $ghc_from {practice_clicks played}}
+(record on note_click)
+(wait 4)
+(record off)
+(expect {> {'-' {practice_clicks played} $ghc_from} 4} 1)
+{practice_option note_click 0}
+{practice_option metronome 1}
+(wait 0.5)
+{set $ghc_from {practice_clicks played}}
+(record on metronome)
+(wait 4.5)
+(record off)
+(expect {> {'-' {practice_clicks played} $ghc_from} 6} 1)
+{practice_option metronome 0}
+{practice_option solo_stems 1}
+(quit)

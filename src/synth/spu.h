@@ -48,12 +48,19 @@ namespace gh2::synth
         uint32_t nextAddress(uint32_t voice) const; // NAX
         bool ended(uint32_t voice) const;           // ENDX
         uint16_t envelope(uint32_t voice) const;    // ENVX
+        uint16_t pitch(uint32_t voice) const;
+        // Samples of the block at NAX played: 0 when NAX is the next to
+        // fetch, so NAX's line plus this is where the voice is.
+        uint32_t playedInBlock(uint32_t voice) const;
 
         void setMasterVolume(uint16_t left, uint16_t right); // both cores
         Reverb &reverb(uint32_t core);
 
-        // Adds `frames` of interleaved stereo at 48 kHz into `out`.
-        void mix(float *out, size_t frames);
+        // Adds `frames` of interleaved stereo at 48 kHz into `out`. With
+        // `side`, the voices of `diverted` (a bit each) are mixed there
+        // instead, dry, through the master volume, for the caller to treat
+        // and add itself.
+        void mix(float *out, size_t frames, float *side = nullptr, uint64_t diverted = 0u);
 
     private:
         enum class Phase : uint8_t
@@ -101,5 +108,6 @@ namespace gh2::synth
         std::vector<int32_t> m_dry[kCores];
         std::vector<int32_t> m_send[kCores];
         std::vector<int32_t> m_wet[kCores];
+        std::vector<int32_t> m_side;
     };
 }

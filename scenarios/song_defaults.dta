@@ -1,17 +1,12 @@
 ; Quickplay with song defaults: its setup's PLAY SHOW opens the setlist
 ; picked last, select's menu flips the defaults (off at first), and with
-; them on a GH1 song plays as GH1 boots (metal), straight from the
-; difficulty.
+; them on a GH1 song plays as GH1 casts it (I Love Rock 'n Roll, GH1's
+; Judy), straight from the difficulty.
 #include common/first_boot.dta
 (needs gh1)
 {setlist select gh2}
-; Into quickplay as a player goes: a first boot leaves the main menu on
-; options, with no tutorial or multiplayer rows to pass.
-(wait 1)
-(press up)
-(wait 0.5)
-(expect {main_panel focus_name} main_quickspin.btn)
-(press green)
+{gamecfg set mode quickplay}
+{ui goto_screen ghc_qp_setup_screen}
 (wait_screen ghc_qp_setup_screen)
 (wait 1)
 (expect {sel_character_panel focus_name} ghc_play.btn)
@@ -19,11 +14,13 @@
 (wait_screen qp_selsong_screen)
 (wait 1)
 (expect {setlist shown} gh2)
-; Select opens the menu and it stays open; green flips its row; select
-; shuts it.
+; Select opens the menu, on SPEED, and it stays open; green flips song
+; defaults' row, under HIGH SCORES; select shuts it.
 (press star_power)
 (wait 0.5)
 (expect {ghc_pick_panel get open} 1)
+(press down)
+(press down)
 (shot menu)
 (expect {quickplay song_defaults} 0)
 (press green)
@@ -51,7 +48,8 @@
 {{game get_player_config 0} set autoplay TRUE}
 (press green)
 (wait_screen game_screen 60)
-(expect {game get_character_outfit} {quickplay outfit gh1})
+(expect {gamecfg get_song} iloverockandroll)
+(expect {game get_character_outfit} alternagh1)
 (expect {campaigns venue_game} gh1)
 (print {game get_character_outfit} {game get_guitar} {game get_venue} {gamecfg get_song})
 (wait 15)

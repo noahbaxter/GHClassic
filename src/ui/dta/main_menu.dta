@@ -57,9 +57,8 @@
          {if {! [already_entered]}
             {lick_attach}
             {synth play_sequence meta_lick}
-            {if {&& {== {game get_controller 0} guitar} {== {campaign tutorials_done} 0}}
-               {$this set_focus main_tutorial.btn}
-            }
+            ; Quick Play first, never Training as the game's own has it for
+            ; a guitar whose tutorials are not done.
             {$this set already_entered TRUE}
          }
          {game set_tutorial_running FALSE}
@@ -232,40 +231,82 @@
 ; The main screen, as the game's own but for fade_panel, which Quit fades
 ; through, and for yellow: held, it lists those games (picker.dta), and the
 ; one picked becomes the theme, its menus and music, back on this screen.
+; With no more of them than $ghc_tap_flips, a tap is the next instead: two
+; are no list to pick from.
+{set $ghc_tap_flips 2}
+; A screen takes its panels as it is typed: the hub's guitarist's
+; (preshow_guitarist.dta, read later) made first.
+{if {! {exists ghc_preshow_char}} {new CharsysPanel ghc_preshow_char}}
 {retype main_screen
    (
-      (panels meta main_panel helpbar ghc_pick_panel fade_panel)
+      ; The hub's guitarist loading behind it (ghc_preshow_preload).
+      (panels meta main_panel ghc_dim_panel dialog ghc_profile_panel helpbar ghc_pick_panel fade_panel
+         ghc_preshow_char)
       (focus main_panel)
       (access_all {main_panel reset_player_settings})
       ; The help bar puts up a screen's (helpbar ...) after its enter, so
       ; this one has none and sets its own.
       (enter
          {$this turn_off_ambient}
+         {ghc_preshow_preload}
          ; Face-Off's looks, one outfit's and finish's each (multiplayer.dta).
          {ghc_multi_forget}
+         ; A 360 song quit to here is over (content/quickplay.h).
+         {quickplay next_gen_song 0}
+         ; As a practice begun from quickplay's pause (game_settings.dta).
+         {set $ghc_practice_from FALSE}
+         ; Song speed is quickplay's and practice's alone.
+         {song_speed set 100}
+         {$this ghc_help}
+         ; Who holds each seat, in the corner (profiles.dta), where a
+         ; controller's Start joins.
+         {ghc_profile_panel set badges TRUE}
+         {ghc_profile_panel paint_badges}
+         {ghc_profile joins 1}
+      )
+      (exit
+         {ghc_profile joins 0}
+         {ghc_profile_panel leave}
+         {ghc_profile_panel set badges FALSE}
+         {ghc_profile_panel paint_badges}
+      )
+      ; A player's menu puts up its own help bar (profiles.dta).
+      (ghc_help_set ($array) {helpbar set_display $array})
+      (ghc_help
          {do
-            ($array)
-            {set $array ()}
-            {resize $array 0}
-            {push_back $array (fret1 help_continue)}
-            {if {> {size {ghc_themes}} 1} {push_back $array (fret3 ghc_theme)}}
-            {push_back $array (strum help_updown)}
-            {helpbar set_display $array}
+            ($actions {array 0})
+            {ghc_act $actions {> {size {ghc_themes}} 1} pick ghc_theme}
+            ; Start puts up a seated player's menu, or joins another
+            ; controller (profiles.dta).
+            {ghc_act $actions TRUE profile ghc_profile_help}
+            {ghc_helpbar help_continue none $actions help_updown}
          }
       )
       (BUTTON_DOWN_MSG
          {cond
+            ({ghc_profile_panel button $player_num $button} TRUE)
             ({ghc_pick_button $button} TRUE)
-            ({&& {== $button kPad_Circle} {> {size {ghc_themes}} 1} {! {ui in_transition}}}
-               {ghc_pick_panel open_with {ghc_themes} {campaigns active}}
+            ({&& {ghc_pressed $button pick} {> {size {ghc_themes}} 1}}
+               {if_else {<= {size {ghc_themes}} $ghc_tap_flips}
+                  {$this ghc_theme_next}
+                  {ghc_pick_panel open_with {ghc_themes} {campaigns active}}
+               }
                TRUE
             )
             (TRUE kDataUnhandled)
          }
       )
+      (ghc_theme_next
+         {do
+            ($themes {ghc_themes})
+            ($at 0)
+            {find_elem $themes {campaigns active} $at}
+            {$this ghc_picked {elem $themes {mod {'+' $at 1} {size $themes}}}}
+         }
+      )
       (ghc_picked
          ($game)
-         {synth play_sequence button_select}
+         {ghc_select}
          {set $ghc_switch $game}
          {set $ghc_switch_next main_screen}
          {set $ghc_switch_as menus}
@@ -273,13 +314,16 @@
       )
    )
 }
-; The splash, as the game's own (splash.dta) but for lick_attach.
+; The splash, as the game's own (splash.dta) but for lick_attach, and its
+; press picks P1's profile on the way to the main menu (profiles.dta).
 {retype splash_panel
    (
       (file ui/splash.milo)
       (player_num 0)
       (finish_load {splash.view set_frame 0} {splash_legal.view set_showing TRUE})
       (enter
+         ; Start only, not GH2's any button.
+         {splash_press_start.lbl set_text ghc_press_start}
          {splash.view animate (period 3.333) (range 0 100)}
          {set $enter_time {taskmgr ui_seconds}}
          {game_screen set attract_mode FALSE}
@@ -307,10 +351,13 @@
          {game_screen set attract_mode TRUE}
          {ui goto_screen loading_screen}
       )
+      ; Start only, which signs P1 in on the notebook, then the main menu.
+      ; Joining: backing out to here frees P1, for whichever controller
+      ; presses Start next.
       (BUTTON_DOWN_MSG
-         {if {meta is_any_button $button $player_num}
-            {synth play_sequence button_select}
-            {ui goto_screen main_screen}
+         {if {ghc_pressed $button profile}
+            {ghc_select}
+            {ghc_profile_screen join 0 splash_screen main_screen}
          }
       )
    )

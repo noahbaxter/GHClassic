@@ -72,8 +72,12 @@ namespace gh2::input
             for (Device &same : devices())
                 if (same.sectionName == name && same.sectionGuid == guid)
                 {
-                    same.profile = overlay(same.builtin, sectionOf(name, guid));
                     same.kind = kindOf(name, guid, same.detected);
+                    // A gamepad's layout follows its mode.
+                    if (same.joystick)
+                        if (const auto layout = builtinProfile(deviceInfo(same.joystick, same.gamepad), same.kind))
+                            same.builtin = layout->profile;
+                    same.profile = overlay(same.builtin, sectionOf(name, guid));
                 }
         }
 
@@ -159,10 +163,13 @@ namespace gh2::input
         for (const BindingEdit &e : edits)
         {
             // The mode it was detected as needs no line.
+            // The keyboard is a guitar unless its mode line says pad.
             const Device *d = deviceById(e.id);
-            if (e.what == BindingEdit::kMode && !d)
+            const bool keyboard = e.id.backend == DeviceId::kKeyboard;
+            if (e.what == BindingEdit::kMode && !d && !keyboard)
                 continue;
-            const DeviceKind swapped = d && d->kind == DeviceKind::kGamepad ? DeviceKind::kGuitar : DeviceKind::kGamepad;
+            const bool playsPad = keyboard ? keyboardPlaysPad() : d && d->kind == DeviceKind::kGamepad;
+            const DeviceKind swapped = playsPad ? DeviceKind::kGuitar : DeviceKind::kGamepad;
             rewrite(e.id, [&](Section &lines, std::string &mode) {
                 if (e.what == BindingEdit::kReset)
                 {
@@ -170,13 +177,15 @@ namespace gh2::input
                     mode.clear();
                 }
                 else if (e.what == BindingEdit::kMode)
-                    mode = swapped == d->detected ? "" : swapped == DeviceKind::kGamepad ? "pad" : "guitar";
+                    mode = swapped == (keyboard ? DeviceKind::kGuitar : d->detected) ? ""
+                           : swapped == DeviceKind::kGamepad                          ? "pad"
+                                                                                      : "guitar";
                 else
                     lines[e.action] = {};
             });
             if (e.what == BindingEdit::kMode)
-                std::cerr << "[input] " << d->name << ": " << (swapped == DeviceKind::kGamepad ? "pad" : "guitar")
-                          << " mode" << std::endl;
+                std::cerr << "[input] " << (keyboard ? "keyboard" : d->name) << ": "
+                          << (swapped == DeviceKind::kGamepad ? "pad" : "guitar") << " mode" << std::endl;
         }
 
         if (!rebinding)
@@ -189,7 +198,7 @@ namespace gh2::input
                 // Tilt may be the accelerometer.
                 if (ask.action == kTilt)
                     enableAccel(*d);
-                s_capture.emplace(d->now, ask.action == kWhammy ? Capture::kAxisOnly
+                s_capture.emplace(d->now, ask.action == kWhammy ? Capture::kWhammy
                                           : ask.action == kTilt ? Capture::kTilt
                                                                 : Capture::kAny);
                 s_caughtNamed = false;

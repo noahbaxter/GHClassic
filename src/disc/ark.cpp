@@ -86,6 +86,7 @@ namespace gh2::ark
         std::vector<Rename> s_renames;
         std::unordered_map<std::string, Entry> s_loose; // searched before all else
         std::unordered_map<std::string, std::function<std::optional<Made>()>> s_made; // loose once made
+        std::vector<std::pair<std::string, std::function<std::optional<Made>(const std::string &)>>> s_makers;
         uint32_t s_blockSizeAddress = 0u;
         struct Layer
         {
@@ -352,6 +353,13 @@ namespace gh2::ark
                     return &(s_loose[name] = addPart({std::move(file->read), size, size}));
                 }
             }
+            for (const auto &[prefix, make] : s_makers)
+                if (name.compare(0u, prefix.size(), prefix) == 0)
+                    if (auto file = make(name))
+                    {
+                        const uint32_t size = file->size;
+                        return &(s_loose[name] = addPart({std::move(file->read), size, size}));
+                    }
             if (const Entry *entry = routed(name))
                 return entry;
             if (s_boot && s_bootFiles.count(name) != 0u)
@@ -507,6 +515,11 @@ namespace gh2::ark
         s_made[key(path.c_str())] = std::move(make);
     }
 
+    void addMaker(const std::string &prefix, std::function<std::optional<Made>(const std::string &path)> make)
+    {
+        s_makers.emplace_back(prefix, std::move(make));
+    }
+
     void addMade(size_t disc, const std::string &path, std::function<std::optional<Made>()> make,
                  std::function<bool()> when)
     {
@@ -574,6 +587,21 @@ namespace gh2::ark
                 return std::nullopt;
             return bytes;
         }
+
+        // A file read in place as it is asked for.
+        std::optional<Made> openEntry(const Entry *entry)
+        {
+            if (!entry)
+                return std::nullopt;
+            const Entry at = *entry;
+            return Made{at.size, [at](uint64_t offset, uint8_t *dst, size_t want)
+                        {
+                            if (offset >= at.size)
+                                return size_t{0};
+                            return s_parts[at.part].read(at.offset + offset, dst,
+                                                         std::min<uint64_t>(want, at.size - offset));
+                        }};
+        }
     }
 
     std::optional<std::vector<uint8_t>> readFile(const std::string &path)
@@ -588,17 +616,12 @@ namespace gh2::ark
 
     std::optional<Made> openFront(const std::string &path)
     {
-        const Entry *entry = s_front ? findIn(s_layers[*s_front], key(path.c_str())) : nullptr;
-        if (!entry)
-            return std::nullopt;
-        const Entry at = *entry;
-        return Made{at.size, [at](uint64_t offset, uint8_t *dst, size_t want)
-                    {
-                        if (offset >= at.size)
-                            return size_t{0};
-                        return s_parts[at.part].read(at.offset + offset, dst,
-                                                     std::min<uint64_t>(want, at.size - offset));
-                    }};
+        return openEntry(s_front ? findIn(s_layers[*s_front], key(path.c_str())) : nullptr);
+    }
+
+    std::optional<Made> open(const std::string &path)
+    {
+        return openEntry(find(key(path.c_str())));
     }
 
     std::optional<std::vector<uint8_t>> readFile(size_t disc, const std::string &path)
@@ -606,6 +629,14 @@ namespace gh2::ark
         if (disc >= s_discs.size())
             return std::nullopt;
         return read(ownOn(s_discs[disc], key(path.c_str())));
+    }
+
+    std::optional<std::vector<uint8_t>> readOwn(size_t disc, const std::string &path)
+    {
+        if (disc >= s_discs.size())
+            return std::nullopt;
+        const auto own = s_discs[disc].files.find(key(path.c_str()));
+        return own != s_discs[disc].files.end() ? read(&own->second) : std::nullopt;
     }
 
     void unlocalize(size_t disc)

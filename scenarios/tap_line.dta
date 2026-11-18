@@ -1,0 +1,28 @@
+; A line drawn along a custom song's runs of taps
+; (highway/extended/guitar/tap_line.h): sixteenths zigzagging, a strum
+; between runs, eighths jumping lanes and one repeating a lane, then tap
+; chords: one off a single tap, back to one, and two after each other, then
+; sustained taps, a chord among them. Gem 10 is let pass, to show the line on
+; a missed tap.
+(songs tap_line)
+#include common/first_boot.dta
+{gamecfg set mode quickplay}
+{setlist select custom}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+(press green)
+(wait_screen game_screen 60)
+(wait_until {> {ghc_play gems} 0} 30)
+(expect {ghc_play gems} 34)
+{ghc_play play 0 10}
+{ghc_play play 11 33}
+(record on tap_line)
+(wait_until {ghc_play idle} 30)
+(wait 1)
+(record off)
+(expect {player0 gems_hit} 33)
+(quit)

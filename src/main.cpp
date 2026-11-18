@@ -17,8 +17,8 @@
 // the archive, ahead of every disc. --scenario runs a file of steps
 // (dev/scenario.h). --speed runs the game's clock that many times real time,
 // hidden and muted only, as nothing else paces it. --fast-boot boots
-// straight to the main menu, past the logos' padding, the intro movie and
-// the press-start splash, whatever settings.ini's fast_boot says. --seed
+// straight to the press-start splash, past the logos' padding and the intro
+// movie, whatever settings.ini's fast_boot says. --seed
 // starts the game's random numbers from n rather than the time of day.
 // --cheats turns on the testing keys (dev/cheats.h) and keeps saves in
 // memory, so nothing won by them reaches the save file.

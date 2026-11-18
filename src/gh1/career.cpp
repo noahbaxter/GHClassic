@@ -78,7 +78,7 @@ namespace gh2::gh1
         // (key (price n))
         dtb::Node priced(const std::string &key, int32_t price)
         {
-            return array({symbol(key), array({symbol("price"), {dtb::kInt, price, 0.0f, {}, {}}})});
+            return array({symbol(key), array({symbol("price"), dtb::integer(price)})});
         }
 
         int32_t priceOf(const dtb::Node &item)
@@ -511,7 +511,7 @@ namespace gh2::gh1
         for (dtb::Node &entry : locale->nodes)
             if (const auto it = text.find(keyOf(entry)); entry.type == dtb::kArray && entry.nodes.size() > 1u && it != text.end())
             {
-                entry.nodes[1] = {dtb::kString, 0, 0.0f, it->second, {}};
+                entry.nodes[1] = dtb::string(it->second);
                 text.erase(it);
             }
         // What GH2's locale has no token for is GH1's alone, so every game's
@@ -519,7 +519,7 @@ namespace gh2::gh1
         // (quickplay_pickers.dta).
         for (const auto &[key, value] : text)
         {
-            locale->nodes.push_back(array({symbol(key), {dtb::kString, 0, 0.0f, value, {}}}));
+            locale->nodes.push_back(array({symbol(key), dtb::string(value)}));
             locale::add(key, value);
         }
 
@@ -548,7 +548,7 @@ namespace gh2::gh1
             if (dtb::Node *n = child(*music, "music"))
                 *n = *loops;
             if (dtb::Node *n = child(*music, "play_from_memory"); n && n->nodes.size() > 1u)
-                n->nodes[1] = {dtb::kInt, 0, 0.0f, {}, {}};
+                n->nodes[1] = dtb::integer(0);
             ark::addFile(layer, "config/gen/synth.dtb", dtb::write(*synth));
         }
         ark::addFile(layer, "ui/gen/ui.dtb", dtb::write(*ui));

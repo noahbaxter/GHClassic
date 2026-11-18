@@ -11,7 +11,6 @@
 #include "render/texture_store.h"
 
 #include <array>
-#include <cmath>
 #include <cstring>
 #include <iostream>
 #include <map>
@@ -102,23 +101,6 @@ namespace gh2::campaign_case
             return poster_meshes::quad(1.195f, 1.69f, 1700.0f / 3225.0f, 1.0f);
         }
 
-        // A flat ring, 1 across its outside, facing front.
-        Mesh ring()
-        {
-            constexpr int kSides = 48;
-            constexpr float kInside = 0.84f;
-            Mesh ring;
-            for (int i = 0; i < kSides; ++i)
-            {
-                const float a = 2.0f * 3.14159265f * static_cast<float>(i) / kSides;
-                for (const float r : {1.0f, kInside})
-                    ring.verts.insert(ring.verts.end(), {r * std::cos(a), 0, r * std::sin(a), 0, -1, 0, 0, 0});
-                const auto at = [](int side, int inner) { return static_cast<uint16_t>((side % kSides) * 2 + inner); };
-                ring.faces.insert(ring.faces.end(), {at(i, 0), at(i, 1), at(i + 1, 0), at(i + 1, 0), at(i, 1), at(i + 1, 1)});
-            }
-            return ring;
-        }
-
         // A Tex like `from` whose bitmap names that bundled picture.
         Bytes texOf(const Bytes &from, const std::string &picture)
         {
@@ -187,7 +169,7 @@ namespace gh2::campaign_case
             // the engine's numeral over it in the title's own font.
             Bytes ringMat = mat;
             milo::replaceStr(ringMat, std::string(kPoster) + ".tex", "");
-            const auto ringMesh = meshBody(mesh, std::string(kPoster) + ".mat", ring(), "ghc_engine.mesh", "ghc_engine.mat",
+            const auto ringMesh = meshBody(mesh, std::string(kPoster) + ".mat", poster_meshes::ring(), "ghc_engine.mesh", "ghc_engine.mat",
                                            nullptr, {0.56f, 0.66f, 0.76f});
             if (!ringMesh)
                 return false;

@@ -93,7 +93,7 @@
    (= enter {play_sfx beat_venue})
    (= BUTTON_DOWN_MSG
       {if {== $button kPad_X}
-         {synth play_sequence button_select}
+         {ghc_select}
          {goto_endgame_complete}}))
 
 ; GH1's screen for beating the game names the difficulty, and opens on the
@@ -135,7 +135,7 @@
                {{win_game_panel loaded_dir} exists win_screen2.view}
                {! {{win_game_panel find win_screen2.view} showing}}}
             {do
-               {synth play_sequence button_select}
+               {ghc_select}
                {campaign buy_item battleaxe 0}
                {helpbar set_display ()}
                {set [continue_time] {'+' {taskmgr ui_seconds} 6}}
@@ -148,7 +148,7 @@
                      {fade_panel start_fade 4 (color 1 1 1) (fade_synth FALSE) (fade_out FALSE)})}}
             {do
                {fade_panel start_fade 1 (color 0 0 0) (fade_synth FALSE) (fade_out TRUE)}
-               {synth play_sequence button_select}
+               {ghc_select}
                {script_task (delay 1) (units kTaskUISeconds)
                   (script
                      ; GH2's letter for Pro Face-Off has no place in GH1's.
@@ -235,14 +235,24 @@
          (bm_video4.btn video4)
          {fail "unknown button: " $btn}}))
 
-; In a song.
+; Loading a song.
 
-; GH1's song failed screen has one list of buttons, in a career too.
-(lose_panel
-   (needs lose)
+; GH1's loading poster turns its knob over 9 seconds, then its light blinks
+; (GH1's loading.dta); GH2's script animates its own tape and word, which
+; GH1's scene has none of. The blink only while the poster is still up: a
+; song loaded sooner has left it.
+(loading_panel
+   (needs loading)
    (enter
-      {normal_buttons.view set_showing TRUE}
-      {$this set_focus lose_restart_normal.btn}))
+      {load_poster.view animate (range 0 32) (period 9) (units kTaskUISeconds)}
+      {load_blink.view set_showing FALSE}
+      {script_task
+         (units kTaskUISeconds)
+         (delay 9)
+         (script
+            {if {find_elem (loading_screen practice_loading_screen) {{ui current_screen} name}}
+               {{loading_panel find load_blink.view} set_showing TRUE}
+               {animate_forever_30fps loading_panel {loading_panel find load_blink.view}}})}))
 
 ; Settings.
 
@@ -253,11 +263,15 @@
    (needs game_settings)
    (enter
       {gs_title.lbl set_localized "AUDIO SETTINGS"}
-      {ghc_gh1_audio_rows $this}))
+      {ghc_gh1_audio_rows $this})
+   (SELECT_START_MSG {ghc_gh1_audio_miss $this $component} kDataUnhandled)
+   (update_help_display {ghc_gh1_audio_miss $this none} kDataUnhandled))
 ; In a song the same rows are GH1's pause settings' (gh1/screens.cpp).
 (pause_audio_settings_panel
    (needs pause_audio_settings)
-   (enter {ghc_gh1_audio_rows $this}))
+   (enter {ghc_gh1_audio_rows $this})
+   (SELECT_START_MSG {ghc_gh1_audio_miss $this $component} kDataUnhandled)
+   (update_help_display {ghc_gh1_audio_miss $this none} kDataUnhandled))
 
 ; GH1's data settings have rows for a band's name, a new band and deleting
 ; one, which are GH2's band screen's.

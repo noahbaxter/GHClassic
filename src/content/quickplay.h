@@ -6,9 +6,13 @@
 //   {quickplay song_defaults}        TRUE while a song plays as its own game's
 //                                    guitarist and venue, none picked
 //   {quickplay song_defaults <0|1>}  that, kept in settings.ini
-//   {quickplay outfit <game>}        the first player's outfit that game boots
-//                                    with (its ui/main.dta), as it is named
-//                                    here while another game is played
+//   {quickplay cast <song> <game> <outfit>}  recast a song of that game's
+//                                    setlist, which set_quickplay cast with
+//                                    that outfit, for song defaults: picked
+//                                    by the song among what is unlocked
+//                                    (quickplay.cpp's castSong)
+//   {quickplay next_gen_song 0}      a 360 song cast so is over (the song
+//                                    list or the main menu shows again)
 //   {quickplay pick <what> [<value>]}  quickplay's last pick of that (outfit,
 //                                    guitar, skin, venue, venue_game), kept
 //                                    for the session through switches of menus
@@ -50,5 +54,9 @@ class PS2Runtime;
 
 namespace gh2::quickplay
 {
+    // From any thread: whether a 360 song is up, played with song defaults,
+    // which has the 360's venue and guitars (settings::hd).
+    bool nextGenSong();
+
     void install(PS2Runtime &runtime, const Addresses &addresses);
 }

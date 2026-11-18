@@ -232,12 +232,10 @@
          ({|| {< $count 2} {! {{$panel find outfit.grp} showing}} {ui in_transition}} kDataUnhandled)
          ({== $button kPad_DDown}
             {$panel set_focus {ghc_multi_button $player {mod {'+' $at 1} $count}}}
-            {synth play_sequence button_toggle}
             TRUE
          )
          ({== $button kPad_DUp}
             {$panel set_focus {ghc_multi_button $player {mod {'+' $at {'-' $count 1}} $count}}}
-            {synth play_sequence button_toggle}
             TRUE
          )
          (TRUE kDataUnhandled)
@@ -281,7 +279,7 @@
    (BUTTON_DOWN_MSG {ghc_multi_char_blue $player_num $button})
    (multi_char_selected
       ($player)
-      {synth play_sequence button_select}
+      {ghc_select}
       {ghc_multi_outfits $player}
    )
    ; As the game's, by the outfits listed.
@@ -291,7 +289,7 @@
          ($player {if_else {== $panel multi_char_outfit0} 0 1})
          {ghc_multi_show $player {! $selected}}
          {if {&& {! $selected} {< {size {elem $ghc_multi_outfits $player}} 2}}
-            {synth play_sequence button_back.cue}
+            {ghc_back}
             {{ghc_multi_outfit_panel $player} set_active FALSE}
             {multi_sel_character_panel set_frozen $player FALSE}
          }
@@ -404,21 +402,10 @@
 ; label where either player has one: both looks, as the pickers show them.
 {func ghc_multi_hd_bar ($any $h0 $h1)
    {do
-      ($array)
-      {set $array ()}
-      {resize $array 0}
-      {push_back $array (fret1 help_continue)}
-      {push_back $array (fret2 help_back)}
-      {if $any
-         {push_back $array
-            {if_else $h0
-               {if_else $h1 (fret4 ghc_hd_hd) (fret4 ghc_hd_sd)}
-               {if_else $h1 (fret4 ghc_sd_hd) (fret4 ghc_sd_sd)}
-            }
-         }
-      }
-      {push_back $array (strum help_updown)}
-      {helpbar set_display $array}
+      ($actions {array 0})
+      {ghc_act $actions $any view
+         {if_else $h0 {if_else $h1 ghc_hd_hd ghc_hd_sd} {if_else $h1 ghc_sd_hd ghc_sd_sd}}}
+      {ghc_helpbar help_continue help_back $actions help_updown}
    }
 }
 ; Put up when it is not what is up: nothing changes of itself, and the
@@ -459,13 +446,13 @@
 ; both hear it. Turns that player's look where they have one the 360 has.
 {func ghc_multi_char_blue ($player $button)
    {cond
-      ({|| {!= $button kPad_Square} {elem $ghc_multi_blue $player} {ui in_transition}} kDataUnhandled)
+      ({|| {! {ghc_pressed $button view}} {elem $ghc_multi_blue $player}} kDataUnhandled)
       ({! {ghc_multi_has_chars $player}} kDataUnhandled)
       (TRUE
          {set_elem $ghc_multi_blue $player TRUE}
          {set_elem $ghc_multi_hdc $player {if_else {ghc_multi_hd_chars $player} 0 1}}
          {ghc_multi_look_char $player}
-         {synth play_sequence button_toggle}
+         {ghc_toggle}
          ; The ones on show load again, and move once they have.
          {ghc_multi_animate}
          {set $ghc_multi_hb -1}
@@ -475,13 +462,13 @@
 }
 {func ghc_multi_guitar_blue ($player $button)
    {cond
-      ({|| {!= $button kPad_Square} {elem $ghc_multi_blue $player} {ui in_transition}} kDataUnhandled)
+      ({|| {! {ghc_pressed $button view}} {elem $ghc_multi_blue $player}} kDataUnhandled)
       ({! {ghc_multi_has_guitar $player}} kDataUnhandled)
       (TRUE
          {set_elem $ghc_multi_blue $player TRUE}
          {set_elem $ghc_multi_hdg $player {if_else {ghc_multi_hd_guitar $player} 0 1}}
          {ghc_multi_look_guitar $player}
-         {synth play_sequence button_toggle}
+         {ghc_toggle}
          ; Shown again as the screen's own does for a scroll: the guitar
          ; is loaded again once its look has changed.
          {multi_sel_guitar_panel update_display $player FALSE}
@@ -532,30 +519,32 @@
 {retype multi_fo_venue_screen $ghc_qp_venue_screen}
 
 ; The songs: any setlist, picked as quickplay's (quickplay.dta), its twin
-; screen loading another.
+; screen loading another. A custom song picked is started as quickplay
+; starts one on guitar (quickplay_setup.dta ghc_custom_start), its lead
+; part whatever quickplay's instrument.
 {func ghc_multi_selsong_helpbar
    {do
-      ($array)
-      {set $array ()}
-      {resize $array 0}
-      {push_back $array (fret1 help_continue)}
-      {push_back $array (fret2 help_back)}
-      {if {> {size {ghc_setlists}} 1} {push_back $array (fret3 ghc_setlist)}}
-      {push_back $array (strum help_updown)}
-      {helpbar set_display $array}
+      ($actions {array 0})
+      {ghc_act $actions {> {size {ghc_setlists}} 1} pick ghc_setlist}
+      {ghc_helpbar help_continue help_back $actions help_updown}
    }
 }
 {func ghc_multi_selsong_button ($button)
    {cond
       ({ghc_pick_button $button} TRUE)
       ({== $button kPad_Tri}
-         {{ui current_screen} backwards_anim}
-         {synth play_sequence button_back.cue}
+         {ghc_back}
          {ui goto_screen {ghc_multi_screen venue}}
          TRUE
       )
-      ({&& {== $button kPad_Circle} {> {size {ghc_setlists}} 1} {! {ui in_transition}}}
+      ({&& {ghc_pressed $button pick} {> {size {ghc_setlists}} 1}}
          {ghc_pick_panel open_with {ghc_setlists} {setlist shown}}
+         TRUE
+      )
+      ; Select's menu, quickplay's speed (quickplay.dta).
+      ({ghc_pressed $button menu}
+         {ghc_select}
+         {ghc_pick_panel open_sticky (speed) speed}
          TRUE
       )
       (TRUE kDataUnhandled)
@@ -567,9 +556,11 @@
       (focus sel_song_panel)
       (sel_song_career FALSE)
       (enter {ghc_multi_selsong_helpbar})
-      (SELECT_START_MSG {ui goto_screen {ghc_multi_screen seldiff}} kDataUnhandled)
+      (SELECT_START_MSG {ghc_custom_start TRUE} {ui goto_screen {ghc_multi_screen seldiff}} kDataUnhandled)
       (BUTTON_DOWN_MSG {ghc_multi_selsong_button $button})
       (ghc_picked ($game) {ghc_qp_picked sel_song_panel ghc_multi_selsong_twin_screen $game})
+      (ghc_option_text ($option) {ghc_qp_option_text $option})
+      (ghc_chose ($option) {ghc_qp_chose sel_song_panel $option})
    )
 }
 {retype multi_vs_selsong_screen $ghc_multi_selsong_screen}
@@ -581,8 +572,32 @@
       (focus sel_song_twin_panel)
       (sel_song_career FALSE)
       (enter {ghc_multi_selsong_helpbar})
-      (SELECT_START_MSG {ui goto_screen {ghc_multi_screen seldiff}} kDataUnhandled)
+      (SELECT_START_MSG {ghc_custom_start TRUE} {ui goto_screen {ghc_multi_screen seldiff}} kDataUnhandled)
       (BUTTON_DOWN_MSG {ghc_multi_selsong_button $button})
       (ghc_picked ($game) {ghc_qp_picked sel_song_twin_panel {ghc_multi_screen selsong} $game})
+      (ghc_option_text ($option) {ghc_qp_option_text $option})
+      (ghc_chose ($option) {ghc_qp_chose sel_song_twin_panel $option})
    )
 }
+
+; Face-Off's difficulties, each player's own (MultiSelectPanel): only those
+; the song has, as Pro Face-Off's and quickplay's (quickplay_pickers.dta
+; sel_difficulty_panel), focused on the nearest to the player's last. The
+; panel shows every button each poll until its player is ready
+; (MultiSelectPanel::Poll, 0x1380b8), so one left out is left blank.
+{func ghc_multi_diffs ($panel $player)
+   {do
+      ($buttons (easy.btn medium.btn hard.btn expert.btn))
+      {foreach_int $d 0 4
+         {do
+            ($button {elem $buttons $d})
+            ($has {custom has {game get_song} $d TRUE})
+            {{$panel find $button} set_text {if_else $has {elem (easy medium hard expert) $d} ""}}
+            {if_else $has {$panel enable $button} {$panel disable $button}}
+         }
+      }
+      {$panel set_focus {elem $buttons {custom nearest {game get_song} {game get_difficulty $player} TRUE}}}
+   }
+}
+{amend seldiff0 (enter {ghc_multi_diffs $this 0})}
+{amend seldiff1 (enter {ghc_multi_diffs $this 1})}

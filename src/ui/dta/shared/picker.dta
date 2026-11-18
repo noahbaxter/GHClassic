@@ -1,0 +1,353 @@
+; A list to pick from while yellow is held: it opens in the middle of the
+; screen, the strum steps through it, and letting go picks. It is the help
+; bar's own text (helpbar.milo, loaded here a second time) on a round-ended
+; box (box.dta) as wide as its text and as tall as its rows, with a lighter
+; one behind the row picked and a faint one behind the row it opened on. A
+; list longer than its rows scrolls under them.
+;
+; A screen with this among its panels sends its presses here first
+; ({ghc_pick_button}), opens it on yellow ({ghc_pick_panel open_with}), and
+; is told the pick, where it is not the one the list opened on:
+; (ghc_picked ($option)). Which fret is which is config/menus.toml's.
+;
+; Opened with open_held it is held on another fret instead, shows only once
+; that has been held a moment, and names its rows, takes the pick and takes
+; a tap (let go before it shows, no strum) by the screen's messages it is
+; given.
+;
+; Opened with open_sticky it is a menu instead: it stays open when yellow
+; is let go, green tells the screen the row picked, (ghc_chose ($option)),
+; or takes a value's row up (ghc_pick_edit), and select or red shuts it.
+; Its rows' text is the screen's
+; (ghc_option_text ($option)), a setlist's name otherwise.
+{if {! {exists ghc_pick_panel}} {new GHPanel ghc_pick_panel}}
+{retype ghc_pick_panel
+   (
+      ; From the ARK root: a path resolves against the file its array came
+      ; from, and this one comes from no file.
+      (file ui/helpbar.milo)
+      ; The most that show at once.
+      (rows (pt0.txt pt1.txt pt2.txt pt3.txt pt4.txt pt5.txt pt6.txt pt7.txt pt8.txt))
+      ; The list's box, a fainter fill on the row it opened on (what is on
+      ; now) and the picked row's fill (box.dta), each with its colour, how
+      ; much it hides, and where it draws among the scene's.
+      (boxes ((pick_bg 0 0 0 0.875 0) (pick_mark 1 1 1 0.1 1) (pick_fill 1 1 1 0.25 1)))
+      ; How wide the box's round ends are, outside its text's room.
+      (end 8)
+      (options ())
+      (editing FALSE) ; the menu's row whose value is being changed (ghc_pick_edit)
+      (picked 0)
+      (first 0)
+      ; The option the top row shows.
+      (top 0)
+      (open FALSE)
+      (sticky FALSE)
+      ; open_held's: the fret held, whether the screen names the rows, its
+      ; messages for a row's text, the pick and a tap (none for none),
+      ; whether it shows yet, and the polls it waits to.
+      (held fret3)
+      (labelled FALSE)
+      (text_msg ghc_option_text)
+      (picked_msg ghc_picked)
+      (tap_msg none)
+      (shown TRUE)
+      (polls 0)
+      (delay 12)
+      ; A row's height, its text's size against the help bar's, and the
+      ; room either side of the widest (x right, z up, the screen's middle
+      ; 0). The width is the open list's.
+      (height 40)
+      (size 1.8)
+      (margin 18)
+      (width 0)
+      ; The widest the list goes, its margins in, on any screen: 4:3's
+      ; width (about 715 across) less a little either side. A row wider is
+      ; cut short with an ellipsis, and the picked one scrolls along to
+      ; show the rest, a character every marquee_polls.
+      (most_width 670)
+      (marquee_polls 5)
+      (marquee 0)
+      ; The width is set once, as it opens, from this many rows about the
+      ; one it opened on, never growing after: a custom setlist's
+      ; thousands of sections, all measured, would hold up a frame for a
+      ; second.
+      (chunk 16)
+      (enter
+         {$this build}
+         {$this shut}
+      )
+      ; The rows, each the help bar's text copied, and the boxes; the help
+      ; bar's own stays out of sight.
+      (build
+         {if {! {exists pt0.txt}}
+            {foreach $o
+               (
+                  help_bar_strum.mesh help_bar_starting.mesh help_bar_strumbar.mesh help_bar.mesh help_bar.txt
+                  help_box_left.mesh help_box_mid.mesh help_box_right.mesh
+               )
+               {{$this find $o} set_showing FALSE}
+            }
+            {foreach $row [rows]
+               {new Text $row}
+               {{$this find $row} copy help_bar.txt 0}
+               {{$this find $row} set_local_scale [size] [size] [size]}
+               {{$this find $row} set draw_order 2}
+               {helpbar.view insert (objects 0) {$this find $row}}
+            }
+            ; Drawn with the help bar's own: the box, then the fill, then
+            ; the text.
+            {foreach $box [boxes]
+               {ghc_box_make $this {elem $box 0} {help_box_mid.mesh get trans_parent} {elem $box 5}}
+               {ghc_box_color $this {elem $box 0} {elem $box 1} {elem $box 2} {elem $box 3} {elem $box 4}}
+               {foreach $part ("_left.mesh" "_mid.mesh" "_right.mesh")
+                  {helpbar.view insert (objects 0) {$this find {sprint {elem $box 0} $part}}}
+               }
+            }
+            {helpbar.view sort_draws}
+            {{$this loaded_dir} sync_objects}
+         }
+      )
+      ; That box, the list's width between ends $p_end wide and $p_tall
+      ; tall, its middle at height $p_z.
+      (stretch
+         ($p_box $p_z $p_tall $p_end)
+         {ghc_box_put $this $p_box
+            {'-' {/ [width] -2.0} $p_end}
+            0
+            $p_z
+            {'+' [width] {'*' 2 $p_end}}
+            $p_tall
+            $p_end
+            $p_end
+         }
+         {ghc_box_show $this $p_box TRUE}
+      )
+      ; How many rows show: the options, or as many as there are rows.
+      (visible {min {size [options]} {size [rows]}})
+      ; That row's height on screen, the list's middle at 0.
+      (row_z ($i) {'*' [height] {'-' {/ {'-' {$this visible} 1} 2.0} $i}})
+      ; Open on those options with that one picked, in the middle of the
+      ; rows where the list is longer than they are.
+      (open_with
+         ($options $current)
+         {set [options] $options}
+         {set [polls] 0}
+         {do
+            ($at 0)
+            {find_elem $options $current $at}
+            {set [picked] $at}
+         }
+         {set [first] [picked]}
+         {set [top]
+            {max 0 {min {'-' {size $options} {$this visible}} {'-' [picked] {int {/ {$this visible} 2}}}}}}
+         {do
+            ($n {size $options})
+            ($from {max 0 {'-' [first] {int {/ [chunk] 2}}}})
+            ($widest 0)
+            {foreach_int $k 0 {min $n [chunk]}
+               {do
+                  ($wide {'*' [size]
+                     {help_bar.txt get_string_width {$this text {elem $options {mod {'+' $from $k} $n}}}}})
+                  {if {> $wide $widest} {set $widest $wide}}
+               }
+            }
+            {set [width] {min [most_width] {'+' $widest {'*' 2 [margin]}}}}
+         }
+         {set [open] TRUE}
+         {if [shown] {$this reveal}}
+      )
+      (text
+         ($option)
+         {if_else {|| [sticky] [labelled]}
+            {{ui current_screen} [text_msg] $option}
+            {localize {sprint "setlist_" $option}}
+         }
+      )
+      (open_sticky
+         ($options $current)
+         {set [sticky] TRUE}
+         {$this open_with $options $current}
+      )
+      ; Open while $fret is held, shown once it has been a moment: each
+      ; row's text {screen $text option}, the pick to {screen $picked
+      ; option}, and a tap to {screen $tap} unless it is none.
+      (open_held
+         ($options $current $fret $text $picked $tap)
+         {set [held] $fret}
+         {set [labelled] TRUE}
+         {set [text_msg] $text}
+         {set [picked_msg] $picked}
+         {set [tap_msg] $tap}
+         {set [shown] FALSE}
+         {$this open_with $options $current}
+      )
+      ; Its rows' text again, the same row picked.
+      (relabel {$this open_with [options] {elem [options] [picked]}})
+      ; The box, and the rows from the top one, the picked one filled.
+      (reveal
+         {set [shown] TRUE}
+         {$this stretch pick_bg 0 {'+' {'*' [height] {$this visible}} 12} [end]}
+         {$this fill}
+         {$this paint}
+      )
+      (fill
+         {foreach_int $i 0 {size [rows]}
+            {do
+               ($row {$this find {elem [rows] $i}})
+               {$row set_showing {< $i {$this visible}}}
+               {if {< $i {$this visible}}
+                  ; The widest, which the width is made from, measures a
+                  ; hair over it here: half a unit spare.
+                  {$row set_text
+                     {text_fit fit_text {$this text {elem [options] {'+' [top] $i}}} $row [size]
+                        {'+' 0.5 {'-' [width] {'*' 2 [margin]}}}}}
+                  {$row set_local_pos {/ [width] -2.0} 0 {$this row_z $i}}
+               }
+            }
+         }
+      )
+      ; The fills have no round ends to draw. The row opened on keeps its
+      ; own while the pick is elsewhere and it is in the rows shown, but in
+      ; a menu, where no row is on.
+      (paint
+         {set [marquee] 0}
+         {$this stretch pick_fill {$this row_z {'-' [picked] [top]}} [height] 0}
+         {pick_fill_left.mesh set_showing FALSE}
+         {pick_fill_right.mesh set_showing FALSE}
+         {if_else
+            {&& {! [sticky]} {!= [first] [picked]} {>= [first] [top]} {< [first] {'+' [top] {$this visible}}}}
+            {do
+               {$this stretch pick_mark {$this row_z {'-' [first] [top]}} [height] 0}
+               {pick_mark_left.mesh set_showing FALSE}
+               {pick_mark_right.mesh set_showing FALSE}
+            }
+            {ghc_box_show $this pick_mark FALSE}
+         }
+      )
+      ; Up or down the list, round its ends, the rows scrolled to keep it in
+      ; them.
+      (step
+         ($by)
+         {set [picked] {mod {'+' {'+' [picked] $by} {size [options]}} {size [options]}}}
+         {if {< [picked] [top]} {set [top] [picked]}}
+         {if {>= [picked] {'+' [top] {$this visible}}} {set [top] {'+' {'-' [picked] {$this visible}} 1}}}
+         {ghc_toggle}
+         {if_else [shown] {do {$this fill} {$this paint}} {$this reveal}}
+      )
+      (shut
+         ; A value being changed put back (ghc_pick_edit).
+         {if [editing]
+            {ghc_option_end [editing] FALSE}
+            {set [editing] FALSE}
+            {ghc_box_color $this pick_fill 1 1 1 0.25}
+         }
+         {foreach $o [rows] {{$this find $o} set_showing FALSE}}
+         {foreach $box [boxes] {ghc_box_show $this {elem $box 0} FALSE}}
+         {set [open] FALSE}
+         {set [sticky] FALSE}
+         {set [held] {ghc_held pick}}
+         {set [labelled] FALSE}
+         {set [text_msg] ghc_option_text}
+         {set [picked_msg] ghc_picked}
+         {set [tap_msg] none}
+         {set [shown] TRUE}
+      )
+      ; The picked row's text scrolled on a step, where it is cut short.
+      (scroll_picked
+         {set [marquee] {'+' [marquee] 1}}
+         {if {== 0 {mod [marquee] [marquee_polls]}}
+            {{$this find {elem [rows] {'-' [picked] [top]}}} set_text
+               {text_fit marquee {$this text {elem [options] [picked]}} {$this find {elem [rows] {'-' [picked] [top]}}}
+                  [size] {'-' [width] {'*' 2 [margin]}} {/ [marquee] [marquee_polls]}}}
+         }
+      )
+      ; Shown once its fret has been held a moment; let go, the pick, or
+      ; the tap, to the screen.
+      (poll
+         {if {&& [open] [shown]} {$this scroll_picked}}
+         {if {&& [open] {! [sticky]}}
+            {if_else {pad_held [held]}
+               {do
+                  {set [polls] {'+' [polls] 1}}
+                  {if {&& {! [shown]} {>= [polls] [delay]}} {$this reveal}}
+               }
+               {do
+                  ($tapped {&& {! [shown]} {!= [tap_msg] none}})
+                  ($moved {!= [picked] [first]})
+                  ($option {elem [options] [picked]})
+                  ($picked_msg [picked_msg])
+                  ($tap_msg [tap_msg])
+                  {$this shut}
+                  {cond
+                     ($tapped {{ui current_screen} $tap_msg})
+                     ($moved {{ui current_screen} $picked_msg $option})
+                  }
+               }
+            }
+         }
+      )
+   )
+}
+; A menu's row that is a value, as practice's speed (game_settings.dta):
+; green takes it up, its fill lit, the strum steps the value, green keeps
+; it, red or select puts back what it was. Its value's own: TRUE from
+; {ghc_option_edits $option}, then {ghc_option_step $option $dir} and
+; {ghc_option_end $option $keep} (quickplay.dta).
+{func ghc_pick_edit ($option)
+   {ghc_pick_panel set editing $option}
+   {if_else $option
+      {ghc_box_color ghc_pick_panel pick_fill 1 0.85 0.2 0.5}
+      {ghc_box_color ghc_pick_panel pick_fill 1 1 1 0.25}
+   }
+   {ghc_pick_panel relabel}
+}
+; A screen's press while the list may be open: with it open the strum steps
+; it and nothing else gets the press.
+{func ghc_pick_button ($button)
+   {if_else {ghc_pick_panel get open}
+      {do
+         ($editing {ghc_pick_panel get editing})
+         {if_else $editing
+            {cond
+               ({|| {== $button kPad_DUp} {== $button kPad_DDown}}
+                  {ghc_option_step $editing {if_else {== $button kPad_DUp} 1 -1}}
+                  {ghc_toggle}
+                  {ghc_pick_panel relabel}
+               )
+               ({== $button kPad_X}
+                  {ghc_option_end $editing TRUE}
+                  {ghc_select}
+                  {ghc_pick_edit FALSE}
+               )
+               ({|| {== $button kPad_Tri} {== $button kPad_Select}}
+                  {ghc_option_end $editing FALSE}
+                  {ghc_back}
+                  {ghc_pick_edit FALSE}
+               )
+            }
+            {do
+               {if {== $button kPad_DUp} {ghc_pick_panel step -1}}
+               {if {== $button kPad_DDown} {ghc_pick_panel step 1}}
+            }
+         }
+         {if {&& {ghc_pick_panel get sticky} {! $editing}}
+            {cond
+               ({&& {== $button kPad_X} {ghc_option_edits {elem {ghc_pick_panel get options} {ghc_pick_panel get picked}}}}
+                  {ghc_select}
+                  {ghc_pick_edit {elem {ghc_pick_panel get options} {ghc_pick_panel get picked}}}
+               )
+               ({== $button kPad_X}
+                  {{ui current_screen} ghc_chose
+                     {elem {ghc_pick_panel get options} {ghc_pick_panel get picked}}}
+               )
+               ({|| {ghc_pressed $button menu} {== $button kPad_Tri}}
+                  {ghc_back}
+                  {ghc_pick_panel shut}
+               )
+            }
+         }
+         TRUE
+      }
+      FALSE
+   }
+}

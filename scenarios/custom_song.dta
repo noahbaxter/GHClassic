@@ -1,0 +1,66 @@
+; A custom song from songs/ (a .chart and an Opus stem of silence): listed on
+; the custom setlist, played to its end on autoplay, its best kept (a
+; profile's: a guest keeps none) and shown back on the list's printout. Its
+; high score table is seeded under its 4 stars, under GH2's seeds' names,
+; and the profile's 4 stars go on top.
+(songs songs)
+#include common/first_boot.dta
+{ghc_profile make 0 "Tester"}
+{gamecfg set mode quickplay}
+{setlist select custom}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(expect {best score {game get_song} expert} 0)
+(shot printout_before)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+{{game get_player_config 0} set autoplay TRUE}
+; Easy and Expert only, as charted.
+(press down)
+(press green)
+(wait_screen game_screen 60)
+(wait_screen endgame_screen 120)
+(wait 1)
+(expect {player0 gems_hit} 32)
+(expect {player0 gems_passed} 0)
+(expect {== {best score {game get_song} expert} {player0 score}} 1)
+(press green)
+(wait_screen highscore_screen 30)
+(wait 1)
+(shot table)
+(expect {highscore_panel get ours} 1)
+(expect {highscore_panel get placed} 1)
+(expect {ghc_scores name {game get_song} expert {'-' {highscore_panel get index} 1}} Tester)
+(expect {ghc_scores seed {game get_song} expert {'-' {highscore_panel get index} 1}} 0)
+(expect {>= {player0 num_stars} 4} 1)
+(expect {highscore_panel get index} 1)
+(expect {ghc_scores seed {game get_song} expert 4} 1)
+(expect {> {ghc_scores score {game get_song} expert 4} 0} 1)
+(expect {< {ghc_scores score {game get_song} expert 1} {player0 score}} 1)
+(press green)
+(wait_screen complete_screen 30)
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(shot printout_after)
+; Select's HIGH SCORES: its board, the preview going on under it.
+(expect $ghc_preview_on {game get_song})
+(press star_power)
+(wait 0.5)
+(press down)
+(wait 0.3)
+(press down)
+(wait 0.3)
+(expect {elem {ghc_pick_panel get options} {ghc_pick_panel get picked}} scores)
+(press green)
+(wait 1)
+(expect {ghc_scores_panel showing} 1)
+(shot board_from_list)
+(expect $ghc_preview_on {game get_song})
+(press red)
+(wait 0.5)
+(expect {ghc_scores_panel showing} 0)
+(quit)

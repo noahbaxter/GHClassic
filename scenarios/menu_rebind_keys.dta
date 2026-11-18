@@ -1,0 +1,32 @@
+; input.ini's [menu keyboard] rebinds the keyboard's menu keys: with green on
+; F and red on B, F picks and B backs out, Return and Esc do neither, and in
+; a song Esc still pauses and resumes.
+#include common/first_boot.dta
+(menu_bind keyboard green "key f")
+(menu_bind keyboard red "key b")
+(key Down)
+(expect {seat_has 0 keyboard} 1)
+(expect {main_screen focus_name} main_options.btn)
+(key Return)
+(wait 0.5)
+(expect {{ui current_screen} name} main_screen)
+(key F)
+(wait_screen options_screen 10)
+(key Escape)
+(wait 0.5)
+(expect {{ui current_screen} name} options_screen)
+(key B)
+(wait_screen main_screen 10)
+{gamecfg set mode quickplay}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty easy}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 2)
+(key Escape)
+(wait_screen pause_screen 10)
+(key Escape)
+(wait_screen game_screen 10)
+(quit)

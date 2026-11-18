@@ -1,0 +1,82 @@
+; A custom song in quickplay with song defaults off plays the loadout the
+; setup shows, never its own cast (custom/cast.h): first the hub's as it
+; came up, nothing picked, then a guitarist, a guitar and finish and a
+; venue picked in their pickers. The fixture casts itself goth2, an sg,
+; small1.
+(songs songs)
+#include common/first_boot.dta
+{quickplay song_defaults 0}
+{gamecfg set mode quickplay}
+{setlist select custom}
+{ui goto_screen ghc_qp_setup_screen}
+(wait_screen ghc_qp_setup_screen)
+(wait 1)
+{set $ghc_t_outfit {game get_character_outfit}}
+{set $ghc_t_guitar {game get_guitar}}
+{set $ghc_t_venue {game get_venue}}
+(press green)
+(wait_screen qp_selsong_screen)
+(wait 2)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+{{game get_player_config 0} set autoplay TRUE}
+(press green)
+(wait_screen game_screen 60)
+(expect {custom ours {game get_song}} 1)
+(expect {game get_character_outfit} $ghc_t_outfit)
+(expect {game get_guitar} $ghc_t_guitar)
+(expect {game get_venue} $ghc_t_venue)
+(expect {campaigns venue_game} gh2)
+(wait 8)
+(shot unpicked)
+{ui goto_screen ghc_qp_setup_screen}
+(wait_screen ghc_qp_setup_screen)
+(wait 1)
+{ui goto_screen ghc_qp_character_screen}
+(wait_screen ghc_qp_character_screen)
+(wait_until {char_single are_chars_loaded})
+(wait 2)
+{game set_character punk1 TRUE}
+{ghc_sel_character_done ghc_qp_character_screen}
+(wait_screen ghc_qp_setup_screen)
+(wait 1)
+{ui goto_screen ghc_qp_guitar_screen}
+(wait_screen ghc_qp_guitar_screen)
+(wait 3)
+(press down)
+(wait 1)
+{ghc_qp_guitar_screen goto_career}
+(wait_screen ghc_qp_setup_screen)
+(wait 1)
+{ghc_qp_to_venues}
+(wait_screen ghc_qp_venue_screen)
+(wait 2)
+; A new save has each game's first venue open: GH1's.
+{ghc_qp_venue_screen ghc_picked gh1}
+(wait_screen ghc_qp_venue_twin_screen)
+(wait 2)
+(press green)
+(wait_screen ghc_qp_setup_screen)
+(wait 1)
+(expect {quickplay pick outfit} punk1)
+(expect {quickplay pick guitar} tobac)
+(expect {quickplay pick venue_game} gh1)
+(press green)
+(wait_screen qp_selsong_screen)
+(wait 2)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+{{game get_player_config 0} set autoplay TRUE}
+(press green)
+(wait_screen game_screen 60)
+(expect {custom ours {game get_song}} 1)
+(expect {game get_character_outfit} punk1)
+(expect {game get_guitar} tobac)
+(expect {game get_guitar_skin} {quickplay pick skin})
+(expect {game get_venue} {quickplay pick venue})
+(expect {campaigns venue_game} gh1)
+(wait 8)
+(shot picked)
+(quit)

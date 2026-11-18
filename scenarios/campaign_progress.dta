@@ -99,7 +99,7 @@
 
 ; Saved and loaded back.
 {ui goto_screen bootup_load}
-(wait_screen main_screen 40)
+(wait_screen splash_screen 40)
 (expect {campaigns progress gh2 0} $progress)
 (expect {campaigns full_combos gh2 0} $combos)
 {gamecfg set mode career}

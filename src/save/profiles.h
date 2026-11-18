@@ -1,0 +1,63 @@
+#pragma once
+
+// Who plays: a profile is a person, apart from GH2's bands (its careers),
+// kept in save.bin by number from 1:
+//
+//   [profiles]
+//   version = 1
+//   1 = Noah
+//   3 = Sam
+//
+// Its bests go in [profile 1 best] (save/best.h). A seat is signed in once
+// its player picks a profile or guest, and plays as that till they drop
+// out: kept for this run only, by the device, as [seats] names it, so every
+// start begins with nobody signed in. A seat not signed in plays as a
+// guest, as does one whose profile a seat before it plays as. A save with
+// bands and no profiles yet gets one of each
+// band's name, the first taking the bests kept before profiles. Not one
+// goes on a PCSX2 card: a card's saves are its bands'.
+
+#include <array>
+#include <optional>
+#include <string>
+
+namespace gh2::save
+{
+    // GH2's band list has eight rows, the last a guest's.
+    constexpr int kProfiles = 7;
+
+    struct Profiles
+    {
+        std::array<std::string, kProfiles> names; // each number's, "" for none
+
+        bool here(std::optional<int> profile) const
+        {
+            return profile && *profile >= 0 && *profile < kProfiles && !names[static_cast<size_t>(*profile)].empty();
+        }
+        // The first number with no profile, none when all are taken.
+        std::optional<int> free() const;
+    };
+    Profiles profiles();
+    // Named, or renamed: its controllers play as it under the new name.
+    void nameProfile(int profile, const std::string &name);
+    // Gone, its bests and preferences with it; its controllers play as
+    // guests.
+    void deleteProfile(int profile);
+
+    // What a profile plays with wherever it sits, in [profile 1 prefs]:
+    // lefty (0 or 1), speed (note speed in tenths, Clone Hero's, on every
+    // difficulty) and length (the highway's, horizon_y). None where it has
+    // set none, so it plays with the game's settings.
+    std::optional<int> profilePref(int profile, const std::string &key);
+    void keepProfilePref(int profile, const std::string &key, int value);
+
+    // The profile seat `seat` plays as, none for a guest; and the one its
+    // controller is to play as from now (a profile plays on one controller,
+    // so whichever had it last forgets it).
+    std::optional<int> seatProfile(int seat);
+    void keepSeatProfile(int seat, std::optional<int> profile);
+    // Whether seat `seat` has picked a profile or guest this run; and its
+    // player signing out, dropping out.
+    bool seatSignedIn(int seat);
+    void signOut(int seat);
+}

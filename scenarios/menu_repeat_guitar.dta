@@ -1,0 +1,19 @@
+; A guitar's strum bar held in a menu repeats after a moment too, as a pad's
+; and the keyboard's do: held about 1 s on Video Settings' eight rows it goes
+; several rows on (not round the list), where one strum is one.
+#include common/first_boot.dta
+(device guitar)
+(press down guitar)
+(expect {seat_has 0 guitar} 1)
+(wait 1)
+{ui goto_screen video_settings_screen}
+(wait_screen video_settings_screen)
+(wait 1.5)
+(expect {video_settings_screen focus_name} widescreen.btn)
+(hold guitar down)
+(wait 0.8)
+(hold guitar)
+(wait 1)
+(print guitar_held {video_settings_screen focus_name})
+(expect {|| {== {video_settings_screen focus_name} widescreen.btn} {== {video_settings_screen focus_name} vs_vfont.btn}} 0)
+(quit)

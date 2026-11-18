@@ -73,12 +73,36 @@ namespace gh2::poster_meshes
         return out;
     }
 
+    bool hide(milo::Bytes &body, const std::string &mat)
+    {
+        const auto at = stringAt(body, mat);
+        if (!at || *at < 25u || milo::u32(body, *at - 25u) != 3u || milo::u32(body, *at - 20u) != 0u)
+            return false;
+        body[*at - 21u] = 0u;
+        return true;
+    }
+
     Mesh quad(float halfWide, float halfHigh, float u0, float u1)
     {
         Mesh out;
         out.verts = {-halfWide, 0, -halfHigh, 0, -1, 0, u0, 1, halfWide,  0, -halfHigh, 0, -1, 0, u1, 1,
                      halfWide,  0, halfHigh,  0, -1, 0, u1, 0, -halfWide, 0, halfHigh,  0, -1, 0, u0, 0};
         out.faces = {0, 1, 2, 0, 2, 3};
+        return out;
+    }
+
+    Mesh ring(float inside)
+    {
+        constexpr int kSides = 48;
+        Mesh out;
+        for (int i = 0; i < kSides; ++i)
+        {
+            const float a = 2.0f * 3.14159265f * static_cast<float>(i) / kSides;
+            for (const float r : {1.0f, inside})
+                out.verts.insert(out.verts.end(), {r * std::cos(a), 0, r * std::sin(a), 0, -1, 0, 0.5f, 0.5f});
+            const auto at = [](int side, int inner) { return static_cast<uint16_t>((side % kSides) * 2 + inner); };
+            out.faces.insert(out.faces.end(), {at(i, 0), at(i, 1), at(i + 1, 0), at(i + 1, 0), at(i, 1), at(i + 1, 1)});
+        }
         return out;
     }
 

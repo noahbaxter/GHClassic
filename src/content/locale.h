@@ -52,6 +52,10 @@ namespace gh2::locale
     // The text `token` takes from its owner's table, where the table in the
     // Locale is GH2's and the owner's text differs from it; 0 otherwise.
     uint32_t owned(const char *token);
+    // `game`'s own text for `token`, a char* in its kept table, whatever
+    // owns it now: GH2's as its table has it, another's where it differs
+    // from GH2's. 0 where there is none, or that game's is not read.
+    uint32_t textOf(uint8_t *rdram, const std::string &game, const std::string &token);
 
     // After every add.
     void install(PS2Runtime &runtime, const Addresses &addresses);

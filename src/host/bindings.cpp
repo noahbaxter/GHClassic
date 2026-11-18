@@ -56,14 +56,6 @@ namespace gh2::input
         // SDL names the comma key ",", which the list would split on.
         constexpr const char *kCommaName = "comma";
 
-        // A UTF-8 byte order mark, which some editors put before the first line.
-        std::string withoutBom(std::string line)
-        {
-            if (line.rfind("\xEF\xBB\xBF", 0) == 0)
-                line.erase(0, 3);
-            return line;
-        }
-
         // The file key for an action: "green", "strum_up", ...
         const char *actionKey(Action action)
         {
@@ -197,6 +189,11 @@ namespace gh2::input
         return "keyboard";
     }
 
+    std::string menuSection(bool keyboard)
+    {
+        return keyboard ? "menu keyboard" : "menu gamepad";
+    }
+
     std::string deviceSection(const std::string &name, const std::string &guid)
     {
         return deviceSection(name) + " " + guid;
@@ -234,7 +231,7 @@ namespace gh2::input
         {
             ++number;
             // Comments take whole lines: ';' and '#' are key names too.
-            const std::string text = trim(number == 1 ? withoutBom(line) : line);
+            const std::string text = trim(number == 1 ? ini::withoutBom(line) : line);
             if (ini::skipped(text))
                 continue;
             if (const auto name = ini::sectionName(text))
@@ -301,7 +298,7 @@ namespace gh2::input
             while (std::getline(in, line))
             {
                 if (first)
-                    line = withoutBom(line);
+                    line = ini::withoutBom(line);
                 first = false;
                 if (const auto name = ini::sectionName(trim(line)))
                     inside = *name == section;
@@ -351,7 +348,7 @@ namespace gh2::input
     }
 
     bool writeTemplate(const std::string &path, const std::string &section, const Profile &profile,
-                       const std::string &mode)
+                       const std::string &mode, bool listUnbound)
     {
         std::vector<std::string> kept = linesWithout(path, section);
 
@@ -379,6 +376,8 @@ namespace gh2::input
                 out << "mode = " << mode << "\n";
             for (int a = 0; a < kActionCount; ++a)
             {
+                if (!listUnbound && profile[a].empty())
+                    continue;
                 out << "; " << kActions[a].name << " =";
                 for (size_t i = 0; i < profile[a].size(); ++i)
                     out << (i == 0 ? " " : ", ") << formatSource(profile[a][i]);

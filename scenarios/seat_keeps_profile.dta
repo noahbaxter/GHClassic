@@ -1,0 +1,77 @@
+; A seat is who sits in it, whatever drives it (save/profiles.cpp's
+; followHandovers): P2 drops out, and a strum on P2's controller takes the
+; lone P1 seat, as one player picking up another controller does, but P1
+; stays Alpha. Lefty is a profile's own, a guest's its own (ui/players.cpp):
+; Alpha's left handed, and P1 a guest puts the guest's back. P1 dropping out
+; signs out: a controller coming back to P1 is no one till it picks.
+#include common/first_boot.dta
+(device guitar)
+(device guitar2)
+(press down guitar)
+(wait 0.5)
+{ghc_profile make 0 "Alpha"}
+(expect {options get_lefty 0} 0)
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+(wait 1)
+(press start guitar2)
+(wait_screen ghc_profile_screen 10)
+(wait 1)
+{ghc_profile make 1 "Beta"}
+{ui goto_screen main_screen}
+(wait_screen main_screen 10)
+(wait 1)
+(expect {ghc_profile name 0} Alpha)
+(expect {ghc_profile name 1} Beta)
+
+; P2's DROP OUT, the poster's last row.
+(press start guitar2)
+(wait 0.6)
+(expect {ghc_profile_panel get seat} 1)
+(press down guitar2)
+(wait 0.2)
+(press down guitar2)
+(wait 0.2)
+(press down guitar2)
+(wait 0.2)
+(press down guitar2)
+(wait 0.2)
+(press green guitar2)
+(wait 1)
+(expect {ghc_profile holder 1} "")
+
+; A strum on P2's controller: it drives P1 now, P1 still Alpha.
+(press down guitar2)
+(wait 0.5)
+(expect {seat_has 0 guitar2} 1)
+(expect {ghc_profile name 0} Alpha)
+; And back to P1's own: Alpha still.
+(press down guitar)
+(wait 0.5)
+(expect {seat_has 0 guitar} 1)
+(expect {ghc_profile name 0} Alpha)
+
+; Alpha left handed; P1 a guest puts Options' lefty back, and Alpha again
+; brings Alpha's.
+{ghc_profile set_pref 0 lefty 1}
+{options set_lefty 0 TRUE}
+(wait 0.5)
+(expect {options get_lefty 0} 1)
+{ghc_profile pick 0 -1}
+(wait 0.5)
+(expect {options get_lefty 0} 0)
+{ghc_profile pick 0 0}
+(wait 0.5)
+(expect {options get_lefty 0} 1)
+
+; P1 drops out, signing out: the keyboard stands in, no one. The guitar
+; pressing back into P1 is no one either till it picks again.
+{ghc_profile drop 0}
+(wait 1)
+(expect {seat_has 0 guitar} 0)
+(expect {ghc_profile holder 0} "")
+(press down guitar)
+(wait 0.5)
+(expect {seat_has 0 guitar} 1)
+(expect {ghc_profile holder 0} "")
+(quit)

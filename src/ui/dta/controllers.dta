@@ -209,7 +209,11 @@
                (leave
                   {set [leaving] TRUE}
                   {ui goto_screen
-                     {if_else {== {ui current_screen} ghc_pause_controllers_screen} pause_settings_screen options_screen}}
+                     {if_else {find_elem (ghc_pause_controllers_screen ghc_practice_controllers_screen) {{ui current_screen} name}}
+                        {ghc_pause_screen pause_settings_screen}
+                        options_screen
+                     }
+                  }
                )
                (paint {$this paint})
             }
@@ -542,13 +546,21 @@
    )
 }
 ; The same from a song's pause menu, its Settings (game_settings.dta), over
-; the paused song and back to that menu.
-{if {! {exists ghc_pause_controllers_screen}}
-   {new GHScreen ghc_pause_controllers_screen}
+; the paused song and back to that menu; in practice over its own panels.
+{foreach $s (ghc_pause_controllers_screen ghc_practice_controllers_screen)
+   {if {! {exists $s}} {new GHScreen $s}}
 }
 {retype ghc_pause_controllers_screen
    (
       (panels GAME_PANELS ghc_controllers_bg_panel helpbar ghc_controllers_panel)
+      (focus ghc_controllers_panel)
+      (in_game TRUE)
+      PAUSE_SCREEN_HANDLERS
+   )
+}
+{retype ghc_practice_controllers_screen
+   (
+      (panels PRACTICE_PANELS ghc_controllers_bg_panel helpbar ghc_controllers_panel)
       (focus ghc_controllers_panel)
       (in_game TRUE)
       PAUSE_SCREEN_HANDLERS

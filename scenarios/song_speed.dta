@@ -1,0 +1,81 @@
+; Song speed: set on the quickplay song list's Select menu as practice's
+; is, green taking the row up, the strum stepping it, green keeping it and
+; red putting it back; in quickplay the song runs at 150% against the clock with
+; its audio stretched to match (ghc_speed/...), its own audio name back once
+; the song is left. Practice's is practice.dta's.
+#include common/first_boot.dta
+; A profile's, as a guest keeps no best.
+(device guitar)
+(press down guitar)
+(wait 0.3)
+{ghc_profile make 0 "Tester"}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 2)
+(press star_power)
+(wait 0.5)
+(expect {ghc_pick_panel get open} TRUE)
+(press green)
+(expect {ghc_pick_panel get editing} speed)
+(press up)
+(press up)
+(expect {song_speed} 110)
+(expect {ghc_pick_panel get editing} speed)
+(shot speed_editing)
+(press red)
+(expect {song_speed} 100)
+(expect {ghc_pick_panel get editing} FALSE)
+(expect {ghc_pick_panel get open} TRUE)
+(press green)
+(press down)
+(press green)
+(expect {song_speed} 95)
+(expect {ghc_pick_panel get editing} FALSE)
+(shot speed_menu)
+(press star_power)
+(wait 0.5)
+{quickplay song_defaults 0}
+{gamecfg set mode quickplay}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_song shoutatthedevil}
+{game set_quickplay}
+{song_speed set 150}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(expect {elem {find $syscfg songs shoutatthedevil song name} 1} ghc_speed/150/songs/shoutatthedevil/shoutatthedevil)
+; The song's clock runs at the speed once the song starts.
+(wait_until {> {taskmgr seconds} 5} 60)
+{set $ghc_t0 {taskmgr ui_seconds}}
+{set $ghc_s0 {taskmgr seconds}}
+(record on quickplay_150)
+(print {taskmgr seconds})
+(wait 20)
+(record off)
+(print {'/' {'-' {taskmgr seconds} $ghc_s0} {'-' {taskmgr ui_seconds} $ghc_t0}})
+(expect {'/' {'-' {taskmgr seconds} $ghc_s0} {'-' {taskmgr ui_seconds} $ghc_t0}} 1.5 0.03)
+{song_speed set 100}
+{ui goto_screen main_screen}
+(wait_screen main_screen 30)
+(expect {elem {find $syscfg songs shoutatthedevil song name} 1} songs/shoutatthedevil/shoutatthedevil)
+
+; A song won at 150% is kept at that speed alone, and skips GH2's own high
+; score table.
+{quickplay song_defaults 0}
+{gamecfg set mode quickplay}
+{{game get_player_config 0} set_difficulty expert}
+{game set_song shoutatthedevil}
+{game set_quickplay}
+{song_speed set 150}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 5)
+{player0 win 5}
+(wait_screen endgame_screen 60)
+(wait 2)
+(press green)
+(wait_screen complete_screen 30)
+(expect {> {best score shoutatthedevil expert} 0} 1)
+{song_speed set 100}
+(expect {best score shoutatthedevil expert} 0)
+(quit)

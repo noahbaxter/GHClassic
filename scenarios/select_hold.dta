@@ -1,0 +1,23 @@
+; A press its screen leaves to the UI held that panel for GH2's
+; select_frames, a third of a second, every press on it lost meanwhile; now
+; one poll (ui/transitions.cpp). Quickplay's hub: song defaults flipped, then
+; up and green inside that third of a second (keys, 0.1 s a step), MODIFIERS
+; opening.
+#include common/first_boot.dta
+{quickplay song_defaults 0}
+{set $ghc_qp_row ghc_defaults.btn}
+{gamecfg set mode quickplay}
+{ui goto_screen ghc_qp_setup_screen}
+(wait_screen ghc_qp_setup_screen)
+(wait 2)
+(expect {sel_character_panel focus_name} ghc_defaults.btn)
+(keys Return)
+(keys)
+(keys Up)
+(keys)
+(keys Return)
+(keys)
+(wait 1.5)
+(expect {quickplay song_defaults} 1)
+(expect {{ui current_screen} name} ghc_qp_extras_screen)
+(quit)

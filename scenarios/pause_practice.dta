@@ -1,0 +1,162 @@
+; Practice from a quickplay song at 120%, its pause menu's third row: the
+; whole song at once, at its 120%. Practice's pause
+; menu has six rows, Settings for New Song, and its Return goes back where practice
+; began: that song in quickplay, at its 120%. Then the pause menus in GH1's
+; scene, and practice begun from the menus, whose Return is practice's song
+; list.
+(needs gh1)
+#include common/first_boot.dta
+{gamecfg set mode quickplay}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty expert}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{song_speed set 120}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 5)
+(press start)
+(wait_screen pause_screen 20)
+(wait 1)
+(expect {{pause_panel find ghc_practice.btn} showing} 1)
+(press down)
+(press down)
+(expect {pause_panel focus_name} ghc_practice.btn)
+(press down)
+(expect {pause_panel focus_name} audio_options.btn)
+(press up)
+(shot gh2_pause)
+(press green)
+(wait_screen practice_game_screen 60)
+(expect {gamecfg get mode} practice)
+(expect {game get_song} shoutatthedevil)
+(expect {gamecfg get (practice_sections 0)} -1)
+(expect {song_speed} 120)
+(wait 5)
+(press start)
+(wait_screen pract_pause_screen 20)
+(wait 1)
+(press down)
+(press down)
+(expect {pract_pause_panel focus_name} change_speed.btn)
+(press down)
+(press down)
+(expect {pract_pause_panel focus_name} newsong.btn)
+(press down)
+(expect {pract_pause_panel focus_name} quit.btn)
+(press up)
+(expect {pract_pause_panel focus_name} newsong.btn)
+(press down)
+(shot gh2_practice_pause)
+(press green)
+(wait_screen qp_selsong_screen 60)
+(wait 2)
+(expect {gamecfg get mode} quickplay)
+(expect {song_speed} 120)
+(expect {game get_song} shoutatthedevil)
+(shot back_in_quickplay)
+; Practice from its pause menu again: red on its sections' list goes back
+; to its pause menu, not out of practice; Return to the list the same way.
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 3)
+(press start)
+(wait_screen pause_screen 20)
+(wait 1)
+(press down)
+(press down)
+(expect {pause_panel focus_name} ghc_practice.btn)
+(press green)
+(wait_screen practice_game_screen 60)
+(wait 2)
+(press start)
+(wait_screen pract_pause_screen 20)
+(wait 1)
+(press down)
+(press down)
+(press down)
+(expect {pract_pause_panel focus_name} section.btn)
+(press green)
+(wait_screen ghc_practice_section_screen 10)
+(wait 0.5)
+(press red)
+(wait_screen pract_pause_screen 10)
+(wait 0.3)
+(expect {gamecfg get mode} practice)
+(press down)
+(press down)
+(expect {pract_pause_panel focus_name} quit.btn)
+(press green)
+(wait_screen qp_selsong_screen 60)
+(expect {gamecfg get mode} quickplay)
+(expect {song_speed} 120)
+(expect {game get_song} shoutatthedevil)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+
+{quickplay in_song_ui gh1}
+{gamecfg set mode quickplay}
+{game set_song shoutatthedevil}
+{game set_quickplay}
+{campaigns venues_from gh2}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 5)
+(press start)
+(wait_screen pause_screen 20)
+(wait 1)
+(press down)
+(press down)
+(expect {pause_panel focus_name} ghc_practice.btn)
+(shot gh1_pause)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+
+{gamecfg set mode practice}
+{game set_song shoutatthedevil}
+{gamecfg set_track 0 0}
+{ui goto_screen practice_diff_screen}
+(wait_screen practice_diff_screen 60)
+(wait 1)
+(press green)
+(wait_screen practice_game_screen 60)
+; No song caption: the section's name alone at the top.
+(wait 1.5)
+(shot practice_start)
+(wait 3.5)
+(shot practice_section)
+(press start)
+(wait_screen pract_pause_screen 20)
+(wait 1)
+; In GH1's look its Settings has Practice's page too, the scene's put away
+; row brought back as a fifth.
+(press down)
+(press down)
+(press down)
+(press down)
+(expect {pract_pause_panel focus_name} newsong.btn)
+(press green)
+(wait_screen ghc_practice_settings_screen 10)
+(wait 0.5)
+(expect {{pause_settings_panel find video_options.btn} showing} 1)
+(press down)
+(press down)
+(press down)
+(expect {pause_settings_panel focus_name} video_options.btn)
+(shot gh1_practice_settings)
+(press green)
+(wait_screen ghc_practice_options_screen 10)
+(press red)
+(wait_screen ghc_practice_settings_screen 10)
+(press red)
+(wait_screen pract_pause_screen 10)
+(wait 0.5)
+(press down)
+(press down)
+(press down)
+(press down)
+(press down)
+(expect {pract_pause_panel focus_name} quit.btn)
+(press green)
+(wait_screen practice_selsong_screen 60)
+(quit)

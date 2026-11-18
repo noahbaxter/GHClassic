@@ -56,6 +56,9 @@ namespace gh2::look
     void addBoard(uint32_t mat);
     bool isBoard(uint32_t mat);
     bool hasBoard();
+    // Whether the board last drawn had the 360's look, its fade with it.
+    void setBoardShaded(bool shaded);
+    bool boardShaded();
     constexpr const char *kBoardMat = "track_surface.mat";
     // The environ the 360 draws the board under, where the PS2's scene has
     // the track's one environ for everything.

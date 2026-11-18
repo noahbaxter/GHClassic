@@ -213,7 +213,11 @@ namespace gh2
             // A Mat the track's code copied from its scene's has no name:
             // the board, and any other by its picture (the side rails).
             if (look::isBoard(mat))
-                return look::find(look::kBoardMat, diffuse);
+            {
+                auto shading = look::find(look::kBoardMat, diffuse);
+                look::setBoardShaded(shading != nullptr);
+                return shading;
+            }
             const std::string copied = diffuse != 0u ? look::matOf(diffuse) : std::string();
             return copied.empty() ? nullptr : look::find(copied.c_str(), diffuse);
         }

@@ -1,0 +1,26 @@
+; Naming a band by keyboard: the arrows move the letter, Enter or Space picks
+; it, Tab is Start and finishes, Esc backs out.
+#include common/first_boot.dta
+(key Down)
+(expect {seat_has 0 keyboard} 1)
+{nameprof_screen set back_screen main_screen}
+{nameprof_screen set is_editing FALSE}
+{nameprof_screen set profile_slot 0}
+{nameprof_screen set next_screen sel_difficulty_screen}
+{ui goto_screen nameprof_screen}
+(wait_screen nameprof_screen 10)
+(wait 1)
+(shot name_band_start)
+(key Down)
+(wait 0.3)
+(key Return)
+(wait 0.3)
+(key Space)
+(wait 0.3)
+(shot name_band_typed)
+(expect {{ui current_screen} name} nameprof_screen)
+(key Tab)
+(wait 1.5)
+(expect {!= {{ui current_screen} name} nameprof_screen} 1)
+(shot name_band_done)
+(quit)

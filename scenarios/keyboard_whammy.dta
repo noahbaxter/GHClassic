@@ -1,0 +1,38 @@
+; The keyboard's whammy key bends in a song as a controller's bar does, not
+; only on the Controllers screen.
+#include common/first_boot.dta
+(key Down)
+(expect {seat_has 0 keyboard} 1)
+{ui goto_screen ghc_controllers_screen}
+(wait_screen ghc_controllers_screen)
+(wait 1)
+(expect {ghc_controllers text title} KEYBOARD)
+(key Up)
+(key Up)
+(key Up)
+(key Up)
+(expect {ghc_controllers text row {ghc_controllers focus}} WHAMMY)
+(key Return)
+(wait 0.3)
+(key W)
+(wait 0.3)
+(expect {ghc_controllers text read {ghc_controllers focus}} "W")
+(key Escape)
+(wait_screen options_screen)
+(wait 1)
+{gamecfg set mode quickplay}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty easy}
+{{game get_player_config 0} set autoplay TRUE}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait 1)
+(expect {pad_held whammy} 0)
+(keys W)
+(wait 0.3)
+(expect {pad_held whammy} 1)
+(keys)
+(wait 0.3)
+(expect {pad_held whammy} 0)
+(quit)

@@ -29,6 +29,7 @@ namespace gh2::settings
             kBool,
             kInt,
             kChoice, // one of `choices`, its value the word's position
+            kText,   // any words, kept as they are; its value 0
         };
 
         // A setting's kind. Its default, section and place in the file, and
@@ -52,6 +53,7 @@ namespace gh2::settings
         const Entry kEntries[kKeyCount] = {
             {"widescreen", Type::kBool, 0, 1, 1, 0},
             {"frame_rate_cap", Type::kInt, 0, 500, 1, 60},
+            {"vsync", Type::kBool, 0, 1, 1, 1},
             // Most of GH2's textures have no mip chain (443 of 470 loaded into
             // a song), so drawn small they shimmer: the highway's far end.
             {"mipmaps", Type::kBool, 0, 1, 1, 0},
@@ -63,21 +65,24 @@ namespace gh2::settings
             // Off: a sphere that holds only part of its mesh hides what still
             // shows (flashpot_4.mesh in battle's fail sequence).
             {"frustum_cull", Type::kBool, 0, 1, 1, 1},
-            // 5 ms: finer is below what a player can feel. 45 by default, as
-            // audio: a frame reaches the screen two or three refreshes after
-            // it is drawn (FIFO presentation, two frames in flight), and with
-            // 0 every animation, light and gem showed late against the music
-            // (Noah's Mac matched at video 80 with audio 80, 2026-10-10).
+            // 5 ms: finer is below what a player can feel. 0 by default, as
+            // reset sets it: calibration is the player's own setup. A frame
+            // reaches the screen two or three refreshes after it is drawn
+            // (FIFO presentation, two frames in flight); Noah's Mac matched
+            // at video 80 with audio 80, 2026-10-10.
             {"video_ms", Type::kInt, -500, 500, 5, 0},
-            // 45 by default: the port's own delay on macOS, SDL's CoreAudio
-            // queue (about 43 ms; the song clock is held to the mixed audio,
-            // synth.cpp). Not measured on Windows or Linux yet.
+            // 0 by default, as video. The port's own delay on macOS, SDL's
+            // CoreAudio queue, is about 43 ms (the song clock is held to the
+            // mixed audio, synth.cpp); not measured on Windows or Linux yet.
             {"audio_ms", Type::kInt, -500, 500, 5, 0},
             // OptionData's (retail 0x10d2e0), which the save carried.
             {"band_volume", Type::kInt, 0, 11, 1, 11},
             {"guitar_volume", Type::kInt, 0, 11, 1, 11},
             {"fx_volume", Type::kInt, 0, 11, 1, 11},
             {"stereo", Type::kBool, 0, 1, 1, 1},
+            // Retail's practice slices the song to keep it, on its own
+            // slowed files.
+            {"maintain_pitch", Type::kBool, 0, 1, 1, 1},
             {"fast_boot", Type::kBool, 0, 1, 1, 0},
             {"lefty", Type::kBool, 0, 1, 1, 0},
             {"lefty_p2", Type::kBool, 0, 1, 1, 0},
@@ -88,8 +93,10 @@ namespace gh2::settings
             // 100: the hit window (slop, beatmatcher.dta), so the note after
             // can be hit from when the release stops muting.
             {"sustain_release_ms", Type::kInt, 0, 500, 5, 0},
+            {"miss_mute", Type::kBool, 0, 1, 1, 1},
             {"whammy_hold", Type::kBool, 0, 1, 1, 0},
             {"strum_limit", Type::kBool, 0, 1, 1, 1},
+            {"star_power_overlap", Type::kBool, 0, 1, 1, 0},
             {"note_streak", Type::kBool, 0, 1, 1, 0},
             {"song_progress", Type::kBool, 0, 1, 1, 0},
             // The unlock-all cheat's, without its turning off saving and the
@@ -130,6 +137,12 @@ namespace gh2::settings
             {"lighting", Type::kChoice, 0, 1, 1, kLastGen, "last_gen next_gen"},
             {"perf_overlay", Type::kChoice, 0, 3, 1, 0, "off fps graph full"},
             {"vector_fonts", Type::kBool, 0, 1, 1, 1},
+            {"folders", Type::kText, 0, 0, 1, 0},
+            {"show_duplicates", Type::kBool, 0, 1, 1, 0},
+            {"disc_song_guitars", Type::kBool, 0, 1, 1, 0},
+            {"practice_metronome", Type::kBool, 0, 1, 1, 0},
+            {"practice_note_click", Type::kBool, 0, 1, 1, 0},
+            {"practice_solo_stems", Type::kBool, 0, 1, 1, 1},
         };
 
         const Entry *entryNamed(const std::string &name)
@@ -140,14 +153,17 @@ namespace gh2::settings
         }
 
         // A `key = value  # note` line's key and value, or none for any other
-        // line.
+        // line. A note's # follows a space, so a folder's (D:\#Charts) is
+        // the value's.
         std::optional<std::pair<std::string, std::string>> assignment(const std::string &line)
         {
             const std::string trimmed = ini::trim(line);
             const size_t eq = trimmed.find('=');
             if (ini::skipped(trimmed) || ini::sectionName(trimmed) || eq == std::string::npos)
                 return std::nullopt;
-            const size_t note = trimmed.find('#', eq);
+            size_t note = trimmed.find('#', eq);
+            while (note != std::string::npos && trimmed[note - 1u] != ' ' && trimmed[note - 1u] != '\t')
+                note = trimmed.find('#', note + 1u);
             return std::make_pair(ini::trim(trimmed.substr(0, eq)),
                                   ini::trim(trimmed.substr(eq + 1, note == std::string::npos ? std::string::npos : note - eq - 1)));
         }
@@ -162,6 +178,7 @@ namespace gh2::settings
         {
             std::array<int, kKeyCount> value{};
             std::array<bool, kKeyCount> set{};
+            std::array<std::string, kKeyCount> text; // kText's
         };
 
         std::string s_path;
@@ -173,6 +190,11 @@ namespace gh2::settings
 
         bool parse(const Entry &entry, const std::string &text, int &out)
         {
+            if (entry.type == Type::kText)
+            {
+                out = 0;
+                return true;
+            }
             if (entry.type == Type::kBool && (text == "true" || text == "false"))
             {
                 out = text == "true";
@@ -215,6 +237,7 @@ namespace gh2::settings
                     if (entry && parse(*entry, pair->second, value))
                     {
                         state.value[entry - kEntries] = value;
+                        state.text[entry - kEntries] = entry->type == Type::kText ? pair->second : "";
                         defaulted[entry - kEntries] = true;
                     }
                     else
@@ -246,6 +269,8 @@ namespace gh2::settings
                 }
                 state.value[entry - kEntries] = value;
                 state.set[entry - kEntries] = true;
+                if (entry->type == Type::kText)
+                    state.text[entry - kEntries] = pair->second;
             }
             return state;
         }
@@ -278,7 +303,8 @@ namespace gh2::settings
                         continue;
                     }
                     const size_t eq = line.find('='), note = line.find('#', eq);
-                    std::string value = text(*entry, state().value[entry - kEntries]);
+                    std::string value = entry->type == Type::kText ? state().text[entry - kEntries]
+                                                                   : text(*entry, state().value[entry - kEntries]);
                     if (note != std::string::npos)
                         value.resize(std::max(value.size() + 1u, note - eq - 2u), ' ');
                     out << line.substr(0, eq + 1) << " " << value
@@ -293,6 +319,11 @@ namespace gh2::settings
     int get(Key key)
     {
         return state().value[key];
+    }
+
+    std::string text(Key key)
+    {
+        return state().text[key];
     }
 
     namespace
@@ -313,7 +344,7 @@ namespace gh2::settings
             return false;
         if (playing.career)
             return playing.nextGen;
-        const bool venue = playing.gh2Venue && get(kVenues) == kHd;
+        const bool venue = playing.gh2Venue && (get(kVenues) == kHd || playing.nextGenSong);
         switch (look)
         {
         case kLookVenue:
@@ -321,7 +352,7 @@ namespace gh2::settings
         case kLookCharacters:
             return get(kCharacters) == kHd;
         case kLookGuitars:
-            return get(kGuitars) == kHd;
+            return get(kGuitars) == kHd || playing.nextGenSong;
         case kLookHighway:
             return get(kHighway) == kHighwayAuto ? venue : get(kHighway) == kHighwayHd;
         default:

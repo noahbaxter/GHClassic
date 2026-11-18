@@ -2,6 +2,7 @@
 
 #include "dev/cheats.h"
 #include "host/audio.h"
+#include "host/boot_picture.h"
 #include "dev/draw_dump.h"
 #include "dev/timing.h"
 #include "host/input.h"
@@ -32,6 +33,7 @@
 #include <fstream>
 #include <iostream>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -138,6 +140,10 @@ namespace gh2
         std::chrono::steady_clock::time_point nextHiddenFrame{};
         Frame shown;                                 // the game frame last drawn
         movie::Picture moviePicture;                 // the movie's, while one plays
+        // The last boot's first picture, shown until the game draws one of
+        // its own (host/boot_picture.h); and whether this boot's is kept.
+        std::optional<boot_picture::Picture> bootPicture;
+        bool bootDrawn = false;
         std::chrono::microseconds frameWait{8333};   // half a display period
         std::chrono::nanoseconds gamePeriod{16667000};
 
@@ -149,9 +155,13 @@ namespace gh2
             if (!hidden)
                 if (const SDL_DisplayMode *mode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(window)))
                     displayHz = mode->refresh_rate;
+            // No cap is as fast as the game thread goes: the scheduler's
+            // shortest period. With vsync, never past what the display shows.
             float hz = static_cast<float>(settings::get(settings::kFrameRateCap));
             if (hz == 0.0f)
-                hz = displayHz > 0.0f ? displayHz : 60.0f;
+                hz = 1000.0f;
+            if (settings::get(settings::kVsync) && displayHz > 0.0f)
+                hz = std::min(hz, displayHz);
             // frame_step replays at most four PS2 frames in one of ours.
             hz = std::max(hz, 15.0f);
             gamePeriod = std::chrono::nanoseconds(static_cast<int64_t>(1e9 / hz));
@@ -200,7 +210,7 @@ namespace gh2
                        "tex_reads,tex_read_ms,gpu_ms";
                 for (const char *span : kGpuSpans)
                     out << ",gpu_" << span << "_ms";
-                out << "\n";
+                out << ",song_s\n";
                 start = lastPresent = lastFlush = Clock::now();
                 std::cerr << "[frame] logging to " << path << std::endl;
             }
@@ -236,7 +246,9 @@ namespace gh2
                     std::snprintf(row, sizeof(row), ",%.2f", span);
                     out << row;
                 }
-                out << "\n";
+                // The song's seconds as the track was last drawn at.
+                std::snprintf(row, sizeof(row), ",%.4f\n", timing::songSeconds());
+                out << row;
                 if (dtMs > kSlowMs)
                     std::cerr << "[frame] " << static_cast<int>(dtMs) << " ms: wait " << static_cast<int>(waitMs)
                               << ", acq " << static_cast<int>(acqMs) << ", rec " << static_cast<int>(recMs)
@@ -277,11 +289,13 @@ namespace gh2
                 for (size_t i = 0; i < pixels.size(); i += 4)
                     std::swap(mapped[i], mapped[i + 2]);
             vmaFlushAllocation(allocator, into.uploadMemory, 0, pixels.size());
-            // The window's image is being written already.
-            if (!windows)
-                imageBarrier(cmd, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                             VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+            // The window's image is being written already, by the blit this
+            // goes over.
+            imageBarrier(cmd, image,
+                         windows ? VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                         windows ? VK_ACCESS_TRANSFER_WRITE_BIT : VK_ACCESS_TRANSFER_READ_BIT,
+                         VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
             VkBufferImageCopy copy{};
             copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
             copy.imageOffset = {picture.offset.x + static_cast<int32_t>(edge),
@@ -301,9 +315,14 @@ namespace gh2
             SDL_GetWindowSizeInPixels(window, &width, &height);
             vkb::SwapchainBuilder builder(device);
             // UNORM, so the guest's display-referred colours pass through as is.
+            // Vsync off: immediate, else mailbox (no tearing, still not
+            // waiting), else FIFO, the one every driver has.
+            const bool vsync = settings::get(settings::kVsync) != 0;
             builder.set_desired_format({VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
                 .set_desired_present_mode(timing::presentMode >= 0 ? static_cast<VkPresentModeKHR>(timing::presentMode)
-                                                                   : VK_PRESENT_MODE_FIFO_KHR)
+                                          : vsync                  ? VK_PRESENT_MODE_FIFO_KHR
+                                                                   : VK_PRESENT_MODE_IMMEDIATE_KHR)
+                .add_fallback_present_mode(vsync ? VK_PRESENT_MODE_FIFO_KHR : VK_PRESENT_MODE_MAILBOX_KHR)
                 .set_desired_extent(static_cast<uint32_t>(width), static_cast<uint32_t>(height))
                 .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT)
                 .set_old_swapchain(swapchain);
@@ -421,14 +440,14 @@ namespace gh2
             readback = VK_NULL_HANDLE;
         }
 
-        // The movie picture into the target, which is its size, left as the
-        // scene leaves it.
-        bool recordMovie(VkCommandBuffer cmd, Slot &into)
+        // A picture into the target, which is its size, left as the scene
+        // leaves it: a movie's, or the boot's kept one.
+        bool recordPicture(VkCommandBuffer cmd, Slot &into, const std::vector<uint8_t> &rgba)
         {
-            const VkDeviceSize size = moviePicture.rgba.size();
+            const VkDeviceSize size = rgba.size();
             if (!roomToUpload(into, size))
                 return false;
-            std::memcpy(into.uploadMapped, moviePicture.rgba.data(), size);
+            std::memcpy(into.uploadMapped, rgba.data(), size);
             vmaFlushAllocation(allocator, into.uploadMemory, 0, size);
 
             imageBarrier(cmd, target, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0,
@@ -494,6 +513,11 @@ namespace gh2
             const VkClearColorValue black{{0.0f, 0.0f, 0.0f, 1.0f}};
             const VkImageSubresourceRange range{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
             vkCmdClearColorImage(cmd, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &black, 1, &range);
+            // Two writes to one image run in any order without a barrier
+            // between: the clear can land over parts of the blit after it.
+            imageBarrier(cmd, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                         VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT);
 
             const VkRect2D rect = pictureRect(displayAspect);
             VkImageBlit blit{};
@@ -534,6 +558,65 @@ namespace gh2
                 std::fclose(file);
             }
             vmaUnmapMemory(allocator, readbackMemory);
+        }
+
+        // The target as read back, for the next boot (host/boot_picture.h).
+        void keepBootPicture(float aspect)
+        {
+            void *mapped = nullptr;
+            if (vmaMapMemory(allocator, readbackMemory, &mapped) != VK_SUCCESS)
+                return;
+            vmaInvalidateAllocation(allocator, readbackMemory, 0, VK_WHOLE_SIZE);
+            const uint8_t *pixels = static_cast<const uint8_t *>(mapped);
+            boot_picture::keep({targetWidth, targetHeight, aspect, std::vector<uint8_t>(pixels, pixels + readbackSize)});
+            vmaUnmapMemory(allocator, readbackMemory);
+        }
+
+        // The kept picture in the window at once, before the host's installs
+        // and the game's boot, which present nothing for seconds.
+        bool presentBootPicture()
+        {
+            if (!bootPicture)
+                return true;
+            Slot &into = slots[slot];
+            vkWaitForFences(device.device, 1, &into.done, VK_TRUE, UINT64_MAX);
+            if (!ensureTarget(bootPicture->width, bootPicture->height))
+                return false;
+            uint32_t imageIndex = 0;
+            const VkResult acquired = vkAcquireNextImageKHR(device.device, swapchain.swapchain, UINT64_MAX,
+                                                            into.imageAvailable, VK_NULL_HANDLE, &imageIndex);
+            if (acquired != VK_SUCCESS && acquired != VK_SUBOPTIMAL_KHR)
+                return true;
+            vkResetFences(device.device, 1, &into.done);
+            VkCommandBuffer cmd = into.cmd;
+            vkResetCommandBuffer(cmd, 0);
+            VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+            begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+            vkBeginCommandBuffer(cmd, &begin);
+            if (!recordPicture(cmd, into, bootPicture->rgba) ||
+                !blitToSwapchain(cmd, into, swapchainImages[imageIndex], bootPicture->aspect, false))
+                return false;
+            vkEndCommandBuffer(cmd);
+            const VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
+            submit.commandBufferCount = 1;
+            submit.pCommandBuffers = &cmd;
+            submit.waitSemaphoreCount = 1;
+            submit.pWaitSemaphores = &into.imageAvailable;
+            submit.pWaitDstStageMask = &waitStage;
+            submit.signalSemaphoreCount = 1;
+            submit.pSignalSemaphores = &renderFinished[imageIndex];
+            if (!check(vkQueueSubmit(queue, 1, &submit, into.done), "submit"))
+                return false;
+            VkPresentInfoKHR info{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
+            info.waitSemaphoreCount = 1;
+            info.pWaitSemaphores = &renderFinished[imageIndex];
+            info.swapchainCount = 1;
+            info.pSwapchains = &swapchain.swapchain;
+            info.pImageIndices = &imageIndex;
+            vkQueuePresentKHR(queue, &info);
+            slot = (slot + 1u) % kFramesInFlight;
+            return true;
         }
 
         // --record's frame (host/record.h), shown at that aspect and drawn at
@@ -672,6 +755,19 @@ namespace gh2
             return false;
         }
         s.device = device.value();
+        {
+            // Which GPU and driver drew it: a player's log says what to test on.
+            const VkPhysicalDeviceProperties &p = s.device.physical_device.properties;
+            const uint32_t v = p.driverVersion;
+            char line[256];
+            std::snprintf(line, sizeof(line),
+                          "[video] gpu %s, vendor 0x%04x, device 0x%04x, api %u.%u.%u, driver 0x%08x (%u.%u.%u, or "
+                          "NVIDIA's %u.%u)",
+                          p.deviceName, p.vendorID, p.deviceID, VK_VERSION_MAJOR(p.apiVersion),
+                          VK_VERSION_MINOR(p.apiVersion), VK_VERSION_PATCH(p.apiVersion), v, VK_VERSION_MAJOR(v),
+                          VK_VERSION_MINOR(v), VK_VERSION_PATCH(v), (v >> 22) & 0x3ffu, (v >> 14) & 0xffu);
+            std::cerr << line << std::endl;
+        }
 #if defined(__APPLE__) || defined(__linux__)
         if (displayTiming)
         {
@@ -739,6 +835,10 @@ namespace gh2
         if (!s.scene.initialize(s.device.device, s.allocator, static_cast<VkSampleCountFlagBits>(samples), everySample))
             return false;
         if (!s.hidden && !s.createSwapchain())
+            return false;
+        if (!s.hidden)
+            s.bootPicture = boot_picture::kept();
+        if (!s.presentBootPicture())
             return false;
         // A hidden run is scripted; the player's controller stays out of it.
         if (!s.hidden)
@@ -854,7 +954,17 @@ namespace gh2
                                                            s.gamePeriod * 2))
                             : frames().next(s.shown, s.frameWait);
         const Frame &frame = s.shown;
-        const float displayAspect = moviePlaying ? 4.0f / 3.0f : frame.displayAspect;
+        // The boot's first frame that draws anything ends the kept picture,
+        // and is kept for the next boot: a window's, not a hidden test run's.
+        bool keepThis = false;
+        if (!s.bootDrawn && !moviePlaying && isNew && !frame.draws.empty())
+        {
+            s.bootDrawn = true;
+            s.bootPicture.reset();
+            keepThis = !s.hidden;
+        }
+        const bool kept = !moviePlaying && s.bootPicture.has_value();
+        const float displayAspect = moviePlaying ? 4.0f / 3.0f : kept ? s.bootPicture->aspect : frame.displayAspect;
         const uint64_t tTaken = timed ? timing::now() : 0u;
         const LogClock::time_point waitEnd = LogClock::now();
         if (timed)
@@ -878,6 +988,11 @@ namespace gh2
         {
             width = s.moviePicture.width;
             height = s.moviePicture.height;
+        }
+        else if (kept)
+        {
+            width = s.bootPicture->width;
+            height = s.bootPicture->height;
         }
         else if (m_renderSize.mode == RenderSize::kHeight)
         {
@@ -914,7 +1029,8 @@ namespace gh2
         vkBeginCommandBuffer(cmd, &begin);
 
         const LogClock::time_point recordStart = LogClock::now();
-        if (moviePlaying ? !s.recordMovie(cmd, slot)
+        if (moviePlaying ? !s.recordPicture(cmd, slot, s.moviePicture.rgba)
+            : kept       ? !s.recordPicture(cmd, slot, s.bootPicture->rgba)
                          : !s.scene.record(cmd, frame, s.target, s.targetWidth, s.targetHeight, s.presented))
             return false;
         const LogClock::time_point recordEnd = LogClock::now();
@@ -926,7 +1042,7 @@ namespace gh2
         // A hidden frame's own slot on the game's clock, which a late wake
         // does not move; a shown one's, when it is drawn.
         const auto drawnAt = present ? ps2x::host_clock::now() : s.nextHiddenFrame;
-        if (shot || recording)
+        if (shot || recording || keepThis)
         {
             VkBufferImageCopy copy{};
             copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
@@ -1019,8 +1135,10 @@ namespace gh2
             }
         }
 
-        if (shot || recording)
+        if (shot || recording || keepThis)
             vkWaitForFences(s.device.device, 1, &slot.done, VK_TRUE, UINT64_MAX);
+        if (keepThis)
+            s.keepBootPicture(displayAspect);
         if (shot)
             s.writeShot(requested);
         if (recording)

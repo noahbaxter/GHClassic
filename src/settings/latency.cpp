@@ -26,10 +26,12 @@
 // against the music. The one musical case: game.dta's beat handler claps in
 // star power through a script task 0.9 beats on. So a script task on the
 // beat clock that plays a sound starts that much sooner, back on the music's
-// timeline; ones on song seconds (an explosion) stay with the picture.
+// timeline (ones on song seconds, an explosion, stay with the picture).
+// Practice's clicks are the mix's own, at the song's time (synth/timeline.h).
 
 #include "settings/latency.h"
 
+#include "content/song_speed.h"
 #include "dev/timing.h"
 #include "dta.h"
 #include "guest.h"
@@ -43,6 +45,7 @@
 #include <cmath>
 #include <cstring>
 #include <iostream>
+#include <optional>
 namespace gh2
 {
     namespace
@@ -55,9 +58,16 @@ namespace gh2
         const Addresses *s_addresses = nullptr;
         PS2Runtime::RecompiledFunction s_getSongMs = nullptr;
 
+        // Lateness is real time; the clock and the hit window count song
+        // time, which a song slowed to s moves only s ms of in each.
+        float songMs(int realMs)
+        {
+            return static_cast<float>(realMs) * static_cast<float>(song_speed::playing()) / 100.0f;
+        }
+
         float syncOffset()
         {
-            return -static_cast<float>(settings::get(settings::kVideoLagMs));
+            return -songMs(settings::get(settings::kVideoLagMs));
         }
 
         struct SetSyncOffsetTag;
@@ -73,14 +83,35 @@ namespace gh2
             store<float>(rdram, load<uint32_t>(rdram, s_addresses->theOptions) + kSyncOffset, syncOffset());
         }
 
+        // A PlayerMatcher's StreamEE: its BeatMatchAudio (+0x34), that's
+        // MasterAudio (+0x8), its stream (+0xC), as BeatMatchAudio::GetStream.
+        constexpr uint32_t kStreamState = 0x4cu, kStreamPlaying = 4u, kStreamPaused = 5u; // StreamEE's; 3 is ready
+        uint32_t songStream(uint8_t *rdram, uint32_t matcher)
+        {
+            return load<uint32_t>(rdram, load<uint32_t>(rdram, load<uint32_t>(rdram, matcher + 0x34u) + 0x8u) + 0xcu);
+        }
+
+        // The shift is taken up over this much song after its stream starts
+        // playing, from none: GamePanel::Poll starts a song still to start
+        // only once this is past -25 ms, so a section restarted from the
+        // song's very start (a jump to 0, no lead-in) with audio 25 ms later
+        // than video would wait there for ever; and the clock it holds never
+        // goes back, so taken up at once it would stand still that long.
+        constexpr float kShiftInMs = 1000.0f;
+        std::optional<float> s_playingFrom; // the clock as its stream started, before the shift
+
         void getSongMs(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
-            const uint32_t returnTo = GPR_U32(ctx, 31);
+            const uint32_t returnTo = GPR_U32(ctx, 31), matcher = GPR_U32(ctx, 4);
             timing::clockRead();
-            runtime->callGuestFunction(rdram, ctx, s_addresses->playerMatcherGetSongMs, {GPR_U32(ctx, 4)},
-                                       s_getSongMs);
-            ctx->f[0] += static_cast<float>(settings::get(settings::kVideoLagMs) -
-                                            settings::get(settings::kAudioLagMs));
+            runtime->callGuestFunction(rdram, ctx, s_addresses->playerMatcherGetSongMs, {matcher}, s_getSongMs);
+            const uint32_t state = load<uint32_t>(rdram, songStream(rdram, matcher) + kStreamState);
+            if (state != kStreamPlaying && state != kStreamPaused)
+                s_playingFrom.reset();
+            else if (!s_playingFrom)
+                s_playingFrom = ctx->f[0];
+            const float in = s_playingFrom ? std::clamp((ctx->f[0] - *s_playingFrom) / kShiftInMs, 0.0f, 1.0f) : 0.0f;
+            ctx->f[0] += in * songMs(settings::get(settings::kVideoLagMs) - settings::get(settings::kAudioLagMs));
             ctx->pc = returnTo;
         }
 
@@ -104,9 +135,24 @@ namespace gh2
             return false;
         }
 
+        // How many beats the song clock trails its music by: audio - video
+        // ms at the song's beats a second, 0 before it moves. TaskMgr's
+        // clocks are at [+0x28] + units * 0x14, now at +0xC and the last
+        // poll's at +0x10.
+        float lateBeats(uint8_t *rdram)
+        {
+            const uint32_t clocks = load<uint32_t>(rdram, s_addresses->theTaskMgr + 0x28u);
+            const uint32_t seconds = clocks, beats = clocks + 0x14u * kTaskBeats;
+            const float dBeat = load<float>(rdram, beats + 0xcu) - load<float>(rdram, beats + 0x10u);
+            const float dSec = load<float>(rdram, seconds + 0xcu) - load<float>(rdram, seconds + 0x10u);
+            if (dBeat <= 0.0f || dSec <= 0.0f)
+                return 0.0f;
+            const float lateS = songMs(settings::get(settings::kAudioLagMs) - settings::get(settings::kVideoLagMs)) / 1000.0f;
+            return lateS * dBeat / dSec;
+        }
+
         // TaskMgr::AddTask(task, units, delay), retail 0x2c6b18: the delay
-        // counts on the clock at [+0x28] + units * 0x14, now at +0xC and the
-        // last poll's at +0x10.
+        // counts on the clock at [+0x28] + units * 0x14.
         struct AddTaskTag;
         void onAddTask(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
         {
@@ -114,15 +160,7 @@ namespace gh2
             if (GPR_U32(ctx, 6) != kTaskBeats || load<uint32_t>(rdram, task) != s_addresses->scriptTaskVtable ||
                 !playsSound(rdram, load<uint32_t>(rdram, task + kScript)))
                 return;
-            const uint32_t clocks = load<uint32_t>(rdram, s_addresses->theTaskMgr + 0x28u);
-            const uint32_t seconds = clocks, beats = clocks + 0x14u * kTaskBeats;
-            const float dBeat = load<float>(rdram, beats + 0xcu) - load<float>(rdram, beats + 0x10u);
-            const float dSec = load<float>(rdram, seconds + 0xcu) - load<float>(rdram, seconds + 0x10u);
-            if (dBeat <= 0.0f || dSec <= 0.0f)
-                return;
-            const float lateS = static_cast<float>(settings::get(settings::kAudioLagMs) -
-                                                   settings::get(settings::kVideoLagMs)) / 1000.0f;
-            ctx->f[12] = std::max(0.0f, ctx->f[12] - lateS * dBeat / dSec);
+            ctx->f[12] = std::max(0.0f, ctx->f[12] - lateBeats(rdram));
         }
 
         // {latency get video|audio}, {latency set video|audio <ms>}: the value
@@ -168,6 +206,16 @@ namespace gh2
             }
             return {static_cast<uint32_t>(settings::get(key)), script::kInt};
         }
+    }
+
+    void pushSyncOffset(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        const uint32_t options = load<uint32_t>(rdram, s_addresses->theOptions);
+        if (options == 0u)
+            return;
+        const R5900Context saved = *ctx;
+        runtime->callGuestFunction(rdram, ctx, s_addresses->optionsSetSyncOffset, {options});
+        *ctx = saved;
     }
 
     void installLatency(PS2Runtime &runtime, const Addresses &addresses)

@@ -69,7 +69,7 @@ namespace gh2
         std::optional<Source> capture(SDL_Joystick *joy, const Snapshot &rest, bool whammy, bool &quit)
         {
             const auto start = Clock::now();
-            Capture caught(rest, whammy ? Capture::kAxisOnly : Capture::kAny);
+            Capture caught(rest, whammy ? Capture::kWhammy : Capture::kAny);
             while (Clock::now() - start < kSkipAfter)
             {
                 std::vector<SDL_Scancode> keys;

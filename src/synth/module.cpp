@@ -3,6 +3,8 @@
 #include "synth/adpcm.h"
 #include "synth/fixed.h"
 
+#include <signalsmith-stretch/signalsmith-stretch.h>
+
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -180,7 +182,60 @@ namespace gh2::synth
         int32_t voice = -1;
     };
 
-    Module::Module()
+    // Signalsmith Stretch at one-to-one, transposing: its latency padded to
+    // whole ticks, so what is heard is the marks that many ticks back, at
+    // the same frame of the tick. A transpose takes from the next spectrum
+    // it makes, whose input is centred its input latency back: each shift
+    // is taken up that long after the voice changed pitch.
+    struct Module::Shifter
+    {
+        Shifter()
+        {
+            stretch.presetDefault(2, float(Spu::kRate));
+            const int latency = stretch.inputLatency() + stretch.outputLatency();
+            ticks = (static_cast<size_t>(latency) + kTickFrames - 1u) / kTickFrames;
+            inputTicks = static_cast<size_t>(std::lround(double(stretch.inputLatency()) / kTickFrames));
+            pad = ticks * kTickFrames - static_cast<size_t>(latency);
+        }
+
+        void reset()
+        {
+            stretch.reset();
+            for (auto &d : delay)
+                d.assign(pad, 0.0f);
+        }
+
+        // `frames` of interleaved stereo, transposed by `shift`, into `out`.
+        void process(const float *side, float *out, size_t frames, double shift)
+        {
+            if (shift != transposed)
+                stretch.setTransposeFactor(float(transposed = shift));
+            for (size_t c = 0; c < 2u; ++c)
+            {
+                in[c].resize(frames);
+                shifted[c].resize(frames);
+                for (size_t f = 0; f < frames; ++f)
+                    in[c][f] = side[f * 2u + c];
+            }
+            float *ins[2] = {in[0].data(), in[1].data()}, *outs[2] = {shifted[0].data(), shifted[1].data()};
+            stretch.process(ins, static_cast<int>(frames), outs, static_cast<int>(frames));
+            for (size_t c = 0; c < 2u; ++c)
+            {
+                delay[c].insert(delay[c].end(), shifted[c].begin(), shifted[c].end());
+                for (size_t f = 0; f < frames; ++f)
+                    out[f * 2u + c] += delay[c][f];
+                delay[c].erase(delay[c].begin(), delay[c].begin() + static_cast<std::ptrdiff_t>(frames));
+            }
+        }
+
+        signalsmith::stretch::SignalsmithStretch<float> stretch;
+        size_t ticks = 0u, inputTicks = 0u, pad = 0u;
+        double transposed = 1.0;
+        std::vector<float> in[2], shifted[2], side;
+        std::deque<float> delay[2];
+    };
+
+    Module::Module() : m_shifter(std::make_unique<Shifter>())
     {
         reset();
     }
@@ -191,6 +246,8 @@ namespace gh2::synth
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         m_spu.reset();
+        m_timeline.clear();
+        m_timeline.setClock(std::nullopt);
         m_streams.clear();
         m_samples.clear();
         freeAllVoices();
@@ -205,6 +262,40 @@ namespace gh2::synth
         m_tickReplies.clear();
         m_sent.clear();
         m_framesToTick = 0;
+        m_shifting = false;
+        m_shifted = 0u;
+        m_marks.clear();
+    }
+
+    void Module::keepPitch(int32_t speed)
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_keptAt = speed;
+    }
+
+    double Module::heardBehind(uint32_t stream)
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if (!m_shifting)
+            return 0.0;
+        // Not yet played that long, or not yet taken up by a tick (its
+        // clock's first poll comes first): as if it had been, at its speed
+        // now.
+        const auto steady = [&](uint16_t pitch) { return double(m_shifter->ticks * kTickFrames) * pitch / Spu::kPitchOne; };
+        if (stream != m_shifted)
+        {
+            const Stream *s = this->stream(stream);
+            const auto clock = m_timeline.clock();
+            if (!s || !clock || clock->stream != stream || s->channels.empty() || s->channels[0].reference < 0)
+                return 0.0;
+            return steady(m_spu.pitch(static_cast<uint32_t>(s->channels[0].reference)));
+        }
+        if (m_marks.empty())
+            return 0.0;
+        const Mark &now = m_marks.back(), &heard = m_marks.front();
+        if (!heard.real)
+            return steady(now.pitch);
+        return now.samples - heard.samples;
     }
 
     Module::Stream *Module::stream(uint32_t id)
@@ -646,6 +737,24 @@ namespace gh2::synth
 
     // Streams -----------------------------------------------------------------
 
+    // A channel's pitch at `speed` (thousandths), times every stream's
+    // (playStreamsAt).
+    uint16_t Module::channelPitch(const Channel &ch, int32_t speed) const
+    {
+        return pitchFor(ch.rate, speed * m_streamSpeed / kSpeedOne);
+    }
+
+    void Module::playStreamsAt(int32_t speed)
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if (speed == m_streamSpeed)
+            return;
+        m_streamSpeed = speed;
+        for (auto &[id, s] : m_streams)
+            for (Channel &ch : s->channels)
+                setChannelSpeed(ch, ch.speed);
+    }
+
     // 0x2f68: a voice for the channel at `address`, set up and keyed on,
     // pitched without the slip speed.
     int32_t Module::keyChannel(Channel &ch, uint32_t address)
@@ -654,7 +763,7 @@ namespace gh2::synth
         if (v < 0)
             return -1;
         setVolumePan(v, ch.volume, ch.pan);
-        setPitch(v, pitchFor(ch.rate, ch.speed));
+        setPitch(v, channelPitch(ch, ch.speed));
         m_spu.setAdsr(static_cast<uint32_t>(v), ch.adsr1, ch.adsr2);
         m_spu.setStart(static_cast<uint32_t>(v), address);
         m_spu.setReverbSend(static_cast<uint32_t>(v), ch.fx);
@@ -690,14 +799,14 @@ namespace gh2::synth
             {
                 resume(ch.main);
                 setVolumePan(ch.main, ch.volume, ch.pan);
-                setPitch(ch.main, pitchFor(ch.rate, ch.speed * ch.slipSpeed / kSpeedOne));
+                setPitch(ch.main, channelPitch(ch, ch.speed * ch.slipSpeed / kSpeedOne));
                 m_spu.setReverbSend(static_cast<uint32_t>(ch.main), ch.fx);
             }
             if (ch.slip && ch.reference >= 0)
             {
                 resume(ch.reference);
                 setVolumePan(ch.reference, 0, 0);
-                setPitch(ch.reference, pitchFor(ch.rate, ch.speed));
+                setPitch(ch.reference, channelPitch(ch, ch.speed));
             }
         }
     }
@@ -722,9 +831,9 @@ namespace gh2::synth
         if (ch.state != kPlaying)
             return;
         if (ch.main >= 0)
-            setPitch(ch.main, pitchFor(ch.rate, ch.speed * ch.slipSpeed / kSpeedOne));
+            setPitch(ch.main, channelPitch(ch, ch.speed * ch.slipSpeed / kSpeedOne));
         if (ch.slip && ch.reference >= 0)
-            setPitch(ch.reference, pitchFor(ch.rate, ch.speed));
+            setPitch(ch.reference, channelPitch(ch, ch.speed));
     }
 
     // 0x3490: the heard voice re-keyed `offset` samples from where the
@@ -915,8 +1024,12 @@ namespace gh2::synth
 
         if (s.state >= kStreamReady && s.state <= kStreamPaused)
         {
+            // None once the first channel has played its data out: its read
+            // position stops there while the rest finish, and the song clock,
+            // held to it, would be pulled back the whole time.
             const uint32_t pos = s.channels.empty() || s.channels[0].reference < 0 ? 0u : position(s.channels[0]);
-            queue(kReplyStreamPosition, {s.id, pos});
+            if (s.channels.empty() || s.channels[0].state != kEnded)
+                queue(kReplyStreamPosition, {s.id, pos});
             // Slip offsets in samples, the heard voice against the reference
             // (0x3644), wrapped to half the ring either way. Taken only while
             // the heard voice plays inside the ring (0x2c54): one keyed on
@@ -1035,13 +1148,89 @@ namespace gh2::synth
             {
                 tick();
                 m_framesToTick = kTickFrames;
+                markSong();
             }
             const size_t n = std::min<size_t>(frames, m_framesToTick);
-            m_spu.mix(out, n);
+            if (m_shifting)
+            {
+                m_shifter->side.resize(n * 2u);
+                m_spu.mix(out, n, m_shifter->side.data(), m_diverted);
+                // The shift its input latency back; none yet: as before.
+                const Mark &by = m_marks[m_marks.size() - 1u - std::min(m_marks.size() - 1u, m_shifter->inputTicks)];
+                m_shifter->process(m_shifter->side.data(), out, n, by.shift > 0.0 ? by.shift : m_shifter->transposed);
+            }
+            else
+            {
+                m_spu.mix(out, n);
+            }
+            // What is heard now: the first mark held.
+            const Mark &heard = m_marks.front();
+            double ms = 0.0, msPerFrame = 0.0;
+            if (m_songClock && heard.pitch != 0u)
+            {
+                const double step = double(heard.pitch) / Spu::kPitchOne; // the stream's samples a frame
+                const double samples = heard.samples + double(m_songFrames) * step;
+                ms = samples * 1000.0 / m_songClock->rate + m_songClock->startMs;
+                msPerFrame = step * 1000.0 / m_songClock->rate;
+            }
+            m_timeline.mix(out, n, ms, msPerFrame);
+            m_songFrames += n;
             out += n * 2u;
             frames -= n;
             m_framesToTick -= static_cast<uint32_t>(n);
         }
+    }
+
+    // The timeline's stream, as the tick left it: its first channel's
+    // reference voice (the one the song clock follows, position) where it
+    // is, to the sample, standing while paused. Keeping pitch, its voices
+    // go through the shifter, from silence when it starts.
+    void Module::markSong()
+    {
+        m_songClock = m_timeline.clock();
+        m_songFrames = 0u;
+        // Paused, the song's stream has no clock (synth.cpp), but the one
+        // going through the shifter is kept while it is there, so a resume
+        // takes up the marks where they stood.
+        Stream *s = m_songClock && m_songClock->rate != 0u ? stream(m_songClock->stream)
+                    : m_shifted                         ? stream(m_shifted)
+                                                        : nullptr;
+        // The shifter runs all the while pitch is kept, on silence between
+        // streams, so a section gone round plays what it holds out at once
+        // and starts the next stream no later than the first.
+        if ((m_keptAt != 0) != m_shifting)
+        {
+            m_shifting = m_keptAt != 0;
+            m_shifter->reset();
+        }
+        const uint32_t shifted = s && m_shifting ? s->id : 0u;
+        if (shifted != m_shifted)
+        {
+            m_shifted = shifted;
+            m_marks.assign(shifted ? m_shifter->ticks : 0u, Mark{});
+        }
+        Mark mark;
+        m_diverted = 0u;
+        if (s && !s->channels.empty())
+        {
+            for (const Channel &ch : s->channels)
+                for (const int32_t v : {ch.main, ch.reference})
+                    if (v >= 0)
+                        m_diverted |= uint64_t(1u) << v;
+            const Channel &ch = s->channels[0];
+            if ((ch.state == kPlaying || ch.state == kPaused) && ch.reference >= 0)
+            {
+                const uint32_t voice = static_cast<uint32_t>(ch.reference);
+                mark.real = true;
+                mark.samples = double(position(ch)) * kAdpcmBlockSamples + m_spu.playedInBlock(voice);
+                mark.pitch = s->state == kStreamPlaying && ch.state == kPlaying ? m_spu.pitch(voice) : 0u;
+                if (m_keptAt != 0 && mark.pitch != 0u)
+                    mark.shift = double(pitchFor(ch.rate, m_keptAt)) / mark.pitch;
+            }
+        }
+        m_marks.push_back(mark);
+        while (m_marks.size() > (m_shifted ? m_shifter->ticks + 1u : 1u))
+            m_marks.pop_front();
     }
 
     // Positions, slip offsets and sample progress each overwrite what the

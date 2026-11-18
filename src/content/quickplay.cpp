@@ -3,11 +3,15 @@
 #include "content/campaigns.h"
 #include "content/games.h"
 #include "content/outfits.h"
+#include "content/setlists.h"
+#include "custom/cast.h"
+#include "custom/songs.h"
 #include "disc/ark.h"
 #include "formats/dtb.h"
 #include "gh2x/models.h"
 #include "guest.h"
 #include "hook.h"
+#include "save/save.h"
 #include "script.h"
 #include "settings/settings.h"
 
@@ -15,6 +19,7 @@
 #include "ps2_runtime_macros.h"
 
 #include <algorithm>
+#include <atomic>
 #include <iostream>
 #include <map>
 #include <string>
@@ -108,6 +113,23 @@ namespace gh2::quickplay
             ctx->pc = returnTo;
         }
 
+        // Campaign::IsVenueUnlockedQuickplay(Symbol) (0x12de88), which
+        // set_quickplay asks of a song's venue: open under the unlock-all
+        // cheat too, which retail leaves to a band's progress alone. With it
+        // on, quickplay has everything.
+        PS2Runtime::RecompiledFunction s_isVenueUnlocked = nullptr;
+        void isVenueUnlocked(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t returnTo = GPR_U32(ctx, 31);
+            uint32_t unlocked = 1u;
+            if (load<uint32_t>(rdram, GPR_U32(ctx, 4) + kAllAccess) == 0u)
+                unlocked = static_cast<uint32_t>(runtime->callGuestFunction(
+                    rdram, ctx, s_addresses->campaignIsVenueUnlockedQuickplay, {GPR_U32(ctx, 4), GPR_U32(ctx, 5)},
+                    s_isVenueUnlocked));
+            SET_GPR_U32(ctx, 2, unlocked);
+            ctx->pc = returnTo;
+        }
+
         // SelectGuitarProvider::InitData (0x119060) lists a player's
         // guitars: for the Grim Ripper (+0x3c) the scythe alone, else
         // quickplay's (Campaign::GetQuickplayGuitars, 0x12df48: config's of
@@ -118,14 +140,17 @@ namespace gh2::quickplay
         // band's items, which a guitar lent whole is not one of.
         constexpr uint32_t kProviderCharacter = 0x3cu, kProviderQuickplay = 0x40u;
         PS2Runtime::RecompiledFunction s_guitarsInitData = nullptr;
+        std::string configGuitars(uint8_t *rdram, bool free)
+        {
+            return std::string("{if {find_exists $syscfg guitars scythe type} {set_elem {find $syscfg guitars scythe type} 1 ") +
+                   (free ? "guitar" : "grim") + "}}\n" + (free ? campaigns::lendFinishes() : std::string()) +
+                   campaigns::ownFinishes(rdram);
+        }
         void guitarsInitData(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
             const uint32_t returnTo = GPR_U32(ctx, 31), provider = GPR_U32(ctx, 4), dir = GPR_U32(ctx, 5);
             const bool free = !campaigns::inCareer(rdram);
-            script::run(rdram, ctx, runtime,
-                        std::string("{if {find_exists $syscfg guitars scythe type} {set_elem {find $syscfg guitars scythe type} 1 ") +
-                            (free ? "guitar" : "grim") + "}}\n" + (free ? campaigns::lendFinishes() : std::string()) +
-                            campaigns::ownFinishes(rdram));
+            script::runKept(rdram, ctx, runtime, configGuitars(rdram, free));
             const uint32_t character = load<uint32_t>(rdram, provider + kProviderCharacter);
             const bool grim = free && character != 0u &&
                               std::string(reinterpret_cast<const char *>(getMemPtr(rdram, character))) == "grim";
@@ -147,6 +172,7 @@ namespace gh2::quickplay
         // which one serves it has changed. The panels are made once, with
         // the UI.
         constexpr uint32_t kPanelModels = 0x5cu, kCacheModelBytes = 0x1cu;
+        constexpr uint32_t kSetTypeDefSlot = 0x58u; // Hmx::Object's vtable
         std::vector<uint32_t> s_charPanels;
         struct ShowCharTag;
         void onShowChar(uint8_t *, R5900Context *ctx, PS2Runtime *)
@@ -183,9 +209,200 @@ namespace gh2::quickplay
         }
         void reloadGuitars(const script::Call &) { ++s_guitarsChanged; }
 
+        // An outfit to play outside a career, by the live config's name for
+        // it, with its character: the config's own and every other game's
+        // added (content/outfits.h), open once unlocked, or all of them
+        // under the unlock-all cheat, as the pickers have them.
+        struct Look
+        {
+            std::string character, outfit;
+            bool open;
+        };
+        std::vector<Look> looks(bool unlockAll)
+        {
+            std::vector<Look> out;
+            const std::string &activeGame = campaigns::active();
+            // The character must be unlocked too: a store sells some (GH1's
+            // Izzy, the Grim Ripper) but never their outfits. The Grim Ripper
+            // only through his own game's career, as the config has his
+            // scythe only then.
+            for (const auto &[character, characterOutfits] : campaigns::characters(activeGame))
+                for (const std::string &outfit : characterOutfits)
+                    out.push_back({character, outfit,
+                                   unlockAll || (anywhere(outfit) && (character == "grim" ? campaigns::unlockedIn(activeGame, character)
+                                                                                         : anywhere(character)))});
+            for (const outfits::Outfit &added : outfits::added())
+                if (added.game != activeGame)
+                    out.push_back({added.character, added.outfit,
+                                   unlockAll || (anywhere(added.outfit) && campaigns::unlockedIn(added.game, added.character))});
+            return out;
+        }
+
+        bool has(const std::vector<std::string> &list, const std::string &item)
+        {
+            return std::find(list.begin(), list.end(), item) != list.end();
+        }
+
+        // A guitar in one of `from`'s finishes of `guitars` that the song
+        // picks, as far along as `at` is (custom/cast.h's pickAlong), if
+        // unlocked; else none. With the 360's guitars preferred, only
+        // finishes it has a model of.
+        std::string openGuitar(const std::vector<campaigns::Finish> &from, const std::vector<std::string> &guitars,
+                               uint32_t seed, std::optional<double> at, bool unlockAll)
+        {
+            const bool hd = settings::hd(settings::kLookGuitars);
+            std::vector<const campaigns::Finish *> finishes;
+            for (const campaigns::Finish &f : from)
+                if (has(guitars, f.guitar) && (!hd || gh2xHasModel("char/og/guitars/gen/" + f.model + ".milo_ps2")))
+                    finishes.push_back(&f);
+            if (finishes.empty())
+                return "";
+            const campaigns::Finish &pick = *finishes[custom::pickAlong(seed, custom::kSaltFinish, finishes.size(), at)];
+            return unlockAll || campaigns::guitarUnlocked(pick.finish).value_or(false) ? pick.guitar + " " + pick.finish : "";
+        }
+
+        // A 360 song (x_<name>) cast by castSong, until the song list or the
+        // main menu shows again.
+        std::atomic<bool> s_nextGenSong{false};
+
+        // Recasts a song for song defaults after set_quickplay has cast it
+        // as songs.dta says: `song` from `game`'s setlist, `retail` its
+        // outfit there.
+        //
+        // A disc song keeps that cast, its guitarist under the name its
+        // game's outfit is added as; GH2's bonus songs (PS2 and 360) play the
+        // same guitarist's alternate outfit once unlocked (GH1's and the
+        // 80s' keep theirs).
+        //
+        // A custom song plays its guitarist in an outfit and its guitar in a
+        // finish, each picked by the song from every game's (custom/cast.h),
+        // where unlocked; else songs.dta's. The Grim Ripper plays his own
+        // game's scythe.
+        //
+        // Unlocked: a career has it, or the unlock-all cheat is on. With the
+        // 360's guitarists or guitars preferred, picks are only among those
+        // it has models of, so none is drawn as the PS2's.
+        void castSong(const script::Call &call)
+        {
+            const std::string song = call.symbol(2), game = call.symbol(3), retail = call.symbol(4);
+            s_nextGenSong = song.rfind("x_", 0) == 0u;
+            const std::string &activeGame = campaigns::active();
+            const auto liveName = [&](const std::string &outfit)
+            { return game == activeGame ? outfit : outfits::named(game, outfit).value_or(outfit); };
+            const uint32_t campaign = load<uint32_t>(call.rdram, s_addresses->theCampaign);
+            const bool unlockAll = campaign != 0u && load<uint32_t>(call.rdram, campaign + kAllAccess) != 0u;
+            const std::vector<Look> all = looks(unlockAll);
+            const auto isOpen = [&](const std::string &outfit)
+            { return std::any_of(all.begin(), all.end(), [&](const Look &look) { return look.open && look.outfit == outfit; }); };
+            const bool hdCharacters = settings::hd(settings::kLookCharacters);
+            // One of `choices` by `seed` if unlocked, else none.
+            const auto pickIfOpen = [&](std::vector<std::string> choices, uint32_t seed) -> std::string
+            {
+                if (hdCharacters)
+                    choices.erase(std::remove_if(choices.begin(), choices.end(),
+                                                 [](const std::string &o) { return !gh2xHasModel("char/" + o + "/"); }),
+                                  choices.end());
+                if (choices.empty())
+                    return "";
+                const std::string &pick = choices[custom::pickOf(seed, custom::kSaltOutfit, choices.size())];
+                return isOpen(pick) ? pick : "";
+            };
+
+            std::string outfit = liveName(retail), guitar;
+            const auto customSong = custom::catalog().find(song);
+            if (customSong)
+            {
+                const custom::Cast cast = custom::castOf(customSong->tags);
+                std::vector<std::string> characterOutfits;
+                for (const Look &look : all)
+                    if (look.character == cast.character)
+                        characterOutfits.push_back(look.outfit);
+                if (const std::string pick = pickIfOpen(characterOutfits, cast.seed); !pick.empty())
+                    outfit = pick;
+                if (cast.character == "grim" && outfit != retail)
+                {
+                    // Each Grim Ripper his own game's scythe, which comes with him.
+                    const auto origin = outfits::ownOf(outfit);
+                    guitar = "scythe " + campaigns::scytheOf(origin ? origin->first : activeGame);
+                }
+                else
+                    guitar = openGuitar(campaigns::finishes(), {cast.realGuitar}, cast.seed, std::nullopt, unlockAll);
+            }
+            else
+            {
+                if (game == "gh2" && (has(setlists::bonusSongs("gh2"), song) || has(setlists::bonusSongs("gh2x"), song)))
+                    for (const auto &[character, characterOutfits] : campaigns::characters("gh2"))
+                        if (has(characterOutfits, retail))
+                        {
+                            std::vector<std::string> alternates;
+                            for (const std::string &other : characterOutfits)
+                                if (other != retail)
+                                    alternates.push_back(liveName(other));
+                            if (const std::string pick = pickIfOpen(alternates, custom::seedOf(song)); !pick.empty())
+                                outfit = pick;
+                        }
+                // Ours alone for now (settings.ini, no menu): a disc song's
+                // guitar among its own game's real ones, cheapest first, a
+                // career song picking as far along as its tier is, a bonus
+                // song among all.
+                if (settings::get(settings::kDiscSongGuitars))
+                {
+                    const std::string setlist = setlists::shown();
+                    guitar = openGuitar(campaigns::finishesOf(setlist), custom::realGuitars(), custom::seedOf(song),
+                                        setlists::careerAt(setlist, song), unlockAll);
+                }
+            }
+            // A disc song's own guitarist plays locked or not, as on its disc
+            // (SetQuickplay asks no unlock of one), where the config has
+            // them: another game's outfit is in it only once that game's
+            // career has it (content/outfits.h). Else, and for a custom
+            // song, the one its game boots with.
+            if (!isOpen(outfit) && (customSong || outfits::ownOf(outfit)))
+                outfit = liveName(bootOutfit(game));
+
+            // Every game's finishes in the config first, as the guitar
+            // picker has them (guitarsInitData).
+            std::string text = configGuitars(call.rdram, true) + "{game set_character " + outfit + " TRUE}\n";
+            if (!guitar.empty())
+                text += "{game set_guitar " + guitar + "}\n";
+            script::run(call.rdram, call.ctx, call.runtime, text);
+        }
+
+        // {preview_load <panel>}: a CharsysPanel's models loaded on as its
+        // poll loads them (PollCharLoading), for one held loaded on no
+        // screen, once a screen had it up. Not its whole poll (Poll,
+        // 0x142110): that also sets the clock all previews animate by
+        // (0x2c6798 on 0x51ee40) from its own, and held another's figure in
+        // its bind pose.
+        script::Node previewLoad(const script::Call &call)
+        {
+            const uint32_t object = call.object(1);
+            if (object == 0u)
+                return {};
+            // Script finds its Hmx::Object; the panel's own `this` is where
+            // its SetTypeDef (CharsysPanel's, 0x141bf8) is called on, by the
+            // offset in that virtual's slot (script.cpp's setTypeDef).
+            const uint32_t vtable = load<uint32_t>(call.rdram, object);
+            const int16_t delta = load<int16_t>(call.rdram, vtable + kSetTypeDefSlot);
+            const uint32_t panel = object + static_cast<uint32_t>(static_cast<int32_t>(delta));
+            call.runtime->callGuestFunction(call.rdram, call.ctx, s_addresses->charsysPanelPollCharLoading, {panel});
+            return {};
+        }
+
         script::Node quickplayCommand(const script::Call &call)
         {
             const std::string op = call.symbol(1);
+            if (op == "cast" && call.size() > 4)
+            {
+                if (!campaigns::inCareer(call.rdram))
+                    castSong(call);
+                return {};
+            }
+            if (op == "next_gen_song" && call.size() > 2)
+            {
+                s_nextGenSong = call.number(2) != 0;
+                return {};
+            }
             if (op == "song_defaults")
             {
                 if (call.size() > 2)
@@ -261,19 +478,29 @@ namespace gh2::quickplay
                     return {(now ? 1u : 0u) | (now != was ? 2u : 0u), script::kInt};
                 }
             }
-            if (op == "outfit" && call.size() > 2)
+            // The theme's own guitarist, the outfit its game boots with: the
+            // one quickplay plays with none picked (quickplay_setup.dta).
+            if (op == "boot_outfit")
+                return {script::symbol(call.rdram, call.ctx, call.runtime, bootOutfit(campaigns::active())),
+                        script::kSymbol};
+            // The outfit picked is kept from run to run (the rest this run's
+            // alone): the guitarist the hub stands and the main menu loads
+            // ahead (preshow_guitarist.dta).
+            static const bool s_seeded = []
             {
-                // Another game's outfit is in the config under the name it was
-                // added with (content/outfits.h); the game played's, GH2's
-                // outside a career, its own.
-                const std::string game = call.symbol(2), own = bootOutfit(game);
-                const std::string outfit = game == campaigns::active() ? own : outfits::named(game, own).value_or(own);
-                return {script::symbol(call.rdram, call.ctx, call.runtime, outfit), script::kSymbol};
-            }
+                if (const std::string outfit = save::state("quickplay", "outfit"); !outfit.empty())
+                    s_picked["outfit"] = outfit;
+                return true;
+            }();
+            (void)s_seeded;
             if (op == "pick" && call.size() > 2)
             {
                 if (call.size() > 3)
+                {
                     s_picked[call.symbol(2)] = call.symbol(3);
+                    if (call.symbol(2) == "outfit")
+                        save::keepState("quickplay", "outfit", call.symbol(3));
+                }
                 const auto it = s_picked.find(call.symbol(2));
                 return {script::symbol(call.rdram, call.ctx, call.runtime, it != s_picked.end() ? it->second : ""),
                         script::kSymbol};
@@ -291,8 +518,10 @@ namespace gh2::quickplay
                     return {0u, script::kInt};
                 return {script::symbol(call.rdram, call.ctx, call.runtime, it->second), script::kSymbol};
             }
-            std::cerr << "[quickplay] usage: {quickplay song_defaults [<0|1>]}, {quickplay outfit <game>}, "
-                         "{quickplay pick|picked <what>}, {quickplay look <character> [<outfit>]}, "
+            std::cerr << "[quickplay] usage: {quickplay song_defaults [<0|1>]}, "
+                         "{quickplay cast <song> <game> <outfit>}, {quickplay next_gen_song 0}, "
+                         "{quickplay boot_outfit}, {quickplay pick|picked <what>}, "
+                         "{quickplay look <character> [<outfit>]}, "
                          "{quickplay in_song_ui [venue|gh1|gh2|gh80s]},"
                          "{quickplay menu_music [theme|gh1|gh2|gh80s|all]}, "
                          "{quickplay menu_music_order [playlist|loop|shuffle]}, "
@@ -302,14 +531,19 @@ namespace gh2::quickplay
         }
     }
 
+    bool nextGenSong() { return s_nextGenSong; }
+
     void install(PS2Runtime &runtime, const Addresses &addresses)
     {
         s_addresses = &addresses;
         script::addCommand("quickplay", quickplayCommand);
+        script::addCommand("preview_load", previewLoad);
         s_isItemUnlocked = runtime.lookupFunction(addresses.campaignIsItemUnlocked);
         runtime.replaceFunction(addresses.campaignIsItemUnlocked, &isItemUnlocked<false>);
         s_isItemUnlockedOn = runtime.lookupFunction(addresses.campaignIsItemUnlockedOn);
         runtime.replaceFunction(addresses.campaignIsItemUnlockedOn, &isItemUnlocked<true>);
+        s_isVenueUnlocked = runtime.lookupFunction(addresses.campaignIsVenueUnlockedQuickplay);
+        runtime.replaceFunction(addresses.campaignIsVenueUnlockedQuickplay, &isVenueUnlocked);
         s_guitarsInitData = runtime.lookupFunction(addresses.selectGuitarProviderInitData);
         runtime.replaceFunction(addresses.selectGuitarProviderInitData, &guitarsInitData);
         EntryHook<ShowCharTag>::install(runtime, addresses.charsysPanelShowChar, onShowChar);

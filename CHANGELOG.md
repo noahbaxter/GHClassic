@@ -1,5 +1,92 @@
 # Changelog
 
+## v0.9
+
+**THIS IS UNFINISHED.** Expect bugs, missing features and things changing between releases.
+
+This is the big one yall.
+
+### Custom songs
+- Point `[songs] folders = ` in settings.ini at your Clone Hero charts (sng or folders, `;` lets you include multiple folders) and they load as their own CUSTOM setlist in quickplay, multiplayer and Face-Off
+- Taps, opens, open chords, extended sustains, star power overlap, trills and tremolos, all still played with base GH1 or GH2 engine rules
+- Band, lighting and lip sync are generated from the chart, no authoring required
+- New sidebar with album art, previews, instrument icons and your best scores, plus their own unique high score tables
+
+### Practice and speedups
+- Play songs faster (or slower) in quickplay without changing the pitch, using best in class signalsmith timestretching, with bests kept per speed
+- Revamped practice mode for every song: select to restart instantly, faster section picking, metronome and note click for help with timing, automatic edrum backing tracks (if your chart has a drum part and stems), and a run evaluation display
+- Practice mode can now be reached from the pause menu or after failing a song
+
+### Player profiles
+- Keep all your best scores under a single name in quickplay or career, with saved lefty swap, note speed and highway length (more polish to come)
+- Profiles and Bands can now be renamed or deleted from their selection lists, so manage band has been removed
+- Press START to jump in
+
+### New
+- Faster menus, and background autosaves so no more "would you like to save?" prompts
+- Select menu inside quickplay to set speed, view high score tables, and pick a random song
+- Hold yellow on the custom song list to sort by various fields or quickly jump between sections
+- Whammy can now be bound to any controller button
+- Quickplay remembers your last played song and preferred character, guitar, and venue
+- Audio toggle to turn off song drops on missed notes
+- FC crowns now show on the results screen and breakdown too
+- GH1 songs now lip sync
+- It's now possible to view all bonus videos from any theme
+
+### Changes
+- Main menu opens on Quick Play instead of Training on startup
+- Gamepads under the GH1 engine play like GH1's DualShock, so holding a fret and pressing another replays them both
+- Scroll hold on song lists should speed up slightly faster
+- Faster startup so you're not stuck looking at a black window
+- Added black outline to purple streak digits to help readability
+
+### Bugs
+- HD highway's far end didn't fade out
+- Results breakdown would scroll with a jitter when holding up/down strum
+- A miss before the first note would indicate an FC run when it shouldn't have
+- GH1 loading poster now animates correctly
+- Keyboard menu prompts wouldn't appear after a controller is connected and used
+- Quickplay hub's row items would overlap the door frame when selected
+
+## v0.8.8
+
+### Bugs
+- Whammy did nothing when bound to a keyboard key
+
+## v0.8.7
+
+### New
+- Gamepads and keyboard once again have a dedicated set of controls for traversing menus separate from in game mappings. This was removed due to inconsistencies with how menus handled buttons but has been reimplemented by request. They can be rebound in input.ini under `[menu keyboard]` and `[menu gamepad]`
+
+|            | Keyboard     | Gamepad           |
+| ---------- | ------------ | ----------------- |
+| Move       | Arrows       | D-pad, left stick |
+| Select     | Space, Enter | A                 |
+| Back       | Esc          | B                 |
+| Yellow     | 3            | Y                 |
+| Blue       | 4            | X                 |
+| Orange     | 5            | LB                |
+| Start      | Tab          | Start             |
+| Star power | Shift        | Back              |
+
+- Pad mode autostrumming is now available as a keyboard controller option (asjkl players rejoice!)
+- Holding up/down now begins scrolling after about half a second rather than 2
+- VSync can now be turned off with `vsync = false` in settings.ini, which in tandem with `frame_rate_cap = 0` now truly means as many frames as your gpu can spit out (Hazzah!)
+
+### Bugs
+- A controller set to guitar mode now gives the proper button mappings expected (A B Y X LB) for a guitar input, this should allow guitars that auto-detect as xinput gamepads (CRKD) to function properly
+- Songs would sometimes freeze momentarily as their audio ended
+- Game timings would drift when frames run late
+
+## v0.8.6
+
+### New
+- Brought back calibration due to popular demand, right above separate video and audio latency controls
+
+### Bugs
+- Render engine issues on some AMD cards (fuck off black squares!)
+- Frame rate cap defaults to 60, as above 60 can stutter on some setups (existing installs: set `frame_rate_cap = 60` in settings.ini)
+
 ## v0.8.5
 
 **THIS IS UNFINISHED.** Expect bugs, missing features and things changing between releases.

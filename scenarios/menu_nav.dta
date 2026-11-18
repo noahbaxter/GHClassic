@@ -41,6 +41,8 @@
 (wait_screen audio_settings_screen)
 (wait 1)
 (press up)
+(expect {audio_settings_screen focus_name} miss.btn)
+(press up)
 (expect {audio_settings_screen focus_name} gs_stereo.btn)
 
 ; A song with GH1's screens around it: its Audio down and up, and its Video's
@@ -65,6 +67,8 @@
 (expect {pause_audio_settings_screen focus_name} gs_sfx.sld)
 (press up)
 (press up)
+(press up)
+(expect {pause_audio_settings_screen focus_name} miss.btn)
 (press up)
 (expect {pause_audio_settings_screen focus_name} gs_stereo.btn)
 {ui goto_screen pause_video_settings_screen}

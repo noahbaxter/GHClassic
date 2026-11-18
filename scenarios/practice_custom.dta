@@ -1,0 +1,99 @@
+; A custom song practiced from practice's own list (quickplay's, every
+; setlist): only its charted difficulties offered, then straight into the
+; whole song at practice's last speed, 90%, stretched to it and played to
+; its end on autoplay.
+(songs songs)
+#include common/first_boot.dta
+{latency set audio 110}
+{gamecfg set mode practice}
+{{game get_player_config 0} set_difficulty easy}
+{setlist select custom}
+{set $ghc_practice_pct 90}
+{ui goto_screen practice_selsong_screen}
+(wait_screen practice_selsong_screen)
+(wait 3)
+(shot song_list)
+; A custom song skips the part screen: Select's menu picks its part.
+(press green)
+(wait_screen practice_diff_screen)
+(wait 1)
+{{game get_player_config 0} set autoplay TRUE}
+; Easy and Expert only, as charted.
+(shot difficulties)
+(press down)
+(press green)
+(expect {game get_difficulty_sym 0} expert)
+(wait_screen practice_game_screen 60)
+; Its chart's own sections, named.
+(expect {custom section 0} "Intro")
+(expect {song_speed} 90)
+; Its one song.opus has no stem of its own: played whole, no clicks.
+(expect $ghc_practice_solo 0)
+(print {elem {find $syscfg songs {game get_song} song name} 1})
+; Past its start, where the clock eases to the music.
+(wait 4)
+{set $ghc_t0 {taskmgr ui_seconds}}
+{set $ghc_s0 {taskmgr seconds}}
+(wait 6)
+(expect {'/' {'-' {taskmgr seconds} $ghc_s0} {'-' {taskmgr ui_seconds} $ghc_t0}} 0.9 0.03)
+(shot playing)
+; Solo Stems is off on its page, unchecked though set, and does nothing.
+(press start)
+(wait_screen pract_pause_screen 10)
+{ui goto_screen ghc_practice_options_screen}
+(wait_screen ghc_practice_options_screen 10)
+(wait 0.5)
+(expect {practice_option solo_stems} 1)
+(expect {== {{ghc_practice_options_panel find widescreen.btn} get_state} kDisabled} 1)
+(expect {{ghc_practice_options_panel find widescreen.chk} get_check} 0)
+(shot no_stems)
+{ghc_practice_options_panel set_focus widescreen.btn}
+(press green)
+(wait 0.2)
+(expect {practice_option solo_stems} 1)
+(expect $ghc_practice_reload FALSE)
+(press start)
+(wait_screen practice_game_screen 10)
+(wait_until {> $ghc_practice_best 0} 120)
+(expect $ghc_practice_best 100)
+; Autoplay misses nothing and strums nothing stray: the crown.
+(expect $ghc_practice_fc 1)
+(wait 0.2)
+(expect {{practice_panel find ghc_crown.mesh} showing} 1)
+; Hit Percent's crown while this run is still one, from its first hit: none
+; just gone round, before any.
+(expect {player0 gems_hit} 0)
+(expect {{practice_panel find ghc_crown_live.mesh} showing} 0)
+(wait_until {> {player0 gems_hit} 0} 20)
+(wait 0.2)
+(expect {{practice_panel find ghc_crown_live.mesh} showing} 1)
+; A best is at its speed: another starts it over.
+{song_speed live 95}
+(wait 0.2)
+(expect $ghc_practice_best 0)
+(expect {{practice_panel find ghc_crown.mesh} showing} 0)
+; Gone round from the song's very start with audio 110 ms behind video: it
+; plays, and once its clock moves it never stands still, through the song's
+; start and the shift taken up (latency.cpp) and the clock pulled to the
+; music (synth.cpp): the least it moves a frame for 300 frames.
+(expect {latency get audio} 110)
+{func ghc_clock_watch
+   {do
+      ($t {taskmgr seconds})
+      {if {&& $ghc_moving {< {'-' $t $ghc_prev} $ghc_least}} {set $ghc_least {'-' $t $ghc_prev}}}
+      {if {&& {> $ghc_prev -99} {> $t $ghc_prev}} {set $ghc_moving TRUE}}
+      {if $ghc_moving {set $ghc_frames {'+' $ghc_frames 1}}}
+      {set $ghc_prev $t}
+      {> $ghc_frames 300}
+   }
+}
+{set $ghc_prev -100}
+{set $ghc_least 1}
+{set $ghc_frames 0}
+{set $ghc_moving FALSE}
+{ghc_practice_again}
+(wait_screen practice_game_screen 10)
+(wait_until {ghc_clock_watch} 10)
+(print "least a frame " $ghc_least)
+(expect {> $ghc_least 0.005} 1)
+(quit)

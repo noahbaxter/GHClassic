@@ -4,6 +4,8 @@
 
 #include "host/bindings.h"
 #include "host/capture.h"
+#include "host/layouts.h"
+#include "host/menu_layer.h"
 #include "host/profiles.h"
 #include "settings/settings.h"
 
@@ -85,6 +87,31 @@ int main()
     CHECK(label(device(0x1209, 0x2882, SDL_JOYSTICK_TYPE_GUITAR, SDL_GAMEPAD_TYPE_PS3)) == "guitar");
     CHECK(label(device(0x045e, 0x028e)) == "gamepad, GH2's joypad layout");
     CHECK(builtinProfile(device(0x045e, 0x028e))->gamepad);
+    // A guitar SDL takes for a pad is a guitar by its name (GitHub #3).
+    DeviceInfo lesPaul = device(0x3285, 0x0001, SDL_JOYSTICK_TYPE_GAMEPAD, SDL_GAMEPAD_TYPE_XBOX360);
+    lesPaul.name = "CRKD Les Paul Encore Edition";
+    CHECK(label(lesPaul) == "guitar (XInput)");
+    CHECK(!builtinProfile(lesPaul)->gamepad);
+    // Its frets are A B Y X LB, whammy the left trigger, star power Back or
+    // D-pad left (YARG's CRKD layouts).
+    CHECK(binds(lesPaul, kGreen, "pad a"));
+    CHECK(binds(lesPaul, kOrange, "pad leftshoulder"));
+    CHECK(binds(lesPaul, kWhammy, "pad axis lefttrigger 0.00 1.00"));
+    CHECK(binds(lesPaul, kStarPower, "pad back"));
+    CHECK(binds(lesPaul, kStarPower, "pad dpleft"));
+    CHECK(formatSource(guitarOnGamepad()[kStrumUp].front()) == "pad dpup");
+    // A joystick with no gamepad layout stays unbound, named or not.
+    DeviceInfo namedJoystick = lesPaul;
+    namedJoystick.gamepad = false;
+    CHECK(!builtinProfile(namedJoystick));
+    DeviceInfo pad = device(0x045e, 0x028e, SDL_JOYSTICK_TYPE_GAMEPAD, SDL_GAMEPAD_TYPE_XBOX360);
+    pad.name = "Xbox 360 Controller";
+    CHECK(builtinProfile(pad)->gamepad);
+    // A gamepad set to guitar plays by a guitar's layout, set to pad by its
+    // own, and a guitar is its own either way.
+    CHECK(builtinProfile(pad, DeviceKind::kGuitar)->profile[kWhammy].front().index == SDL_GAMEPAD_AXIS_LEFT_TRIGGER);
+    CHECK(builtinProfile(pad, DeviceKind::kGamepad)->profile[kWhammy].front().index == SDL_GAMEPAD_AXIS_LEFTY);
+    CHECK(builtinProfile(xplorer, DeviceKind::kGuitar)->label == "Xbox 360 Guitar Hero guitar");
     CHECK(!builtinProfile(device(0x12ba, 0x074b, SDL_JOYSTICK_TYPE_GUITAR)));
     DeviceInfo joystick = device(0x1234, 0x5678);
     joystick.gamepad = false;
@@ -289,6 +316,107 @@ int main()
         tilt.buttons[0] = true;
         CHECK(!c.feed(tilt));
         CHECK(c.feed(rest) && formatSource(*c.found()) == "button 0");
+    }
+
+    // The left stick as a menu's up or down is one press a push: its rebound
+    // after it is let go of (to 60% the same way) is not a second one, and a
+    // deliberate second push is.
+    {
+        const auto presses = [](std::initializer_list<float> path)
+        {
+            int count = 0;
+            bool held = false;
+            for (const float amount : path)
+            {
+                const bool now = stickHeld(amount, held);
+                count += now && !held;
+                held = now;
+            }
+            return count;
+        };
+        CHECK(presses({0.0f, 0.4f, 0.8f, 1.0f, 0.6f, 0.2f, 0.0f}) == 1);
+        CHECK(presses({0.0f, 1.0f, 0.1f, 0.6f, 0.2f, -0.1f, 0.5f, 0.0f}) == 1);
+        CHECK(presses({0.0f, 1.0f, 0.1f, 0.0f, 0.9f, 0.0f}) == 2);
+        CHECK(presses({0.0f, 0.6f, 0.4f, 0.6f, 0.0f}) == 0);
+    }
+
+    // Up held in a menu: one press at once, none more for the first 600 ms,
+    // (pad:: is gh2's, input.h)
+    // then a press every 90 ms, each with a gap of 35 ms where it lets go;
+    // let go, it starts over, and down counts apart from it.
+    {
+        NavRepeat nav;
+        int edges = 0;
+        bool was = false;
+        bool quietEarly = true;
+        for (uint64_t t = 0; t <= 2000; t += 5)
+        {
+            const bool on = navRepeat(gh2::pad::kUp, 1000 + t, nav) & gh2::pad::kUp;
+            edges += on && !was;
+            if (t < 600 && !on)
+                quietEarly = false;
+            was = on;
+        }
+        CHECK(quietEarly);
+        CHECK(edges >= 16 && edges <= 18); // 1 + 1 + (2000 - 635) / 90
+        CHECK(navRepeat(0, 5000, nav) == 0);
+        CHECK(navRepeat(gh2::pad::kUp, 5010, nav) == gh2::pad::kUp); // fresh again
+        CHECK(navRepeat(gh2::pad::kUp | gh2::pad::kDown, 5100, nav) == (gh2::pad::kUp | gh2::pad::kDown)); // down starts here
+        // 610 ms into up's hold, in its gap; 520 ms into down's, not yet repeating.
+        CHECK(navRepeat(gh2::pad::kUp | gh2::pad::kDown, 5620, nav) == gh2::pad::kDown);
+        CHECK(navRepeat(gh2::pad::kStart, 6000, nav) == gh2::pad::kStart); // nothing else is touched
+    }
+
+    // Esc pauses a song and backs out of a menu whatever is bound, so a line
+    // in input.ini binding it is ignored: green on Esc alone keeps its key,
+    // red on Esc and 2 keeps 2, and Tab, Enter and Space bind as any key.
+    {
+        const std::string path = bindingFilePath();
+        {
+            std::ofstream out(path, std::ios::trunc);
+            out << "[keyboard]\ngreen = key escape\nred = key escape, key 2\nyellow = key tab\nblue = key return\n";
+        }
+        loadLayouts();
+        const Profile &layout = keyboardLayout();
+        bool escape = false;
+        for (const std::vector<Source> &sources : layout)
+            for (const Source &s : sources)
+                escape = escape || (s.kind == Source::kKey && s.index == SDL_SCANCODE_ESCAPE);
+        CHECK(!escape);
+        CHECK(layout[kGreen].size() == 1 && formatSource(layout[kGreen][0]) == formatSource(keyboardProfile()[kGreen][0]));
+        CHECK(layout[kRed].size() == 1 && layout[kRed][0].index == SDL_SCANCODE_2);
+        CHECK(layout[kYellow].size() == 1 && layout[kYellow][0].index == SDL_SCANCODE_TAB);
+        CHECK(layout[kBlue].size() == 1 && layout[kBlue][0].index == SDL_SCANCODE_RETURN);
+        // A file with no menu sections gets both, their defaults as comments.
+        std::ifstream in(path);
+        const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        CHECK(text.find("[menu keyboard]\n; green = key Return, key Keypad Enter, key Space\n") != std::string::npos);
+        CHECK(text.find("[menu gamepad]\n; green = pad a\n") != std::string::npos);
+        CHECK(text.find("; star_power = pad back\n; tilt") == std::string::npos);
+        CHECK(text.find("; star_power = pad back\n") != std::string::npos);
+        CHECK(menuLayout(true)[kStart].size() == 1 && menuLayout(true)[kStart][0].index == SDL_SCANCODE_TAB);
+    }
+
+    // [menu keyboard] and [menu gamepad] rebind what a menu reads: a line
+    // takes over its action, an empty one unbinds it, one with no control of
+    // its kind keeps the default, and whammy is not a menu's.
+    {
+        const std::string path = bindingFilePath();
+        {
+            std::ofstream out(path, std::ios::trunc);
+            out << "[menu keyboard]\ngreen = key f\nred =\nblue = pad y\n"
+                   "[menu gamepad]\ngreen = pad y, key f\nstart = pad leftshoulder\nwhammy = pad axis lefty 0 -1\n";
+        }
+        loadLayouts();
+        const Profile &keys = menuLayout(true), &pad = menuLayout(false);
+        CHECK(keys[kGreen].size() == 1 && keys[kGreen][0].index == SDL_SCANCODE_F);
+        CHECK(keys[kRed].empty());
+        CHECK(keys[kBlue].size() == 1 && keys[kBlue][0].index == SDL_SCANCODE_4);
+        CHECK(keys[kStart].size() == 1 && keys[kStart][0].index == SDL_SCANCODE_TAB);
+        CHECK(pad[kGreen].size() == 1 && formatSource(pad[kGreen][0]) == "pad y");
+        CHECK(pad[kStart].size() == 1 && formatSource(pad[kStart][0]) == "pad leftshoulder");
+        CHECK(pad[kRed].size() == 1 && formatSource(pad[kRed][0]) == "pad b");
+        CHECK(pad[kWhammy].empty());
     }
 
     if (s_failed)

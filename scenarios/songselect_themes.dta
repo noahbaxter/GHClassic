@@ -1,0 +1,177 @@
+; Quickplay's song list under each theme's menus, on the theme's own setlist
+; and on custom songs: entered on either, and switched to the other and back
+; in place. Each shows in its own scene whatever the screen showed before:
+; custom songs' two-line rows and printout, the theme's one-line rows and no
+; printout. A theme switch goes through a screen with no panels, which lets
+; every panel go, so each theme's first entry loads afresh.
+(songs songs)
+#include common/first_boot.dta
+(needs gh1 gh80s)
+; gh2's menus.
+{set $ghc_switch gh2}
+{set $ghc_switch_next main_screen}
+{ui goto_screen ghc_switch_screen}
+(wait 2)
+(wait_screen main_screen)
+{gamecfg set mode quickplay}
+{setlist select gh2}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(expect {setlist shown} gh2)
+(shot gh2_1_disc_first)
+{qp_selsong_screen ghc_picked custom}
+(wait_screen qp_selsong_twin_screen)
+(wait 3)
+(expect {setlist shown} custom)
+(shot gh2_2_custom_switched)
+{qp_selsong_twin_screen ghc_picked gh2}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(expect {setlist shown} gh2)
+(shot gh2_3_disc_switched_back)
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+(wait 1)
+{gamecfg set mode quickplay}
+{setlist select custom}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(expect {setlist shown} custom)
+(shot gh2_4_custom_reentered)
+{ui goto_screen ghc_switch_screen}
+(wait 2)
+(wait_screen main_screen)
+{gamecfg set mode quickplay}
+{setlist select custom}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(expect {setlist shown} custom)
+(shot gh2_5_custom_first)
+{qp_selsong_screen ghc_picked gh2}
+(wait_screen qp_selsong_twin_screen)
+(wait 3)
+(expect {setlist shown} gh2)
+(shot gh2_6_disc_switched)
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+(wait 1)
+; gh1's menus.
+{set $ghc_switch gh1}
+{set $ghc_switch_next main_screen}
+{ui goto_screen ghc_switch_screen}
+(wait 2)
+(wait_screen main_screen)
+{gamecfg set mode quickplay}
+{setlist select gh1}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(expect {setlist shown} gh1)
+(shot gh1_1_disc_first)
+{qp_selsong_screen ghc_picked custom}
+(wait_screen qp_selsong_twin_screen)
+(wait 3)
+(expect {setlist shown} custom)
+(shot gh1_2_custom_switched)
+{qp_selsong_twin_screen ghc_picked gh1}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(expect {setlist shown} gh1)
+(shot gh1_3_disc_switched_back)
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+(wait 1)
+{gamecfg set mode quickplay}
+{setlist select custom}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(expect {setlist shown} custom)
+(shot gh1_4_custom_reentered)
+{ui goto_screen ghc_switch_screen}
+(wait 2)
+(wait_screen main_screen)
+{gamecfg set mode quickplay}
+{setlist select custom}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(expect {setlist shown} custom)
+(shot gh1_5_custom_first)
+{qp_selsong_screen ghc_picked gh1}
+(wait_screen qp_selsong_twin_screen)
+(wait 3)
+(expect {setlist shown} gh1)
+(shot gh1_6_disc_switched)
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+(wait 1)
+; The 80s' menus.
+{set $ghc_switch gh80s}
+{set $ghc_switch_next main_screen}
+{ui goto_screen ghc_switch_screen}
+(wait 2)
+(wait_screen main_screen)
+{gamecfg set mode quickplay}
+{setlist select gh80s}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(expect {setlist shown} gh80s)
+(shot gh80s_1_disc_first)
+{qp_selsong_screen ghc_picked custom}
+(wait_screen qp_selsong_twin_screen)
+(wait 3)
+(expect {setlist shown} custom)
+(shot gh80s_2_custom_switched)
+{qp_selsong_twin_screen ghc_picked gh80s}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(expect {setlist shown} gh80s)
+(shot gh80s_3_disc_switched_back)
+{ui goto_screen main_screen}
+(wait_screen main_screen)
+(wait 1)
+{gamecfg set mode quickplay}
+{setlist select custom}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(expect {setlist shown} custom)
+(shot gh80s_4_custom_reentered)
+; A song played from there and back: every panel let go as it loads.
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+{{game get_player_config 0} set autoplay TRUE}
+(press green)
+(wait_screen game_screen 60)
+(wait_screen endgame_screen 120)
+{ui goto_screen main_screen}
+(wait_screen main_screen 30)
+(wait 1)
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(expect {setlist shown} custom)
+(shot gh80s_4b_custom_after_song)
+{ui goto_screen ghc_switch_screen}
+(wait 2)
+(wait_screen main_screen)
+{gamecfg set mode quickplay}
+{setlist select custom}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(expect {setlist shown} custom)
+(shot gh80s_5_custom_first)
+{qp_selsong_screen ghc_picked gh80s}
+(wait_screen qp_selsong_twin_screen)
+(wait 3)
+(expect {setlist shown} gh80s)
+(shot gh80s_6_disc_switched)
+(quit)

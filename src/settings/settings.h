@@ -13,7 +13,8 @@ namespace gh2::settings
     enum Key
     {
         kWidescreen,
-        kFrameRateCap, // game frames per second, 0 for the display's rate
+        kFrameRateCap, // game frames per second, 0 for no cap; never above the display's rate with kVsync
+        kVsync,        // presents wait for the display's refresh (FIFO); off, they show at once and may tear
         kMipmaps,   // smaller copies for textures the game shipped without
         kMsaa,      // samples per pixel
         kRenderScale, // drawn at this percent of the window's size each way, then brought to it
@@ -24,6 +25,7 @@ namespace gh2::settings
         kGuitarVolume,
         kFxVolume,
         kStereo,
+        kMaintainPitch, // a song at another speed keeps its pitch (content/song_speed.h)
         kFastBoot,   // straight to the main menu, past the logos and splash
         kLefty,      // player 1's frets mirrored
         kLeftyP2,
@@ -31,8 +33,10 @@ namespace gh2::settings
         kExportCard, // each save also written to GHClassic.ps2, a PCSX2 card
         kTrackOnAtStart, // the player's track heard before its first hit
         kSustainReleaseMs, // a sustain let go this close to its end stays heard
+        kMissMute,   // a miss or a sustain let go early cuts the played part's track
         kWhammyHold, // a whammy bar held down bends every sustain
         kStrumLimit, // a strum within 52 ms of the last taken is dropped, as retail
+        kStarPowerOverlap, // a star phrase finished during star power adds to it
         kNoteStreak, // the streak counter under the score meter and its popups
         kSongProgress, // a bar under the rock meter filling as the song plays
         kUnlockAll,    // outside a career, every song, venue, guitarist and guitar open
@@ -58,6 +62,12 @@ namespace gh2::settings
         kLighting,   // kLastGen: the PS2's lighting wherever the 360's would be
         kPerfOverlay, // host/perf.h's Level: frame times in the picture's corner
         kVectorFonts, // text in the traced fonts drawn from their outlines (render/vector_fonts.h)
+        kSongFolders, // text: chart folders custom songs are read from, ';' between (custom/install.h)
+        kShowDuplicates, // every copy of a custom chart listed, not just the first by folder
+        kDiscSongGuitars, // song defaults give a disc song a guitar by how far into its career it is, not its own (no menu has it)
+        kPracticeMetronome, // practice clicks each beat, its bar's first another click (content/practice_sounds.h)
+        kPracticeNoteClick, // practice clicks each note as it reaches the strikeline
+        kPracticeSoloStems, // practice plays the part alone with drum clicks where it can, else the whole song
         kKeyCount,
     };
 
@@ -145,15 +155,19 @@ namespace gh2::settings
         bool nextGen = false;  // that career is the 360's
         bool gh2Venue = false; // the venue a song plays in is one of GH2's
         bool inVenue = false;  // a venue is drawn
+        bool nextGenSong = false; // a 360 song is up, played with song defaults: its venue (one of GH2's) and guitars are the 360's
     };
 
     int get(Key key);
+    // A text setting's words as written, empty when unset.
+    std::string text(Key key);
     // Whether that is the 360's now. A career is its own game's all through.
     // Outside one the models are the pickers' three, the lighting is the
     // venue's (the guitarist's or guitar's on a screen with no venue), and
     // the HUD's and menus' pictures, the same ones drawn larger, are the
-    // 360's wherever its disc is mounted. It can change from one song to
-    // the next.
+    // 360's wherever its disc is mounted; a 360 song played with song
+    // defaults has the 360's venue and guitars whatever the pickers say. It
+    // can change from one song to the next.
     bool hd(Look look);
     // Who says what is played. Until one is given, nothing is the 360's.
     void setPlaying(std::function<Playing()> now);

@@ -28,7 +28,13 @@ namespace gh2
         script::addCommand("quit_app", quitApp);
         // The main menu's version line (main_menu.dta).
         script::patchUi("{set $ghc_version \"" + build::shownVersion() + "\"}");
+        // The menus' rules (config/menus.toml), then what applies them.
+        script::patchUi(kMenuRulesDta);
+        script::patchUi(kSfxDta);
+        script::patchUi(kFretsDta);
         script::patchUi(kPickerDta);
+        // Before the screens that hold its panel (ui/players.h).
+        script::patchUi(kProfilesDta);
         script::patchUi(kMainMenuDta);
         script::patchUi(kHighscorePanelDta);
         script::patchUi(kSelCharacterDta);
@@ -48,6 +54,8 @@ namespace gh2
         locale::add("campaign_gh80s", "ROCKS THE 80S");
         locale::add("ghc_theme", "THEME");
         locale::add("ghc_setlist", "SETLIST");
+        locale::add("ghc_sort", "SORT");
+        locale::add("ghc_section", "SECTION");
         locale::add("ghc_map", "MAP");
         locale::add("ghc_hd", "HD");
         locale::add("ghc_sd", "SD");

@@ -1,0 +1,59 @@
+; Practice plays the part alone where it has a stem of its own, with drum
+; clicks from the chart's drums: a custom song with a guitar stem and a drum
+; chart has its backing at -96 dB and its clicks heard at 100%, the
+; backing back once the song is left. GH2's own song the same, its clicks
+; GH2's TRIGGERS. practice_custom has a song with no stem, played whole.
+(songs songs_stems)
+#include common/first_boot.dta
+; The clicks counted as the mix plays them, the metronome's and note
+; click's off.
+{practice_option metronome 0}
+{practice_option note_click 0}
+{gamecfg set mode practice}
+{setlist select custom}
+{ui goto_screen practice_selsong_screen}
+(wait_screen practice_selsong_screen)
+(wait 3)
+(press green)
+(wait_screen practice_diff_screen)
+(wait 1)
+{{game get_player_config 0} set autoplay TRUE}
+(press green)
+(wait_screen practice_game_screen 60)
+; Its chart has no sections: one each tenth of the song.
+(expect {custom section 0} "0%")
+(expect {custom section 9} "90%")
+{set $ghc_from {practice_clicks played}}
+(expect $ghc_practice_solo 1)
+(expect {elem {elem {find $syscfg songs {game get_song} song vols} 1} 0} -96.0)
+(expect {elem {elem {find $syscfg songs {game get_song} song vols} 1} 2} 0.0)
+(wait_until {> $ghc_practice_best 0} 120)
+; Four kicks, four snares, eight hi-hats: GH2's snare and hi-hat each a
+; left and a right sample.
+(expect {'-' {practice_clicks played} $ghc_from} 28)
+{ui goto_screen main_screen}
+(wait_screen main_screen 30)
+(expect $ghc_practice_solo 0)
+(expect {elem {elem {find $syscfg songs {game get_song} song vols} 1} 0} 0.0)
+
+{gamecfg set mode practice}
+{game set_song shoutatthedevil}
+{gamecfg set_track 0 0}
+{{game get_player_config 0} set_difficulty expert}
+{ghc_practice_whole}
+{ui goto_screen practice_loading_screen}
+(wait_screen practice_game_screen 60)
+(expect $ghc_practice_solo 1)
+(expect {elem {elem {find $syscfg songs shoutatthedevil song vols} 1} 0} -96.0)
+{set $ghc_from {practice_clicks played}}
+(wait 15)
+(expect {> {'-' {practice_clicks played} $ghc_from} 10} 1)
+; Its page's Solo Stems row is on.
+(press start)
+(wait_screen pract_pause_screen 10)
+{ui goto_screen ghc_practice_options_screen}
+(wait_screen ghc_practice_options_screen 10)
+(wait 0.5)
+(expect {== {{ghc_practice_options_panel find widescreen.btn} get_state} kDisabled} 0)
+(expect {{ghc_practice_options_panel find widescreen.chk} get_check} 1)
+(quit)

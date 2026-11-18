@@ -65,15 +65,20 @@ namespace gh2
     void lockSeats(bool locked);
     // Practice's song is up, holding the seats as a venue's song does.
     void practicing(bool on);
+    // The keyboard's left and right arrows pressed as practice plays since
+    // last taken, right +1 and left -1 each. Callable from any thread.
+    int takePracticeSteps();
     // Which screen of a song is up: in one playing, the keyboard's menu
     // keys would be a guitar's frets and strums, so only its Esc works,
-    // as Start; in its pause menu Esc is Start too, to resume. Callable
-    // from any thread.
+    // as Start; in its pause menu Esc is Start too, to resume. The results'
+    // breakdown scrolls while up or down is held, so they stay held there,
+    // not stepped as a menu's. Callable from any thread.
     enum class SongScreen
     {
         kOther,
         kPlaying,
         kPaused,
+        kBreakdown,
     };
     void songScreen(SongScreen screen);
 
@@ -84,6 +89,10 @@ namespace gh2
     // bits, and raw buttons by number. Callable from any thread.
     void addScriptedDevice(const std::string &name);
     void removeScriptedDevice(const std::string &name); // unplugged
+    // A scenario's menu binding, as a line of [menu keyboard] or
+    // [menu gamepad] has it ("key F", "pad y, pad b"), for this run alone.
+    // Callable from any thread; the next poll sets it.
+    void bindScriptedMenu(bool keyboard, const std::string &action, const std::string &sources);
     void setScriptedDevice(const std::string &name, uint16_t pressed, const std::vector<int> &buttons = {});
     // A scenario's controller plugged into SDL as a real one shows up: a
     // virtual joystick with that USB vendor and product and SDL joystick
@@ -113,13 +122,41 @@ namespace gh2
     // What a player is shown for it: its guitar's layout ("Wii guitar
     // (raphnet)"), else its name; "" for none. Callable from any thread.
     std::string seatLabel(int seat);
+    // Who holds it, as input.ini's [seats] has it (DeviceId::text), while
+    // away too; the keyboard for P1 with no controller, else "". Callable
+    // from any thread.
+    std::string seatDevice(int seat);
+    // A seat's player moved to another device in it, as seatDevice names
+    // each: one controller taking a lone P1 from another, or from the
+    // keyboard standing in. Each once, oldest first. Callable from any
+    // thread.
+    struct Handover
+    {
+        std::string from, to;
+    };
+    std::vector<Handover> takeHandovers();
+    // Whether it plays in pad mode, a gamepad's (as HostPad::joypad, but
+    // outside a song too). Callable from any thread.
+    bool seatPad(int seat);
 
     // Whether Multiplayer's screen is up, where a controller joins with
     // Start and yellow moves a player up a seat. Callable from any thread.
     void setPlayersStep(bool on);
+    // Whether the main menu is up, where Start on a controller with no seat
+    // joins the next free one (Seats::seat). Callable from any thread.
+    void setMenuJoins(bool on);
     // How many times P1 and P2 have traded places, by yellow there or by
     // P2 moving up when P1's controller is let go. Callable from any thread.
     uint32_t seatTrades();
+    // A player's profile menu is up (ui/players.h): no controller takes,
+    // leaves or trades a seat until it shuts. Callable from any thread.
+    void holdSeats(bool held);
+    // That seat's player dropped out, at the next poll. Callable from any
+    // thread.
+    void dropSeat(int seat);
+    // How many times a controller's Start has taken a seat, which the game
+    // never sees. Callable from any thread.
+    uint32_t startSeats();
 
     // The free camera's controls (ui/photo_mode.h): W A S D as how far it
     // is pushed right and forward, -1 to 1, the mouse's travel in pixels,

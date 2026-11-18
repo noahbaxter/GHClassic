@@ -14,6 +14,7 @@
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
 #include "render/camera.h"
+#include "render/draw_hue.h"
 #include "render/frame.h"
 #include "render/look.h"
 #include "render/mesh_capture.h"
@@ -29,6 +30,7 @@ namespace gh2
     namespace
     {
         const Addresses *s_addresses = nullptr;
+        std::vector<MeshRider> s_riders;
 
         // The name of the Hmx::Object an object's first word points to.
         std::string objectName(uint8_t *rdram, uint32_t address)
@@ -98,6 +100,7 @@ namespace gh2
                 draw.material = readMaterial(rdram, mat);
                 if (draw.material.texGen == milo::mat::kTexGenSphere)
                     readSphereRows(rdram, ctx, runtime, *s_addresses, mat, draw.material);
+                turnMaterial(draw.material);
                 building().draws.push_back(draw);
             }
         }
@@ -246,6 +249,18 @@ namespace gh2
                     if (frame.lit >= 0 && static_cast<size_t>(frame.lit) < frame.shadows.size())
                         draw.shadow = static_cast<uint32_t>(frame.lit) + 1u;
                     pushPasses(rdram, ctx, runtime, mesh, draw);
+                    if (!s_riders.empty())
+                    {
+                        std::vector<std::shared_ptr<const MeshData>> more;
+                        const auto geometry = draw.mesh;
+                        for (const MeshRider rider : s_riders)
+                            rider(rdram, mesh, *geometry, more);
+                        for (auto &extra : more)
+                        {
+                            draw.mesh = std::move(extra);
+                            pushPasses(rdram, ctx, runtime, mesh, draw);
+                        }
+                    }
                 }
             }
             ctx->pc = returnTo;
@@ -301,4 +316,6 @@ namespace gh2
         runtime.replaceFunction(addresses.psMeshDrawShowing, drawShowing);
         runtime.replaceFunction(addresses.psMultiMeshDrawShowing, drawMultiShowing);
     }
+
+    void addMeshRider(MeshRider rider) { s_riders.push_back(rider); }
 }
