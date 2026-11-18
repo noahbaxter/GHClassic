@@ -8,7 +8,7 @@ namespace gh2
     void readHacks();
 
     // Each hack mounted (content/games.h) as a campaign and a quickplay
-    // setlist of its own, never a theme. After ark::install, which indexes
-    // the discs.
+    // setlist of its own, and a theme after the official games'
+    // (main_menu.dta). After ark::install, which indexes the discs.
     void installHacks();
 }

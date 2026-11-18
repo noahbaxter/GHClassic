@@ -46,6 +46,20 @@
       ; at the top right corner, above the poster's tape.
       (version_x 290)
       (version_z 245)
+      ; Whose of those the menu's art is: a hack's menu is GH2's or the
+      ; 80s' redrawn, told apart by how far apart its rows are.
+      (look
+         {do
+            ($game {campaigns active})
+            ($cx 0) ($cy 0) ($cz 0) ($mx 0) ($my 0) ($mz 0)
+            {if {! {find_exists [quit_size] $game}}
+               {main_career.btn get_local_pos $cx $cy $cz}
+               {main_multiplayer.btn get_local_pos $mx $my $mz}
+               {set $game {if_else {> {abs {'-' $cz $mz}} 46} gh80s gh2}}
+            }
+            $game
+         }
+      )
       (enter
          {$this add_quit}
          {$this add_version}
@@ -68,12 +82,12 @@
             {do
                ($ox 0) ($oy 0) ($oz 0)
                ($group {main_options.btn get trans_parent})
-               ($k {elem {elem {find [menu_shrink] {campaigns active}} 1} 0})
-               ($pivot {elem {elem {find [menu_shrink] {campaigns active}} 1} 1})
-               ($dq {elem {find [quit_place] {campaigns active}} 1})
+               ($k {elem {elem {find [menu_shrink] {$this look}} 1} 0})
+               ($pivot {elem {elem {find [menu_shrink] {$this look}} 1} 1})
+               ($dq {elem {find [quit_place] {$this look}} 1})
                ($gx 0) ($gy 0) ($gz 0) ($cx 0) ($cy 0) ($cz 0) ($sx 1) ($sy 1) ($sz 1)
-               ($w {elem {elem {find [quit_size] {campaigns active}} 1} 0})
-               ($h {elem {elem {find [quit_size] {campaigns active}} 1} 1})
+               ($w {elem {elem {find [quit_size] {$this look}} 1} 0})
+               ($h {elem {elem {find [quit_size] {$this look}} 1} 1})
                {if {!= $k 1}
                   {$group get_local_pos $gx $gy $gz}
                   {if_else {== $pivot quit}
@@ -92,7 +106,7 @@
                   ; Its own scale and place kept: the pivot stays where it is.
                   {$group set_local_pos
                      {'+' $gx {'*' {'-' 1 $k} {'*' $sx $cx}}} $gy
-                     {'+' {'+' $gz {'*' {'-' 1 $k} {'*' $sz $cz}}} {elem {find [menu_lift] {campaigns active}} 1}}}
+                     {'+' {'+' $gz {'*' {'-' 1 $k} {'*' $sz $cz}}} {elem {find [menu_lift] {$this look}} 1}}}
                }
                {new {main_options.btn class_name} quit.btn}
                {quit.btn copy main_options.btn 0}
@@ -102,7 +116,7 @@
                {new Group quit.grp}
                {quit.grp set trans_parent $group}
                {do
-                  ($d {elem {find [quit_place] {campaigns active}} 1})
+                  ($d {elem {find [quit_place] {$this look}} 1})
                   {quit.grp set_local_pos {'+' $ox {elem $d 0}} $oy {'+' $oz {elem $d 1}}}
                }
                {quit.grp set_local_scale $w 1 $h}
@@ -212,8 +226,9 @@
    )
 }
 ; The games whose menus these can turn into: those with a campaign
-; ({campaigns}, content/campaigns.h). The 360's songs have no menus of
-; their own, so its campaign is not one of these.
+; ({campaigns}, content/campaigns.h), the official ones, then the hacks'
+; ({hacks}, content/games.h). The 360's songs have no menus of their own,
+; so its campaign is not one of these.
 {func ghc_themes
    {do
       ($themes)
@@ -222,12 +237,18 @@
       {foreach $game (gh1 gh2 gh80s)
          {if {campaigns has $game} {push_back $themes $game}}
       }
+      {foreach $game {hacks} {push_back $themes $game}}
       $themes
    }
 }
+; Where the hacks start in that list.
+{func ghc_first_hack_theme
+   {'-' {size {ghc_themes}} {size {hacks}}}
+}
 ; The main screen, as the game's own but for fade_panel, which Quit fades
 ; through, and for yellow: held, it lists those games (picker.dta), and the
-; one picked becomes the theme, its menus and music, back on this screen.
+; one picked becomes the theme, its menus and music, back on this screen. A
+; line parts the hacks from the official games.
 {retype main_screen
    (
       (panels meta main_panel helpbar ghc_pick_panel fade_panel)
@@ -255,6 +276,7 @@
          {cond
             ({ghc_pick_button $button} TRUE)
             ({&& {== $button kPad_Circle} {> {size {ghc_themes}} 1} {! {ui in_transition}}}
+               {ghc_pick_panel set divide {ghc_first_hack_theme}}
                {ghc_pick_panel open_with {ghc_themes} {campaigns active}}
                TRUE
             )

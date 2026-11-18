@@ -1,0 +1,27 @@
+; The main menu's themes list the hacks after the official games, a line
+; between (main_menu.dta), and one picked puts up its own menus.
+(needs ghce00020)
+#include common/first_boot.dta
+(wait 1)
+; Yellow and the strum are libpad's 0x1000 and 0x40.
+(hold 4096)
+(wait 1)
+(expect {ghc_pick_panel get divide} {'-' {size {ghc_themes}} {size {hacks}}})
+(shot themes)
+; From GH2's, past the 80s, to the first hack.
+(hold 4160)
+(wait 0.3)
+(hold 4096)
+(wait 0.3)
+(hold 4160)
+(wait 0.3)
+(hold 4096)
+(wait 1)
+(shot themes_hack)
+(hold 0)
+(wait 4)
+(wait_screen main_screen 40)
+(expect {campaigns active} {elem {hacks} 0})
+{set $hack ghce00020}
+#include common/hack_theme.dta
+(quit)

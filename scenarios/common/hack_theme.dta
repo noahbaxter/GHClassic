@@ -1,0 +1,30 @@
+; $hack's menus as the theme, from GH2's main menu: its main menu, options
+; and credits, then quickplay's setlist and back.
+{set $ghc_switch $hack}
+{set $ghc_switch_next main_screen}
+{set $ghc_switch_as menus}
+{ui goto_screen ghc_switch_screen}
+(wait 3)
+(wait_screen main_screen 40)
+(expect {campaigns active} $hack)
+(expect {campaigns live} gh2)
+(wait 2)
+(shot main)
+{ui goto_screen options_screen}
+(wait_screen options_screen)
+(wait 1.5)
+(shot options)
+{ui goto_screen credits_screen}
+(wait_screen credits_screen)
+(wait 3)
+(shot credits)
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen 40)
+(wait 2)
+(shot quickplay)
+{ui goto_screen main_screen}
+(wait_screen main_screen 40)
+(wait 1)
+(expect {campaigns active} $hack)
+(shot main_again)

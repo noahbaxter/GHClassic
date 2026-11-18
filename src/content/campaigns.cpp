@@ -558,8 +558,8 @@ namespace gh2::campaigns
             syncConfig(guest, s_campaigns[from], kMetaMusic);
             if (s_career || pick != settings::kMusicAll)
                 return;
-            // The 360's are GH2's, each loop once. A hack's are its career's
-            // alone: it is no theme (hacks/install.h).
+            // The 360's are GH2's, each loop once. A hack's play only under
+            // its own menus: every game's is the official games'.
             std::set<std::string> listed(musicOf(from).begin(), musicOf(from).end());
             const std::vector<std::string> hacks = games::hacks();
             std::string text = "{do ($m {find $syscfg synth metamusic})";

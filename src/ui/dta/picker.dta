@@ -2,8 +2,9 @@
 ; screen, the strum steps through it, and letting go picks. It is the help
 ; bar's own text (helpbar.milo, loaded here a second time) on a round-ended
 ; box (box.dta) as wide as its text and as tall as its rows, with a lighter
-; one behind the row picked and a faint one behind the row it opened on. A
-; list longer than its rows scrolls under them.
+; one behind the row picked and a faint one behind the row it opened on,
+; and a line between two groups where it is given one. A list longer than
+; its rows scrolls under them.
 ;
 ; A screen with this among its panels sends its presses here first
 ; ({ghc_pick_button}), opens it on yellow ({ghc_pick_panel open_with}), and
@@ -30,7 +31,7 @@
       ; The list's box, a fainter fill on the row it opened on (what is on
       ; now) and the picked row's fill (box.dta), each with its colour, how
       ; much it hides, and where it draws among the scene's.
-      (boxes ((pick_bg 0 0 0 0.875 0) (pick_mark 1 1 1 0.1 1) (pick_fill 1 1 1 0.25 1)))
+      (boxes ((pick_bg 0 0 0 0.875 0) (pick_mark 1 1 1 0.1 1) (pick_fill 1 1 1 0.25 1) (pick_rule 1 1 1 0.4 1)))
       ; How wide the box's round ends are, outside its text's room.
       (end 8)
       (options ())
@@ -40,6 +41,9 @@
       (top 0)
       (open FALSE)
       (sticky FALSE)
+      ; The option a line goes above, the first of a second group: none
+      ; at 0. Set before opening, and back to 0 as it shuts.
+      (divide 0)
       ; open_held's: the fret held, whether the screen names the rows, its
       ; messages for a row's text, the pick and a tap (none for none),
       ; whether it shows yet, and the polls it waits to.
@@ -219,6 +223,14 @@
             }
             {ghc_box_show $this pick_mark FALSE}
          }
+         {if_else {&& {> [divide] [top]} {< [divide] {'+' [top] {$this visible}}}}
+            {do
+               {$this stretch pick_rule {'+' {$this row_z {'-' [divide] [top]}} {/ [height] 2.0}} 2 0}
+               {pick_rule_left.mesh set_showing FALSE}
+               {pick_rule_right.mesh set_showing FALSE}
+            }
+            {ghc_box_show $this pick_rule FALSE}
+         }
       )
       ; Up or down the list, round its ends, the rows scrolled to keep it in
       ; them.
@@ -235,6 +247,7 @@
          {foreach $box [boxes] {ghc_box_show $this {elem $box 0} FALSE}}
          {set [open] FALSE}
          {set [sticky] FALSE}
+         {set [divide] 0}
          {set [held] yellow}
          {set [labelled] FALSE}
          {set [text_msg] ghc_option_text}
