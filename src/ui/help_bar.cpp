@@ -361,7 +361,9 @@ namespace gh2
             // engine's ring, ghc_ring_<game>_<seat>.mesh, in that seat's
             // colour from that game's menus (ui/seat_colors.h), the colour in
             // its verts as the engine's is (a Mat's colour does not reach a
-            // prelit mesh), on the white box's Mat with no picture.
+            // prelit mesh), on the white box's Mat with no picture. Each is
+            // hidden, only copied from: a panel on its own helpbar.milo that
+            // syncs its objects (shared/picker.dta) draws all that show.
             const milo::Bytes *like = body("Mesh", "help_box_mid.mesh"), *white = body("Mat", "ghc_box_mid.mat");
             if (like && white && !body("Mat", "ghc_ring.mat"))
             {
@@ -372,14 +374,16 @@ namespace gh2
                     for (size_t seat = 0; seat < c.seats.size(); ++seat)
                     {
                         const std::string name = std::string("ghc_ring_") + c.game + "_" + std::to_string(seat) + ".mesh";
-                        if (const auto ring = poster_meshes::meshBody(*like, "help_box_mid.mat", poster_meshes::ring(), name,
-                                                                      "ghc_ring.mat", nullptr, c.seats[seat]))
+                        if (auto ring = poster_meshes::meshBody(*like, "help_box_mid.mat", poster_meshes::ring(), name,
+                                                                "ghc_ring.mat", nullptr, c.seats[seat]);
+                            ring && poster_meshes::hide(*ring, "ghc_ring.mat"))
                             milo::add(*dir, "Mesh", name, *ring);
                     }
                 // A black disc to go behind a ring where it stands on a
                 // picture (profiles.dta's poster).
-                if (const auto disc = poster_meshes::meshBody(*like, "help_box_mid.mat", poster_meshes::ring(0.0f),
-                                                              "ghc_disc.mesh", "ghc_ring.mat", nullptr, {0.0f, 0.0f, 0.0f}))
+                if (auto disc = poster_meshes::meshBody(*like, "help_box_mid.mat", poster_meshes::ring(0.0f),
+                                                        "ghc_disc.mesh", "ghc_ring.mat", nullptr, {0.0f, 0.0f, 0.0f});
+                    disc && poster_meshes::hide(*disc, "ghc_ring.mat"))
                     milo::add(*dir, "Mesh", "ghc_disc.mesh", *disc);
             }
             ark::addFile(path, milo::write(*dir));

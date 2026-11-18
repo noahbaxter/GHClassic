@@ -73,6 +73,15 @@ namespace gh2::poster_meshes
         return out;
     }
 
+    bool hide(milo::Bytes &body, const std::string &mat)
+    {
+        const auto at = stringAt(body, mat);
+        if (!at || *at < 25u || milo::u32(body, *at - 25u) != 3u || milo::u32(body, *at - 20u) != 0u)
+            return false;
+        body[*at - 21u] = 0u;
+        return true;
+    }
+
     Mesh quad(float halfWide, float halfHigh, float u0, float u1)
     {
         Mesh out;

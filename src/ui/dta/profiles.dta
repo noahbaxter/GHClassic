@@ -63,9 +63,6 @@
       ($t {$e_dir find $e_tag})
       ($on {>= $e_seat 0})
       ($across 0)
-      {$r set_showing $on}
-      {$d set_showing $on}
-      {$t set_showing $on}
       {if $on
          {do
             ($parent {$r get trans_parent})
@@ -94,6 +91,10 @@
                {'+' {'+' $e_x {/ $across 2.0}} {'*' {elem (-0.4 -1 -0.95 -1) {mod $e_seat 4}} $e_size}} 0 $e_z}
          }
       }
+      ; After the copies, which bring their hidden templates' showing.
+      {$r set_showing $on}
+      {$d set_showing $on}
+      {$t set_showing $on}
       $across
    }
 }
