@@ -14,7 +14,9 @@
 - Fully playable campaigns for Guitar Hero, Guitar Hero 2 (both on PS2 and Xbox 360) and GH80s
 - Swap between the note engine of GH2, or GH1 if you really hate yourself
 - Quickplay mixing featuring every song from every game, for every character skin, with every guitar, in every venue
-- Local multiplayer
+- Custom songs from Clone Hero charts, with taps, opens, extended sustains and a generated band and venue
+- Practice mode and song speedups for every song
+- Player profiles and local multiplayer
 - Custom Vulkan rendering engine lets you play with the PS2's original look, the Xbox 360's, or anything in between
 - Any resolution, uncapped frame rate, plus MSAA, TAA, and mipmaps
 - Modern QOL improvements like note streaks, custom note speed and highway lengths, independent A/V sync, and more!
@@ -47,7 +49,9 @@ Everything GHC needs is stored in one folder. Windows and Linux are portable ins
 | `PUT_DISC_HERE/` | Your disc images                          |
 | `settings.ini`   | Every setting, includes some not in menus |
 | `input.ini`      | Controller bindings                       |
-| `save.bin`       | All bands progress                        |
+| `save.bin`       | Profiles, scores and every band's progress |
+| `state.ini`      | Last picked song, setlist and menus       |
+| `songs/`         | Custom song index, and `badsongs.txt` listing charts that failed to load |
 | `GHClassic.log`  | The last session's log, for bug reports   |
 
 ## Controls
