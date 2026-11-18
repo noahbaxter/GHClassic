@@ -2,6 +2,8 @@
 ; Space pick, Esc backs out, the arrows move. Its green (1) is a fret, so it
 ; picks nothing there.
 #include common/first_boot.dta
+; From Training, a row above Options (the menu opens on Quick Play).
+{main_panel set_focus {main_panel find main_tutorial.btn}}
 (key Down)
 (expect {seat_has 0 keyboard} 1)
 (expect {main_screen focus_name} main_options.btn)

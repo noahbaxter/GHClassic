@@ -16,6 +16,11 @@
 {sel_character_panel set char_focus metal}
 {sel_character_panel find_outfits}
 (expect {size {sel_character_panel get outfits}} 1)
+; Back through the main menu, as a player goes: straight from career's
+; picker to quickplay's hangs, in v0.8.8 too, and no button leads there.
+{ui goto_screen main_screen}
+(wait_screen main_screen 30)
+(wait 2)
 {gamecfg set mode quickplay}
 {game set_song shoutatthedevil}
 {game set_quickplay}

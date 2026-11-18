@@ -1,6 +1,8 @@
 ; With a guitar as P1, the keyboard still moves menus as P1's: its arrows
 ; and Enter. On Multiplayer's screen it joins nobody: it is never a seat's.
 #include common/first_boot.dta
+; From Training, a row above Options (the menu opens on Quick Play).
+{main_panel set_focus {main_panel find main_tutorial.btn}}
 (device guitar)
 (press down guitar)
 (expect {seat_has 0 guitar} 1)
@@ -14,6 +16,8 @@
 {ui goto_screen multi_screen}
 (wait_screen multi_screen)
 (wait 1)
+; P1 signed in, as a guest: an unsigned seat's Start opens the profile list.
+{ghc_profile pick 0 -1}
 (key Tab)
 (wait 0.3)
 (expect {seat_has 1 keyboard} 0)

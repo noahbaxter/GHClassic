@@ -55,8 +55,10 @@
 (print {'/' {'-' {taskmgr seconds} $ghc_s0} {'-' {taskmgr ui_seconds} $ghc_t0}})
 (expect {'/' {'-' {taskmgr seconds} $ghc_s0} {'-' {taskmgr ui_seconds} $ghc_t0}} 1.5 0.03)
 {song_speed set 100}
-{ui goto_screen main_screen}
-(wait_screen main_screen 30)
+; Left through loading, as the pause menu's Quit does: a song left by
+; goto_screen is never torn down, so its name would stay renamed.
+{meta_loading_nosave_goto qp_selsong_screen}
+(wait_screen qp_selsong_screen 60)
 (expect {elem {find $syscfg songs shoutatthedevil song name} 1} songs/shoutatthedevil/shoutatthedevil)
 
 ; A song won at 150% is kept at that speed alone, and skips GH2's own high

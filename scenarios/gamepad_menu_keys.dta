@@ -3,6 +3,8 @@
 ; player with frets on LB, LT, RB, RT and A has it: LB then picks nothing in a
 ; menu, and A (a fret of theirs in a song) still picks.
 #include common/first_boot.dta
+; From Training, a row above Options (the menu opens on Quick Play).
+{main_panel set_focus {main_panel find main_tutorial.btn}}
 (controller pad "045e:028e" pad)
 (wait 0.5)
 (press dpdown pad)

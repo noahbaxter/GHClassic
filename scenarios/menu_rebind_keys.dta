@@ -2,6 +2,8 @@
 ; F and red on B, F picks and B backs out, Return and Esc do neither, and in
 ; a song Esc still pauses and resumes.
 #include common/first_boot.dta
+; From Training, a row above Options (the menu opens on Quick Play).
+{main_panel set_focus {main_panel find main_tutorial.btn}}
 (menu_bind keyboard green "key f")
 (menu_bind keyboard red "key b")
 (key Down)

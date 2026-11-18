@@ -110,8 +110,11 @@
 (wait 3)
 (shot lose)
 (expect {{lose_panel find normal_buttons.view} showing} 1)
+; Restart, Practice, Song list, Quit.
 (press down)
 (press down)
+(press down)
+(expect {lose_panel focus_name} lose_quit_normal.btn)
 (press green)
 
 ; Settings: the audio screen's sliders and tick box, the memory card

@@ -31,8 +31,10 @@
 ; Four kicks, four snares, eight hi-hats: GH2's snare and hi-hat each a
 ; left and a right sample.
 (expect {'-' {practice_clicks played} $ghc_from} 28)
-{ui goto_screen main_screen}
-(wait_screen main_screen 30)
+; Quit, as the pause menu's does: a song left by goto_screen is never torn
+; down, so its solo would stay.
+{ghc_practice_exit}
+(wait_screen practice_selsong_screen 60)
 (expect $ghc_practice_solo 0)
 (expect {elem {elem {find $syscfg songs {game get_song} song vols} 1} 0} 0.0)
 

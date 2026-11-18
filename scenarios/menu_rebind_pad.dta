@@ -1,6 +1,8 @@
 ; input.ini's [menu gamepad] rebinds every gamepad's menu controls: with
 ; green on Y and red on X, Y picks and X backs out, and A and B do neither.
 #include common/first_boot.dta
+; From Training, a row above Options (the menu opens on Quick Play).
+{main_panel set_focus {main_panel find main_tutorial.btn}}
 (menu_bind gamepad green "pad y")
 (menu_bind gamepad red "pad x")
 (controller pad "045e:028e" pad)

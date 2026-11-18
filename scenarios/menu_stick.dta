@@ -2,6 +2,8 @@
 ; tap of it down then up from the first row is one row each way, and a pad
 ; whose whammy is on the stick does not move it a second time.
 #include common/first_boot.dta
+; From Training, a row above Options (the menu opens on Quick Play).
+{main_panel set_focus {main_panel find main_tutorial.btn}}
 (controller pad "045e:028e" pad)
 (wait 0.5)
 (press dpdown pad)
