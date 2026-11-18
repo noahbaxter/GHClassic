@@ -338,6 +338,7 @@ namespace gh2
         uint32_t campaignCtor;
         uint32_t campaignDtor;
         uint32_t campaignSave;             // Campaign::Save(BinStream &)
+        uint32_t campaignDeleteSlot;       // Campaign::DeleteSlot(int)
         uint32_t campaignIsItemUnlocked;   // Campaign::IsItemUnlocked(Symbol) const
         uint32_t campaignIsItemUnlockedOn; // Campaign::IsItemUnlocked(Symbol, Difficulty) const
         uint32_t campaignIsVenueUnlockedQuickplay; // Campaign::IsVenueUnlockedQuickplay(Symbol) const
@@ -745,6 +746,7 @@ namespace gh2
         .campaignCtor = 0x12cf00u,
         .campaignDtor = 0x12d0c0u,
         .campaignSave = 0x12ec90u,
+        .campaignDeleteSlot = 0x12d3f8u,
         .campaignIsItemUnlocked = 0x12d490u,
         .campaignIsItemUnlockedOn = 0x12d5a0u,
         .campaignIsVenueUnlockedQuickplay = 0x12de88u,
