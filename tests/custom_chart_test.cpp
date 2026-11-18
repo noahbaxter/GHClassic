@@ -785,6 +785,23 @@ namespace
         std::sort(chart.drums.begin(), chart.drums.end());
 
         {
+            // A double kick's notes each end before the next, a sixteenth
+            // at most: overlapping, some were lost.
+            Chart fast = chart;
+            fast.kicks = {0u, 60u, 120u};
+            midi::Track guitar, events;
+            const auto band = addStage({fast, lead, kSameTicks, 32u * 480u}, guitar, events);
+            std::vector<std::pair<uint32_t, bool>> kick;
+            for (const midi::Event &e : band[0].events)
+                if ((midi::kind(e) == midi::kNoteOn || midi::kind(e) == midi::kNoteOff) && e.data.size() >= 2u &&
+                    e.data[0] == 36u)
+                    kick.emplace_back(e.tick, midi::kind(e) == midi::kNoteOn && e.data[1] > 0u);
+            const std::vector<std::pair<uint32_t, bool>> apart = {{0u, true},   {59u, false}, {60u, true},
+                                                                  {119u, false}, {120u, true}, {240u, false}};
+            CHECK(kick == apart);
+        }
+
+        {
             midi::Track guitar, events;
             const auto band = addStage({chart, lead, kSameTicks, 32u * 480u}, guitar, events);
             const auto texts = textsOf(guitar);
