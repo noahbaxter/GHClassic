@@ -20,6 +20,7 @@
 
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
+#include "runtime/host_clock.h"
 
 #include <algorithm>
 #include <chrono>
@@ -78,7 +79,7 @@ namespace gh2::guitar
             if (s_streakMats.empty())
                 return;
             const double seconds =
-                std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+                std::chrono::duration<double>(ps2x::host_clock::now().time_since_epoch()).count();
             const float along = static_cast<float>(std::fmod(seconds / kStreakSeconds, 1.0));
             for (const uint32_t mat : s_streakMats)
                 store<float>(rdram, mat + ::milo::mat::kTexXfm + 0x30u, along);
