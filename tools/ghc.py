@@ -87,7 +87,6 @@ import sys
 import tempfile
 import time
 import urllib.request
-import venv
 import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -143,6 +142,18 @@ def game_binary():
     return GAME / f"GHClassic{EXE}"
 
 
+def pinned_python():
+    """The Python .python-version names where it is installed, else this one:
+    a newer Python can lack wheels for the pins and fall back to building
+    them from source."""
+    if sys.version_info[:2] == tuple(int(n) for n in PYTHON.split(".")):
+        return [sys.executable]
+    if WINDOWS and shutil.which("py") and not subprocess.run(["py", f"-{PYTHON}", "-c", ""]).returncode:
+        return ["py", f"-{PYTHON}"]
+    found = shutil.which(f"python{PYTHON}")
+    return [found] if found else [sys.executable]
+
+
 def ensure_venv():
     """build/venv with requirements.txt installed, redone when the file changes."""
     wanted = (ROOT / "requirements.txt").read_text()
@@ -152,7 +163,7 @@ def ensure_venv():
     if f"Python {PYTHON}+" not in (ROOT / "README.md").read_text():
         sys.exit(f"README.md must say Python {PYTHON}+, as .python-version does")
     print("setting up build/venv", file=sys.stderr)
-    venv.create(VENV, with_pip=True, clear=True)
+    subprocess.run([*pinned_python(), "-m", "venv", "--clear", VENV], check=True)
     pip = [VENV_PYTHON, "-m", "pip", "install", "--quiet", "--disable-pip-version-check"]
     # The check below needs pip's --dry-run (22.2); a venv takes the pip its
     # Python bundles, older on Ubuntu 22.04's 3.11.

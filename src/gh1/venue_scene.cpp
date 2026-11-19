@@ -42,7 +42,7 @@ namespace gh2::gh1
             std::map<std::string, std::vector<std::string>> draws; // by Mesh, View or Environ, its Draw 1's children
             std::set<std::string> meshes, environs;
             std::map<std::string, std::string> moves; // by TransAnim, the Trans it moves
-            std::set<std::string> hung;  // what the top View's Trans reach
+            std::map<std::string, std::string> hung; // what the top View's Trans reach, by the one first there
         };
 
         Scan scan(const milo::Dir &scene, const std::set<std::string> &classes, const std::set<std::string> &without,
@@ -126,13 +126,17 @@ namespace gh2::gh1
         // never reaches keeps the world it loads with, here its local
         // with no parent, even as a TransAnim moves its local: the arena's
         // orange_spot05.mesh holds at its first key while its anim runs.
-        void hang(Scan &s, const std::string &n)
+        // A Trans two lists name is worked out under the first this walk
+        // reaches it from, which then clears its dirty flag: the basement's
+        // lighting.view lists lamp_bone02.mesh after lamp_bone01.mesh, which
+        // lists it too, and the lamp hangs from 01.
+        void hang(Scan &s, const std::string &n, const std::string &from)
         {
             const auto it = s.trans.find(n);
-            if (it == s.trans.end() || !s.hung.insert(n).second)
+            if (it == s.trans.end() || !s.hung.emplace(n, from).second)
                 return;
             for (const std::string &child : it->second.children)
-                hang(s, child);
+                hang(s, child, n);
         }
 
         bool held(const Scan &s, const std::string &n)
@@ -306,8 +310,9 @@ namespace gh2::gh1
 
         // A Trans 8 with the world for both its local and world where it is
         // held. RndTransformable::Load (0x3d72d0) parents each of its
-        // children without a check that it is there, so the list keeps only
-        // those that are. Its constraint, target and preserve scale stay;
+        // children without a check that it is there, the last list loaded
+        // winning, so the list keeps only those that are and that GH1 works
+        // out under it. Its constraint, target and preserve scale stay;
         // its parent is the object's own name for none, as here when the
         // one it names is left out.
         void placed(const Scan &s, const std::string &n, const Bytes &b, const Trans &t, Bytes &body)
@@ -318,7 +323,8 @@ namespace gh2::gh1
             put(body, b, still ? world : local, still ? children : world);
             put(body, b, world, children);
             std::vector<std::string> kept = t.children;
-            std::erase_if(kept, [&](const std::string &child) { return s.trans.count(child) == 0u || held(s, child); });
+            std::erase_if(kept, [&](const std::string &child)
+                          { const auto it = s.hung.find(child); return it == s.hung.end() || it->second != n; });
             putNames(body, kept);
             put(body, b, t.constraint, t.parent);
             size_t o = t.parent;
@@ -479,7 +485,7 @@ namespace gh2::gh1
                                 Drivers &drivers)
     {
         Scan s = scan(scene, classes, without, scripted, switched);
-        hang(s, top);
+        hang(s, top, {});
         for (const auto &e : scene.entries)
             stand(s, drivers, e.second, 0);
         Tree tree{s, hidden, transparentOf(top)};

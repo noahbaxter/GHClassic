@@ -59,8 +59,9 @@ namespace gh2
         milo::Dir guitar(const milo::Dir &gh2, const milo::Dir &gh1);
 
         // Leaves out of drawing the meshes of `gh1` that none of its views
-        // list: Bip01.mesh, the ponytails hair is skinned to. Retail's frame
-        // has none of a band member's.
+        // list: Bip01.mesh, the ponytails hair is skinned to, and the
+        // white box at the room's centre a guitarist's would draw. GH1 draws a
+        // character from its top view alone (CharBase::Draw, GH1 0x194080).
         void hideUnviewed(milo::Dir &outfit, const milo::Dir &gh1);
 
         // A scene from the mounted discs.

@@ -1,0 +1,33 @@
+; A band deleted and a new one made in its slot keeps its own name through a
+; switch to another campaign, which loads the bands from the save: the save
+; after a delete parses again (save.cpp's deleteSlot).
+(needs gh1)
+#include common/first_boot.dta
+{set $pick gh2}
+#include common/career_start.dta
+{ui goto_screen chooseprof_screen}
+(wait_screen chooseprof_screen)
+(wait 1)
+(press blue)
+(wait_screen ghc_delete_screen 10)
+(wait 1)
+(press up)
+(wait 0.3)
+(press green)
+(wait_screen chooseprof_screen 20)
+(wait 1)
+(expect {campaign is_empty_profile 0} 1)
+(press green)
+(wait_screen nameprof_screen 10)
+(wait 1)
+{{nameprof_panel find profile.ten} set_text "Second Band"}
+(press start)
+(wait_screen ghc_campaign_screen 20)
+(wait 1)
+{set $pick gh1}
+#include common/pick_campaign.dta
+(press green)
+(wait_screen sel_difficulty_screen)
+(wait 1)
+(expect {campaign profile_name 0} "Second Band")
+(quit)

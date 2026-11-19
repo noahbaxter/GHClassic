@@ -41,6 +41,8 @@ namespace milo
     namespace camera
     {
         constexpr uint32_t kView = 0xc0u;   // Transform: inverse of the camera's world
+        constexpr uint32_t kXScale = 0x100u; // projection's x: aspect over tan(yfov / 2) (UpdateLocal 0x1b1f50)
+        constexpr uint32_t kYScale = 0x124u; // projection's y: -1 over tan(yfov / 2)
         constexpr uint32_t kNear = 0x2c0u;
         constexpr uint32_t kFar = 0x2c4u;
         constexpr uint32_t kYFov = 0x2c8u;  // 0 is orthographic
@@ -72,6 +74,7 @@ namespace milo
     // CamShotFrame (CamShotFrame::Interp 0x2665a0).
     namespace camShotFrame
     {
+        constexpr uint32_t kScreenSpot = 0x60u; // x, y: where on screen it holds its targets
         constexpr uint32_t kNearBlur = 0x78u;
         constexpr uint32_t kFarBlur = 0x7cu;
         constexpr uint32_t kMaxFocalBlur = 0x80u;

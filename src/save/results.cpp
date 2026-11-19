@@ -5,6 +5,7 @@
 #include "guest.h"
 #include "hook.h"
 #include "host/input.h"
+#include "host/song_log.h"
 #include "save/profiles.h"
 #include "save/save.h"
 #include "script.h"
@@ -213,6 +214,7 @@ namespace gh2::save
         // GamePanel::SetGameOver(won), before any screen of the song's end.
         void onGameOver(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
+            song_log::gameOver(GPR_U32(ctx, 5) != 0u);
             if (GPR_U32(ctx, 5) == 0u)
                 return;
             const R5900Context saved = *ctx;

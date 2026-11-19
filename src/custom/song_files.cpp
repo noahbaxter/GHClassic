@@ -59,6 +59,7 @@ namespace gh2::custom
                 symbol(id),
                 array({symbol("name"), dtb::string(title(song))}),
                 array({symbol("artist"), dtb::string(plain(tag(song.tags, "artist").value_or("")))}),
+                array({symbol("caption"), symbol("performed_by")}),
                 array({
                     symbol("song"),
                     array({symbol("name"), symbol(dir)}),
