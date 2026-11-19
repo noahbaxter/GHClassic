@@ -29,6 +29,20 @@ namespace gh2
         // prebakeFonts: set at install, read only after.
         std::vector<std::pair<size_t, std::string>> s_scenes;
         std::set<std::string> s_traced;
+
+        // A font's characters for a log line: its Latin-1 ones as \xNN, the
+        // log being UTF-8.
+        std::string printable(const std::string &chars)
+        {
+            std::string out;
+            for (const unsigned char c : chars)
+            {
+                char hex[5];
+                std::snprintf(hex, sizeof hex, "\\x%02x", c);
+                out += c < 0x80u ? std::string(1, static_cast<char>(c)) : hex;
+            }
+            return out;
+        }
         constexpr float kRegistered = 0.7f; // a font's median cell overlapping its trace this much: the trace sits on the sheet
         constexpr float kOwnArt = 0.8f;     // a cell overlapping its own trace this much is its own art
         constexpr float kBetter = 0.2f;     // else, another character's trace overlapping it this much more: that one's art
@@ -547,7 +561,7 @@ namespace gh2
                 if (disc != 0u)
                     if (const std::string added = addMissing(*scene, i, path); !added.empty())
                     {
-                        std::cerr << "[font bake] " << path << " " << scene->entries[i].second << ": added " << added
+                        std::cerr << "[font bake] " << path << " " << scene->entries[i].second << ": added " << printable(added)
                                   << std::endl;
                         changed = true;
                     }
@@ -555,7 +569,7 @@ namespace gh2
                 if (drawn.empty())
                     continue;
                 if (log::verbose())
-                    std::cerr << "[font bake] " << path << " " << scene->entries[i].second << ": drew " << drawn
+                    std::cerr << "[font bake] " << path << " " << scene->entries[i].second << ": drew " << printable(drawn)
                               << std::endl;
                 changed = true;
             }
