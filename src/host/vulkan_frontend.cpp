@@ -9,6 +9,7 @@
 #include "host/perf.h"
 #include "host/record.h"
 #include "host/scene_renderer.h"
+#include "host/song_log.h"
 #include "movie/screen.h"
 #include "render/frame.h"
 #include "render/texture_store.h"
@@ -353,6 +354,22 @@ namespace gh2
                     return false;
             }
             swapchainStale = false;
+            {
+                // How the picture is paced, again only when that changes and
+                // not on every resize.
+                static std::string logged;
+                const SDL_DisplayMode *mode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(window));
+                constexpr const char *kModes[] = {"immediate", "mailbox", "fifo", "fifo relaxed"};
+                const VkPresentModeKHR present = swapchain.present_mode;
+                char line[192];
+                std::snprintf(line, sizeof line, "%s, %zu images, display %.2f Hz, %s, %s, frame cap %d",
+                              present < 4 ? kModes[present] : "other", swapchainImages.size(),
+                              mode ? mode->refresh_rate : 0.0f, SDL_GetCurrentVideoDriver(),
+                              (SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN) ? "fullscreen" : "windowed",
+                              settings::get(settings::kFrameRateCap));
+                if (logged != line)
+                    std::cerr << "[video] present " << (logged = line) << std::endl;
+            }
             if (timing::on())
             {
                 VkSurfaceCapabilitiesKHR caps{};
@@ -799,6 +816,18 @@ namespace gh2
         allocatorInfo.pVulkanFunctions = &functions;
         if (!check(vmaCreateAllocator(&allocatorInfo, &s.allocator), "allocator"))
             return false;
+        // What every texture, target and buffer holds, summed over heaps.
+        song_log::gpuMemory(
+            [](void *allocator)
+            {
+                VmaBudget budgets[VK_MAX_MEMORY_HEAPS] = {};
+                vmaGetHeapBudgets(static_cast<VmaAllocator>(allocator), budgets);
+                uint64_t bytes = 0;
+                for (const VmaBudget &budget : budgets)
+                    bytes += budget.statistics.allocationBytes;
+                return bytes;
+            },
+            s.allocator);
 
         VkCommandPoolCreateInfo poolInfo{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
         poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -1094,6 +1123,7 @@ namespace gh2
         s.times.add(isNew || moviePlaying, static_cast<float>(State::FrameLog::ms(waitEnd - acquireEnd)),
                     static_cast<float>(State::FrameLog::ms(recordEnd - recordStart)),
                     moviePlaying ? SceneStats{} : s.scene.stats());
+        song_log::present(isNew);
         if (s.frameLog.on)
             s.frameLog.add(isNew, frames().published(), State::FrameLog::ms(waitEnd - acquireEnd),
                            State::FrameLog::ms(acquireEnd - acquireStart),
@@ -1185,6 +1215,7 @@ namespace gh2
                 vkDestroySemaphore(s.device.device, slot.imageAvailable, nullptr);
             }
             vkDestroyCommandPool(s.device.device, s.commandPool, nullptr);
+            song_log::gpuMemory(nullptr, nullptr);
             if (s.allocator != VK_NULL_HANDLE)
                 vmaDestroyAllocator(s.allocator);
             vkb::destroy_device(s.device);

@@ -2,6 +2,7 @@
 
 #include "dev/timing.h"
 #include "host/record.h"
+#include "host/song_log.h"
 #include "runtime/host_clock.h"
 
 #include <SDL3/SDL.h>
@@ -23,6 +24,7 @@ namespace gh2
         std::thread s_timer;
         std::atomic<bool> s_timerRunning{false};
         std::string s_deviceName;
+        float s_periodMs = 0.0f; // the device's buffer
 
         void render(std::vector<float> &buffer, size_t frames)
         {
@@ -40,6 +42,11 @@ namespace gh2
             const size_t frames = static_cast<size_t>(additional) / (2u * sizeof(float));
             if (frames == 0u)
                 return;
+            static std::chrono::steady_clock::time_point lastPull;
+            const auto pulled = std::chrono::steady_clock::now();
+            if (lastPull != std::chrono::steady_clock::time_point{})
+                song_log::audioPull(std::chrono::duration<float, std::milli>(pulled - lastPull).count(), s_periodMs);
+            lastPull = pulled;
             if (timing::on())
             {
                 static uint64_t last = 0;
@@ -112,18 +119,15 @@ namespace gh2
             return;
         }
         SDL_ResumeAudioStreamDevice(s_stream);
-        if (timing::on())
-        {
-            SDL_AudioSpec got{};
-            int frames = 0;
-            const SDL_AudioDeviceID device = SDL_GetAudioStreamDevice(s_stream);
-            SDL_GetAudioDeviceFormat(device, &got, &frames);
-            const char *name = SDL_GetAudioDeviceName(device);
-            timing::note(std::string("audio driver ") + SDL_GetCurrentAudioDriver() + ", device \"" + (name ? name : "?") +
-                         "\", " + std::to_string(got.freq) + " Hz, " + std::to_string(got.channels) + " ch, format 0x" +
-                         std::to_string(got.format) + ", buffer " + std::to_string(frames) + " frames (" +
-                         std::to_string(frames * 1000.0 / std::max(got.freq, 1)) + " ms)");
-        }
+        SDL_AudioSpec got{};
+        int frames = 0;
+        const SDL_AudioDeviceID device = SDL_GetAudioStreamDevice(s_stream);
+        SDL_GetAudioDeviceFormat(device, &got, &frames);
+        const char *name = SDL_GetAudioDeviceName(device);
+        s_periodMs = static_cast<float>(frames) * 1000.0f / static_cast<float>(std::max(got.freq, 1));
+        std::cerr << "[audio] " << SDL_GetCurrentAudioDriver() << ", \"" << (name ? name : "?") << "\", " << got.freq
+                  << " Hz, " << got.channels << " ch, buffer " << frames << " frames (" << s_periodMs << " ms)"
+                  << std::endl;
     }
 
     void closeAudio()

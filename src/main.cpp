@@ -5,7 +5,7 @@
 //            [--fast-boot] [--seed <n>] [--cheats] [--save <file>] [--import-card <ps2>] [--export-card <ps2>]
 //            [--settings <file>] [--shots <dir>] [--shot-every <n>] [--record <dir>]
 //            [--res window|native|480p|720p|1080p|1440p|2160p]
-//            [--timing] [--present-mode fifo|relaxed|mailbox|immediate] [--swap-images <n>] [--audio-device <name>]
+//            [--verbose] [--timing] [--present-mode fifo|relaxed|mailbox|immediate] [--swap-images <n>] [--audio-device <name>]
 //   GHClassic --bind [keyboard | <n>]
 //
 // Without a disc, the first image in PUT_DISC_HERE (disc/disc.h) with this
@@ -30,7 +30,8 @@
 // stage's delay between a press, the sound and the picture
 // (dev/timing.h); --present-mode and --swap-images change how the
 // swapchain presents, and --audio-device plays through the device with
-// that in its name, all to measure with. --record writes the run as video clips,
+// that in its name, all to measure with. --verbose keeps the developer's lines
+// in GHClassic.log (host/log.h). --record writes the run as video clips,
 // picture and sound, through ffmpeg into that folder (host/record.h). --bind
 // sets up a controller or the keyboard in input.ini; with no device it
 // lists them.
@@ -41,6 +42,7 @@
 #include "ui/fast_boot.h"
 #include "host/bind.h"
 #include "host/input.h"
+#include "host/log.h"
 #include "host/perf.h"
 #include "host/record.h"
 #include "host/update.h"
@@ -58,9 +60,7 @@
 
 #include <SDL3/SDL.h>
 
-#ifdef _WIN32
-#include <io.h> // dup2
-#else
+#ifndef _WIN32
 #include <unistd.h>
 #endif
 
@@ -132,6 +132,7 @@ int main(int argc, char *argv[])
     PS2Runtime::HostOptions hostOptions;
     gh2::RenderSize renderSize;
     double speed = 1.0;
+    bool verbose = false;
     for (int i = 1; i < argc; ++i)
     {
         const std::string arg = argv[i];
@@ -142,6 +143,8 @@ int main(int argc, char *argv[])
             hostOptions.mute = true;
         else if (arg == "--timing")
             gh2::timing::enable();
+        else if (arg == "--verbose")
+            verbose = true;
         else if (arg == "--present-mode" && hasValue)
         {
             // VkPresentModeKHR's own numbers.
@@ -252,10 +255,14 @@ int main(int argc, char *argv[])
 #endif
     if (!hostOptions.hidden && !terminal)
     {
-        const std::string log = gh2::settings::userDataPath("GHClassic.log");
-        if (std::freopen(log.c_str(), "w", stderr))
-            dup2(fileno(stderr), fileno(stdout));
+        gh2::log::open(gh2::settings::userDataPath("GHClassic.log"));
+        // A quit by exit() closes it as much as the window does.
+        std::atexit(gh2::log::closed);
     }
+    if (verbose)
+        gh2::log::setVerbose();
+    gh2::log::system();
+    std::cerr << "[settings] " << gh2::settings::describe() << std::endl;
 
     // A player who takes a newer release is sent to it and not into this one.
     if (!hostOptions.hidden && gh2::settings::get(gh2::settings::kCheckUpdates) && gh2::update::offer())
@@ -311,6 +318,7 @@ int main(int argc, char *argv[])
     runtime.run();
 
     // Guest threads may still hold host resources; skip static destructors.
+    gh2::log::closed();
     std::cout.flush();
     std::cerr.flush();
     std::_Exit(0);

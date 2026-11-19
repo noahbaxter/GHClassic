@@ -1,6 +1,7 @@
 #include "render/vector_fonts.h"
 
 #include "guest.h"
+#include "host/log.h"
 #include "milo/layout.h"
 #include "render/texture_capture.h"
 #include "vector_fonts_pack.h"
@@ -444,7 +445,8 @@ namespace gh2::vector_fonts
                 std::lock_guard lock(s_tablesLock);
                 id = static_cast<uint32_t>(s_tables.size());
                 s_tables.push_back(std::move(*table));
-                std::cerr << "[vector fonts] " << name << " through tex " << std::hex << tex << std::dec << ", "
+                if (log::verbose())
+                    std::cerr << "[vector fonts] " << name << " through tex " << std::hex << tex << std::dec << ", "
                           << s_tables.back()[0] << " characters" << std::endl;
             }
         s_made[{font, tex}] = id;

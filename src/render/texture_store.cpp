@@ -3,6 +3,7 @@
 #include "disc/ark.h"
 #include "formats/bitmap.h"
 #include "formats/dxt.h"
+#include "host/log.h"
 #include "milo/layout.h"
 #include "milo/milo.h"
 #include "milo/objects.h"
@@ -504,8 +505,10 @@ namespace gh2::textures
         if (here)
         {
             ++s_readCount;
-            std::cerr << "[textures] read " << source.path << " " << source.tex << " in " << took / 1000000
-                      << " ms on the game thread" << std::endl;
+            // A read long enough to see as a stall, the slow disk's.
+            if (took >= 30000000 || log::verbose())
+                std::cerr << "[textures] read " << source.path << " " << source.tex << " in " << took / 1000000
+                          << " ms on the game thread" << std::endl;
         }
         if (!data)
             std::cerr << "[textures] cannot read " << source.path << " " << source.tex << std::endl;

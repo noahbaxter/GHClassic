@@ -1,6 +1,7 @@
 #include "host/scene_renderer.h"
 
 #include "dev/draw_dump.h"
+#include "host/log.h"
 #include "host/mesh_push.h"
 #include "milo/layout.h"
 #include "render/camera.h"
@@ -1856,10 +1857,11 @@ namespace gh2
                 pipeline(milo::mat::kBlendSrc, milo::mat::kZNormal, false, false, false, true);
             if (temporal)
                 pipeline(milo::mat::kBlendSrc, milo::mat::kZNormal, false, false, false, false, true);
-            std::cerr << "[scene] pipelines in "
-                      << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start)
-                             .count()
-                      << " ms" << std::endl;
+            // Rebuilt from the cache in no time on most changes of look.
+            const auto took =
+                std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+            if (took >= 20 || log::verbose())
+                std::cerr << "[scene] pipelines in " << took << " ms" << std::endl;
             size_t size = 0;
             vkGetPipelineCacheData(device, pipelineCache, &size, nullptr);
             std::vector<char> data(size);
