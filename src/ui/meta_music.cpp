@@ -40,6 +40,7 @@
 #include "disc/ark.h"
 #include "guest.h"
 #include "hook.h"
+#include "host/log.h"
 #include "ps2_runtime_macros.h"
 #include "settings/settings.h"
 
@@ -259,7 +260,7 @@ namespace gh2
                 std::cerr << "[meta_music] couldn't open " << path << ".vgs, looping instead" << std::endl;
                 s_chainFailed = true;
             }
-            else
+            else if (log::verbose())
                 std::cerr << "[meta_music] next " << path << std::endl;
         }
     }

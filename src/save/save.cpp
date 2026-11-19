@@ -268,6 +268,49 @@ namespace gh2::save
             runCampaign(rdram, ctx, runtime, 0x50u, bytes);
         }
 
+        // Campaign::DeleteSlot builds the band's ProfileState anew from the
+        // config as it is now, which guitars lent from other games have grown
+        // since the Campaign built the other bands': the items no longer line
+        // up, Campaign::Save writes what no load reads, and nothing saves
+        // until a campaign switch brings the deleted band back. The band goes
+        // through the save instead, its slot the fresh campaign's again.
+        PS2Runtime::RecompiledFunction s_deleteSlot = nullptr;
+        void deleteSlot(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const R5900Context saved = *ctx;
+            const uint32_t campaign = GPR_U32(ctx, 4);
+            const int32_t slot = GPR_S32(ctx, 5);
+            std::optional<gh2::Save> save;
+            if (s_fresh && slot >= 0 && slot < gh2::kProfiles)
+                save = saveCampaign(rdram, ctx, runtime);
+            // All access on: Save wrote nothing.
+            if (!save)
+            {
+                *ctx = saved;
+                callOriginal(rdram, ctx, runtime, s_addresses->campaignDeleteSlot, s_deleteSlot);
+                return;
+            }
+            save->profiles[slot] = s_fresh->profiles[slot];
+            const auto reset = [&](std::vector<gh2::Item> &items, const std::vector<gh2::Item> &fresh, int per)
+            {
+                for (gh2::Item &item : items)
+                    for (const gh2::Item &base : fresh)
+                        if (base.name == item.name)
+                            for (int i = slot * per; i < (slot + 1) * per; ++i)
+                                item.states[i] = base.states[i];
+            };
+            reset(save->profileItems, s_fresh->profileItems, 1);
+            reset(save->campaignItems, s_fresh->campaignItems, gh2::kDifficulties);
+            loadCampaign(rdram, ctx, runtime, *save);
+            // DeleteSlot's own last steps: the band played, if this one, is
+            // slot 0's, and the Campaign has changed.
+            if (load<int32_t>(rdram, campaign + 0x48u) == slot)
+                store<int32_t>(rdram, campaign + 0x48u, 0);
+            store<uint32_t>(rdram, campaign + 0x7cu, 1u);
+            *ctx = saved;
+            ctx->pc = GPR_U32(ctx, 31);
+        }
+
         // Other games' songs start on their own game's names.
         void nameDefaults(gh2::Save &fresh)
         {
@@ -1036,6 +1079,7 @@ namespace gh2::save
         runtime.replaceFunction(addresses.loadData1, loadData1);
         EntryHook<LoadData2Tag>::install(runtime, addresses.loadData2, onLoadData2);
         EntryHook<HighScoreDbTag>::install(runtime, addresses.highScoreDbCtor, onHighScoreDb);
+        replaceKeeping(runtime, addresses.campaignDeleteSlot, deleteSlot, s_deleteSlot);
         installResults(runtime, addresses);
     }
 }

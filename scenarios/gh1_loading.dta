@@ -1,6 +1,7 @@
 ; A song loading in GH1's look: GH1's poster turns its knobs (gh1/menus.dta's
 ; loading_panel), as GH1's own does, where GH2's script finds none of its
-; own tape and word to animate.
+; own tape and word to animate. All three turned and the light on before
+; the song's screen comes.
 (needs gh1)
 #include common/first_boot.dta
 {quickplay song_defaults 0}
@@ -13,5 +14,9 @@
 {ui goto_screen loading_screen}
 (wait 0.5)
 (expect {campaigns look} gh1)
-(wait_until {> {{loading_panel find load_poster.view} frame} 2} 5)
+(wait_until {{loading_panel find load_blink.view} showing} 10)
+(expect {== {ui current_screen} loading_screen} 1)
+(expect {{loading_panel find knobturn1.mnm} frame} 10.0)
+(expect {{loading_panel find knobturn2.mnm} frame} 21.0)
+(expect {{loading_panel find knobturn3.mnm} frame} 32.0)
 (quit)

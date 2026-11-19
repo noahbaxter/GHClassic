@@ -28,17 +28,17 @@
       ; Quit's size, and where from Options (x right, z up): small, in the
       ; black gap at the poster's foot. Shrunk less in height, which keeps
       ; the bitmap font nearer full size and so sharper.
-      (quit_size ((gh1 (0.44 0.72)) (gh2 (0.41 0.67)) (gh80s (0.52 0.72))))
+      (quit_size ((gh1 (0.44 0.72)) (gh2 (0.41 0.67)) (gh2x (0.41 0.67)) (gh80s (0.52 0.72))))
       ; The rows drawn a little smaller, towards one fixed point (the top
       ; row, or Quit), to make room below Options for Quit or close the gap
       ; above it.
-      (menu_shrink ((gh1 (0.93 career)) (gh2 (0.95 quit)) (gh80s (0.93 career))))
+      (menu_shrink ((gh1 (0.93 career)) (gh2 (0.95 quit)) (gh2x (0.95 quit)) (gh80s (0.93 career))))
       ; The whole menu raised by this much (z up), with the shrink.
-      (menu_lift ((gh1 0) (gh2 0) (gh80s 6)))
+      (menu_lift ((gh1 0) (gh2 0) (gh2x 0) (gh80s 6)))
       ; Per game, as the menus' rows sit 16 apart in GH1's and GH2's and 30
       ; in the 80s': right under Options' right end, as GH1's, but in GH2's
       ; drawn in from the monster at its right.
-      (quit_place ((gh1 (-4 -14)) (gh2 (44 -14)) (gh80s (35 -26))))
+      (quit_place ((gh1 (-4 -14)) (gh2 (44 -14)) (gh2x (44 -14)) (gh80s (35 -26))))
       ; The build's version ($ghc_version, menus.cpp): a copy of the help
       ; bar's text, drawn with the menu but placed from the help bar's group,
       ; which gives it the help bar's size and faces it to the menu's light

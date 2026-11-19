@@ -41,6 +41,7 @@ namespace gh2
     {
         using gh1::graft;
         using gh1::Guitarist;
+        using gh1::hideUnviewed;
         using gh1::kGuitarists;
         using gh1::load;
         using gh1::pickerSet;
@@ -138,6 +139,8 @@ namespace gh2
             }
             milo::Dir main = graft(*gh2, *gh1, *face, name);
             milo::Dir ui = graft(*gh2Ui, *gh1, *face, name);
+            hideUnviewed(main, *gh1);
+            hideUnviewed(ui, *gh1);
             const std::string ours = "../../../" + name + "/anims/" + name;
             const std::string base1 = songClips->substr(0, songClips->size() - 10u);
             for (milo::Dir *dir : {&main, &ui})

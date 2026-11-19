@@ -18,6 +18,8 @@
 #include "hook.h"
 #include "host/bindings.h"
 #include "host/input.h"
+#include "host/log.h"
+#include "host/song_log.h"
 #include "milo/layout.h"
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
@@ -143,11 +145,13 @@ namespace gh2
         // A song's screens, by name, for the keyboard's keys in it (input.h):
         // the two it is played on, the two pause menus and the breakdown.
         struct GotoScreenTag;
-        void onGotoScreen(uint8_t *rdram, R5900Context *ctx, PS2Runtime *)
+        void onGotoScreen(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
             const uint32_t screen = GPR_U32(ctx, 5);
             const uint32_t text = screen != 0u ? load<uint32_t>(rdram, screen + milo::object::kName) : 0u;
             const std::string name = text != 0u ? reinterpret_cast<const char *>(getMemPtr(rdram, text)) : "";
+            log::screen(name.c_str());
+            song_log::screen(rdram, ctx, runtime, name);
             songScreen(name == "game_screen" || name == "practice_game_screen" ||
                                name == "ghc_practice_again_screen"
                            ? SongScreen::kPlaying
@@ -176,6 +180,7 @@ namespace gh2
         // asked (input.h's takePracticeSteps).
         script::addCommand("practice_steps", [](const script::Call &)
                            { return script::Node{static_cast<uint32_t>(takePracticeSteps()), script::kInt}; });
+        song_log::install();
         EntryHook<GotoScreenTag>::install(runtime, addresses.uiGotoScreen, onGotoScreen);
         runtime.replaceFunction(addresses.scePadRead, padRead);
         runtime.replaceFunction(addresses.scePadInfoAct, padInfoAct);

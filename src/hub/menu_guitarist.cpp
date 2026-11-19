@@ -9,6 +9,7 @@
 #include "gh2x/models.h"
 #include "guest.h"
 #include "hook.h"
+#include "host/log.h"
 #include "milo/milo.h"
 #include "ps2_runtime_macros.h"
 #include "script.h"
@@ -732,7 +733,7 @@ namespace gh2::menu_guitarist
         {
             return [path](milo::Dir &set)
             {
-                if (!addWalkOns(set, "sd"))
+                if (!addWalkOns(set, "sd") && log::verbose())
                     std::cerr << "[menu_guitarist] no walk-ons in " << path << std::endl;
             };
         };

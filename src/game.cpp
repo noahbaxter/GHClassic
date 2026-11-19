@@ -5,6 +5,7 @@
 #include "content/band.h"
 #include "content/crowd_cards.h"
 #include "content/focus.h"
+#include "content/shot_spot.h"
 #include "content/floor_spot.h"
 #include "content/encores.h"
 #include "content/quickplay.h"
@@ -130,6 +131,7 @@ namespace
         gh2::quickplay::install(runtime, gh2::kSlus21447);
         gh2::crowd_cards::install(runtime, gh2::kSlus21447);
         gh2::focus::install(runtime, gh2::kSlus21447);
+        gh2::shot_spot::install(runtime, gh2::kSlus21447);
         gh2::floor_spot::install(runtime, gh2::kSlus21447);
         gh2::installNullRnd(runtime, gh2::kSlus21447);
         gh2::installNativeRnd(runtime, gh2::kSlus21447);
@@ -138,7 +140,7 @@ namespace
         gh2::installTextureCapture(runtime, gh2::kSlus21447);
         gh2::installNativeMat(runtime, gh2::kSlus21447);
         gh2::installNativeMesh(runtime, gh2::kSlus21447);
-        // After focus, whose hook on a shot's Interp runs inside this one's,
+        // After focus and shot_spot, whose hooks on a shot's Interp run inside this one's,
         // and the native mesh, whose draw this one's hook runs before.
         gh2::installLeftyGuitarist(runtime, gh2::kSlus21447);
         gh2::installNativeEnviron(runtime, gh2::kSlus21447);
