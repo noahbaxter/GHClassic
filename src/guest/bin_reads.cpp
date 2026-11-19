@@ -5,6 +5,7 @@
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
 #include "runtime/ee_scheduler.h"
+#include "runtime/host_clock.h"
 
 #include <chrono>
 #include <cstring>
@@ -30,7 +31,10 @@ namespace gh2::bin_reads
         // Native work charged to the guest's clock at what it took, less the
         // cycles the guest code it called counted: the loader budgets each
         // frame by that clock (LoadMgr::Poll's COP0 Count), and work that
-        // cost no cycles had it load on long past its frame.
+        // cost no cycles had it load on long past its frame. Not on a
+        // stepped clock (a recording's, runtime/host_clock.h), whose frames
+        // take what they take: charged by the host's time, the same load
+        // would land on another frame on a busier machine.
         struct Charged
         {
             EeScheduler &scheduler;
@@ -39,6 +43,8 @@ namespace gh2::bin_reads
 
             ~Charged()
             {
+                if (ps2x::host_clock::stepped())
+                    return;
                 const auto took = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start);
                 const uint64_t cycles = uint64_t(took.count()) * EeScheduler::kEeClockHz / 1000000000ull;
                 const uint32_t counted = scheduler.readCount() - count;

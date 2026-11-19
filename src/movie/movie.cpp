@@ -104,7 +104,7 @@ namespace gh2
         public:
             Player(ark::Made file, float minSkipSeconds, PS2Runtime &runtime)
                 : m_file(std::move(file)), m_runtime(runtime),
-                  m_skipAfter(Clock::now() + std::chrono::duration_cast<Clock::duration>(
+                  m_skipAfter(ps2x::host_clock::now() +std::chrono::duration_cast<Clock::duration>(
                                                  std::chrono::duration<float>(minSkipSeconds)))
             {
                 m_decoder = mpeg2_init();
@@ -225,7 +225,13 @@ namespace gh2
                         s_running = true;
                         if (stopping())
                             return;
-                        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                        // Marked before the look, as waitUntil()'s.
+                        ps2x::host_clock::Wait wait;
+                        if (at >= s_played.load(std::memory_order_acquire) + kRingFrames)
+                        {
+                            wait.block();
+                            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                        }
                     }
                     s_ring[(at % kRingFrames) * 2u] = frames[i * 2u];
                     s_ring[(at % kRingFrames) * 2u + 1u] = frames[i * 2u + 1u];
@@ -310,11 +316,20 @@ namespace gh2
                 return m_clockBase + int64_t(played * 90000u / kAudioRate);
             }
 
-            // Until the soundtrack reaches `pts`, or the player skips.
+            // Until the soundtrack reaches `pts`, or the player skips. The
+            // soundtrack moves as it is mixed, which a stepped clock's
+            // stepper does once the game waits (runtime/host_clock.h): the
+            // wait marked before the look, so it sees each mix.
             void waitUntil(int64_t pts)
             {
-                while (!stopping() && clock() < pts)
+                for (;;)
+                {
+                    ps2x::host_clock::Wait wait;
+                    if (stopping() || clock() >= pts)
+                        return;
+                    wait.block();
                     std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                }
             }
 
             // Retail skips on JoypadData buttons once the minimum time is up
@@ -326,7 +341,7 @@ namespace gh2
                 if (m_done)
                     return true;
                 const uint16_t pressed = hostPad().pressed;
-                const bool skip = Clock::now() >= m_skipAfter && (pressed & input::kActions[input::kGreen].button) &&
+                const bool skip = ps2x::host_clock::now() >= m_skipAfter && (pressed & input::kActions[input::kGreen].button) &&
                                   !(pressed & input::kActions[input::kStart].button);
                 m_done = skip || m_runtime.isStopRequested();
                 return m_done;

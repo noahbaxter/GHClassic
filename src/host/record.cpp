@@ -8,7 +8,6 @@
 #include <condition_variable>
 #include <csignal>
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <deque>
 #include <iostream>
@@ -45,7 +44,7 @@ namespace gh2::record
         std::chrono::steady_clock::time_point s_start{};
         uint32_t s_width = 0, s_height = 0;
         std::chrono::nanoseconds s_period{};
-        uint64_t s_written = 0, s_repeated = 0, s_dropped = 0, s_samples = 0;
+        uint64_t s_written = 0, s_repeated = 0, s_dropped = 0, s_samples = 0, s_held = 0;
         // Game time the game spent waiting on ffmpeg, cut from the clip.
         std::chrono::steady_clock::duration s_cut{};
 
@@ -76,8 +75,6 @@ namespace gh2::record
             }
         }
 
-        const std::string &encoder();
-
         // Under s_mutex: the clip on, ended. Its pipe closes behind the
         // frames still queued for it.
         void end()
@@ -88,12 +85,13 @@ namespace gh2::record
             s_changed.notify_all();
             std::fclose(s_sound);
             s_video = s_sound = nullptr;
-            std::cerr << "[record] " << s_clip << " (" << encoder() << "): " << s_written << " frames ("
+            std::cerr << "[record] " << s_clip << ": " << s_written << " frames ("
                       << std::chrono::duration<double>(s_period * s_written).count() << " s, sound "
                       << static_cast<double>(s_samples) / kAudioRate << " s), " << s_repeated << " repeated and "
-                      << s_dropped << " dropped (any repeated: the game fell behind its clock, so a lower --speed), "
+                      << s_dropped << " dropped (any repeated: the game fell behind its clock), "
                       << std::chrono::duration<double>(s_cut).count()
-                      << " s cut waiting on ffmpeg (any: it fell behind, so a lower --speed)" << std::endl;
+                      << " s cut waiting on ffmpeg (any: it fell behind), " << s_held
+                      << " the game made nothing new for" << std::endl;
         }
 
         // A picture not the clip's size, at its aspect in the middle of it,
@@ -118,30 +116,12 @@ namespace gh2::record
             return out;
         }
 
-        // VideoToolbox: the Mac's own encoder, far faster than the game.
-        // Elsewhere NVENC where the GPU has it (x264 at 1080p keeps up with
-        // about 2.5 times the game's speed on an 8-core Ryzen, NVENC well
-        // past it), else x264 at its fastest. Asked of ffmpeg once.
-        const std::string &encoder()
-        {
-#ifdef __APPLE__
-            static const std::string chosen = "h264_videotoolbox";
-#else
-#ifdef _WIN32
-            constexpr const char *kQuiet = " >NUL 2>&1";
-#else
-            constexpr const char *kQuiet = " >/dev/null 2>&1";
-#endif
-            static const std::string chosen =
-                std::system((std::string("ffmpeg -hide_banner -loglevel error -f lavfi -i nullsrc=s=256x256 "
-                                         "-frames:v 1 -c:v h264_nvenc -preset p1 -f null -") +
-                             kQuiet)
-                            .c_str()) == 0
-                    ? "h264_nvenc -preset p1"
-                    : "libx264 -preset ultrafast";
-#endif
-            return chosen;
-        }
+        // x264 at its fastest, near lossless: the same frames make the same
+        // clip. A hardware encoder's (VideoToolbox, NVENC) rate control
+        // moves with whatever else uses it, so its clips differed between
+        // takes of the same frames. Its speed costs a stepped record
+        // (host_clock.h) only time.
+        constexpr const char *kEncoder = "libx264 -preset ultrafast -crf 14";
 
         // Under s_mutex: a clip from this frame, as tall and 16:9, the widest
         // the game is shown, so its 4:3 frames (boot's, a movie's) sit in it.
@@ -160,7 +140,7 @@ namespace gh2::record
             std::snprintf(rate, sizeof(rate), "%.6f", 1e9 / static_cast<double>(period.count()));
             const std::string command = "ffmpeg -hide_banner -loglevel error -y -f rawvideo -pix_fmt rgba -s " +
                                         std::to_string(s_width) + "x" + std::to_string(s_height) + " -r " + rate +
-                                        " -i - -c:v " + encoder() + " -b:v 30M -pix_fmt yuv420p \"" + path + ".ts\"";
+                                        " -i - -c:v " + kEncoder + " -pix_fmt yuv420p \"" + path + ".ts\"";
             s_video = popen(command.c_str(), "w");
             s_sound = std::fopen((path + ".f32").c_str(), "wb");
             if (!s_video || !s_sound)
@@ -176,7 +156,7 @@ namespace gh2::record
             }
             s_start = at;
             s_period = period;
-            s_written = s_repeated = s_dropped = s_samples = 0u;
+            s_written = s_repeated = s_dropped = s_samples = s_held = 0u;
             s_cut = {};
             if (!s_writer.joinable())
                 s_writer = std::thread(write);
@@ -211,13 +191,14 @@ namespace gh2::record
     bool wanted() { return s_wanted.load(std::memory_order_relaxed) && !s_dir.empty(); }
 
     void frame(const uint8_t *rgba, uint32_t width, uint32_t height, float aspect,
-               std::chrono::steady_clock::time_point at, std::chrono::nanoseconds period)
+               std::chrono::steady_clock::time_point at, std::chrono::nanoseconds period, bool fresh)
     {
         std::unique_lock<std::mutex> lock(s_mutex);
         if (s_dir.empty() || s_finished || !s_wanted)
             return;
         if (!s_video && !begin(height, at, period))
             return;
+        s_held += s_written != 0u && !fresh;
         // Its place in the clip, by the game's clock.
         const auto place = static_cast<uint64_t>((at - s_start + period / 2) / period);
         if (place < s_written)

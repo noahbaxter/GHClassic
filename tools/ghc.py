@@ -6,7 +6,7 @@
     tools/ghc.py bind [--isolated] [keyboard | <n>]   set up a controller; with no device, list them
     tools/ghc.py arm [out] [--scenario <file>] [--speed <x>] [--secs 30] [--disc <image>] [--shot-every 60]
                      [--res 1080p] [--set <name>=<value> ...] [--series <name>]
-    tools/ghc.py record <scenario> [--speed 2.5] [--res 1080p] [--secs 900] [--set <name>=<value> ...]
+    tools/ghc.py record <scenario> [--res 1080p] [--secs 900] [--set <name>=<value> ...]
                         [--series <name>]
     tools/ghc.py scenarios [-j 4] [--speed 2] [--review] [--discs gh2,gh1] [--releases] [name ...]
     tools/ghc.py release [--skip-build] [disc]  this platform's player package, into build/release
@@ -691,8 +691,6 @@ def cmd_arm(argv):
 def cmd_record(argv):
     parser = argparse.ArgumentParser(prog="ghc.py record")
     parser.add_argument("scenario")
-    parser.add_argument("--speed", type=float, default=2.5,
-                        help="game seconds a real one; too high and frames repeat, which the log counts")
     parser.add_argument("--res", default="1080p")
     parser.add_argument("--secs", type=int, default=900, help="real seconds before it is stopped")
     parser.add_argument("--disc")
@@ -713,7 +711,8 @@ def cmd_record(argv):
     clips = out / "clips"
     prune_runs()
     # No periodic frames: (shot) steps still come out as a sheet.
-    state = arm(out, args.scenario, args.speed, args.secs, args.disc, 1 << 30, res=args.res, games=args.discs,
+    # The game steps its clock a frame at a time, as fast as it makes them.
+    state = arm(out, args.scenario, None, args.secs, args.disc, 1 << 30, res=args.res, games=args.discs,
                 review=name, settings=args.settings, record=clips)
     print(f"{state}, log {out / 'run.log'}")
     for line in (out / "run.log").read_text(errors="replace").splitlines():

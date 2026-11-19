@@ -133,6 +133,7 @@ int main(int argc, char *argv[])
     gh2::RenderSize renderSize;
     double speed = 1.0;
     bool verbose = false;
+    bool recording = false;
     for (int i = 1; i < argc; ++i)
     {
         const std::string arg = argv[i];
@@ -158,7 +159,10 @@ int main(int argc, char *argv[])
         else if (arg == "--audio-device" && hasValue)
             gh2::setAudioDevice(argv[++i]);
         else if (arg == "--record" && hasValue)
+        {
             gh2::record::setPath(argv[++i]);
+            recording = true;
+        }
         else if (arg == "--speed" && hasValue)
             speed = std::strtod(argv[++i], nullptr);
         else if (arg == "--fast-boot")
@@ -239,6 +243,18 @@ int main(int argc, char *argv[])
             return 2;
         }
         ps2x::host_clock::setSpeed(speed);
+    }
+    // A hidden, muted recording steps the game's clock a frame at a time
+    // (runtime/host_clock.h), as fast as the machine makes them, so no
+    // --speed.
+    if (recording && hostOptions.hidden && hostOptions.mute)
+    {
+        if (speed != 1.0)
+        {
+            std::cerr << "--record makes each frame as fast as it can, with no --speed" << std::endl;
+            return 2;
+        }
+        ps2x::host_clock::step();
     }
     // After --settings, which names the file it is read from.
     if (gh2::settings::get(gh2::settings::kFastBoot))
