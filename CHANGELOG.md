@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.9.1
+
+### Changes
+- GHClassic.log now tracks more detailed system information, settings, and song runs (frame times, hitches, audio sync, memory) to assist in debugging. Remember to attach your logs when reporting an issue. NO TELEMETRY, LOGS DON'T LEAVE YOUR COMPUTER UNLESS YOU SEND ME THEM.
+- Custom songs now say "as performed by" instead of "as made famous by" (ty aaronfairest)
+- GH1's loading screen knobs now turn and the light blinks on fast loads
+
+### Bugs
+- 360 campaign's main menu showed no options (#12)
+- Deleting a band and making a new one in its slot would bring the old name back (#5)
+- Various floating white cubes appeared in some GH1 venues (#6)
+- Misplaced geo in GH1 Basement (#4)
+- Some GH1 camera shots sat behind walls on widescreen (#7)
+- A rare bad memory copy could clobber all of the game's memory
+- GH1 song loads longer than 9 seconds would crash
+
 ## v0.9
 
 **THIS IS UNFINISHED.** Expect bugs, missing features and things changing between releases.
