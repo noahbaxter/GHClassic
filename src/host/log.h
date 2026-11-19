@@ -5,7 +5,8 @@
 // capped in size, and a line for a crash. The run before is kept beside it
 // as GHClassic.prev.log, and its system line and songs are copied in, with
 // its last lines when it never closed, since the run a player reports is
-// often the one after.
+// often the one after. Player logs are posted publicly: the home folder in
+// any line is written as ~.
 
 #include <cstdint>
 #include <string>

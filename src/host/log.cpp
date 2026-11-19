@@ -9,6 +9,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <deque>
@@ -69,12 +70,31 @@ namespace gh2::log
             return text;
         }
 
+        // The home folder, each way its separators are written; every line
+        // has it as ~.
+        std::string s_home[2];
+
+        void unhome(std::string &line)
+        {
+            for (const std::string &home : s_home)
+                for (size_t at = home.empty() ? std::string::npos : line.find(home); at != std::string::npos;
+                     at = line.find(home, at + 1))
+                {
+                    // C:\Users\al is not C:\Users\alex's.
+                    const char next = at + home.size() < line.size() ? line[at + home.size()] : '\0';
+                    if (next == '\\' || next == '/' || next == '\0' || next == '\n' || next == '"' || next == '\'' ||
+                        next == ' ' || next == ')' || next == ',')
+                        line.replace(at, home.size(), "~");
+                }
+        }
+
         void write(const std::string &line, bool always = false)
         {
             std::lock_guard lock(s_mutex);
             if (s_capped && !always)
                 return;
-            const std::string out = stamp() + line;
+            std::string out = stamp() + line;
+            unhome(out);
             std::fwrite(out.data(), 1, out.size(), stderr);
             s_written += out.size();
             if (s_written > kCap && !s_capped)
@@ -231,6 +251,19 @@ namespace gh2::log
         std::setvbuf(stderr, nullptr, _IONBF, 0);
         s_toFile = true;
         s_verbose = false;
+#ifdef _WIN32
+        const char *home = std::getenv("USERPROFILE");
+#else
+        const char *home = std::getenv("HOME");
+#endif
+        if (home && std::strlen(home) > 3)
+        {
+            s_home[0] = home;
+            s_home[1] = home;
+            std::replace(s_home[1].begin(), s_home[1].end(), '\\', '/');
+            if (s_home[1] == s_home[0])
+                s_home[1].clear();
+        }
         std::cerr.rdbuf(&s_lines);
         std::cout.rdbuf(&s_lines);
 #ifdef _WIN32
