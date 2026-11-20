@@ -99,6 +99,7 @@ namespace gh2::settings
             {"star_power_overlap", Type::kBool, 0, 1, 1, 0},
             {"note_streak", Type::kBool, 0, 1, 1, 0},
             {"song_progress", Type::kBool, 0, 1, 1, 0},
+            {"tap_rope", Type::kChoice, 0, 2, 1, kRopeRails, "off line rails"},
             // The unlock-all cheat's, without its turning off saving and the
             // career (content/campaigns.cpp).
             {"unlock_all", Type::kBool, 0, 1, 1, 0},

@@ -1,6 +1,6 @@
 // A run of taps (gameplay/extended/guitar/gem_kinds.h) joined by a line on
 // the track, as later games draw it: one smooth curve through the run, two
-// white rails with a gap between. Once a tap is hit its end of the line
+// white rails with a gap between, or one line (the tap_rope setting). Once a tap is hit its end of the line
 // holds a frame, then pulls in to the next tap, across and along at once,
 // the curve laid again each frame, so what is left stands up into a short
 // hook under the gem.
@@ -46,6 +46,7 @@
 #include <array>
 #include <cmath>
 #include <map>
+#include <span>
 #include <utility>
 #include <vector>
 
@@ -67,8 +68,9 @@ namespace gh2::guitar
         constexpr bool kRopeChords = true, kRopeSustains = true;
         constexpr float kHoldMs = 17.0f, kPullInMs = 140.0f;
         constexpr float kTouchMs = 5.0f, kGatherMs = 150.0f, kMinRunMs = 60.0f;
-        // Each rail across a line: its middle's offset and half width.
-        constexpr std::array<std::pair<float, float>, 2> kRails{{{-0.24f, 0.1f}, {0.24f, 0.1f}}};
+        // Each strip across a line, its middle's offset and half width: the
+        // tap_rope setting's line, then its two rails.
+        constexpr std::array<std::pair<float, float>, 3> kStrips{{{0.0f, 0.14f}, {-0.24f, 0.1f}, {0.24f, 0.1f}}};
         // How far short of the track's far end a line starts fading out.
         constexpr float kFarFade = 20.0f;
 
@@ -310,8 +312,10 @@ namespace gh2::guitar
 
         void ride(uint8_t *rdram, uint32_t mesh, const MeshData &geometry, std::vector<std::shared_ptr<const MeshData>> &out)
         {
-            if (s_taps.empty() || geometry.verts.empty())
+            const int rope = settings::get(settings::kTapRope);
+            if (s_taps.empty() || geometry.verts.empty() || rope == settings::kRopeOff)
                 return;
+            const auto strips = rope == settings::kRopeLine ? std::span(kStrips).first(1) : std::span(kStrips).last(2);
             const uint32_t mat = load<uint32_t>(rdram, mesh + ::milo::mesh::kMat);
             if (s_dividersMat == 0u && mat != 0u && objectName(rdram, mat) == kDividersMat)
                 s_dividersMat = mat;
@@ -344,7 +348,7 @@ namespace gh2::guitar
                 if (py >= far)
                     return;
                 const float last = gy > far ? (far - py) / dy : 1.0f;
-                for (const auto &[offset, half] : kRails)
+                for (const auto &[offset, half] : strips)
                 {
                     const uint16_t first = uint16_t(line->verts.size());
                     for (int i = 0; i <= kSteps; ++i)
