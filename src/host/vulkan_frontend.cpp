@@ -729,7 +729,7 @@ namespace gh2
             std::cerr << "[sdl] window: " << SDL_GetError() << std::endl;
             return false;
         }
-        if (timing::fullscreen)
+        if (timing::fullscreen || (!s.hidden && settings::get(settings::kFullscreen)))
         {
             SDL_SetWindowFullscreen(s.window, true);
             SDL_SyncWindow(s.window);
@@ -944,6 +944,10 @@ namespace gh2
                 devicesChanged = true;
             if (event.type == SDL_EVENT_WINDOW_FOCUS_GAINED)
                 takeControllers();
+            // Kept for the next launch, however it went in or out.
+            if ((event.type == SDL_EVENT_WINDOW_ENTER_FULLSCREEN || event.type == SDL_EVENT_WINDOW_LEAVE_FULLSCREEN) &&
+                !s.hidden && settings::get(settings::kFullscreen) != (event.type == SDL_EVENT_WINDOW_ENTER_FULLSCREEN))
+                settings::set(settings::kFullscreen, event.type == SDL_EVENT_WINDOW_ENTER_FULLSCREEN);
             // Fullscreen: Cmd+F on macOS, F11 elsewhere. Not Alt+Enter, since
             // Enter is Start on the keyboard.
             if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && s.window)
