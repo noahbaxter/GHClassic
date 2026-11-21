@@ -78,13 +78,15 @@ def discs_arg(value):
 
 
 def releases(env):
-    """Every content disc image under game/, as (game, image): game/ itself
-    holds the set a run mounts, folders in it the other releases of each."""
+    """Every content disc image under game/, as (game, image), and every
+    Europe GH2 disc, as ("gh2", image), played as the game disc in place of
+    USA's: game/ itself holds the set a run mounts, folders in it the other
+    releases of each."""
     found = []
     for image in sorted(p for p in discs_dir().rglob("*") if p.suffix.lower() in (".iso", ".bin", ".chd")):
-        for game in content_games():
-            if not subprocess.run([sys.executable, ROOT / "tools" / "disc.py", "find", game, str(image)], env=env,
-                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
+        for game, release in [(g, g) for g in content_games()] + [("gh2", EUROPE)]:
+            if not subprocess.run([sys.executable, ROOT / "tools" / "disc.py", "find", release, str(image)],
+                                  env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
                 found.append((game, image))
     return found
 

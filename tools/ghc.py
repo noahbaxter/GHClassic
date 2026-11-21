@@ -762,8 +762,9 @@ def cmd_scenarios(argv):
                         help="content discs to mount, as gh2,gh1; default every one in game/. A scenario that "
                              "(needs) another skips")
     parser.add_argument("--releases", action="store_true",
-                        help="each content disc under game/, folders in it too, in turn as its game's: the "
-                             "scenarios that (needs) that game, once per disc")
+                        help="each content disc under game/, folders in it too, in turn as its game's, and each "
+                             "Europe GH2 disc as the game disc: the scenarios that (needs) that game, once per "
+                             "disc")
     parser.add_argument("names", nargs="*", help="files in scenarios/ without .dta; none means all")
     args = parser.parse_args(argv)
     # Not dotfiles: pathlib's glob matches them, and a tar made on macOS
@@ -787,7 +788,9 @@ def cmd_scenarios(argv):
         out = ROOT / "runs" / name
         started = time.time()
         # The longest plays a career's whole first tier, five songs.
-        state = arm(out, scenario, args.speed, 900, disc, env=env, games=args.discs,
+        # A gh2 release (Europe's) is the game disc itself.
+        game_disc = release[1] if release and release[0] == "gh2" else disc
+        state = arm(out, scenario, args.speed, 900, game_disc, env=env, games=args.discs,
                     review=name if args.review else None, release=release)
         log = (out / "run.log").read_text(errors="replace")
         # Anywhere in a line: the watchdog's STALL lands mid-line in the game thread's output.
