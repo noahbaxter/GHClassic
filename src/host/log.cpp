@@ -94,6 +94,11 @@ namespace gh2::log
             std::lock_guard lock(s_mutex);
             if (s_capped && !always)
                 return;
+            // PS2Recomp's, every boot: the IOP modules GH2 loads that the
+            // host stands in for. A developer's line, not one of ours to keep
+            // behind verbose().
+            if (!s_verbose && line.find("[IOP:load-failed]") != std::string::npos)
+                return;
             std::string out = stamp() + line;
             unhome(out);
             std::fwrite(out.data(), 1, out.size(), stderr);
