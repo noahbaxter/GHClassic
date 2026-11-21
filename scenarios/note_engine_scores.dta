@@ -1,6 +1,7 @@
 ; High scores under each note engine (note_engine.h) their own: a score set
 ; under one is not under the other, either way, and both come back from
 ; save.bin.
+(needs gh2)
 #include common/first_boot.dta
 (expect {note_engine} gh2)
 {game set_song shoutatthedevil}

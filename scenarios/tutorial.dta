@@ -1,0 +1,16 @@
+; The first tutorial from Training: its lesson starts and its voice plays
+; (tutorial/streams, on Europe's disc under eng/).
+(needs gh2)
+#include common/first_boot.dta
+{ui goto_screen training_screen}
+(wait_screen training_screen 10)
+(wait 1)
+(press green)
+(wait_screen tutorials_screen 10)
+(wait 1)
+(press green)
+(wait_screen tut_script_screen 60)
+(wait_until {tutorial is_vo_playing} 30)
+(wait 3)
+(shot lesson)
+(quit)
