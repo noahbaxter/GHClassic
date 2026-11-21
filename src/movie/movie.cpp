@@ -371,6 +371,19 @@ namespace gh2
             bool m_done = false;
         };
 
+        // A movie from the archive, else from the game disc's own files.
+        std::optional<ark::Made> movieFile(const std::string &path)
+        {
+            if (std::optional<ark::Made> file = ark::open(path))
+                return file;
+            DiscImage *disc = ps2ConfiguredDisc();
+            DiscImage::Extent extent;
+            if (!disc || !disc->find(path, extent) || extent.isDir)
+                return std::nullopt;
+            return ark::Made{static_cast<uint32_t>(extent.size), [disc, extent](uint64_t offset, uint8_t *dst, size_t size)
+                             { return disc->readExtent(extent, offset, dst, size); }};
+        }
+
         // PlayMovie(path, minSkipSeconds, alloc, free), retail 0x21bb60. Retail
         // plays the PSS through libmpeg, the IPU and a libsdr channel until
         // sceMpegIsEnd or a skip and returns 1 (0x21bebc), or 0 when the file
@@ -383,12 +396,7 @@ namespace gh2
             const std::string path = reinterpret_cast<const char *>(getMemPtr(rdram, GPR_U32(ctx, 4)));
             const float minSkipSeconds = ctx->f[12];
             uint32_t result = 0;
-            std::optional<ark::Made> file = ark::open(path);
-            DiscImage *disc = ps2ConfiguredDisc();
-            DiscImage::Extent extent;
-            if (!file && disc && disc->find(path, extent) && !extent.isDir)
-                file = ark::Made{static_cast<uint32_t>(extent.size), [disc, extent](uint64_t offset, uint8_t *dst, size_t size)
-                                 { return disc->readExtent(extent, offset, dst, size); }};
+            std::optional<ark::Made> file = movieFile(path);
             if (file)
             {
                 std::cerr << "[movie] playing " << path << std::endl;
@@ -412,6 +420,8 @@ namespace gh2
     {
         runtime.replaceFunction(addresses.playMovie, playMovie);
     }
+
+    bool movieExists(const std::string &path) { return movieFile(path).has_value(); }
 
     bool moviePlaying()
     {

@@ -684,11 +684,16 @@
    )
 }
 ; The store's first screen without the categories the campaign sells nothing
-; in (GH1 has no outfits): each off, and down stepping through the rest.
+; in (GH1 has no outfits, nor Videos when the disc has none of its videos, as
+; Europe's GH2): each off, and down stepping through the rest.
 {func ghc_store_categories
    {do
       ($dir {store_panel loaded_dir})
       ($shown)
+      ($videos FALSE)
+      {foreach $v (video1 video2 video3 video4)
+         {if {!= {campaigns video_file {campaigns live} $v} ""} {set $videos TRUE}}
+      }
       {set $shown ()}
       {resize $shown 0}
       {foreach $c
@@ -697,7 +702,12 @@
             (character st_characters.btn) (outfit st_outfits.btn) (video st_videos.btn)
          )
          {if {$dir exists {elem $c 1}}
-            {if_else {&& {find_exists $syscfg store {elem $c 0}} {> {size {find $syscfg store {elem $c 0}}} 1}}
+            {if_else
+               {&&
+                  {find_exists $syscfg store {elem $c 0}}
+                  {> {size {find $syscfg store {elem $c 0}}} 1}
+                  {|| $videos {!= {elem $c 0} video}}
+               }
                {push_back $shown {elem $c 1}}
                {do
                   {{$dir find {elem $c 1}} set_showing FALSE}
