@@ -265,6 +265,8 @@ namespace gh2
             uint32_t width = 0;
             uint32_t height = 0;
             bool copied = false; // filled by a screen copy: colour only
+            uint64_t lastUsed = 0;
+            Clock::time_point lastSeen{}; // as of the frame that last drew it
         };
 
         // Room for this many live textures before the pool refuses.
@@ -2928,6 +2930,24 @@ namespace gh2
                 }
                 ++it;
             }
+            // A rendered texture is keyed by its guest address, new with each
+            // venue loaded; one not drawn for kEvictAfter goes, its key with
+            // it once none of its generations is left.
+            for (auto it = targets.begin(); it != targets.end();)
+            {
+                bool kept = false;
+                for (TargetImage &t : it->second)
+                {
+                    if (t.color != VK_NULL_HANDLE && t.lastUsed + kRetireAfter < serial &&
+                        t.lastSeen + kEvictAfter < frameAt)
+                    {
+                        destroyTarget(t);
+                        ++stats.evicted;
+                    }
+                    kept = kept || t.color != VK_NULL_HANDLE;
+                }
+                it = kept ? std::next(it) : targets.erase(it);
+            }
         }
     };
 
@@ -3390,8 +3410,13 @@ namespace gh2
             if (images.size() <= run.generation)
                 images.resize(run.generation + 1u);
         }
+        // Stamped once made: remade at a new size, it starts over blank.
         for (TargetRun &run : runs)
-            run.image = s.targetImage(run.tex, run.generation, run.width, run.height, run.copied);
+            if ((run.image = s.targetImage(run.tex, run.generation, run.width, run.height, run.copied)))
+            {
+                run.image->lastUsed = serial;
+                run.image->lastSeen = s.frameAt;
+            }
 
         s.addVectorTables();
         std::vector<PushConstants> pushes(frame.draws.size());
