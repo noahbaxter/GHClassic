@@ -72,13 +72,17 @@ namespace gh2
     // keys would be a guitar's frets and strums, so only its Esc works,
     // as Start; in its pause menu Esc is Start too, to resume. The results'
     // breakdown scrolls while up or down is held, so they stay held there,
-    // not stepped as a menu's. Callable from any thread.
+    // not stepped as a menu's. Not a song's, the press-start splash: it takes
+    // Start alone, which on the keyboard is Enter there too, so a player with
+    // no controller signs in by the key the screen leaves them to guess.
+    // Callable from any thread.
     enum class SongScreen
     {
         kOther,
         kPlaying,
         kPaused,
         kBreakdown,
+        kSplash,
     };
     void songScreen(SongScreen screen);
 
