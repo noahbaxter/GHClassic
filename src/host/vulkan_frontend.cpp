@@ -1249,6 +1249,8 @@ namespace gh2
         if (!m_state)
             return;
         State &s = *m_state;
+        // A song still on gets its line while its GPU memory is all there.
+        song_log::quit();
         record::finish();
         if (perf::logging())
             std::cerr << s.times.summary();

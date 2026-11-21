@@ -216,6 +216,17 @@ namespace gh2::song_log
             s_outcome = won ? "won" : "failed";
     }
 
+    void quit()
+    {
+        // try_lock: exit() can come from a thread while another holds it.
+        std::unique_lock lock(s_mutex, std::try_to_lock);
+        if (!lock || !s_on)
+            return;
+        s_on = false;
+        s_outcome = "quit";
+        report();
+    }
+
     void present(bool isNew, float gpuMs, float recordMs, float gameWaitMs, float displayWaitMs)
     {
         std::lock_guard lock(s_mutex);
@@ -233,7 +244,8 @@ namespace gh2::song_log
             reset();
         }
         s_songAt = song;
-        if (song <= 0.0f)
+        // Counted while it plays: not its intro, nor a pause menu's frames.
+        if (song <= 0.0f || !s_playing)
         {
             s_lastPresent = s_lastNew = {};
             return;
