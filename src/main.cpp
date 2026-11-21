@@ -45,6 +45,7 @@
 #include "host/log.h"
 #include "host/perf.h"
 #include "host/record.h"
+#include "host/song_log.h"
 #include "host/update.h"
 #include "host/vulkan_frontend.h"
 #include "save/save.h"
@@ -77,6 +78,13 @@
 
 namespace
 {
+    // The log's last lines: a song still on, then the close.
+    void closeLog()
+    {
+        gh2::song_log::quit();
+        gh2::log::closed();
+    }
+
     // file:///... with anything but unreserved characters and '/' escaped,
     // as macOS takes no space in a URL.
     std::string fileUrl(const std::filesystem::path &path)
@@ -273,7 +281,7 @@ int main(int argc, char *argv[])
     {
         gh2::log::open(gh2::settings::userDataPath("GHClassic.log"));
         // A quit by exit() closes it as much as the window does.
-        std::atexit(gh2::log::closed);
+        std::atexit(closeLog);
     }
     if (verbose)
         gh2::log::setVerbose();
@@ -334,7 +342,7 @@ int main(int argc, char *argv[])
     runtime.run();
 
     // Guest threads may still hold host resources; skip static destructors.
-    gh2::log::closed();
+    closeLog();
     std::cout.flush();
     std::cerr.flush();
     std::_Exit(0);
