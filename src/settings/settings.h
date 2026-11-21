@@ -13,6 +13,7 @@ namespace gh2::settings
     enum Key
     {
         kWidescreen,
+        kFullscreen,   // as the window last was: kept as it goes in or out, by key or the OS
         kFrameRateCap, // game frames per second, 0 for no cap; never above the display's rate with kVsync
         kVsync,        // presents wait for the display's refresh (FIFO); off, they show at once and may tear
         kMipmaps,   // smaller copies for textures the game shipped without
