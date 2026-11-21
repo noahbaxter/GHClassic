@@ -8,6 +8,10 @@
 // history matches across reads; a jump starts afresh from that sample. What
 // follows a jump is kept a while, so a jump back there (practice's section
 // again) has it at once, as the game reads it all again before it plays.
+//
+// The game thread reads it, and waits for its read. So a thread of its own
+// encodes the song last read ahead of its reads, a step at a time: a read
+// finds its rounds done, and waits at most for that thread's one step.
 
 #include "content/vgs.h"
 
@@ -15,10 +19,14 @@
 #include "synth/adpcm.h"
 
 #include <algorithm>
+#include <atomic>
+#include <condition_variable>
 #include <cstring>
 #include <deque>
 #include <iostream>
 #include <list>
+#include <mutex>
+#include <thread>
 #include <vector>
 
 namespace gh2::vgs
@@ -45,6 +53,7 @@ namespace gh2::vgs
             std::unique_ptr<Pcm> pcm;
             uint32_t rounds = 0u; // blocks per channel, its silent last one too
             uint32_t next = 0u;   // the round the decoder is at
+            uint32_t ahead = 0u;  // encoded ahead of the reads up to here
             std::vector<synth::AdpcmState> states;
             uint32_t windowStart = 0u; // the first round in window
             std::vector<uint8_t> window;
@@ -66,6 +75,17 @@ namespace gh2::vgs
 
         // Most recently used first.
         std::list<std::pair<const Source *, std::unique_ptr<Stream>>> s_open;
+        // Over s_open and every stream in it; recursive, as a speed's stream
+        // reads the song's own vgs inside its read (song_speed.cpp). A read
+        // about to take it is counted, so the thread encoding ahead lets it
+        // in between steps.
+        std::recursive_mutex s_mutex;
+        std::condition_variable_any s_wake;
+        std::atomic<int> s_reading{0};
+        // The stream the game read last, not one read inside a read nor by
+        // the thread encoding ahead.
+        const Stream *s_lastRead = nullptr;
+        thread_local bool t_inner = false;
 
         std::unique_ptr<Stream> open(const Source &source)
         {
@@ -101,7 +121,9 @@ namespace gh2::vgs
             return s_open.front().second.get();
         }
 
-        // Encodes up to kRoundsAtOnce rounds onto the window.
+        // Encodes up to kRoundsAtOnce rounds onto the window. The same steps
+        // ahead as on a read, as a speed's stretch gives other samples for
+        // input cut up otherwise.
         void encode(Stream &s)
         {
             const uint32_t count = std::min(kRoundsAtOnce, s.rounds - s.next);
@@ -187,8 +209,44 @@ namespace gh2::vgs
                 encode(s);
         }
 
+        // The song last read, encoded on ahead of its reads.
+        void encodeAhead()
+        {
+            t_inner = true;
+            std::unique_lock lock(s_mutex);
+            for (;;)
+            {
+                Stream *s = nullptr;
+                for (auto &open : s_open)
+                    if (open.second.get() == s_lastRead)
+                        s = open.second.get();
+                if (!s || s->next >= std::min(s->ahead, s->rounds))
+                {
+                    s_wake.wait(lock);
+                    continue;
+                }
+                encode(*s);
+                lock.unlock();
+                while (s_reading.load() > 0)
+                    std::this_thread::yield();
+                lock.lock();
+            }
+        }
+
+        // Before any other use of s_open.
+        std::unique_lock<std::recursive_mutex> lockStreams()
+        {
+            static const bool started = (std::thread(encodeAhead).detach(), true);
+            (void)started;
+            ++s_reading;
+            std::unique_lock lock(s_mutex);
+            --s_reading;
+            return lock;
+        }
+
         size_t read(const Source &source, uint64_t offset, uint8_t *dst, size_t size)
         {
+            const auto lock = lockStreams();
             Stream *s = opened(source);
             if (!s)
                 return 0u;
@@ -211,7 +269,16 @@ namespace gh2::vgs
             const uint64_t body = offset + done - kHeaderBytes;
             const uint32_t first = static_cast<uint32_t>(body / s->roundBytes());
             const uint32_t last = static_cast<uint32_t>((body + (size - done) - 1u) / s->roundBytes());
+            const bool outer = !t_inner;
+            t_inner = true;
             cover(*s, first, last);
+            t_inner = !outer;
+            s->ahead = last + kFollowRounds;
+            if (outer)
+            {
+                s_lastRead = s;
+                s_wake.notify_one();
+            }
             const size_t at = static_cast<size_t>(body - uint64_t(s->windowStart) * s->roundBytes());
             const size_t n = std::min(size - done, s->window.size() - std::min(at, s->window.size()));
             std::memcpy(dst + done, s->window.data() + at, n);
@@ -222,6 +289,7 @@ namespace gh2::vgs
     std::optional<ark::Made> made(const std::string &path, std::function<std::unique_ptr<Pcm>()> open)
     {
         static std::deque<Source> s_sources; // the reader and open list point at them
+        const auto lock = lockStreams();
         // One a path, so a file opened again (a section gone round) finds
         // its song still open, and what it kept; opened afresh (reopen) with
         // the newest way to open it.
@@ -245,6 +313,7 @@ namespace gh2::vgs
 
     void reopen(const std::string &path)
     {
+        const auto lock = lockStreams();
         s_open.remove_if([&](const auto &open) { return open.first->path == path; });
     }
 
