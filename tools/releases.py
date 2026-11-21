@@ -13,6 +13,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SERIAL = "SLUS-21447"
+# Europe's GH2, which plays through a patch to USA's executable.
+EUROPE, EUROPE_ELF = "SLES-54442", "SLES_544.42"
 
 
 def main_checkout():
@@ -39,6 +41,19 @@ def find_disc(env):
     if result.returncode:
         sys.exit(f"no {SERIAL} disc image in game/; pass one")
     return result.stdout.strip()
+
+
+def find_europe(disc, env):
+    """Europe's GH2 executable for the build to patch from, else None:
+    SLES_544.42 beside a bare USA one (CI's build/elf, ELF_REPO's), else
+    a Europe disc image in game/."""
+    if disc and Path(disc).suffix.lower() not in (".iso", ".bin", ".chd"):
+        beside = Path(disc).with_name(EUROPE_ELF)
+        return str(beside) if beside.is_file() else None
+    images = sorted(str(p) for p in discs_dir().glob("*"))
+    result = subprocess.run([sys.executable, ROOT / "tools" / "disc.py", "find", EUROPE, *images],
+                            env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    return None if result.returncode else result.stdout.strip()
 
 
 def content_games():

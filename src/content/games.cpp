@@ -47,14 +47,11 @@ namespace gh2::games
                 continue;
             }
             const std::string serial = volume->serial();
-            const char *game = nullptr;
-            for (const Release &release : kReleases)
-                if (serial == release.serial)
-                    game = release.game;
-            if (!game)
+            const std::string game = of(serial);
+            if (game.empty())
                 std::cerr << "[games] " << image.filename().string() << ": " << serial
                           << " is no release this build takes content from" << std::endl;
-            else if (std::string(game) != kEngine)
+            else if (game != kEngine)
                 found.emplace(game, image);
         }
         std::vector<std::string> order(std::begin(kOrder), std::end(kOrder));
@@ -64,6 +61,14 @@ namespace gh2::games
         for (const std::string &game : order)
             if (const auto it = found.find(game); it != found.end())
                 ark::addDisc(it->second);
+    }
+
+    std::string of(const std::string &serial)
+    {
+        for (const Release &release : kReleases)
+            if (serial == release.serial)
+                return release.game;
+        return {};
     }
 
     std::optional<size_t> disc(const std::string &game)

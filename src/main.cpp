@@ -285,25 +285,26 @@ int main(int argc, char *argv[])
         return 0;
 
     // The disc, and this build's executable on it, before any window opens.
-    std::string why;
     if (discPath.empty())
     {
-        discPath = gh2::disc::find(why);
+        discPath = gh2::disc::find();
         if (discPath.empty())
         {
-            const std::filesystem::path folder = gh2::disc::folder();
             if (!hostOptions.hidden)
-                SDL_OpenURL(fileUrl(folder).c_str());
-            return fail(hostOptions, "Put your Guitar Hero II (USA) disc image (.iso, .chd or .bin) in\n" +
-                                         folder.string() + "\nthen start GH Classic again.\n\n" + why);
+                SDL_OpenURL(fileUrl(gh2::disc::folder()).c_str());
+            return fail(hostOptions, gh2::disc::missing());
         }
         // The other games' discs from beside it, unless the run named its own.
         if (!contentGiven)
             gh2::games::mount(gh2::disc::images());
     }
+    std::string why;
     const std::vector<uint8_t> elf = gh2::disc::bootElf(discPath, why);
     if (elf.empty())
-        return fail(hostOptions, discPath.string() + ": " + why);
+    {
+        std::cerr << "[disc] " << discPath.string() << ": " << why << std::endl;
+        return fail(hostOptions, gh2::disc::missing());
+    }
 
     PS2Runtime runtime;
     runtime.setHostOptions(hostOptions);
