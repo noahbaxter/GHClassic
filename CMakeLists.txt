@@ -291,6 +291,7 @@ set(GHC_GAME_SOURCES
     src/content/campaigns.cpp
     src/content/card.cpp
     src/content/crowd_cards.cpp
+    src/content/crowd_presence.cpp
     src/content/focus.cpp
     src/content/shot_spot.cpp
     src/content/floor_spot.cpp
@@ -364,6 +365,7 @@ set(GHC_GAME_SOURCES
     src/gameplay/engine/gh1/star_power.cpp
     src/gameplay/engine/gh1/watcher.cpp
     src/gameplay/engine/hopo_lock.cpp
+    src/gameplay/engine/no_fail.cpp
     src/gameplay/engine/note_engine.cpp
     src/gameplay/engine/star_power_overlap.cpp
     src/gameplay/engine/strum_limit.cpp
@@ -607,12 +609,14 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     src/ui/dta/campaigns.dta src/gh1/menus.dta src/gh1/scripts.dta src/ui/dta/quickplay_pickers.dta
     src/ui/dta/quickplay_setup.dta src/ui/dta/multiplayer.dta src/ui/dta/preshow_guitarist.dta src/ui/dta/in_song.dta
     src/content/guitar_copy.dta src/hub/preshow_picks.dta src/ui/dta/game_settings.dta src/ui/dta/photo_mode.dta
-    src/ui/dta/note_streak.dta src/ui/dta/streak_counter.dta src/ui/dta/song_progress.dta src/ui/dta/players.dta
+    src/ui/dta/note_streak.dta src/ui/dta/streak_counter.dta src/ui/dta/song_progress.dta src/ui/dta/no_fail.dta src/ui/dta/crowd_presence.dta src/ui/dta/players.dta
     src/ui/dta/controllers.dta src/ui/dta/profiles.dta)
 file(READ src/ui/dta/shared/box.dta GHC_BOX_DTA)
 file(READ src/ui/dta/note_streak.dta GHC_NOTE_STREAK_DTA)
 file(READ src/ui/dta/streak_counter.dta GHC_STREAK_COUNTER_DTA)
 file(READ src/ui/dta/song_progress.dta GHC_SONG_PROGRESS_DTA)
+file(READ src/ui/dta/no_fail.dta GHC_NO_FAIL_DTA)
+file(READ src/ui/dta/crowd_presence.dta GHC_CROWD_PRESENCE_DTA)
 file(READ src/ui/dta/game_settings.dta GHC_GAME_SETTINGS_DTA)
 file(READ src/ui/dta/photo_mode.dta GHC_PHOTO_MODE_DTA)
 file(READ src/ui/dta/players.dta GHC_PLAYERS_DTA)

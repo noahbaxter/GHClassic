@@ -1,0 +1,94 @@
+; A no_fail fail (gameplay/engine/no_fail.cpp): the rock meter powered down
+; where it is. Nothing on it lit, its face dull and ROCK near black, its frame
+; as bright as ever and its needle where it died. The frame shares the face's
+; mat, so the face gets a copy to dull. no_fail.cpp stops the meter's Poll,
+; which would light it all again; it goes back as the song starts over.
+{set $no_fail_lights
+   (rock_light_red.mesh rock_light_yellow.mesh rock_light_green.mesh
+      rock_light_red_front.mesh rock_light_yellow_front.mesh rock_light_green_front.mesh
+      vu_needle_led.mesh hud_rock_light.mesh hud_rock_light_front.mesh)
+}
+
+{func no_fail_face_make
+   {new Mat no_fail_face.mat}
+}
+
+; The hub the needle turns on is part of the frame's mesh, so it can't be
+; dulled apart from the edges: a dark half disc over it, the help bar's round
+; end turned to curve up, drawn by the meter's Group after its own.
+; x y z of its flat edge's middle, then how tall and how wide from there.
+{set $no_fail_hub (-8 -3 -124 26 35)}
+
+{func no_fail_hub_make
+   {ghc_box_make hud no_fail_hub {hud find hud1_rock_meter.view} 6}
+   {ghc_box_color hud no_fail_hub 0 0 0 0.6}
+   {{hud find hud1_rock_meter.view} insert
+      (objects {{hud find hud1_rock_meter.view} size (objects)})
+      {hud find no_fail_hub_right.mesh}}
+   {{hud loaded_dir} sync_objects}
+}
+
+{func no_fail_hub_put
+   {do
+      ($hub {hud find no_fail_hub_right.mesh})
+      {$hub set_local_rot 0 90 0}
+      {$hub set_local_pos {elem $no_fail_hub 0} {elem $no_fail_hub 1} {elem $no_fail_hub 2}}
+      {$hub set_local_scale {/ {elem $no_fail_hub 3} -16.0} 1 {/ {* {elem $no_fail_hub 4} 2} 16.0}}
+   }
+}
+
+{func no_fail_meter_hold
+   {do
+      ($meter {hud find BandCrowdMeterDir1})
+      {set $no_fail_quiet TRUE}
+      {if $meter
+         {if {! {hud find no_fail_hub_right.mesh}}
+            {ghc_with_this hud no_fail_hub_make}
+         }
+         {no_fail_hub_put}
+         {{hud find no_fail_hub_right.mesh} set_showing TRUE}
+         {hud show_message kPlayerShared song_failed}
+         ; Those lit, to light again.
+         {set $no_fail_lit {array 0}}
+         {foreach $light $no_fail_lights
+            {if {{$meter find $light} showing}
+               {push_back $no_fail_lit $light}
+               {{$meter find $light} set_showing FALSE}
+            }
+         }
+         {set $no_fail_frame {{$meter find rock_face_2d.mat} get color}}
+         {set $no_fail_sign {{$meter find rock_sign_2d.mat} get color}}
+         {set $no_fail_glow {{$meter find meter_glowplane.mat} get color}}
+         {if {! {$meter find no_fail_face.mat}}
+            {ghc_with_this $meter no_fail_face_make}
+         }
+         {{$meter find no_fail_face.mat} copy {$meter find rock_face_2d.mat} 1}
+         {{$meter find no_fail_face.mat} set color {pack_color 0.3 0.3 0.3}}
+         {{$meter find rock_face_2d.mesh} set_mat {$meter find no_fail_face.mat}}
+         {{$meter find rock_face_2d.mat} set color {pack_color 1 1 1}}
+         {{$meter find rock_sign_2d.mat} set color {pack_color 0.1 0.1 0.1}}
+         ; The glow behind the sign, added: black, none.
+         {{$meter find meter_glowplane.mat} set color {pack_color 0 0 0}}
+      }
+   }
+}
+
+{func no_fail_meter_back
+   {do
+      ($meter {hud find BandCrowdMeterDir1})
+      {set $no_fail_quiet FALSE}
+      {if $meter
+         {if {hud find no_fail_hub_right.mesh}
+            {{hud find no_fail_hub_right.mesh} set_showing FALSE}
+         }
+         {foreach $light $no_fail_lit
+            {{$meter find $light} set_showing TRUE}
+         }
+         {{$meter find rock_face_2d.mesh} set_mat {$meter find rock_face_2d.mat}}
+         {{$meter find rock_face_2d.mat} set color $no_fail_frame}
+         {{$meter find rock_sign_2d.mat} set color $no_fail_sign}
+         {{$meter find meter_glowplane.mat} set color $no_fail_glow}
+      }
+   }
+}
+

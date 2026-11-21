@@ -18,6 +18,15 @@ namespace gh2
         uint32_t rndTestPoint; // Rnd::TestPoint
         uint32_t sphereOutsideFrustum; // operator>(const Sphere &, const Frustum &)
         uint32_t gamePanelSetGameOver; // GamePanel::SetGameOver(bool won)
+        uint32_t performerLoseGame;    // Performer::LoseGame, as the rock meter runs out
+        uint32_t sideRailAnimPoll;     // SideRailAnim::Poll(float seconds, PlayerState &, PlayerState &)
+        uint32_t sideRailAnimGetType;  // SideRailAnim::GetType(PlayerState &): none, warning, star, both
+        uint32_t crowdMeterPoll;       // CrowdMeter::Poll, the rock meter's needle, lamps and sign each frame
+        uint32_t crowdAudioSetExcitement; // CrowdAudio::SetExcitement(int), its excitement message
+        uint32_t crowdAudioPlayOneOff;    // CrowdAudio::PlayOneOff(Sfx *), the one playing at +0xA0
+        uint32_t crowdAudioSetMasterVolume; // CrowdAudio::SetMasterVolume(float dB), its loop's
+        uint32_t camShotStartAnim;        // CamShot::StartAnim, as each shot starts
+        uint32_t worldCrowdDrawShowing;   // WorldCrowd::DrawShowing(DrawType)
         uint32_t gamePanelReset;
         uint32_t gamePanelExit;
         uint32_t winCampaignSong; // GameConfig::WinCampaignSong
@@ -430,6 +439,15 @@ namespace gh2
         .rndTestPoint = 0x1d55b8u,
         .sphereOutsideFrustum = 0x2d9170u,
         .gamePanelSetGameOver = 0x108178u,
+        .performerLoseGame = 0x10fe30u,
+        .sideRailAnimPoll = 0x15e158u,
+        .sideRailAnimGetType = 0x15e1f8u,
+        .crowdMeterPoll = 0x29fee8u,
+        .crowdAudioSetExcitement = 0x1239d0u,
+        .crowdAudioPlayOneOff = 0x124310u,
+        .crowdAudioSetMasterVolume = 0x123ed8u,
+        .camShotStartAnim = 0x262700u,
+        .worldCrowdDrawShowing = 0x26ae00u,
         .gamePanelReset = 0x105fd8u,
         .gamePanelExit = 0x106d50u,
         .winCampaignSong = 0x126f10u,

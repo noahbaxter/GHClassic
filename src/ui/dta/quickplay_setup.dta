@@ -649,10 +649,11 @@
 
 ; The modifiers: the game's own cheats (long_cheats, gh2.dta) as boxes, named
 ; as its own messages for them name them (cheat_*), each the global the cheat
-; sets. Hyperspeed's is gone (game_settings.dta). The two crowds are one
-; global, so one ticked unticks the other. The scene is Video Settings'
-; (video_settings.milo): its four rows of a box each, and two more as its
-; last again, a row further down each.
+; sets, and No Fail, ours ({no_fail}, gameplay/engine/no_fail.h). Hyperspeed's
+; is gone (game_settings.dta). The two crowds are one global, so one ticked
+; unticks the other. The scene is Video Settings' (video_settings.milo): its
+; four rows of a box each, and three more as its last again, a row further
+; down each.
 {if {! {exists ghc_qp_extras_screen}}
    ; As the scene's own panel is (options.dta): a plain one takes no select.
    {new SliderPanel ghc_qp_extras_panel}
@@ -674,6 +675,7 @@
             (p_scan.btn p_scan.chk cheat_flaming_head)
             (ex_eyeball.btn ex_eyeball.chk cheat_eyeball_head_crowd)
             (ex_monkey.btn ex_monkey.chk cheat_monkey_head_crowd)
+            (ex_no_fail.btn ex_no_fail.chk ghc_no_fail)
          )
       )
       (enter
@@ -703,7 +705,7 @@
                {p_scan.btn get_local_pos $x $y $z}
                {p_scan.chk get_local_pos $cx $cy $cz}
                {set $gap {'-' $z $gap}}
-               {foreach $row ((ex_eyeball.btn ex_eyeball.chk) (ex_monkey.btn ex_monkey.chk))
+               {foreach $row ((ex_eyeball.btn ex_eyeball.chk) (ex_monkey.btn ex_monkey.chk) (ex_no_fail.btn ex_no_fail.chk))
                   {new {p_scan.btn class_name} {elem $row 0}}
                   {{$this find {elem $row 0}} copy p_scan.btn 0}
                   {{$this find {elem $row 0}} set trans_parent {p_scan.btn get trans_parent}}
@@ -723,7 +725,8 @@
                }
                {p_scan.btn set nav_down ex_eyeball.btn}
                {ex_eyeball.btn set nav_down ex_monkey.btn}
-               {ex_monkey.btn set nav_down gs_left_p1.btn}
+               {ex_monkey.btn set nav_down ex_no_fail.btn}
+               {ex_no_fail.btn set nav_down gs_left_p1.btn}
                {{$this loaded_dir} sync_objects}
             }
          }
@@ -735,6 +738,7 @@
          {p_scan.chk set_check $cheat_enabled_flaming_head}
          {ex_eyeball.chk set_check {== $cheat_crowd_heads eyeball_crowd_heads}}
          {ex_monkey.chk set_check {== $cheat_crowd_heads monkey_crowd_heads}}
+         {ex_no_fail.chk set_check {no_fail}}
       )
       (SELECT_START_MSG
          {switch $component
@@ -746,6 +750,7 @@
                {set $cheat_crowd_heads {if_else {== $cheat_crowd_heads eyeball_crowd_heads} 0 eyeball_crowd_heads}})
             (ex_monkey.btn
                {set $cheat_crowd_heads {if_else {== $cheat_crowd_heads monkey_crowd_heads} 0 monkey_crowd_heads}})
+            (ex_no_fail.btn {no_fail {! {no_fail}}})
          }
          {$this sync}
          kDataUnhandled

@@ -101,6 +101,7 @@
 #include "synth/synth.h"
 #include "settings/video_options.h"
 #include "gameplay/engine/star_power_overlap.h"
+#include "gameplay/engine/no_fail.h"
 #include "gameplay/engine/strum_limit.h"
 #include "gameplay/engine/sustain_release.h"
 #include "gameplay/engine/track_start.h"
@@ -192,6 +193,7 @@ namespace
         // After the note engine, whose hook on BeatMatcher::Swing it wraps:
         // a strum it drops never reaches the engine.
         gh2::installStrumLimit(runtime, gh2::kSlus21447);
+        gh2::installNoFail(runtime, gh2::kSlus21447);
         gh2::installTourOrHigher(runtime, gh2::kSlus21447);
         gh2::installNoteSpeed(runtime, gh2::kSlus21447);
         gh2::installRetrack(runtime, gh2::kSlus21447);

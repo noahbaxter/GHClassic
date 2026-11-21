@@ -427,8 +427,9 @@ namespace gh2::scenario
                 }
                 else if (verb == "shot")
                 {
-                    // Nothing more runs until that frame is written.
-                    requestShot(array.symbol(1));
+                    // Nothing more runs until that frame is written. Its name
+                    // a word, or what an expression makes ({sprint ...}).
+                    requestShot(text(rdram, array.arg(1)));
                     s_shooting = true;
                     return;
                 }
