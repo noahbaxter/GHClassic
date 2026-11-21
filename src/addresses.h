@@ -18,6 +18,7 @@ namespace gh2
         uint32_t rndTestPoint; // Rnd::TestPoint
         uint32_t sphereOutsideFrustum; // operator>(const Sphere &, const Frustum &)
         uint32_t gamePanelSetGameOver; // GamePanel::SetGameOver(bool won)
+        uint32_t performerLoseGame;    // Performer::LoseGame, as the rock meter runs out
         uint32_t gamePanelReset;
         uint32_t gamePanelExit;
         uint32_t winCampaignSong; // GameConfig::WinCampaignSong
@@ -430,6 +431,7 @@ namespace gh2
         .rndTestPoint = 0x1d55b8u,
         .sphereOutsideFrustum = 0x2d9170u,
         .gamePanelSetGameOver = 0x108178u,
+        .performerLoseGame = 0x10fe30u,
         .gamePanelReset = 0x105fd8u,
         .gamePanelExit = 0x106d50u,
         .winCampaignSong = 0x126f10u,

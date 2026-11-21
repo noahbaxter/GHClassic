@@ -98,6 +98,7 @@ namespace gh2::settings
             {"whammy_hold", Type::kBool, 0, 1, 1, 0},
             {"strum_limit", Type::kBool, 0, 1, 1, 1},
             {"star_power_overlap", Type::kBool, 0, 1, 1, 0},
+            {"no_fail", Type::kBool, 0, 1, 1, 0},
             {"note_streak", Type::kBool, 0, 1, 1, 0},
             {"song_progress", Type::kBool, 0, 1, 1, 0},
             {"tap_rope", Type::kChoice, 0, 2, 1, kRopeRails, "off line rails"},

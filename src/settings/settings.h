@@ -38,6 +38,7 @@ namespace gh2::settings
         kWhammyHold, // a whammy bar held down bends every sustain
         kStrumLimit, // a strum within 52 ms of the last taken is dropped, as retail
         kStarPowerOverlap, // a star phrase finished during star power adds to it
+        kNoFail,           // in quick play the rock meter can't end a song; the run is kept, marked failed
         kNoteStreak, // the streak counter under the score meter and its popups
         kSongProgress, // a bar under the rock meter filling as the song plays
         kTapRope,      // the line joining a run of taps on the track
