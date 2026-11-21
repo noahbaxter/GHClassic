@@ -77,6 +77,9 @@ namespace gh2::song_log
         std::string s_what;
         const char *s_outcome = "left";
         Clock::time_point s_began, s_lastPresent, s_lastNew;
+        // The loading screen's start, for how long it took to the song's;
+        // none for a song started without one (practice's restarts).
+        Clock::time_point s_loading;
         float s_songAt = -1.0f;
         Histogram s_frames, s_held;
         // Where each frame went: the GPU's passes, recording its draws, and
@@ -109,7 +112,12 @@ namespace gh2::song_log
                      std::to_string(static_cast<int>(call.number(5))) + "p, venue " + call.symbol(6);
             // The calibration it is played with, which can change mid-run.
             std::cerr << "[song] start " << s_what << ", video " << settings::get(settings::kVideoLagMs)
-                      << " ms, audio " << settings::get(settings::kAudioLagMs) << " ms" << std::endl;
+                      << " ms, audio " << settings::get(settings::kAudioLagMs) << " ms";
+            if (s_loading != Clock::time_point{})
+                std::cerr << ", loaded in "
+                          << std::chrono::duration_cast<std::chrono::milliseconds>(s_began - s_loading).count() << " ms";
+            std::cerr << std::endl;
+            s_loading = {};
             return {};
         }
 
@@ -195,6 +203,8 @@ namespace gh2::song_log
             on = s_on;
             s_playing = playedOn(name);
             s_lastNew = {}; // a pause menu's wait is no freeze
+            if (name == "loading_screen")
+                s_loading = Clock::now();
         }
         if (on && !inSong(name))
             end(name == "practice_end_screen" ? "finished" : nullptr);
