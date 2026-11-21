@@ -56,6 +56,15 @@ namespace gh2::song_log
                         return i + 1u == bins.size() ? max : static_cast<float>(i) / 4.0f;
                 return 0.0f;
             }
+
+            // How many took longer than `ms`.
+            uint32_t above(float ms) const
+            {
+                uint32_t n = 0;
+                for (size_t i = std::min<size_t>(static_cast<size_t>(ms * 4.0f) + 1u, bins.size()); i < bins.size(); ++i)
+                    n += bins[i];
+                return n;
+            }
         };
 
         std::mutex s_mutex;
@@ -70,6 +79,9 @@ namespace gh2::song_log
         Clock::time_point s_began, s_lastPresent, s_lastNew;
         float s_songAt = -1.0f;
         Histogram s_frames, s_held;
+        // Where each frame went: the GPU's passes, recording its draws, and
+        // waiting on the game thread's frame or on the display.
+        Histogram s_gpu, s_record, s_gameWait, s_displayWait;
         int s_hitches = 0;
         uint32_t s_locks = 0, s_snaps = 0;
         double s_errorSum = 0.0;
@@ -108,7 +120,7 @@ namespace gh2::song_log
             s_began = Clock::now();
             s_lastPresent = s_lastNew = {};
             s_songAt = -1.0f;
-            s_frames = s_held = {};
+            s_frames = s_held = s_gpu = s_record = s_gameWait = s_displayWait = {};
             s_hitches = 0;
             s_locks = s_snaps = 0;
             s_errorSum = 0.0;
@@ -137,14 +149,21 @@ namespace gh2::song_log
             const textures::Reads reads = textures::reads();
             constexpr uint64_t kMB = 1u << 20;
             const uint64_t gpu = s_gpuBytes ? s_gpuBytes(s_gpuOf) : 0u;
-            char line[640];
+            // A frame half again the usual missed the display's refresh.
+            const float usual = s_frames.at(0.5);
+            char line[900];
             std::snprintf(line, sizeof line,
-                          "[song] end %s, %s after %d:%02d: frames p50 %.1f p99 %.1f max %.0f ms, game %.0f fps p99 "
-                          "%.1f ms, %d held over %.0f ms; song clock to sound mean %+.1f max %.1f ms, %u jumps; "
+                          "[song] end %s, %s after %d:%02d: frames p50 %.1f p99 %.1f max %.0f ms, %u of %u missed; "
+                          "game %.0f fps p99 %.1f ms, %d held over %.0f ms; per frame p50/p99 ms gpu %.1f/%.1f, "
+                          "record %.1f/%.1f, wait for game %.1f/%.1f, wait for gpu+display %.1f/%.1f; "
+                          "song clock to sound mean %+.1f max %.1f ms, %u jumps; "
                           "sound late %u times, worst %.0f ms; game thread read %llu textures in %llu ms; memory "
                           "%llu MB, gpu %llu MB",
-                          s_what.c_str(), s_outcome, seconds / 60, seconds % 60, s_frames.at(0.5), s_frames.at(0.99),
-                          s_frames.max, gameFps, s_held.at(0.99), s_hitches, kHitchMs,
+                          s_what.c_str(), s_outcome, seconds / 60, seconds % 60, usual, s_frames.at(0.99),
+                          s_frames.max, usual > 0.0f ? s_frames.above(usual * 1.5f) : 0u, s_frames.count, gameFps,
+                          s_held.at(0.99), s_hitches, kHitchMs, s_gpu.at(0.5), s_gpu.at(0.99), s_record.at(0.5),
+                          s_record.at(0.99), s_gameWait.at(0.5), s_gameWait.at(0.99), s_displayWait.at(0.5),
+                          s_displayWait.at(0.99),
                           s_locks ? s_errorSum / s_locks : 0.0, s_errorMax, s_snaps, s_late, s_lateWorst,
                           static_cast<unsigned long long>(reads.count - s_readsAt.count),
                           static_cast<unsigned long long>((reads.ns - s_readsAt.ns) / 1000000u),
@@ -197,7 +216,7 @@ namespace gh2::song_log
             s_outcome = won ? "won" : "failed";
     }
 
-    void present(bool isNew)
+    void present(bool isNew, float gpuMs, float recordMs, float gameWaitMs, float displayWaitMs)
     {
         std::lock_guard lock(s_mutex);
         const Clock::time_point now = Clock::now();
@@ -222,6 +241,10 @@ namespace gh2::song_log
         if (s_lastPresent != Clock::time_point{})
             s_frames.add(std::chrono::duration<float, std::milli>(now - s_lastPresent).count());
         s_lastPresent = now;
+        s_gpu.add(gpuMs);
+        s_record.add(recordMs);
+        s_gameWait.add(gameWaitMs);
+        s_displayWait.add(displayWaitMs);
         if (!isNew)
         {
             if (s_playing && !s_frozen && s_lastNew != Clock::time_point{} && now - s_lastNew >= kFrozen)
