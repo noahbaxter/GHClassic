@@ -5,6 +5,7 @@
 #
 # The recompile reads GH2's boot executable, which is no part of this repo:
 # it comes from a private one through a read-only deploy key (ELF_DEPLOY_KEY).
+# Europe's (SLES_544.42) comes beside it, for the patch that lets its disc play.
 name: release
 
 on:

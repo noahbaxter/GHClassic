@@ -23,7 +23,8 @@ tree's build/data instead, apart from everything.
 The disc defaults to the GH2 image in game/, which is only ever read;
 everything made lands in build/, which is safe to delete. build and release
 also take the disc's boot executable alone (SLUS_214.47), which is all the
-recompile reads.
+recompile reads. Europe's disc plays too when the build finds its executable,
+SLES_544.42 beside that one or a Europe image in game/, to patch from.
 
 From the system: Python (.python-version's or newer), git, and a C++ compiler (Xcode's on macOS, gcc
 or clang on Linux, nothing on Windows, where llvm-mingw is fetched into
@@ -91,7 +92,7 @@ import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from releases import content, discs_arg, find_disc, main_checkout, releases
+from releases import content, discs_arg, find_disc, find_europe, main_checkout, releases
 
 ROOT = Path(__file__).resolve().parent.parent
 # The Python GH Classic is built and tested on, the oldest it supports: CI
@@ -338,6 +339,14 @@ def build(disc=None, recomp=True, lto=False):
         build_step("naming its functions",
                    [sys.executable, tools / "symbolize.py", RECOMP / "retail.elf",
                     ROOT / "config" / "gh2-retail.symbols", ELF], env, "symbolize.log")
+        # Europe's disc plays when the build has its executable too, to patch from.
+        if europe := find_europe(disc, env):
+            build_step("patching Europe's executable",
+                       [VENV_PYTHON, tools / "disc.py", "patch", RECOMP / "retail.elf", europe,
+                        RECOMP / "europe.patch"], env, "patch.log")
+        else:
+            print("  no Europe executable (SLES_544.42 beside the USA one, or its disc in game/); "
+                  "the build plays the USA disc only", file=sys.stderr)
 
         build_tools(env, jobs)
 
@@ -832,7 +841,7 @@ def cmd_bind(argv):
     return subprocess.run([str(game_binary()), "--bind", *argv, *data_dir(isolated)]).returncode
 
 
-PLACEHOLDER = "Put your Guitar Hero II (USA) disc image here (.iso, .chd or .bin).txt"
+PLACEHOLDER = "Put your Guitar Hero II disc image here (.iso, .chd or .bin).txt"
 SOURCE_URL = "https://github.com/noahbaxter/GHClassic"
 
 

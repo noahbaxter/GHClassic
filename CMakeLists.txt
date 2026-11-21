@@ -794,6 +794,22 @@ if(NOT EXISTS "${GHC_RETAIL_ELF}")
 endif()
 file(SHA1 "${GHC_RETAIL_ELF}" GHC_RETAIL_SHA1)
 target_compile_definitions(GHClassic PRIVATE GHC_RETAIL_SHA1="${GHC_RETAIL_SHA1}")
+# Europe's disc plays when tools/ghc.py had its executable to patch from
+# (disc.py patch); without the patch the build takes the USA disc only.
+set(GHC_EUROPE_PATCH "${GHC_GENERATED_DIR}/../europe.patch")
+if(EXISTS "${GHC_EUROPE_PATCH}")
+    file(READ "${GHC_EUROPE_PATCH}" GHC_EUROPE_PATCH_BYTES HEX)
+    string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_EUROPE_PATCH_BYTES "${GHC_EUROPE_PATCH_BYTES}")
+    file(CONFIGURE OUTPUT "${GHC_DTA_DIR}/europe_patch.inc" CONTENT "${GHC_EUROPE_PATCH_BYTES}\n")
+    # disc.cpp's alone, so a patch coming or going rebuilds only it; zstd's
+    # decoder comes with libchdr.
+    set_source_files_properties(src/disc/disc.cpp PROPERTIES COMPILE_DEFINITIONS GHC_EUROPE_PATCH
+        INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/lib/libchdr/deps/zstd-1.5.7")
+    target_link_libraries(GHClassic PRIVATE zstd)
+    message(STATUS "Europe's disc: playable")
+else()
+    message(STATUS "Europe's disc: not playable, no ${GHC_EUROPE_PATCH}")
+endif()
 
 # Upstream sets its platform setup (sse2neon on ARM) at directory scope, so it
 # reaches only targets inside lib/PS2Recomp. Generated code needs it too.

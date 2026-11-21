@@ -1,6 +1,8 @@
 # Build tools, installed into build/venv by tools/ghc.py.
 cmake==4.4.3
 ninja==1.13.2
+# Europe's executable patch (tools/disc.py patch); 3.14 has it as compression.zstd.
+backports.zstd==1.8.0; python_version < "3.14"
 # Scenario frames and contact sheets.
 pillow==12.3.0
 # Font tracing.

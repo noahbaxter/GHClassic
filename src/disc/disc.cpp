@@ -1,11 +1,16 @@
 #include "disc/disc.h"
 
+#include "content/games.h"
 #include "settings/settings.h"
 #include "disc/sha1.h"
+#include "disc/volume.h"
 
 #include "runtime/ps2_disc_image.h"
 
 #include <SDL3/SDL.h>
+#ifdef GHC_EUROPE_PATCH
+#include <zstd.h>
+#endif
 
 #include <algorithm>
 #include <cctype>
@@ -36,6 +41,47 @@ namespace gh2::disc
             const size_t end = text.find_first_of("\r\n", start);
             return start == std::string::npos ? std::string() : text.substr(start, end - start);
         }
+
+        bool xbox360(const std::filesystem::path &image)
+        {
+            std::string error;
+            const std::unique_ptr<Volume> volume = Volume::open(image, error);
+            return volume && games::of(volume->serial()) == "gh2x";
+        }
+
+        constexpr const char *kEuropeElf = "SLES_544.42";
+#ifdef GHC_EUROPE_PATCH
+        // tools/disc.py patch's, made by the build from both executables.
+        constexpr uint8_t kEuropePatchBytes[] = {
+#include "europe_patch.inc"
+        };
+        constexpr const uint8_t *kEuropePatch = kEuropePatchBytes;
+#else
+        constexpr const uint8_t *kEuropePatch = nullptr;
+#endif
+
+        // Europe's executable rebuilt as USA's, the patch's zstd frame
+        // decoded with it as the prefix (zstd --patch-from), else empty.
+        std::vector<uint8_t> fromEurope(const std::vector<uint8_t> &elf)
+        {
+#ifdef GHC_EUROPE_PATCH
+            const unsigned long long size = ZSTD_getFrameContentSize(kEuropePatch, sizeof kEuropePatchBytes);
+            if (size > (64u << 20))
+                return {};
+            std::vector<uint8_t> usa(size);
+            ZSTD_DCtx *context = ZSTD_createDCtx();
+            size_t made = ZSTD_DCtx_refPrefix(context, elf.data(), elf.size());
+            if (!ZSTD_isError(made))
+                made = ZSTD_decompressDCtx(context, usa.data(), usa.size(), kEuropePatch, sizeof kEuropePatchBytes);
+            ZSTD_freeDCtx(context);
+            if (ZSTD_isError(made) || made != usa.size())
+                return {};
+            return usa;
+#else
+            (void)elf;
+            return {};
+#endif
+        }
     }
 
     bool portable()
@@ -57,19 +103,35 @@ namespace gh2::disc
     std::vector<uint8_t> bootElf(const std::filesystem::path &image, std::string &why)
     {
         std::unique_ptr<DiscImage> disc = DiscImage::open(image, why);
-        if (!disc)
-            return {};
-        const std::string boot = bootPath(readFile(*disc, "SYSTEM.CNF"));
+        const std::string boot = disc ? bootPath(readFile(*disc, "SYSTEM.CNF")) : std::string();
         if (boot.empty())
         {
-            why = "not a PS2 game disc";
+            if (xbox360(image))
+                why = "this is the Xbox 360 Guitar Hero II disc. It goes in beside the PS2 Guitar Hero II disc "
+                      "as an extra content disc, not as the main one";
+            else if (disc)
+                why = "not a PS2 game disc";
             return {};
         }
         std::vector<uint8_t> elf = readFile(*disc, boot);
         const std::string sha1 = sha1Hex(elf.data(), elf.size());
+        // Europe's disc boots its own build of the game, which the patch
+        // turns into the USA one the code is recompiled from.
+        if (sha1 != GHC_RETAIL_SHA1 && boot.find(kEuropeElf) != std::string::npos)
+        {
+            elf = fromEurope(elf);
+            if (elf.empty() || sha1Hex(elf.data(), elf.size()) != GHC_RETAIL_SHA1)
+            {
+                why = kEuropePatch ? boot + " is not Guitar Hero II (Europe, Australia) as this build knows it "
+                                            "(SHA-1 " + sha1 + "); the dump may be damaged or changed"
+                                   : "this build of GH Classic plays only the USA Guitar Hero II disc";
+                return {};
+            }
+            return elf;
+        }
         if (sha1 != GHC_RETAIL_SHA1)
         {
-            why = boot + " is not Guitar Hero II (USA) as this build knows it (SHA-1 " + sha1 + ")";
+            why = boot + " is not a Guitar Hero II disc this build plays (SHA-1 " + sha1 + ")";
             return {};
         }
         return elf;

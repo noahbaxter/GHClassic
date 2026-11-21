@@ -294,7 +294,7 @@ int main(int argc, char *argv[])
             const std::filesystem::path folder = gh2::disc::folder();
             if (!hostOptions.hidden)
                 SDL_OpenURL(fileUrl(folder).c_str());
-            return fail(hostOptions, "Put your Guitar Hero II (USA) disc image (.iso, .chd or .bin) in\n" +
+            return fail(hostOptions, "Put your Guitar Hero II disc image (.iso, .chd or .bin) in\n" +
                                          folder.string() + "\nthen start GH Classic again.\n\n" + why);
         }
         // The other games' discs from beside it, unless the run named its own.
