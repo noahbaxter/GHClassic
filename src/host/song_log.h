@@ -23,10 +23,13 @@ namespace gh2::song_log
     void screen(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &name);
     // GamePanel::SetGameOver: the song won or failed.
     void gameOver(bool won);
+    // The game closing: a song still on, its pause menu too, gets its line.
+    void quit();
 
-    // A frame presented, showing a new game frame or the last again. Host
-    // thread.
-    void present(bool isNew);
+    // A frame presented, showing a new game frame or the last again: its
+    // GPU passes (of a frame a few back), recording its draws, and its
+    // waits for the game thread's frame and for the display. Host thread.
+    void present(bool isNew, float gpuMs, float recordMs, float gameWaitMs, float displayWaitMs);
     // What reads the GPU memory the renderer holds, for each song's end
     // line; nullptr once it is gone. Host thread.
     void gpuMemory(uint64_t (*bytes)(void *), void *of);

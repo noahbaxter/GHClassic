@@ -1158,7 +1158,15 @@ namespace gh2
         s.times.add(isNew || moviePlaying, static_cast<float>(State::FrameLog::ms(waitEnd - acquireEnd)),
                     static_cast<float>(State::FrameLog::ms(recordEnd - recordStart)),
                     moviePlaying ? SceneStats{} : s.scene.stats());
-        song_log::present(isNew);
+        {
+            float gpuMs = 0.0f;
+            if (!moviePlaying)
+                for (float span : s.scene.stats().gpuMs)
+                    gpuMs += span;
+            song_log::present(isNew, gpuMs, static_cast<float>(State::FrameLog::ms(recordEnd - recordStart)),
+                              static_cast<float>(State::FrameLog::ms(waitEnd - acquireEnd)),
+                              static_cast<float>(State::FrameLog::ms(acquireEnd - acquireStart)));
+        }
         if (s.frameLog.on)
             s.frameLog.add(isNew, frames().published(), State::FrameLog::ms(waitEnd - acquireEnd),
                            State::FrameLog::ms(acquireEnd - acquireStart),
@@ -1241,6 +1249,8 @@ namespace gh2
         if (!m_state)
             return;
         State &s = *m_state;
+        // A song still on gets its line while its GPU memory is all there.
+        song_log::quit();
         record::finish();
         if (perf::logging())
             std::cerr << s.times.summary();
