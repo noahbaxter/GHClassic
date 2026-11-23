@@ -22,7 +22,9 @@
 //   {custom best <song>}                  its best on its hardest
 //                                         difficulty played, as played
 //                                         now: score, stars, percent
-//                                         or FC; else NOT PLAYED
+//                                         or FC; a failed one's score
+//                                         alone; else NOT PLAYED
+//   {custom best_failed <song>}           1 if that best failed (no_fail)
 //   {custom art <song>}                   TRUE once its album art is
 //                                         read off its disk, which this
 //                                         starts, and the art of the

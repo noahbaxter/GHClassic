@@ -1,6 +1,7 @@
 #include "host/song_log.h"
 
 #include "dev/timing.h"
+#include "gameplay/engine/no_fail.h"
 #include "host/log.h"
 #include "ps2_runtime.h"
 #include "render/texture_store.h"
@@ -223,7 +224,7 @@ namespace gh2::song_log
     {
         std::lock_guard lock(s_mutex);
         if (s_on)
-            s_outcome = won ? "won" : "failed";
+            s_outcome = !won ? "failed" : failedThisPlay() ? "finished after failing" : "won";
     }
 
     void quit()

@@ -1,0 +1,75 @@
+; The venue's camera that sees most of its crowd: each of its shots forced
+; for three frames, the one the crowd drew in most of ({crowd_presence drawn},
+; content/crowd_presence.h, counts only draws in view), band_POV's, LIGHTER's
+; and WIN's tried first so they win a tie. In a song:
+;
+;   {ghc_crowd_scan_start}
+;   (wait_until {ghc_crowd_scan_step} 60)
+;   {world force_shot $ghc_crowd_shot}
+;
+; $ghc_crowd_shot_is its category, $ghc_crowd_shot_draws its draws. Then
+; held, forced back to its first frame each poll so no cut takes it away,
+; with the crowd's draws over those polls counted:
+;
+;   {ghc_crowd_hold_start}
+;   (wait_until {ghc_crowd_hold_step} 30)
+;   (expect $ghc_crowd_held_draws 0)       gone; or {> ... 0} 1, there
+{func ghc_crowd_hold_start
+   {set $ghc_ch_polls 0}
+   {set $ghc_crowd_held_draws 0}
+   {world force_shot $ghc_crowd_shot}
+   {crowd_presence drawn}
+}
+{func ghc_crowd_hold_step
+   {set $ghc_crowd_held_draws {'+' $ghc_crowd_held_draws {crowd_presence drawn}}}
+   {set $ghc_ch_polls {'+' $ghc_ch_polls 1}}
+   {world force_shot $ghc_crowd_shot}
+   {$ghc_crowd_shot set_frame 0}
+   {>= $ghc_ch_polls 30}
+}
+{func ghc_crowd_scan_start
+   {set $ghc_cs_shots {array 0}}
+   {foreach $first (TRUE FALSE)
+      {world iterate CamShot $s
+         {do
+            ($c {$s get category})
+            {if {&& {&& {!= $c LOSE} {!= $c x360_focus}}
+                  {== $first {|| {== $c band_POV} {|| {== $c LIGHTER} {== $c WIN}}}}}
+               {push_back $ghc_cs_shots $s}
+            }
+         }
+      }
+   }
+   {set $ghc_cs_at -1}
+   {set $ghc_cs_tick 3}
+   {set $ghc_crowd_shot 0}
+   {set $ghc_crowd_shot_is none}
+   {set $ghc_crowd_shot_draws 0}
+}
+
+; Each poll: a shot's three frames counted, then the next. TRUE once every
+; shot has been seen.
+{func ghc_crowd_scan_step
+   {set $ghc_cs_tick {'+' $ghc_cs_tick 1}}
+   {if_else {< $ghc_cs_tick 3}
+      FALSE
+      {do
+         ($drawn {crowd_presence drawn})
+         {set $ghc_cs_tick 0}
+         {if {&& {>= $ghc_cs_at 0} {> $drawn $ghc_crowd_shot_draws}}
+            {set $ghc_crowd_shot_draws $drawn}
+            {set $ghc_crowd_shot {elem $ghc_cs_shots $ghc_cs_at}}
+            {set $ghc_crowd_shot_is {$ghc_crowd_shot get category}}
+         }
+         {set $ghc_cs_at {'+' $ghc_cs_at 1}}
+         {if_else {< $ghc_cs_at {size $ghc_cs_shots}}
+            {do
+               {world force_shot {elem $ghc_cs_shots $ghc_cs_at}}
+               {crowd_presence drawn}
+               FALSE
+            }
+            TRUE
+         }
+      }
+   }
+}

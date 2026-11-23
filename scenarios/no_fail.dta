@@ -1,0 +1,25 @@
+; No Fail, the last row on Quick Play's MODIFIERS (quickplay_setup.dta): up
+; from the first row wraps to it, green ticks it. Then song_fail.dta's song,
+; lost at 32.2 s without it, still plays at 45.
+#include common/first_boot.dta
+{gamecfg set mode quickplay}
+{ui goto_screen ghc_qp_extras_screen}
+(wait_screen ghc_qp_extras_screen)
+(wait 1)
+(expect {ghc_qp_extras_panel focus_name} gs_left_p1.btn)
+(press up)
+(wait 0.5)
+(expect {ghc_qp_extras_panel focus_name} ex_no_fail.btn)
+(press green)
+(wait 0.5)
+(expect {no_fail} 1)
+(shot modifiers)
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty expert}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait_until {> {taskmgr seconds} 45} 120)
+(expect {{ui current_screen} name} game_screen)
+(shot played_on)
+(quit)

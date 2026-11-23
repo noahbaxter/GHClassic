@@ -393,7 +393,10 @@ namespace gh2
                         s_keyWait[k.key] = false;
                     else if (!s_keyWait[k.key])
                     {
-                        const uint16_t bit = esc && (mode == Mode::kPlaying || mode == Mode::kPaused)
+                        // And on the splash, green's key (Enter) is Start.
+                        const bool splashGreen = s_songScreen.load(std::memory_order_relaxed) == SongScreen::kSplash &&
+                                                 k.bit == kActions[kGreen].button;
+                        const uint16_t bit = (esc && (mode == Mode::kPlaying || mode == Mode::kPaused)) || splashGreen
                                                  ? static_cast<uint16_t>(pad::kStart)
                                                  : menuButtons(k.bit, port.joypad);
                         (k.bit == pad::kUp || k.bit == pad::kDown ? nav : port.pressed) |= bit;

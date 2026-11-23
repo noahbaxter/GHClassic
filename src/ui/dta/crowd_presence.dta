@@ -1,0 +1,48 @@
+; The script side of content/crowd_presence.h's setCrowd.
+;
+; WorldCrowd stops drawing there; these are the flat crowds built into a
+; venue's own geometry, by name. A venue with another goes on this list.
+{set $crowd_presence_flats
+   (crowd_distant.grp crowd_highlight.mesh
+      bleacher_folk_left_a.mesh bleacher_folk_left_b.mesh bleacher_folk_rear.mesh
+      bleacher_folk_right_a.mesh bleacher_folk_right_b.mesh
+      bleacher_folk.mesh median_crowd.mesh median_crowd01.mesh
+      median_crowd.1.mesh median_crowd01.1.mesh
+      floor_crowd1.1.mesh floor_crowd02.1.mesh floor_crowd03.1.mesh floor_crowd04.1.mesh floor_crowd05.1.mesh
+      floor_crowd1.mesh floor_crowd02.mesh floor_crowd03.mesh floor_crowd04.mesh floor_crowd05.mesh
+      crowd_new.grp crowd_plane.mesh crowd_plane01.mesh)
+}
+
+; The venue hidden in: a restart keeps it, a new song loads its own afresh.
+{func crowd_presence_hide
+   {set $crowd_presence_hid {array 0}}
+   {set $crowd_presence_venue {game get_venue}}
+   {foreach $part $crowd_presence_flats
+      {if {world find $part}
+         {if {{world find $part} showing}
+            {push_back $crowd_presence_hid $part}
+            {{world find $part} set_showing FALSE}
+         }
+      }
+   }
+}
+
+{func crowd_presence_show
+   {if {== $crowd_presence_venue {game get_venue}}
+      {foreach $part $crowd_presence_hid
+         {if {world find $part}
+            {{world find $part} set_showing TRUE}
+         }
+      }
+   }
+   {set $crowd_presence_hid {array 0}}
+}
+
+{func crowd_presence_mute
+   {set $crowd_presence_audio {crowd_audio enabled}}
+   {if $crowd_presence_audio {crowd_audio set_enabled FALSE}}
+}
+
+{func crowd_presence_unmute
+   {if $crowd_presence_audio {crowd_audio set_enabled TRUE}}
+}

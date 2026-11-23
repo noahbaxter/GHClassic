@@ -1,6 +1,7 @@
 #include "save/results.h"
 #include "content/song_speed.h"
 
+#include "gameplay/engine/no_fail.h"
 #include "gameplay/engine/note_engine.h"
 #include "guest.h"
 #include "hook.h"
@@ -191,6 +192,7 @@ namespace gh2::save
                 const uint32_t hit = count(call, 11), passed = count(call, 12);
                 // As the campaign hub's full combos: every gem hit in one streak.
                 run.fullCombo = hit > 0u && passed == 0u && run.streak == hit;
+                run.failed = failedThisPlay();
                 keepBest(playedKey(call.symbol(4), call.symbol(5), call.symbol(6), seatController(seat)),
                          seatProfile(seat), run, *mode);
                 return {};

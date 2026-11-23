@@ -1,0 +1,82 @@
+; No Fail in one venue, $ghc_nf_venue of $ghc_nf_game's, seen through its
+; crowd camera (common/crowd_shot.dta): the crowd drawn; failed (the meter
+; emptied) and, at the song's next cut, walked out, so none drawn and every
+; flat crowd hidden; Restart from the pause menu, all of it back; failed
+; again, then Quit and a new song there, back again. Shot at each.
+{func ghc_nf_start
+   {campaigns venues_from $ghc_nf_game}
+   {game set_song shoutatthedevil}
+   {{game get_player_config 0} set_difficulty expert}
+   {game set_quickplay}
+   {game set_venue $ghc_nf_venue}
+   {ui goto_screen loading_screen}
+}
+{func ghc_nf_shot ($what) {sprint $ghc_nf_game "_" $ghc_nf_venue "_" $what}}
+; Of the flats the walkout hid ($ghc_nf_hid), how many are here, and show.
+{func ghc_nf_flats ($showing)
+   {do ($n 0)
+      {foreach $p $ghc_nf_hid
+         {if {world find $p}
+            {if {|| {! $showing} {{world find $p} showing}} {set $n {'+' $n 1}}}
+         }
+      }
+      $n
+   }
+}
+
+{ghc_nf_start}
+(wait_screen game_screen 60)
+(expect {game get_venue} $ghc_nf_venue)
+(wait_until {> {taskmgr seconds} 8} 60)
+{ghc_crowd_scan_start}
+(wait_until {ghc_crowd_scan_step} 60)
+(print crowd_shot $ghc_nf_game $ghc_nf_venue $ghc_crowd_shot_is $ghc_crowd_shot_draws of 3)
+(expect {> $ghc_crowd_shot_draws 0} 1)
+{ghc_crowd_hold_start}
+(wait_until {ghc_crowd_hold_step} 30)
+(expect {> $ghc_crowd_held_draws 0} 1)
+(shot {ghc_nf_shot a_before})
+
+{player0 set_crowd_rating 0}
+(wait_until {crowd_presence gone} 60)
+{ghc_crowd_hold_start}
+(wait_until {ghc_crowd_hold_step} 30)
+(expect $ghc_crowd_held_draws 0)
+{set $ghc_nf_hid $crowd_presence_hid}
+(expect {ghc_nf_flats TRUE} 0)
+(shot {ghc_nf_shot b_walked_out})
+
+{ui goto_screen pause_screen}
+(wait_screen pause_screen 10)
+(wait 1)
+(press down)
+(wait 0.5)
+(expect {pause_panel focus_name} restart.btn)
+(press green)
+(wait_until {< {taskmgr seconds} 5} 60)
+(wait_until {> {taskmgr seconds} 8} 60)
+(expect {crowd_presence gone} 0)
+{ghc_crowd_hold_start}
+(wait_until {ghc_crowd_hold_step} 30)
+(expect {> $ghc_crowd_held_draws 0} 1)
+(expect {ghc_nf_flats TRUE} {ghc_nf_flats FALSE})
+(expect {size $crowd_presence_hid} 0)
+(shot {ghc_nf_shot c_restarted})
+
+{player0 set_crowd_rating 0}
+(wait_until {crowd_presence gone} 60)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 30)
+{ghc_nf_start}
+(wait_screen game_screen 60)
+(wait_until {> {taskmgr seconds} 8} 60)
+(expect {crowd_presence gone} 0)
+(expect {size $crowd_presence_hid} 0)
+{ghc_crowd_scan_start}
+(wait_until {ghc_crowd_scan_step} 60)
+{ghc_crowd_hold_start}
+(wait_until {ghc_crowd_hold_step} 30)
+(expect {> $ghc_crowd_held_draws 0} 1)
+(shot {ghc_nf_shot d_next_song})
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 30)

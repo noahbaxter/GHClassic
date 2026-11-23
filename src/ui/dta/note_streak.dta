@@ -20,9 +20,12 @@
    }
 }
 
+; None once a no_fail run has failed: SONG FAILED stays what it says.
 {func note_streak_show ($player $token)
-   {hud show_message $player $token}
-   {play_game_sfx_player meter_slide meter_slide {if_else {== $player kPlayerShared} 0 $player}}
+   {if {! $no_fail_quiet}
+      {hud show_message $player $token}
+      {play_game_sfx_player meter_slide meter_slide {if_else {== $player kPlayerShared} 0 $player}}
+   }
 }
 
 {func note_streak_hit ($player)

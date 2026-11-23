@@ -55,9 +55,9 @@
          {set [flushed] FALSE}
          {set [ours] {custom ours {game get_song}}}
          {ghc_score_stats $this}
-         ; A run at another speed is in no table (content/song_speed.h), so
-         ; on.
-         {if_else {!= {song_speed} 100}
+         ; A run at another speed is in no table (content/song_speed.h), nor
+         ; is one that failed and played on (no_fail.dta), so on.
+         {if_else {|| {!= {song_speed} 100} $no_fail_quiet}
             {ui goto_screen complete_screen}
             {do
                ($score {player0 score})

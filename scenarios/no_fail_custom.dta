@@ -1,0 +1,29 @@
+; custom_song.dta's song with No Fail and nobody playing: it fails, plays to
+; its end, and the list's printout shows the failed best as its score and a
+; red FAILED.
+(songs songs)
+#include common/first_boot.dta
+{ghc_profile make 0 "Tester"}
+{no_fail 1}
+{gamecfg set mode quickplay}
+{setlist select custom}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(press green)
+(wait_screen qp_diff_screen)
+(wait 1)
+(press down)
+(press green)
+(wait_screen game_screen 60)
+(wait_screen endgame_screen 120)
+(wait 1)
+(expect {player0 gems_hit} 0)
+(expect {custom best_failed {game get_song}} 1)
+{gamecfg set mode quickplay}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(expect {custom best {game get_song}} "0")
+(shot printout_failed)
+(quit)
