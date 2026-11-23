@@ -8,6 +8,8 @@
 // to show what grows over a career. A song frozen 3 s gets its line while
 // it is still frozen. Always on: fixed counters, no allocation per frame.
 
+#include "addresses.h"
+
 #include <cstdint>
 #include <string>
 
@@ -18,6 +20,10 @@ namespace gh2::song_log
 {
     // The script command that names the song as it starts.
     void install();
+    // The song clock (timing::songSeconds), from TaskMgr::SetSecondsBeat, in
+    // every build. Installed after the scenario's hook there, so it reads
+    // the game's seconds before a record holds them.
+    void installClock(PS2Runtime &runtime, const Addresses &addresses);
     // The screen GH2 went to: a song starts on its game screen and ends on
     // any but that and its pause menus. Game thread.
     void screen(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &name);

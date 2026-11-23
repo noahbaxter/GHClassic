@@ -79,6 +79,7 @@
 #include "streak/note_streak.h"
 #include "dev/null_rnd.h"
 #include "host/pad.h"
+#include "host/song_log.h"
 #include "render/char_lod.h"
 #include "render/font_bake.h"
 #include "render/mesh_capture.h"
@@ -101,6 +102,7 @@
 #include "synth/synth.h"
 #include "settings/video_options.h"
 #include "gameplay/engine/star_power_overlap.h"
+#include "gameplay/engine/no_autoplay.h"
 #include "gameplay/engine/no_fail.h"
 #include "gameplay/engine/strum_limit.h"
 #include "gameplay/engine/sustain_release.h"
@@ -236,8 +238,13 @@ namespace
         gh2::locale::install(runtime, gh2::kSlus21447);
         gh2::games::install(runtime, gh2::kSlus21447);
         gh2::campaigns::install(runtime, gh2::kSlus21447);
+#ifdef GHC_PLAYER_BUILD
+        gh2::installNoAutoplay(runtime, gh2::kSlus21447);
+#else
         gh2::scenario::install(runtime, gh2::kSlus21447);
         gh2::scripted_play::install(runtime, gh2::kSlus21447);
+#endif
+        gh2::song_log::installClock(runtime, gh2::kSlus21447);
         gh2::transplant::install(runtime, gh2::kSlus21447);
         gh2::cheats::install(runtime, gh2::kSlus21447);
         gh2::fast_boot::install(runtime, gh2::kSlus21447);

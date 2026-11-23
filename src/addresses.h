@@ -129,6 +129,7 @@ namespace gh2
         uint32_t beatMatcherFretButtonUp;   // BeatMatcher::FretButtonUp(int slot)
         uint32_t beatMatcherNonStrumSwing;  // BeatMatcher::NonStrumSwing(int slot, bool isPress)
         uint32_t beatMatcherPoll;           // BeatMatcher::Poll(float)
+        uint32_t beatMatcherSetAutoplay;    // BeatMatcher::SetAutoplay(bool)
         uint32_t beatMatcherDtor;           // BeatMatcher::~BeatMatcher
         uint32_t guitarWatcherJumpHook; // GuitarTrackWatcherImpl::JumpHook
         uint32_t guitarWatcherFretButtonDown; // GuitarTrackWatcherImpl::FretButtonDown(int slot)
@@ -550,6 +551,7 @@ namespace gh2
         .beatMatcherFretButtonUp = 0x235610u,
         .beatMatcherNonStrumSwing = 0x2358f0u,
         .beatMatcherPoll = 0x235340u,
+        .beatMatcherSetAutoplay = 0x2359a0u,
         .beatMatcherDtor = 0x234b08u,
         .guitarWatcherJumpHook = 0x24d4e0u,
         .guitarWatcherFretButtonDown = 0x24d890u,

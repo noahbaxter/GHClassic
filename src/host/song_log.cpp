@@ -2,6 +2,7 @@
 
 #include "dev/timing.h"
 #include "gameplay/engine/no_fail.h"
+#include "hook.h"
 #include "host/log.h"
 #include "ps2_runtime.h"
 #include "render/texture_store.h"
@@ -194,6 +195,14 @@ namespace gh2::song_log
     void install()
     {
         script::addCommand("ghc_song_start", startCommand);
+    }
+
+    void installClock(PS2Runtime &runtime, const Addresses &addresses)
+    {
+        struct SecondsBeatTag;
+        EntryHook<SecondsBeatTag>::install(runtime, addresses.taskMgrSetSecondsBeat,
+                                           [](uint8_t *, R5900Context *ctx, PS2Runtime *)
+                                           { timing::songSeconds(ctx->f[12]); });
     }
 
     void screen(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const std::string &name)

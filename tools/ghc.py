@@ -326,7 +326,7 @@ def experimental(tag):
     return "-exp" in tag
 
 
-def build(disc=None, recomp=True, lto=False):
+def build(disc=None, recomp=True, lto=False, dev_tools=True):
     env = tool_env()
     jobs = str(os.cpu_count() or 4)
     if recomp:
@@ -372,7 +372,7 @@ def build(disc=None, recomp=True, lto=False):
     tag = tree_version()
     configure = ["cmake", "-S", ROOT, "-B", GAME, "-DCMAKE_BUILD_TYPE=Release",
                  f"-DGHC_GENERATED_DIR={RECOMP / 'output'}", f"-DGHC_ENABLE_LTO={'ON' if lto else 'OFF'}",
-                 f"-DGHC_VERSION={tag}", f"-DGHC_EXPERIMENTAL={'ON' if experimental(tag) else 'OFF'}",
+                 f"-DGHC_DEV_TOOLS={'ON' if dev_tools else 'OFF'}", f"-DGHC_VERSION={tag}", f"-DGHC_EXPERIMENTAL={'ON' if experimental(tag) else 'OFF'}",
                  f"-DPython3_EXECUTABLE={sys.executable}", *DEP_CACHE]
     build_step("configuring game", configure, env, "game-configure.log")
     build_step("building game", ["cmake", "--build", GAME, "--target", "GHClassic", "-j", jobs], env, "game.log")
@@ -966,9 +966,11 @@ def cmd_release(argv):
     parser.add_argument("disc", nargs="?")
     args = parser.parse_args(argv)
     if not args.skip_build:
-        build(args.disc, recomp=not (RECOMP / "output").is_dir(), lto=True)
+        build(args.disc, recomp=not (RECOMP / "output").is_dir(), lto=True, dev_tools=False)
     if not game_binary().exists():
         sys.exit("no build; run tools/ghc.py build")
+    if "GHC_DEV_TOOLS:BOOL=OFF" not in (GAME / "CMakeCache.txt").read_text():
+        sys.exit("that build has the dev tools in it; run tools/ghc.py release without --skip-build")
     version = tree_version()
     out = BUILD / "release"
     shutil.rmtree(out, ignore_errors=True)

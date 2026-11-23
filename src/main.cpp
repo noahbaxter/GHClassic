@@ -193,12 +193,14 @@ int main(int argc, char *argv[])
             if (!gh2::ark::addFolder(argv[++i]))
                 return 1;
         }
+#ifndef GHC_PLAYER_BUILD
         else if (arg == "--scenario" && hasValue)
         {
             if (!gh2::scenario::load(argv[++i]))
                 return 1;
             gh2::leaveControllers();
         }
+#endif
         else if (arg == "--settings" && hasValue)
             gh2::settings::usePath(argv[++i]);
         else if (arg == "--save" && hasValue)

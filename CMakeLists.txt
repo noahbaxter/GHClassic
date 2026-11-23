@@ -365,6 +365,7 @@ set(GHC_GAME_SOURCES
     src/gameplay/engine/gh1/star_power.cpp
     src/gameplay/engine/gh1/watcher.cpp
     src/gameplay/engine/hopo_lock.cpp
+    src/gameplay/engine/no_autoplay.cpp
     src/gameplay/engine/no_fail.cpp
     src/gameplay/engine/note_engine.cpp
     src/gameplay/engine/star_power_overlap.cpp
@@ -703,6 +704,13 @@ target_include_directories(GHClassic PRIVATE "${GHC_DTA_DIR}")
 # from, whether that is the experimental track's, and when it was configured.
 set(GHC_VERSION "dev" CACHE STRING "The release this build is")
 string(TIMESTAMP GHC_BUILT "%Y-%m-%d %H:%M")
+# Off for what players get (tools/ghc.py release): no scenarios, no scripted
+# play, and GH2's own autoplay held off (gameplay/engine/no_autoplay.h).
+option(GHC_DEV_TOOLS "Scenarios, scripted play and autoplay, for local testing" ON)
+if(NOT GHC_DEV_TOOLS)
+    set_source_files_properties(src/dev/scenario.cpp src/dev/scripted_play.cpp PROPERTIES HEADER_FILE_ONLY ON)
+    set_source_files_properties(src/main.cpp src/game.cpp PROPERTIES COMPILE_DEFINITIONS GHC_PLAYER_BUILD)
+endif()
 option(GHC_EXPERIMENTAL "The experimental track: its own name, saves and settings" OFF)
 set(GHC_EXPERIMENTAL_VALUE 0)
 set(GHC_BUNDLE_NAME "GH Classic")
