@@ -138,14 +138,18 @@ namespace gh2
 
     void addToTrackScene(void (*add)(milo::Dir &scene))
     {
-        ark::addFix(0u, kTrackScene, [add](std::vector<uint8_t> &file)
-                    {
-                        auto scene = milo::read(file);
-                        if (!scene)
-                            return;
-                        add(*scene);
-                        file = milo::write(*scene);
-                    });
+        // Every disc's: the 80s highway is its own disc's scene. GH1's and
+        // the 360's are made from GH2's, so have these already.
+        for (size_t disc = 0u; disc < ark::discs(); ++disc)
+            if (!ark::paths(disc, kTrackScene).empty())
+                ark::addFix(disc, kTrackScene, [add](std::vector<uint8_t> &file)
+                            {
+                                auto scene = milo::read(file);
+                                if (!scene)
+                                    return;
+                                add(*scene);
+                                file = milo::write(*scene);
+                            });
     }
 
     void onGemAdded(void (*added)(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, const GemAdded &gem))
