@@ -1,0 +1,20 @@
+; pad_opens.dta's song, once started: its gems at 2, 3, 4, 5 and 7 s (120
+; bpm), each pressed for 10 ms before, the pad's actions by name. ghc_play
+; reads only a guitar's watcher, so the song's clock and the player's counts.
+(wait_screen game_screen 60)
+(wait 1)
+(expect {game get_controller 0} joypad_guitar)
+{player0 set_crowd_rating_active FALSE}
+(wait_until {>= {taskmgr seconds} 1.99} 30)
+(press down pad)
+(wait_until {>= {taskmgr seconds} 2.99} 30)
+(press down pad)
+(wait_until {>= {taskmgr seconds} 3.99} 30)
+(press down pad)
+(wait_until {>= {taskmgr seconds} 4.99} 30)
+(press down pad)
+(wait_until {>= {taskmgr seconds} 6.99} 30)
+(press up pad)
+(wait_until {>= {taskmgr seconds} 8} 30)
+(expect {player0 gems_hit} 4)
+(expect {player0 gems_passed} 1)

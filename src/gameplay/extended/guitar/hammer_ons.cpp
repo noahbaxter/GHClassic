@@ -230,6 +230,71 @@ namespace gh2::guitar
             s_canHopo(rdram, ctx, runtime);
         }
 
+        // A gamepad's strum button (D-pad up and down, input.cpp's
+        // kJoypadButtons), which GH2's JoypadGuitarController passes over in
+        // a song (its OnMsg(ButtonDownMsg), 0x2374e8, asks ButtonToSlot and
+        // gets none): on an open, the strum with nothing held that hits it.
+        // A pad's fret press is always a fret, so nothing else can.
+        constexpr uint32_t kPadUp = 12u, kPadDown = 14u;
+        constexpr uint32_t kButtonDownAsks = 0x2375bcu; // OnMsg(ButtonDownMsg), after ButtonToSlot
+        constexpr uint32_t kJoypadChord = 0x88u;        // JoypadTrackWatcherImpl's chord being pressed, -1 for none
+        PS2Runtime::RecompiledFunction s_buttonToSlot = nullptr;
+
+        void padStrumOpen(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t controller)
+        {
+            // Its BeatMatchControllerSink (+0x40), the BeatMatcher less the
+            // this adjustment its vtable's Swing entry (+0x10) gives.
+            const uint32_t sink = load<uint32_t>(rdram, controller + 0x40u);
+            if (sink == 0u)
+                return;
+            const uint32_t matcher =
+                sink + static_cast<uint32_t>(static_cast<int32_t>(load<int16_t>(rdram, load<uint32_t>(rdram, sink) + 0x10u)));
+            const uint32_t watcher = guest::BeatMatcher(rdram, matcher).swingWatcher();
+            if (watcher == 0u)
+                return;
+            const int32_t index = closestUnplayed(rdram, ctx, runtime, watcher);
+            if (index < 0)
+                return;
+            const GameGem gem(rdram, watcherGem(rdram, watcher, index));
+            if (gem.slots() != 0u)
+                return;
+            // GH1's engine plays a pad on the guitar's watcher (gh1/watcher.cpp),
+            // where a strum with nothing held is an open's, as on a guitar.
+            if (noteEngine() == NoteEngine::kGh1)
+            {
+                if (GuitarTrackWatcherImpl(rdram, watcher).held() & ~sustainedLanes(rdram, watcher, 0u))
+                    return;
+                runtime->callGuestFunction(rdram, ctx, s_addresses->beatMatcherSwing,
+                                           {matcher, static_cast<uint32_t>(-1), 1u});
+                return;
+            }
+            // GH2's pad watcher only matches a gem by a fret pressed: the
+            // open shown as kOpenLane's for the press, as a hammered one is.
+            if (load<int32_t>(rdram, watcher + kJoypadChord) != -1)
+                return;
+            s_hammeredOpen = gem.address;
+            const uint8_t slots = gem.slots();
+            gem.setSlots(static_cast<uint8_t>(1u << kOpenLane));
+            runtime->callGuestFunction(rdram, ctx, s_addresses->joypadWatcherSwing, {watcher, kOpenLane, 0u});
+            gem.setSlots(slots);
+            s_hammeredOpen = 0u;
+        }
+
+        // BeatMatchController::ButtonToSlot(int button), 0x234818: still
+        // none for the strum, after its open is tried.
+        void buttonToSlot(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+        {
+            const uint32_t from = GPR_U32(ctx, 31), controller = GPR_U32(ctx, 4), button = GPR_U32(ctx, 5);
+            callOriginal(rdram, ctx, runtime, s_addresses->joypadButtonToSlot, s_buttonToSlot);
+            if (from != kButtonDownAsks || (button != kPadUp && button != kPadDown) || !playingCustom())
+                return;
+            const uint64_t slot = GPR_U64(ctx, 2);
+            const uint32_t pc = ctx->pc;
+            padStrumOpen(rdram, ctx, runtime, controller);
+            SET_GPR_U64(ctx, 2, slot);
+            ctx->pc = pc;
+        }
+
         // Hammered on with every fret let go, under GH1's engine: a tap, and
         // an open by the let-go that hits it, which counts as a fret held.
         bool strumless(uint8_t *rdram, uint32_t watcher, int32_t index)
@@ -274,6 +339,7 @@ namespace gh2::guitar
         replaceKeeping(runtime, addresses.guitarWatcherCanHopo, &canHopo, s_canHopo);
         replaceKeeping(runtime, addresses.guitarWatcherFretButtonUp, &fretButtonUp, s_fretButtonUp);
         replaceKeeping(runtime, addresses.guitarWatcherFretButtonDown, &fretButtonDown, s_fretButtonDown);
+        replaceKeeping(runtime, addresses.joypadButtonToSlot, &buttonToSlot, s_buttonToSlot);
         EntryHook<HitGemTag>::install(runtime, addresses.trackWatcherHitGem, onHitGem);
         EntryHook<AnalyzeGemTag>::install(runtime, addresses.multiplayerAnalyzerAddMultiGem, onAnalyzeGem);
         setStrumlessGems(&strumless);

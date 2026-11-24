@@ -158,6 +158,8 @@ namespace gh2
         uint32_t guitarWatcherVtable;
         uint32_t guitarWatcherCtor;  // GuitarTrackWatcherImpl::GuitarTrackWatcherImpl
         uint32_t guitarWatcherSwing; // GuitarTrackWatcherImpl::Swing
+        uint32_t joypadWatcherSwing; // JoypadTrackWatcherImpl::Swing(int slot, bool isStrum)
+        uint32_t joypadButtonToSlot; // BeatMatchController::ButtonToSlot(int button), -1 for none
         uint32_t guitarWatcherFretButtonUp;
         uint32_t guitarWatcherGemCanBePassed;
         uint32_t guitarWatcherSlop;
@@ -580,6 +582,8 @@ namespace gh2
         .guitarWatcherVtable = 0x3efb10u,
         .guitarWatcherCtor = 0x24d400u,
         .guitarWatcherSwing = 0x24d518u,
+        .joypadWatcherSwing = 0x24e008u,
+        .joypadButtonToSlot = 0x234818u,
         .guitarWatcherFretButtonUp = 0x24d938u,
         .guitarWatcherGemCanBePassed = 0x24da40u,
         .guitarWatcherSlop = 0x24da50u,
