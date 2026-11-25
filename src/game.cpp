@@ -53,6 +53,7 @@
 #include "ui/players.h"
 #include "ui/classic_scene.h"
 #include "ui/song_crown.h"
+#include "ui/faceoff_hud.h"
 #include "ui/zebra_wall.h"
 #include "settings/latency.h"
 #include "settings/settings.h"
@@ -176,6 +177,7 @@ namespace
         }
         if (gh2::settings::get(gh2::settings::kSongProgress))
             gh2::installSongProgress(runtime, gh2::kSlus21447);
+        gh2::installFaceoffHud(runtime, gh2::kSlus21447);
         gh2::installFontBake();
         gh2::installNoteEngine(runtime, gh2::kSlus21447);
         // Over the note engine's: a custom chart's kinds answer before GH1's
