@@ -325,16 +325,20 @@
                ($b {[panel] find $row})
                ($movie {ghc_bonus_movie $row})
                ($text {campaigns text [game] $movie})
+               ($file {campaigns video_file [game] $movie})
                {$b set_localized_text {if_else {== $text ""} {localize $movie} $text}}
-               {if_else {ghc_bonus_unlocked [game] $movie}
-                  {do
+               ; A video the disc has no file for (Europe's GH2 has neither) is left off.
+               {$b set_showing {!= $file ""}}
+               {cond
+                  ({== $file ""} {$this disable $b kPad_DDown})
+                  ({ghc_bonus_unlocked [game] $movie}
                      {$this enable $b}
                      {if {== $first none} {set $first $row}}
-                  }
-                  {do
+                  )
+                  (TRUE
                      {$this disable $b kPad_DDown}
                      {set $locked TRUE}
-                  }
+                  )
                }
             }
          }

@@ -93,6 +93,19 @@ namespace
             CHECK(best.score == 123456u && best.stars == 5u && best.percent == 98u && best.streak == 412u &&
                   best.fullCombo);
         CHECK(!parseBest("123 4"));
+        // A no_fail run keeps its failed mark; a line from before it has none.
+        Best failed = other;
+        failed.failed = true;
+        const auto failedBack = parseBest(bestText(failed));
+        CHECK(failedBack && failedBack->failed && failedBack->fullCombo);
+        const auto old = parseBest("123 4 98 412 1");
+        CHECK(old && old->score == 123u && old->fullCombo && !old->failed);
+        // A failed run never takes a clean best, however high it scored.
+        Best highFailed = run;
+        highFailed.score = 999999u;
+        highFailed.failed = true;
+        for (const Best &best : {better(other, highFailed), better(highFailed, other)})
+            CHECK(best.score == other.score && !best.failed);
         CHECK(bestKey("gh2.freebird", "gh1", "guitar", "expert", "gamepad") == "gh2.freebird.gh1.guitar.expert.gamepad");
         // A save with them keeps them as any section: one build's [best] goes
         // through another's untouched.

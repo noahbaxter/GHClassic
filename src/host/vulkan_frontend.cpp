@@ -53,6 +53,32 @@ namespace gh2
         constexpr int kWindowWidthWide = 1280;
         constexpr int kWindowWidth = 960;
 
+        // A stepped clock (a recording's, runtime/host_clock.h): until the
+        // game has done all it does at the clock's time and waits on it,
+        // with the time it waits for. False if the run stops meanwhile.
+        bool settle(PS2Runtime &runtime, std::chrono::steady_clock::time_point &waitsFor)
+        {
+            while (!ps2x::host_clock::settled(waitsFor))
+            {
+                if (runtime.isStopRequested())
+                    return false;
+                std::this_thread::sleep_for(std::chrono::microseconds(50));
+            }
+            return true;
+        }
+
+        // The stepped clock on to `to`, stopping at each time the game waits
+        // for before it, for the game to do what it does there.
+        void stepTo(PS2Runtime &runtime, std::chrono::steady_clock::time_point to)
+        {
+            for (std::chrono::steady_clock::time_point waitsFor; settle(runtime, waitsFor);)
+            {
+                ps2x::host_clock::stepTo(std::min(waitsFor, to));
+                if (waitsFor >= to)
+                    return;
+            }
+        }
+
         bool check(VkResult result, const char *what)
         {
             if (result == VK_SUCCESS)
@@ -637,14 +663,15 @@ namespace gh2
         }
 
         // --record's frame (host/record.h), shown at that aspect and drawn at
-        // `at` on the game's clock.
-        void writeRecord(float aspect, std::chrono::steady_clock::time_point at)
+        // `at` on the game's clock, `fresh` if the game made it new.
+        void writeRecord(float aspect, std::chrono::steady_clock::time_point at, bool fresh)
         {
             void *mapped = nullptr;
             if (vmaMapMemory(allocator, readbackMemory, &mapped) != VK_SUCCESS)
                 return;
             vmaInvalidateAllocation(allocator, readbackMemory, 0, VK_WHOLE_SIZE);
-            record::frame(static_cast<const uint8_t *>(mapped), targetWidth, targetHeight, aspect, at, gamePeriod);
+            record::frame(static_cast<const uint8_t *>(mapped), targetWidth, targetHeight, aspect, at, gamePeriod,
+                          fresh);
             vmaUnmapMemory(allocator, readbackMemory);
         }
     };
@@ -702,7 +729,7 @@ namespace gh2
             std::cerr << "[sdl] window: " << SDL_GetError() << std::endl;
             return false;
         }
-        if (timing::fullscreen)
+        if (timing::fullscreen || (!s.hidden && settings::get(settings::kFullscreen)))
         {
             SDL_SetWindowFullscreen(s.window, true);
             SDL_SyncWindow(s.window);
@@ -892,6 +919,12 @@ namespace gh2
             lastLoop = t0;
             timing::report();
         }
+        // Stepped, the frame is whatever the game made by this time, and
+        // the input it reads next is taken while it waits.
+        const bool stepped = ps2x::host_clock::stepped();
+        std::chrono::steady_clock::time_point waitsFor;
+        if (stepped && !settle(runtime, waitsFor))
+            return true;
         SDL_Event event;
         bool devicesChanged = false;
         while (SDL_PollEvent(&event))
@@ -911,6 +944,10 @@ namespace gh2
                 devicesChanged = true;
             if (event.type == SDL_EVENT_WINDOW_FOCUS_GAINED)
                 takeControllers();
+            // Kept for the next launch, however it went in or out.
+            if ((event.type == SDL_EVENT_WINDOW_ENTER_FULLSCREEN || event.type == SDL_EVENT_WINDOW_LEAVE_FULLSCREEN) &&
+                !s.hidden && settings::get(settings::kFullscreen) != (event.type == SDL_EVENT_WINDOW_ENTER_FULLSCREEN))
+                settings::set(settings::kFullscreen, event.type == SDL_EVENT_WINDOW_ENTER_FULLSCREEN);
             // Fullscreen: Cmd+F on macOS, F11 elsewhere. Not Alt+Enter, since
             // Enter is Start on the keyboard.
             if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && s.window)
@@ -976,12 +1013,14 @@ namespace gh2
         // frames for one, so a present follows each publish and the game
         // sets the pace; taking the newest without waiting showed a third
         // of the frames twice and dropped as many. A hidden run takes each
-        // in order. With none, the last is shown again.
+        // in order, or stepped, the newest made by now without waiting. With
+        // none, the last is shown again.
         bool isNew = false;
         if (!moviePlaying)
             isNew = present ? frames().latest(s.shown, std::chrono::duration_cast<std::chrono::microseconds>(
                                                            s.gamePeriod * 2))
-                            : frames().next(s.shown, s.frameWait);
+                    : stepped ? frames().latest(s.shown, {})
+                              : frames().next(s.shown, s.frameWait);
         const Frame &frame = s.shown;
         // The boot's first frame that draws anything ends the kept picture,
         // and is kept for the next boot: a window's, not a hidden test run's.
@@ -1123,7 +1162,15 @@ namespace gh2
         s.times.add(isNew || moviePlaying, static_cast<float>(State::FrameLog::ms(waitEnd - acquireEnd)),
                     static_cast<float>(State::FrameLog::ms(recordEnd - recordStart)),
                     moviePlaying ? SceneStats{} : s.scene.stats());
-        song_log::present(isNew);
+        {
+            float gpuMs = 0.0f;
+            if (!moviePlaying)
+                for (float span : s.scene.stats().gpuMs)
+                    gpuMs += span;
+            song_log::present(isNew, gpuMs, static_cast<float>(State::FrameLog::ms(recordEnd - recordStart)),
+                              static_cast<float>(State::FrameLog::ms(waitEnd - acquireEnd)),
+                              static_cast<float>(State::FrameLog::ms(acquireEnd - acquireStart)));
+        }
         if (s.frameLog.on)
             s.frameLog.add(isNew, frames().published(), State::FrameLog::ms(waitEnd - acquireEnd),
                            State::FrameLog::ms(acquireEnd - acquireStart),
@@ -1172,7 +1219,7 @@ namespace gh2
         if (shot)
             s.writeShot(requested);
         if (recording)
-            s.writeRecord(displayAspect, drawnAt);
+            s.writeRecord(displayAspect, drawnAt, isNew || moviePlaying);
         if (!requested.empty())
         {
             std::lock_guard<std::mutex> lock(s_shotMutex);
@@ -1181,8 +1228,16 @@ namespace gh2
 
         s.slot = (s.slot + 1u) % kFramesInFlight;
 
+        // Stepped, the frame's sound, then the clock on to the next frame:
+        // the game's own rate, however long this one took to make.
+        if (stepped)
+        {
+            s.nextHiddenFrame += s.gamePeriod;
+            mixAudioTo(s.nextHiddenFrame);
+            stepTo(runtime, s.nextHiddenFrame);
+        }
         // No swapchain paces a hidden window, so hold it to the game's rate.
-        if (!present)
+        else if (!present)
         {
             s.nextHiddenFrame += s.gamePeriod;
             const auto now = ps2x::host_clock::now();
@@ -1198,6 +1253,8 @@ namespace gh2
         if (!m_state)
             return;
         State &s = *m_state;
+        // A song still on gets its line while its GPU memory is all there.
+        song_log::quit();
         record::finish();
         if (perf::logging())
             std::cerr << s.times.summary();

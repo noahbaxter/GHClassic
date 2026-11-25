@@ -45,6 +45,7 @@
 #include "host/log.h"
 #include "host/perf.h"
 #include "host/record.h"
+#include "host/song_log.h"
 #include "host/update.h"
 #include "host/vulkan_frontend.h"
 #include "save/save.h"
@@ -77,6 +78,13 @@
 
 namespace
 {
+    // The log's last lines: a song still on, then the close.
+    void closeLog()
+    {
+        gh2::song_log::quit();
+        gh2::log::closed();
+    }
+
     // file:///... with anything but unreserved characters and '/' escaped,
     // as macOS takes no space in a URL.
     std::string fileUrl(const std::filesystem::path &path)
@@ -133,6 +141,7 @@ int main(int argc, char *argv[])
     gh2::RenderSize renderSize;
     double speed = 1.0;
     bool verbose = false;
+    bool recording = false;
     for (int i = 1; i < argc; ++i)
     {
         const std::string arg = argv[i];
@@ -158,7 +167,10 @@ int main(int argc, char *argv[])
         else if (arg == "--audio-device" && hasValue)
             gh2::setAudioDevice(argv[++i]);
         else if (arg == "--record" && hasValue)
+        {
             gh2::record::setPath(argv[++i]);
+            recording = true;
+        }
         else if (arg == "--speed" && hasValue)
             speed = std::strtod(argv[++i], nullptr);
         else if (arg == "--fast-boot")
@@ -181,12 +193,14 @@ int main(int argc, char *argv[])
             if (!gh2::ark::addFolder(argv[++i]))
                 return 1;
         }
+#ifndef GHC_PLAYER_BUILD
         else if (arg == "--scenario" && hasValue)
         {
             if (!gh2::scenario::load(argv[++i]))
                 return 1;
             gh2::leaveControllers();
         }
+#endif
         else if (arg == "--settings" && hasValue)
             gh2::settings::usePath(argv[++i]);
         else if (arg == "--save" && hasValue)
@@ -240,6 +254,18 @@ int main(int argc, char *argv[])
         }
         ps2x::host_clock::setSpeed(speed);
     }
+    // A hidden, muted recording steps the game's clock a frame at a time
+    // (runtime/host_clock.h), as fast as the machine makes them, so no
+    // --speed.
+    if (recording && hostOptions.hidden && hostOptions.mute)
+    {
+        if (speed != 1.0)
+        {
+            std::cerr << "--record makes each frame as fast as it can, with no --speed" << std::endl;
+            return 2;
+        }
+        ps2x::host_clock::step();
+    }
     // After --settings, which names the file it is read from.
     if (gh2::settings::get(gh2::settings::kFastBoot))
         gh2::fast_boot::enable();
@@ -257,7 +283,7 @@ int main(int argc, char *argv[])
     {
         gh2::log::open(gh2::settings::userDataPath("GHClassic.log"));
         // A quit by exit() closes it as much as the window does.
-        std::atexit(gh2::log::closed);
+        std::atexit(closeLog);
     }
     if (verbose)
         gh2::log::setVerbose();
@@ -269,25 +295,26 @@ int main(int argc, char *argv[])
         return 0;
 
     // The disc, and this build's executable on it, before any window opens.
-    std::string why;
     if (discPath.empty())
     {
-        discPath = gh2::disc::find(why);
+        discPath = gh2::disc::find();
         if (discPath.empty())
         {
-            const std::filesystem::path folder = gh2::disc::folder();
             if (!hostOptions.hidden)
-                SDL_OpenURL(fileUrl(folder).c_str());
-            return fail(hostOptions, "Put your Guitar Hero II (USA) disc image (.iso, .chd or .bin) in\n" +
-                                         folder.string() + "\nthen start GH Classic again.\n\n" + why);
+                SDL_OpenURL(fileUrl(gh2::disc::folder()).c_str());
+            return fail(hostOptions, gh2::disc::missing());
         }
         // The other games' discs from beside it, unless the run named its own.
         if (!contentGiven)
             gh2::games::mount(gh2::disc::images());
     }
+    std::string why;
     const std::vector<uint8_t> elf = gh2::disc::bootElf(discPath, why);
     if (elf.empty())
-        return fail(hostOptions, discPath.string() + ": " + why);
+    {
+        std::cerr << "[disc] " << discPath.string() << ": " << why << std::endl;
+        return fail(hostOptions, gh2::disc::missing());
+    }
 
     PS2Runtime runtime;
     runtime.setHostOptions(hostOptions);
@@ -318,7 +345,7 @@ int main(int argc, char *argv[])
     runtime.run();
 
     // Guest threads may still hold host resources; skip static destructors.
-    gh2::log::closed();
+    closeLog();
     std::cout.flush();
     std::cerr.flush();
     std::_Exit(0);

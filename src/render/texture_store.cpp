@@ -7,6 +7,7 @@
 #include "milo/layout.h"
 #include "milo/milo.h"
 #include "milo/objects.h"
+#include "runtime/host_clock.h"
 #include "worker.h"
 
 // Built in raylib's rtextures, which the runtime links.
@@ -575,7 +576,7 @@ namespace gh2::textures
     {
         s_open.reset();
         const std::lock_guard lock(s_mutex);
-        s_now = Clock::now();
+        s_now = ps2x::host_clock::now();
         std::erase_if(s_fetches, [](const auto &fetch) { return fetch.second->asked + kFetchHold < s_now; });
         // A scene's Texes go together, so once a second is soon enough.
         if (s_now - s_groupsChecked < std::chrono::seconds(1))

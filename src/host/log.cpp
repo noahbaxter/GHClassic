@@ -12,13 +12,13 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
-#include <deque>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <mutex>
 #include <streambuf>
-#include <vector>
+#include <string_view>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -40,11 +40,12 @@ namespace gh2::log
 {
     namespace
     {
-        // Far past a long session's few hundred KB; a run that loops on a
-        // warning stops here and not at the player's disk.
-        constexpr size_t kCap = 8u << 20;
+        // Every run is appended. A launch drops the oldest whole runs past
+        // kKeep, and a run stops writing past kRunCap (one that loops on a
+        // warning), so the file stays under Discord's 10 MB upload.
+        constexpr size_t kKeep = 5u << 20;
+        constexpr size_t kRunCap = 3u << 20;
         constexpr const char *kClosed = "[log] closed";
-        constexpr size_t kTailLines = 40;
 
         bool s_toFile = false;
         bool s_verbose = true;
@@ -93,14 +94,20 @@ namespace gh2::log
             std::lock_guard lock(s_mutex);
             if (s_capped && !always)
                 return;
+            // PS2Recomp's, every boot: the IOP modules GH2 loads that the
+            // host stands in for. A developer's line, not one of ours to keep
+            // behind verbose().
+            if (!s_verbose && line.find("[IOP:load-failed]") != std::string::npos)
+                return;
             std::string out = stamp() + line;
             unhome(out);
             std::fwrite(out.data(), 1, out.size(), stderr);
             s_written += out.size();
-            if (s_written > kCap && !s_capped)
+            if (s_written > kRunCap && !s_capped)
             {
                 s_capped = true;
-                const std::string note = stamp() + "[log] 8 MB written; the rest of this run is left out\n";
+                const std::string note = stamp() + "[log] " + std::to_string(kRunCap >> 20) +
+                                         " MB written; the rest of this run is left out\n";
                 std::fwrite(note.data(), 1, note.size(), stderr);
             }
             std::fflush(stderr);
@@ -142,33 +149,45 @@ namespace gh2::log
         };
         Lines s_lines;
 
-        // A run's system line, songs, freezes and crash, at most this many.
-        constexpr size_t kSummaryLines = 80;
-        bool summarises(const std::string &line)
+        // A run's first line is its [system] line, right after the stamp.
+        bool startsRun(std::string_view line)
         {
-            for (const char *tag : {"] [system] ", "] [song] end ", "] [freeze] ", "] [crash] "})
-                if (line.find(tag) != std::string::npos)
-                    return true;
-            return false;
+            const size_t at = line.find("] ");
+            return at != std::string_view::npos && line.substr(at + 2).rfind("[system] ", 0) == 0;
         }
 
-        // The last lines of a log, as they were, and its summary.
-        std::deque<std::string> tail(const std::filesystem::path &path, bool &closed, std::vector<std::string> &summary)
+        // The log's oldest whole runs dropped until the rest fits kKeep.
+        // Whether its last run closed, for a line saying it did not.
+        bool trim(const std::filesystem::path &path)
         {
-            std::deque<std::string> lines;
-            std::ifstream in(path, std::ios::binary);
-            for (std::string line; std::getline(in, line);)
+            std::string text;
             {
-                // Its own copy of the run before it stays behind.
-                if (summarises(line) && line.find("[log]   ") == std::string::npos && summary.size() < kSummaryLines)
-                    summary.push_back(line);
-                lines.push_back(line);
-                if (lines.size() > kTailLines)
-                    lines.pop_front();
+                std::ifstream in(path, std::ios::binary);
+                text.assign(std::istreambuf_iterator<char>(in), {});
             }
-            closed = std::any_of(lines.begin(), lines.end(),
-                                 [](const std::string &l) { return l.find(kClosed) != std::string::npos; });
-            return lines;
+            const size_t last = text.rfind("] [system] ");
+            const bool closed = last == std::string::npos || text.find(kClosed, last) != std::string::npos;
+            if (text.size() <= kKeep)
+                return closed;
+            size_t from = text.size();
+            for (size_t line = 0; line < text.size();)
+            {
+                const size_t end = std::min(text.find('\n', line), text.size() - 1u) + 1u;
+                if (text.size() - line <= kKeep && startsRun(std::string_view(text).substr(line, end - line)))
+                {
+                    from = line;
+                    break;
+                }
+                line = end;
+            }
+            // One run bigger than all we keep: its end, from a whole line.
+            if (from == text.size())
+            {
+                const size_t newline = text.find('\n', text.size() - kKeep);
+                from = newline == std::string::npos ? text.size() - kKeep : newline + 1u;
+            }
+            std::ofstream(path, std::ios::binary | std::ios::trunc).write(text.data() + from, text.size() - from);
+            return closed;
         }
 
         // A crash's line: what failed, where, and on what screen. Written
@@ -229,19 +248,12 @@ namespace gh2::log
     {
         s_start = std::chrono::steady_clock::now();
         const std::filesystem::path log = path;
-        std::filesystem::path previous = log;
-        previous.replace_extension(".prev.log");
         std::error_code error;
-        bool closed = true;
-        std::deque<std::string> lines;
-        std::vector<std::string> summary;
-        if (std::filesystem::exists(log, error))
-        {
-            lines = tail(log, closed, summary);
-            std::filesystem::remove(previous, error);
-            std::filesystem::rename(log, previous, error);
-        }
-        if (!std::freopen(path.c_str(), "w", stderr))
+        // 0.9.1 kept the run before here; it is in the log itself now.
+        std::filesystem::remove(std::filesystem::path(log).replace_extension(".prev.log"), error);
+        const bool any = std::filesystem::file_size(log, error) > 0u && !error;
+        const bool closed = !any || trim(log);
+        if (!std::freopen(path.c_str(), "a", stderr))
             return;
 #ifdef _WIN32
         _dup2(_fileno(stderr), _fileno(stdout));
@@ -272,18 +284,11 @@ namespace gh2::log
         for (int signal : {SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT})
             std::signal(signal, onCrash);
 #endif
-        if (!summary.empty())
-        {
-            std::cerr << "[log] the run before, its system and songs:\n";
-            for (const std::string &line : summary)
-                std::cerr << "[log]   | " << line << '\n';
-        }
-        if (!closed && !lines.empty())
-        {
-            std::cerr << "[log] the run before never closed (a crash, a freeze or a kill); its last lines:\n";
-            for (const std::string &line : lines)
-                std::cerr << "[log]   | " << line << '\n';
-        }
+        if (!closed)
+            std::cerr << "[log] the run above never closed (a crash, a freeze or a kill)\n";
+        // A blank line between runs.
+        if (any)
+            std::fputc('\n', stderr);
     }
 
     bool toFile() { return s_toFile; }

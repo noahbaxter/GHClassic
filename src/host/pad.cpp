@@ -143,7 +143,8 @@ namespace gh2
         }
 
         // A song's screens, by name, for the keyboard's keys in it (input.h):
-        // the two it is played on, the two pause menus and the breakdown.
+        // the two it is played on, the two pause menus and the breakdown;
+        // and the splash.
         struct GotoScreenTag;
         void onGotoScreen(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
         {
@@ -157,6 +158,7 @@ namespace gh2
                            ? SongScreen::kPlaying
                        : name == "pause_screen" || name == "pract_pause_screen" ? SongScreen::kPaused
                        : name == "endgame_stats_screen"                         ? SongScreen::kBreakdown
+                       : name == "splash_screen"                                ? SongScreen::kSplash
                                                                                 : SongScreen::kOther);
             // Practice draws no venue, which holds the seats in a song
             // (native_rnd.cpp), so its song's own screens do, from its

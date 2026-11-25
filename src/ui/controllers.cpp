@@ -10,6 +10,7 @@
 #include "host/layouts.h"
 #include "milo/milo.h"
 #include "render/texture_store.h"
+#include "runtime/host_clock.h"
 #include "script.h"
 #include "settings/settings.h"
 #include "ui/players.h"
@@ -18,6 +19,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <cmath>
 #include <iostream>
 #include <sstream>
@@ -298,7 +300,9 @@ namespace gh2
         {
             if (s_rebinding)
                 return kTestCard;
-            return (*s_channel)[(SDL_GetTicks() / kFrameMs) % s_channel->size()];
+            const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                ps2x::host_clock::now().time_since_epoch());
+            return (*s_channel)[(static_cast<uint64_t>(ms.count()) / kFrameMs) % s_channel->size()];
         }
 
         // {ghc_controllers poll}: the keyboard's keys acted on, and red held

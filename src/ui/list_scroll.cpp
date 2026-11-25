@@ -2,6 +2,7 @@
 
 #include "guest.h"
 #include "hook.h"
+#include "runtime/host_clock.h"
 #include "script.h"
 
 #include <algorithm>
@@ -39,7 +40,7 @@ namespace gh2::list_scroll
         {
             const uint32_t button = GPR_U32(ctx, 5);
             if (button == kPadDUp || button == kPadDDown)
-                s_held[GPR_U32(ctx, 4)] = Clock::now();
+                s_held[GPR_U32(ctx, 4)] = ps2x::host_clock::now();
             else
                 s_held.erase(GPR_U32(ctx, 4));
         }
@@ -50,7 +51,7 @@ namespace gh2::list_scroll
         struct PollTag;
         void onPoll(uint8_t *, R5900Context *ctx, PS2Runtime *)
         {
-            const auto now = Clock::now();
+            const auto now = ps2x::host_clock::now();
             const auto held = s_held.find(GPR_U32(ctx, 4));
             if (asked(now) && held != s_held.end() && now - held->second >= kFastAfter)
                 ctx->f[13] = std::min(ctx->f[13], kFastMs);
@@ -61,7 +62,7 @@ namespace gh2::list_scroll
         // a row's move shows to wait until it slows.
         script::Node fast(const script::Call &)
         {
-            const auto now = Clock::now();
+            const auto now = ps2x::host_clock::now();
             const bool rushing = asked(now) && std::any_of(s_held.begin(), s_held.end(), [&](const auto &h)
                                                            { return now - h.second >= kFastAfter; });
             s_asked = now;

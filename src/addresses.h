@@ -18,6 +18,15 @@ namespace gh2
         uint32_t rndTestPoint; // Rnd::TestPoint
         uint32_t sphereOutsideFrustum; // operator>(const Sphere &, const Frustum &)
         uint32_t gamePanelSetGameOver; // GamePanel::SetGameOver(bool won)
+        uint32_t performerLoseGame;    // Performer::LoseGame, as the rock meter runs out
+        uint32_t sideRailAnimPoll;     // SideRailAnim::Poll(float seconds, PlayerState &, PlayerState &)
+        uint32_t sideRailAnimGetType;  // SideRailAnim::GetType(PlayerState &): none, warning, star, both
+        uint32_t crowdMeterPoll;       // CrowdMeter::Poll, the rock meter's needle, lamps and sign each frame
+        uint32_t crowdAudioSetExcitement; // CrowdAudio::SetExcitement(int), its excitement message
+        uint32_t crowdAudioPlayOneOff;    // CrowdAudio::PlayOneOff(Sfx *), the one playing at +0xA0
+        uint32_t crowdAudioSetMasterVolume; // CrowdAudio::SetMasterVolume(float dB), its loop's
+        uint32_t camShotStartAnim;        // CamShot::StartAnim, as each shot starts
+        uint32_t worldCrowdDrawShowing;   // WorldCrowd::DrawShowing(DrawType)
         uint32_t gamePanelReset;
         uint32_t gamePanelExit;
         uint32_t winCampaignSong; // GameConfig::WinCampaignSong
@@ -120,6 +129,7 @@ namespace gh2
         uint32_t beatMatcherFretButtonUp;   // BeatMatcher::FretButtonUp(int slot)
         uint32_t beatMatcherNonStrumSwing;  // BeatMatcher::NonStrumSwing(int slot, bool isPress)
         uint32_t beatMatcherPoll;           // BeatMatcher::Poll(float)
+        uint32_t beatMatcherSetAutoplay;    // BeatMatcher::SetAutoplay(bool)
         uint32_t beatMatcherDtor;           // BeatMatcher::~BeatMatcher
         uint32_t guitarWatcherJumpHook; // GuitarTrackWatcherImpl::JumpHook
         uint32_t guitarWatcherFretButtonDown; // GuitarTrackWatcherImpl::FretButtonDown(int slot)
@@ -148,6 +158,8 @@ namespace gh2
         uint32_t guitarWatcherVtable;
         uint32_t guitarWatcherCtor;  // GuitarTrackWatcherImpl::GuitarTrackWatcherImpl
         uint32_t guitarWatcherSwing; // GuitarTrackWatcherImpl::Swing
+        uint32_t joypadWatcherSwing; // JoypadTrackWatcherImpl::Swing(int slot, bool isStrum)
+        uint32_t joypadButtonToSlot; // BeatMatchController::ButtonToSlot(int button), -1 for none
         uint32_t guitarWatcherFretButtonUp;
         uint32_t guitarWatcherGemCanBePassed;
         uint32_t guitarWatcherSlop;
@@ -430,6 +442,15 @@ namespace gh2
         .rndTestPoint = 0x1d55b8u,
         .sphereOutsideFrustum = 0x2d9170u,
         .gamePanelSetGameOver = 0x108178u,
+        .performerLoseGame = 0x10fe30u,
+        .sideRailAnimPoll = 0x15e158u,
+        .sideRailAnimGetType = 0x15e1f8u,
+        .crowdMeterPoll = 0x29fee8u,
+        .crowdAudioSetExcitement = 0x1239d0u,
+        .crowdAudioPlayOneOff = 0x124310u,
+        .crowdAudioSetMasterVolume = 0x123ed8u,
+        .camShotStartAnim = 0x262700u,
+        .worldCrowdDrawShowing = 0x26ae00u,
         .gamePanelReset = 0x105fd8u,
         .gamePanelExit = 0x106d50u,
         .winCampaignSong = 0x126f10u,
@@ -532,6 +553,7 @@ namespace gh2
         .beatMatcherFretButtonUp = 0x235610u,
         .beatMatcherNonStrumSwing = 0x2358f0u,
         .beatMatcherPoll = 0x235340u,
+        .beatMatcherSetAutoplay = 0x2359a0u,
         .beatMatcherDtor = 0x234b08u,
         .guitarWatcherJumpHook = 0x24d4e0u,
         .guitarWatcherFretButtonDown = 0x24d890u,
@@ -560,6 +582,8 @@ namespace gh2
         .guitarWatcherVtable = 0x3efb10u,
         .guitarWatcherCtor = 0x24d400u,
         .guitarWatcherSwing = 0x24d518u,
+        .joypadWatcherSwing = 0x24e008u,
+        .joypadButtonToSlot = 0x234818u,
         .guitarWatcherFretButtonUp = 0x24d938u,
         .guitarWatcherGemCanBePassed = 0x24da40u,
         .guitarWatcherSlop = 0x24da50u,

@@ -44,13 +44,34 @@ namespace gh2
             return dir;
         }
 
+        // A folder as it is pasted: in quotes (Windows' Copy as path, some
+        // terminals), or shell-escaped, its spaces, brackets and so on each
+        // after a \ (a Mac or Linux terminal; not on Windows, where \ is the
+        // separator).
+        std::string pasted(std::string folder)
+        {
+            if (folder.size() >= 2u && (folder.front() == '"' || folder.front() == '\'') && folder.back() == folder.front())
+                folder = ini::trim(folder.substr(1u, folder.size() - 2u));
+#ifndef _WIN32
+            for (size_t at = folder.find('\\'); at != std::string::npos && at + 1u < folder.size();
+                 at = folder.find('\\', at + 1u))
+                folder.erase(at, 1u);
+#endif
+            return folder;
+        }
+
         // Ours, then settings.ini's, split by ';'.
         std::vector<fs::path> roots()
         {
             std::vector<fs::path> out{ownFolder()};
             for (const std::string &folder : split(settings::text(settings::kSongFolders), ';'))
-                if (const std::string one = ini::trim(folder); !one.empty())
+                if (const std::string one = pasted(ini::trim(folder)); !one.empty())
+                {
                     out.emplace_back(fromUtf8(one));
+                    std::error_code error;
+                    if (!fs::is_directory(out.back(), error))
+                        std::cerr << "[custom] no folder " << one << std::endl;
+                }
             return out;
         }
 

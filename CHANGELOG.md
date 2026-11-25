@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.9.2
+
+### New
+- No Fail is now a quickplay modifier. Failed runs still save your score but won't be recorded in the high score screen. Fail a run and watch the crowd walk out
+- Tap rope can now be set to `rails`, `line` or `off` (`tap_rope` in settings.ini)
+- Europe/Australia copies of GH2 (SLES-54442) should now work as the primary game disc. Note that alternative languages are not supported yet
+
+### Changes
+- Fullscreen mode is now remembered between launches
+- Enter now works as Start on the title screen
+- Song folders in settings.ini can now include quotes or escaped spaces
+- GHClassic.log now keeps your last several runs (up to 5 MB) and says more about each song's performance and load time, to make debugging more useful
+
+### Bugs
+- Custom songs and speedups would sometimes stutter, especially on slower drives
+- GPU memory leaked with every song played
+- Open notes, taps and cyan stars wouldn't show on the 80s highway
+- Some kicks in custom songs wouldn't animate when overlapped
+- Some .chart vocal phrases wouldn't animate correctly
+- Open notes are now hittable in pad mode using strum up/down
+
 ## v0.9.1
 
 ### Changes

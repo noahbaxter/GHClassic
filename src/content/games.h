@@ -26,6 +26,10 @@ namespace gh2::games
     // no supported release is named in the log. Before ark::install.
     void mount(const std::vector<std::filesystem::path> &images);
 
+    // The game a supported release is of, by the serial its disc boots
+    // (Volume::serial: "SLES_544.42" is gh2, "415607E7" gh2x), else empty.
+    std::string of(const std::string &serial);
+
     // Its disc's index in the archive (ark::readFile), once ark::install has
     // run, or none when not mounted.
     std::optional<size_t> disc(const std::string &game);
