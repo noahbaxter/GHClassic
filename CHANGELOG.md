@@ -12,6 +12,8 @@
 - Enter now works as Start on the title screen
 - Song folders in settings.ini can now include quotes or escaped spaces
 - GHClassic.log now keeps your last several runs (up to 5 MB) and says more about each song's performance and load time, to make debugging more useful
+- Repositioned score meters and popup text in faceoff
+- Popup messages now queue rather than replace an existing notification
 
 ### Bugs
 - Custom songs and speedups would sometimes stutter, especially on slower drives
@@ -20,6 +22,8 @@
 - Some kicks in custom songs wouldn't animate when overlapped
 - Some .chart vocal phrases wouldn't animate correctly
 - Open notes are now hittable in pad mode using strum up/down
+- Face-Off would show the other player's sections as a series of open notes
+- Player 2's streak counter would position poorly in Face-Off
 
 ## v0.9.1
 
