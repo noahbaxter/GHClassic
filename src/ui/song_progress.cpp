@@ -74,18 +74,6 @@ namespace gh2
             return {s_meters ? 1u : 0u, script::kInt};
         }
 
-        // {ghc_with_this <object> <func>}: {<func>} run as the object's own
-        // handlers are, $this that object, so {new} names into its dir, where
-        // its scene draws what is made; then $this put back.
-        script::Node withThis(const script::Call &call)
-        {
-            const uint32_t was = load<uint32_t>(call.rdram, s_addresses->dataThis);
-            call.runtime->callGuestFunction(call.rdram, call.ctx, s_addresses->dataSetThis, {call.object(1)});
-            script::run(call.rdram, call.ctx, call.runtime, "{" + call.symbol(2) + "}");
-            call.runtime->callGuestFunction(call.rdram, call.ctx, s_addresses->dataSetThis, {was});
-            return {};
-        }
-
         // The song's seconds over its length, 0 to 1: TaskMgr's seconds,
         // the song's clock (its clocks at [+0x28], seconds the first, now at
         // +0xC), which stops while paused.
@@ -159,7 +147,6 @@ namespace gh2
         script::runWhenUiReady(kSongProgressDta);
         script::addCommand("ghc_song_progress", songProgress);
         script::addCommand("ghc_song_progress_meters", songProgressMeters);
-        script::addCommand("ghc_with_this", withThis);
         EntryHook<HudEnterTag>::install(runtime, addresses.hudPanelEnter, onHudEnter);
         EntryHook<SetScoreTag>::install(runtime, addresses.bandScoreDisplaySetScore, onSetScore);
         EntryHook<SetMetersShowingTag>::install(runtime, addresses.hudPanelSetMetersShowing, onSetMetersShowing);
