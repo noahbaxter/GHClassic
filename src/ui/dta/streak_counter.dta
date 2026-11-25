@@ -125,8 +125,8 @@
    {set $streak_counter_broken0 FALSE}
    {set $streak_counter_broken1 FALSE}
    {set $streak_counter_display1 {hud find streak_counter1}}
-   ; A second only in face-off, whatever else the HUD holds.
-   {set $streak_counter_display2 {if_else {== {gamecfg get mode} multi_fo} {hud find streak_counter2} 0}}
+   ; A second only in Face-Off and Pro Face-Off, whatever else the HUD holds.
+   {set $streak_counter_display2 {if_else {ghc_multi_mode} {hud find streak_counter2} 0}}
    {if $streak_counter_display1 {streak_counter_setup 1 $streak_counter_display1}}
    {if $streak_counter_display2 {streak_counter_setup 2 $streak_counter_display2}}
    ; None in the tutorial, nor in practice, whose stats take its place.

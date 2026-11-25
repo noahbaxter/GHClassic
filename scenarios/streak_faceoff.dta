@@ -30,4 +30,18 @@
 (wait_until {>= {player0 current_streak} 55} 120)
 (wait 0.5)
 (shot both_out)
+; Plain Face-Off too: player 2's drawer under their meter, not left over
+; their score.
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+{gamecfg set mode multi_vs}
+{game set_num_players 2}
+{game set_song shoutatthedevil}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait_until {!= $streak_counter_display1 0} 30)
+(expect {!= $streak_counter_display2 0} 1)
+(wait_until {>= {player1 current_streak} 60} 120)
+(wait 0.5)
+(shot vs_p2_out)
 (quit)
