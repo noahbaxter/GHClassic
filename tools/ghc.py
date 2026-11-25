@@ -44,7 +44,8 @@ review/<branch>/<date>_<time>_<name>/, the run's own set, where everything to
 look at goes and nothing is loose. scenarios runs the files in scenarios/
 through arm side by side, the sheets staying in each run as shots.png unless
 --review: a run passes when it reaches its last step and quits with no FAIL
-or STALL in its log. Both clear runs/ of runs older than three days.
+or STALL in its log, and a pass's frames/ are deleted. Both clear runs/ of
+runs older than three days.
 
 record runs a scenario as arm does and makes it videos, picture and sound,
 in the run's set, review/<branch>/<date>_<time>_<scenario's name>/, beside
@@ -52,7 +53,8 @@ its shots: the game pipes each frame to ffmpeg as it draws and writes its
 mixed sound beside it, both on the game's clock, so it can run faster than
 real time. Without (record) steps the whole run is one video,
 <scenario's name>.mp4; with them, each (record on name) to (record off) is
-its own, <name>.mp4. A run stopped at --secs keeps what it drew. With
+its own, <name>.mp4. A run stopped at --secs keeps what it drew. Once every
+clip is in review/, the run keeps only its run.log. With
 --series <name>, arm and record add to one set, review/<branch>/<date>_<name>/,
 made the first time and found again after, each take's files named by its
 time, so the takes of something being worked on sit side by side.
@@ -749,6 +751,11 @@ def cmd_record(argv):
             sound.unlink(missing_ok=True)
     if not made:
         return 1
+    # Every clip in review/: the run keeps only its log.
+    if made == len(videos):
+        for left in out.iterdir():
+            if left.name != "run.log":
+                shutil.rmtree(left, ignore_errors=True) if left.is_dir() else left.unlink()
 
 
 def cmd_scenarios(argv):
@@ -801,6 +808,10 @@ def cmd_scenarios(argv):
         if not failures and not skips and not re.search(r"^\[scenario\] (done|\S+ s: \(quit\))", log, re.M):
             failures = ["ended before its last step"]
         verdict = "FAIL" if failures or not state.startswith("exited") else "skip" if skips else "pass"
+        # A pass's frames tell nothing (a hundred MB or more a run); a
+        # failure's are kept to see what went wrong.
+        if verdict == "pass":
+            shutil.rmtree(out / "frames", ignore_errors=True)
         note = failures[0] if failures else skips[0] if skips else ""
         return f"{verdict:<4} {name:<16} {round(time.time() - started):4d}s  {note}".rstrip()
 
