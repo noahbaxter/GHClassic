@@ -26,7 +26,7 @@
 ## Requirements
 - Legally obtained disc images for the following games in `.chd`, `.iso` or `.bin`:
   - **Required:**
-    - Guitar Hero II (PS2), USA only (SLUS-21447)
+    - Guitar Hero II (PS2), USA (SLUS-21447) or Europe/Australia (SLES-54442)
   - **Optional, any region:**
     - Guitar Hero (PS2)
     - Guitar Hero II (360)

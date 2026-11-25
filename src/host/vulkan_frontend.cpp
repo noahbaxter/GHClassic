@@ -729,7 +729,7 @@ namespace gh2
             std::cerr << "[sdl] window: " << SDL_GetError() << std::endl;
             return false;
         }
-        if (timing::fullscreen)
+        if (timing::fullscreen || (!s.hidden && settings::get(settings::kFullscreen)))
         {
             SDL_SetWindowFullscreen(s.window, true);
             SDL_SyncWindow(s.window);
@@ -944,6 +944,10 @@ namespace gh2
                 devicesChanged = true;
             if (event.type == SDL_EVENT_WINDOW_FOCUS_GAINED)
                 takeControllers();
+            // Kept for the next launch, however it went in or out.
+            if ((event.type == SDL_EVENT_WINDOW_ENTER_FULLSCREEN || event.type == SDL_EVENT_WINDOW_LEAVE_FULLSCREEN) &&
+                !s.hidden && settings::get(settings::kFullscreen) != (event.type == SDL_EVENT_WINDOW_ENTER_FULLSCREEN))
+                settings::set(settings::kFullscreen, event.type == SDL_EVENT_WINDOW_ENTER_FULLSCREEN);
             // Fullscreen: Cmd+F on macOS, F11 elsewhere. Not Alt+Enter, since
             // Enter is Start on the keyboard.
             if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && s.window)
@@ -1158,7 +1162,15 @@ namespace gh2
         s.times.add(isNew || moviePlaying, static_cast<float>(State::FrameLog::ms(waitEnd - acquireEnd)),
                     static_cast<float>(State::FrameLog::ms(recordEnd - recordStart)),
                     moviePlaying ? SceneStats{} : s.scene.stats());
-        song_log::present(isNew);
+        {
+            float gpuMs = 0.0f;
+            if (!moviePlaying)
+                for (float span : s.scene.stats().gpuMs)
+                    gpuMs += span;
+            song_log::present(isNew, gpuMs, static_cast<float>(State::FrameLog::ms(recordEnd - recordStart)),
+                              static_cast<float>(State::FrameLog::ms(waitEnd - acquireEnd)),
+                              static_cast<float>(State::FrameLog::ms(acquireEnd - acquireStart)));
+        }
         if (s.frameLog.on)
             s.frameLog.add(isNew, frames().published(), State::FrameLog::ms(waitEnd - acquireEnd),
                            State::FrameLog::ms(acquireEnd - acquireStart),
@@ -1241,6 +1253,8 @@ namespace gh2
         if (!m_state)
             return;
         State &s = *m_state;
+        // A song still on gets its line while its GPU memory is all there.
+        song_log::quit();
         record::finish();
         if (perf::logging())
             std::cerr << s.times.summary();

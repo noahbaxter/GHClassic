@@ -1,4 +1,5 @@
 ; Plays the intro movie through and back to the main menu.
+(needs gh2)
 #include common/first_boot.dta
 {meta play_movie intro.pss}
 (wait_screen main_screen)

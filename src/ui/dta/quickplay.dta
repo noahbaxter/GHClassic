@@ -267,7 +267,23 @@
                {ghc_info_parts $s_dir $song}
                {ghc_info_dashes $s_dir $ghc_info_rule2}
                {ghc_info_key $s_dir {text_fit upper best} 8 $ghc_info_best}
-               {ghc_info_line $s_dir {custom best $song} 8 $ghc_info_best TRUE}
+               {if_else {custom best_failed $song}
+                  ; A failed best (no_fail): its score, then FAILED in red
+                  ; at the right edge.
+                  {do
+                     ($right {'-' {/ $ghc_info_width 2} $ghc_info_margin})
+                     ($failed {text_fit label_width "  FAILED" {$s_dir find ghc_info_0.lbl} 8})
+                     {ghc_info_put $s_dir {custom best $song} 8 {'-' $right $failed} $ghc_info_best 68}
+                     {ghc_info_line $s_dir "FAILED" 8 $ghc_info_best TRUE}
+                     ; A label's color takes at its next text.
+                     {do
+                        ($l {$s_dir find {sprint "ghc_info_" {'-' $ghc_info_n 1} ".lbl"}})
+                        {$l set color {pack_color 0.72 0.08 0.06}}
+                        {$l set_localized_text "FAILED"}
+                     }
+                  }
+                  {ghc_info_line $s_dir {custom best $song} 8 $ghc_info_best TRUE}
+               }
             }
          }
       }

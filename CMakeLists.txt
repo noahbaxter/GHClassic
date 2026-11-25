@@ -291,6 +291,7 @@ set(GHC_GAME_SOURCES
     src/content/campaigns.cpp
     src/content/card.cpp
     src/content/crowd_cards.cpp
+    src/content/crowd_presence.cpp
     src/content/focus.cpp
     src/content/shot_spot.cpp
     src/content/floor_spot.cpp
@@ -364,6 +365,8 @@ set(GHC_GAME_SOURCES
     src/gameplay/engine/gh1/star_power.cpp
     src/gameplay/engine/gh1/watcher.cpp
     src/gameplay/engine/hopo_lock.cpp
+    src/gameplay/engine/no_autoplay.cpp
+    src/gameplay/engine/no_fail.cpp
     src/gameplay/engine/note_engine.cpp
     src/gameplay/engine/star_power_overlap.cpp
     src/gameplay/engine/strum_limit.cpp
@@ -607,12 +610,14 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     src/ui/dta/campaigns.dta src/gh1/menus.dta src/gh1/scripts.dta src/ui/dta/quickplay_pickers.dta
     src/ui/dta/quickplay_setup.dta src/ui/dta/multiplayer.dta src/ui/dta/preshow_guitarist.dta src/ui/dta/in_song.dta
     src/content/guitar_copy.dta src/hub/preshow_picks.dta src/ui/dta/game_settings.dta src/ui/dta/photo_mode.dta
-    src/ui/dta/note_streak.dta src/ui/dta/streak_counter.dta src/ui/dta/song_progress.dta src/ui/dta/players.dta
+    src/ui/dta/note_streak.dta src/ui/dta/streak_counter.dta src/ui/dta/song_progress.dta src/ui/dta/no_fail.dta src/ui/dta/crowd_presence.dta src/ui/dta/players.dta
     src/ui/dta/controllers.dta src/ui/dta/profiles.dta)
 file(READ src/ui/dta/shared/box.dta GHC_BOX_DTA)
 file(READ src/ui/dta/note_streak.dta GHC_NOTE_STREAK_DTA)
 file(READ src/ui/dta/streak_counter.dta GHC_STREAK_COUNTER_DTA)
 file(READ src/ui/dta/song_progress.dta GHC_SONG_PROGRESS_DTA)
+file(READ src/ui/dta/no_fail.dta GHC_NO_FAIL_DTA)
+file(READ src/ui/dta/crowd_presence.dta GHC_CROWD_PRESENCE_DTA)
 file(READ src/ui/dta/game_settings.dta GHC_GAME_SETTINGS_DTA)
 file(READ src/ui/dta/photo_mode.dta GHC_PHOTO_MODE_DTA)
 file(READ src/ui/dta/players.dta GHC_PLAYERS_DTA)
@@ -699,6 +704,13 @@ target_include_directories(GHClassic PRIVATE "${GHC_DTA_DIR}")
 # from, whether that is the experimental track's, and when it was configured.
 set(GHC_VERSION "dev" CACHE STRING "The release this build is")
 string(TIMESTAMP GHC_BUILT "%Y-%m-%d %H:%M")
+# Off for what players get (tools/ghc.py release): no scenarios, no scripted
+# play, and GH2's own autoplay held off (gameplay/engine/no_autoplay.h).
+option(GHC_DEV_TOOLS "Scenarios, scripted play and autoplay, for local testing" ON)
+if(NOT GHC_DEV_TOOLS)
+    set_source_files_properties(src/dev/scenario.cpp src/dev/scripted_play.cpp PROPERTIES HEADER_FILE_ONLY ON)
+    set_source_files_properties(src/main.cpp src/game.cpp PROPERTIES COMPILE_DEFINITIONS GHC_PLAYER_BUILD)
+endif()
 option(GHC_EXPERIMENTAL "The experimental track: its own name, saves and settings" OFF)
 set(GHC_EXPERIMENTAL_VALUE 0)
 set(GHC_BUNDLE_NAME "GH Classic")
@@ -794,6 +806,22 @@ if(NOT EXISTS "${GHC_RETAIL_ELF}")
 endif()
 file(SHA1 "${GHC_RETAIL_ELF}" GHC_RETAIL_SHA1)
 target_compile_definitions(GHClassic PRIVATE GHC_RETAIL_SHA1="${GHC_RETAIL_SHA1}")
+# Europe's disc plays when tools/ghc.py had its executable to patch from
+# (disc.py patch); without the patch the build takes the USA disc only.
+set(GHC_EUROPE_PATCH "${GHC_GENERATED_DIR}/../europe.patch")
+if(EXISTS "${GHC_EUROPE_PATCH}")
+    file(READ "${GHC_EUROPE_PATCH}" GHC_EUROPE_PATCH_BYTES HEX)
+    string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," GHC_EUROPE_PATCH_BYTES "${GHC_EUROPE_PATCH_BYTES}")
+    file(CONFIGURE OUTPUT "${GHC_DTA_DIR}/europe_patch.inc" CONTENT "${GHC_EUROPE_PATCH_BYTES}\n")
+    # disc.cpp's alone, so a patch coming or going rebuilds only it; zstd's
+    # decoder comes with libchdr.
+    set_source_files_properties(src/disc/disc.cpp PROPERTIES COMPILE_DEFINITIONS GHC_EUROPE_PATCH
+        INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/lib/libchdr/deps/zstd-1.5.7")
+    target_link_libraries(GHClassic PRIVATE zstd)
+    message(STATUS "Europe's disc: playable")
+else()
+    message(STATUS "Europe's disc: not playable, no ${GHC_EUROPE_PATCH}")
+endif()
 
 # Upstream sets its platform setup (sse2neon on ARM) at directory scope, so it
 # reaches only targets inside lib/PS2Recomp. Generated code needs it too.

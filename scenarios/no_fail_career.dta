@@ -1,0 +1,13 @@
+; No Fail ticked is Quick Play's alone: a career song with nobody playing is
+; still lost (song_fail.dta's song).
+#include common/first_boot.dta
+{no_fail 1}
+{gamecfg set mode career}
+{campaign set_profile_slot 0}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty expert}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait_screen lose_screen 180)
+(expect {no_fail} 1)
+(quit)

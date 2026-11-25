@@ -594,12 +594,16 @@ namespace gh2::ark
             if (!entry)
                 return std::nullopt;
             const Entry at = *entry;
-            return Made{at.size, [at](uint64_t offset, uint8_t *dst, size_t want)
+            // Its own copy: the audio worker reads this while the game thread
+            // may be adding parts.
+            std::unique_lock lock(s_partsMutex);
+            auto from = s_parts[at.part].read;
+            lock.unlock();
+            return Made{at.size, [at, from = std::move(from)](uint64_t offset, uint8_t *dst, size_t want)
                         {
                             if (offset >= at.size)
                                 return size_t{0};
-                            return s_parts[at.part].read(at.offset + offset, dst,
-                                                         std::min<uint64_t>(want, at.size - offset));
+                            return from(at.offset + offset, dst, std::min<uint64_t>(want, at.size - offset));
                         }};
         }
     }

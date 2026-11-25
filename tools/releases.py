@@ -13,6 +13,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SERIAL = "SLUS-21447"
+# Europe's GH2, which plays through a patch to USA's executable.
+EUROPE, EUROPE_ELF = "SLES-54442", "SLES_544.42"
 
 
 def main_checkout():
@@ -41,6 +43,19 @@ def find_disc(env):
     return result.stdout.strip()
 
 
+def find_europe(disc, env):
+    """Europe's GH2 executable for the build to patch from, else None:
+    SLES_544.42 beside a bare USA one (CI's build/elf, ELF_REPO's), else
+    a Europe disc image in game/."""
+    if disc and Path(disc).suffix.lower() not in (".iso", ".bin", ".chd"):
+        beside = Path(disc).with_name(EUROPE_ELF)
+        return str(beside) if beside.is_file() else None
+    images = sorted(str(p) for p in discs_dir().glob("*"))
+    result = subprocess.run([sys.executable, ROOT / "tools" / "disc.py", "find", EUROPE, *images],
+                            env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    return None if result.returncode else result.stdout.strip()
+
+
 def content_games():
     """The games whose discs come along when their images are in game/, in
     the order their archives are searched: Rocks the 80s, GH1, then 360 GH2,
@@ -63,13 +78,15 @@ def discs_arg(value):
 
 
 def releases(env):
-    """Every content disc image under game/, as (game, image): game/ itself
-    holds the set a run mounts, folders in it the other releases of each."""
+    """Every content disc image under game/, as (game, image), and every
+    Europe GH2 disc, as ("gh2", image), played as the game disc in place of
+    USA's: game/ itself holds the set a run mounts, folders in it the other
+    releases of each."""
     found = []
     for image in sorted(p for p in discs_dir().rglob("*") if p.suffix.lower() in (".iso", ".bin", ".chd")):
-        for game in content_games():
-            if not subprocess.run([sys.executable, ROOT / "tools" / "disc.py", "find", game, str(image)], env=env,
-                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
+        for game, release in [(g, g) for g in content_games()] + [("gh2", EUROPE)]:
+            if not subprocess.run([sys.executable, ROOT / "tools" / "disc.py", "find", release, str(image)],
+                                  env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
                 found.append((game, image))
     return found
 

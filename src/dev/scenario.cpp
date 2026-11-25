@@ -4,7 +4,6 @@
 #include "dev/transplant.h"
 #include "frame_step.h"
 #include "dev/draw_dump.h"
-#include "dev/timing.h"
 #include "ps2_runtime_macros.h"
 #include "guest.h"
 #include "hook.h"
@@ -427,8 +426,9 @@ namespace gh2::scenario
                 }
                 else if (verb == "shot")
                 {
-                    // Nothing more runs until that frame is written.
-                    requestShot(array.symbol(1));
+                    // Nothing more runs until that frame is written. Its name
+                    // a word, or what an expression makes ({sprint ...}).
+                    requestShot(text(rdram, array.arg(1)));
                     s_shooting = true;
                     return;
                 }
@@ -663,7 +663,6 @@ namespace gh2::scenario
         struct SecondsBeatTag;
         void onSetSecondsBeat(uint8_t *, R5900Context *ctx, PS2Runtime *)
         {
-            timing::songSeconds(ctx->f[12]);
             if (!s_frozen)
                 return;
             ctx->f[12] = s_seconds;

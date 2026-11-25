@@ -1,0 +1,33 @@
+; GH2's bonus videos show only where the game disc has them: Europe's has
+; neither, so its bonus poster leaves both rows off (and still opens and
+; backs out) and its career store has no Videos. USA's shows them all.
+(needs gh2)
+#include common/first_boot.dta
+{campaigns unlock_all TRUE}
+{ui goto_screen options_screen}
+(wait_screen options_screen)
+(wait 1)
+{options_panel set_focus {options_panel find op_bonus.btn}}
+(wait 0.3)
+(press green)
+(wait_screen ghc_bonus_gh2_screen 10)
+(wait 1)
+(expect {== {{ghc_bonus_gh2_panel find bm_video3.btn} showing} {!= {campaigns video_file gh2 video3} ""}} 1)
+(expect {== {{ghc_bonus_gh2_panel find bm_video2.btn} showing} {!= {campaigns video_file gh2 video2} ""}} 1)
+(shot gh2_poster)
+(press red)
+(wait_screen options_screen 10)
+{campaigns unlock_all FALSE}
+
+{set $pick gh2}
+#include common/career_start.dta
+{ui goto_screen store_screen}
+(wait_screen store_screen)
+(wait 2)
+(expect {== {{store_panel find st_videos.btn} showing} {!= {campaigns video_file gh2 video3} ""}} 1)
+; Up from Guitars wraps to the last category: Videos only where it shows.
+(press up)
+(wait 0.5)
+(expect {== {== {store_panel get category} video} {!= {campaigns video_file gh2 video3} ""}} 1)
+(shot store)
+(quit)

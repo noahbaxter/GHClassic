@@ -49,14 +49,25 @@ namespace gh2::custom
         constexpr size_t kMostSections = 1000u;
 
         // Its best as `profile` plays it on `controller`, on the hardest
-        // difficulty with one: score, stars, and percent or FC.
-        std::string bestLine(const std::string &id, std::optional<int> profile, const std::string &controller)
+        // difficulty with one.
+        std::optional<save::Best> bestOf(const std::string &id, std::optional<int> profile, const std::string &controller)
         {
             for (const char *difficulty : {"expert", "hard", "medium", "easy"})
                 if (const auto best = save::keptBest(save::playedKey(id, difficulty, "guitar", controller), profile))
-                    return std::to_string(best->score) + "  " + std::to_string(best->stars) + "*  " +
-                           (best->fullCombo ? std::string("FC") : std::to_string(best->percent) + "%");
-            return "NOT PLAYED";
+                    return best;
+            return std::nullopt;
+        }
+
+        // That best as the sidebar shows it: score, stars, and percent or
+        // FC; a failed one's score alone, FAILED drawn beside it (quickplay.dta).
+        std::string bestLine(const std::optional<save::Best> &best)
+        {
+            if (!best)
+                return "NOT PLAYED";
+            if (best->failed)
+                return std::to_string(best->score);
+            return std::to_string(best->score) + "  " + std::to_string(best->stars) + "*  " +
+                   (best->fullCombo ? std::string("FC") : std::to_string(best->percent) + "%");
         }
 
         script::Node customCommand(const script::Call &call)
@@ -144,7 +155,12 @@ namespace gh2::custom
             if (op == "length")
                 return call.word(lengthText(song ? song->length : 0.0));
             if (op == "best")
-                return call.word(bestLine(id, save::seatProfile(0), save::seatController(0)));
+                return call.word(bestLine(bestOf(id, save::seatProfile(0), save::seatController(0))));
+            if (op == "best_failed")
+            {
+                const auto best = bestOf(id, save::seatProfile(0), save::seatController(0));
+                return {best && best->failed ? 1u : 0u, script::kInt};
+            }
             // The part it plays: quickplay's instrument's, or with a TRUE
             // after the rest its lead, as on guitar (Face-Off's).
             const auto part = [&](int lead)
