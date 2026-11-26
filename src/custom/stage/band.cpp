@@ -503,8 +503,14 @@ namespace gh2::custom
                                         : toGh2Sorted(chart.kicks, toGh2);
         const std::vector<Chart::Cue> drummerCues = memberCues(stageTrack(chart, "PART DRUMS"));
         addMemberCues(band.drums, drummerCues, drumming, toGh2);
-        for (const uint32_t t : kicks)
-            addShortNote(band.drums, t, 36u);
+        // Each a sixteenth, ended before the next: a double kick's notes
+        // overlapping lost some.
+        for (size_t i = 0; i < kicks.size(); ++i)
+        {
+            const uint32_t t = kicks[i], next = i + 1u < kicks.size() ? kicks[i + 1u] : UINT32_MAX;
+            if (next > t)
+                addNote(band.drums, t, std::min<uint64_t>(uint64_t(t) + kBeat / 4u, next - 1u), 36u);
+        }
         // The chart's crashes, else one a section (addSectionCrashes).
         for (const uint32_t t : toGh2Sorted(chart.crashes, toGh2))
             addShortNote(band.drums, t, 37u);

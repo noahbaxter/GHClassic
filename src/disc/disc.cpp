@@ -1,15 +1,22 @@
 #include "disc/disc.h"
 
+#include "content/games.h"
 #include "settings/settings.h"
 #include "disc/sha1.h"
+#include "disc/volume.h"
 
 #include "runtime/ps2_disc_image.h"
 
 #include <SDL3/SDL.h>
+#ifdef GHC_EUROPE_PATCH
+#include <zstd.h>
+#endif
 
 #include <algorithm>
 #include <cctype>
+#include <iostream>
 #include <memory>
+#include <utility>
 
 namespace gh2::disc
 {
@@ -36,6 +43,63 @@ namespace gh2::disc
             const size_t end = text.find_first_of("\r\n", start);
             return start == std::string::npos ? std::string() : text.substr(start, end - start);
         }
+
+        // The supported game a disc is of (games::of), else "".
+        std::string gameOf(const std::filesystem::path &image)
+        {
+            std::string error;
+            const std::unique_ptr<Volume> volume = Volume::open(image, error);
+            return volume ? games::of(volume->serial()) : std::string();
+        }
+
+        // The games whose discs go beside the game disc, in release order.
+        constexpr std::pair<const char *, const char *> kExtras[] = {
+            {"gh1", "Guitar Hero"},
+            {"gh2x", "Guitar Hero II (Xbox 360)"},
+            {"gh80s", "Guitar Hero Encore: Rocks the 80s"},
+        };
+
+        const char *extraName(const std::string &game)
+        {
+            for (const auto &[id, name] : kExtras)
+                if (game == id)
+                    return name;
+            return nullptr;
+        }
+
+        constexpr const char *kEuropeElf = "SLES_544.42";
+#ifdef GHC_EUROPE_PATCH
+        // tools/disc.py patch's, made by the build from both executables.
+        constexpr uint8_t kEuropePatchBytes[] = {
+#include "europe_patch.inc"
+        };
+        constexpr const uint8_t *kEuropePatch = kEuropePatchBytes;
+#else
+        constexpr const uint8_t *kEuropePatch = nullptr;
+#endif
+
+        // Europe's executable rebuilt as USA's, the patch's zstd frame
+        // decoded with it as the prefix (zstd --patch-from), else empty.
+        std::vector<uint8_t> fromEurope(const std::vector<uint8_t> &elf)
+        {
+#ifdef GHC_EUROPE_PATCH
+            const unsigned long long size = ZSTD_getFrameContentSize(kEuropePatch, sizeof kEuropePatchBytes);
+            if (size > (64u << 20))
+                return {};
+            std::vector<uint8_t> usa(size);
+            ZSTD_DCtx *context = ZSTD_createDCtx();
+            size_t made = ZSTD_DCtx_refPrefix(context, elf.data(), elf.size());
+            if (!ZSTD_isError(made))
+                made = ZSTD_decompressDCtx(context, usa.data(), usa.size(), kEuropePatch, sizeof kEuropePatchBytes);
+            ZSTD_freeDCtx(context);
+            if (ZSTD_isError(made) || made != usa.size())
+                return {};
+            return usa;
+#else
+            (void)elf;
+            return {};
+#endif
+        }
     }
 
     bool portable()
@@ -57,19 +121,39 @@ namespace gh2::disc
     std::vector<uint8_t> bootElf(const std::filesystem::path &image, std::string &why)
     {
         std::unique_ptr<DiscImage> disc = DiscImage::open(image, why);
-        if (!disc)
+        const std::string boot = disc ? bootPath(readFile(*disc, "SYSTEM.CNF")) : std::string();
+        const std::string game = gameOf(image);
+        if (const char *extra = extraName(game))
+        {
+            why = std::string(extra) + ", an extra disc, not the game disc";
             return {};
-        const std::string boot = bootPath(readFile(*disc, "SYSTEM.CNF"));
+        }
         if (boot.empty())
         {
-            why = "not a PS2 game disc";
+            if (disc)
+                why = "not a PS2 game disc";
             return {};
         }
         std::vector<uint8_t> elf = readFile(*disc, boot);
         const std::string sha1 = sha1Hex(elf.data(), elf.size());
+        // Europe's disc boots its own build of the game, which the patch
+        // turns into the USA one the code is recompiled from.
+        if (sha1 != GHC_RETAIL_SHA1 && boot.find(kEuropeElf) != std::string::npos)
+        {
+            elf = fromEurope(elf);
+            if (elf.empty() || sha1Hex(elf.data(), elf.size()) != GHC_RETAIL_SHA1)
+            {
+                why = kEuropePatch ? "Guitar Hero II (Europe, Australia), but damaged or modified (SHA-1 " + sha1 + ")"
+                                   : "Guitar Hero II (Europe, Australia), which this build can't play";
+                return {};
+            }
+            return elf;
+        }
         if (sha1 != GHC_RETAIL_SHA1)
         {
-            why = boot + " is not Guitar Hero II (USA) as this build knows it (SHA-1 " + sha1 + ")";
+            why = game == "gh2" ? "Guitar Hero II, but damaged or modified (SHA-1 " + sha1 + ")"
+                                : "not Guitar Hero II (it boots " +
+                                      boot.substr(boot.find('\\') + 1u, boot.find(';') - boot.find('\\') - 1u) + ")";
             return {};
         }
         return elf;
@@ -100,16 +184,33 @@ namespace gh2::disc
         return images;
     }
 
-    std::filesystem::path find(std::string &why)
+    std::filesystem::path find()
     {
-        why.clear();
         for (const std::filesystem::path &image : images())
         {
-            std::string rejected;
-            if (!bootElf(image, rejected).empty())
+            std::string why;
+            if (!bootElf(image, why).empty())
                 return image;
-            why += image.filename().string() + ": " + rejected + "\n";
+            std::cerr << "[disc] " << image.filename().string() << ": " << why << std::endl;
         }
         return {};
+    }
+
+    std::string missing()
+    {
+        std::string text =
+            "No Guitar Hero II (PS2) disc found. Please place your disc image (.iso, .chd or .bin) into\n" +
+            folder().string() + "\nthen restart GH Classic.";
+        std::vector<std::string> found;
+        for (const std::filesystem::path &image : images())
+            if (const std::string game = gameOf(image); extraName(game))
+                found.push_back(game);
+        if (found.empty())
+            return text;
+        text += "\n\nContent discs found:";
+        for (const auto &[id, name] : kExtras)
+            if (std::find(found.begin(), found.end(), id) != found.end())
+                text += std::string("\n") + name;
+        return text;
     }
 }

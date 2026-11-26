@@ -20,9 +20,18 @@
    }
 }
 
+; None once a no_fail run has failed: SONG FAILED stays what it says.
 {func note_streak_show ($player $token)
-   {hud show_message $player $token}
-   {play_game_sfx_player meter_slide meter_slide {if_else {== $player kPlayerShared} 0 $player}}
+   {if {! $no_fail_quiet}
+      {hud show_message $player $token}
+      {play_game_sfx_player meter_slide meter_slide {if_else {== $player kPlayerShared} 0 $player}}
+   }
+}
+
+; Face-Off's say only NOTE STREAK!: the counter's drawer under each player's
+; score meter holds the count.
+{func note_streak_token ($token)
+   {if_else {ghc_multi_mode} note_streak_faceoff $token}
 }
 
 {func note_streak_hit ($player)
@@ -36,11 +45,11 @@
       {if_else {== $player 0}
          {do
             {set $note_streak_0 {player0 current_streak}}
-            {if {note_streak_due $note_streak_0} {note_streak_show 0 note_streak_0}}
+            {if {note_streak_due $note_streak_0} {note_streak_show 0 {note_streak_token note_streak_0}}}
          }
          {do
             {set $note_streak_1 {player1 current_streak}}
-            {if {note_streak_due $note_streak_1} {note_streak_show 1 note_streak_1}}
+            {if {note_streak_due $note_streak_1} {note_streak_show 1 {note_streak_token note_streak_1}}}
          }
       }
    }

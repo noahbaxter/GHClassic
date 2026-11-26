@@ -92,12 +92,36 @@ vec2 vectorCoverage(uint g, vec2 p, float size, float reach)
     return vec2(clamp(distance / size + 0.5, 0.0, 1.0), distance);
 }
 
+// A border (render/outline.h) round a texture's own ink, under it: the most
+// of its alpha a border's width about. A table of no characters holds it
+// (vector_fonts::outlined): its colour, then its width in uv, a share of the
+// texture's height.
+vec4 textureBorder(vec4 texel, vec2 uv, vec2 dx, vec2 dy)
+{
+    uint base = uint(pc.textBase);
+    vec4 border = unpackUnorm4x8(vf[base + 8u]);
+    vec2 size = vec2(textureSize(tex, 0));
+    vec2 reach = vec2(vff(base + 9u) * size.y) / size;
+    float ring = 0.0;
+    for (int i = 0; i < 16; ++i)
+    {
+        float t = float(i) * (6.2831853 / 16.0);
+        vec2 o = vec2(cos(t), sin(t)) * reach;
+        ring = max(ring, max(textureGrad(tex, uv + o, dx, dy).a, textureGrad(tex, uv + 0.5 * o, dx, dy).a));
+    }
+    ring *= border.a;
+    float over = texel.a + ring * (1.0 - texel.a);
+    vec3 rgb = over > 0.0 ? (texel.rgb * texel.a + border.rgb * ring * (1.0 - texel.a)) / over : border.rgb;
+    return vec4(rgb, over);
+}
+
 // The texel a vector font's glyph gives at uv: its layers over each other in
 // their colours, coverage as alpha. A masked font's is the texture's own,
 // cut to the outline, with the font's tone standing in for the texture's
 // fade over its edge's width of texels inside the outline (none at 0), and
 // the texture's own fade kept past it, dying out over its feather's texels.
-// The texture's own where the font's table has no glyph for the quad.
+// The texture's own where the font's table has no glyph for the quad, with
+// its border if the table is one.
 vec4 vectorTexel(vec2 uv, vec2 dx, vec2 dy)
 {
     uint base = uint(pc.textBase);
@@ -139,7 +163,8 @@ vec4 vectorTexel(vec2 uv, vec2 dx, vec2 dy)
         }
         return color;
     }
-    return textureGrad(tex, uv, dx, dy);
+    vec4 texel = textureGrad(tex, uv, dx, dy);
+    return count == 0u ? textureBorder(texel, uv, dx, dy) : texel;
 }
 
 void main()

@@ -4,9 +4,11 @@
 # is a different engine), and 360 GH2. Recognised by the serial in the boot
 # executable's name (a 360's title ID), so a disc we cannot use still gets
 # named. game: the name src/content/games.h and ghc.py --discs give it.
-# role: "engine" is recompiled (required), "content" adds its songs and
-# outfits when mounted, any of a game's content releases doing; a release
-# with no role is not supported (not yet checked to work).
+# role: "engine" is the game disc, "content" adds its songs and outfits
+# when mounted, any of a game's content releases doing; a release with no
+# role is not supported (not yet checked to work). USA GH2 is the engine
+# recompiled; Europe's executable is patched into it as the game loads
+# (disc.py patch), so its disc plays the same code.
 #
 # data_sha1 is the whole disc's: the data track's 2048-byte sectors hashed
 # (`tools/disc.py identify --image-hash`), which is exactly Redump's SHA-1.
@@ -81,6 +83,7 @@ serial = "SLES-54442"
 game = "gh2"
 name = "Guitar Hero II (Europe, Australia)"
 version = "1.01"
+role = "engine"
 data_sha1 = "c18c69fdae10b6c329f38245a7ea93a7e6088197"
 
 [[release]]
@@ -101,6 +104,11 @@ data_sha1 = "bc2ddeb9a392352986c50cfaf60e440d25e21616"
 name = "GH2 retail"
 file = "SLUS_214.47"
 sha1 = "aea7bbb01eb6e56056c3a33771ed046090d39168"
+
+[[executable]]
+name = "GH2 Europe retail"
+file = "SLES_544.42"
+sha1 = "cd98b10f779880736ebdddc8409fe697647d7047"
 
 [[executable]]
 name = "GH2 debug"

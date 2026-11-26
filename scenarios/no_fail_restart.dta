@@ -1,0 +1,39 @@
+; No Fail's walkout undone: a restart from the pause menu shows again every
+; flat crowd the walkout hid (the venue stays loaded), and a quit then a new
+; song starts with none left hidden.
+#include common/first_boot.dta
+{gamecfg set mode quickplay}
+{no_fail 1}
+{game set_song shoutatthedevil}
+{{game get_player_config 0} set_difficulty expert}
+{game set_quickplay}
+{game set_venue arena}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(expect {game get_venue} arena)
+(wait_until {> {taskmgr seconds} 45} 120)
+(expect {> {size $crowd_presence_hid} 0} 1)
+{set $hid $crowd_presence_hid}
+{ui goto_screen pause_screen}
+(wait_screen pause_screen 10)
+(wait 1)
+(press down)
+(wait 0.5)
+(expect {pause_panel focus_name} restart.btn)
+(press green)
+(wait_until {< {taskmgr seconds} 5} 60)
+(wait_until {> {taskmgr seconds} 3} 60)
+(expect {size $crowd_presence_hid} 0)
+(expect {do ($n 0) {foreach $p $hid {if {{world find $p} showing} {set $n {+ $n 1}}}} $n} {size $hid})
+(shot restarted)
+(wait_until {> {taskmgr seconds} 45} 120)
+(expect {> {size $crowd_presence_hid} 0} 1)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 30)
+{game set_song shoutatthedevil}
+{game set_quickplay}
+{ui goto_screen loading_screen}
+(wait_screen game_screen 60)
+(wait_until {> {taskmgr seconds} 3} 60)
+(expect {size $crowd_presence_hid} 0)
+(quit)

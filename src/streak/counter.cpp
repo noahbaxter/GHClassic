@@ -15,7 +15,9 @@
 #include "dta.h"
 #include "guest.h"
 #include "hook.h"
+#include "milo/layout.h"
 #include "milo/milo.h"
+#include "render/outline.h"
 #include "script.h"
 #include "streak/counter_motion.h"
 #include "streak/counter_scene.h"
@@ -87,13 +89,20 @@ namespace gh2
             return {};
         }
 
-        // {ghc_streak_counter_digit <display> <wheel> <digit> <streak_w<wheel>_<digit>.mat>}
+        // {ghc_streak_counter_digit <display> <wheel> <digit> <streak_w<wheel>_<digit>.mat>},
+        // its digit given a black ring (render/outline.h), so it reads
+        // against the wheel's grey whatever it is tinted: black stays black
+        // under the full combo's purple. 4 texels of a wheel picture's 64.
+        constexpr outline::Border kDigitRing = {0xff000000u, 4.0f / 64.0f};
         script::Node streakCounterDigit(const script::Call &call)
         {
             const uint32_t display = displayOf(call);
             const auto wheel = static_cast<size_t>(call.number(2)), digit = static_cast<size_t>(call.number(3));
+            const uint32_t mat = call.object(4);
             if (display && wheel < streak_counter::kWheels && digit <= 9u)
-                s_counters[display].digits[wheel][digit] = call.object(4);
+                s_counters[display].digits[wheel][digit] = mat;
+            if (const uint32_t tex = mat ? load<uint32_t>(call.rdram, mat + ::milo::mat::kDiffuseTex) : 0u)
+                outline::set(tex, kDigitRing);
             return {};
         }
 

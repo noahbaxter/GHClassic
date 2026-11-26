@@ -104,7 +104,7 @@ namespace gh2
         public:
             Player(ark::Made file, float minSkipSeconds, PS2Runtime &runtime)
                 : m_file(std::move(file)), m_runtime(runtime),
-                  m_skipAfter(Clock::now() + std::chrono::duration_cast<Clock::duration>(
+                  m_skipAfter(ps2x::host_clock::now() +std::chrono::duration_cast<Clock::duration>(
                                                  std::chrono::duration<float>(minSkipSeconds)))
             {
                 m_decoder = mpeg2_init();
@@ -225,7 +225,13 @@ namespace gh2
                         s_running = true;
                         if (stopping())
                             return;
-                        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                        // Marked before the look, as waitUntil()'s.
+                        ps2x::host_clock::Wait wait;
+                        if (at >= s_played.load(std::memory_order_acquire) + kRingFrames)
+                        {
+                            wait.block();
+                            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                        }
                     }
                     s_ring[(at % kRingFrames) * 2u] = frames[i * 2u];
                     s_ring[(at % kRingFrames) * 2u + 1u] = frames[i * 2u + 1u];
@@ -310,11 +316,20 @@ namespace gh2
                 return m_clockBase + int64_t(played * 90000u / kAudioRate);
             }
 
-            // Until the soundtrack reaches `pts`, or the player skips.
+            // Until the soundtrack reaches `pts`, or the player skips. The
+            // soundtrack moves as it is mixed, which a stepped clock's
+            // stepper does once the game waits (runtime/host_clock.h): the
+            // wait marked before the look, so it sees each mix.
             void waitUntil(int64_t pts)
             {
-                while (!stopping() && clock() < pts)
+                for (;;)
+                {
+                    ps2x::host_clock::Wait wait;
+                    if (stopping() || clock() >= pts)
+                        return;
+                    wait.block();
                     std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                }
             }
 
             // Retail skips on JoypadData buttons once the minimum time is up
@@ -326,7 +341,7 @@ namespace gh2
                 if (m_done)
                     return true;
                 const uint16_t pressed = hostPad().pressed;
-                const bool skip = Clock::now() >= m_skipAfter && (pressed & input::kActions[input::kGreen].button) &&
+                const bool skip = ps2x::host_clock::now() >= m_skipAfter && (pressed & input::kActions[input::kGreen].button) &&
                                   !(pressed & input::kActions[input::kStart].button);
                 m_done = skip || m_runtime.isStopRequested();
                 return m_done;
@@ -356,6 +371,19 @@ namespace gh2
             bool m_done = false;
         };
 
+        // A movie from the archive, else from the game disc's own files.
+        std::optional<ark::Made> movieFile(const std::string &path)
+        {
+            if (std::optional<ark::Made> file = ark::open(path))
+                return file;
+            DiscImage *disc = ps2ConfiguredDisc();
+            DiscImage::Extent extent;
+            if (!disc || !disc->find(path, extent) || extent.isDir)
+                return std::nullopt;
+            return ark::Made{static_cast<uint32_t>(extent.size), [disc, extent](uint64_t offset, uint8_t *dst, size_t size)
+                             { return disc->readExtent(extent, offset, dst, size); }};
+        }
+
         // PlayMovie(path, minSkipSeconds, alloc, free), retail 0x21bb60. Retail
         // plays the PSS through libmpeg, the IPU and a libsdr channel until
         // sceMpegIsEnd or a skip and returns 1 (0x21bebc), or 0 when the file
@@ -368,12 +396,7 @@ namespace gh2
             const std::string path = reinterpret_cast<const char *>(getMemPtr(rdram, GPR_U32(ctx, 4)));
             const float minSkipSeconds = ctx->f[12];
             uint32_t result = 0;
-            std::optional<ark::Made> file = ark::open(path);
-            DiscImage *disc = ps2ConfiguredDisc();
-            DiscImage::Extent extent;
-            if (!file && disc && disc->find(path, extent) && !extent.isDir)
-                file = ark::Made{static_cast<uint32_t>(extent.size), [disc, extent](uint64_t offset, uint8_t *dst, size_t size)
-                                 { return disc->readExtent(extent, offset, dst, size); }};
+            std::optional<ark::Made> file = movieFile(path);
             if (file)
             {
                 std::cerr << "[movie] playing " << path << std::endl;
@@ -397,6 +420,8 @@ namespace gh2
     {
         runtime.replaceFunction(addresses.playMovie, playMovie);
     }
+
+    bool movieExists(const std::string &path) { return movieFile(path).has_value(); }
 
     bool moviePlaying()
     {

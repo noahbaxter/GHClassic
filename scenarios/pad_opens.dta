@@ -1,0 +1,32 @@
+; A gamepad's opens, by its strum button (D-pad down or up), under each
+; engine: an open, a green the strum leaves alone, an open, an open held, an
+; open. Every open hit, the green not (gameplay/extended/guitar/hammer_ons.h).
+(songs pad_opens)
+(needs gh1)
+#include common/first_boot.dta
+(device pad)
+(press down pad)
+(expect {seat_has 0 pad} 1)
+{gamecfg set mode quickplay}
+{setlist select custom}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+{set $ghc_po_song {game get_song}}
+{func ghc_po_start ($engine)
+   {note_engine set $engine}
+   {gamecfg set mode quickplay}
+   {{game get_player_config 0} set_difficulty expert}
+   {game set_song $ghc_po_song}
+   {game set_quickplay}
+   {ui goto_screen loading_screen}
+}
+{func ghc_po_due ($i) {>= {ghc_play now} {'-' {ghc_play gem $i ms} 10}}}
+
+{ghc_po_start gh2}
+#include common/pad_opens_play.dta
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 30)
+{ghc_po_start gh1}
+#include common/pad_opens_play.dta
+(quit)

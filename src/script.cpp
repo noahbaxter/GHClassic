@@ -275,6 +275,18 @@ namespace gh2::script
             release(call.rdram, call.ctx, call.runtime, copy);
             return {};
         }
+
+        // {ghc_with_this <object> <func>}: {<func>} run as the object's own
+        // handlers are, $this that object, so {new} names into its dir, where
+        // its scene draws what is made; then $this put back.
+        Node withThis(const Call &call)
+        {
+            const uint32_t was = load<uint32_t>(call.rdram, s_addresses->dataThis);
+            call.runtime->callGuestFunction(call.rdram, call.ctx, s_addresses->dataSetThis, {call.object(1)});
+            run(call.rdram, call.ctx, call.runtime, "{" + call.symbol(2) + "}");
+            call.runtime->callGuestFunction(call.rdram, call.ctx, s_addresses->dataSetThis, {was});
+            return {};
+        }
     }
 
     Node floatNode(float value)
@@ -542,6 +554,7 @@ namespace gh2::script
         s_addresses = &addresses;
         addCommand("retype", retype);
         addCommand("amend", amend);
+        addCommand("ghc_with_this", withThis);
         EntryHook<InitTag>::install(runtime, addresses.ghUtlInit, onDataReady);
         EntryHook<GotoScreenTag>::install(runtime, addresses.uiGotoScreen, onGotoScreen);
         EntryHook<UiPollTag>::install(runtime, addresses.uiManagerPoll, onUiPoll);

@@ -9,6 +9,7 @@
 #include "gameplay/engine/note_engine.h"
 #include "guest.h"
 #include "hook.h"
+#include "movie/movie.h"
 #include "save/save.h"
 #include "script.h"
 #include "settings/settings.h"
@@ -1062,7 +1063,8 @@ namespace gh2::campaigns
             }
             // {campaigns video_file <game> <video>}: the file that game's
             // store names for one of its bonus videos, lent from its disc
-            // with the menus' files until they change; "" for none.
+            // with the menus' files until they change; "" for none, or one
+            // its disc lacks (Europe's GH2 sells two it has no file for).
             if (op == "video_file")
             {
                 const auto index = indexOf(call.symbol(2));
@@ -1074,7 +1076,7 @@ namespace gh2::campaigns
                 {
                     s_menusLent.push_back(path);
                     ark::lend(path, s_campaigns[*index].front);
-                    return call.word(path.substr(std::strlen("videos/")));
+                    return call.word(movieExists(path) ? path.substr(std::strlen("videos/")) : "");
                 }
                 return call.word("");
             }

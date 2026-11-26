@@ -20,6 +20,7 @@
 
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
+#include "runtime/host_clock.h"
 
 #include <algorithm>
 #include <chrono>
@@ -44,6 +45,11 @@ namespace gh2::guitar
         // their frets' reps, each lifted how far.
         std::set<uint32_t> s_openChords;
         std::map<uint32_t, float> s_lifted;
+        // The Gems that are opens: their GameGem has no frets and is the
+        // track's player's (TrackConfig::Player, +0x00). Face-Off empties
+        // the frets of another player's gems to hide them, so no frets alone
+        // isn't an open.
+        std::set<uint32_t> s_opens;
         // Each Gem's tick, for the track's gems range: GemManager::SetupGems
         // hides those outside it (practice's sections) with no frets, which
         // an open has anyway, so it is asked of the range itself
@@ -78,7 +84,7 @@ namespace gh2::guitar
             if (s_streakMats.empty())
                 return;
             const double seconds =
-                std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+                std::chrono::duration<double>(ps2x::host_clock::now().time_since_epoch()).count();
             const float along = static_cast<float>(std::fmod(seconds / kStreakSeconds, 1.0));
             for (const uint32_t mat : s_streakMats)
                 store<float>(rdram, mat + ::milo::mat::kTexXfm + 0x30u, along);
@@ -159,7 +165,7 @@ namespace gh2::guitar
             for (const uint32_t rep : s_openFree[pool])
                 runtime->callGuestFunction(rdram, ctx, s_addresses->gemRepPoolReturnGem, {pool, rep});
             s_openFree.erase(pool);
-            s_openChords.clear(), s_lifted.clear(), s_ticks.clear();
+            s_openChords.clear(), s_opens.clear(), s_lifted.clear(), s_ticks.clear();
             // Those still out are deleted with their gems (~Gem), never
             // through Gem::RemoveRep.
             for (auto out = s_openOut.begin(); out != s_openOut.end();)
@@ -176,11 +182,18 @@ namespace gh2::guitar
         void gemAdded(uint8_t *rdram, R5900Context *, PS2Runtime *, const GemAdded &added)
         {
             s_openChords.erase(added.gem);
+            s_opens.erase(added.gem);
             s_ticks.erase(added.gem);
             if (added.game == 0u)
                 return;
             const guest::GameGem game(rdram, added.game);
             s_ticks[added.gem] = static_cast<int32_t>(game.tick());
+            const uint32_t config = load<uint32_t>(rdram, added.manager + gemManager::kConfig);
+            const uint32_t player = config ? load<uint32_t>(rdram, config) : 0u;
+            if (game.players() != 0u && (player > 1u || ((game.players() >> player) & 1u) == 0u))
+                return;
+            if (game.slots() == 0u)
+                s_opens.insert(added.gem);
             if (!playingCustom())
                 return;
             if (const Gh2Gem *chart = chartGem(added.track, static_cast<uint32_t>(game.tick()), game.slots());
@@ -235,7 +248,7 @@ namespace gh2::guitar
             const auto tick = s_ticks.find(gem);
             const bool outside = tick != s_ticks.end() && (tick->second < load<int32_t>(rdram, config + kGemsFrom) ||
                                                            tick->second >= load<int32_t>(rdram, config + kGemsTo));
-            if (outside || (load<uint8_t>(rdram, gem + gem::kFrets) != 0u && !chord))
+            if (outside || (s_opens.count(gem) == 0u && !chord))
                 return s_addRep(rdram, ctx, runtime);
             const uint32_t returnTo = GPR_U32(ctx, 31);
             const EntryArgs args(ctx);

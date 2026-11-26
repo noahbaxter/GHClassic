@@ -13,6 +13,7 @@ namespace gh2::settings
     enum Key
     {
         kWidescreen,
+        kFullscreen,   // as the window last was: kept as it goes in or out, by key or the OS
         kFrameRateCap, // game frames per second, 0 for no cap; never above the display's rate with kVsync
         kVsync,        // presents wait for the display's refresh (FIFO); off, they show at once and may tear
         kMipmaps,   // smaller copies for textures the game shipped without
@@ -39,6 +40,7 @@ namespace gh2::settings
         kStarPowerOverlap, // a star phrase finished during star power adds to it
         kNoteStreak, // the streak counter under the score meter and its popups
         kSongProgress, // a bar under the rock meter filling as the song plays
+        kTapRope,      // the line joining a run of taps on the track
         kUnlockAll,    // outside a career, every song, venue, guitarist and guitar open
         kNoteSpeedEasy, // Clone Hero's note speed in tenths, on easy and medium
         kNoteSpeedHard, // and on hard and expert
@@ -100,6 +102,14 @@ namespace gh2::settings
         kShadowsOff,
         kShadowsClassic,
         kShadowsGh2,
+    };
+
+    // kTapRope's: the line joining a run of taps.
+    enum TapRope
+    {
+        kRopeOff,
+        kRopeLine,  // one line
+        kRopeRails, // two white rails with a gap between
     };
 
     enum Lighting

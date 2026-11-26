@@ -9,6 +9,7 @@
 
 #include "settings/ini.h"
 
+#include <algorithm>
 #include <set>
 #include <sstream>
 
@@ -69,7 +70,21 @@ namespace gh2::custom
         Chart chart;
         std::map<std::pair<Part, size_t>, std::map<uint32_t, Raw>> rawsByTrack;
         std::map<std::pair<Part, size_t>, std::optional<uint32_t>> soloOn;
-        std::optional<uint32_t> phraseOn;
+        // The vocal phrase open and its last lyric. A phrase_start needs no
+        // phrase_end before it (chart-formats Lyrics.md): one still open
+        // ends a beat past its last lyric, or at what comes next if sooner.
+        std::optional<uint32_t> phraseOn, phraseLast;
+        const auto closePhrase = [&](uint32_t next)
+        {
+            if (phraseOn && phraseLast)
+            {
+                const uint32_t end = std::min<uint64_t>(next, uint64_t(*phraseLast) + chart.resolution);
+                if (end > *phraseOn)
+                    chart.vocals.push_back({*phraseOn, end - *phraseOn});
+            }
+            phraseOn.reset();
+            phraseLast.reset();
+        };
         // Each difficulty's drum hits by lane, cymbal markers by tick and
         // the pad's lane, and keys hits.
         std::array<std::vector<PadHit>, 4> drumHits;
@@ -136,16 +151,22 @@ namespace gh2::custom
                     if (auto name = sectionName(text))
                         chart.sections.emplace_back(tick, *name);
                     else if (text == "phrase_start")
+                    {
+                        closePhrase(tick);
                         phraseOn = tick;
+                    }
                     else if (text == "phrase_end" && phraseOn)
                     {
                         chart.vocals.push_back({*phraseOn, tick - *phraseOn});
                         phraseOn.reset();
+                        phraseLast.reset();
                     }
                     else if (text.rfind("lyric", 0) == 0)
                     {
                         lyrics.push_back(tick);
                         addLyric(chart, tick, 0u, text.substr(5u));
+                        if (phraseOn)
+                            phraseLast = tick;
                     }
                 }
                 continue;
@@ -216,6 +237,7 @@ namespace gh2::custom
                 }
             }
         }
+        closePhrase(UINT32_MAX);
         chart.hopoThreshold = songThreshold(options, chart.resolution);
         for (const auto &[track, raws] : rawsByTrack)
             settleGems(chart.parts[track.first][track.second], raws, chart.resolution, chart.hopoThreshold);

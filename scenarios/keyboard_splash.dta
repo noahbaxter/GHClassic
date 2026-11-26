@@ -1,0 +1,13 @@
+; The splash takes Start alone, which on the keyboard is Enter there too: a
+; player with no controller signs in by Return, on to the profile screen.
+; Its other keys still pick nothing there.
+#include common/first_boot.dta
+{ui goto_screen splash_screen}
+(wait_screen splash_screen 10)
+(wait 1)
+(key 1)
+(wait 0.5)
+(expect {{ui current_screen} name} splash_screen)
+(key Return)
+(wait_screen ghc_profile_screen 10)
+(quit)

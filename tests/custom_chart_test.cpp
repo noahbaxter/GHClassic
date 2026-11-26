@@ -426,6 +426,18 @@ namespace
         CHECK(chart && chart->kicks == std::vector<uint32_t>({0u, 384u}) && chart->drums.size() == 3u &&
               chart->snares.empty());
         CHECK(chart && chart->vocals.size() == 1u && chart->vocals[0].tick == 0u && chart->vocals[0].length == 384u);
+        // A phrase_start needs no phrase_end before it: the one open ends a
+        // beat past its last lyric, or at the next phrase if sooner; the last
+        // one open the same, and a phrase with no lyric is none.
+        const auto unended = parseChart(kOneGemChart + "[Events]\n{\n  0 = E \"phrase_start\"\n  96 = E \"lyric la\"\n"
+                                                       "  1000 = E \"phrase_start\"\n  1100 = E \"lyric la\"\n"
+                                                       "  1200 = E \"lyric la\"\n  1250 = E \"phrase_start\"\n"
+                                                       "  1300 = E \"lyric la\"\n  2000 = E \"phrase_start\"\n}\n",
+                                        {}, why);
+        CHECK(unended && unended->vocals.size() == 3u);
+        CHECK(unended && unended->vocals[0].tick == 0u && unended->vocals[0].length == 288u);
+        CHECK(unended && unended->vocals[1].tick == 1000u && unended->vocals[1].length == 250u);
+        CHECK(unended && unended->vocals[2].tick == 1250u && unended->vocals[2].length == 242u);
         CHECK(chart && chart->keys.empty() && chart->stage.at("EVENTS").cues.size() == 3u &&
               chart->stage.at("EVENTS").cues[1].text == "lyric la");
         const auto keyed = parseChart(text + "[ExpertKeyboard]\n{\n  0 = N 1 0\n  0 = N 3 0\n  192 = N 7 0\n}\n", {}, why);
@@ -771,6 +783,23 @@ namespace
         chart.kicks = {0u};
         chart.drums.push_back(0u);
         std::sort(chart.drums.begin(), chart.drums.end());
+
+        {
+            // A double kick's notes each end before the next, a sixteenth
+            // at most: overlapping, some were lost.
+            Chart fast = chart;
+            fast.kicks = {0u, 60u, 120u};
+            midi::Track guitar, events;
+            const auto band = addStage({fast, lead, kSameTicks, 32u * 480u}, guitar, events);
+            std::vector<std::pair<uint32_t, bool>> kick;
+            for (const midi::Event &e : band[0].events)
+                if ((midi::kind(e) == midi::kNoteOn || midi::kind(e) == midi::kNoteOff) && e.data.size() >= 2u &&
+                    e.data[0] == 36u)
+                    kick.emplace_back(e.tick, midi::kind(e) == midi::kNoteOn && e.data[1] > 0u);
+            const std::vector<std::pair<uint32_t, bool>> apart = {{0u, true},   {59u, false}, {60u, true},
+                                                                  {119u, false}, {120u, true}, {240u, false}};
+            CHECK(kick == apart);
+        }
 
         {
             midi::Track guitar, events;

@@ -28,6 +28,7 @@ namespace gh2::save
     {
         uint32_t score = 0u, stars = 0u, percent = 0u, streak = 0u;
         bool fullCombo = false;
+        bool failed = false; // played on past the rock meter running out (no_fail)
     };
 
     std::optional<Best> parseBest(const std::string &text);

@@ -14,6 +14,7 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <mutex>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -52,6 +53,7 @@ namespace gh2::settings
 
         const Entry kEntries[kKeyCount] = {
             {"widescreen", Type::kBool, 0, 1, 1, 0},
+            {"fullscreen", Type::kBool, 0, 1, 1, 0},
             {"frame_rate_cap", Type::kInt, 0, 500, 1, 60},
             {"vsync", Type::kBool, 0, 1, 1, 1},
             // Most of GH2's textures have no mip chain (443 of 470 loaded into
@@ -99,6 +101,7 @@ namespace gh2::settings
             {"star_power_overlap", Type::kBool, 0, 1, 1, 0},
             {"note_streak", Type::kBool, 0, 1, 1, 0},
             {"song_progress", Type::kBool, 0, 1, 1, 0},
+            {"tap_rope", Type::kChoice, 0, 2, 1, kRopeRails, "off line rails"},
             // The unlock-all cheat's, without its turning off saving and the
             // career (content/campaigns.cpp).
             {"unlock_all", Type::kBool, 0, 1, 1, 0},
@@ -290,6 +293,9 @@ namespace gh2::settings
         // can be set, in its sections, with its notes in their column.
         void save()
         {
+            // The host thread saves too (fullscreen), through the same .tmp.
+            static std::mutex saving;
+            const std::lock_guard lock(saving);
             const std::string file = path();
             const std::error_code error = ini::writeReplacing(file, [](std::ofstream &out) {
                 std::istringstream lines(kSettingsTemplate);

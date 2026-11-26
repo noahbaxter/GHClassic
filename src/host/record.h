@@ -2,7 +2,9 @@
 
 // --record: the game as video clips, each frame piped to ffmpeg as it is
 // drawn and the mixed sound written beside it, both on the game's clock, so
-// a run at any --speed comes out in step and at the game's own pace. Each
+// a run at any --speed comes out in step and at the game's own pace. Hidden
+// and muted, the game's clock is stepped a frame at a time as each is made
+// (runtime/host_clock.h), so a busy machine only takes longer. Each
 // clip is <name>.ts and <name>.f32 in the folder given, which tools/ghc.py
 // record joins once the game is gone. A transport stream plays cut short,
 // so a run killed mid-clip keeps what it drew.
@@ -30,9 +32,11 @@ namespace gh2::record
     // A drawn frame, RGBA and shown at that aspect, at that time on the
     // game's clock. One not the clip's size (a movie's, at its own) is fitted
     // into it. A frame late for its place in the clip repeats the one before,
-    // so the picture keeps time with the sound.
+    // so the picture keeps time with the sound; on a stepped clock
+    // (runtime/host_clock.h) none ever is. `fresh` if the game made it new,
+    // only counted.
     void frame(const uint8_t *rgba, uint32_t width, uint32_t height, float aspect,
-               std::chrono::steady_clock::time_point at, std::chrono::nanoseconds period);
+               std::chrono::steady_clock::time_point at, std::chrono::nanoseconds period, bool fresh);
 
     // Interleaved stereo at kAudioRate, as mixed, into the clip on at its
     // place on the game's clock.

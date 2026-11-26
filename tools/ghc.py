@@ -6,7 +6,7 @@
     tools/ghc.py bind [--isolated] [keyboard | <n>]   set up a controller; with no device, list them
     tools/ghc.py arm [out] [--scenario <file>] [--speed <x>] [--secs 30] [--disc <image>] [--shot-every 60]
                      [--res 1080p] [--set <name>=<value> ...] [--series <name>]
-    tools/ghc.py record <scenario> [--speed 2.5] [--res 1080p] [--secs 900] [--set <name>=<value> ...]
+    tools/ghc.py record <scenario> [--res 1080p] [--secs 900] [--set <name>=<value> ...]
                         [--series <name>]
     tools/ghc.py scenarios [-j 4] [--speed 2] [--review] [--discs gh2,gh1] [--releases] [name ...]
     tools/ghc.py release [--skip-build] [disc]  this platform's player package, into build/release
@@ -23,7 +23,8 @@ tree's build/data instead, apart from everything.
 The disc defaults to the GH2 image in game/, which is only ever read;
 everything made lands in build/, which is safe to delete. build and release
 also take the disc's boot executable alone (SLUS_214.47), which is all the
-recompile reads.
+recompile reads. Europe's disc plays too when the build finds its executable,
+SLES_544.42 beside that one or a Europe image in game/, to patch from.
 
 From the system: Python (.python-version's or newer), git, and a C++ compiler (Xcode's on macOS, gcc
 or clang on Linux, nothing on Windows, where llvm-mingw is fetched into
@@ -43,7 +44,8 @@ review/<branch>/<date>_<time>_<name>/, the run's own set, where everything to
 look at goes and nothing is loose. scenarios runs the files in scenarios/
 through arm side by side, the sheets staying in each run as shots.png unless
 --review: a run passes when it reaches its last step and quits with no FAIL
-or STALL in its log. Both clear runs/ of runs older than three days.
+or STALL in its log, and a pass's frames/ are deleted. Both clear runs/ of
+runs older than three days.
 
 record runs a scenario as arm does and makes it videos, picture and sound,
 in the run's set, review/<branch>/<date>_<time>_<scenario's name>/, beside
@@ -51,7 +53,8 @@ its shots: the game pipes each frame to ffmpeg as it draws and writes its
 mixed sound beside it, both on the game's clock, so it can run faster than
 real time. Without (record) steps the whole run is one video,
 <scenario's name>.mp4; with them, each (record on name) to (record off) is
-its own, <name>.mp4. A run stopped at --secs keeps what it drew. With
+its own, <name>.mp4. A run stopped at --secs keeps what it drew. Once every
+clip is in review/, the run keeps only its run.log. With
 --series <name>, arm and record add to one set, review/<branch>/<date>_<name>/,
 made the first time and found again after, each take's files named by its
 time, so the takes of something being worked on sit side by side.
@@ -91,7 +94,7 @@ import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from releases import content, discs_arg, find_disc, main_checkout, releases
+from releases import content, discs_arg, find_disc, find_europe, main_checkout, releases
 
 ROOT = Path(__file__).resolve().parent.parent
 # The Python GH Classic is built and tested on, the oldest it supports: CI
@@ -325,7 +328,7 @@ def experimental(tag):
     return "-exp" in tag
 
 
-def build(disc=None, recomp=True, lto=False):
+def build(disc=None, recomp=True, lto=False, dev_tools=True):
     env = tool_env()
     jobs = str(os.cpu_count() or 4)
     if recomp:
@@ -338,6 +341,14 @@ def build(disc=None, recomp=True, lto=False):
         build_step("naming its functions",
                    [sys.executable, tools / "symbolize.py", RECOMP / "retail.elf",
                     ROOT / "config" / "gh2-retail.symbols", ELF], env, "symbolize.log")
+        # Europe's disc plays when the build has its executable too, to patch from.
+        if europe := find_europe(disc, env):
+            build_step("patching Europe's executable",
+                       [VENV_PYTHON, tools / "disc.py", "patch", RECOMP / "retail.elf", europe,
+                        RECOMP / "europe.patch"], env, "patch.log")
+        else:
+            print("  no Europe executable (SLES_544.42 beside the USA one, or its disc in game/); "
+                  "the build plays the USA disc only", file=sys.stderr)
 
         build_tools(env, jobs)
 
@@ -363,7 +374,7 @@ def build(disc=None, recomp=True, lto=False):
     tag = tree_version()
     configure = ["cmake", "-S", ROOT, "-B", GAME, "-DCMAKE_BUILD_TYPE=Release",
                  f"-DGHC_GENERATED_DIR={RECOMP / 'output'}", f"-DGHC_ENABLE_LTO={'ON' if lto else 'OFF'}",
-                 f"-DGHC_VERSION={tag}", f"-DGHC_EXPERIMENTAL={'ON' if experimental(tag) else 'OFF'}",
+                 f"-DGHC_DEV_TOOLS={'ON' if dev_tools else 'OFF'}", f"-DGHC_VERSION={tag}", f"-DGHC_EXPERIMENTAL={'ON' if experimental(tag) else 'OFF'}",
                  f"-DPython3_EXECUTABLE={sys.executable}", *DEP_CACHE]
     build_step("configuring game", configure, env, "game-configure.log")
     build_step("building game", ["cmake", "--build", GAME, "--target", "GHClassic", "-j", jobs], env, "game.log")
@@ -691,8 +702,6 @@ def cmd_arm(argv):
 def cmd_record(argv):
     parser = argparse.ArgumentParser(prog="ghc.py record")
     parser.add_argument("scenario")
-    parser.add_argument("--speed", type=float, default=2.5,
-                        help="game seconds a real one; too high and frames repeat, which the log counts")
     parser.add_argument("--res", default="1080p")
     parser.add_argument("--secs", type=int, default=900, help="real seconds before it is stopped")
     parser.add_argument("--disc")
@@ -713,7 +722,8 @@ def cmd_record(argv):
     clips = out / "clips"
     prune_runs()
     # No periodic frames: (shot) steps still come out as a sheet.
-    state = arm(out, args.scenario, args.speed, args.secs, args.disc, 1 << 30, res=args.res, games=args.discs,
+    # The game steps its clock a frame at a time, as fast as it makes them.
+    state = arm(out, args.scenario, None, args.secs, args.disc, 1 << 30, res=args.res, games=args.discs,
                 review=name, settings=args.settings, record=clips)
     print(f"{state}, log {out / 'run.log'}")
     for line in (out / "run.log").read_text(errors="replace").splitlines():
@@ -741,6 +751,11 @@ def cmd_record(argv):
             sound.unlink(missing_ok=True)
     if not made:
         return 1
+    # Every clip in review/: the run keeps only its log.
+    if made == len(videos):
+        for left in out.iterdir():
+            if left.name != "run.log":
+                shutil.rmtree(left, ignore_errors=True) if left.is_dir() else left.unlink()
 
 
 def cmd_scenarios(argv):
@@ -754,8 +769,9 @@ def cmd_scenarios(argv):
                         help="content discs to mount, as gh2,gh1; default every one in game/. A scenario that "
                              "(needs) another skips")
     parser.add_argument("--releases", action="store_true",
-                        help="each content disc under game/, folders in it too, in turn as its game's: the "
-                             "scenarios that (needs) that game, once per disc")
+                        help="each content disc under game/, folders in it too, in turn as its game's, and each "
+                             "Europe GH2 disc as the game disc: the scenarios that (needs) that game, once per "
+                             "disc")
     parser.add_argument("names", nargs="*", help="files in scenarios/ without .dta; none means all")
     args = parser.parse_args(argv)
     # Not dotfiles: pathlib's glob matches them, and a tar made on macOS
@@ -779,7 +795,9 @@ def cmd_scenarios(argv):
         out = ROOT / "runs" / name
         started = time.time()
         # The longest plays a career's whole first tier, five songs.
-        state = arm(out, scenario, args.speed, 900, disc, env=env, games=args.discs,
+        # A gh2 release (Europe's) is the game disc itself.
+        game_disc = release[1] if release and release[0] == "gh2" else disc
+        state = arm(out, scenario, args.speed, 900, game_disc, env=env, games=args.discs,
                     review=name if args.review else None, release=release)
         log = (out / "run.log").read_text(errors="replace")
         # Anywhere in a line: the watchdog's STALL lands mid-line in the game thread's output.
@@ -790,6 +808,10 @@ def cmd_scenarios(argv):
         if not failures and not skips and not re.search(r"^\[scenario\] (done|\S+ s: \(quit\))", log, re.M):
             failures = ["ended before its last step"]
         verdict = "FAIL" if failures or not state.startswith("exited") else "skip" if skips else "pass"
+        # A pass's frames tell nothing (a hundred MB or more a run); a
+        # failure's are kept to see what went wrong.
+        if verdict == "pass":
+            shutil.rmtree(out / "frames", ignore_errors=True)
         note = failures[0] if failures else skips[0] if skips else ""
         return f"{verdict:<4} {name:<16} {round(time.time() - started):4d}s  {note}".rstrip()
 
@@ -833,7 +855,7 @@ def cmd_bind(argv):
     return subprocess.run([str(game_binary()), "--bind", *argv, *data_dir(isolated)]).returncode
 
 
-PLACEHOLDER = "Put your Guitar Hero II (USA) disc image here (.iso, .chd or .bin).txt"
+PLACEHOLDER = "Put your Guitar Hero II disc image here (.iso, .chd or .bin).txt"
 SOURCE_URL = "https://github.com/noahbaxter/GHClassic"
 
 
@@ -955,9 +977,11 @@ def cmd_release(argv):
     parser.add_argument("disc", nargs="?")
     args = parser.parse_args(argv)
     if not args.skip_build:
-        build(args.disc, recomp=not (RECOMP / "output").is_dir(), lto=True)
+        build(args.disc, recomp=not (RECOMP / "output").is_dir(), lto=True, dev_tools=False)
     if not game_binary().exists():
         sys.exit("no build; run tools/ghc.py build")
+    if "GHC_DEV_TOOLS:BOOL=OFF" not in (GAME / "CMakeCache.txt").read_text():
+        sys.exit("that build has the dev tools in it; run tools/ghc.py release without --skip-build")
     version = tree_version()
     out = BUILD / "release"
     shutil.rmtree(out, ignore_errors=True)

@@ -33,6 +33,7 @@ namespace gh2
         // Deluxe 2.0's text (ui/eng/locale_milo.dta there).
         for (const char *count : {"note_streak_0", "note_streak_1", "note_streak_band"})
             locale::addExpression(count, std::string("{sprint $") + count + " \" NOTE STREAK!\"}");
+        locale::add("note_streak_faceoff", "NOTE STREAK!");
         EntryHook<HudEnterTag>::install(runtime, addresses.hudPanelEnter, onHudEnter);
     }
 }

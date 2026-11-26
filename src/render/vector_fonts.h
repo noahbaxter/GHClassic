@@ -10,6 +10,8 @@
 // characters' quads covers, where that character's cell starts, and the
 // glyph it is in the pack.
 
+#include "render/outline.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -25,6 +27,11 @@ namespace gh2::vector_fonts
 
     // The table a texture's text draws from, if any. Game thread only.
     std::optional<uint32_t> tableOf(uint32_t tex);
+
+    // The table a texture with no font draws its own pixels from with a
+    // border (render/outline.h): no characters, then the border's colour
+    // and width. Made the first time. Game thread only.
+    uint32_t outlined(const outline::Border &border);
 
     // The texture is gone; or every one is.
     void forget(uint32_t tex);

@@ -1,0 +1,52 @@
+; No Fail in every venue of every game (common/no_fail_venue.dta), each
+; through its crowd camera: the crowd drawn, walked out after a fail, back on
+; Restart, and back after Quit and a new song. About a minute a venue.
+(needs gh1 gh80s)
+#include common/first_boot.dta
+#include common/crowd_shot.dta
+{gamecfg set mode quickplay}
+{no_fail 1}
+{set $ghc_nf_game gh2}
+{set $ghc_nf_venue battle}
+#include common/no_fail_venue.dta
+{set $ghc_nf_venue small1}
+#include common/no_fail_venue.dta
+{set $ghc_nf_venue small2}
+#include common/no_fail_venue.dta
+{set $ghc_nf_venue big}
+#include common/no_fail_venue.dta
+{set $ghc_nf_venue theatre}
+#include common/no_fail_venue.dta
+{set $ghc_nf_venue fest}
+#include common/no_fail_venue.dta
+{set $ghc_nf_venue arena}
+#include common/no_fail_venue.dta
+{set $ghc_nf_venue stone}
+#include common/no_fail_venue.dta
+{set $ghc_nf_game gh1}
+{set $ghc_nf_venue battle}
+#include common/no_fail_venue.dta
+{set $ghc_nf_venue small1}
+#include common/no_fail_venue.dta
+{set $ghc_nf_venue big}
+#include common/no_fail_venue.dta
+{set $ghc_nf_venue theatre}
+#include common/no_fail_venue.dta
+{set $ghc_nf_venue fest}
+#include common/no_fail_venue.dta
+{set $ghc_nf_venue arena}
+#include common/no_fail_venue.dta
+{set $ghc_nf_game gh80s}
+{set $ghc_nf_venue battle}
+#include common/no_fail_venue.dta
+{set $ghc_nf_venue small1}
+#include common/no_fail_venue.dta
+{set $ghc_nf_venue small2}
+#include common/no_fail_venue.dta
+{set $ghc_nf_venue theatre}
+#include common/no_fail_venue.dta
+{set $ghc_nf_venue fest}
+#include common/no_fail_venue.dta
+{set $ghc_nf_venue arena}
+#include common/no_fail_venue.dta
+(quit)

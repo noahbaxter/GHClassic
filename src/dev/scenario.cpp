@@ -4,7 +4,6 @@
 #include "dev/transplant.h"
 #include "frame_step.h"
 #include "dev/draw_dump.h"
-#include "dev/timing.h"
 #include "ps2_runtime_macros.h"
 #include "guest.h"
 #include "hook.h"
@@ -83,8 +82,11 @@ namespace gh2::scenario
         int s_transplantPolls = 0;    // polls since it
 
         // Steps wait in game time, which --speed runs faster than real. The
-        // timeouts stay real: a game behind its clock is not hung.
+        // timeouts stay real: a game behind its clock is not hung. A stepped
+        // clock's (a recording's) game is never behind it, only slow, so
+        // there they are game time, as is the watchdog's.
         Clock::time_point now() { return ps2x::host_clock::now(); }
+        Clock::time_point timeoutNow() { return ps2x::host_clock::stepped() ? now() : Clock::now(); }
 
         double seconds()
         {
@@ -198,7 +200,7 @@ namespace gh2::scenario
                 const std::string current = currentScreen(rdram, ctx, runtime);
                 if (current != s_screen)
                 {
-                    if (Clock::now() > s_deadline)
+                    if (timeoutNow() > s_deadline)
                     {
                         std::cerr << "[scenario] FAIL: no " << s_screen << " after " << s_timeout << " s, on '"
                                   << current << "'" << std::endl;
@@ -214,7 +216,7 @@ namespace gh2::scenario
                 const script::Node value = condition.arg(1);
                 if (value.type == script::kInt && value.value == 0u)
                 {
-                    if (Clock::now() > s_deadline)
+                    if (timeoutNow() > s_deadline)
                     {
                         std::cerr << "[scenario] FAIL: wait_until still false after " << s_timeout << " s"
                                   << std::endl;
@@ -353,7 +355,7 @@ namespace gh2::scenario
                     else
                         s_condition = node.value;
                     s_timeout = array.size() > 2 ? static_cast<int>(array.number(2)) : kTimeout;
-                    s_deadline = Clock::now() + std::chrono::seconds(s_timeout);
+                    s_deadline = timeoutNow() +std::chrono::seconds(s_timeout);
                     return;
                 }
                 if (verb == "star_power")
@@ -424,8 +426,9 @@ namespace gh2::scenario
                 }
                 else if (verb == "shot")
                 {
-                    // Nothing more runs until that frame is written.
-                    requestShot(array.symbol(1));
+                    // Nothing more runs until that frame is written. Its name
+                    // a word, or what an expression makes ({sprint ...}).
+                    requestShot(text(rdram, array.arg(1)));
                     s_shooting = true;
                     return;
                 }
@@ -563,7 +566,7 @@ namespace gh2::scenario
             s_done = true;
         }
 
-        std::atomic<int64_t> s_lastPoll{0}; // steady_clock ticks
+        std::atomic<int64_t> s_lastPoll{0}; // timeoutNow()'s ticks
         std::atomic<PS2Runtime *> s_runtime{nullptr};
         std::atomic<uint8_t *> s_rdram{nullptr};
 
@@ -583,10 +586,10 @@ namespace gh2::scenario
                 // A movie holds the game thread for its whole length.
                 if (moviePlaying())
                 {
-                    s_lastPoll = Clock::now().time_since_epoch().count();
+                    s_lastPoll = timeoutNow().time_since_epoch().count();
                     continue;
                 }
-                const auto idle = Clock::now() - Clock::time_point(Clock::duration(s_lastPoll.load()));
+                const auto idle = timeoutNow() -Clock::time_point(Clock::duration(s_lastPoll.load()));
                 // Boot and screen loads pause it a few seconds.
                 if (idle < std::chrono::seconds(8))
                     continue;
@@ -660,7 +663,6 @@ namespace gh2::scenario
         struct SecondsBeatTag;
         void onSetSecondsBeat(uint8_t *, R5900Context *ctx, PS2Runtime *)
         {
-            timing::songSeconds(ctx->f[12]);
             if (!s_frozen)
                 return;
             ctx->f[12] = s_seconds;
@@ -671,7 +673,7 @@ namespace gh2::scenario
         {
             if (s_done || s_text.empty())
                 return;
-            s_lastPoll = Clock::now().time_since_epoch().count();
+            s_lastPoll = timeoutNow().time_since_epoch().count();
             s_runtime = runtime;
             s_rdram = rdram;
             ++s_clockPolls;

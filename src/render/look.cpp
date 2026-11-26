@@ -1,6 +1,7 @@
 #include "render/look.h"
 
 #include "render/texture_store.h"
+#include "runtime/host_clock.h"
 #include "settings/settings.h"
 
 #include <algorithm>
@@ -179,7 +180,7 @@ namespace gh2::look
 
     void endFrame()
     {
-        s_now = Clock::now();
+        s_now = ps2x::host_clock::now();
         std::erase_if(s_held, [](const auto &entry) { return entry.second.asked + kHold < s_now; });
     }
 

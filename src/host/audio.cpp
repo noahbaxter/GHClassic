@@ -80,8 +80,28 @@ namespace gh2
 
     void setAudioDevice(const std::string &name) { s_deviceName = name; }
 
+    void mixAudioTo(std::chrono::steady_clock::time_point to)
+    {
+        static std::vector<float> buffer;
+        static const auto from = ps2x::host_clock::now();
+        static uint64_t mixed = 0;
+        // Counted from the first, so the sound never drifts from the clock.
+        const auto wanted = static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(to - from).count() * kAudioRate / 1000000000);
+        if (wanted <= mixed)
+            return;
+        render(buffer, wanted - mixed);
+        record::audio(buffer.data(), wanted - mixed);
+        mixed = wanted;
+    }
+
     void openAudio(bool mute)
     {
+        if (mute && ps2x::host_clock::stepped())
+        {
+            mixAudioTo(ps2x::host_clock::now());
+            return;
+        }
         if (mute)
         {
             s_timerRunning = true;

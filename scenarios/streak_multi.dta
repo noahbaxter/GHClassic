@@ -1,0 +1,97 @@
+; Streaks in every two-player mode (streak_counter.dta, note_streak.dta).
+; Face-Off and Pro Face-Off: each player's own count, drawer and popups,
+; player 1 on Easy and player 2 on Expert so the two differ, none the
+; band's; then player 1 not playing (every note passed), their streak held
+; at 0 while player 2's runs on. Co-op: the band's alone, broken by either
+; player's miss, so player 1 not playing keeps it short however long
+; player 2's own runs.
+#include common/first_boot.dta
+(device p1)
+(device p2)
+(press start p1)
+{ui goto_screen multi_screen}
+(wait_screen multi_screen)
+(press start p2)
+(wait 0.5)
+{func ghc_sm_start ($mode $p1_plays)
+   {gamecfg set mode $mode}
+   {game set_num_players 2}
+   {game set_song shoutatthedevil}
+   {{game get_player_config 0} set_difficulty easy}
+   {{game get_player_config 1} set_difficulty expert}
+   {{game get_player_config 0} set autoplay $p1_plays}
+   {{game get_player_config 1} set autoplay TRUE}
+   {ui goto_screen loading_screen}
+}
+{func ghc_sm_started {&& {== {{ui current_screen} name} game_screen} {< {ghc_play now} 1000}}}
+{func ghc_sm_leave
+   {meta_loading_nosave_goto main_screen}
+}
+
+; Face-Off, both playing.
+{ghc_sm_start multi_vs TRUE}
+(wait_until {ghc_sm_started} 60)
+(expect {!= $streak_counter_display1 0} 1)
+(expect {!= $streak_counter_display2 0} 1)
+(wait_until {>= {player1 current_streak} 50} 120)
+(wait 0.3)
+(shot faceoff_p2_popup)
+(expect {== $note_streak_1 {player1 current_streak}} 1)
+(expect {== $note_streak_0 {player0 current_streak}} 1)
+(expect {!= {player0 current_streak} {player1 current_streak}} 1)
+(expect $note_streak_band 0)
+(wait_until {>= {player0 current_streak} 50} 120)
+(wait 0.3)
+(shot faceoff_p1_popup)
+(expect $note_streak_band 0)
+{ghc_sm_leave}
+(wait_screen main_screen 60)
+
+; Face-Off, player 1 not playing.
+{ghc_sm_start multi_vs FALSE}
+(wait_until {ghc_sm_started} 60)
+(wait_until {>= {player1 current_streak} 50} 120)
+(wait 0.3)
+(shot faceoff_p1_out_p2_popup)
+(expect {player0 current_streak} 0)
+(expect {> {player0 gems_passed} 0} 1)
+(expect $note_streak_band 0)
+{ghc_sm_leave}
+(wait_screen main_screen 60)
+
+; Pro Face-Off, both playing.
+{ghc_sm_start multi_fo TRUE}
+(wait_until {ghc_sm_started} 60)
+(expect {!= $streak_counter_display2 0} 1)
+(wait_until {>= {player1 current_streak} 50} 120)
+(wait 0.3)
+(shot pro_p2_popup)
+(expect {== $note_streak_1 {player1 current_streak}} 1)
+(expect {== $note_streak_0 {player0 current_streak}} 1)
+(expect {!= {player0 current_streak} {player1 current_streak}} 1)
+(expect $note_streak_band 0)
+{ghc_sm_leave}
+(wait_screen main_screen 60)
+
+; Pro Face-Off, player 1 not playing.
+{ghc_sm_start multi_fo FALSE}
+(wait_until {ghc_sm_started} 60)
+(wait_until {>= {player1 current_streak} 50} 120)
+(wait 0.3)
+(shot pro_p1_out_p2_popup)
+(expect {player0 current_streak} 0)
+(expect {> {player0 gems_passed} 0} 1)
+{ghc_sm_leave}
+(wait_screen main_screen 60)
+
+; Co-op, player 1 not playing: the band's streak broken by each pass.
+{ghc_sm_start multi_coop FALSE}
+(wait_until {ghc_sm_started} 60)
+(expect $streak_counter_display2 0)
+(wait_until {>= {player1 current_streak} 50} 120)
+(wait 0.3)
+(shot coop_p1_out)
+(print coop_band $streak_counter_band p2 {player1 current_streak})
+(expect {< $streak_counter_band 20} 1)
+(expect {player0 current_streak} 0)
+(quit)

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -19,8 +20,11 @@ namespace gh2
     // --audio-device: the playback device whose name has this in it, in
     // place of the default one.
     void setAudioDevice(const std::string &name);
+    // A stepped clock (a recording's, runtime/host_clock.h) has no thread:
+    // its stepper mixes the sound up to each time with mixAudioTo().
     void openAudio(bool mute);
     void closeAudio();
+    void mixAudioTo(std::chrono::steady_clock::time_point to);
 
     // What is pulled. Silence until one is set; settable any time.
     void setAudioSource(AudioSource source);

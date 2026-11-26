@@ -191,7 +191,7 @@ namespace gh2
             return;
         }
         loadLayouts();
-        s_seats.restore(layoutFile().seats, SDL_GetTicks() + 3000u);
+        s_seats.restore(layoutFile().seats, gameMs() + 3000u);
         s_open = true;
         openDevices();
         claimControllers();
@@ -261,7 +261,7 @@ namespace gh2
         if (mode == Mode::kControllers)
             screenPoll(reads, keys, s_modeWas != Mode::kControllers, s_seats);
         s_seats.leave(s_dropSeat.exchange(-1, std::memory_order_relaxed));
-        s_seats.seat(reads, mode, SDL_GetTicks(), s_seatsHeld.load(std::memory_order_relaxed));
+        s_seats.seat(reads, mode, gameMs(), s_seatsHeld.load(std::memory_order_relaxed));
         if (s_modeWas == Mode::kControllers && mode != Mode::kControllers)
             s_seats.letGoAll();
 
@@ -393,7 +393,10 @@ namespace gh2
                         s_keyWait[k.key] = false;
                     else if (!s_keyWait[k.key])
                     {
-                        const uint16_t bit = esc && (mode == Mode::kPlaying || mode == Mode::kPaused)
+                        // And on the splash, green's key (Enter) is Start.
+                        const bool splashGreen = s_songScreen.load(std::memory_order_relaxed) == SongScreen::kSplash &&
+                                                 k.bit == kActions[kGreen].button;
+                        const uint16_t bit = (esc && (mode == Mode::kPlaying || mode == Mode::kPaused)) || splashGreen
                                                  ? static_cast<uint16_t>(pad::kStart)
                                                  : menuButtons(k.bit, port.joypad);
                         (k.bit == pad::kUp || k.bit == pad::kDown ? nav : port.pressed) |= bit;

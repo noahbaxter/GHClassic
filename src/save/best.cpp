@@ -12,18 +12,23 @@ namespace gh2::save
         if (!(in >> best.score >> best.stars >> best.percent >> best.streak >> fullCombo))
             return std::nullopt;
         best.fullCombo = fullCombo != 0;
+        // Saves from before no_fail have no sixth.
+        int failed = 0;
+        if (in >> failed)
+            best.failed = failed != 0;
         return best;
     }
 
     std::string bestText(const Best &best)
     {
         return std::to_string(best.score) + ' ' + std::to_string(best.stars) + ' ' + std::to_string(best.percent) + ' ' +
-               std::to_string(best.streak) + ' ' + (best.fullCombo ? '1' : '0');
+               std::to_string(best.streak) + ' ' + (best.fullCombo ? '1' : '0') + ' ' + (best.failed ? '1' : '0');
     }
 
     Best better(const Best &a, const Best &b)
     {
-        Best best = b.score > a.score ? b : a;
+        // A run that finished clean outranks one that failed, whatever its score.
+        Best best = a.failed != b.failed ? (a.failed ? b : a) : (b.score > a.score ? b : a);
         best.fullCombo = a.fullCombo || b.fullCombo;
         return best;
     }

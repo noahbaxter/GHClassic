@@ -12,7 +12,6 @@
 #include <array>
 #include <cmath>
 #include <cstring>
-#include <functional>
 #include <string>
 #include <vector>
 
@@ -43,11 +42,9 @@ namespace gh2::streak_counter
 
         using bitmap::paletteSlot;
 
-        // A Tex's colours turned over. The pixels `keep` names (by place and
-        // whether they were light) stay as they were, each the nearest
-        // turned-over colour.
-        using Keep = std::function<bool(size_t x, size_t y, bool light)>;
-        void invert(milo::Bytes &body, uint32_t version, const Keep &keep = {})
+        // A Tex's colours turned over. With `keepDark`, its dark pixels stay
+        // as they were, each the nearest turned-over colour.
+        void invert(milo::Bytes &body, uint32_t version, bool keepDark = false)
         {
             const auto tex = milo::readTex(body, version);
             const auto header = tex ? bitmap::read(body.data() + tex->bitmap, body.size() - tex->bitmap) : std::nullopt;
@@ -59,7 +56,7 @@ namespace gh2::streak_counter
             for (size_t c = 0; c < entries * 4u; c += 4u)
                 for (size_t ch = 0; ch < 3u; ++ch)
                     palette[c + ch] = static_cast<uint8_t>(255u - palette[c + ch]);
-            if (!keep || header->bpp != 8u)
+            if (!keepDark || header->bpp != 8u)
                 return;
             uint8_t *pixels = palette + entries * 4u;
             for (size_t y = 0; y < header->height; ++y)
@@ -67,7 +64,7 @@ namespace gh2::streak_counter
                 {
                     uint8_t &index = pixels[y * header->rowBytes + x];
                     const uint8_t *old = was.data() + paletteSlot(index, 8u) * 4u;
-                    if (!keep(x, y, old[0] + old[1] + old[2] >= 3u * 128u))
+                    if (old[0] + old[1] + old[2] >= 3u * 128u)
                         continue;
                     uint32_t best = UINT32_MAX;
                     for (size_t k = 0; k < entries; ++k)
@@ -84,80 +81,12 @@ namespace gh2::streak_counter
                 }
         }
 
-        // A black ring round a digit, on the clear about it, so the digit
-        // reads against the wheel's grey whatever it is tinted: black stays
-        // black under the full combo's purple. A digit's palette is white at
-        // every alpha, its first two entries both clear; the second is made
-        // the ring's opaque black, what used it the first.
-        constexpr int kOutline = 4;
-        void outline(milo::Bytes &body, uint32_t version)
-        {
-            const auto tex = milo::readTex(body, version);
-            const auto header = tex ? bitmap::read(body.data() + tex->bitmap, body.size() - tex->bitmap) : std::nullopt;
-            if (!header || (header->bpp != 4u && header->bpp != 8u))
-                return;
-            const uint8_t bpp = header->bpp;
-            uint8_t *palette = body.data() + tex->bitmap + bitmap::kHeaderBytes;
-            uint8_t *pixels = palette + bitmap::paletteBytes(*header);
-            const size_t w = header->width, h = header->height;
-            uint8_t *clear = palette + paletteSlot(0u, bpp) * 4u, *ring = palette + paletteSlot(1u, bpp) * 4u;
-            if (clear[3] != 0u || ring[3] != 0u)
-                return;
-            const auto index = [&](size_t x, size_t y) -> size_t
-            {
-                const uint8_t b = pixels[y * header->rowBytes + x * bpp / 8u];
-                return bpp == 8u ? b : (b >> (4u * (x & 1u))) & 15u;
-            };
-            const auto set = [&](size_t x, size_t y, size_t k)
-            {
-                uint8_t &b = pixels[y * header->rowBytes + x * bpp / 8u];
-                b = bpp == 8u ? static_cast<uint8_t>(k)
-                              : static_cast<uint8_t>((b & (0xf0u >> (4u * (x & 1u)))) | (k << (4u * (x & 1u))));
-            };
-            // Ink: at least half opaque (the PS2's 0x80 is whole).
-            std::vector<bool> ink(w * h);
-            for (size_t y = 0; y < h; ++y)
-                for (size_t x = 0; x < w; ++x)
-                {
-                    if (index(x, y) == 1u)
-                        set(x, y, 0u);
-                    ink[y * w + x] = palette[paletteSlot(index(x, y), bpp) * 4u + 3u] >= 0x40u;
-                }
-            const uint8_t black[4] = {0u, 0u, 0u, 0x80u};
-            std::copy(black, black + 4, ring);
-            for (size_t y = 0; y < h; ++y)
-                for (size_t x = 0; x < w; ++x)
-                {
-                    if (index(x, y) != 0u)
-                        continue;
-                    bool near = false;
-                    for (int dy = -kOutline; dy <= kOutline && !near; ++dy)
-                        for (int dx = -kOutline; dx <= kOutline && !near; ++dx)
-                        {
-                            const int nx = int(x) + dx, ny = int(y) + dy;
-                            near = dx * dx + dy * dy <= kOutline * kOutline && nx >= 0 && ny >= 0 && nx < int(w) &&
-                                   ny < int(h) && ink[size_t(ny) * w + size_t(nx)];
-                        }
-                    if (near)
-                        set(x, y, 1u);
-                }
-        }
-
         // The wheels the counter keeps, of the score's six (score_num_1 on
         // the left): an icon, then three digits, the last its ones. Its
         // frame (score_num_frame.tex, 256 wide, the full width of its quad)
         // is cut at the line left of the third wheel.
         constexpr const char *kDropped[] = {"score_num_1.mesh", "score_num_2.mesh"};
         constexpr float kFrameFrom = 81.0f / 256.0f;
-        // Its black edge, which stays black: above row 37 and from row 98,
-        // the line it is cut at (81 to 84) and its right end (from 243), and
-        // the gap after the icon's wheel (118 to 136).
-        bool frameKeeps(size_t x, size_t y, bool light)
-        {
-            if (light)
-                return false;
-            return y < 37u || y >= 98u || x < 85u || x >= 243u || (x >= 118u && x < 136u);
-        }
 
         // The frame's art, rows 28 to 101, has its corners and edges clear
         // where the score's shell met it; the metal here sits a pixel off,
@@ -454,14 +383,13 @@ namespace gh2::streak_counter
                     whiten(body);
                 else if (name == "score_num_frame.tex")
                 {
-                    invert(body, scene->version, frameKeeps);
+                    // Its black stays black: its edge, the gap after the
+                    // icon's wheel, and the lines between the wheels.
+                    invert(body, scene->version, true);
                     closeEdges(body, scene->version);
                 }
                 else if (className == "Tex" && name.starts_with("score_"))
-                {
                     invert(body, scene->version);
-                    outline(body, scene->version);
-                }
                 else if (name == "score_num_frame.mesh")
                     trimFrame(body);
                 else if (className == "Group")

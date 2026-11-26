@@ -10,6 +10,11 @@
                                              one already extracted, named as on the
                                              disc), refusing anything but a known
                                              supported one
+    tools/disc.py patch <usa-elf> <europe-image-or-elf> <out>  the patch that
+                                             turns Europe's executable into USA's
+
+The patch needs zstd: Python 3.14's compression.zstd, else backports.zstd
+(build/venv's).
 
 Images are .iso or .bin (ISO 9660, cooked or raw sectors) or .chd, read in
 place through libchdr from lib/libchdr, which is built into build/chdr on
@@ -35,6 +40,9 @@ IMAGE_SUFFIXES = (".iso", ".bin", ".chd")
 PLAIN_LAYOUTS = ((2048, 0), (2448, 0), (2352, 16), (2352, 24), (2448, 16), (2448, 24))
 CHD_OFFSETS = (0, 16, 24)
 CHT2 = int.from_bytes(b"CHT2", "big")
+# The executable the game is recompiled from, and the one a patch turns into it.
+RECOMPILED, RECOMPILED_ELF = "SLUS-21447", "SLUS_214.47"
+PATCHED_ELF = "SLES_544.42"
 
 
 class FileFrames:
@@ -377,6 +385,8 @@ def main():
         sys.exit(f"no {args[1]} image among the given paths")
     elif args[:1] == ["boot-elf"] and len(args) == 3:
         boot_elf(args[1], args[2])
+    elif args[:1] == ["patch"] and len(args) == 4:
+        patch(args[1], args[2], args[3])
     else:
         sys.exit(__doc__)
 
@@ -389,15 +399,41 @@ def boot_elf(image, out):
     else:
         name, data = Path(image).name, Path(image).read_bytes()
     rel = release(name)
-    if not rel or rel.get("role") != "engine":
+    # Europe's disc plays, but only USA's executable is recompiled.
+    if not rel or rel["serial"] != RECOMPILED:
         what = f"{rel['name']} v{rel['version']}" if rel else name
-        sys.exit(f"{image}: {what} is not the engine disc (Guitar Hero II (USA))")
+        sys.exit(f"{image}: {what} is not the disc the game is built from, Guitar Hero II (USA)")
     sha1, entry = identify_bytes(data)
     if not entry:
         sys.exit(f"{image}: {name} has SHA-1 {sha1}, not the known retail executable; "
                  "the dump may be damaged or modified")
     Path(out).write_bytes(data)
     print(f"{rel['name']} v{rel['version']}: {name}")
+
+
+def patch(usa, europe, out):
+    """A zstd frame that rebuilds USA's executable with Europe's as its prefix
+    (`zstd --patch-from`), which src/disc/disc.cpp applies to a Europe disc's.
+    Made from both executables, so the repo never holds either."""
+    try:
+        from compression import zstd
+    except ImportError:
+        from backports import zstd
+    target = Path(usa).read_bytes()
+    source = load_elf(europe)
+    for data, file in ((target, RECOMPILED_ELF), (source, PATCHED_ELF)):
+        sha1, entry = identify_bytes(data)
+        if not entry or entry["file"] != file:
+            sys.exit(f"{file}: SHA-1 {sha1} is not the known retail executable")
+    prefix = zstd.ZstdDict(source, is_raw=True).as_prefix
+    # A window over both executables, and long-distance matching, as --patch-from sets.
+    options = {zstd.CompressionParameter.compression_level: 19, zstd.CompressionParameter.window_log: 23,
+               zstd.CompressionParameter.enable_long_distance_matching: 1}
+    frame = zstd.compress(target, options=options, zstd_dict=prefix)
+    if zstd.decompress(frame, zstd_dict=prefix) != target:
+        sys.exit("the patch does not rebuild the USA executable")
+    Path(out).write_bytes(frame)
+    print(f"{PATCHED_ELF} to {RECOMPILED_ELF}: {len(frame)} bytes")
 
 
 if __name__ == "__main__":
