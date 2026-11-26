@@ -12,7 +12,6 @@
 #include <array>
 #include <cmath>
 #include <cstring>
-#include <functional>
 #include <string>
 #include <vector>
 
@@ -43,11 +42,9 @@ namespace gh2::streak_counter
 
         using bitmap::paletteSlot;
 
-        // A Tex's colours turned over. The pixels `keep` names (by place and
-        // whether they were light) stay as they were, each the nearest
-        // turned-over colour.
-        using Keep = std::function<bool(size_t x, size_t y, bool light)>;
-        void invert(milo::Bytes &body, uint32_t version, const Keep &keep = {})
+        // A Tex's colours turned over. With `keepDark`, its dark pixels stay
+        // as they were, each the nearest turned-over colour.
+        void invert(milo::Bytes &body, uint32_t version, bool keepDark = false)
         {
             const auto tex = milo::readTex(body, version);
             const auto header = tex ? bitmap::read(body.data() + tex->bitmap, body.size() - tex->bitmap) : std::nullopt;
@@ -59,7 +56,7 @@ namespace gh2::streak_counter
             for (size_t c = 0; c < entries * 4u; c += 4u)
                 for (size_t ch = 0; ch < 3u; ++ch)
                     palette[c + ch] = static_cast<uint8_t>(255u - palette[c + ch]);
-            if (!keep || header->bpp != 8u)
+            if (!keepDark || header->bpp != 8u)
                 return;
             uint8_t *pixels = palette + entries * 4u;
             for (size_t y = 0; y < header->height; ++y)
@@ -67,7 +64,7 @@ namespace gh2::streak_counter
                 {
                     uint8_t &index = pixels[y * header->rowBytes + x];
                     const uint8_t *old = was.data() + paletteSlot(index, 8u) * 4u;
-                    if (!keep(x, y, old[0] + old[1] + old[2] >= 3u * 128u))
+                    if (old[0] + old[1] + old[2] >= 3u * 128u)
                         continue;
                     uint32_t best = UINT32_MAX;
                     for (size_t k = 0; k < entries; ++k)
@@ -90,15 +87,6 @@ namespace gh2::streak_counter
         // is cut at the line left of the third wheel.
         constexpr const char *kDropped[] = {"score_num_1.mesh", "score_num_2.mesh"};
         constexpr float kFrameFrom = 81.0f / 256.0f;
-        // Its black edge, which stays black: above row 37 and from row 98,
-        // the line it is cut at (81 to 84) and its right end (from 243), and
-        // the gap after the icon's wheel (118 to 136).
-        bool frameKeeps(size_t x, size_t y, bool light)
-        {
-            if (light)
-                return false;
-            return y < 37u || y >= 98u || x < 85u || x >= 243u || (x >= 118u && x < 136u);
-        }
 
         // The frame's art, rows 28 to 101, has its corners and edges clear
         // where the score's shell met it; the metal here sits a pixel off,
@@ -395,7 +383,9 @@ namespace gh2::streak_counter
                     whiten(body);
                 else if (name == "score_num_frame.tex")
                 {
-                    invert(body, scene->version, frameKeeps);
+                    // Its black stays black: its edge, the gap after the
+                    // icon's wheel, and the lines between the wheels.
+                    invert(body, scene->version, true);
                     closeEdges(body, scene->version);
                 }
                 else if (className == "Tex" && name.starts_with("score_"))
