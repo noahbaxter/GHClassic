@@ -478,6 +478,7 @@ set(GHC_GAME_SOURCES
     src/ui/song_crown.cpp
     src/ui/song_progress.cpp
     src/ui/faceoff_hud.cpp
+    src/ui/hud_messages.cpp
     src/ui/zebra_wall.cpp
     src/host/audio.cpp
     src/host/bind.cpp
