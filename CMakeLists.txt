@@ -477,6 +477,8 @@ set(GHC_GAME_SOURCES
     src/ui/slider_scale.cpp
     src/ui/song_crown.cpp
     src/ui/song_progress.cpp
+    src/ui/faceoff_hud.cpp
+    src/ui/hud_messages.cpp
     src/ui/zebra_wall.cpp
     src/host/audio.cpp
     src/host/bind.cpp
@@ -521,6 +523,7 @@ set(GHC_GAME_SOURCES
     src/render/texture_capture.cpp
     src/render/texture_store.cpp
     src/render/vector_fonts.cpp
+    src/render/outline.cpp
 )
 
 add_executable(GHClassic
@@ -610,12 +613,13 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     src/ui/dta/campaigns.dta src/gh1/menus.dta src/gh1/scripts.dta src/ui/dta/quickplay_pickers.dta
     src/ui/dta/quickplay_setup.dta src/ui/dta/multiplayer.dta src/ui/dta/preshow_guitarist.dta src/ui/dta/in_song.dta
     src/content/guitar_copy.dta src/hub/preshow_picks.dta src/ui/dta/game_settings.dta src/ui/dta/photo_mode.dta
-    src/ui/dta/note_streak.dta src/ui/dta/streak_counter.dta src/ui/dta/song_progress.dta src/ui/dta/no_fail.dta src/ui/dta/crowd_presence.dta src/ui/dta/players.dta
+    src/ui/dta/note_streak.dta src/ui/dta/streak_counter.dta src/ui/dta/song_progress.dta src/ui/dta/faceoff_hud.dta src/ui/dta/no_fail.dta src/ui/dta/crowd_presence.dta src/ui/dta/players.dta
     src/ui/dta/controllers.dta src/ui/dta/profiles.dta)
 file(READ src/ui/dta/shared/box.dta GHC_BOX_DTA)
 file(READ src/ui/dta/note_streak.dta GHC_NOTE_STREAK_DTA)
 file(READ src/ui/dta/streak_counter.dta GHC_STREAK_COUNTER_DTA)
 file(READ src/ui/dta/song_progress.dta GHC_SONG_PROGRESS_DTA)
+file(READ src/ui/dta/faceoff_hud.dta GHC_FACEOFF_HUD_DTA)
 file(READ src/ui/dta/no_fail.dta GHC_NO_FAIL_DTA)
 file(READ src/ui/dta/crowd_presence.dta GHC_CROWD_PRESENCE_DTA)
 file(READ src/ui/dta/game_settings.dta GHC_GAME_SETTINGS_DTA)

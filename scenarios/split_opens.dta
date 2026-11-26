@@ -1,0 +1,72 @@
+; Opens in every two-player mode, from a chart with Face-Off phrases: player
+; 1's opens in the first, player 2's in the second, a fret note in each.
+; Face-Off: each player's opens on their own highway alone, the other's
+; hidden. Pro Face-Off: every open on both. Co-op: both on the lead part
+; here, every open on both. Both on autoplay, every note of their own hit
+; (highway/extended/guitar/open_gems.cpp).
+(songs split_opens)
+#include common/first_boot.dta
+(device p1)
+(device p2)
+{gamecfg set mode quickplay}
+{setlist select custom}
+{ui goto_screen qp_selsong_screen}
+(wait_screen qp_selsong_screen)
+(wait 3)
+(expect {custom tag {game get_song} name} "Split Opens")
+{set $ghc_so_song {game get_song}}
+(press start p1)
+{ui goto_screen multi_screen}
+(wait_screen multi_screen)
+(press start p2)
+(wait 0.5)
+{func ghc_so_start ($mode)
+   {gamecfg set mode $mode}
+   {game set_num_players 2}
+   {game set_song $ghc_so_song}
+   {{game get_player_config 0} set_difficulty expert}
+   {{game get_player_config 1} set_difficulty expert}
+   {{game get_player_config 0} set autoplay TRUE}
+   {{game get_player_config 1} set autoplay TRUE}
+   {ui goto_screen loading_screen}
+}
+; Its game screen, and the new song started (the last one's clock gone).
+{func ghc_so_started {&& {== {{ui current_screen} name} game_screen} {< {ghc_play now} 1000}}}
+
+{ghc_so_start multi_vs}
+(wait_until {ghc_so_started} 60)
+(wait_until {> {ghc_play now} 1100} 30)
+(shot faceoff_p1_opens)
+(wait_until {> {ghc_play now} 4700} 30)
+(shot faceoff_p2_opens)
+(wait_until {> {ghc_play now} 8000} 30)
+(print faceoff_hit {player0 gems_hit} {player1 gems_hit} passed {player0 gems_passed} {player1 gems_passed})
+(expect {player0 gems_hit} 5)
+(expect {player1 gems_hit} 5)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+
+{ghc_so_start multi_fo}
+(wait_until {ghc_so_started} 60)
+(wait_until {> {ghc_play now} 1100} 30)
+(shot pro_faceoff_p1_opens)
+(wait_until {> {ghc_play now} 4700} 30)
+(shot pro_faceoff_p2_opens)
+(wait_until {> {ghc_play now} 8000} 30)
+(print pro_hit {player0 gems_hit} {player1 gems_hit} passed {player0 gems_passed} {player1 gems_passed})
+(expect {player0 gems_hit} 10)
+(expect {player1 gems_hit} 10)
+{meta_loading_nosave_goto main_screen}
+(wait_screen main_screen 60)
+
+{ghc_so_start multi_coop}
+(wait_until {ghc_so_started} 60)
+(wait_until {> {ghc_play now} 1100} 30)
+(shot coop_start)
+(wait_until {> {ghc_play now} 4700} 30)
+(shot coop_later)
+(wait_until {> {ghc_play now} 8000} 30)
+(print coop_hit {player0 gems_hit} {player1 gems_hit} passed {player0 gems_passed} {player1 gems_passed})
+(expect {player0 gems_hit} 10)
+(expect {player1 gems_hit} 10)
+(quit)

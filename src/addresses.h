@@ -148,6 +148,9 @@ namespace gh2
         uint32_t hudPanelEnter;      // HudPanel::Enter
         uint32_t hudPanelSetMetersShowing; // HudPanel::SetMetersShowing(bool)
         uint32_t hudPanelOnGameOver; // HudPanel::OnGameOver, as a song is won or lost
+        uint32_t hudPanelShowMessage; // HudPanel::ShowMessage(PlayerSetting, Symbol)
+        uint32_t hudPanelPoll;       // HudPanel::Poll
+        uint32_t hudPanelReset;      // HudPanel::Reset, as a song starts or starts over
         uint32_t bandScoreDisplaySetScore; // BandScoreDisplay::SetScore(int)
         uint32_t bandScoreDisplaySetDigitMat; // BandScoreDisplay::SetDigitMat(int, RndMat *)
         uint32_t willBeNoStrum;      // GameGemList::WillBeNoStrum
@@ -572,6 +575,9 @@ namespace gh2
         .hudPanelEnter = 0x12ba00u,
         .hudPanelSetMetersShowing = 0x12c210u,
         .hudPanelOnGameOver = 0x12c340u,
+        .hudPanelShowMessage = 0x12c380u,
+        .hudPanelPoll = 0x12bd80u,
+        .hudPanelReset = 0x12ba80u,
         .bandScoreDisplaySetScore = 0x291af8u,
         .bandScoreDisplaySetDigitMat = 0x291c48u,
         .willBeNoStrum = 0x24d360u,

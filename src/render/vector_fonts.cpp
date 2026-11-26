@@ -175,6 +175,7 @@ namespace gh2::vector_fonts
         std::vector<std::vector<uint32_t>> s_tables; // under s_tablesLock
         std::unordered_map<uint32_t, uint32_t> s_byTex;      // game thread
         std::map<std::pair<uint32_t, uint32_t>, uint32_t> s_made; // (font, tex), game thread
+        std::map<std::pair<uint32_t, uint32_t>, uint32_t> s_outlined; // (colour, width's bits), game thread
 
         // A Font object's name less ".font".
         std::string fontName(uint8_t *rdram, uint32_t font)
@@ -459,6 +460,20 @@ namespace gh2::vector_fonts
     {
         const auto found = s_byTex.find(tex);
         return found != s_byTex.end() ? std::optional(found->second) : std::nullopt;
+    }
+
+    uint32_t outlined(const outline::Border &border)
+    {
+        const auto key = std::make_pair(border.rgba8, bits(border.width));
+        if (const auto made = s_outlined.find(key); made != s_outlined.end())
+            return made->second;
+        std::vector<uint32_t> t(8u, 0u);
+        t.insert(t.end(), {key.first, key.second});
+        std::lock_guard lock(s_tablesLock);
+        const uint32_t id = static_cast<uint32_t>(s_tables.size());
+        s_tables.push_back(std::move(t));
+        s_outlined[key] = id;
+        return id;
     }
 
     void forget(uint32_t tex)

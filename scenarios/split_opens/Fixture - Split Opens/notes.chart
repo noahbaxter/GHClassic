@@ -1,0 +1,37 @@
+[Song]
+{
+  Resolution = 192
+}
+[SyncTrack]
+{
+  0 = TS 4
+  0 = B 120000
+}
+[Events]
+{
+  0 = E "section P1 Opens"
+  1920 = E "section P2 Opens"
+}
+[ExpertSingle]
+{
+  384 = S 0 1344
+  384 = N 7 0
+  576 = N 7 192
+  960 = N 0 0
+  1152 = N 7 0
+  1344 = N 1 0
+  1920 = S 1 1344
+  1920 = N 7 0
+  2112 = N 7 192
+  2496 = N 2 0
+  2688 = N 7 0
+  2880 = N 3 0
+}
+[ExpertDoubleBass]
+{
+  384 = N 7 0
+  960 = N 7 192
+  1536 = N 0 0
+  1920 = N 7 0
+  2496 = N 7 0
+}

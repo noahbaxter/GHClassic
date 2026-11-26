@@ -1,0 +1,45 @@
+; Face-Off's HUD (hud/gen/hud_vs.milo, Face-Off and Pro Face-Off) centred
+; over each player's highway (faceoff_hud.cpp). Retail lays it out once in
+; the HUD's flat space while the highways are drawn in 3D: at 4:3 the score
+; meters sit outward of their highways, and widescreen spreads the highways
+; further than the HUD, leaving the meters and each player's messages (STAR
+; POWER READY!, the note streaks) inward. Retail does both.
+;
+; Each moves by a Group put between it and its parent: a message's own place
+; is keyed again each time it shows (message0.tnm). Each object, its Group,
+; its x shift at 4:3 and in widescreen, measured in game against the middle
+; fret (the highways sit a little left of the screen's middle, so the two
+; players' shifts differ), and its shift down: the messages clear the streak
+; counter's drawer, out under the score meter as a streak's message shows.
+{set $faceoff_hud_moves
+   ((message0.txt faceoff_hud_message0.grp -12 -65 -10)
+      (message1.txt faceoff_hud_message1.grp 0 50 -10)
+      (score1.grp faceoff_hud_score1.grp 28 -26 0)
+      (score2.grp faceoff_hud_score2.grp -41 16 0))
+}
+
+{func faceoff_hud_make
+   {foreach $move $faceoff_hud_moves
+      {new Group {elem $move 1}}
+   }
+}
+
+{func faceoff_hud_enter
+   {if {&& {ghc_multi_mode} {hud find message0.txt FALSE}}
+      {if {! {hud find faceoff_hud_message0.grp FALSE}}
+         {ghc_with_this hud faceoff_hud_make}
+      }
+      {foreach $move $faceoff_hud_moves
+         {do
+            ($object {hud find {elem $move 0}})
+            ($group {hud find {elem $move 1}})
+            {if {!= {$object get trans_parent} $group}
+               {$group set trans_parent {$object get trans_parent}}
+               {$object set trans_parent $group}
+            }
+            {$group set_local_pos
+               {elem $move {if_else {== {rnd aspect} kWidescreenAspect} 3 2}} 0 {elem $move 4}}
+         }
+      }
+   }
+}

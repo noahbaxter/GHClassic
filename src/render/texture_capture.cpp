@@ -19,6 +19,7 @@
 #include "ps2_runtime_macros.h"
 #include "render/frame.h"
 #include "render/look.h"
+#include "render/outline.h"
 #include "render/texture_store.h"
 #include "render/vector_fonts.h"
 
@@ -427,6 +428,7 @@ namespace gh2
             dropStandIn(tex);
             s_textTextures.erase(tex);
             vector_fonts::forget(tex);
+            outline::clear(tex);
             std::erase(s_yellowFretIcons, tex);
             std::erase(s_sliderScales, tex);
         }
@@ -545,6 +547,7 @@ namespace gh2
         s_standIns.clear();
         s_textTextures.clear();
         vector_fonts::forgetAll();
+        outline::forgetAll();
         s_yellowFretIcons.clear();
         s_sliderScales.clear();
         s_foreign = true;
