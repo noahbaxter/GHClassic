@@ -523,6 +523,7 @@ set(GHC_GAME_SOURCES
     src/render/texture_capture.cpp
     src/render/texture_store.cpp
     src/render/vector_fonts.cpp
+    src/render/outline.cpp
 )
 
 add_executable(GHClassic

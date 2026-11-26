@@ -19,6 +19,7 @@
 #include "milo/layout.h"
 #include "ps2_runtime.h"
 #include "render/look.h"
+#include "render/outline.h"
 #include "render/texture_capture.h"
 #include "render/vector_fonts.h"
 #include "settings/settings.h"
@@ -247,6 +248,8 @@ namespace gh2
             m.texture = capturedTexture(rdram, tex);
             if (const auto table = vector_fonts::tableOf(tex); table && settings::get(settings::kVectorFonts) != 0)
                 m.vectorTable = static_cast<int32_t>(*table);
+            if (const auto border = outline::of(tex); border && m.vectorTable < 0)
+                m.vectorTable = static_cast<int32_t>(vector_fonts::outlined(*border));
             sliderScaleDrawn(tex, m.color);
             colourOff(tex, m.color);
             const uint32_t type = tex != 0u ? load<uint32_t>(rdram, tex + milo::tex::kType) : 0u;
